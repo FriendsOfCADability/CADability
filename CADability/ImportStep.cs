@@ -4238,7 +4238,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
                                         }
                                     }
                                 }
-                                if (nurbsSurfacesWithModifiedKnots.TryGetValue(srf as NurbsSurface, out ModOp2D modify2DCurve))
+                                if (srf is NurbsSurface nurbsSurface && nurbsSurfacesWithModifiedKnots.TryGetValue(nurbsSurface, out ModOp2D modify2DCurve))
                                 {
                                     // this nurbs surface doesn't have the original 2d space. Move the 2d curve to the modified 2d space here.
                                     c2d = c2d.GetModified(modify2DCurve);

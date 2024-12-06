@@ -4824,17 +4824,26 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
                                 if (it.parameter.TryGetValue("name", out Item name))
                                 {
                                     //REVIEW: Is *= 1000 really right? Shouldn't it be = 1000?
-                                    if (name.type == Item.ItemType.stringval && name.sval == "METRE") 
+                                    if (name.type == Item.ItemType.stringval && name.sval == "METRE")
                                         context.factor *= 1000; // added because of "PROBLEM ELE NULLPUNKT.stp"
                                 }
                             }
                         }
                     }
-                    else if (it.parameter.TryGetValue("name", out Item name))
+                    else if (it.parameter.TryGetValue("name", out Item name) && it.parameter.TryGetValue("prefix", out Item prefix))
                     {
                         //TODO: Add other units
-                        if (name.type == Item.ItemType.keyword && name.sval == "METRE") 
-                            context.factor = 1000; // added because of "issue153.stp"
+                        if (name.type == Item.ItemType.keyword && name.sval == "METRE")
+                        {
+                            if (prefix.sval == "MILLI")
+                                context.factor = 1; // added because of issue 183.
+                            else if (prefix.sval == "CENTI")
+                                context.factor = 10;
+                            else if (prefix.sval == "DECI")
+                                context.factor = 100;
+                            else if (prefix.sval == null)
+                                context.factor = 1000; // added because of "issue153.stp"
+                        }
                     }
                 }
             }

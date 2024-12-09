@@ -259,7 +259,7 @@ namespace CADability.Actions
                     {
                         findShapeThread.Abort();
                     }
-                    catch (System.Threading.ThreadStateException e)
+                    catch (System.Threading.ThreadStateException)
                     {
                         findShapeIsRunning = false;
                         return; // keinen weiteren thread starten
@@ -269,7 +269,7 @@ namespace CADability.Actions
                 {
                     findShapeThread.Join();
                 }
-                catch (System.Threading.ThreadStateException e)
+                catch (System.Threading.ThreadStateException)
                 {
                     findShapeIsRunning = false;
                     return; // keinen weiteren thread starten

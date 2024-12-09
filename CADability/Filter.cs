@@ -468,7 +468,7 @@ namespace CADability.Attribute
                 }
                 return res;
             }
-            catch (System.Reflection.ReflectionTypeLoadException e)
+            catch (System.Reflection.ReflectionTypeLoadException)
             {
                 // MessageBox.Show(e.Message);
                 return new Dictionary<Type, string>();
@@ -770,7 +770,7 @@ namespace CADability.Attribute
                 {
                     Name = newValue;
                 }
-                catch (NameAlreadyExistsException e) { }
+                catch (NameAlreadyExistsException) { }
             }
         }
         public override string LabelText { get => Name; set => Name = value; }

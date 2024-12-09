@@ -188,7 +188,7 @@ namespace CADability.Actions
                     }
                 }
             }
-            catch (ApplicationException e)
+            catch (ApplicationException)
             {
                 return false;
             }

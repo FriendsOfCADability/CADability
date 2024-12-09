@@ -457,7 +457,7 @@ namespace CADability.GeoObject
                     }
                 }
             }
-            catch (ApplicationException ex) { }
+            catch (ApplicationException) { }
             return sol.ToArray();
         }
         /// <summary>

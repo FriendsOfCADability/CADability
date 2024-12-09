@@ -663,7 +663,7 @@ namespace CADability
             {
                 ff = new FontFamily(fontName);
             }
-            catch (System.ArgumentException ae)
+            catch (System.ArgumentException)
             {
                 ff = new FontFamily(System.Drawing.Text.GenericFontFamilies.SansSerif);
             }
@@ -909,7 +909,7 @@ namespace CADability
                             GeoPoint2D ip = cs.SimpleShapes[0].Outline.SomeInnerPoint;
                             return ZPositionAt(ip).CompareTo((other as PrintTriangle).ZPositionAt(ip));
                         }
-                        catch (BorderException ex)
+                        catch (BorderException)
                         {
                             return 0;
                         }
@@ -1230,7 +1230,7 @@ namespace CADability
                     br.Dispose();
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
             }
 
@@ -1535,7 +1535,7 @@ namespace CADability
                     pd.PrintPage -= new PrintPageEventHandler(ptg.OnPrintPage);
                     (found as IView).Projection.ShowFaces = sf;
                 }
-            } catch (Exception ex)
+            } catch (Exception)
             {
                 // MessageBox.Show(ex.StackTrace, "Exception in PrintSinglePage");
             }
@@ -1844,7 +1844,7 @@ namespace CADability
                     e.Graphics.DrawImage(bmp, dest, src, GraphicsUnit.Pixel);
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // MessageBox.Show(ex.StackTrace, "Exception in OnPrintPage");
             }
@@ -2488,7 +2488,7 @@ namespace CADability
                 {
                     ff = new FontFamily(fontName);
                 }
-                catch (System.ArgumentException ae)
+                catch (System.ArgumentException)
                 {
                     ff = new FontFamily(System.Drawing.Text.GenericFontFamilies.SansSerif);
                 }

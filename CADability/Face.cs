@@ -6305,7 +6305,7 @@ namespace CADability.GeoObject
                     }
                 }
             }
-            catch (ApplicationException e)
+            catch (ApplicationException)
             {   // something went wrong with the triangulation. This should not happen and needs to be debugged and fixed
             }
             triangleExtent = BoundingCube.EmptyBoundingCube; // needs to be recalculated
@@ -6606,7 +6606,7 @@ namespace CADability.GeoObject
                 }
 #endif
             }
-            catch (ApplicationException e)
+            catch (ApplicationException)
             {   // Selbstüberschneidungen von Löchern und Rand oder in den Rändern selbst
                 List<GeoPoint2D> sumTriUv = new List<GeoPoint2D>();
                 List<GeoPoint> sumTriPoint = new List<GeoPoint>();

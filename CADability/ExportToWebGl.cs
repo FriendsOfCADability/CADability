@@ -1231,7 +1231,7 @@ namespace CADability
                     outfile.Close();
                 }
             }
-            catch (IOException e)
+            catch (IOException)
             {
                 return false;
             }

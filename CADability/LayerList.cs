@@ -544,7 +544,7 @@ namespace CADability.Attribute
                     }
                 } while (found);
             }
-            catch (InvalidOperationException e)
+            catch (InvalidOperationException)
             {   // soll mal bei der Iteration vorgekommen sein (Mail vom 21.10 13, Nürnberger) kann ich mir aber nicht erklären
             }
         }

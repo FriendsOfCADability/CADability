@@ -1627,7 +1627,7 @@ namespace CADability.Curve2D
                 if (directions[0].IsNullVector()) linterdir.Add((points[1] - points[0]).Normalized);
                 else linterdir.Add(directions[0].Normalized);
             }
-            catch (GeoVectorException ex)
+            catch (GeoVectorException)
             {
                 linterdir.Add(GeoVector2D.XAxis);
             }

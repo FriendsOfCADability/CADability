@@ -312,7 +312,7 @@ namespace CADability.GeoObject
                         double a = cp.Length / 2.0; // area of the triangle
                         corr += a * d * 3 / 4; // 3/4 is a good value for spheres and cylinders
                     }
-                    catch (PlaneException pe) { }
+                    catch (PlaneException) { }
                 }
             }
             return sum / 6 + corr;
@@ -700,7 +700,7 @@ namespace CADability.GeoObject
                                 }
                             }
                         }
-                        catch (Exception ex) { }
+                        catch (Exception) { }
                     }
                     backSide.Clear();
                     if (bestFace != null) backSide.Add(bestFace);

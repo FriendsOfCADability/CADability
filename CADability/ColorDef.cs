@@ -202,7 +202,7 @@ namespace CADability.Attribute
             {
                 color = (Color)info.GetValue("Color", typeof(Color));
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 color = Color.Black;
             }

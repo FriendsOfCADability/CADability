@@ -75,7 +75,6 @@ namespace CADability.GeoObject
         private GeoPoint[] interpol; // Interpolation mit einer gewissen Genauigkeit
         private GeoVector[] interdir; // Interpolation mit einer gewissen Genauigkeit
         private double[] interparam; // die Parameter zur Interpolation
-        private double maxInterpolError; // der größte Fehler bei der Interpolation
         private BoundingCube extent;
         private TetraederHull tetraederHull;
         private GeoPoint[] approximation; // Interpolation mit der Genauigkeit der Auflösung
@@ -517,7 +516,6 @@ namespace CADability.GeoObject
                 interdir = null;
                 interparam = null;
                 approximation = null;
-                maxInterpolError = 0.0;
                 extent = BoundingCube.EmptyBoundingCube;
                 tetraederHull = null;
                 extrema = null;
@@ -551,7 +549,6 @@ namespace CADability.GeoObject
                     bSpline.interpol = null;
                     bSpline.interdir = null;
                     bSpline.interparam = null;
-                    bSpline.maxInterpolError = 0.0;
                     if (!keepNurbs)
                     {
                         bSpline.nubs3d = null;

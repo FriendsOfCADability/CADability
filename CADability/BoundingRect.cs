@@ -12,7 +12,7 @@ namespace CADability
     /// so assignements always make a copy.
     /// </summary>
     [Serializable()]
-    public struct BoundingRect : IQuadTreeInsertable, IComparable<BoundingRect>, ISerializable
+    public struct BoundingRect : IQuadTreeInsertable, IComparable<BoundingRect>, ISerializable, IEquatable<BoundingRect>
     {
         public double Left;
         public double Right;
@@ -824,6 +824,27 @@ namespace CADability
         }
         #endregion
 
+        public bool Equals(BoundingRect other)
+        {
+            return Left.Equals(other.Left) && Right.Equals(other.Right) && Bottom.Equals(other.Bottom) && Top.Equals(other.Top);
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is BoundingRect other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                var hashCode = Left.GetHashCode();
+                hashCode = (hashCode * 397) ^ Right.GetHashCode();
+                hashCode = (hashCode * 397) ^ Bottom.GetHashCode();
+                hashCode = (hashCode * 397) ^ Top.GetHashCode();
+                return hashCode;
+            }
+        }
     }
 
 }

@@ -138,7 +138,7 @@ namespace CADability
                 // mres.FunctionInfoAtMinimum.Value;
                 return true;
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 return false;
             }
@@ -178,7 +178,7 @@ namespace CADability
                 ip = lastIp;
                 return true;
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 ip = GeoPoint.Origin;
                 return false;
@@ -622,7 +622,7 @@ namespace CADability
                     return true;
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
             }
             normal = GeoVector.NullVector;

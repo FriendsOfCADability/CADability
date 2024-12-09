@@ -1976,7 +1976,7 @@ namespace CADability.GeoObject
                     {
                         reparametrisation = ModOp2D.Fit(srcf, dstf, true);
                     }
-                    catch (ModOpException mex)
+                    catch (ModOpException)
                     {
                         return false;
                     }
@@ -2825,7 +2825,7 @@ namespace CADability.GeoObject
                         if (!isPlane) break;
                     }
                 }
-                catch (ModOpException mex)
+                catch (ModOpException)
                 {
                     isPlane = false;
                 }

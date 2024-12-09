@@ -2713,7 +2713,7 @@ namespace CADability
                     Polyline pdbg = Polyline.Construct();
                     pdbg.SetPoints(pnts, false);
                 }
-                catch (PolylineException ex) { };
+                catch (PolylineException) { };
             }
 #endif
             if (curve3d != null) dist = Math.Max(dist, curve3d.DistanceTo(mp));

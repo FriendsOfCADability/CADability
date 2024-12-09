@@ -123,7 +123,7 @@ namespace CADability
             {
                 coordSys = new CoordSys(Location, DirectionX, DirectionY);
             }
-            catch (CoordSysException e)
+            catch (CoordSysException)
             {
                 throw new PlaneException(PlaneException.tExceptionType.ConstructorFailed);
             }

@@ -756,7 +756,7 @@ namespace CADability.Curve2D
                 MinimizationResult mres = nm.FindMinimum(iof, new DenseVector(new double[] { position }));
                 return mres.MinimizingPoint[0];
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return iof.Point[0];
             }

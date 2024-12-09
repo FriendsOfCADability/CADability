@@ -606,7 +606,7 @@ namespace CADability.Curve2D
             {
                 Init();
             }
-            catch (NurbsException ne)
+            catch (NurbsException)
             {
             }
             // sollte durch Start/Endparameter nur ein Teilbereich des Splines gelten, dann

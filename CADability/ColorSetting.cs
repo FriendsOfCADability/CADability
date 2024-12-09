@@ -73,7 +73,7 @@ namespace CADability
                 color = (Color)info.GetValue("Color", typeof(Color));
                 object dbg = info.GetValue("Color", typeof(object));
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 color = Color.Black;
             }

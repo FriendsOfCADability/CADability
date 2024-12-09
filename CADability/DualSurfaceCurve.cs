@@ -615,7 +615,6 @@ namespace CADability
         BoundingRect periodicDomain; // only for periodic domains: to which period the 3d points should be mapped
         GeoPoint2D startPoint2d, endPoint2d;
         bool startPointIsPole, endPointIsPole;
-        bool spu, epu; // starting or ending pole in u
 #if DEBUG
         static int debugCounter = 0;
         private int debugCount; // to identify instance when debugging
@@ -704,14 +703,12 @@ namespace CADability
                     GeoPoint2D tmp = surface.PositionOf(curve3D.PointAt(0.1));
                     startPoint2d = new GeoPoint2D(us[i], tmp.y);
                     startPointIsPole = true;
-                    spu = true;
                 }
                 if ((pl | ep) < prec)
                 {
                     GeoPoint2D tmp = surface.PositionOf(curve3D.PointAt(0.9));
                     endPoint2d = new GeoPoint2D(us[i], tmp.y);
                     endPointIsPole = true;
-                    epu = true;
                 }
             }
             double[] vs = surface.GetVSingularities();
@@ -723,14 +720,12 @@ namespace CADability
                     GeoPoint2D tmp = surface.PositionOf(curve3D.PointAt(0.1));
                     startPoint2d = new GeoPoint2D(tmp.x, vs[i]);
                     startPointIsPole = true;
-                    spu = false;
                 }
                 if ((pl | ep) < prec*10)
                 {
                     GeoPoint2D tmp = surface.PositionOf(curve3D.PointAt(0.9));
                     endPoint2d = new GeoPoint2D(tmp.x, vs[i]);
                     endPointIsPole = true;
-                    epu = false;
                 }
             }
             if (forward)

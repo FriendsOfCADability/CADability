@@ -1472,7 +1472,7 @@ namespace CADability
                 }
                 return null;
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 formatter = new BinaryFormatter(); // (null, new StreamingContext(StreamingContextStates.File, finishDeserialization));
                 formatter.Binder = new CondorSerializationBinder();
@@ -1603,7 +1603,7 @@ namespace CADability
                     }
                     res.fileName = FileName;
                 }
-                catch (ProjectOldVersionException ex)
+                catch (ProjectOldVersionException)
                 {
                     stream.Close();
                     stream.Dispose();

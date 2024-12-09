@@ -317,7 +317,7 @@ namespace CADability.Shapes
                     GeoVector2D dir2 = border2.DirectionAt(isp[j].par2).Normalized;
                     dirz = dir1.x * dir2.y - dir1.y * dir2.x;
                 }
-                catch (GeoVectorException e)
+                catch (GeoVectorException)
                 {
                     dirz = 0.0;
                 }

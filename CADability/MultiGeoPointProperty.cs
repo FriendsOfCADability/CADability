@@ -376,7 +376,7 @@ namespace CADability.UserInterface
                             break;
                     }
                 }
-                catch (IndexOutOfRangeException e)
+                catch (IndexOutOfRangeException)
                 {
                 }
             }

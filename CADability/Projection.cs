@@ -1548,7 +1548,7 @@ namespace CADability
                     res.Add(Face.MakeFace(new PlaneSurface(arrowPlane), new SimpleShape(Border.MakeCircle(GeoPoint2D.Origin, arrowSize))));
                     res.Add(Face.MakeFace(new PlaneSurface(arrowPlane), new SimpleShape(Border.MakePolygon(new GeoPoint2D[] { new GeoPoint2D(headx, 0), new GeoPoint2D(headx - arrowSize, arrowSize), new GeoPoint2D(headx - arrowSize, -arrowSize) }))));
                 }
-                catch (PlaneException _) { }
+                catch (PlaneException) { }
             }
             return res;
         }

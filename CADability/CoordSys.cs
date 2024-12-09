@@ -54,7 +54,7 @@ namespace CADability
                 directionY.Norm();
                 directionZ.Norm();
             }
-            catch (GeoVectorException e)
+            catch (GeoVectorException)
             {
                 throw new CoordSysException(CoordSysException.tExceptionType.ConstructorFailed);
             }

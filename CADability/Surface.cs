@@ -3227,7 +3227,7 @@ namespace CADability.GeoObject
                 {
                     b2d = new BSpline2D(through, 3, Precision.IsEqual(through[0], through[through.Length - 1])); //  curve.IsClosed);
                 }
-                catch (NurbsException ne)
+                catch (NurbsException)
                 {
                     List<GeoPoint2D> cleanThroughPoints = new List<GeoPoint2D>();
                     cleanThroughPoints.Add(through[0]);
@@ -9165,7 +9165,7 @@ namespace CADability.GeoObject
                             dbgl.Add(pl);
                         }
                     }
-                    catch (PolylineException ex)
+                    catch (PolylineException)
                     { }
                 }
                 dbgl.Add(Line.TwoPoints(cube.pll, cube.pll + 10 * cube.nll));

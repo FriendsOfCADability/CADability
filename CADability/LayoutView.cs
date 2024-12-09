@@ -129,7 +129,7 @@ namespace CADability
                 {
                     pd.Print();
                 }
-                catch (Exception e)
+                catch (Exception)
                 {
                 }
                 pd.PrintPage -= new PrintPageEventHandler(pdg.OnPrintPage);
@@ -141,7 +141,7 @@ namespace CADability
                 {
                     pd.Print();
                 }
-                catch (Exception e)
+                catch (Exception)
                 {
                 }
                 pd.PrintPage -= new PrintPageEventHandler(OnPrintPage);

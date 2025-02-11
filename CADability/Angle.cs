@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.Serialization;
+using CADability.GeoObject;
 
 namespace CADability
 {
@@ -180,17 +181,20 @@ namespace CADability
         {
             return new Angle(d / 180.0 * Math.PI);
         }
+
         /// <summary>
-        /// Returns true if the radians differ less than 1e-12
+        /// Returns true if the radians differ less than 1e-6 or provided tolerance
         /// </summary>
         /// <param name="ang"></param>
+        /// <param name="tolerance"></param>
         /// <returns></returns>
-        public bool IsCloseTo(Angle ang)
+        public bool IsCloseTo(Angle ang, double tolerance = 1e-6)
         {
             double d = Math.Abs(ang.a - a);
             if (d > Math.PI) d = Math.Abs(d - 2 * Math.PI);
-            return d < 1e-12; // davon geht der sin noch
+            return d < tolerance;
         }
+        
         /// <summary>
         /// Liefert true, wenn der im Parameter gegebene TestWinkel von diesem Winkel
         /// ausgehend mit dem SweepAngle überstrichen wird.

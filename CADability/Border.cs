@@ -2276,7 +2276,7 @@ namespace CADability.Shapes
             }
             return minDist;
         }
-        internal double GetMinDistance(GeoPoint2D p)
+        public double GetMinDistance(GeoPoint2D p)
         {
             double minDist = double.MaxValue;
             for (int i = 0; i < segment.Length; ++i)

@@ -16,7 +16,7 @@ namespace CADability.UserInterface
         {
             this.curve = curve;
             IsSelected = false;
-            base.resourceId = "Curve.Object"; // kommt nicht dran, oder?
+            base.resourceIdInternal = "Curve.Object"; // kommt nicht dran, oder?
         }
         public void SetSelected(bool IsSelected)
         {

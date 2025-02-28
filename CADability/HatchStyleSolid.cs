@@ -22,7 +22,7 @@ namespace CADability.Attribute
             // 
             // TODO: Add constructor logic here
             //
-            resourceId = "HatchStyleNameSolid";
+            resourceIdInternal = "HatchStyleNameSolid";
         }
         public ColorDef Color
         {

@@ -11,7 +11,7 @@
         PropertyEntryType flags;
         public GroupProperty(string resourceId, IPropertyEntry[] subEntries)
         {
-            this.resourceId = resourceId;
+            this.resourceIdInternal = resourceId;
             this.subEntries = subEntries;
             flags = PropertyEntryType.GroupTitle | PropertyEntryType.Selectable;
             if (subEntries.Length > 0) flags |= PropertyEntryType.HasSubEntries;

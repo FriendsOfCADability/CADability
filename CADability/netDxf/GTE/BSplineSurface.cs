@@ -54,10 +54,10 @@ namespace netDxf.GTE
             this.numControls = new[] {input0.NumControls, input1.NumControls};
 
             // The mBasisFunction stores the domain but so does ParametricCurve.
-            this.uMin = this.basisFunctions[0].MinDomain;
-            this.uMax = this.basisFunctions[0].MaxDomain;
-            this.vMin = this.basisFunctions[1].MinDomain;
-            this.vMax = this.basisFunctions[1].MaxDomain;
+            UMin = this.basisFunctions[0].MinDomain;
+            UMax = this.basisFunctions[0].MaxDomain;
+            VMin = this.basisFunctions[1].MinDomain;
+            VMax = this.basisFunctions[1].MaxDomain;
 
             // The replication of control points for periodic splines is
             // avoided by wrapping the i-loop index in Evaluate.
@@ -67,7 +67,7 @@ namespace netDxf.GTE
                 controls.CopyTo(this.controls, 0);
             }
 
-            this.isConstructed = true;
+            IsConstructed  = true;
         }
 
         // Member access.  The index 'dim' must be in {0,1}.
@@ -115,10 +115,10 @@ namespace netDxf.GTE
         // u and v [0,1]
         public override void Evaluate(double u, double v, int order, out Vector3[] jet)
         {
-            int supOrder = SUP_ORDER;
+            int supOrder = SupOrder;
             jet = new Vector3[supOrder];
 
-            if (!this.isConstructed || order >= supOrder)
+            if (!IsConstructed || order >= supOrder)
             {
                 // Return a zero-valued jet for invalid state.
                 return;

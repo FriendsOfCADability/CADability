@@ -18,7 +18,6 @@ namespace CADability.UserInterface
         private GeoPointProperty locationProperty; // wg. hotspot merken 
         private GeoPointProperty locationParallelProperty; // wg. hotspot merken 
         private ShowPropertyHotSpot widthHotSpot;
-        private ShowPropertyHotSpot widthParallelHotSpot;
         private ShowPropertyHotSpot heightHotSpot;
         private GeoVectorHotSpot directionHotSpot;
         private GeoVectorHotSpot directionXParallelHotSpot;
@@ -73,9 +72,9 @@ namespace CADability.UserInterface
         public ShowPropertyPolyline(Polyline polyline, IFrame frame): base(frame)
         {
             this.polyline = polyline;
-            base.resourceId = "Polyline.Object";
-            if (polyline.IsParallelogram) base.resourceId = "Polyline.Parallel";
-            if (polyline.IsRectangle) base.resourceId = "Polyline.Rectangle";
+            base.resourceIdInternal = "Polyline.Object";
+            if (polyline.IsParallelogram) base.resourceIdInternal = "Polyline.Parallel";
+            if (polyline.IsRectangle) base.resourceIdInternal = "Polyline.Rectangle";
             InitSubEntries();
         }
         private void InitSubEntries()
@@ -231,7 +230,7 @@ namespace CADability.UserInterface
                 rectangleProperty = null;
                 subEntries = new IPropertyEntry[1];
                 subEntries[0] = vertexProperty;
-                base.resourceId = "Polyline.Object";
+                base.resourceIdInternal = "Polyline.Object";
                 base.propertyPage.Refresh(this);
                 base.propertyPage.OpenSubEntries(vertexProperty, true);
             }
@@ -240,7 +239,7 @@ namespace CADability.UserInterface
                 parallelProperty = null;
                 subEntries = new IPropertyEntry[1];
                 subEntries[0] = vertexProperty;
-                base.resourceId = "Polyline.Object";
+                base.resourceIdInternal = "Polyline.Object";
                 base.propertyPage.Refresh(this);
                 base.propertyPage.OpenSubEntries(vertexProperty, true);
             }

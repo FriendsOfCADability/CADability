@@ -38,12 +38,6 @@ namespace CADability
         //public event Repaint RepaintDrawingEvent;
         //public event Repaint RepaintSelectEvent;
         //public event Repaint RepaintActiveEvent;
-
-        private System.Drawing.Bitmap Background;
-        private System.Drawing.Bitmap MainDrawing;
-        private System.Drawing.Bitmap ActiveObjects;
-        private System.Drawing.Bitmap Select;
-
         //		private Region DrawingInvalid;
         //		private Region SelectInvalid;
         //		private Region ActiveInvalid;
@@ -52,11 +46,7 @@ namespace CADability
         private Rectangle DrawingInvalid;
         private Rectangle SelectInvalid;
         private Rectangle ActiveInvalid;
-
-        private System.Drawing.TextureBrush brSelectBrush;
-        private System.Drawing.Pen penSelectPen;
-        private System.Drawing.Size CurrentSize; // so groß sind die Buffer gerade
-
+        
         /// <summary>
         /// liefert einRechteck, welches die beiden im Parameter gegeben Rechtecke umfasst
         /// </summary>

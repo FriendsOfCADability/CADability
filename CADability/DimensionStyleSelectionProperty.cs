@@ -33,7 +33,7 @@ namespace CADability.UserInterface
         }
         public DimensionStyleSelectionProperty(string resourceId, DimensionStyleList list, IDimensionStyle dimensionStyle, Dimension.EDimType dimType, bool includeUndefined) : base()
         {
-            base.resourceId = resourceId;
+            base.resourceIdInternal = resourceId;
             this.dimensionStyle = dimensionStyle;
             List<DimensionStyle> al = new List<DimensionStyle>();
             for (int i = 0; i < list.Count; ++i)
@@ -57,8 +57,8 @@ namespace CADability.UserInterface
                 // sollte es den Namen schon geben, werden solange - davor und dahintergemacht, bis es den Namen mehr gibt
                 // while (Find(undef)!=null) undef = "-" + undef +"-";
                 choices[0] = undef;
-                if (dimensionStyle.DimensionStyle != null) selectedText = dimensionStyle.DimensionStyle.Name;
-                else selectedText = undef;
+                if (dimensionStyle.DimensionStyle != null) SelectedText = dimensionStyle.DimensionStyle.Name;
+                else SelectedText = undef;
             }
             else
             {
@@ -67,7 +67,7 @@ namespace CADability.UserInterface
                 {
                     base.choices[i] = selectableStyles[i].Name;
                 }
-                if (dimensionStyle.DimensionStyle != null) base.selectedText = dimensionStyle.DimensionStyle.Name;
+                if (dimensionStyle.DimensionStyle != null) base.SelectedText = dimensionStyle.DimensionStyle.Name;
             }
             toWatch = dimensionStyle as IGeoObject;
         }
@@ -102,8 +102,8 @@ namespace CADability.UserInterface
             {
                 if ((Change as GeoObjectChange).MethodOrPropertyName == "DimensionStyle")
                 {
-                    if ((toWatch as IDimensionStyle).DimensionStyle != null) base.selectedText = (toWatch as IDimensionStyle).DimensionStyle.Name;
-                    else base.selectedText = null;
+                    if ((toWatch as IDimensionStyle).DimensionStyle != null) base.SelectedText = (toWatch as IDimensionStyle).DimensionStyle.Name;
+                    else base.SelectedText = null;
                     propertyPage.Refresh(this);
                 }
             }

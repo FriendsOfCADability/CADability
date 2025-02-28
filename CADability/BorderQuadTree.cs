@@ -717,7 +717,7 @@ namespace CADability.Shapes
                         position = BorderPosition.intersecting;
                         break;
                     }
-                    catch (CriticalPosition cp)
+                    catch (CriticalPosition)
                     {   // Korrekturwert für nächste Runde, wenn es einen Schnittpunkt genau auf einer Kante gab oder einen tangentialen Schnitt
                         center = center + korr;
                         width = width + korr.Length;

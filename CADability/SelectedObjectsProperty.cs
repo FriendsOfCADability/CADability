@@ -439,7 +439,7 @@ namespace CADability.UserInterface
             : base(Frame)
         {
             selectedObjects = new GeoObjectList(); // zuerst eine leere Liste
-            resourceId = "SelectedObjects.Title";
+            resourceIdInternal = "SelectedObjects.Title";
         }
         public void SetGeoObjectList(GeoObjectList SelectedObjects)
         {

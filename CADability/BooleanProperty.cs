@@ -23,11 +23,11 @@ namespace CADability.UserInterface
         private void Initialize(object ObjectWithProperty, string PropertyName, string resourceIdLabel, string resourceIdValues)
         {
             // beim deserialisieren sind die Werte resourceIdLabel und resourceIdValues bereits gesetzt
-            if (resourceIdLabel != null) this.resourceId = resourceIdLabel;
+            if (resourceIdLabel != null) this.resourceIdInternal = resourceIdLabel;
             if (resourceIdValues != null) this.resourceIdValues = resourceIdValues;
             objectWithProperty = ObjectWithProperty;
             propertyName = PropertyName;
-            propertyLabelText = StringTable.GetString(this.resourceId);
+            propertyLabelText = StringTable.GetString(this.resourceIdInternal);
             string BooleanText = StringTable.GetString(this.resourceIdValues);
             // mit folgendem konnte geklärt werden, wer frühzeitig die global settings läd
             // so dass eine Anwendung keine chance hat vorher die StringTable zu laden.
@@ -57,8 +57,8 @@ namespace CADability.UserInterface
             MethodInfo mi = propertyInfo.GetGetMethod();
             object[] prm = new Object[0];
             bool val = (bool)mi.Invoke(objectWithProperty, prm);
-            if (val) selectedText = BooleanTextTrue;
-            else selectedText = BooleanTextFalse;
+            if (val) SelectedText = BooleanTextTrue;
+            else SelectedText = BooleanTextFalse;
         }
         public delegate void SetBooleanDelegate(bool val);
         public delegate bool GetBooleanDelegate();
@@ -87,7 +87,7 @@ namespace CADability.UserInterface
         }
         public BooleanProperty(string resourceIdLabel, string resourceIdValues)
         {
-            this.resourceId = resourceIdLabel;
+            this.resourceIdInternal = resourceIdLabel;
             this.resourceIdValues = resourceIdValues;
             string BooleanText = StringTable.GetString(this.resourceIdValues);
             if (BooleanText != null && BooleanText.Length > 0)
@@ -107,8 +107,8 @@ namespace CADability.UserInterface
                 BooleanTextFalse = false.ToString();
             }
             base.choices = new string[] { BooleanTextTrue, BooleanTextFalse };
-            base.propertyLabelText = StringTable.GetString(resourceId + ".Label");
-            selectedText = BooleanTextTrue;
+            base.propertyLabelText = StringTable.GetString(resourceIdInternal + ".Label");
+            SelectedText = BooleanTextTrue;
         }
         /// <summary>
         /// Erzeugt eine BooleanProperty, welches einen eigenen boolean Wert enthält und
@@ -195,7 +195,7 @@ namespace CADability.UserInterface
         protected BooleanProperty(SerializationInfo info, StreamingContext context)
         {
             internalValue = (bool)info.GetValue("InternalValue", typeof(bool));
-            resourceId = (string)info.GetValue("ResourceIdLabel", typeof(string));
+            resourceIdInternal = (string)info.GetValue("ResourceIdLabel", typeof(string));
             resourceIdValues = (string)info.GetValue("ResourceIdValues", typeof(string));
             settingName = (string)info.GetValue("SettingName", typeof(string));
         }
@@ -207,14 +207,14 @@ namespace CADability.UserInterface
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("InternalValue", internalValue, internalValue.GetType());
-            info.AddValue("ResourceIdLabel", resourceId, resourceId.GetType());
+            info.AddValue("ResourceIdLabel", resourceIdInternal, resourceIdInternal.GetType());
             info.AddValue("ResourceIdValues", resourceIdValues, resourceIdValues.GetType());
             info.AddValue("SettingName", settingName, settingName.GetType());
         }
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("InternalValue", internalValue);
-            data.AddProperty("ResourceIdLabel", resourceId);
+            data.AddProperty("ResourceIdLabel", resourceIdInternal);
             data.AddProperty("ResourceIdValues", resourceIdValues);
             data.AddProperty("SettingName", settingName);
         }
@@ -222,7 +222,7 @@ namespace CADability.UserInterface
         public void SetObjectData(IJsonReadData data)
         {
             internalValue = data.GetProperty<bool>("InternalValue");
-            resourceId = data.GetProperty<string>("ResourceIdLabel");
+            resourceIdInternal = data.GetProperty<string>("ResourceIdLabel");
             resourceIdValues = data.GetProperty<string>("ResourceIdValues");
             settingName = data.GetProperty<string>("SettingName");
             data.RegisterForSerializationDoneCallback(this);

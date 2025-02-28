@@ -52499,6 +52499,7 @@ namespace CADability
         public static extern int GetPixelFormat(IntPtr deviceContext);
         [DllImport(GDI_NATIVE_LIBRARY, SetLastError = true), SuppressUnmanagedCodeSecurity]
         public static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+        [CLSCompliant(false)]
         public struct ABC
         {
             public int abcA;
@@ -52519,9 +52520,6 @@ namespace CADability
         }
         [DllImport("gdi32", EntryPoint = "GetKerningPairsW")]
         public static extern int GetKerningPairs(IntPtr hDC, int cPairs, [Out] KERNINGPAIR[] lpkrnpair);
-        [DllImport("gdi32.dll")]
-        public static extern int DescribePixelFormat(IntPtr hdc, int iPixelFormat, uint nBytes, IntPtr pfd);
-
     }
 
     public static class Wgl
@@ -52543,5 +52541,4 @@ namespace CADability
         [DllImport(WGL_NATIVE_LIBRARY, SetLastError = true), SuppressUnmanagedCodeSecurity]
         public static extern bool wglShareLists(IntPtr source, IntPtr destination);
     }
-
 }

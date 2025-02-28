@@ -284,7 +284,7 @@ namespace CADability.Attribute
         }
         public override void Added(IPropertyPage pp)
         {
-            base.resourceId = "LinePatternList";
+            base.resourceIdInternal = "LinePatternList";
             base.Added(pp);
         }
         public override void Removed(IPropertyPage pp)

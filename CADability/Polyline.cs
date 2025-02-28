@@ -1721,7 +1721,7 @@ namespace CADability.GeoObject
 
         bool IOctTreeInsertable.HitTest(Projection projection, BoundingRect rect, bool onlyInside)
         {
-            ClipRect clr = new ClipRect(ref rect);
+            ClipRect clr = new ClipRect(rect);
             for (int i = 1; i < vertex.Length - 3; ++i)
             {
                 if (clr.LineHitTest(projection.ProjectUnscaled(vertex[i]), projection.ProjectUnscaled(vertex[i + 1]))) return true;

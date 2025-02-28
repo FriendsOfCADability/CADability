@@ -930,7 +930,7 @@ namespace CADability
         /// <returns>ture if interference, false otherwise</returns>
         public bool Interferes(Projection projection, BoundingRect rect)
         {
-            ClipRect clr = new ClipRect(ref rect);
+            ClipRect clr = new ClipRect(rect);
             GeoPoint2D[] points2d = new GeoPoint2D[]{
                 projection.ProjectUnscaled(new GeoPoint(Xmin, Ymin, Zmin)),
                 projection.ProjectUnscaled(new GeoPoint(Xmax, Ymin, Zmin)),

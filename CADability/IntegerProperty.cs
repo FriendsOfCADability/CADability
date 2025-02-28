@@ -18,7 +18,6 @@ namespace CADability.UserInterface
         private string text;
         private bool readOnly;
         private bool IsSetting;
-        private bool settingChanged;
         private bool highlight;
         private int minValue; // Grenzen für die Eingabe
         private int maxValue;
@@ -33,7 +32,7 @@ namespace CADability.UserInterface
         private void Initialize(object ObjectWithInt, string PropertyName, string resourceId)
         {
             IsSetting = false;
-            if (resourceId != null) this.resourceId = resourceId;
+            if (resourceId != null) this.resourceIdInternal = resourceId;
             this.ObjectWithInt = ObjectWithInt;
             TheProperty = ObjectWithInt.GetType().GetProperty(PropertyName);
             if (TheProperty == null)
@@ -51,7 +50,6 @@ namespace CADability.UserInterface
                 }
             }
             IntChanged();
-            settingChanged = false;
         }
         public IntegerProperty(object ObjectWithInt, string PropertyName, string resourceId)
         {
@@ -61,7 +59,7 @@ namespace CADability.UserInterface
         public IntegerProperty(int initialValue, string resourceId)
         {
             IsSetting = false;
-            if (resourceId != null) this.resourceId = resourceId;
+            if (resourceId != null) this.resourceIdInternal = resourceId;
             internalValue = initialValue;
             text = initialValue.ToString();
             NotifyOnLostFocusOnly = false;
@@ -169,7 +167,6 @@ namespace CADability.UserInterface
         {
             if (d == internalValue)
                 return;
-            settingChanged = true;
             internalValue = d;
             if (SetIntEvent != null)
             {
@@ -342,7 +339,7 @@ namespace CADability.UserInterface
         protected IntegerProperty(SerializationInfo info, StreamingContext context)
         {
             internalValue = (int)info.GetValue("InternalValue", typeof(int));
-            resourceId = (string)info.GetValue("resourceId", typeof(string));
+            resourceIdInternal = (string)info.GetValue("resourceId", typeof(string));
             settingName = (string)info.GetValue("SettingName", typeof(string));
             try
             {
@@ -363,7 +360,7 @@ namespace CADability.UserInterface
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("InternalValue", internalValue, internalValue.GetType());
-            info.AddValue("resourceId", resourceId, resourceId.GetType());
+            info.AddValue("resourceId", resourceIdInternal, resourceIdInternal.GetType());
             info.AddValue("SettingName", settingName, typeof(string)); // kann auch null sein
             info.AddValue("SpecialValues", specialValues, typeof(Dictionary<int, string>));
         }
@@ -371,7 +368,7 @@ namespace CADability.UserInterface
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("InternalValue", internalValue);
-            data.AddProperty("resourceId", resourceId);
+            data.AddProperty("resourceId", resourceIdInternal);
             if (settingName != null) data.AddProperty("SettingName", settingName);
             if (specialValues != null) data.AddProperty("SpecialValues", specialValues);
         }
@@ -379,7 +376,7 @@ namespace CADability.UserInterface
         public void SetObjectData(IJsonReadData data)
         {
             internalValue = data.GetProperty<int>("InternalValue");
-            resourceId = data.GetProperty<string>("resourceId");
+            resourceIdInternal = data.GetProperty<string>("resourceId");
             settingName = data.GetPropertyOrDefault<string>("SettingName");
             specialValues = data.GetPropertyOrDefault<Dictionary<int, string>>("SpecialValues");
             data.RegisterForSerializationDoneCallback(this);

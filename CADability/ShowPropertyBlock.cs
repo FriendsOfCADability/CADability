@@ -20,7 +20,7 @@ namespace CADability.UserInterface
         {
             block = Block;
             attributeProperties = block.GetAttributeProperties(Frame);
-            base.resourceId = "Block.Object";
+            base.resourceIdInternal = "Block.Object";
         }
         public void EditName()
         {

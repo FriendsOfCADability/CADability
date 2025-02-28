@@ -1117,11 +1117,12 @@ namespace CADability
         }
 
         private void Reverse(vertex v2, bool withConnections)
-        {   // das ginge auch ohne die Liste!!!
-            if (!mayReverse(v2))
-            {
-                int dbg = 0;
-            }
+        {   
+            // das ginge auch ohne die Liste!!!
+            //if (!mayReverse(v2))
+            //{
+            //    int dbg = 0;
+            //}
             List<vertex> path = new List<vertex>();
             for (vertex v = v2.previous; v != null; v = v.previous)
             {

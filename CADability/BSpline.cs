@@ -75,7 +75,6 @@ namespace CADability.GeoObject
         private GeoPoint[] interpol; // Interpolation mit einer gewissen Genauigkeit
         private GeoVector[] interdir; // Interpolation mit einer gewissen Genauigkeit
         private double[] interparam; // die Parameter zur Interpolation
-        private double maxInterpolError; // der größte Fehler bei der Interpolation
         private BoundingCube extent;
         private TetraederHull tetraederHull;
         private GeoPoint[] approximation; // Interpolation mit der Genauigkeit der Auflösung
@@ -517,7 +516,6 @@ namespace CADability.GeoObject
                 interdir = null;
                 interparam = null;
                 approximation = null;
-                maxInterpolError = 0.0;
                 extent = BoundingCube.EmptyBoundingCube;
                 tetraederHull = null;
                 extrema = null;
@@ -551,7 +549,6 @@ namespace CADability.GeoObject
                     bSpline.interpol = null;
                     bSpline.interdir = null;
                     bSpline.interparam = null;
-                    bSpline.maxInterpolError = 0.0;
                     if (!keepNurbs)
                     {
                         bSpline.nubs3d = null;
@@ -3085,6 +3082,9 @@ namespace CADability.GeoObject
                     if (throughPoints2d.Count < 2)
                     {
                         return new Line2D(p.Project((this as ICurve).StartPoint), p.Project((this as ICurve).EndPoint));
+
+                        //Unreachable code
+                        /*
                         return null;
                         double prec = this.GetExtent(Precision.eps).Size * 1e-4;
                         ICurve approx = (this as ICurve).Approximate(false, prec);
@@ -3095,7 +3095,7 @@ namespace CADability.GeoObject
                             p2d.Reduce(prec);   // vereinfacht den Pfad selbst, also res
                             if (p2d.SubCurvesCount == 1) return p2d.SubCurves[0];
                         }
-                        return res;
+                        return res;*/
                     }
                 }
                 try

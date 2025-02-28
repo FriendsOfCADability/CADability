@@ -22,7 +22,7 @@ namespace CADability
             dx = dy = 10.0; // damit es nicht 0.0 ist
             displayMode = Appearance.dots;
             show = false;
-            base.resourceId = "Grid";
+            base.resourceIdInternal = "Grid";
         }
         public double XDistance
         {

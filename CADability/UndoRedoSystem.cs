@@ -148,7 +148,6 @@ namespace CADability
         private class isInRedo : IDisposable
         {
             private UndoRedoSystem undoRedoSystem;
-            private object openRedoFrame;
             public isInRedo(UndoRedoSystem sys)
             {
                 undoRedoSystem = sys;

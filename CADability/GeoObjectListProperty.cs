@@ -9,18 +9,17 @@ namespace CADability.UserInterface
     internal class GeoObjectListProperty : IShowPropertyImpl, ICommandHandler
     {
         ListWithEvents<IGeoObject> list;
-        bool isDragging;
         string contextMenuId;
         ICommandHandler contextHandler;
         public GeoObjectListProperty(ListWithEvents<IGeoObject> list, string resourceId)
         {
             this.list = list;
-            base.resourceId = resourceId;
+            base.resourceIdInternal = resourceId;
         }
         public GeoObjectListProperty(ListWithEvents<IGeoObject> list, string resourceId, string contextMenuId, ICommandHandler contextHandler)
         {
             this.list = list;
-            base.resourceId = resourceId;
+            base.resourceIdInternal = resourceId;
             this.contextMenuId = contextMenuId;
             this.contextHandler = contextHandler;
         }
@@ -88,7 +87,7 @@ namespace CADability.UserInterface
                     List<IShowProperty> res = new List<IShowProperty>();
                     foreach (IGeoObject go in list)
                     {
-                        SimpleNameProperty sp = new SimpleNameProperty(go.Description, go, base.resourceId, "MenuId.GeoObjectList");
+                        SimpleNameProperty sp = new SimpleNameProperty(go.Description, go, base.resourceIdInternal, "MenuId.GeoObjectList");
                         sp.OnCommandEvent += new SimpleNameProperty.OnCommandDelegate(OnCommand);
                         sp.OnUpdateCommandEvent += new SimpleNameProperty.OnUpdateCommandDelegate(OnUpdateCommand);
                         res.Add(sp);

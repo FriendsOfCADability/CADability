@@ -15,7 +15,7 @@ namespace CADability.GeoObject
     /// <summary>
     /// A GeoObject that displays an icon at a given position. The icon will always face the viewer
     /// and will not be scaled. The icon appears with a small offset in direction to the viewer, so it will not be covered
-    /// by a face whith which it coincides.
+    /// by a face with which it coincides.
     /// </summary>
     [Serializable()]
     public class Icon : IGeoObjectImpl, ISerializable
@@ -30,13 +30,13 @@ namespace CADability.GeoObject
         /// <returns>A Icon or Icon derived class</returns>
         public delegate Icon ConstructionDelegate();
         /// <summary>
-        /// Provide a delegate here if you want you Icon derived class to be 
-        /// created each time CADability creates a Icon.
+        /// Provide a delegate here if you want your Icon derived class to be 
+        /// created each time CADability creates an Icon.
         /// </summary>
         public static ConstructionDelegate Constructor;
         /// <summary>
-        /// The only way to create a Icon. There are no public constructors for the Icon to assure
-        /// that this is the only way to construct a Icon.
+        /// The only way to create an Icon. There are no public constructors for the Icon to assure
+        /// that this is the only way to construct an Icon.
         /// </summary>
         /// <returns></returns>
         public static Icon Construct()
@@ -50,12 +50,13 @@ namespace CADability.GeoObject
         /// <param name="justConstructed">The Icon that was just constructed</param>
         public delegate void ConstructedDelegate(Icon justConstructed);
         /// <summary>
-        /// Event beeing raised when a Icon object has been created.
+        /// Event being raised when an Icon object has been created.
         /// </summary>
         public static event ConstructedDelegate Constructed;
         #endregion
         protected Icon()
         {
+            if (Constructed != null) Constructed(this);
         }
         /// <summary>
         /// Sets the Data of the UnscaledIcon.
@@ -271,14 +272,14 @@ namespace CADability.GeoObject
 
     internal class ShowPropertyUnscaledIcon : PropertyEntryImpl, ICommandHandler, IGeoObjectShowProperty
     {
-        private IPropertyEntry[] attributeProperties; // Anzeigen für die Attribute (Ebene, Farbe u.s.w)
+        private readonly IPropertyEntry[] attributeProperties; //Show properties (Layer, color, etc.)
         private IPropertyEntry[] subEntries;
-        private Icon icon;
-        public ShowPropertyUnscaledIcon(Icon icon, IFrame frame): base(frame)
+        private readonly Icon icon;
+        public ShowPropertyUnscaledIcon(Icon icon, IFrame frame) : base(frame)
         {
             this.icon = icon;
             attributeProperties = icon.GetAttributeProperties(Frame);
-            base.resourceId = "Icon.Object";
+            base.resourceIdInternal = "Icon.Object";
         }
         #region IPropertyEntry overrides
         public override PropertyEntryType Flags => PropertyEntryType.ContextMenu | PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
@@ -289,23 +290,16 @@ namespace CADability.GeoObject
                 if (subEntries == null)
                 {
                     List<IPropertyEntry> prop = new List<IPropertyEntry>();
-                    GeoPointProperty location = new GeoPointProperty("Icon.Location", Frame, true);
-                    location.GetGeoPointEvent += new CADability.UserInterface.GeoPointProperty.GetGeoPointDelegate(OnGetRefPoint);
-                    location.SetGeoPointEvent += new CADability.UserInterface.GeoPointProperty.SetGeoPointDelegate(OnSetRefPoint);
+                    GeoPointProperty location = new GeoPointProperty(Frame, "Icon.Location");
+                    location.OnGetValue = () => icon.Location;
+                    location.OnSetValue = (p) => icon.Location = p;
+
                     prop.Add(location);
                     IPropertyEntry[] mainProps = prop.ToArray();
                     subEntries = PropertyEntryImpl.Concat(mainProps, attributeProperties);
                 }
                 return subEntries;
             }
-        }
-        private GeoPoint OnGetRefPoint(GeoPointProperty sender)
-        {
-            return icon.Location;
-        }
-        private void OnSetRefPoint(GeoPointProperty sender, GeoPoint p)
-        {
-            icon.Location = p;
         }
         #endregion
         #region ICommandHandler Members

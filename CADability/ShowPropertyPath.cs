@@ -21,7 +21,7 @@ namespace CADability.UserInterface
         public ShowPropertyPath(Path path, IFrame frame): base(frame)
         {
             this.path = path;
-            base.resourceId = "Path.Object";
+            base.resourceIdInternal = "Path.Object";
             InitSubEntries();
         }
         private class VertexCommandHandler : ICommandHandler

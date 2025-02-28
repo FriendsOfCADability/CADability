@@ -20,7 +20,7 @@ namespace CADability
         }
         internal void Initialize()
         {
-            this.resourceId = "Action.Settings";
+            this.resourceIdInternal = "Action.Settings";
             this.myName = "Action";
 
             if (!this.ContainsSetting("RepeatConstruct"))

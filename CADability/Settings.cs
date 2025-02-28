@@ -226,14 +226,14 @@ namespace CADability
                 int lid = GlobalSettings.GetLanguageId();
                 StringTable.SetActiveLanguage(lid);
                 //finishDeserialization.DeserializationDone();
-                GlobalSettings.resourceId = "GlobalSettings";
+                GlobalSettings.resourceIdInternal = "GlobalSettings";
                 GlobalSettings.modified = false;
                 // und nochmal einlesen, jetzt mit der richtigen SparchID
                 stream.Seek(0, SeekOrigin.Begin);
                 jsonSerialize = new JsonSerialize();
                 GlobalSettings = (Settings)jsonSerialize.FromStream(stream);
                 // FinishDeserialization kommt wohl nicht mehr dran...
-                GlobalSettings.resourceId = "GlobalSettings";
+                GlobalSettings.resourceIdInternal = "GlobalSettings";
                 GlobalSettings.modified = false;
             }
             finally
@@ -294,7 +294,7 @@ namespace CADability
             // alle gewünschten Settings darin enthalten sind.
             // Die reihenfolge wie die einzelnen Settings hier zugefügt werden ist entscheidend 
             // für die Darstellung im ControlCenter
-            GlobalSettings.resourceId = "GlobalSettings";
+            GlobalSettings.resourceIdInternal = "GlobalSettings";
 
             // die Sprache muss als erstes stehen, da einige der folgenden properties schon auf die Stringtable
             // zurückgreifen und dazu die activelanguage gesetzt sein muss
@@ -387,14 +387,14 @@ namespace CADability
             else
             {
                 Settings s = GlobalSettings.GetSubSetting("Formatting");
-                s.resourceId = "Setting.Formatting";
+                s.resourceIdInternal = "Setting.Formatting";
             }
             if (!GlobalSettings.ContainsSetting("Formatting.Angle"))
             {
                 Settings FormattingSetting = GlobalSettings.GetSubSetting("Formatting");
                 Settings Angle = new Settings();
                 Angle.myName = "Angle";
-                Angle.resourceId = "Setting.Formatting.Angle";
+                Angle.resourceIdInternal = "Setting.Formatting.Angle";
                 MultipleChoiceSetting mcang = new MultipleChoiceSetting("Setting.Formatting.Angle.Mode", "Mode");
                 mcang.CurrentSelection = 0; // |Grad (dezimal)|Grad (Minuten)|Grad (Minuten,Sekunden)|Bogenmaß
                 Angle.AddSetting("Mode", mcang);
@@ -450,7 +450,7 @@ namespace CADability
             {
                 colorSettings = new Settings();
                 colorSettings.myName = "Colors";
-                colorSettings.resourceId = "Setting.Colors";
+                colorSettings.resourceIdInternal = "Setting.Colors";
                 GlobalSettings.AddSetting("Colors", colorSettings);
             }
             else
@@ -497,7 +497,7 @@ namespace CADability
             {
                 Settings SnapSetting = new Settings();
                 SnapSetting.myName = "Snap";
-                SnapSetting.resourceId = "Setting.Snap";
+                SnapSetting.resourceIdInternal = "Setting.Snap";
                 GlobalSettings.AddSetting("Snap", SnapSetting);
                 BooleanProperty Snap30 = new BooleanProperty("Snap.Snap30", "YesNo.Values", "Snap30");
                 Snap30.BooleanValue = false;
@@ -523,7 +523,7 @@ namespace CADability
             if (!GlobalSettings.ContainsSetting("Approximate"))
             {
                 Settings ApproximateSetting = new Settings();
-                ApproximateSetting.resourceId = "Approximate";
+                ApproximateSetting.resourceIdInternal = "Approximate";
                 GlobalSettings.AddSetting("Approximate", ApproximateSetting);
                 DoubleProperty prec = new DoubleProperty("Precision", "Approximate.Precision", 0.001, null);
                 ApproximateSetting.AddSetting("Precision", prec);
@@ -534,7 +534,7 @@ namespace CADability
             if (!GlobalSettings.ContainsSetting("Path"))
             {
                 Settings PathSetting = new Settings();
-                PathSetting.resourceId = "Path";
+                PathSetting.resourceIdInternal = "Path";
                 GlobalSettings.AddSetting("Path", PathSetting);
                 DoubleProperty gap = new DoubleProperty("MaxGap", "Path.MaxGap", 0.001, null);
                 PathSetting.AddSetting("MaxGap", gap);
@@ -548,7 +548,7 @@ namespace CADability
             if (!GlobalSettings.ContainsSetting("Ruler"))
             {
                 Settings RulerSetting = new Settings();
-                RulerSetting.resourceId = "Ruler";
+                RulerSetting.resourceIdInternal = "Ruler";
                 RulerSetting.myName = "Ruler";
                 GlobalSettings.AddSetting("Ruler", RulerSetting);
                 MultipleChoiceSetting mcs = new MultipleChoiceSetting("Ruler.Show", "Show");
@@ -558,7 +558,7 @@ namespace CADability
             if (!GlobalSettings.ContainsSetting("DxfDwg"))
             {
                 Settings DxfDwgSetting = new Settings();
-                DxfDwgSetting.resourceId = "DxfDwg";
+                DxfDwgSetting.resourceIdInternal = "DxfDwg";
                 DxfDwgSetting.myName = "DxfDwg";
                 GlobalSettings.AddSetting("DxfDwg", DxfDwgSetting);
                 MultipleChoiceSetting mcsFormat = new MultipleChoiceSetting("DxfDwg.Format", "Format");
@@ -592,7 +592,7 @@ namespace CADability
             if (!GlobalSettings.ContainsSetting("StepImport"))
             {
                 Settings StepImportSetting = new Settings();
-                StepImportSetting.resourceId = "StepImport";
+                StepImportSetting.resourceIdInternal = "StepImport";
                 StepImportSetting.myName = "StepImport";
                 GlobalSettings.AddSetting("StepImport", StepImportSetting);
                 BooleanProperty parallel = new BooleanProperty("StepImport.Parallel", "YesNo.Values", "Parallel");
@@ -619,7 +619,7 @@ namespace CADability
             if (!GlobalSettings.ContainsSetting("Grid"))
             {
                 Settings GridSetting = new Settings();
-                GridSetting.resourceId = "Grid";
+                GridSetting.resourceIdInternal = "Grid";
                 GridSetting.myName = "Grid";
                 GlobalSettings.AddSetting("Grid", GridSetting);
                 DoubleProperty dxProperty = new DoubleProperty("XDistance", "Grid.XDistance", 10.0, null);
@@ -638,7 +638,7 @@ namespace CADability
             if (!GlobalSettings.ContainsSetting("Font"))
             {
                 Settings FontSetting = new Settings();
-                FontSetting.resourceId = "Font";
+                FontSetting.resourceIdInternal = "Font";
                 FontSetting.myName = "Font";
                 GlobalSettings.AddSetting("Font", FontSetting);
                 MultipleChoiceSetting mcs = new MultipleChoiceSetting("Font.DisplayMode", "DisplayMode");
@@ -652,7 +652,7 @@ namespace CADability
             if (!GlobalSettings.ContainsSetting("Printing"))
             {
                 Settings PrintSetting = new Settings();
-                PrintSetting.resourceId = "Printing";
+                PrintSetting.resourceIdInternal = "Printing";
                 PrintSetting.myName = "Printing";
                 GlobalSettings.AddSetting("Printing", PrintSetting);
                 MultipleChoiceSetting mcs = new MultipleChoiceSetting("Printing.Mode", "PrintingMode");
@@ -691,7 +691,7 @@ namespace CADability
             if (!GlobalSettings.ContainsSetting("Experimental"))
             {
                 Settings ExperimentalSetting = new Settings();
-                ExperimentalSetting.resourceId = "Experimental";
+                ExperimentalSetting.resourceIdInternal = "Experimental";
                 ExperimentalSetting.myName = "Experimental";
                 GlobalSettings.AddSetting("Experimental", ExperimentalSetting);
             }
@@ -709,7 +709,7 @@ namespace CADability
             {
                 Settings res = new Settings();
                 res.myName = "Formatting";
-                res.resourceId = "Setting.Formatting";
+                res.resourceIdInternal = "Setting.Formatting";
                 MultipleChoiceSetting mcdim = new MultipleChoiceSetting("Setting.Formatting.Dimension", "Dimension");
                 mcdim.CurrentSelection = 2; // immer 2D | vorzugsweise 2D | immer 3D
                 res.AddSetting("Dimension", mcdim);
@@ -725,7 +725,7 @@ namespace CADability
                 // eingeschachtelt: Koordinaten
                 Settings coordSystem = new Settings();
                 coordSystem.myName = "Coordinate";
-                coordSystem.resourceId = "Setting.Formatting.Coordinate";
+                coordSystem.resourceIdInternal = "Setting.Formatting.Coordinate";
 
                 IntegerProperty coordnum = new IntegerProperty("Setting.Formatting.Coordinate.Digits", "Digits");
                 coordnum.IntegerValue = 1; // Nachkommastellen Übersicht
@@ -748,7 +748,7 @@ namespace CADability
                 // eingeschachtelt: Vektoren (Digits wie Koordinaten)
                 Settings vector = new Settings();
                 vector.myName = "Vector";
-                vector.resourceId = "Setting.Formatting.Vector";
+                vector.resourceIdInternal = "Setting.Formatting.Vector";
 
                 MultipleChoiceSetting vectormode = new MultipleChoiceSetting("Setting.Formatting.Vector.Mode", "Mode");
                 vectormode.CurrentSelection = 0; // als Winkel | polar | X-Y-Z-Werte
@@ -794,7 +794,7 @@ namespace CADability
             entries = new Hashtable();
             sortedEntries = new ArrayList();
             modified = false;
-            resourceId = ResourceID;
+            resourceIdInternal = ResourceID;
         }
 
         public void AddSetting(string Name, object Value)
@@ -1024,6 +1024,10 @@ namespace CADability
                         {
                             ((IntegerProperty)(entries[Name])).SetInt((int)NewValue);
                         }
+                        else if (entries[Name].GetType() == typeof(DoubleProperty) && NewValue is double)
+                        {
+                            ((DoubleProperty)(entries[Name])).SetDouble((double)NewValue);
+                        }
                         else if (entries[Name].GetType() == typeof(ColorSetting))
                         {
                             ((ColorSetting)(entries[Name])).Color = (Color)NewValue;
@@ -1175,8 +1179,8 @@ namespace CADability
                         {
                             if (p.Value is Settings)
                             {
-                                if ((p.Value as Settings).resourceId == null) continue;
-                                if ((p.Value as Settings).resourceId.Length == 0) continue;
+                                if ((p.Value as Settings).resourceIdInternal == null) continue;
+                                if ((p.Value as Settings).resourceIdInternal.Length == 0) continue;
                             }
                             al.Add(p.Value as IShowProperty);
                         }
@@ -1259,11 +1263,11 @@ namespace CADability
             }
             try
             {
-                resourceId = (string)info.GetValue("ResourceId", typeof(string));
+                resourceIdInternal = (string)info.GetValue("ResourceId", typeof(string));
             }
             catch (SerializationException)
             {	// resourceId sollte hier unverändert sein
-                resourceId = "";
+                resourceIdInternal = "";
             }
             try
             {
@@ -1282,14 +1286,14 @@ namespace CADability
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("SortedEntries", sortedEntries, sortedEntries.GetType());
-            info.AddValue("ResourceId", resourceId, typeof(string));
+            info.AddValue("ResourceId", resourceIdInternal, typeof(string));
             info.AddValue("Name", myName, typeof(string));
             modified = false;
         }
         public virtual void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("SortedEntries", sortedEntries);
-            data.AddProperty("ResourceId", resourceId);
+            data.AddProperty("ResourceId", resourceIdInternal);
             data.AddProperty("Name", myName);
             modified = false;
         }
@@ -1297,7 +1301,7 @@ namespace CADability
         public virtual void SetObjectData(IJsonReadData data)
         {
             sortedEntries = data.GetProperty<ArrayList>("SortedEntries");
-            resourceId = data.GetProperty<string>("ResourceId");
+            resourceIdInternal = data.GetProperty<string>("ResourceId");
             myName = data.GetProperty<string>("Name");
             data.RegisterForSerializationDoneCallback(this);
         }

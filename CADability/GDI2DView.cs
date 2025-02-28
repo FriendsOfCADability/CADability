@@ -79,7 +79,7 @@ namespace CADability
         protected GDI2DView()
         {
             if (Settings.GlobalSettings != null) mouseWheelZoomFactor = Settings.GlobalSettings.GetDoubleValue("MouseWheelZoomFactor", 1.1);
-            base.resourceId = "GDI2DView";
+            base.resourceIdInternal = "GDI2DView";
             if (Settings.GlobalSettings != null)
             {
                 allowDrag = Settings.GlobalSettings.GetBoolValue("AllowDrag", true);
@@ -289,7 +289,7 @@ namespace CADability
             {
                 pd.Print();
             }
-            catch (Exception e)
+            catch (Exception)
             {
             }
             pd.PrintPage -= new PrintPageEventHandler(pdg.OnPrintPage);

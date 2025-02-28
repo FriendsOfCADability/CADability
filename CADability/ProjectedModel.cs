@@ -56,7 +56,6 @@ namespace CADability
         public Kind kind;
         public Edge edge;
         public ICurve2D edge2d;
-        double[] visibleParts; // Paare von Intervallgrenzen für die sichtbaren Teilstücke, leer: unsichtbar
     }
 
 
@@ -66,7 +65,6 @@ namespace CADability
     [Serializable]
     public class ProjectedModel : ISerializable, IDeserializationCallback, IJsonSerialize
     {
-        static bool DoBackgroundPaint = false; // immer false, keine Hidden lines mehr!
         #region Konzept:
         /*	Konzept zum ProjectedModel:
          * Die Klasse ProjectedModel hält einen QuadTree, der die Objekte für die 2D Darstellung enthält.

@@ -57,7 +57,6 @@ namespace CADability.Forms
         private IView view;
         private IPaintTo3D paintTo3D;
         private Rectangle lastClientRect;
-        private System.Drawing.Point lastMousePosition;
         private ToolTip toolTip;
         private string currenToolTip;
         private string currentCursor;

@@ -970,6 +970,9 @@ namespace CADability.GeoObject
 
 #endif
                 return res;
+
+                //Unreachable code
+                /*
                 // return base.GetLineIntersection(startPoint, direction); // bleibt auch hängen
                 // Richards Code bleibt manchmal hängen
                 GeoPoint sp = fromSurface * startPoint;
@@ -1031,6 +1034,7 @@ namespace CADability.GeoObject
                     hp[i] = hps[i].p;
                 }
                 return hp;
+                */
             }
         }
         /// <summary>

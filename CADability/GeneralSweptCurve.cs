@@ -679,6 +679,8 @@ namespace CADability
             return f * (PointAt(p2) - PointAt(p1)); // das ist einfach ein kleines umgebendes Intervall diskret abgeleitet (bis ich eine bessere Lösung habe)
             // forDerivation wird nicht benötigt
 
+            //Unreachable code
+            /*            
             GeoPoint loc;
             GeoVector deriv1, deriv2;
             if (along.TryPointDeriv2At(uv.y, out loc, out deriv1, out deriv2))
@@ -713,6 +715,7 @@ namespace CADability
                 return res;
             }
             return GeoVector.NullVector; // da muss nocht die NURBS Hilsfläche gemacht werden
+            */
         }
         private ModOp modOpAt(double v)
         {

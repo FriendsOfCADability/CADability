@@ -2894,7 +2894,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
                                         //if (2859 == item.definingIndex || 3219 == item.definingIndex)
                                         //    (item.val as Face[])[i].AssureTriangles(0.004); // remove when done
 
-                                        //foreach (Edge edg in (item.val as Face[])[i].AllEdgesIterated())
+                                        //foreach (Edge edg in (item.val as Face[])[i].Edges)
                                         //{
                                         //    if (edg.PrimaryFace != (item.val as Face[])[i]) edg.PrimaryFace.CheckConsistency();
                                         //    if (edg.SecondaryFace != null && edg.SecondaryFace != (item.val as Face[])[i]) edg.SecondaryFace.CheckConsistency();
@@ -4563,7 +4563,6 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
                             importProblems[item.definingIndex] = "item not imported: " + item.type.ToString();
                             break;
                         }
-                        break;
                 }
 #if DEBUG
                 lock (definitionStack) definitionStack.Pop();
@@ -4695,6 +4694,9 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
             //System.Diagnostics.Trace.WriteLine("     (" + res.Item(1, 0).ToString("F3", c) + ", " + res.Item(1, 1).ToString("F3", c) + ", " + res.Item(1, 2).ToString("F3", c) + ", " + res.Item(1, 3).ToString("F3", c) + ")");
             //System.Diagnostics.Trace.WriteLine("     (" + res.Item(2, 0).ToString("F3", c) + ", " + res.Item(2, 1).ToString("F3", c) + ", " + res.Item(2, 2).ToString("F3", c) + ", " + res.Item(2, 3).ToString("F3", c) + ")");
             return res;
+
+            //Unreachable code
+            /*
             // according to pdmug_release4_3.pdf, page 52, but not used
             GeoVector zo = (GeoVector)origin.parameter["axis"].val;
             GeoVector ao = (GeoVector)origin.parameter["ref_direction"].val;
@@ -4759,6 +4761,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
             ModOp rot = ModOp.Fit(new GeoVector[] { org.DirectionZ, cross, -orgperp }, new GeoVector[] { trg.DirectionZ, cross, trgperp });
             ModOp trans = ModOp.Translate(org.Location - trg.Location);
             return trans * rot;
+            */
         }
 
         private double GetContextLengthFactor(Item item)
@@ -4812,30 +4815,48 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
             {
                 foreach (Item it in units.val as List<Item>)
                 {
-                    if (it.parameter.TryGetValue("conversion_factor", out Item cf))
+                    if (it.parameter.TryGetValue("conversion_factor", out Item cf) &&
+                        cf.parameter.TryGetValue("value_component", out Item vc) &&
+                        vc.val is List<Item> vcList && vcList.Count > 0 &&
+                        vcList[0].type == Item.ItemType.floatval)
                     {
-                        if (cf.parameter.TryGetValue("value_component", out Item vc))
+                        double value = (double)vcList[0].val;
+                    
+                        if (cf.type == Item.ItemType.planeAngleMeasure || cf.type == Item.ItemType.planeAngleMeasureWithUnit)
                         {
-                            if ((cf.type == Item.ItemType.planeAngleMeasure || cf.type == Item.ItemType.planeAngleMeasureWithUnit) && vc.val is List<Item> && (vc.val as List<Item>)[0].type == Item.ItemType.floatval)
-                                context.toRadian = (double)(vc.val as List<Item>)[0].val;
-                            if ((cf.type == Item.ItemType.positiveLengthMeasure || cf.type == Item.ItemType.lengthMeasureWithUnit) && vc.val is List<Item> && (vc.val as List<Item>)[0].type == Item.ItemType.floatval)
+                            context.toRadian = value;
+                        }
+                        else if (cf.type == Item.ItemType.positiveLengthMeasure || cf.type == Item.ItemType.lengthMeasureWithUnit)
+                        {
+                            context.factor = value;
+                    
+                            if (it.parameter.TryGetValue("name", out Item name) &&
+                                name.type == Item.ItemType.stringval && name.sval == "METRE")
                             {
-                                context.factor = (double)(vc.val as List<Item>)[0].val; // why * 1000 ? definitely wrong for 83855_elp11b.stp
-                                if (it.parameter.TryGetValue("name", out Item name))
-                                {
-                                    //REVIEW: Is *= 1000 really right? Shouldn't it be = 1000?
-                                    if (name.type == Item.ItemType.stringval && name.sval == "METRE") 
-                                        context.factor *= 1000; // added because of "PROBLEM ELE NULLPUNKT.stp"
-                                }
+                                context.factor *= 1000; // Handle "METRE" case
                             }
                         }
                     }
                     else if (it.parameter.TryGetValue("name", out Item name))
                     {
-                        //TODO: Add other units
-                        //Commented until I get an ansnwer from GH and MM. I think at least also the prefix of this item should be checked.
-                        //if (name.type == Item.ItemType.keyword && name.sval == "METRE") 
-                        //    context.factor = 1000; // added because of "issue153.stp"
+                        // added because of issue 183.
+                        if (it.parameter.TryGetValue("prefix", out Item prefix) &&
+                            name.type == Item.ItemType.keyword && name.sval == "METRE")
+                        {
+                            if (prefix.sval == "MILLI")
+                                context.factor = 1;
+                            else if (prefix.sval == "CENTI")
+                                context.factor = 10;
+                            else if (prefix.sval == "DECI")
+                                context.factor = 100;
+                            else if (prefix.sval == null)
+                                context.factor = 1000; // Default case for "METRE" without prefix
+                        }
+                        else if (name.type == Item.ItemType.keyword && name.sval == "METRE")
+                        {
+                            // added because of "issue153.stp"
+                            context.factor = 1000; // Default case for "METRE"
+                        }
                     }
                 }
             }
@@ -5056,8 +5077,6 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
                 ICurve fu = res.FixedU(u, res.VKnots[0], res.VKnots[res.VKnots.Length - 1]);
                 double[] si = fu.GetSelfIntersections();
                 int bestPair = -1;
-                double minDist = double.MaxValue;
-                double minPar = double.MaxValue;
                 double minTan = double.MaxValue;
                 for (int i = 0; i < si.Length; i += 2)
                 {   // when there are multiple self intersection pairs, then it looks like the best pair is where the intersection is tangential

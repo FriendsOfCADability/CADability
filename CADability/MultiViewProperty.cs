@@ -15,7 +15,7 @@ namespace CADability.UserInterface
         {
             this.condorViews = condorViews;
             this.frame = frame;
-            base.resourceId = "MultiViewProperty";
+            base.resourceIdInternal = "MultiViewProperty";
         }
         #region IShowProperty Members
         public override ShowPropertyLabelFlags LabelType

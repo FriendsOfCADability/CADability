@@ -12,38 +12,17 @@
     <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DefineConstants>TRACE;DEBUG;xTESTNEWCONTEXTMENU, xUSENONPRIODICSURFACES</DefineConstants>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <DefineConstants>TRACE;DEBUG;xTESTNEWCONTEXTMENU, xUSENONPRIODICSURFACES</DefineConstants>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='WebDebug|AnyCPU'">
+  <PropertyGroup Condition="'$(Configuration)'=='WebDebug'">
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DefineConstants>TRACE;xPARALLEL, xTESTNEWCONTEXTMENU, xUSENONPRIODICSURFACES, WEBASSEMBLY</DefineConstants>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='WebDebug|x64'">
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <DefineConstants>TRACE;xPARALLEL, xTESTNEWCONTEXTMENU, xUSENONPRIODICSURFACES, WEBASSEMBLY</DefineConstants>
-  </PropertyGroup>
-
-
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <DefineConstants>xTESTNEWCONTEXTMENU</DefineConstants>
-    <Optimize>false</Optimize>
-    <DebugType>full</DebugType>
-    <DebugSymbols>true</DebugSymbols>
-    <DocumentationFile></DocumentationFile>
-  </PropertyGroup>
-
-
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DefineConstants>xTESTNEWCONTEXTMENU</DefineConstants>
     <Optimize>false</Optimize>
@@ -52,31 +31,7 @@
     <DocumentationFile />
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <Compile Remove="WebDrawing.cs" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <Compile Remove="WebDrawing.cs" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <Compile Remove="WebDrawing.cs" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <Compile Remove="WebDrawing.cs" />
-  </ItemGroup>
-
-<ItemGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDoc|AnyCPU'">
-    <Compile Remove="WebDrawing.cs" />
-  </ItemGroup>
-
-<ItemGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDoc|x64'">
-  <Compile Remove="WebDrawing.cs" />
-</ItemGroup>
-
-   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDoc|AnyCPU'">
+   <PropertyGroup Condition="'$(Configuration)'=='RelWithDoc'">
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DefineConstants>xPARALLEL, xTESTNEWCONTEXTMENU</DefineConstants>
     <Optimize>false</Optimize>
@@ -85,39 +40,28 @@
     <DocumentationFile />
   </PropertyGroup>
 
-   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDoc|x64'">
-     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-     <DefineConstants>xPARALLEL, xTESTNEWCONTEXTMENU</DefineConstants>
-     <Optimize>false</Optimize>
-     <DebugType>full</DebugType>
-     <DebugSymbols>true</DebugSymbols>
-     <DocumentationFile />
-   </PropertyGroup>
-
   <ItemGroup>
-    <Compile Remove="CADability.DXF\**" />
-    <Compile Remove="DXF\**" />
-    <Compile Remove="_site\**" />
-    <EmbeddedResource Remove="CADability.DXF\**" />
-    <EmbeddedResource Remove="DXF\**" />
-    <EmbeddedResource Remove="_site\**" />
-    <None Remove="CADability.DXF\**" />
-    <None Remove="DXF\**" />
-    <None Remove="_site\**" />
-  </ItemGroup>
+    <!-- collect the list of files to exclude from build.. -->
+    <RemoveFiles Include="CADability.DXF\**" />
+    <RemoveFiles Include="DXF\**" />
+    <RemoveFiles Include="_site\**" />
 
-  <ItemGroup>
-    <Compile Remove="OpenGlList.cs" />
-    <Compile Remove="Scripting.cs" />
-    <Compile Remove="Tangulation.cs" />
-  </ItemGroup>
+    <RemoveFiles Include="OpenGlList.cs" />
+    <RemoveFiles Include="Scripting.cs" />
+    <RemoveFiles Include="Tangulation.cs" />
 
-  <ItemGroup>
-    <None Remove="log.txt" />
-    <None Remove="MenuResource.xml" />
-    <None Remove="StringTableDeutsch.xml" />
-    <None Remove="StringTableEnglish.xml" />
-    <None Remove="_ToDo.txt" />
+    <RemoveFiles Include="log.txt" />
+    <RemoveFiles Include="_ToDo.txt" />
+
+    <RemoveFiles Include="WebDrawing.cs" Condition="'$(Configuration)'!='WebDebug'"/>
+
+    <!-- ..and exclude it from all potential compile types -->
+    <EmbeddedResource Remove="@(RemoveFiles)" />
+    <EmbeddedFiles Remove="@(RemoveFiles)" />
+    <Resource Remove="@(RemoveFiles)" />
+    <Compile Remove="@(RemoveFiles)" />
+    <Content Remove="@(RemoveFiles)" />
+    <None Remove="@(RemoveFiles)" />
   </ItemGroup>
 
   <ItemGroup>
@@ -135,9 +79,6 @@
     <PackageReference Include="System.Drawing.Common" Version="5.0.3" />
     <PackageReference Include="System.Text.Encoding.CodePages" Version="6.0.0" />
     <PackageReference Include="System.Text.Encoding.CodePages" Version="6.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Reference Include="Microsoft.VisualStudio.DebuggerVisualizers">
       <HintPath>$(VsInstallRoot)\Common7\IDE\PublicAssemblies\Microsoft.VisualStudio.DebuggerVisualizers.dll</HintPath>
     </Reference>

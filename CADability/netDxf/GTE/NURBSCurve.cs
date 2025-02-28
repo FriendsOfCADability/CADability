@@ -69,7 +69,7 @@ namespace netDxf.GTE
                 weights.CopyTo(this.weights, 0);
             }
 
-            this.isConstructed = true;
+            IsConstructed = true;
         }
 
         // Member access.
@@ -143,7 +143,7 @@ namespace netDxf.GTE
             const int supOrder = SUP_ORDER;
             jet = new Vector3[supOrder];
 
-            if (!this.isConstructed || order >= supOrder)
+            if (!IsConstructed || order >= supOrder)
             {
                 // Return a zero-valued jet for invalid state.
                 return;

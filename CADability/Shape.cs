@@ -165,15 +165,8 @@ namespace CADability.Shapes
         /// <summary>
         /// Returns true, if the Area of this shape is 0.0
         /// </summary>
-        public bool Empty
-        {
-            get
-            {
-                return outline.IsEmpty;
-                if (Area == 0.0) return true;
-                return false;
-            }
-        }
+        public bool Empty => outline.IsEmpty;
+
         /// <summary>
         /// Tests whether the provided point is contained in this simple shape.
         /// </summary>

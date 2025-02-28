@@ -28,7 +28,7 @@ namespace CADability.GeoObject
         public ShowPropertyShell(Shell shell, IFrame frame)
             : base(frame)
         {
-            resourceId = "Shell.Object";
+            resourceIdInternal = "Shell.Object";
             this.shell = shell;
             attributeProperties = shell.GetAttributeProperties(frame);
         }
@@ -312,7 +312,7 @@ namespace CADability.GeoObject
                         double a = cp.Length / 2.0; // area of the triangle
                         corr += a * d * 3 / 4; // 3/4 is a good value for spheres and cylinders
                     }
-                    catch (PlaneException pe) { }
+                    catch (PlaneException) { }
                 }
             }
             return sum / 6 + corr;
@@ -700,7 +700,7 @@ namespace CADability.GeoObject
                                 }
                             }
                         }
-                        catch (Exception ex) { }
+                        catch (Exception) { }
                     }
                     backSide.Clear();
                     if (bestFace != null) backSide.Add(bestFace);
@@ -742,7 +742,7 @@ namespace CADability.GeoObject
                     HashSet<Face> backTangential = new HashSet<Face>();
                     foreach (Face face in frontSide)
                     {
-                        foreach (Edge edge in face.AllEdgesIterated())
+                        foreach (Edge edge in face.Edges)
                         {
                             if (edge.IsTangentialEdge() && !frontSide.Contains(edge.OtherFace(face)) && !backSide.Contains(edge.OtherFace(face)))
                             {
@@ -752,7 +752,7 @@ namespace CADability.GeoObject
                     }
                     foreach (Face face in backSide)
                     {
-                        foreach (Edge edge in face.AllEdgesIterated())
+                        foreach (Edge edge in face.Edges)
                         {
                             if (edge.IsTangentialEdge() && !backSide.Contains(edge.OtherFace(face)) && !frontSide.Contains(edge.OtherFace(face)))
                             {
@@ -1428,11 +1428,15 @@ namespace CADability.GeoObject
             }
             return res;
         }
+
         private static double findCylinder(GeoPoint[] points, GeoVector[] normals, out GeoPoint axisPoint, out GeoVector axisDir, out double radius)
         {
             // points must be a multipe of 3, each triple describes a triangle, for each triangle there is a normal
             // typically there is one side of the triangles, which is parallel to the axis. So let us try to find parallel triengla edges
             throw new NotImplementedException();
+
+            //Unreachable code
+            /*
             int nTriple = points.Length / 3;
             Matrix m = new DenseMatrix(nTriple + 1, 3);
             Vector b = new DenseVector(nTriple + 1);
@@ -1470,7 +1474,9 @@ namespace CADability.GeoObject
                     return maxerr;
                 }
             }
+            */
         }
+        
 #if DEBUG
         public
 #else
@@ -1523,10 +1529,10 @@ namespace CADability.GeoObject
 #endif
 
             return false;
+
+            //Unreachable code
+            /*
             Set<Face> usedFaces = new Set<Face>();
-
-
-
             List<Face> createdFaces = new List<Face>();
             Dictionary<Edge, Edge> newEdges = new Dictionary<Edge, Edge>();
             foreach (Edge edg in Edges)
@@ -1546,6 +1552,7 @@ namespace CADability.GeoObject
                 }
             }
             return false;
+            */
         }
 
         private class VectorInOctTree : IOctTreeInsertable
@@ -1629,7 +1636,7 @@ namespace CADability.GeoObject
                     dbgvtx.Add(vertex);
                     dbgext.MinMax(vertex.Position);
                 }
-                foreach (Edge edg in fc.AllEdgesIterated())
+                foreach (Edge edg in fc.Edges)
                 {
                     dbgedg.Add(edg);
                 }
@@ -1999,7 +2006,6 @@ namespace CADability.GeoObject
                     circles.Sort(delegate (Tripel<double, GeoPoint, GeoVector> c1, Tripel<double, GeoPoint, GeoVector> c2) { return c1.First.CompareTo(c2.First); });
                     // sort by radius. Now youn dont know which kind is smaller, but longitudes should have almost the same radius, although two latitudes could also have the same radius
                     double eps = circles[0].First * 1e-4; // some precision guess
-                    double sr = 0.0;
                     int lower = -1;
                     int upper = -1;
                     for (int i = 0; i < circles.Count - 1; i++)
@@ -2247,7 +2253,7 @@ namespace CADability.GeoObject
             // 1. in sich selbst zurückkehrende edges entfernen
             // 2. doppelt vorhandene Edges entfernen und das innere Stück in ein Loch verwandeln
 
-            foreach (Edge edg in fc.AllEdgesIterated())
+            foreach (Edge edg in fc.Edges)
             {
                 List<Edge> connecting = new List<Edge>(Vertex.ConnectingEdges(edg.Vertex1, edg.Vertex2));
                 if (connecting.Count > 1)
@@ -2912,7 +2918,6 @@ namespace CADability.GeoObject
             get
             {
                 List<Edge> open = new List<Edge>(OpenEdges);
-                bool ok = true;
                 for (int i = open.Count - 1; i >= 0; --i)
                 {
                     if (open[i].Vertex1 == open[i].Vertex2)
@@ -4099,7 +4104,7 @@ namespace CADability.GeoObject
             // 4. noch offene Kanten schließen
             for (int i = 0; i < fcs.Count; i++)
             {
-                foreach (Edge edg in fcs[i].AllEdgesIterated())
+                foreach (Edge edg in fcs[i].Edges)
                 {
                     if (edg.SecondaryFace == null)
                     {
@@ -4189,7 +4194,6 @@ namespace CADability.GeoObject
                     Edge innerParallel, outerParallel;
                     if (innerEdges.TryGetValue(oe[i], out innerParallel) && outerEdges.TryGetValue(oe[i], out outerParallel))
                     {
-                        ISurface srf;
                         Edge e1, e2; // die beiden Verbindungslinien
                         Vertex v1 = outerParallel.Vertex1;
                         Vertex v2 = outerParallel.Vertex2;
@@ -4620,7 +4624,7 @@ namespace CADability.GeoObject
             Set<Vertex> splitVertices = new Set<Vertex>(); // das sollen alle vertices sein, die in replaceBy sind, aber nicht in affected
             foreach (Face fc in replaceBy)
             {
-                foreach (Edge edg in fc.AllEdgesIterated())
+                foreach (Edge edg in fc.Edges)
                 {
                     if (edg.SecondaryFace == null)
                     {
@@ -4767,7 +4771,7 @@ namespace CADability.GeoObject
             BoundingCube ext = BoundingCube.EmptyBoundingCube;
             for (int i = 0; i < toConnect.Length; i++)
             {
-                foreach (Edge edg in toConnect[i].AllEdgesIterated())
+                foreach (Edge edg in toConnect[i].Edges)
                 {
                     if (edg.SecondaryFace == null)
                     {
@@ -5191,7 +5195,7 @@ namespace CADability.GeoObject
                 // somit ist der folgende Abschnitt noch nicht getestet
                 Set<Edge> freeEdges = new Set<Edge>(OpenEdges); // ggf. als OctTree, ber Edge ist nicht OctTreeInsertable
                 Dictionary<Edge, SortedList<double, Vertex>> edgesToSplit = new Dictionary<Edge, SortedList<double, Vertex>>();
-                foreach (Edge edge in face.AllEdgesIterated())
+                foreach (Edge edge in face.Edges)
                 {
                     foreach (Edge freeEdge in freeEdges)
                     {
@@ -5226,7 +5230,7 @@ namespace CADability.GeoObject
                 }
                 // jetzt entprechen sich Kanten entweder komplett oder garnicht
                 freeEdges = new Set<Edge>(OpenEdges); // ggf. als OctTree, ber Edge ist nicht OctTreeInsertable
-                foreach (Edge edge in face.AllEdgesIterated())
+                foreach (Edge edge in face.Edges)
                 {
                     foreach (Edge freeEdge in freeEdges)
                     {
@@ -5516,7 +5520,7 @@ namespace CADability.GeoObject
                                 edg.DisconnectFromFace(edg.SecondaryFace);
                                 edg.DisconnectFromFace(edg.PrimaryFace);
                             }
-                            foreach (Edge edg in faceToRemove.AllEdgesIterated())
+                            foreach (Edge edg in faceToRemove.Edges)
                             {
                                 if (edg.Vertex1 != null) edg.Vertex1.RemovePositionOnFace(faceToRemove);
                                 if (edg.Vertex2 != null) edg.Vertex2.RemovePositionOnFace(faceToRemove);
@@ -6150,7 +6154,7 @@ namespace CADability.GeoObject
                 Set<Edge> openEdges = new Set<Edge>();
                 foreach (Face fce in saveFeatureFaces)
                 {
-                    foreach (Edge edg in fce.AllEdgesIterated())
+                    foreach (Edge edg in fce.Edges)
                     {
                         if (!saveFeatureFaces.Contains(edg.PrimaryFace))
                         {

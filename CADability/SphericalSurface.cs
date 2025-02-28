@@ -352,6 +352,9 @@ namespace CADability.GeoObject
         public override IDualSurfaceCurve[] GetPlaneIntersection(PlaneSurface pl, double umin, double umax, double vmin, double vmax, double precision)
         {
             return GetDualSurfaceCurves(new BoundingRect(umin, vmin, umax, vmax), pl, BoundingRect.EmptyBoundingRect, null, null); // ist dort schon richtig implementiert
+            
+            //Unreachable code
+            /*
             // hier könnte man die oben beschriebene 2D Schnittkure erzeugen
             Plane pln = new Plane(toUnit * pl.Location, toUnit * pl.DirectionX, toUnit * pl.DirectionY);
             bool rotated = false;
@@ -447,6 +450,7 @@ namespace CADability.GeoObject
             BSpline2D c2d = new BSpline2D(pnts, 2, false);
             DualSurfaceCurve dsc = new DualSurfaceCurve(elli, this, c2d, pl, c2dpl);
             return new IDualSurfaceCurve[] { dsc };
+            */
             //            return base.GetPlaneIntersection(pl, umin, umax, vmin, vmax);
         }
         /// <summary>

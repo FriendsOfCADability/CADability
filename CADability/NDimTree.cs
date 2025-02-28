@@ -466,6 +466,8 @@ namespace CADability
             }
             return false;
 
+            //Unreachable code
+            /*
             // min and max describe a family of planes defined by x*n=d, where min[] or max[] are {nx, ny, nz, d}
             // now ther is a cube spanned by the min-nx,ny,nz and max-nx,ny,nz
             // if this cube interferes with the plane normal to edgedir (and origin)
@@ -551,6 +553,7 @@ namespace CADability
                 else if (s0 != s) return true; // different signs of distance to vertex from two extreme planes
             }
             return false; // all planes have the vertex on the same side. There is no plane in the family which contains the point.
+            */
         }
         protected override Node[] MakeSubNodes(Node node)
         {

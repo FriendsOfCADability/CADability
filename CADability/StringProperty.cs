@@ -15,7 +15,7 @@ namespace CADability.UserInterface
         public StringProperty(string stringValue, string resourceId)
         {
             base.SetValue(stringValue, false);
-            base.resourceId = resourceId;
+            base.resourceIdInternal = resourceId;
         }
 
         protected override bool TextToValue(string text, out string val)
@@ -98,12 +98,12 @@ namespace CADability.UserInterface
         #region ISerializable Members
         protected StringProperty(SerializationInfo info, StreamingContext context)
         {   // wird z.Z. nur für DebuggerVisualizer gebraucht
-            base.resourceId = (string)info.GetValue("ResourceId", typeof(string));
+            base.resourceIdInternal = (string)info.GetValue("ResourceId", typeof(string));
         }
         void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("InternalValue", GetValue(), typeof(string));
-            info.AddValue("ResourceId", resourceId, typeof(string));
+            info.AddValue("ResourceId", resourceIdInternal, typeof(string));
         }
         #endregion
 

@@ -120,6 +120,9 @@ namespace CADability.Curve2D
             double a1 = udiff * (Math.Sin(ustart) + Math.Sin(ustart + udiff)) / 2.0;
             double r1 = triangle + fromUnit.Determinant * (a0 + a1);
             return r1;
+
+            //Unreachable code
+            /*
             // following the debug code to find the correct signs:
             // I don't understand the signs, they should be wrong in the code above, but turn out to be correct
 #if DEBUG
@@ -129,6 +132,7 @@ namespace CADability.Curve2D
             double r4 = triangle - fromUnit.Determinant * (a0 - a1);
             System.Diagnostics.Trace.WriteLine("SinArea. " + (udiff > 0).ToString() + ", " + (fromUnit.Determinant > 0).ToString() + ", " + aa.ToString() + ", " + r1.ToString() + ", " + r2.ToString() + ", " + r3.ToString() + ", " + r4.ToString());
 #endif
+            */
         }
         internal override void GetTriangulationPoints(out GeoPoint2D[] interpol, out double[] interparam)
         {

@@ -2398,7 +2398,7 @@ namespace CADability
                         }
                     }
                 }
-                catch (FileNotFoundException fnf)
+                catch (FileNotFoundException)
                 {
                     UIService.ShowMessageBox(StringTable.GetFormattedString("Error.FileNotFound", fileName), StringTable.GetString("Errormessage.Import"), MessageBoxButtons.OK);
                 }

@@ -28,7 +28,7 @@ namespace CADability.GeoObject
         {
             this.generalCurve = GeneralCurve;
             attributeProperties = generalCurve.GetAttributeProperties(Frame);
-            base.resourceId = "General.Curve";
+            base.resourceIdInternal = "General.Curve";
         }
         #region PropertyEntryImpl Overrides
         public override PropertyEntryType Flags
@@ -1096,6 +1096,9 @@ namespace CADability.GeoObject
                             GeoPoint p4 = pl4.Intersect(ip, id);
                             double d12 = (p1 | p2);
                             // if ((p3 | p4) > d12 || (p1 | p3) > d12 || (p1 | p4) > d12 || (p2 | p3) > d12 || (p2 | p4) > d12)
+                            
+                            //Unreachable code
+                            /*
                             if (false)
                             {   // die Sehne p1->p2 muss die längste Seite des Tatraeders sein
                                 double m = (from + to) / 2.0;
@@ -1104,25 +1107,27 @@ namespace CADability.GeoObject
                             }
                             else
                             {
-                                // Orientierung überprüfen
-                                Plane plt = new Plane(p1, p3, p2); // geht ggf. nach PlaneException
-                                pars.Add(from);
-                                points.Add(p1);
-                                GeoPoint pm = new GeoPoint(p1, p2, p3, p4);
-                                GeoPoint p11 = plt.ToLocal(pm);
-                                if (p11.z > 0) // war vorher anders so sind die Ebenen alle so orientiert, dass sie nach außen zeigen
-                                // aber die Orientierung ist immer noch nicht gut
-                                // if ((((p2 - p1) ^ (p3 - p1)) * (p4 - p1)) < 0)
-                                {
-                                    vertices.Add(p4);
-                                    vertices.Add(p3);
-                                }
-                                else
-                                {
-                                    vertices.Add(p3);
-                                    vertices.Add(p4);
-                                }
+                            */
+
+                            // Orientierung überprüfen
+                            Plane plt = new Plane(p1, p3, p2); // geht ggf. nach PlaneException
+                            pars.Add(from);
+                            points.Add(p1);
+                            GeoPoint pm = new GeoPoint(p1, p2, p3, p4);
+                            GeoPoint p11 = plt.ToLocal(pm);
+                            if (p11.z > 0) // war vorher anders so sind die Ebenen alle so orientiert, dass sie nach außen zeigen
+                            // aber die Orientierung ist immer noch nicht gut
+                            // if ((((p2 - p1) ^ (p3 - p1)) * (p4 - p1)) < 0)
+                            {
+                                vertices.Add(p4);
+                                vertices.Add(p3);
                             }
+                            else
+                            {
+                                vertices.Add(p3);
+                                vertices.Add(p4);
+                            }
+                            //}
                         }
                         else
                         {   // es geht völlig gerade weiter

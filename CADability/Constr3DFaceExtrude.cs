@@ -29,7 +29,6 @@ namespace CADability.Actions
         static private Double height;
         static private Double heightOffset;
         private Boolean selectedMode;
-        private int insertModeValue;
         private Path pipePath;
         private GeoObjectList selectedObjectsList; // die Liste der selektierten Objekte
         // die folgenden Listen werden dazu synchron gefüllt mit Werten oder "null", bei OnDone zum Einfügen bzw Löschen ausgewertet.

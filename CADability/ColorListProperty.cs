@@ -22,7 +22,7 @@ namespace CADability.UserInterface
         {
             colorList = ColorList;
             index = Index;
-            base.resourceId = "ColorName";
+            base.resourceIdInternal = "ColorName";
         }
         #region PropertyEntry
         public override PropertyEntryType Flags

@@ -64,7 +64,7 @@ namespace CADability.UserInterface
                 attributeProperties[i] = sp[i] as IPropertyEntry;
             }
 
-            base.resourceId = "Line.Object";
+            base.resourceIdInternal = "Line.Object";
         }
         private void OnGeoObjectDidChange(IGeoObject Sender, GeoObjectChange Change)
         {   // wird bei Änderungen von der Linie aufgerufen, Abgleich der Anzeigen

@@ -16,7 +16,7 @@ namespace CADability.UserInterface
         public ShowPropertyHatch(Hatch hatch, IFrame frame): base(frame)
         {
             this.hatch = hatch;
-            base.resourceId = "Hatch.Object";
+            base.resourceIdInternal = "Hatch.Object";
             attributeProperties = hatch.GetAttributeProperties(Frame);
         }
         public IPropertyEntry GetHatchStyleProperty()

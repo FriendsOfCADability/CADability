@@ -19,8 +19,6 @@ namespace CADability.Curve2D
         private ICurve2D[] subCurves;
         // private double[] length; // die Längen der einzelnen Teilstücke wird nirgends verwendet, kostet Zeit
         private enum State { yes, no, unknown }
-        private State closed;
-        private State selfIntersecting;
         private bool displayClosed;
         public Path2D(ICurve2D[] subCurves)
         {

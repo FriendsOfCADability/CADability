@@ -342,18 +342,20 @@ namespace CADability.GeoObject
                 }
                 else
                 {   // ein paar spezielle Lösungen (mit Ellipsen als Ergebnis) abfangen. BoxedSurfaceEx.Intersect ist aber auch gut!
+                    
+                    double dpar1, dpar2;
+                    double adist = Geometry.DistLL(this.Location, this.Axis, cyl2.Location, cyl2.Axis, out dpar1, out dpar2);
+                    if (adist < Precision.eps)
                     {
-                        double dpar1, dpar2;
-                        double adist = Geometry.DistLL(this.Location, this.Axis, cyl2.Location, cyl2.Axis, out dpar1, out dpar2);
-                        if (adist < Precision.eps)
-                        {
 
-                        }
-                        GetExtremePositions(thisBounds, other, otherBounds, out List<Tuple<double, double, double, double>> extremePositions);
-                        if (usedArea.IsInfinite || double.IsInfinity(usedArea.Size)) { usedArea = thisBounds; }
-                        ICurve[] res = BoxedSurfaceEx.Intersect(thisBounds, other, otherBounds, null, extremePositions);
-                        return res;
                     }
+                    GetExtremePositions(thisBounds, other, otherBounds, out List<Tuple<double, double, double, double>> extremePositions);
+                    if (usedArea.IsInfinite || double.IsInfinity(usedArea.Size)) { usedArea = thisBounds; }
+                    ICurve[] res = BoxedSurfaceEx.Intersect(thisBounds, other, otherBounds, null, extremePositions);
+                    return res;
+                    
+                    //Unreachable code
+                    /*
                     InterpolatedDualSurfaceCurve.SurfacePoint[] basePoints = new InterpolatedDualSurfaceCurve.SurfacePoint[5];
                     // wir brauchen 4 Punkte (der 5. ist der 1.)
                     // zwei Ebenen sind gegeben durch die Achse eines Zylinder und der Senkrechten auf beide Achsen, dgl. mit dem anderen Zylinder
@@ -386,6 +388,7 @@ namespace CADability.GeoObject
                             }
                         }
                     }
+                    */
                 }
             }
             if (other is SphericalSurface)
@@ -1028,20 +1031,16 @@ namespace CADability.GeoObject
                 {   // the smaller of this two cylinders completely penetrates the wider cylinder
                     // so we have two intersection curves (entering and leaving)
                     CylindricalSurface cyl1 = this;
-                    bool exchanged = false;
-                    BoundingRect bounds1, bounds2;
+                    BoundingRect bounds1;
                     if (cyl2.RadiusX < cyl1.RadiusX)
                     {
                         cyl1 = cyl2;
                         cyl2 = this;
-                        exchanged = true;
-                        bounds2 = thisBounds;
                         bounds1 = otherBounds;
                     }
                     else
                     {
                         bounds1 = thisBounds;
-                        bounds2 = otherBounds;
                     }
                     // cyl1 is the smaller one
                     GeoVector nrm = (cyl1.Axis ^ cyl2.Axis).Normalized;

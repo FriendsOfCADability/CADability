@@ -87,7 +87,7 @@ namespace CADability.UserInterface
                 endAngleProperty.PropertyEntryChangedStateEvent+= new PropertyEntryChangedStateDelegate(OnStateChanged);
                 endAngleHotSpot = new AngleHotSpot(endAngleProperty);
                 endAngleHotSpot.Position = circle.EndPoint;
-                base.resourceId = "CircleArc.Object";
+                base.resourceIdInternal = "CircleArc.Object";
 
                 directionProperty = new BooleanProperty("Arc.Direction", "Arc.Direction.Values");
                 directionProperty.BooleanValue = circle.SweepParameter > 0.0;
@@ -125,7 +125,7 @@ namespace CADability.UserInterface
                     startPointProperty.ReadOnly = true;
                     startPointProperty.PropertyEntryChangedStateEvent+= new PropertyEntryChangedStateDelegate(OnStateChanged);
                 }
-                base.resourceId = "Circle.Object";
+                base.resourceIdInternal = "Circle.Object";
             }
             arcLengthProperty = new LengthProperty("Circle.ArcLength", Frame, true);
             arcLengthProperty.GetLengthEvent += new CADability.UserInterface.LengthProperty.GetLengthDelegate(OnGetArcLength);

@@ -298,7 +298,7 @@ namespace CADability.Curve2D
         /// <returns></returns>
         public override bool HitTest(ref BoundingRect Rect, bool IncludeControlPoints)
         {
-            ClipRect clr = new ClipRect(ref Rect);
+            ClipRect clr = new ClipRect(Rect);
             if (clr.ArcHitTest(center, radius, 0, new GeoPoint2D(center.x + radius, center.y), new GeoPoint2D(center.x, center.y + radius))) return true;
             if (clr.ArcHitTest(center, radius, 1, new GeoPoint2D(center.x, center.y + radius), new GeoPoint2D(center.x - radius, center.y))) return true;
             if (clr.ArcHitTest(center, radius, 2, new GeoPoint2D(center.x - radius, center.y), new GeoPoint2D(center.x, center.y - radius))) return true;

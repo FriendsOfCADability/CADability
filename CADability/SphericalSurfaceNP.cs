@@ -194,7 +194,7 @@ namespace CADability.GeoObject
             {
                 return Plane.XYPlane.Intersect(beam); // intersection of XY plane
             }
-            catch (PlaneException pe)
+            catch (PlaneException)
             {
                 return GeoPoint2D.Invalid;
             }

@@ -276,13 +276,13 @@ namespace CADability.UserInterface
         }
         public virtual void GetObjectData(IJsonWriteData data)
         {
-            data.AddProperty("ResourceId", resourceId);
+            data.AddProperty("ResourceId", resourceIdInternal);
             data.AddProperty("Value", GetValue());
             if (!string.IsNullOrEmpty(settingName)) data.AddProperty("SettingName", settingName);
         }
         public virtual void SetObjectData(IJsonReadData data)
         {
-            resourceId = data.GetProperty<string>("ResourceId");
+            resourceIdInternal = data.GetProperty<string>("ResourceId");
             SetValue(data.GetProperty<double>("Value"), false);
             if (data.HasProperty("SettingName")) settingName = data.GetStringProperty("SettingName");
         }
@@ -291,7 +291,7 @@ namespace CADability.UserInterface
         protected DoubleProperty(SerializationInfo info, StreamingContext context)
         {
             SetValue(info.GetDouble("InternalValue"), false);
-            resourceId = (string)info.GetValue("resourceId", typeof(string));
+            resourceIdInternal = (string)info.GetValue("resourceId", typeof(string));
             settingName = (string)info.GetValue("SettingName", typeof(string));
             //try
             //{
@@ -309,7 +309,7 @@ namespace CADability.UserInterface
         public virtual void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("InternalValue", GetValue(), typeof(double));
-            info.AddValue("resourceId", resourceId, resourceId.GetType());
+            info.AddValue("resourceId", resourceIdInternal, resourceIdInternal.GetType());
             info.AddValue("SettingName", settingName, settingName.GetType());
             //info.AddValue("MinValue", minValue);
             //info.AddValue("MaxValue", maxValue);

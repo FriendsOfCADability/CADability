@@ -279,8 +279,6 @@ namespace CADability
                             List<List<double>> eigVV)
         {
             //Parameter initialization
-            char jobvl = 'N';
-            char jobvr = 'V';
             int nOrder = sMtrx.Count;
             double[,] sArray = mtrx2array(sMtrx);
             double[,] cArray = mtrx2array(cMtrx);

@@ -127,7 +127,7 @@ namespace CADability.Attribute
             MultipleChoiceProperty mcp = new MultipleChoiceProperty("LineWidth.Scale", choices, choice);
             mcp.ValueChangedEvent += new ValueChangedDelegate(ScalingChanged);
             subEntries[0] = mcp;
-            base.resourceId = "LineWidthName";
+            base.resourceIdInternal = "LineWidthName";
         }
         public override string LabelText
         {

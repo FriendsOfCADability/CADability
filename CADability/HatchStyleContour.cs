@@ -119,7 +119,7 @@ namespace CADability.Attribute
         }
         public HatchStyleContour()
         {
-            resourceId = "HatchStyleNameContour";
+            resourceIdInternal = "HatchStyleNameContour";
         }
         /// <summary>
         /// Gets or stes the line distance. This is the distance between adjacent contours.
@@ -325,7 +325,6 @@ namespace CADability.Attribute
                     ICurve2D startcurve = last.SubCurves[0]; // das ist der Eintritt in die innere Kurve
                     GeoPoint2D m = startcurve.PointAt(0.5); // Mittelpunkt der inneren für Parallelensuche
                     Path2D next = null; // der nächst äußere mit dem richtigen Anfang
-                    double minpardist = double.MaxValue;
 #if DEBUG
                     DebuggerContainer dc1 = new DebuggerContainer();
                     dc1.Add(curves.ToArray());

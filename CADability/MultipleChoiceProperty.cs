@@ -1,8 +1,4 @@
 ﻿using System;
-using System.ComponentModel;
-using System.Drawing;
-
-using Wintellect.PowerCollections;
 
 namespace CADability.UserInterface
 {
@@ -25,9 +21,7 @@ namespace CADability.UserInterface
         internal string[] choices; // die Auswahlmöglichkeiten
         //protected int[] imageIndices; // die Indizes in der ImageList, selbe Reihenfolge wie choices
         //protected ImageList images; // die ImageList (kann fehlen)
-        protected string selectedText; // der ausgewählte Text
         protected string unselectedText; // der Text, wenn nichts ausgewählt ist (wenn null, dann ganz leer)
-        private bool popup;
         /// <value>
         /// Back reference to any user item. Not used by the MultipleChoiceProperty object itself.
         /// </value>
@@ -41,17 +35,17 @@ namespace CADability.UserInterface
         public MultipleChoiceProperty(string resourceId, string[] Choices, string InitialSelection)
             : this()
         {
-            base.resourceId = resourceId;
+            base.resourceIdInternal = resourceId;
             choices = Choices;
-            selectedText = InitialSelection;
+            SelectedText = InitialSelection;
         }
         public MultipleChoiceProperty(string resourceId, int InitialSelection)
             : this()
         {
-            base.resourceId = resourceId;
+            base.resourceIdInternal = resourceId;
             choices = StringTable.GetSplittedStrings(resourceId + ".Values");
             if (InitialSelection >= choices.Length) InitialSelection = 0;
-            selectedText = choices[InitialSelection];
+            SelectedText = choices[InitialSelection];
         }
         /// <summary>
         /// Leerer Konstruktor (für die Verwendung von abgeleiteten Klassen).
@@ -59,7 +53,6 @@ namespace CADability.UserInterface
         /// </summary>
         public MultipleChoiceProperty()
         {
-            popup = true;
         }
         //private int ImageIndex(int Index)
         //{
@@ -90,13 +83,8 @@ namespace CADability.UserInterface
                 //fillPopupList();
             }
         }
-        public string SelectedText
-        {
-            get
-            {
-                return selectedText;
-            }
-        }
+
+        public string SelectedText { get; protected set; }
         public int ChoiceIndex(string choice)
         {
             for (int i = 0; i < choices.Length; ++i)
@@ -116,32 +104,32 @@ namespace CADability.UserInterface
         {
             if (toSelect < 0)
             {
-                selectedText = null;
+                SelectedText = null;
             }
             else
             {
                 try
                 {
-                    selectedText = choices[toSelect];
+                    SelectedText = choices[toSelect];
                 }
                 catch (IndexOutOfRangeException)
                 {
-                    selectedText = null;
+                    SelectedText = null;
                 }
             }
         }
         protected virtual void OnSelectionChanged(string selected)
         {
             if (SelectionChangedEvent != null) SelectionChangedEvent(this, EventArgs.Empty);
-            selectedText = selected;
-            if (ValueChangedEvent != null) ValueChangedEvent(this, selectedText);
+            SelectedText = selected;
+            if (ValueChangedEvent != null) ValueChangedEvent(this, SelectedText);
         }
         public int CurrentIndex
         {
             get
             {
                 for (int i = 0; i < choices.Length; i++)
-                    if (selectedText == choices[i])
+                    if (SelectedText == choices[i])
                         return i;
                 return -1;
             }
@@ -162,7 +150,7 @@ namespace CADability.UserInterface
         {
             get
             {
-                if (selectedText != null) return selectedText;
+                if (SelectedText != null) return SelectedText;
                 if (unselectedText != null) return "[[ColorTxt:128:128:128]]" + unselectedText;
                 return "";
             }
@@ -171,8 +159,8 @@ namespace CADability.UserInterface
         {
             if (selectedIndex >= 0)
             {
-                selectedText = Choices[selectedIndex];
-                OnSelectionChanged(selectedText);
+                SelectedText = Choices[selectedIndex];
+                OnSelectionChanged(SelectedText);
                 // the following is already done by OnSelectionChanged
                 //SelectionChangedEvent?.Invoke(this, EventArgs.Empty);
                 //ValueChangedEvent?.Invoke(this, selectedText);

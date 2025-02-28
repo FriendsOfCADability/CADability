@@ -1799,7 +1799,8 @@ namespace CADability
                     other = surface1;
                 }
                 //if (pls != null) // noch untersuchen, warum das am Ende manchmal fehlschlägt
-                if (false)
+                //Unreachable code
+                /*if (false)
                 {
                     GeoPoint loc;
                     GeoVector dir;
@@ -1907,6 +1908,8 @@ namespace CADability
                         }
                     }
                 }
+                */
+
                 if (surface1 is ISurfacePlaneIntersection && surface2 is ISurfacePlaneIntersection)
                 {   // Schnittpunkt der beiden einfachen Kurven, die die Ebene mit den surfaces schneidet
                     // geht schneller als die Iteration
@@ -2319,9 +2322,14 @@ namespace CADability
             double ppos = TetraederHull.PositionOf(p);
             if (approxPolynom == null) InitApproxPolynom();
             double pos1 = approxPolynom.PositionOf(p, out double md);
-            if ((PointAt(pos1) | p) < (PointAt(ppos) | p)) return pos1;
-            else return ppos;
-            if (Math.Abs(pos1 - ppos) > 0.1 && md < Precision.eps)
+            
+            if ((PointAt(pos1) | p) < (PointAt(ppos) | p)) 
+                return pos1;
+            
+            return ppos;
+
+            //Unreachable code
+            /* if (Math.Abs(pos1 - ppos) > 0.1 && md < Precision.eps)
             { }
             return ppos;
             double res = -1.0;
@@ -2361,7 +2369,7 @@ namespace CADability
                     }
                 }
             }
-            return res / (basePoints.Length - 1);
+            return res / (basePoints.Length - 1);*/
         }
         public override double PositionOf(GeoPoint p, double prefer)
         {

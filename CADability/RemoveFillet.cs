@@ -38,7 +38,7 @@ namespace CADability
             {
                 if (face.Surface is ISurfaceOfArcExtrusion extrusion)
                 {
-                    foreach (Edge edge in face.AllEdgesIterated())
+                    foreach (Edge edge in face.Edges)
                     {
                         Face otherFace = edge.OtherFace(face);
                         if (edge.IsTangentialEdge() && edge.Curve2D(face).DirectionAt(0.5).IsMoreHorizontal != extrusion.ExtrusionDirectionIsV)
@@ -52,7 +52,7 @@ namespace CADability
                 }
                 else if (face.Surface is SphericalSurface)
                 {
-                    foreach (Edge edge in face.AllEdgesIterated())
+                    foreach (Edge edge in face.Edges)
                     {
                         Face otherFace = edge.OtherFace(face);
                         if (fillets.Contains(otherFace)) crossway.Add(edge);
@@ -219,7 +219,7 @@ namespace CADability
             foreach (Face face in shell.Faces)
             {
                 if (fillets.Contains(face)) continue;
-                foreach (Edge edge in face.AllEdgesIterated())
+                foreach (Edge edge in face.Edges)
                 {
                     if (verticesToReplace.ContainsKey(edge.Vertex1))
                     {

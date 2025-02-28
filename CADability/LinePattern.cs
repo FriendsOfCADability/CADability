@@ -145,7 +145,7 @@ namespace CADability.Attribute
         public override void Added(IPropertyPage pp)
         {
             base.Added(pp);
-            base.resourceId = "LinePatternName";
+            base.resourceIdInternal = "LinePatternName";
         }
         public override string LabelText
         {

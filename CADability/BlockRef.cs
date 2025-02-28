@@ -16,7 +16,7 @@ namespace CADability.GeoObject
         {
             blockRef = theBlockRef;
             frame = theFrame;
-            resourceId = "BlockRef.Object";
+            resourceIdInternal = "BlockRef.Object";
             attributeProperties = blockRef.GetAttributeProperties(frame);
         }
 

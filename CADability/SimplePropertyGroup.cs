@@ -14,7 +14,7 @@ namespace CADability.UserInterface
         private ArrayList subentries;
         public SimplePropertyGroup(string resourceId)
         {
-            this.resourceId = resourceId;
+            this.resourceIdInternal = resourceId;
             subentries = new ArrayList();
         }
         public void Add(IPropertyEntry subEntry)

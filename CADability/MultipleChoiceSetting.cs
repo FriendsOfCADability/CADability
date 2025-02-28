@@ -23,9 +23,9 @@ namespace CADability
         /// <param name="settingName">the name of the setting</param>
         public MultipleChoiceSetting(string resourceId, string settingName) : base()
         {
-            this.resourceId = resourceId;
+            this.resourceIdInternal = resourceId;
             this.settingName = settingName;
-            base.propertyLabelText = StringTable.GetString(this.resourceId);
+            base.propertyLabelText = StringTable.GetString(this.resourceIdInternal);
             string SelText = StringTable.GetString(resourceId + ".Values");
             base.choices = StringTable.GetSplittedStrings(resourceId + ".Values");
             selected = -1;
@@ -39,9 +39,9 @@ namespace CADability
         public MultipleChoiceSetting(string resourceId, string settingName, string[] values)
             : base()
         {
-            this.resourceId = resourceId;
+            this.resourceIdInternal = resourceId;
             this.settingName = settingName;
-            base.propertyLabelText = StringTable.GetString(this.resourceId);
+            base.propertyLabelText = StringTable.GetString(this.resourceIdInternal);
             string SelText = StringTable.GetString(resourceId + ".Values");
             base.choices = values;
             selected = -1;
@@ -69,12 +69,12 @@ namespace CADability
         protected MultipleChoiceSetting(SerializationInfo info, StreamingContext context)
         {
             selected = (int)info.GetValue("Selected", typeof(int));
-            resourceId = (string)info.GetValue("ResourceId", typeof(string));
+            resourceIdInternal = (string)info.GetValue("ResourceId", typeof(string));
             settingName = (string)info.GetValue("SettingName", typeof(string));
 
-            base.propertyLabelText = StringTable.GetString(this.resourceId);
-            base.choices = StringTable.GetSplittedStrings(resourceId + ".Values");
-            if (selected >= 0 && selected < base.choices.Length) base.selectedText = base.choices[selected];
+            base.propertyLabelText = StringTable.GetString(this.resourceIdInternal);
+            base.choices = StringTable.GetSplittedStrings(resourceIdInternal + ".Values");
+            if (selected >= 0 && selected < base.choices.Length) base.SelectedText = base.choices[selected];
         }
         /// <summary>
         /// Implements <see cref="ISerializable.GetObjectData"/>
@@ -84,24 +84,24 @@ namespace CADability
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Selected", selected, selected.GetType());
-            info.AddValue("ResourceId", resourceId, resourceId.GetType());
+            info.AddValue("ResourceId", resourceIdInternal, resourceIdInternal.GetType());
             info.AddValue("SettingName", settingName, settingName.GetType());
         }
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("Selected", selected);
-            data.AddProperty("ResourceId", resourceId);
+            data.AddProperty("ResourceId", resourceIdInternal);
             data.AddProperty("SettingName", settingName);
         }
         public void SetObjectData(IJsonReadData data)
         {
             selected = data.GetProperty<int>("Selected");
-            resourceId = data.GetProperty<string>("ResourceId");
+            resourceIdInternal = data.GetProperty<string>("ResourceId");
             settingName = data.GetProperty<string>("SettingName");
 
-            base.propertyLabelText = StringTable.GetString(this.resourceId);
-            base.choices = StringTable.GetSplittedStrings(resourceId + ".Values");
-            if (selected >= 0 && selected < base.choices.Length) base.selectedText = base.choices[selected];
+            base.propertyLabelText = StringTable.GetString(this.resourceIdInternal);
+            base.choices = StringTable.GetSplittedStrings(resourceIdInternal + ".Values");
+            if (selected >= 0 && selected < base.choices.Length) base.SelectedText = base.choices[selected];
         }
         protected MultipleChoiceSetting() { }
         #endregion

@@ -14,12 +14,12 @@ namespace CADability.UserInterface
         public PointSymbolSelectionProperty(GeoObject.Point point, string ResourceID)
         {
             this.point = point;
-            resourceId = ResourceID;
+            resourceIdInternal = ResourceID;
         }
         public PointSymbolSelectionProperty(GeoObject.GeoObjectList multiPoint, string ResourceID)
         {   // mehrere Punkte ausgewählt
             this.multiPoint = multiPoint;
-            resourceId = ResourceID;
+            resourceIdInternal = ResourceID;
         }
         public override MenuWithHandler[] ContextMenu
         {

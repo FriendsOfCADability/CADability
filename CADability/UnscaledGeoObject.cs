@@ -323,7 +323,7 @@ namespace CADability.GeoObject
         {
             this.unscaledGeoObject = unscaledGeoObject;
             attributeProperties = unscaledGeoObject.GetAttributeProperties(Frame);
-            base.resourceId = "UnscaledGeoObject.Object";
+            base.resourceIdInternal = "UnscaledGeoObject.Object";
         }
         #region IPropertyEntry overrides
         public override PropertyEntryType Flags => PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries | PropertyEntryType.ContextMenu | PropertyEntryType.Selectable;

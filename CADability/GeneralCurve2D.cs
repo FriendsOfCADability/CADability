@@ -1433,40 +1433,29 @@ namespace CADability.Curve2D
         }
         #endregion
 
-#if (DEBUG)
-        public void Debug(string Title)
-        {
-            System.Diagnostics.Trace.WriteLine(Title + ": (GeneralCurve2D) (" + (this as ICurve2D).StartPoint.ToString() + ") --> (" + (this as ICurve2D).EndPoint.ToString() + ")");
-        }
-#endif
-
         GeoPoint2D[] I2DIntersectable.IntersectWith(I2DIntersectable other)
         {
-            if (other is ICurve2D)
+            if (other is ICurve2D curve2D)
             {
-                GeoPoint2DWithParameter[] ips = Intersect(other as ICurve2D);
+                GeoPoint2DWithParameter[] ips = Intersect(curve2D);
                 GeoPoint2D[] res = new GeoPoint2D[ips.Length];
+                
                 for (int i = 0; i < ips.Length; i++)
-                {
                     res[i] = ips[i].p;
-                    return res;
-                }
+
+                return res;
             }
+
             return other.IntersectWith(this);
-            // throw new NotImplementedException("I2DIntersectable.IntersectWith " + other.GetType().Name);
         }
 #if DEBUG
-        public GeoObjectList debug
+        public void DebugWriteInfo(string title)
         {
-            get
-            {
-                return new GeoObjectList(this.MakeGeoObject(Plane.XYPlane));
-            }
+            System.Diagnostics.Trace.WriteLine(title + ": (GeneralCurve2D) (" + (this as ICurve2D).StartPoint.ToString() + ") --> (" + (this as ICurve2D).EndPoint.ToString() + ")");
         }
-#endif
 
-        #region ICndHlp2DBuddy Members
-        #endregion
+        public GeoObjectList Debug => new GeoObjectList(this.MakeGeoObject(Plane.XYPlane));
+#endif
     }
 
     /// <summary>
@@ -1627,7 +1616,7 @@ namespace CADability.Curve2D
                 if (directions[0].IsNullVector()) linterdir.Add((points[1] - points[0]).Normalized);
                 else linterdir.Add(directions[0].Normalized);
             }
-            catch (GeoVectorException ex)
+            catch (GeoVectorException)
             {
                 linterdir.Add(GeoVector2D.XAxis);
             }
@@ -3562,6 +3551,9 @@ namespace CADability.Curve2D
             }
             par = p1 + Math.Abs(d1) / (Math.Abs(d1) + Math.Abs(d2)) * (p2 - p1);
             return true; // this is a good value without much iteration. This method is only used to find the extend and may be somewhat imprecise
+            
+            //Unreachable code
+            /*
             while (p2 - p1 > 1e-6)
             {
                 double p = (p1 + p2) / 2.0;
@@ -3582,6 +3574,7 @@ namespace CADability.Curve2D
             }
             par = (p1 + p2) / 2.0;
             return true;
+            */
         }
 
         private bool TriangleHitTest(ref ClipRect rect, GeoPoint2D sp, GeoPoint2D ep, GeoPoint2D tr, double spar, double epar, GeoVector2D sdir, GeoVector2D edir)
@@ -3633,7 +3626,7 @@ namespace CADability.Curve2D
         }
         public virtual bool HitTest(ref BoundingRect rect, bool includeControlPoints)
         {
-            ClipRect clr = new ClipRect(ref rect);
+            ClipRect clr = new ClipRect(rect);
             if (interpol == null) MakeTriangulation();
             for (int i = 0; i < interpol.Length - 1; ++i)
             {

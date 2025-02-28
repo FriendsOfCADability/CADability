@@ -81,13 +81,11 @@ namespace CADability
     public class LookedUpEnumerable<T> : IEnumerable<T>, IEnumerator<T>, IEnumerator
     {
         IEnumerable<T> toEnumerate;
-        int currentIndex;
         IEnumerator<T> currentEnumerator;
         Dictionary<T, T> lookUp;
         public LookedUpEnumerable(IEnumerable<T> enumerable, Dictionary<T, T> lookUp)
         {
             toEnumerate = enumerable;
-            currentIndex = 0;
             currentEnumerator = null;
             this.lookUp = lookUp;
             currentEnumerator = enumerable.GetEnumerator();

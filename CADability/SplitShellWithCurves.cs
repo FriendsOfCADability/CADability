@@ -24,7 +24,6 @@ namespace CADability.GeoObject
         OctTree<Face> faceOcttree;
         double precision;
         Face[] vertexToFace;
-        List<ICurve2D> all2DCurvesxxx;
         Dictionary<Face, List<ICurve2D>> all2DCurves;
         Dictionary<Edge, List<double>> splitedEdges;
         Set<Vertex> outsideVertices;

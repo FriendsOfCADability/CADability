@@ -279,7 +279,7 @@ namespace CADability
 
             bool IQuadTreeInsertable.HitTest(ref BoundingRect rect, bool includeControlPoints)
             {
-                ClipRect clr = new ClipRect(ref rect);
+                ClipRect clr = new ClipRect(rect);
                 return clr.LineHitTest(vertex[edge.v1].p2d, vertex[edge.v2].p2d);
             }
 
@@ -997,7 +997,6 @@ namespace CADability
         }
         void InsertLengthEdge(SortedList<double, Edge> sortededges, params Edge[] edges)
         {
-            double f = 1.0 + 1e-13;
             for (int i = 0; i < edges.Length; ++i)
             {
                 Edge edge = edges[i];
@@ -2050,8 +2049,7 @@ namespace CADability
                     }
                 }
             }
-            bool exchanged;
-            int dbgcount = 0;
+
 #if DEBUG
             DebuggerContainer dc = Debug;
 #endif

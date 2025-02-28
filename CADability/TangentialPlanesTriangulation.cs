@@ -57,7 +57,6 @@ namespace CADability
                 lineStartPoint.Add(new GeoPoint2D(ip));
                 lineDirection.Add(new GeoVector2D(toThis * common));
                 this.other.Add(other);
-                GeoPoint2D sp;
                 other.AddLine(new GeoPoint2D(other.toThis * to3d(new GeoPoint2D(ip))), new GeoVector2D(-(other.toThis * common)), this);
                 return true;
             }

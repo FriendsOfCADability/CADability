@@ -71,8 +71,8 @@ namespace netDxf
         /// </summary>
         public Vector3 StartPoint
         {
-            get { return this.controlPoints[0]; }
-            set { this.controlPoints[0] = value; }
+            get { return ControlPoints[0]; }
+            set { ControlPoints[0] = value; }
         }
 
         /// <summary>
@@ -80,8 +80,8 @@ namespace netDxf
         /// </summary>
         public Vector3 ControlPoint
         {
-            get { return this.controlPoints[1]; }
-            set { this.controlPoints[1] = value; }
+            get { return ControlPoints[1]; }
+            set { ControlPoints[1] = value; }
         }
 
         /// <summary>
@@ -89,8 +89,8 @@ namespace netDxf
         /// </summary>
         public Vector3 EndPoint
         {
-            get { return this.controlPoints[2]; }
-            set { this.controlPoints[2] = value; }
+            get { return ControlPoints[2]; }
+            set { ControlPoints[2] = value; }
         }
 
         #endregion
@@ -157,7 +157,7 @@ namespace netDxf
         /// </summary>
         public void Reverse()
         {
-            Array.Reverse(this.controlPoints);
+            Array.Reverse(ControlPoints);
         }
 
         /// <summary>

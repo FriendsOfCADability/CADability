@@ -530,11 +530,11 @@ namespace CADability.DXF
 
                         ICurve curve = (ICurve)bsp;
                         //Use approximate to get the count of lines that will be needed to convert the spline into a Polyline2D
-                        double maxError = project.Frame.GetDoubleSetting("Approximate.Precision", 0.01);
+                        double maxError = Settings.GlobalSettings.GetDoubleValue("Approximate.Precision", 0.01);
                         ICurve approxCurve = curve.Approximate(true, maxError);
 
                         int usedCurves = 0;
-                        if (approxCurve is GeoObject.Line)
+                        if (approxCurve is GeoObject.Line || approxCurve.SubCurves.Length == 1 && approxCurve.SubCurves[0] is GeoObject.Line)
                             usedCurves = 2;
                         else
                             usedCurves = approxCurve.SubCurves.Length;
@@ -881,8 +881,10 @@ namespace CADability.DXF
                 blk.Set(res);
                 return blk;
             }
-            else if (res.Count == 1) return res[0];
-            else return null;
+            
+            if (res.Count == 1) 
+                return res[0];
+             
             return null;
         }
         private string processAcadString(string acstr)
@@ -928,7 +930,6 @@ namespace CADability.DXF
             double h = txt.Height;
             Plane plane = Plane(txt.Position, txt.Normal);
 
-            bool isShx = false;
             if (typeface.Length > 0)
             {
                 text.Font = typeface;
@@ -938,7 +939,6 @@ namespace CADability.DXF
                 if (filename.EndsWith(".shx") || filename.EndsWith(".SHX"))
                 {
                     filename = filename.Substring(0, filename.Length - 4);
-                    isShx = true;
                 }
                 if (filename.EndsWith(".ttf") || filename.EndsWith(".TTF"))
                 {

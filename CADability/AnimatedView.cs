@@ -77,7 +77,6 @@ namespace CADability
         // Animation läuft
         private bool isRunning;
         private bool isPaused;
-        private int startTickCount;
         ISchedule schedule;
         double timeBase; // basis für die Zeitbestimmung, so dass time = (tc - timeBase) / 1000.0 * speed;
         double startTime;
@@ -154,7 +153,7 @@ namespace CADability
             dragWidth = Frame.GetIntSetting("Select.DragWidth", 5);
             projection = new Projection(Projection.StandardProjection.Isometric);
             highlightWidth = 0;
-            base.resourceId = "AnimatedView";
+            base.resourceIdInternal = "AnimatedView";
         }
         /// <summary>
         /// Creates a new AnimatedView object. In oder to display this view on the screen you need to add this view to a

@@ -300,7 +300,7 @@ namespace CADability.Curve2D
             {   // 19.8.15: bin nicht sicher, ob das mit negativem sweep auch geht, deshalb hier umdrehen
                 return (new Arc2D(Center, Radius, start + sweep, -sweep)).HitTest(ref Rect, IncludeControlPoints);
             }
-            ClipRect clr = new ClipRect(ref Rect);
+            ClipRect clr = new ClipRect(Rect);
 
             int StartQuadrant = start.Quadrant;
             int EndQuadrant = (start + sweep).Quadrant;

@@ -7,11 +7,8 @@ namespace CADability.Actions
     /// </summary>
     internal class EditTextAction
     {
-        private StringProperty strProp;
         internal EditTextAction()
         {
         }
-
-
     }
 }

@@ -45,12 +45,12 @@ namespace CADability.UserInterface
             this.dimension = dimension;
             switch (dimension.DimType)
             {
-                case Dimension.EDimType.DimPoints: base.resourceId = "Dimension.DimPoints"; break;
-                case Dimension.EDimType.DimCoord: base.resourceId = "Dimension.DimCoord"; break;
-                case Dimension.EDimType.DimAngle: base.resourceId = "Dimension.DimAngle"; break;
-                case Dimension.EDimType.DimRadius: base.resourceId = "Dimension.DimRadius"; break;
-                case Dimension.EDimType.DimDiameter: base.resourceId = "Dimension.DimDiameter"; break;
-                case Dimension.EDimType.DimLocation: base.resourceId = "Dimension.DimLocation"; break;
+                case Dimension.EDimType.DimPoints: base.resourceIdInternal = "Dimension.DimPoints"; break;
+                case Dimension.EDimType.DimCoord: base.resourceIdInternal = "Dimension.DimCoord"; break;
+                case Dimension.EDimType.DimAngle: base.resourceIdInternal = "Dimension.DimAngle"; break;
+                case Dimension.EDimType.DimRadius: base.resourceIdInternal = "Dimension.DimRadius"; break;
+                case Dimension.EDimType.DimDiameter: base.resourceIdInternal = "Dimension.DimDiameter"; break;
+                case Dimension.EDimType.DimLocation: base.resourceIdInternal = "Dimension.DimLocation"; break;
             }
 
             Init();

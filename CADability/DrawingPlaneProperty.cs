@@ -34,7 +34,7 @@ namespace CADability.UserInterface
             subEntries[0] = planeOrigin;
             subEntries[1] = planeDirectionX;
             subEntries[2] = planeDirectionY;
-            resourceId = "DrawingPlane";
+            resourceIdInternal = "DrawingPlane";
         }
         public GeoPoint PlanePoint
         {

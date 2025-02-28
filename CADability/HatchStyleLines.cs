@@ -41,7 +41,7 @@ namespace CADability.Attribute
             // 
             // TODO: Add constructor logic here
             //
-            resourceId = "HatchStyleNameLines";
+            resourceIdInternal = "HatchStyleNameLines";
         }
         /// <summary>
         /// This method is used by a <see cref="Hatch"/> object to calculate its contents. It generates a

@@ -122,7 +122,7 @@ namespace CADability.UserInterface
                 endPointProperty.GetGeoPointEvent += new CADability.UserInterface.GeoPointProperty.GetGeoPointDelegate(OnGetEndPoint);
                 endPointProperty.ReadOnly = true;
                 endPointProperty.PropertyEntryChangedStateEvent += new PropertyEntryChangedStateDelegate(OnStateChanged);
-                base.resourceId = "EllipseArc.Object";
+                base.resourceIdInternal = "EllipseArc.Object";
             }
             else
             {
@@ -146,7 +146,7 @@ namespace CADability.UserInterface
                     startPointProperty.ReadOnly = true;
                     startPointProperty.PropertyEntryChangedStateEvent += new PropertyEntryChangedStateDelegate(OnStateChanged);
                 }
-                base.resourceId = "Ellipse.Object";
+                base.resourceIdInternal = "Ellipse.Object";
             }
 
             attributeProperties = ellipse.GetAttributeProperties(Frame);

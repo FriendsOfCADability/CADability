@@ -1691,7 +1691,9 @@ namespace CADability.GeoObject
                             ep.x += 2 * Math.PI; // noch nicht getestet
                         }
                         return new Line2D(sp, ep);
-
+                        
+                        //Unreachable code
+                        /*
                         if (!forward && (ustart < uend))
                         {
                             // entweder ustart + 2*pi oder uend - 2*pi
@@ -1701,6 +1703,7 @@ namespace CADability.GeoObject
                         {
                             uend += 2 * Math.PI; // noch nicht getestet
                         }
+                        */
                     }
                     // Grenzfälle: ustart oder uend liegen auf 0.0 oder 2*pi
                     // dann weiß man nicht ob der Punkt zyklisch richtig ist

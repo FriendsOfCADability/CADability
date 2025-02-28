@@ -298,38 +298,30 @@ namespace CADability.Curve2D
             {
                 case 0:
                     return TangentCircleLLL(c1 as Line2D, c2 as Line2D, c3 as Line2D);
-                    break;
                 case 1:
                     points = TangentCircleLLC(c2 as Line2D, c3 as Line2D, c1 as Circle2D);
                     Exchange(points, 2, 0);
                     Exchange(points, 2, 1);
                     return points;
-                    break;
                 case 2:
                     points = TangentCircleLLC(c1 as Line2D, c3 as Line2D, c2 as Circle2D);
                     Exchange(points, 2, 1);
                     return points;
-                    break;
                 case 3:
                     points = TangentCircleLCC(c3 as Line2D, c1 as Circle2D, c2 as Circle2D);
                     Exchange(points, 0, 2);
                     Exchange(points, 0, 1);
                     return points;
-                    break;
                 case 4:
                     return TangentCircleLLC(c1 as Line2D, c2 as Line2D, c3 as Circle2D);
-                    break;
                 case 5:
                     points = TangentCircleLCC(c2 as Line2D, c1 as Circle2D, c3 as Circle2D);
                     Exchange(points, 1, 0);
                     return points;
-                    break;
                 case 6:
                     return TangentCircleLCC(c1 as Line2D, c2 as Circle2D, c3 as Circle2D);
-                    break;
                 case 7:
                     return TangentCircleCCC(c1 as Circle2D, c2 as Circle2D, c3 as Circle2D);
-                    break;
             }
 
 

@@ -120,7 +120,7 @@ namespace CADability.UserInterface
             this.bSpline = bSpline;
 
             InitSubEntries();
-            base.resourceId = "BSpline.Object";
+            base.resourceIdInternal = "BSpline.Object";
         }
         private void InitSubEntries()
         {

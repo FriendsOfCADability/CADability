@@ -41,7 +41,7 @@ namespace CADability.Attribute
         public ColorList()
         {
             namedColors = new ArrayList();
-            resourceId = "ColorList";
+            resourceIdInternal = "ColorList";
         }
 
 
@@ -532,7 +532,7 @@ namespace CADability.Attribute
         {
             namedColors = (ArrayList)(info.GetValue("NamedColors", typeof(ArrayList)));
             current = ColorDef.Read("Current", info, context);
-            resourceId = "ColorList";
+            resourceIdInternal = "ColorList";
         }
         /// <summary>
         /// Implements <see cref="ISerializable.GetObjectData"/>

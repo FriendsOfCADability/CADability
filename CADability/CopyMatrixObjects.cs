@@ -149,22 +149,14 @@ namespace CADability.Actions
 
         private bool SetHorDist(double Length)
         {
-            // if (Length > 0) // alles erlaubt, insbesondere in PFOCAD
-            {
-                distX = Length;
-                return (showMatrix());
-            }
-            return false;
+            distX = Length;
+            return (showMatrix());
         }
 
         private bool SetVerDist(double Length)
         {
-            //if (Length > 0)
-            {
-                distY = Length;
-                return (showMatrix());
-            }
-            return false;
+            distY = Length;
+            return (showMatrix());
         }
 
         private bool SetDir(GeoVector vector)

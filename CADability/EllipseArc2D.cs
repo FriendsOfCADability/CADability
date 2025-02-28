@@ -200,7 +200,7 @@ namespace CADability.Curve2D
             Angle majorang = majorAxis.Angle;
             double radiusx = majorAxis.Length;
             double radiusy = minorAxis.Length;
-            ClipRect clr = new ClipRect(ref Rect);
+            ClipRect clr = new ClipRect(Rect);
             if (clr.Contains(startPoint)) return true;
             if (clr.Contains(EndPoint)) return true;
 
@@ -809,6 +809,9 @@ namespace CADability.Curve2D
         public override double GetArea()
         {   // Area from origin, source: https://www.geometrictools.com/Documentation/AreaIntersectingEllipses.pdf
             double a = majorAxis.Length, b = minorAxis.Length;
+            
+            //Unreachable Code
+            /*
             if (false) // nonsense, works the same for ellipses >180°, was: (sweepPar > Math.PI)
             {
                 // make two sections, because the formula works only for angles less than 180°
@@ -835,23 +838,24 @@ namespace CADability.Curve2D
             }
             else
             {
-                GeoPoint2D startPoint = StartPoint;
-                GeoPoint2D endPoint = EndPoint;
-                double triangle = startPoint.x * endPoint.y - startPoint.y * endPoint.x;
-                double phi1 = (startPoint - center).Angle - majorAxis.Angle;
-                double phi2 = (endPoint - center).Angle - majorAxis.Angle;
-                if (Sweep > 0) // chenged to "Sweep" because "sweep" was positiv when it should have been negative
-                {
-                    if (phi2 <= phi1) phi2 += Math.PI * 2;
-                }
-                else
-                {
-                    if (phi2 >= phi1) phi2 -= Math.PI * 2;
-                }
-                double segment = a * b * (areaHelper(a, b, phi2) - areaHelper(a, b, phi1)); // this is the double value
-                double segtriangle = GeoVector2D.Area(startPoint - center, endPoint - center); // area of the parallelogram
-                return (triangle + segment - segtriangle) / 2.0; // all values are double size, hence /2.0
+            */
+            GeoPoint2D startPoint = StartPoint;
+            GeoPoint2D endPoint = EndPoint;
+            double triangle = startPoint.x * endPoint.y - startPoint.y * endPoint.x;
+            double phi1 = (startPoint - center).Angle - majorAxis.Angle;
+            double phi2 = (endPoint - center).Angle - majorAxis.Angle;
+            if (Sweep > 0) // chenged to "Sweep" because "sweep" was positiv when it should have been negative
+            {
+                if (phi2 <= phi1) phi2 += Math.PI * 2;
             }
+            else
+            {
+                if (phi2 >= phi1) phi2 -= Math.PI * 2;
+            }
+            double segment = a * b * (areaHelper(a, b, phi2) - areaHelper(a, b, phi1)); // this is the double value
+            double segtriangle = GeoVector2D.Area(startPoint - center, endPoint - center); // area of the parallelogram
+            return (triangle + segment - segtriangle) / 2.0; // all values are double size, hence /2.0
+            //}
         }
         public EllipseArc2D GetComplement()
         {

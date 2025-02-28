@@ -100,7 +100,7 @@ namespace CADability
         double Position(GeoPoint fromHere, GeoVector direction, double precision);
     }
     /// <summary>
-    /// Generic class to privide fast access to <see cref="IOctTreeInsertable"/> implementing objects.
+    /// Generic class to provide fast access to <see cref="IOctTreeInsertable"/> implementing objects.
     /// </summary>
     /// <typeparam name="T">The generic type, must implement <see cref="IOctTreeInsertable"/></typeparam>
     public class OctTree<T> where T : IOctTreeInsertable
@@ -112,7 +112,7 @@ namespace CADability
         /// <summary>
         /// The root <see cref="Node&lt;T&gt;"/> of this octtree
         /// </summary>
-        protected Node<T> node;
+        private Node<T> node;
         private readonly SplitTestFunction splitTest;
 
         /// <summary>

@@ -327,7 +327,6 @@ namespace CADability
                     return 255;
                 }
             }
-            private SortedDictionary<Color, SortedDictionary<string, List<chunk>>> data;
             List<chunk> allChunks;
             HashSet<int> allColors;
             HashSet<string> allLayers;
@@ -1231,7 +1230,7 @@ namespace CADability
                     outfile.Close();
                 }
             }
-            catch (IOException e)
+            catch (IOException)
             {
                 return false;
             }

@@ -26,8 +26,6 @@ namespace CADability
         private object distanceFromHere, distanceToHere; // the two objects which define the distance (may be vertices, edges or faces)
         private GeoVector originalOffset; // the offset vector between the facesToMove and facesToKeep
         private GeoVector currentOffset; // the additional offset vector between the facesToMove and facesToKeep
-        private GeoPoint point1; // the first point of the line defining the distance
-        private GeoPoint point2; // the second point of the line defining the distance. these points are not changed but together with distance they define how facesToMove and facesToKeep have to be moved
         private Shell shell; // the shell containing the edge
         private List<Face> facesToMove; // list of the faces, which have to be moved
         private List<Face> facesToKeep; // list of the faces, which should stay in place (ore been moved in opposite direction when symmetric or backward is chosen)

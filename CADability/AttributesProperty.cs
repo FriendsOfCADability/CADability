@@ -19,7 +19,7 @@ namespace CADability.UserInterface
                 colorSelectProp = new ColorSelectionProperty(o, "ColorDef", "GeoObject.Color", frame.Project.ColorList, ColorList.StaticFlags.allowAll);
             }
             layerSelectProp = new LayerSelectionProperty(o, StringTable.GetString("GeoObject.Layer"), frame.Project.LayerList);
-            resourceId = "GeoObject.Attributes";
+            resourceIdInternal = "GeoObject.Attributes";
         }
         #region IShowPropertyImpl Overrides
         /// <summary>

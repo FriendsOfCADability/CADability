@@ -129,7 +129,7 @@ namespace CADability
             {
                 section = Area.Extent;
             }
-            base.resourceId = "Layout.Patch";
+            base.resourceIdInternal = "Layout.Patch";
             project.LayerList.DidModifyEvent += new DidModifyDelegate(OnLayerListModifed);
 
             model.GeoObjectAddedEvent += new Model.GeoObjectAdded(OnModelChanged);

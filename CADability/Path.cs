@@ -1,4 +1,4 @@
-﻿using CADability.Attribute;
+using CADability.Attribute;
 using CADability.Curve2D;
 using CADability.UserInterface;
 using System;
@@ -1151,13 +1151,20 @@ namespace CADability.GeoObject
                 return res.ToArray();
             }
         }
-        #region IGeoObjectImpl
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetShowProperties (IFrame)"/>
-        /// </summary>
-        /// <param name="Frame"></param>
-        /// <returns></returns>
-        public override IPropertyEntry GetShowProperties(IFrame Frame)
+		#region IGeoObjectImpl
+		public override Style.EDefaultFor PreferredStyle
+		{
+			get
+			{
+				return Style.EDefaultFor.Curves;
+			}
+		}
+		/// <summary>
+		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetShowProperties (IFrame)"/>
+		/// </summary>
+		/// <param name="Frame"></param>
+		/// <returns></returns>
+		public override IPropertyEntry GetShowProperties(IFrame Frame)
         {
             return new ShowPropertyPath(this, Frame);
         }

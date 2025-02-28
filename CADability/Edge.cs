@@ -220,7 +220,6 @@ namespace CADability
         private Vertex v1, v2;
         private bool oriented; // obsolete, if false (forwardOnPrimaryFace, forwardOnSecondaryFace) have not yet been calculated
         enum EdgeKind { unknown, sameSurface, tangential, sharp }
-        private EdgeKind edgeKind = EdgeKind.unknown;
         internal BRepOperation.EdgeInfo edgeInfo; // only used for BRepOperation
         // TODO: überprüfen, ob isPartOf und startAtOriginal, endAtOriginal noch gebraucht wird (evtl. zu einem Objekt machen)
         // TODO: ist owner nicht immer primaryFace?
@@ -466,7 +465,7 @@ namespace CADability
         }
         private void SpreadVertex(Vertex v)
         {   // gib diesen Vertex weiter an die mit dieser Kante verbunden Kanten
-            GeoPoint2D pruv, scuv = GeoPoint2D.Origin;
+            GeoPoint2D scuv = GeoPoint2D.Origin;
             if (primaryFace != null)
             {
                 Edge[] adj = primaryFace.FindAdjacentEdges(this);
@@ -818,7 +817,6 @@ namespace CADability
         }
         internal Edge()
         {
-            edgeKind = EdgeKind.unknown;
             hashCode = hashCodeCounter++; // 
 #if DEBUG
             if (hashCode == 1214)
@@ -1761,7 +1759,6 @@ namespace CADability
             this.curveOnPrimaryFace = curveOnPrimaryFace;
             this.forwardOnPrimaryFace = forwardOnPrimaryFace;
             oriented = true;
-            edgeKind = EdgeKind.unknown;
         }
         internal void SetPrimary(Face fc, bool forward)
         {
@@ -1770,7 +1767,6 @@ namespace CADability
             if (!forward) curveOnPrimaryFace.Reverse();
             forwardOnPrimaryFace = forward;
             oriented = true;
-            edgeKind = EdgeKind.unknown;
         }
         internal void SetSecondary(Face fc, bool forward)
         {
@@ -1779,7 +1775,6 @@ namespace CADability
             if (!forward) curveOnSecondaryFace.Reverse();
             forwardOnSecondaryFace = forward;
             oriented = true;
-            edgeKind = EdgeKind.unknown;
         }
         internal void UpdateInterpolatedDualSurfaceCurve()
         {
@@ -1823,7 +1818,8 @@ namespace CADability
 #endif
                         return;
 
-
+                        //Unreachable code
+                        /*
                         //BoundingRect bounds1 = curveOnPrimaryFace.GetExtent();
                         //BoundingRect bounds2 = curveOnSecondaryFace.GetExtent();
                         // sicher ist hier, dass StartVertex und EndVertex stimmen
@@ -1912,6 +1908,7 @@ namespace CADability
 #if DEBUG
                         dsc.CheckSurfaceParameters();
 #endif
+                        */
                     }
                 }
                 else
@@ -2689,7 +2686,6 @@ namespace CADability
             // GeoPoint2D mp2d = curve2d.PointAt(ipar);
             GeoPoint2D mp2d;
             double dist = surface.MaxDist(parpoint[spar], parpoint[epar], out mp2d);
-            double distCurve = 0.0;
             ipar = curve2d.PositionOf(mp2d);
             //ipar = findMaxDist(spar, epar, curve2d, surface, out dist);
             if (ipar <= spar || ipar >= epar)
@@ -2713,7 +2709,7 @@ namespace CADability
                     Polyline pdbg = Polyline.Construct();
                     pdbg.SetPoints(pnts, false);
                 }
-                catch (PolylineException ex) { };
+                catch (PolylineException) { };
             }
 #endif
             if (curve3d != null) dist = Math.Max(dist, curve3d.DistanceTo(mp));
@@ -3043,7 +3039,6 @@ namespace CADability
             // diese Kante soll ja rausgelöst und ersetzt werden
             if (v2 != null) v2.RemoveEdge(this);
 #if DEBUG
-            DebuggerContainer dc;
             //if (primaryFace.GetHashCode()==2098 || primaryFace.GetHashCode() == 2198)
             //{
             //    dc = primaryFace.DebugEdges2D;

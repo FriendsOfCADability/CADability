@@ -73,7 +73,7 @@ static class RealPolynomialRootFinder
         double xxx = 0;
         double yy = 0;
 
-        // These are used to scale the polynomial for more accurecy
+        // These are used to scale the polynomial for more accuracy
         double factor = 0;
         double sc = 0;
 
@@ -89,10 +89,11 @@ static class RealPolynomialRootFinder
         // = 0.99756405
 
         //Are the polynomial larger that the maximum allowed?
-        if (Degree > Degree)
-        {
-            throw new ApplicationException("The entered Degree is greater than MAXDEGREE. Exiting root finding algorithm. No further action taken.");
-        }
+        //TODO: Reenable this check if MAXDEGREE was defined.
+        //if (Degree > Degree)
+        //{
+        //    throw new ApplicationException("The entered Degree is greater than MAXDEGREE. Exiting root finding algorithm. No further action taken.");
+        //}
 
         //Check if the leading coefficient is zero
 

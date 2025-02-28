@@ -81,7 +81,16 @@ namespace CADability.DXF
                 case GeoObject.Ellipse elli: entity = ExportEllipse(elli); break;
                 case GeoObject.Polyline polyline: entity = ExportPolyline(polyline); break;
                 case GeoObject.BSpline bspline: entity = ExportBSpline(bspline); break;
-                case GeoObject.Path path: entity = ExportPath(path); break;
+                case GeoObject.Path path:
+                    if (Settings.GlobalSettings.GetBoolValue("DxfExport.ExportPathsAsBlocks", true))
+                    {
+                        entity = ExportPath(path);
+                    }
+                    else
+                    {
+                        entities = ExportPathWithoutBlock(path);
+                    }
+                    break;
                 case GeoObject.Text text: entity = ExportText(text); break;
                 case GeoObject.Block block: entity = ExportBlock(block); break;
                 case GeoObject.Face face: entity = ExportFace(face); break;
@@ -98,18 +107,18 @@ namespace CADability.DXF
             {
                 for (int i = 0; i < entities.Length; i++)
                 {
-                    if (geoObject.Layer != null && !createdLayers.TryGetValue(geoObject.Layer, out netDxf.Tables.Layer layer))
+                    if (geoObject.Layer == null)
+                    {
+                        entities[i].Layer = netDxf.Tables.Layer.Default;
+                        continue;
+                    }
+                    if (!createdLayers.TryGetValue(geoObject.Layer, out netDxf.Tables.Layer layer))
                     {
                         layer = new netDxf.Tables.Layer(geoObject.Layer.Name);
                         doc.Layers.Add(layer);
                         createdLayers[geoObject.Layer] = layer;
                     }
-                    else
-                    {
-                        layer = netDxf.Tables.Layer.Default;
-                    }
                     entities[i].Layer = layer;
-
                 }
                 return entities;
             }
@@ -321,11 +330,12 @@ namespace CADability.DXF
         }
         private netDxf.Entities.Text ExportText(GeoObject.Text text)
         {
+            var textStringValue = text.TextString.Replace("\r\n", " ");
             System.Drawing.FontStyle fs = System.Drawing.FontStyle.Regular;
             if (text.Bold) fs |= System.Drawing.FontStyle.Bold;
             if (text.Italic) fs |= System.Drawing.FontStyle.Italic;
             System.Drawing.Font font = new System.Drawing.Font(text.Font, 1000.0f, fs);
-            netDxf.Entities.Text res = new netDxf.Entities.Text(text.TextString, Vector2.Zero, text.TextSize * 1000 / font.Height, new TextStyle(text.Font, text.Font + ".ttf"));
+            netDxf.Entities.Text res = new netDxf.Entities.Text(textStringValue, Vector2.Zero, text.TextSize * 1000 / font.Height, new TextStyle(text.Font, text.Font + ".ttf"));
             ModOp toText = ModOp.Fit(GeoPoint.Origin, new GeoVector[] { GeoVector.XAxis, GeoVector.YAxis, GeoVector.ZAxis }, text.Location, new GeoVector[] { text.LineDirection.Normalized, text.GlyphDirection.Normalized, text.LineDirection.Normalized ^ text.GlyphDirection.Normalized });
             res.TransformBy(Matrix4(toText)); // easier than setting normal and rotation
             return res;
@@ -356,6 +366,17 @@ namespace CADability.DXF
             netDxf.Blocks.Block block = new netDxf.Blocks.Block(GetNextAnonymousBlockName(), entities);
             doc.Blocks.Add(block);
             return new netDxf.Entities.Insert(block);
+        }
+
+        private EntityObject[] ExportPathWithoutBlock(Path path)
+        {
+            List<EntityObject> entities = new List<EntityObject>();
+            for (int i = 0; i < path.Curves.Length; i++)
+            {
+                EntityObject[] curve = GeoObjectToEntity(path.Curves[i] as IGeoObject);
+                if (curve != null) entities.AddRange(curve);
+            }
+            return entities.ToArray();
         }
 
         private netDxf.Entities.Spline ExportBSpline(BSpline bspline)

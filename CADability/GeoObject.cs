@@ -1172,7 +1172,7 @@ namespace CADability.GeoObject
                 attributes.Add((this as IStyle).Style);
             if (userAttributes != null)
             {
-                foreach (INamedAttribute na in userAttributes)
+                foreach (INamedAttribute na in userAttributes.Values)
                     attributes.Add(na);
             }
             for (int i = 0; i < NumChildren; i++)

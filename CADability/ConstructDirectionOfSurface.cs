@@ -16,7 +16,6 @@ namespace CADability.Actions
         private GeoVector cancelVector;
         private GeoVector actualVector;
         private GeoVector faceVector;
-        private int dirPointSelect;
         private int dirOffsetSelect;
         private bool measure;
         private bool succeeded;

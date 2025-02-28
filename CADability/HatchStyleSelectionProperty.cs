@@ -23,7 +23,7 @@ namespace CADability.UserInterface
         public HatchStyleSelectionProperty(string ResourceId, HatchStyleList hsl, HatchStyle preselect, bool includeUndefined)
         {
             hatchStyleList = hsl;
-            resourceId = ResourceId;
+            resourceIdInternal = ResourceId;
             if (includeUndefined)
             {
                 base.choices = new string[hatchStyleList.Count + 1];
@@ -36,8 +36,8 @@ namespace CADability.UserInterface
                 // sollte es den Namen schon geben, werden solange "-" davor und dahintergemacht, bis es den Namen mehr gibt
                 while (hatchStyleList.Find(undef) != null) undef = "-" + undef + "-";
                 choices[0] = undef;
-                if (preselect != null) selectedText = preselect.Name;
-                else selectedText = undef;
+                if (preselect != null) SelectedText = preselect.Name;
+                else SelectedText = undef;
             }
             else
             {
@@ -47,18 +47,18 @@ namespace CADability.UserInterface
                     HatchStyle hst = hatchStyleList[i];
                     choices[i] = hst.Name;
                 }
-                if (preselect != null) selectedText = preselect.Name;
+                if (preselect != null) SelectedText = preselect.Name;
             }
         }
         public void SetSelection(HatchStyle hatchStyle)
         {
             if (hatchStyle == null)
             {
-                base.selectedText = null;
+                base.SelectedText = null;
             }
             else
             {
-                base.selectedText = hatchStyle.Name;
+                base.SelectedText = hatchStyle.Name;
             }
         }
         protected override void OnSelectionChanged(string selected)

@@ -55,8 +55,6 @@ namespace CADability.Curve2D
         //private GeoVector2D[] interdir; // Richtungen an den Stützpunkten
         //private double[] interparam; // Parameterwerte an den Stützpunkten
         //private GeoPoint2D[] tringulation; // Dreiecks-Zwischenpunkte (einer weniger als interpol)
-        private BoundingRect extend; // Umgebendes Rechteck nur einmal berechnen
-        private bool extendIsValid; // schon berechnet?
         private double parameterEpsilon; // ein epsilon, welches sich auf den Parameter bezieht. Abbruch für Iterationen
         private double distanceEpsilon; // ein epsilon, welches sich auf die Ausdehnung bezieht. Abbruch für Iterationen
         WeakReference<ExplicitPCurve2D> explicitPCurve2D;
@@ -68,7 +66,6 @@ namespace CADability.Curve2D
             //interdir = null;
             //interparam = null;
             //tringulation = null;
-            extendIsValid = false;
             nubs = null;
             nurbs = null;
             explicitPCurve2D = null;
@@ -86,6 +83,9 @@ namespace CADability.Curve2D
                     knotslist.Add(knots[i]);
                 }
             }
+
+            //Unreachable code
+            /*
             if (false) // periodic ist nur eine Info, der Spline selbst ist doch immer geclampet, oder?
             // if (periodic)
             {
@@ -107,10 +107,14 @@ namespace CADability.Curve2D
                     ++secondknotindex;
                 }
             }
+            */
+
             if (weights == null)
             {
                 GeoPoint2D[] npoles;
-                if (false)
+                
+                //Unreachable code
+                /* if (false)
                 //if (periodic)
                 {
                     npoles = new GeoPoint2D[poles.Length + degree];
@@ -131,22 +135,25 @@ namespace CADability.Curve2D
                     //{   // das kommt bei STEP/piece0 z.B. vor, kommt ja nur über OpenCascade
                     //    knotslist.Insert(0, knotslist[0]);
                     //}
-                }
-                else
-                {
+                }*/
+                //else
+                //{
+
                     npoles = new GeoPoint2D[poles.Length];
                     for (int i = 0; i < poles.Length; ++i)
                     {
                         npoles[i] = poles[i];
                     }
-                }
+                //}
                 this.nubs = new Nurbs<GeoPoint2D, GeoPoint2DPole>(degree, npoles, knotslist.ToArray());
                 nubs.InitDeriv1();
             }
             else
             {
                 GeoPoint2DH[] npoles;
-                if (false)
+                
+                //Unreachable code
+                /*if (false)
                 // if (periodic)
                 {
                     npoles = new GeoPoint2DH[poles.Length + degree];
@@ -161,13 +168,13 @@ namespace CADability.Curve2D
                     // s.o.
                 }
                 else
-                {
+                {*/
                     npoles = new GeoPoint2DH[poles.Length];
                     for (int i = 0; i < poles.Length; ++i)
                     {
                         npoles[i] = new GeoPoint2DH(poles[i], weights[i]);
                     }
-                }
+                //}
                 this.nurbs = new Nurbs<GeoPoint2DH, GeoPoint2DHPole>(degree, npoles, knotslist.ToArray());
                 nurbs.InitDeriv1();
             }
@@ -268,9 +275,7 @@ namespace CADability.Curve2D
         //            }
         //#endif
         //        }
-#if DEBUG
-        private static int maxTriangleCount = 0;
-#endif
+
         private bool FindInflectionPoint(double su, GeoPoint2D pl, GeoVector2D dir1l, GeoVector2D dir2l, double eu, GeoPoint2D pr, GeoVector2D dir1r, GeoVector2D dir2r, out double par)
         {
             GeoPoint2D pm;
@@ -606,7 +611,7 @@ namespace CADability.Curve2D
             {
                 Init();
             }
-            catch (NurbsException ne)
+            catch (NurbsException)
             {
             }
             // sollte durch Start/Endparameter nur ein Teilbereich des Splines gelten, dann
@@ -2889,7 +2894,6 @@ namespace CADability.Curve2D
 
         private void SubTriangle(GeoPoint2D p1, GeoPoint2D p2, GeoVector2D v1, GeoVector2D v2, double mp, out GeoPoint2D pm1, out GeoPoint2D pm2, out GeoPoint2D pmm, out GeoVector2D vm)
         {
-            GeoPoint2D ints;
             PointDirAt(mp, out pmm, out vm);
             if (!Geometry.IntersectLL(p1, v1, pmm, vm, out pm1)) throw new BSplineException("internal");
             if (!Geometry.IntersectLL(pmm, vm, p2, v2, out pm2)) throw new BSplineException("internal");

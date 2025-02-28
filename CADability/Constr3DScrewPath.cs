@@ -16,8 +16,6 @@ namespace CADability.Actions
     {
         private CurveInput pathInput;
         private CurveInput rotateLineInput;
-        private GeoVectorInput axisVectorInput;
-        private GeoPointInput axisPointInput;
         private MultipleChoiceInput orientation;
         private DoubleInput numTurns;
         private bool handed; // true: righthanded, false: lefthanded
@@ -51,7 +49,7 @@ namespace CADability.Actions
                         // here we could directely set shape and plane
                     }
                     clones.Clear();
-                    foreach (Edge edg in (selectedObjects[0] as Face).AllEdgesIterated())
+                    foreach (Edge edg in (selectedObjects[0] as Face).Edges)
                     {
                         if (edg.Curve3D != null) clones.Add(edg.Curve3D as IGeoObject);
                     }
@@ -87,7 +85,7 @@ namespace CADability.Actions
                 {
                     if ((selectedObjects[0] as Face).Surface is PlaneSurface) return true;
                     clones.Clear();
-                    foreach (Edge edg in (selectedObjects[0] as Face).AllEdgesIterated())
+                    foreach (Edge edg in (selectedObjects[0] as Face).Edges)
                     {
                         if (edg.Curve3D != null) clones.Add(edg.Curve3D as IGeoObject);
                     }

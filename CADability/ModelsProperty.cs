@@ -10,7 +10,7 @@
         public ModelsProperty(Project project)
         {
             this.project = project;
-            base.resourceId = "Models";
+            base.resourceIdInternal = "Models";
         }
         /// <summary>
         /// Overrides <see cref="IShowPropertyImpl.LabelType"/>

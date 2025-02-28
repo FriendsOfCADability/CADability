@@ -78,7 +78,7 @@ namespace CADability.UserInterface
         public MultiGeoPointProperty(IIndexedGeoPoint controlledObject, string resourceId, IFrame frame)
         {
             this.Frame = frame;
-            this.resourceId = resourceId;
+            this.resourceIdInternal = resourceId;
             this.controlledObject = controlledObject;
             prependContextMenue = null;
             MultipleChoiceSetting formattingZValue = Settings.GlobalSettings.GetValue("Formatting.Coordinate.ZValue") as MultipleChoiceSetting;
@@ -226,7 +226,7 @@ namespace CADability.UserInterface
                     subEntries = new IPropertyEntry[controlledObject.GetGeoPointCount()];
                     for (int i = 0; i < subEntries.Length; ++i)
                     {
-                        GeoPointProperty gpp = new GeoPointProperty(resourceId + ".Point", this.Frame, false);
+                        GeoPointProperty gpp = new GeoPointProperty(resourceIdInternal + ".Point", this.Frame, false);
                         gpp.UserData["Index"] = i;
                         gpp.SetGeoPointEvent += new CADability.UserInterface.GeoPointProperty.SetGeoPointDelegate(OnSetGeoPoint);
                         gpp.GetGeoPointEvent += new CADability.UserInterface.GeoPointProperty.GetGeoPointDelegate(OnGetGeoPoint);
@@ -237,7 +237,7 @@ namespace CADability.UserInterface
                         gpp.ContextMenuId = "MenuId.IndexedPoint";
                         gpp.PrependContextMenu = prependContextMenue; // zusätzliches Menue
                         gpp.DisplayZComponent = displayZComponent;
-                        string lt = StringTable.GetString(resourceId + ".Point.Label");
+                        string lt = StringTable.GetString(resourceIdInternal + ".Point.Label");
                         if (lt.IndexOf("{0") >= 0)
                         {
                             try
@@ -376,7 +376,7 @@ namespace CADability.UserInterface
                             break;
                     }
                 }
-                catch (IndexOutOfRangeException e)
+                catch (IndexOutOfRangeException)
                 {
                 }
             }

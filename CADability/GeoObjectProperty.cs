@@ -16,7 +16,7 @@ namespace CADability.UserInterface
         public event SelectionChangedDelegate SelectionChangedEvent;
         public GeoObjectProperty(string resourceId, IFrame frame)
         {
-            this.resourceId = resourceId;
+            this.resourceIdInternal = resourceId;
             this.frame = frame;
             geoObjects = new IGeoObject[0]; // leer initialisieren
         }
@@ -130,14 +130,14 @@ namespace CADability.UserInterface
             this.name = name;
             this.associatedObject = associatedObject;
             IsSelected = false;
-            base.resourceId = resourceId;
+            base.resourceIdInternal = resourceId;
         }
         public SimpleNameProperty(string name, object associatedObject, string resourceId, string contextMenuResourceId)
         {
             this.name = name;
             this.associatedObject = associatedObject;
             IsSelected = false;
-            base.resourceId = resourceId;
+            base.resourceIdInternal = resourceId;
             this.contextMenuResourceId = contextMenuResourceId;
         }
         public void SetSelected(bool IsSelected)

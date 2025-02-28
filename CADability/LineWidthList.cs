@@ -276,7 +276,7 @@ namespace CADability.Attribute
         /// <param name="propertyTreeView"></param>
         public override void Added(IPropertyPage pp)
         {
-            base.resourceId = "LineWidthList";
+            base.resourceIdInternal = "LineWidthList";
             base.Added(pp);
         }
         public override void Removed(IPropertyPage pp)

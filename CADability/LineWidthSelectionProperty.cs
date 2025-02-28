@@ -18,7 +18,7 @@ namespace CADability.UserInterface
         public LineWidthSelectionProperty(string ResourceId, LineWidthList lineWidthList, LineWidth select, bool includeUndefined)
         {
             this.lineWidthList = lineWidthList;
-            resourceId = ResourceId;
+            resourceIdInternal = ResourceId;
             if (includeUndefined)
             {
                 choices = new string[lineWidthList.Count + 1];
@@ -32,11 +32,11 @@ namespace CADability.UserInterface
                 choices[0] = undef;
                 if (select != null)
                 {
-                    base.selectedText = select.Name;
+                    base.SelectedText = select.Name;
                 }
                 else
                 {
-                    base.selectedText = undef;
+                    base.SelectedText = undef;
                 }
             }
             else
@@ -48,14 +48,14 @@ namespace CADability.UserInterface
                 }
                 if (select != null)
                 {
-                    base.selectedText = select.Name;
+                    base.SelectedText = select.Name;
                 }
             }
         }
         public LineWidthSelectionProperty(string ResourceId, LineWidthList lineWidthList, ILineWidth iLineWidth, bool includeUndefined)
         {
             this.lineWidthList = lineWidthList;
-            resourceId = ResourceId;
+            resourceIdInternal = ResourceId;
             LineWidth select = iLineWidth.LineWidth;
             if (includeUndefined)
             {
@@ -70,11 +70,11 @@ namespace CADability.UserInterface
                 choices[0] = undef;
                 if (select != null)
                 {
-                    base.selectedText = select.Name;
+                    base.SelectedText = select.Name;
                 }
                 else
                 {
-                    base.selectedText = undef;
+                    base.SelectedText = undef;
                 }
             }
             else
@@ -86,7 +86,7 @@ namespace CADability.UserInterface
                 }
                 if (select != null)
                 {
-                    base.selectedText = select.Name;
+                    base.SelectedText = select.Name;
                 }
             }
             this.iLineWidth = iLineWidth;
@@ -126,8 +126,8 @@ namespace CADability.UserInterface
                 if ((Change as GeoObjectChange).MethodOrPropertyName == "LineWidth" ||
                     (Change as GeoObjectChange).MethodOrPropertyName == "Style")
                 {
-                    if ((toWatch as ILineWidth).LineWidth != null) base.selectedText = (toWatch as ILineWidth).LineWidth.Name;
-                    else base.selectedText = null;
+                    if ((toWatch as ILineWidth).LineWidth != null) base.SelectedText = (toWatch as ILineWidth).LineWidth.Name;
+                    else base.SelectedText = null;
                     propertyPage.Refresh(this);
                 }
             }

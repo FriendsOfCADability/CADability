@@ -8,8 +8,8 @@ namespace CADability
     public class ParallelHelper
     {
 #if DEBUG
-        private static string lmfa = ""; // to have an object to lock access to maxFailedAttempts
-        static int maxFailedAttempts = 0;
+        //private static string lmfa = ""; // to have an object to lock access to maxFailedAttempts
+        //static int maxFailedAttempts = 0;
         static HashSet<string> debug = new HashSet<string>();
 #endif
         class LockMultiple : IDisposable

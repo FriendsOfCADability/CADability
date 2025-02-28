@@ -42,12 +42,11 @@ namespace netDxf.GTE
         protected const int DEFAULT_MAX_BISECTIONS = 1024;
         protected const int SUP_ORDER = 4;
 
-        protected readonly double[] times;
-        protected readonly double[] segmentLength;
-        protected readonly double[] acumulatedLength;
-        protected int rombergOrder;
-        protected int maxBisections;
-        protected bool isConstructed;
+        private readonly double[] times;
+        private readonly double[] segmentLength;
+        private readonly double[] acumulatedLength;
+        private int rombergOrder;
+        private int maxBisections;
 
         // Abstract base class for a parameterized curve X(t), where t is the
         // parameter in [tmin,tmax] and X is an N-tuple position.  The first
@@ -66,16 +65,13 @@ namespace netDxf.GTE
             this.acumulatedLength = new double[numSegments];
             this.rombergOrder = DEFAULT_ROMBERG_ORDER;
             this.maxBisections = DEFAULT_MAX_BISECTIONS;
-            this.isConstructed = false;
+            IsConstructed = false;
         }
 
         // To validate construction, create an object as shown:
         // DerivedClassCurve<N, Real> curve(parameters);
         // if (!curve) { <constructor failed, handle accordingly>; }
-        public bool IsConstructed
-        {
-            get { return this.isConstructed; }
-        }
+        public bool IsConstructed { get; protected set; }
 
         // Member access.
         public double TMin

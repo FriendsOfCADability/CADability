@@ -29,7 +29,6 @@ namespace CADability.GeoObject
         private Bitmap bitmap;
         private GeoPoint location;
         private GeoVector directionWidth, directionHeight;
-        private string path;
         #region polymorph construction
         /// <summary>
         /// Delegate for the construction of a Picture.
@@ -57,13 +56,13 @@ namespace CADability.GeoObject
         /// <param name="justConstructed">The Picture that was just constructed</param>
         public delegate void ConstructedDelegate(Picture justConstructed);
         /// <summary>
-        /// Event beeing raised when a Picture object has been created.
+        /// Event being raised when a Picture object has been created.
         /// </summary>
         public static event ConstructedDelegate Constructed;
         #endregion
         protected Picture()
         {
-            if (Constructed != null) Constructed(this);
+            Constructed?.Invoke(this);
         }
         //~Picture()
         //{
@@ -182,25 +181,16 @@ namespace CADability.GeoObject
         }
         /// <summary>
         /// The path where the Bitmap is located. This value is not used by the Picture object and may have any content.
-        /// Usually it is the path and filename, especially when the object is beeing generated interactively 
+        /// Usually it is the path and filename, especially when the object is being generated interactively 
         /// by CADability's user interface. Setting the value does NOT load the specified bitmap. This must be done
-        /// seperately by setting the <see cref="Bitmap"/> property
+        /// separately by setting the <see cref="Bitmap"/> property
         /// </summary>
-        public string Path
-        {
-            get
-            {
-                return path;
-            }
-            set
-            {
-                path = value;
-            }
-        }
+        public string Path { get; set; }
+
         /// <summary>
         /// Clips the bitmap according to the provided shape and plane. The BitmapBits are replaced by
         /// transparent pixels, the original bits are lost. Setting another clip area doesn't restore already clipped
-        /// pixels. (Ofcourse undo restores the original bitmap bits)
+        /// pixels. (Of course undo restores the original bitmap bits)
         /// </summary>
         /// <param name="plane">The plane as a reference system for the shape</param>
         /// <param name="shape">The shape for the clip operation</param>
@@ -231,7 +221,7 @@ namespace CADability.GeoObject
         {
             bitmap = bmp;
         }
-#region IGeoObject override
+        #region IGeoObject override
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Modify (ModOp)"/>
         /// </summary>
@@ -262,13 +252,13 @@ namespace CADability.GeoObject
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.CopyGeometry (IGeoObject)"/>
         /// </summary>
-        /// <param name="ToCopyFrom"></param>
-        public override void CopyGeometry(IGeoObject ToCopyFrom)
+        /// <param name="toCopyFrom"></param>
+        public override void CopyGeometry(IGeoObject toCopyFrom)
         {
             using (new Changing(this))
             {
-                Picture from = ToCopyFrom as Picture;
-                if (from == null) return;
+                if (!(toCopyFrom is Picture from)) 
+                    return;
                 this.location = from.location;
                 this.bitmap = from.bitmap;
                 this.directionWidth = from.directionWidth;
@@ -330,11 +320,11 @@ namespace CADability.GeoObject
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetShowProperties (IFrame)"/>
         /// </summary>
-        /// <param name="Frame"></param>
+        /// <param name="frame"></param>
         /// <returns></returns>
-        public override IPropertyEntry GetShowProperties(IFrame Frame)
+        public override IPropertyEntry GetShowProperties(IFrame frame)
         {
-            return new ShowPropertyPicture(this, Frame);
+            return new ShowPropertyPicture(this, frame);
         }
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetQuadTreeItem (Projection, ExtentPrecision)"/>
@@ -381,7 +371,7 @@ namespace CADability.GeoObject
             }
             else
             {
-                ClipRect clr = new ClipRect(ref rect);
+                ClipRect clr = new ClipRect(rect);
                 return clr.ParallelogramHitTest(projection.ProjectUnscaled(location), projection.ProjectUnscaled(directionWidth), projection.ProjectUnscaled(directionHeight));
             }
         }
@@ -424,8 +414,7 @@ namespace CADability.GeoObject
             if (spf.SnapToFaceSurface)
             {
                 Plane pln = new Plane(location, directionWidth, directionHeight);
-                GeoPoint ip;
-                if (pln.Intersect(spf.SourceBeam.Location, spf.SourceBeam.Direction, out ip))
+                if (pln.Intersect(spf.SourceBeam.Location, spf.SourceBeam.Direction, out var ip))
                 {
                     GeoPoint2D ip2d = Geometry.GetPosition(pln.Project(ip), GeoPoint2D.Origin, pln.Project(directionWidth), pln.Project(directionHeight));
                     double linepos = Geometry.LinePar(spf.SourceBeam.Location, spf.SourceBeam.Direction, ip);
@@ -439,8 +428,8 @@ namespace CADability.GeoObject
             }
             if (spf.SnapToObjectCenter)
             {
-                GeoPoint Center = location + 0.5 * directionWidth + 0.5 * directionHeight;
-                spf.Check(Center, this, SnapPointFinder.DidSnapModes.DidSnapToObjectCenter);
+                GeoPoint center = location + 0.5 * directionWidth + 0.5 * directionHeight;
+                spf.Check(center, this, SnapPointFinder.DidSnapModes.DidSnapToObjectCenter);
             }
             if (spf.SnapToObjectSnapPoint)
             {
@@ -451,9 +440,9 @@ namespace CADability.GeoObject
             }
         }
         public override Style.EDefaultFor PreferredStyle => Style.EDefaultFor.Text;
-#endregion
+        #endregion
 
-#region ISerializable Members
+        #region ISerializable Members
         protected Picture(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -461,7 +450,7 @@ namespace CADability.GeoObject
             location = (GeoPoint)info.GetValue("Location", typeof(GeoPoint));
             directionWidth = (GeoVector)info.GetValue("DirectionWidth", typeof(GeoVector));
             directionHeight = (GeoVector)info.GetValue("DirectionHeight", typeof(GeoVector));
-            path = info.GetString("Path");
+            Path = info.GetString("Path");
         }
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
@@ -470,9 +459,9 @@ namespace CADability.GeoObject
             info.AddValue("Location", location);
             info.AddValue("DirectionWidth", directionWidth);
             info.AddValue("DirectionHeight", directionHeight);
-            info.AddValue("Path", path);
+            info.AddValue("Path", Path);
         }
-#endregion
+        #endregion
         internal static Bitmap CopyFrom(string filePath)
         {
             //open file from the disk (file path is the path to the file to be opened)
@@ -492,60 +481,68 @@ namespace CADability.GeoObject
 
     public class ShowPropertyPicture : PropertyEntryImpl, ICommandHandler, IGeoObjectShowProperty, IDisplayHotSpots
     {
-        private IPropertyEntry[] attributeProperties; // Anzeigen für die Attribute (Ebene, Farbe u.s.w)
+        private readonly IPropertyEntry[] attributeProperties; // Display for the attributes (layer, color, etc.)
         private IPropertyEntry[] subEntries;
-        private Picture picture;
-        private GeoVectorProperty dirWidth;
-        private GeoVectorProperty dirHeight;
-        GeoPointProperty location;
-        LengthProperty width, height;
-        StringProperty path;
-        BooleanProperty keepAspectRatio;
-        BooleanProperty rectangular;
-        private GeoVectorHotSpot dirWidthHotSpot, dirHeightHotSpot; // Hotspot für Richtung
+        private readonly Picture picture;
+        private readonly GeoVectorProperty dirWidth;
+        private readonly GeoVectorProperty dirHeight;
+        private readonly GeoPointProperty location;
+        private readonly LengthProperty width;
+        private readonly LengthProperty height;
+        private readonly StringProperty path;
+        private readonly BooleanProperty keepAspectRatio;
+        private readonly BooleanProperty rectangular;
+        private readonly GeoVectorHotSpot dirWidthHotSpot; // Hotspot for direction
+        private readonly GeoVectorHotSpot dirHeightHotSpot; // Hotspot for direction
 
-        public ShowPropertyPicture(Picture picture, IFrame Frame): base(Frame)
+        public ShowPropertyPicture(Picture picture, IFrame frame) : base(frame)
         {
             this.picture = picture;
-            attributeProperties = picture.GetAttributeProperties(Frame);
-            base.resourceId = "Picture.Object";
+            attributeProperties = picture.GetAttributeProperties(frame);
+            base.resourceIdInternal = "Picture.Object";
 
-            location = new GeoPointProperty("Picture.Location", Frame, true);
-            location.GetGeoPointEvent += new CADability.UserInterface.GeoPointProperty.GetGeoPointDelegate(OnGetRefPoint);
-            location.SetGeoPointEvent += new CADability.UserInterface.GeoPointProperty.SetGeoPointDelegate(OnSetRefPoint);
-            location.ModifyWithMouseEvent += new ModifyWithMouseDelegate(OnModifyLocationWithMouse);
-            width = new LengthProperty("Picture.Width", Frame, true);
-            width.GetLengthEvent += new LengthProperty.GetLengthDelegate(OnGetWidth);
-            width.SetLengthEvent += new LengthProperty.SetLengthDelegate(OnSetWidth);
-            height = new LengthProperty("Picture.Height", Frame, true);
-            height.GetLengthEvent += new LengthProperty.GetLengthDelegate(OnGetHeight);
-            height.SetLengthEvent += new LengthProperty.SetLengthDelegate(OnSetHeight);
-            dirWidth = new GeoVectorProperty("Picture.DirWidth", Frame, true);
-            dirWidth.GetGeoVectorEvent += new GeoVectorProperty.GetGeoVectorDelegate(OnGetDirWidth);
-            dirWidth.SetGeoVectorEvent += new GeoVectorProperty.SetGeoVectorDelegate(OnSetDirWidth);
-            dirWidth.ModifyWithMouseEvent += new ModifyWithMouseDelegate(OnModifyDirWidthWithMouse);
-            dirHeight = new GeoVectorProperty("Picture.DirHeight", Frame, true);
-            dirHeight.GetGeoVectorEvent += new GeoVectorProperty.GetGeoVectorDelegate(OnGetDirHeight);
-            dirHeight.SetGeoVectorEvent += new GeoVectorProperty.SetGeoVectorDelegate(OnSetDirHeight);
-            dirHeight.ModifyWithMouseEvent += new ModifyWithMouseDelegate(OnModifyDirHeightWithMouse);
+            location = new GeoPointProperty(frame, "Picture.Location");
+            location.OnGetValue = OnGetRefPoint;
+            location.OnSetValue = OnSetRefPoint;
+            location.ModifyWithMouse = OnModifyLocationWithMouse;
+
+            width = new LengthProperty(frame, "Picture.Width");
+            width.OnGetValue = OnGetWidth;
+            width.OnSetValue = OnSetWidth;
+
+            height = new LengthProperty(frame, "Picture.Height");
+            height.OnGetValue = OnGetHeight;
+            height.OnSetValue = OnSetHeight;
+
+            dirWidth = new GeoVectorProperty(frame, "Picture.DirWidth");
+            dirWidth.OnGetValue = OnGetDirWidth;
+            dirWidth.OnSetValue = OnSetDirWidth;
+            dirWidth.ModifyWithMouse = OnModifyDirWidthWithMouse;
+
+            dirHeight = new GeoVectorProperty(frame, "Picture.DirHeight");
+            dirHeight.OnGetValue = OnGetDirHeight;
+            dirHeight.OnSetValue = OnSetDirHeight;
+            dirHeight.ModifyWithMouse = OnModifyDirHeightWithMouse;
+
             path = new StringProperty(picture.Path, "Picture.Path");
-            path.GetStringEvent += new StringProperty.GetStringDelegate(OnGetPath);
-            path.SetStringEvent += new StringProperty.SetStringDelegate(OnSetPath);
+            path.OnGetValue = OnGetPath;
+            path.OnSetValue = OnSetPath;
+
             path.SetContextMenu("MenuId.Picture.Path", this);
             keepAspectRatio = new BooleanProperty("Picture.KeepAspectRatio", "YesNo.Values");
             double p = picture.DirectionWidth.Length / picture.Bitmap.Width * picture.Bitmap.Height / picture.DirectionHeight.Length;
             keepAspectRatio.BooleanValue = Math.Abs(1.0 - p) < 1e-6;
-            keepAspectRatio.BooleanChangedEvent += new BooleanChangedDelegate(OnKeepAspectRatioChanged);
+            keepAspectRatio.BooleanChangedEvent += OnKeepAspectRatioChanged;
             rectangular = new BooleanProperty("Picture.Rectangular", "YesNo.Values");
             rectangular.BooleanValue = Precision.IsPerpendicular(picture.DirectionWidth, picture.DirectionHeight, false);
-            rectangular.BooleanChangedEvent += new BooleanChangedDelegate(OnRectangularChanged);
+            rectangular.BooleanChangedEvent += OnRectangularChanged;
             dirWidthHotSpot = new GeoVectorHotSpot(dirWidth);
             dirWidthHotSpot.Position = picture.Location + picture.DirectionWidth;
             dirHeightHotSpot = new GeoVectorHotSpot(dirHeight);
             dirHeightHotSpot.Position = picture.Location + picture.DirectionHeight;
         }
 
-        void OnKeepAspectRatioChanged(object sender, bool NewValue)
+        private void OnKeepAspectRatioChanged(object sender, bool newValue)
         {
             if (keepAspectRatio.BooleanValue)
             {
@@ -553,7 +550,7 @@ namespace CADability.GeoObject
             }
         }
 
-        void OnRectangularChanged(object sender, bool NewValue)
+        private void OnRectangularChanged(object sender, bool newValue)
         {
             GeoVector normal = picture.DirectionWidth ^ picture.DirectionHeight;
             if (rectangular.BooleanValue)
@@ -562,25 +559,26 @@ namespace CADability.GeoObject
             }
         }
 
-        void OnModifyDirHeightWithMouse(IPropertyEntry sender, bool StartModifying)
-        {
-            GeneralGeoVectorAction gva = new GeneralGeoVectorAction(sender as GeoVectorProperty, picture.Location, picture);
-            Frame.SetAction(gva);
-        }
-        void OnModifyDirWidthWithMouse(IPropertyEntry sender, bool StartModifying)
+        private void OnModifyDirHeightWithMouse(IPropertyEntry sender, bool startModifying)
         {
             GeneralGeoVectorAction gva = new GeneralGeoVectorAction(sender as GeoVectorProperty, picture.Location, picture);
             Frame.SetAction(gva);
         }
 
-        void OnModifyLocationWithMouse(IPropertyEntry sender, bool StartModifying)
+        private void OnModifyDirWidthWithMouse(IPropertyEntry sender, bool startModifying)
+        {
+            GeneralGeoVectorAction gva = new GeneralGeoVectorAction(sender as GeoVectorProperty, picture.Location, picture);
+            Frame.SetAction(gva);
+        }
+
+        private void OnModifyLocationWithMouse(IPropertyEntry sender, bool startModifying)
         {
             GeneralGeoPointAction gpa = new GeneralGeoPointAction(location, picture);
             Frame.SetAction(gpa);
         }
 
         #region IPropertyEntry overrides
-        private void OnGeoObjectDidChange(IGeoObject Sender, GeoObjectChange Change)
+        private void OnGeoObjectDidChange(IGeoObject sender, GeoObjectChange change)
         {	// wird bei Änderungen der Geometrie aufgerufen, Abgleich der Anzeigen
             location.Refresh();
             width.Refresh();
@@ -595,17 +593,17 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
-        /// Overrides <see cref="PropertyEntryImpl.Added (IPropertyTreeView)"/>
+        /// Overrides <see cref="PropertyEntryImpl.Added (IPropertyPage)"/>
         /// </summary>
         /// <param name="propertyTreeView"></param>
         public override void Added(IPropertyPage propertyTreeView)
-        {	
+        {
             picture.DidChangeEvent += new ChangeDelegate(OnGeoObjectDidChange);
             base.Added(propertyTreeView);
             OnGeoObjectDidChange(picture, null); // reactivate HotSpots
         }
         /// <summary>
-        /// Overrides <see cref="PropertyEntryImpl.Removed (IPropertyTreeView)"/>
+        /// Overrides <see cref="PropertyEntryImpl.Removed (IPropertyPage)"/>
         /// </summary>
         /// <param name="propertyTreeView"></param>
         public override void Removed(IPropertyPage propertyTreeView)
@@ -616,14 +614,15 @@ namespace CADability.GeoObject
         /// <summary>
         /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.Opened (bool)"/>
         /// </summary>
-        /// <param name="IsOpen"></param>
-        public override void Opened(bool IsOpen)
-        {	// dient dazu, die Hotspots anzuzeigen bzw. zu verstecken wenn die SubProperties
-            // aufgeklappt bzw. zugeklappt werden. Wenn also mehrere Objekte markiert sind
-            // und diese Linie aufgeklappt wird.
+        /// <param name="isOpen"></param>
+        public override void Opened(bool isOpen)
+        {	
+            // Used to show or hide the hotspots when the sub-properties
+            // are expanded or collapsed. This happens, for example, when multiple objects are selected
+            // and this line is expanded.
             if (HotspotChangedEvent != null)
             {
-                if (IsOpen)
+                if (isOpen)
                 {
                     HotspotChangedEvent(location, HotspotChangeMode.Visible);
                     HotspotChangedEvent(dirWidthHotSpot, HotspotChangeMode.Visible);
@@ -636,45 +635,43 @@ namespace CADability.GeoObject
                     HotspotChangedEvent(dirHeightHotSpot, HotspotChangeMode.Invisible);
                 }
             }
-            base.Opened(IsOpen);
+            base.Opened(isOpen);
         }
-        public override PropertyEntryType Flags 
-        {
-            get
-            {
-                return PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries | PropertyEntryType.ContextMenu | PropertyEntryType.Selectable;
-            }
-        }
+        public override PropertyEntryType Flags => PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries | PropertyEntryType.ContextMenu | PropertyEntryType.Selectable;
+
         public override IPropertyEntry[] SubItems
         {
             get
             {
-                if (subEntries == null)
-                {
-                    List<IPropertyEntry> prop = new List<IPropertyEntry>();
-                    prop.Add(path);
-                    prop.Add(location);
-                    prop.Add(width);
-                    prop.Add(height);
-                    prop.Add(dirWidth);
-                    prop.Add(dirHeight);
-                    prop.Add(keepAspectRatio);
-                    prop.Add(rectangular);
-                    IPropertyEntry[] mainProps = prop.ToArray();
-                    subEntries = PropertyEntryImpl.Concat(mainProps, attributeProperties);
-                }
+                if (subEntries != null)
+                    return subEntries;
+
+                List<IPropertyEntry> prop = new List<IPropertyEntry>();
+                prop.Add(path);
+                prop.Add(location);
+                prop.Add(width);
+                prop.Add(height);
+                prop.Add(dirWidth);
+                prop.Add(dirHeight);
+                prop.Add(keepAspectRatio);
+                prop.Add(rectangular);
+                IPropertyEntry[] mainProps = prop.ToArray();
+                subEntries = PropertyEntryImpl.Concat(mainProps, attributeProperties);
                 return subEntries;
             }
         }
-        void OnSetPath(StringProperty sender, string newValue)
+
+        private void OnSetPath(string newValue)
         {
             picture.Path = newValue;
         }
-        string OnGetPath(StringProperty sender)
+
+        private string OnGetPath()
         {
             return picture.Path;
         }
-        void OnSetDirHeight(GeoVectorProperty sender, GeoVector v)
+
+        private void OnSetDirHeight(GeoVector v)
         {
             double l = picture.DirectionHeight.Length;
             GeoVector normal = picture.DirectionWidth ^ picture.DirectionHeight;
@@ -691,11 +688,13 @@ namespace CADability.GeoObject
                 }
             }
         }
-        GeoVector OnGetDirHeight(GeoVectorProperty sender)
+
+        private GeoVector OnGetDirHeight()
         {
             return picture.DirectionHeight;
         }
-        void OnSetDirWidth(GeoVectorProperty sender, GeoVector v)
+
+        private void OnSetDirWidth(GeoVector v)
         {
             double l = picture.DirectionWidth.Length;
             GeoVector normal = picture.DirectionWidth ^ picture.DirectionHeight;
@@ -712,45 +711,50 @@ namespace CADability.GeoObject
                 }
             }
         }
-        GeoVector OnGetDirWidth(GeoVectorProperty sender)
+
+        private GeoVector OnGetDirWidth()
         {
             return picture.DirectionWidth;
         }
-        void OnSetHeight(LengthProperty sender, double l)
+
+        private void OnSetHeight(double l)
         {
             if (l != 0.0)
             {
                 picture.SetHeight(l, keepAspectRatio.BooleanValue);
             }
         }
-        double OnGetHeight(LengthProperty sender)
+
+        private double OnGetHeight()
         {
             return picture.DirectionHeight.Length;
         }
-        void OnSetWidth(LengthProperty sender, double l)
+
+        private void OnSetWidth(double l)
         {
             if (l != 0.0)
             {
                 picture.SetWidth(l, keepAspectRatio.BooleanValue);
             }
         }
-        double OnGetWidth(LengthProperty sender)
+
+        private double OnGetWidth()
         {
             return picture.DirectionWidth.Length;
         }
-        private GeoPoint OnGetRefPoint(GeoPointProperty sender)
+        private GeoPoint OnGetRefPoint()
         {
             return picture.Location;
         }
-        private void OnSetRefPoint(GeoPointProperty sender, GeoPoint p)
+        private void OnSetRefPoint(GeoPoint p)
         {
             picture.Location = p;
         }
-#endregion
-#region ICommandHandler Members
-        bool ICommandHandler.OnCommand(string MenuId)
+        #endregion
+        #region ICommandHandler Members
+        bool ICommandHandler.OnCommand(string menuId)
         {
-            switch (MenuId)
+            switch (menuId)
             {
                 case "MenuId.Picture.Path.Reload":
                     try
@@ -760,7 +764,8 @@ namespace CADability.GeoObject
                     }
                     catch (Exception e)
                     {
-                        if (e is ThreadAbortException) throw (e);
+                        if (e is ThreadAbortException) 
+                            throw;
                     }
                     return true;
                 case "MenuId.Picture.Path.Open":
@@ -777,7 +782,8 @@ namespace CADability.GeoObject
                             }
                             catch (Exception e)
                             {
-                                if (e is ThreadAbortException) throw (e);
+                                if (e is ThreadAbortException) 
+                                    throw;
                             }
                         }
                     }
@@ -785,23 +791,23 @@ namespace CADability.GeoObject
             }
             return false;
         }
-        bool ICommandHandler.OnUpdateCommand(string MenuId, CommandState CommandState)
+        bool ICommandHandler.OnUpdateCommand(string menuId, CommandState commandState)
         {
-            switch (MenuId)
+            switch (menuId)
             {
                 case "MenuId.Picture.Path.Reload":
-                    CommandState.Enabled = true;
+                    commandState.Enabled = true;
                     return true;
                 case "MenuId.Picture.Path.Open":
-                    CommandState.Enabled = true;
+                    commandState.Enabled = true;
                     return true;
             }
             return false;
         }
         void ICommandHandler.OnSelected(MenuWithHandler selectedMenuItem, bool selected) { }
-#endregion
-#region IGeoObjectShowProperty Members
-
+        #endregion
+        #region IGeoObjectShowProperty Members
+        
         event CreateContextMenueDelegate IGeoObjectShowProperty.CreateContextMenueEvent
         {
             add { }
@@ -816,11 +822,10 @@ namespace CADability.GeoObject
         string IGeoObjectShowProperty.GetContextMenuId()
         {
             return null;
-            throw new Exception("The method or operation is not implemented.");
         }
 
-#endregion
-#region IDisplayHotSpots Members
+        #endregion
+        #region IDisplayHotSpots Members
         public event CADability.HotspotChangedDelegate HotspotChangedEvent;
         /// <summary>
         /// Implements <see cref="CADability.IDisplayHotSpots.ReloadProperties ()"/>
@@ -830,7 +835,7 @@ namespace CADability.GeoObject
             base.propertyPage.Refresh(this);
         }
 
-#endregion
+        #endregion
 
     }
 }

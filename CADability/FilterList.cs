@@ -27,7 +27,7 @@ namespace CADability.Attribute
         public FilterList()
         {
             entries = new SortedList();
-            resourceId = "FilterList";
+            resourceIdInternal = "FilterList";
             propertyPages = new List<IPropertyPage>();
         }
         /// <summary>

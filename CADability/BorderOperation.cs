@@ -6,22 +6,22 @@ using System.Collections.Generic;
 
 namespace CADability.Shapes
 {
-    /* NEUES KONZEPT (noch nicht implementiert, 20.7.15)
-     * --- es geht um einfache Borders, nicht um SimpleShapes, d.h. es gibt keine Löcher, alles ist linksrum orientiert ---
-     * 
-     * Mache einen Quadtree über beide Borders.
-     * Teile den Quadtree soweit auf, dass in jeder Liste nur ein Schnittpunkt liegt. Wenn Schnittpunkt näher als "recision" zusammenfallen,
-     * dann als nur einen Schnittpunkt betrachten.
-     * Jedes Quadrat (also Blatt des Quadtrees) hat bezüglich einer Border nur 2 Schnittpunkte, bzw. es ist ganz innerhalb oder ganz außerhalb.
-     * Diese Schnittpunkte muss man bestimmen (Parameter auf der Quadratseite und Parameter auf dem Border)
-     * Je nach boolscher Operation sollte es jetzt ganz einfach sein: jedes Quadrat liefert ein Interval (border1/2, von bis) oder 2 Intervalle,
-     * wenn ein Schnittpunkt enthalten ist. (Wenn kein Schnittpunkt enthalten ist, dann soll das Quadrat auch nur ein Border enthalten.
-     * (Probleme sind Selbstüberschneidungen/Berührungen: wenn alle 4 Eckpunkte innerhalb sind, dann kann man das Intervall vergessen).
-     * Segmente, die identisch sind, werden wie Schnittpunkte behandelt, mit einer besonderen Kennung.
-     * Zum Schluss werden die Intervalle aufgesammelt, zusammenhängende Stücke einer Border sind einfach zusammenfügbar. Hier können mehrere Umrandungen
-     * und auch Löcher entstehen. Auch die Richtungen sind klar: bei Vereinigung bleiben die Richtungen erhalten, bei Differenz dreht sich die Richtung 
-     * der rechten Seite um.
-     * 
+    /* NEW CONCEPT (not yet implemented, 20.7.15)
+     * --- this concerns simple borders, not SimpleShapes, i.e., there are no holes, everything is oriented counterclockwise ---
+     *
+     * Create a quadtree over both borders.
+     * Subdivide the quadtree so far that each list contains only one intersection point. If intersection points are closer than "precision,"
+     * then treat them as one intersection point.
+     * Each square (i.e., leaf of the quadtree) has, with respect to a border, only 2 intersection points, or it is entirely inside or entirely outside.
+     * These intersection points must be determined (parameters on the square's side and parameters on the border).
+     * Depending on the boolean operation, it should now be very simple: each square yields one interval (border1/border2, from-to) or 2 intervals if an
+     * intersection point is contained. (If no intersection point is contained, then the square should only contain one border.
+     * (Problems are self-intersections/contacts: if all 4 corner points are inside, then the interval can be ignored.)
+     * Segments that are identical are treated like intersection points, with a special identifier.
+     * Finally, the intervals are collected. Connected pieces of a border are simply joinable. Here, multiple outlines and even holes can arise.
+     * The directions are also clear: during union operations, the directions remain preserved; during a difference,
+     * the direction of the right side is reversed.
+     *
      * */
 
     internal class BorderOperation
@@ -39,13 +39,13 @@ namespace CADability.Shapes
                 this.used = false;
                 this.cross = cross;
             }
-            public int id; // zwei mit der gleichen id gehören zum selben Schnittpunkt
-            public double par; // Positionsparameter auf dem Border von 0 bis Segmentanzahl, ganzzahlig bei Ecken
-            public GeoPoint2D point; // der Punkt selbst
-            public double oppositePar; // Positionsparameter auf der anderen Border (nur wenn auf dem Rand)
-            public int index; // der Index in der anderen Liste
-            public bool used; // schon verbraucht, nicht mehr verwenden
-            public enum Direction { Entering, Leaving, Crossing, Ambigous, Ignore, Unknown } // Crossing ist für offene Border
+            public int id; // two with the same ID belong to the same intersection point
+            public double par; // Position parameter on the border ranges from 0 to the number of segments, integer at corners
+            public GeoPoint2D point; // the point itself
+            public double oppositePar; // Position parameter on the other border (only if on the edge)
+            public int index; // the index in the other list
+            public bool used; // already used, do not use anymore
+            public enum Direction { Entering, Leaving, Crossing, Ambigous, Ignore, Unknown } // Crossing is for open borders
             public Direction direction;
             public double cross;
             public PointPosition Decremented()
@@ -68,19 +68,19 @@ namespace CADability.Shapes
             }
             #endregion
         }
-        private double precision; // kleiner Wert, Punkte mit noch kleinerem Abstand werden als identisch betrachtet
-        private BoundingRect extent; // gemeinsame Ausdehnung beider Borders
+        private double precision; // small value, points with an even smaller distance are considered identical
+        private BoundingRect extent; // common extent of both borders
         private bool intersect;
-        private Border border1; // erster Operand
-        private Border border2; // zweiter Operand
-        private PointPosition[] border1Points; // Liste von relevanten Punkten auf B1
-        private PointPosition[] border2Points; // Liste von relevanten Punkten auf B2
+        private Border border1; // first operand
+        private Border border2; // second operand
+        private PointPosition[] border1Points; // list of relevant points on B1
+        private PointPosition[] border2Points; // list of relevant points on B2
         private void Refine(List<PointPosition> points, Border pointsborder, Border other)
         {
-            // doppelte entfernen. Die Frage nach der Genauigkeit erhebt sich hier
-            // zunächstmal fix mit 1e-6 implementiert
-            // zusätzlicher Aufwand, wenn Ende und Anfang übereinstimmen
-            // weggelassen, da vor dem Aufruf geregelt
+            // remove duplicates. The question of precision arises here
+            // initially implemented with a fixed value of 1e-6
+            // additional effort if end and beginning are identical
+            // omitted, as it is handled before the call
             //for (int i=points.Count-1; i>0; --i)
             //{
             //    if (Math.Abs((points[i - 1]).par - (points[i]).par) < 1e-6 ||
@@ -93,7 +93,7 @@ namespace CADability.Shapes
             //        }
             //    }
             //}
-            // noch den letzten und den ersten checken
+            // still check the last and the first
             //int last = points.Count - 1;
             //if (last > 0)
             //{
@@ -108,16 +108,20 @@ namespace CADability.Shapes
             //    }
             //}
             PointPosition[] pointsa = (PointPosition[])points.ToArray();
-            // die Punkte auf pointsa werden hinsichtlich 
-            // ihres Verhaltens bezüglich der anderen Kurve charakterisiert: tritt
-            // die jeweilige Border in die andere ein, oder verlässt sie diese.
-            // Problemfall: Berührung über eine Strecke: zunächst wird der Eintrittspunkt in eine Berührung auf Ignore gesetzt
-            // in der darauffolgenden Schleife breitet sich das ignore nach hinten aus, wenn davor und danach gleiche Wete sind.
-            // Vermutlich wird es ein Problem geben, wenn zwei Border ein gemeinsames Segment haben, aber dennoch eine echte Überschneidung
-            // stattfindet. So einen Fall muss man mal konstruieren. Denn wir lassen jeweils den Austrittspunkt gelten und die beiden
-            // Punktlisten werden in verschiedener Richtung durchlaufen, also die Punkte passen dann  nicht zusammen. Man sollte dann den
-            // Mittelpunkt nehmen.
-            // Problemfall: Berührung mit nur einem Eckpunkt wird eliminiert
+            // the points in pointsa are characterized with respect to 
+            // their behavior concerning the other curve: does the 
+            // respective border enter the other, or leave it.
+            // Problem case: contact over a segment: initially, the entry point 
+            // in a contact is set to Ignore. 
+            // In the subsequent loop, the ignore spreads backward if there are 
+            // the same values before and after.
+            // It is likely that there will be a problem if two borders 
+            // share a common segment but still have an actual intersection.
+            // Such a case needs to be constructed. This is because we always 
+            // consider the exit point, and the two point lists are traversed 
+            // in different directions, so the points won't match. The midpoint 
+            // should be used in such cases.
+            // Problem case: contact with only a single corner point is eliminated.
             if (pointsa.Length > 1)
             {
                 double par = (pointsa[pointsa.Length - 1].par + pointsborder.Count + pointsa[0].par) / 2.0;
@@ -144,7 +148,8 @@ namespace CADability.Shapes
                         par = (pointsa[i].par + pointsa[i + 1].par) / 2.0;
                         newpos = other.GetPosition(pointsborder.PointAt(par), precision);
                         if (newpos == Border.Position.OnCurve)
-                        {   // zur Sicherheit zwei weiterePunkte profen. Wenn einer nicht auf OnCurve ist, dann das nehmen. Genau die Mitte kann ein Artefakt liefern
+                        {   // for safety, check two additional points. If one is not OnCurve, take that one. 
+                            // Exactly the midpoint can produce an artifact
                             double par1 = pointsa[i].par + 0.324625 * (pointsa[i + 1].par - pointsa[i].par);
                             double par2 = pointsa[i].par + 0.689382 * (pointsa[i + 1].par - pointsa[i].par);
                             Border.Position newpos1 = other.GetPosition(pointsborder.PointAt(par1), precision);
@@ -157,8 +162,8 @@ namespace CADability.Shapes
                     {
                         newpos = firstpos;
                     }
-                    // neu eingeführt: Positionsbestimmung anhand der Richtung des Schnittes
-                    // epsilon noch willkürlich
+                    // newly introduced: position determination based on the direction of the intersection
+                    // epsilon is still arbitrary
                     if (pointsa[i].cross > 0.01 && other.IsClosed)
                     {
                         pointsa[i].direction = PointPosition.Direction.Leaving;
@@ -181,9 +186,9 @@ namespace CADability.Shapes
                     }
                     else if (newpos == Border.Position.OnCurve)
                     {
-                        // Bei Schraffur mit Inseln werden oft genau passende puzzleteile abgezogen
-                        // die in einzelnen Abschnitten übereinstimmen. Diese dürfen nicht 
-                        // als zugehörig betrachtete werden. Siehe z.B. Schraffur2.cdb
+                        // In hatching with islands, perfectly fitting puzzle pieces are often subtracted
+                        // that match in individual sections. These must not be
+                        // considered as belonging. See, for example, Schraffur2.cdb
                         // pointsa[i].direction = PointPosition.Direction.Ignore;
                         if (lastpos == Border.Position.Outside)
                             pointsa[i].direction = PointPosition.Direction.Entering;
@@ -207,15 +212,15 @@ namespace CADability.Shapes
                     dc.Add(pointsa[i].point, System.Drawing.Color.DarkBlue, pointsa[i].direction.ToString());
                 }
 #endif
-                // in folgender Schleife werden zwei gleiche, die nur von ignore getrennt sind auf einen reduziert
-                if (pointsborder != border1) // testweise mal nur auf den 2. Durchlauf beschränkt
+                // in the following loop, two identical ones, separated only by ignore, are reduced to one
+                if (pointsborder != border1) // for testing purposes, limited to the 2nd pass only
                 {
                     bool ignoring;
                     do
                     {
                         ignoring = false;
                         PointPosition.Direction lastdir = PointPosition.Direction.Ignore;
-                        // den letzten Wert als Startwert verwenden:
+                        // use the last value as the starting value:
                         for (int i = pointsa.Length - 1; i >= 0; --i)
                         {
                             if (pointsa[i].direction != PointPosition.Direction.Ignore)
@@ -262,7 +267,7 @@ namespace CADability.Shapes
                     {
                         int iminus1 = i - 1;
                         if (iminus1 < 0) iminus1 = pointsa.Length - 1;
-                        // nur solche nehmen, wo wirklich ein Wechsel ist
+                        // only take those where there is really a change
                         if ((pointsa[iminus1].direction != pointsa[i].direction) ||
                             (pointsa[iminus1].direction == PointPosition.Direction.Crossing && pointsa[i].direction == PointPosition.Direction.Crossing))
                         {
@@ -280,20 +285,20 @@ namespace CADability.Shapes
             }
             else
             {
-                points.Clear(); // nur ein einziger Punkt, der gilt sowieso nicht, oder
-                intersect = false; // jedenfalls kein Fall bekannt, wo sowas auftritt
+                points.Clear(); // only a single point, which doesn't count anyway, right?
+                intersect = false; // in any case, no known instance where something like this occurs
             }
         }
         private void GenerateClusterSet()
         {
-            // zuerst die beiden Listen mit den Eckpunkten füttern. wozu? abgeschafft!
+            // first, populate the two lists with the corner points. why? abolished!
             List<PointPosition> b1p = new List<PointPosition>();
             List<PointPosition> b2p = new List<PointPosition>();
 #if DEBUG
             debugb1p = b1p;
             debugb2p = b2p;
 #endif
-            // warum sollten wir die Eckpunkte dazunehmen???
+            // why should we include the corner points???
             //			for (int i=0; i<border1.Count; ++i)
             //			{
             //				GeoPoint2D p = border1[i].StartPoint;
@@ -304,8 +309,8 @@ namespace CADability.Shapes
             //				GeoPoint2D p = border2[i].StartPoint;
             //				b2p.Add(new PointPosition(i,p,border1.GetPosition(p,precision)));
             //			}
-            // jetzt noch die Schnittpunkt hinzunehmen:
-            // es würde Sinn machen über die Border mit den wenigeren Segmenten zu iterieren
+            // now add the intersection points:
+            // it would make sense to iterate over the border with fewer segments
             intersect = false;
             GeoPoint2DWithParameter[] isp = border1.GetIntersectionPoints(border2, precision);
             for (int j = 0; j < isp.Length; ++j)
@@ -317,21 +322,21 @@ namespace CADability.Shapes
                     GeoVector2D dir2 = border2.DirectionAt(isp[j].par2).Normalized;
                     dirz = dir1.x * dir2.y - dir1.y * dir2.x;
                 }
-                catch (GeoVectorException e)
+                catch (GeoVectorException)
                 {
                     dirz = 0.0;
                 }
-                // Am Eckpunkt ist das dirz nicht aussagekräftig, also 0.0 setzen, dann kommt anderer Mechanismus dran
+                // At the corner point, dirz is not meaningful, so set it to 0.0, then another mechanism takes over
                 if (Math.Abs(Math.Round(isp[j].par2) - isp[j].par2) < 1e-7) dirz = 0.0;
                 if (Math.Abs(Math.Round(isp[j].par1) - isp[j].par1) < 1e-7) dirz = 0.0;
                 b1p.Add(new PointPosition(isp[j].par1, isp[j].p, isp[j].par2, j, dirz));
                 b2p.Add(new PointPosition(isp[j].par2, isp[j].p, isp[j].par1, j, -dirz));
                 intersect = true;
             }
-            b1p.Sort(); // sortiert nach aufsteigendem Parameter
+            b1p.Sort(); // sorted by ascending parameter
             b2p.Sort();
-            // zu eng liegende entfernen, und zwar aus beiden Listen gleichermaßen
-            // es dürfte eigentlich genügen über eine Liste zu iterieren
+            // remove points that are too close to each other, and do so equally from both lists
+            // it should actually be sufficient to iterate over one list
             for (int i = b1p.Count - 1; i > 0; --i)
             {
                 if (Math.Abs((b1p[i - 1]).par - (b1p[i]).par) < 1e-6 ||
@@ -353,7 +358,7 @@ namespace CADability.Shapes
                     }
                 }
             }
-            // und noch am Ende checken
+            // and check again at the end
             int last = b1p.Count - 1;
             if (last > 0)
             {
@@ -378,12 +383,13 @@ namespace CADability.Shapes
             }
 
             Refine(b1p, border1, border2);
-            // Alle, die aus b1 entfernt wurden, müssen auch aus b2 entfernt werden
-            // das stand früher nach Refine(b2p... aber das hatte folgenden Nachteil:
-            // z.B. zwei horizontal leicht versetzte horizontale Rechtecke haben 4 Schnittpunkte, wobei jeweils zweimal
-            // Entering und zweimal Leaving kommt. Beim ersten Refine wird nur das nebeneinanderliegende Paar Entering->Leaving belassen
-            // das liegt aber in der Punktliste b2p nicht aufeinanderfolgend und dann wird dort das andere Paar beibehalten, so dass
-            // insgesamt nicht übrig bleibt. Deshalb also gleich entfernen.
+            // All entries removed from b1 must also be removed from b2.
+            // Previously, this was done after Refine(b2p...), but that had the following drawback:
+            // For example, two horizontally slightly offset horizontal rectangles have 4 intersection points,
+            // where there are two Entering and two Leaving points each.
+            // During the first Refine, only the adjacent pair Entering->Leaving is retained.
+            // However, in the point list b2p, these do not appear consecutively, so the other pair is retained there,
+            // which means that, in total, nothing is left. Therefore, remove them right away.
             for (int i = b2p.Count - 1; i >= 0; --i)
             {
                 bool ok = false;
@@ -401,15 +407,15 @@ namespace CADability.Shapes
             for (int i = 0; i < b1p.Count; ++i)
             {
                 for (int j = 0; j < b2p.Count; ++j)
-                {   // den folgenden Vergleich von == auf <1e-10 geändert, da offensichtlich kleinste Unterschiede auftreten
-                    // die Unterschiede kommen, weil fast identische entfernt wurden, 
-                    // aber es wurden nicht in beiden Listen die gleichen entfernt
-                    // hier müsste es aber jetzt genügen nach der id zu gucken, oder?
+                {   // Changed the following comparison from == to <1e-10 because very small differences occur.
+                    // The differences arise because nearly identical items were removed,
+                    // but not the same ones were removed from both lists.
+                    // Here, it should now be sufficient to check by id, right?
                     //if ((Math.Abs((b1p[i]).par-(b2p[j]).oppositePar)<1e-10) &&
                     //    (Math.Abs((b1p[i]).oppositePar-(b2p[j]).par)<1e-10))
                     if (b1p[i].id == b2p[j].id)
                     {
-                        // da PointPosition ein struct, hier umständlich:
+                        // since PointPosition is a struct, it's cumbersome here:
                         PointPosition pp1 = b1p[i];
                         PointPosition pp2 = b2p[j];
                         pp1.index = j;
@@ -420,13 +426,14 @@ namespace CADability.Shapes
                 }
                 if (b1p[i].index == -1)
                 {
-                    b1p.RemoveAt(i); // keinen Partner gefunden, weg damit
+                    b1p.RemoveAt(i); // no partner found, remove it
                     --i;
                 }
             }
-            // noch folgenden Sonderfall berücksichtigen:
-            // wenn in einer Liste zweimal Entering und die dazugehörigen zweimal Leaving sind
-            // dann einen der beiden löschen, denn es handelt sich um ein gemeinsames Konturstück
+
+            // Consider the following special case:
+            // If there are two Entering points and their corresponding two Leaving points in a list,
+            // then delete one of the pairs because it represents a shared contour segment.
             bool removed = true;
             while (removed)
             {
@@ -439,14 +446,14 @@ namespace CADability.Shapes
                         int i2 = b1p[i].index;
                         if (Math.Abs(i2 - i1) == 1 && b2p[i1].direction == b2p[i2].direction)
                         {
-                            // Bedingung erfüllt: i in List b1p löschen
+                            // Condition met: remove i from list b1p
                             int r1 = i;
                             int r2 = b1p[i].index;
                             b2p.RemoveAt(r2);
                             b1p.RemoveAt(r1);
                             for (int j = 0; j < b1p.Count; j++)
                             {
-                                if (b1p[j].index > r2) b1p[j] = b1p[j].Decremented(); // wg. blöden struct
+                                if (b1p[j].index > r2) b1p[j] = b1p[j].Decremented(); // because of the annoying struct
                             }
                             for (int j = 0; j < b2p.Count; j++)
                             {
@@ -458,9 +465,10 @@ namespace CADability.Shapes
                     }
                 }
             }
-            // eigentlich sollte jetzt kein Eintrag mit index == -1 mehr vorkommen
-            // und das rauslöschen ist ein bisschen blöd, weil die Indizes schon vergeben sind
-            // es würde aber gehen. Hier erstmal eine exception werfen:
+
+            // actually, there should no longer be any entries with index == -1
+            // and removing them is a bit tricky because the indices have already been assigned
+            // but it would be possible. For now, just throw an exception:
             for (int i = 0; i < b1p.Count; ++i)
             {
                 if ((b1p[i]).index == -1) throw new BorderException("internal error in GenerateClusterSet", BorderException.BorderExceptionType.InternalError);
@@ -479,7 +487,7 @@ namespace CADability.Shapes
             border2 = b2;
             extent = border1.Extent;
             extent.MinMax(border2.Extent);
-            precision = (extent.Width + extent.Height) * 1e-6; // 1e-8 war zu scharf!
+            precision = (extent.Width + extent.Height) * 1e-6; // 1e-8 was too strict!
             try
             {
                 GenerateClusterSet();
@@ -549,7 +557,7 @@ namespace CADability.Shapes
                 case BorderPosition.disjunct:
                     return new CompoundShape(new SimpleShape(border1), new SimpleShape(border2));
                 case BorderPosition.intersecting:
-                    // der schwierigste Fall, hier kann es eine Hülle und mehrere Löcher geben
+                    // The most difficult case, here there can be a shell and multiple holes
                     List<Border> bdrs = new List<Border>();
                     int startb1 = -1;
                     int ind;
@@ -573,7 +581,7 @@ namespace CADability.Shapes
                             //dc.toShow.Clear();
                             //dc.Add(segments.ToArray());
 #endif
-                            startb1 = border2Points[ind2].index; // index auf b1
+                            startb1 = border2Points[ind2].index; // index to b1
                         }
                         if (segments.Count > 0)
                         {
@@ -582,7 +590,7 @@ namespace CADability.Shapes
                             if ((sp | ep) < precision)
                             {
                                 Border bdr = new Border(segments.ToArray(), true);
-                                // identische hin und zurücklaufende Kurven entfernen
+                                // Remove identical forward and backward curves
                                 if (bdr.ReduceDeadEnd(precision * 10))
                                 {
                                     bdr.RemoveSmallSegments(precision);
@@ -595,15 +603,15 @@ namespace CADability.Shapes
                     }
                     if (bdrs.Count > 0)
                     {
-                        // hier kann ein Ring entstehen, der nur aus einem Border besteht
-                        // das müsste noch extra überprüft werden
+                        // Here, a ring may emerge that consists only of a single border
+                        // This still needs to be checked additionally
 
                         bdrs.Sort(new BorderAreaComparer());
                         Border outline = bdrs[bdrs.Count - 1] as Border;
                         double[] si = outline.GetSelfIntersection(precision);
-                        if (si.Length >= 3) // zwei Schnittpunkt, wie ein "C", das sich an der Öffnung berührt, also eigentlich ein "O" ist
+                        if (si.Length >= 3) // Two intersection points, like a "C" that touches at the opening, so it is essentially an "O"
                         {
-                            // zerschneide die outline in Stücke und eliminiere gegeläufige Teile
+                            // Cut the outline into pieces and eliminate counter-oriented parts
                             List<double> parms = new List<double>();
                             for (int i = 0; i < si.Length; i += 3)
                             {
@@ -623,7 +631,7 @@ namespace CADability.Shapes
                                 dbgl1.Add(parts[i].MakeGeoObject(Plane.XYPlane));
                             }
 #endif
-                            // parts enthält jetzt die aufgeschnipselte outline. Suche und entferne gegenläufige identische Teilabschnitte
+                            // `parts` now contains the sliced-up outline. Search for and remove identical sections with opposing directions.
                             bool removed = true;
                             while (removed)
                             {
@@ -638,7 +646,8 @@ namespace CADability.Shapes
                                     }
                                     Path2D part1 = parts[i].CloneReverse(true) as Path2D;
                                     if (part1.IsClosed)
-                                    {   // ein in sich zurückkehrendes Stückchen?
+                                    {
+                                        // a self-returning piece?
                                         Border testEmpty = new Border(part1);
                                         if (testEmpty.Area < precision)
                                         {
@@ -670,19 +679,20 @@ namespace CADability.Shapes
                             CompoundShape tmp = CompoundShape.CreateFromList(parts.ToArray(), precision);
                             if (tmp != null && tmp.SimpleShapes.Length == 1)
                             {
-                                bdrs.RemoveAt(bdrs.Count - 1); // alte outline weg
+                                bdrs.RemoveAt(bdrs.Count - 1); // old outline removed
                                 for (int i = 0; i < tmp.SimpleShapes[0].NumHoles; i++)
                                 {
-                                    bdrs.Add(tmp.SimpleShapes[0].Hole(i)); // Löcher dazu
+                                    bdrs.Add(tmp.SimpleShapes[0].Hole(i)); // Add holes
                                 }
                                 outline = tmp.SimpleShapes[0].Outline;
-                                bdrs.Add(tmp.SimpleShapes[0].Outline); // neue outline dazu, kommt gleich wieder weg
+                                bdrs.Add(tmp.SimpleShapes[0].Outline); // new outline added, will be removed again shortly
                             }
                         }
                         else if (si.Length == 3)
-                        {   // ein einziger innerer Schnittpunkt, das kann ein "Spike" in  der outline sein
+                        {
+                            // A single inner intersection point, this could be a "spike" in the outline
                         }
-                        bdrs.RemoveAt(bdrs.Count - 1); // outline weg
+                        bdrs.RemoveAt(bdrs.Count - 1); // remove outline
                         return new CompoundShape(new SimpleShape(outline, bdrs.ToArray()));
                     }
                     break;
@@ -699,9 +709,9 @@ namespace CADability.Shapes
                 case BorderPosition.b2coversb1:
                     return new CompoundShape(new SimpleShape(border1));
                 case BorderPosition.disjunct:
-                    return new CompoundShape(); // leer!
+                    return new CompoundShape(); // empty!
                 case BorderPosition.intersecting:
-                    // der schwierigste Fall, hier kann es mehrere Hüllen aber keine Löcher geben
+                    // The most difficult case, here there can be multiple shells but no holes
                     ArrayList bdrs = new ArrayList();
                     int startb1 = -1;
                     int ind;
@@ -714,7 +724,7 @@ namespace CADability.Shapes
                             segments.AddRange(border1.GetPart(border1Points[ind].par, border1Points[ind1].par, true));
                             int ind2 = FindNextPoint(false, border1Points[ind1].index, PointPosition.Direction.Leaving, true);
                             segments.AddRange(border2.GetPart(border2Points[border1Points[ind1].index].par, border2Points[ind2].par, true));
-                            startb1 = border2Points[ind2].index; // index auf b1
+                            startb1 = border2Points[ind2].index; // index to b1
                         }
                         if (segments.Count > 0)
                         {
@@ -739,7 +749,7 @@ namespace CADability.Shapes
                         }
                         return new CompoundShape(ss);
                     }
-                    // sie überschneiden sich (vermutlich Berührung), aber der Inhalt ist leer, also leer liefern
+                    // They overlap (presumably touch), but the content is empty, so return empty
                     return new CompoundShape();
             }
             throw new BorderException("unexpected error in BorderOperation.Intersection!", BorderException.BorderExceptionType.InternalError);
@@ -751,15 +761,15 @@ namespace CADability.Shapes
                 case BorderPosition.b1coversb2:
                     return new CompoundShape(new SimpleShape(border1, border2));
                 case BorderPosition.b2coversb1:
-                    // es wird alles weggenommen, also leer, warum stand hier vorher b2-b1???
-                    return new CompoundShape(); // leer!
+                    // Everything is removed, so it’s empty. Why was "b2-b1" written here before???
+                    return new CompoundShape(); // empty!
                 // return new CompoundShape(new SimpleShape(border2, border1));
                 case BorderPosition.disjunct:
-                    // disjunkt: das muss dann doch border1 sein, oder? vorher stand hier leer
+                    // disjoint: then it must be border1, right? previously this was left empty
                     return new CompoundShape(new SimpleShape(border1));
-                // return new CompoundShape(); // leer!
+                // return new CompoundShape(); // empty!
                 case BorderPosition.intersecting:
-                    // der schwierigste Fall, hier kann es mehrere Hüllen aber keine Löcher geben
+                    // the most difficult case, here there can be multiple outlines but no holes
                     ArrayList bdrs = new ArrayList();
                     int startb1 = -1;
                     int ind;
@@ -773,7 +783,7 @@ namespace CADability.Shapes
                             segments.AddRange(border1.GetPart(border1Points[ind].par, border1Points[ind1].par, true));
                             int ind2 = FindNextPoint(false, border1Points[ind1].index, PointPosition.Direction.Entering, false);
                             segments.AddRange(border2.GetPart(border2Points[border1Points[ind1].index].par, border2Points[ind2].par, false));
-                            startb1 = border2Points[ind2].index; // index auf b1
+                            startb1 = border2Points[ind2].index; // index to b1
                         }
                         if (segments.Count > 0)
                         {
@@ -803,10 +813,12 @@ namespace CADability.Shapes
                         }
                         return new CompoundShape(ss);
                     }
-                    // sie überschneiden sich, aber der Inhalt ist leer, also border1 liefern
-                    if (found) return new CompoundShape();
-                    else return new CompoundShape(new SimpleShape(border1));
-                    break;
+                    // they intersect, but the content is empty, so return border1
+                    if (found) 
+                        return new CompoundShape();
+                    
+                    return new CompoundShape(new SimpleShape(border1));
+
             }
             throw new BorderException("unexpected error in BorderOperation.Intersection!", BorderException.BorderExceptionType.InternalError);
         }
@@ -814,23 +826,23 @@ namespace CADability.Shapes
         {
             if (!intersect || border1Points.Length == 0 || border2Points.Length == 0)
             {
-                return new CompoundShape(new SimpleShape(border1)); // kein Schnitt
+                return new CompoundShape(new SimpleShape(border1)); // no intersection
             }
-            // die 2. Border ist offen und teilt die 1. auf
+            // The second border is open and splits the first one
             ArrayList bdrs = new ArrayList();
             int startb2 = -1;
             int ind;
             ArrayList segments = new ArrayList();
-            // zunächst in Richtung von border2 suchen
-            // auf border1 gehen wir immer nur vorwärts
+            // first search in the direction of border2
+            // We always move forward on border1
             while ((ind = FindNextPoint(false, startb2, PointPosition.Direction.Entering, true)) >= 0)
             {
                 int ind1 = FindNextPoint(false, ind, PointPosition.Direction.Leaving, true);
                 if (ind1 >= 0)
                 {
                     segments.AddRange(border2.GetPart(border2Points[ind].par, border2Points[ind1].par, true));
-                    // auf Border 1 sind eigentlich alle Punkte "Crossing", was ist mit Berührungen?
-                    // aber der, auf den border2Points[ind1].index darf ja nicht nochmal gefunden werden, deshalb "+1"
+                    // On Border 1, all points are actually "Crossing"; what about contacts (touch points)?
+                    // But the point at "border2Points[ind1].index" must not be found again, hence the "+1"
                     int nextInd = (border2Points[ind1].index + 1);
                     if (nextInd >= border1Points.Length) nextInd = 0;
                     int ind2 = FindNextPoint(true, nextInd, PointPosition.Direction.Crossing, true);
@@ -857,8 +869,9 @@ namespace CADability.Shapes
                     }
                 }
             }
-            // jetzt entgegen der Richtung von border2 suchen.
-            // zuvor aber alle Punkte wieder freigeben
+
+            // now search in the opposite direction of border2.
+            // but first, release all points again
             for (int i = 0; i < border1Points.Length; i++)
             {
                 border1Points[i].used = false;
@@ -873,8 +886,8 @@ namespace CADability.Shapes
                 if (ind1 >= 0)
                 {
                     segments.AddRange(border2.GetPart(border2Points[ind].par, border2Points[ind1].par, false));
-                    // auf Border 1 sind eigentlich alle Punkte "Crossing", was ist mit Berührungen?
-                    // aber der, auf den border2Points[ind1].index darf ja nicht nochmal gefunden werden, deshalb "+1"
+                    // On Border 1, all points are actually "Crossing"; what about touch points?
+                    // However, the point at border2Points[ind1].index must not be found again, hence the "+1".
                     int nextInd = (border2Points[ind1].index + 1);
                     if (nextInd >= border1Points.Length) nextInd = 0;
                     int ind2 = FindNextPoint(true, nextInd, PointPosition.Direction.Crossing, true);
@@ -901,7 +914,7 @@ namespace CADability.Shapes
                     }
                 }
             }
-            if (bdrs.Count > 1) // wenn Split nur ein Border liefert, dann war was falsch (geändert am 2.11.15)
+            if (bdrs.Count > 1) // If Split only returns one border, something went wrong (changed on 2.11.15)
             {
                 SimpleShape[] ss = new SimpleShape[bdrs.Count];
                 for (int i = 0; i < bdrs.Count; i++)
@@ -912,7 +925,7 @@ namespace CADability.Shapes
             }
             else
             {
-                return new CompoundShape(new SimpleShape(border1)); // kein Schnitt
+                return new CompoundShape(new SimpleShape(border1)); // no intersection
             }
         }
         public enum BorderPosition { disjunct, intersecting, b1coversb2, b2coversb1, identical, unknown };
@@ -921,7 +934,7 @@ namespace CADability.Shapes
         {
             get
             {
-                if (border1 == null) return BorderPosition.unknown; // die Initialisierung hat nicht geklappt
+                if (border1 == null) return BorderPosition.unknown; // The initialization did not succeed
                 if (borderPosition == BorderPosition.unknown)
                 {
                     if (intersect && this.border1Points.Length > 0)
@@ -934,13 +947,14 @@ namespace CADability.Shapes
                         bool on2 = false;
                         Border.Position pos = border2.GetPosition(border1.StartPoint, precision);
                         if (pos == Border.Position.OnCurve)
-                        {   // dummer Zufall: kein Schnittpunkt und mit Berührpunkt getestet
+                        {
+                            // silly coincidence: no intersection point and tested with a contact point
                             try
                             {
                                 // pos = border2.GetPosition(border1.SomeInnerPoint);
-                                // geändert wie folgt. Überlegung: kein Schnittpunkt und mit Berührpunkt getestet
-                                // dann mit einem anderen Punkt auf dem Border testen. Zwei Berührpunkte
-                                // wäre großer Zufall. deshalb die komische zahl, um Systematiken auszuweichen
+                                // Changed as follows: Consideration - no intersection point and tested with a contact point.
+                                // Then test with another point on the border. Two contact points would be a big coincidence.
+                                // That's why the strange number is used, to avoid systematic patterns.
                                 pos = border2.GetPosition(border1.PointAt(0.636548264536 * border1.Segments.Length), precision);
                             }
                             catch (BorderException) { }
@@ -1042,7 +1056,7 @@ namespace CADability.Shapes
         }
     }
 
-    // als key für Dictionary
+    // as a key for Dictionary
     internal class BorderPair : IComparable
     {
         int id1, id2;

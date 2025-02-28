@@ -19,14 +19,12 @@ namespace CADability.Actions
     {
         StringInput fileNameInput; // input field for the filename of the bitmap
         GeoPointInput positionInput; // input field for the position of the bitmap
-        DoubleInput scalingFactorInput; // optional input field for a scaling factor for the bitmap
         LengthInput width; // optional input field for a width factor for the bitmap
         LengthInput height; // optional input field for a height factor for the bitmap
         GeoVectorInput dirHeight;
         GeoVectorInput dirWidth;
         Picture picture; // the picture object beeing placed
         string fileName; // the filename for the bitmap
-        double scalingFactor; // the scaling factor
         double widthValue; // the width value
         double heightValue; // the height value
         GeoPoint location; // the location of the picture object

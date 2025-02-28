@@ -17,7 +17,7 @@ namespace CADability
         public NamedValuesProperty()
         {
             namedValues = new Hashtable();
-            this.resourceId = "NamedValues";
+            this.resourceIdInternal = "NamedValues";
         }
         public object GetNamedValue(string name)
         {

@@ -17,14 +17,14 @@ namespace CADability.UserInterface
 
         public CheckProperty(string resourceID, CheckState state)
         {
-            base.resourceId = resourceID;
+            base.resourceIdInternal = resourceID;
             this.state = (int)state;
         }
         public CheckProperty(object ObjectWithProperty, string PropertyName, string resourceId)
         {
 
             objectWithProperty = ObjectWithProperty;
-            base.resourceId = resourceId;
+            base.resourceIdInternal = resourceId;
 
             propertyInfoBool = objectWithProperty.GetType().GetProperty(PropertyName, typeof(bool));
             propertyInfoCheckState = objectWithProperty.GetType().GetProperty(PropertyName, typeof(CheckState));
@@ -86,7 +86,7 @@ namespace CADability.UserInterface
                     {
                         MethodInfo mi = propertyInfoSetBool;
                         object[] prm = new Object[2];
-                        prm[0] = labelText;
+                        prm[0] = labelTextInternal;
                         if (value == 1) prm[1] = true;
                         else prm[1] = false;
                         mi.Invoke(objectWithProperty, prm);
@@ -133,7 +133,7 @@ namespace CADability.UserInterface
                 if (cs != 2) cs = 1 - cs;
                 CheckState = cs;
                 propertyPage?.Refresh(this);
-                CheckStateChangedEvent?.Invoke(labelText, (
+                CheckStateChangedEvent?.Invoke(labelTextInternal, (
                     CheckState)cs);
             }
         }

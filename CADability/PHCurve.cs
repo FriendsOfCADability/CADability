@@ -1258,7 +1258,6 @@ namespace CADability.GeoObject
         public double curvature(double param)
         {
             int i = 0;
-            double r = 0;
             while (param > theCurve.par[i + 1])
                 i += 1;
             double pos = (param - theCurve.par[i]) / theCurve.t[i + 1];

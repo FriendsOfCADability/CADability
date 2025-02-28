@@ -43,7 +43,7 @@ namespace CADability.Attribute
         public HatchStyleList()
         {
             entries = new SortedList();
-            resourceId = "HatchStyleList";
+            resourceIdInternal = "HatchStyleList";
             needsUpdate = false;
         }
 
@@ -244,7 +244,7 @@ namespace CADability.Attribute
                 entries = (SortedList)info.GetValue("Entries", typeof(SortedList));
             }
             current = (HatchStyle)InfoReader.Read(info, "Current", typeof(HatchStyle));
-            resourceId = "HatchStyleList";
+            resourceIdInternal = "HatchStyleList";
         }
         void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
         {
@@ -366,10 +366,6 @@ namespace CADability.Attribute
                 if (hatchst != null && entries.Contains(hatchst.Name))
                 {
                     hatch.Update();
-                }
-                else
-                {
-                    int dbg = 0;
                 }
             }
             else if (go is Block)

@@ -24,7 +24,7 @@ namespace CADability.Attribute
         public DimensionStyleList()
         {
             entries = new SortedList();
-            resourceId = "DimensionStyleList";
+            resourceIdInternal = "DimensionStyleList";
         }
 
         public DimensionStyle this[int Index]
@@ -378,10 +378,6 @@ namespace CADability.Attribute
                 if (dimst != null && entries.Contains(dimst.Name))
                 {
                     dim.Recalc();
-                }
-                else
-                {
-                    int dbg = 0;
                 }
             }
             else if (go is Block)

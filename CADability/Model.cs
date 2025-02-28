@@ -702,7 +702,7 @@ namespace CADability
             defaultScale = 1.0;
             lineStyleScale = 1.0;
             projectionToExtent = new Hashtable();
-            base.resourceId = "ModelName";
+            base.resourceIdInternal = "ModelName";
             extent = null;
             layerFaceDisplayList = new LayerToDisplayListDictionary();
             layerTransparentDisplayList = new LayerToDisplayListDictionary();

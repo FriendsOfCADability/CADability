@@ -13,7 +13,6 @@ namespace CADability.Actions
         private GeoPoint objectPoint; // der (evtl. mittlere) Pickpunkt zum Runden
         private GeoPoint objectPoint1; // der Pickpunkt der ersten Curve
         private GeoPoint objectPointSav; // der  Pickpunkt zum Runden als Merker für onDone
-        private GeoPoint radiusPoint; // der Pickpunkt der Aufteil-Curve
         private ICurve iCurve1; // lokales Element
         private ICurve iCurve2; // lokales Element
         private ICurve iCurveComposedSplit; // lokales Element

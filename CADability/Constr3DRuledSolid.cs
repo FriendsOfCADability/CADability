@@ -10,8 +10,6 @@ namespace CADability.Actions
         private GeoObjectInput geoObjectInput1;
         private GeoObjectInput geoObjectInput2;
         //        private GeoPoint objectPoint;
-        private IGeoObject iGeoObjectSel1;
-        private IGeoObject iGeoObjectSel2;
         private IGeoObject iGeoObjectOrg1;
         private IGeoObject iGeoObjectOrg2;
         private IGeoObject attrObject;

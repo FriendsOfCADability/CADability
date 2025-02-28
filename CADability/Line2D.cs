@@ -34,7 +34,7 @@ namespace CADability.Curve2D
             double l = clippedBy.Width + clippedBy.Height;
             startPoint = c + l * direction;
             endPoint = c - l * direction;
-            ClipRect clr = new ClipRect(ref clippedBy);
+            ClipRect clr = new ClipRect(clippedBy);
             clr.ClipLine(ref startPoint, ref endPoint);
         }
         public override string ToString()
@@ -188,7 +188,7 @@ namespace CADability.Curve2D
         /// <returns></returns>
 		public override bool HitTest(ref BoundingRect Rect, bool IncludeControlPoints)
         {
-            ClipRect clr = new ClipRect(ref Rect);
+            ClipRect clr = new ClipRect(Rect);
             return clr.LineHitTest(startPoint, endPoint);
         }
         /// <summary>
@@ -838,21 +838,18 @@ namespace CADability.Curve2D
                 case Direction.toLeft:
                     if (Rect.Left > startPoint.x) return false;
                     return Rect.Bottom <= startPoint.y && Rect.Top >= startPoint.y;
-                    break;
                 case Direction.toRight:
                     if (Rect.Right < startPoint.x) return false;
                     return Rect.Bottom <= startPoint.y && Rect.Top >= startPoint.y;
-                    break;
                 case Direction.toBottom:
                     if (Rect.Bottom > startPoint.y) return false;
                     return Rect.Left <= startPoint.x && Rect.Right >= startPoint.x;
-                    break;
                 case Direction.toTop:
                     if (Rect.Top < startPoint.y) return false;
                     return Rect.Left <= startPoint.x && Rect.Right >= startPoint.x;
-                    break;
+                default:
+                    return false;
             }
-            return false; // damit der Compiler zufrieden ist
         }
         public object ReferencedObject
         {

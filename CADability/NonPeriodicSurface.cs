@@ -45,7 +45,6 @@ namespace CADability.GeoObject
         BoundingRect periodicBounds;
         bool hasPole, fullPeriod;
         ModOp2D toNonPeriodicBounds, toPeriodicBounds;
-        GeoPoint extendedPole; // when there is no pole, the definition area is a annulus (circular ring). extendedPole is the point at (0,0)
         /// <summary>
         /// </summary>
         /// <param name="periodicSurface"></param>

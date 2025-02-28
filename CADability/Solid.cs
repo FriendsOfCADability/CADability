@@ -16,7 +16,7 @@ namespace CADability.GeoObject
             : base(frame)
         {
             this.solid = solid;
-            resourceId = "Solid.Object";
+            resourceIdInternal = "Solid.Object";
             attributeProperties = solid.GetAttributeProperties(frame);
         }
         #region IShowPropertyImpl overrides

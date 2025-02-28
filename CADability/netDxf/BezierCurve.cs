@@ -34,13 +34,6 @@ namespace netDxf
     /// </summary>
     public abstract class BezierCurve
     {
-        #region private fields
-
-        protected readonly Vector3[] controlPoints;
-        protected readonly int degree;
-
-        #endregion
-
         #region constructors
 
         /// <summary>
@@ -62,10 +55,10 @@ namespace netDxf
                 throw new ArgumentOutOfRangeException(nameof(degree), degree, "The bezier curve degree must be at least one.");
             }
 
-            this.controlPoints = controlPoints.ToArray();
-            this.degree = degree;
+            this.ControlPoints = controlPoints.ToArray();
+            this.Degree = degree;
             
-            if (this.degree != this.controlPoints.Length - 1)
+            if (this.Degree != ControlPoints.Length - 1)
             {
                 throw new ArgumentException("The bezier curve degree must be equal to the number of control points minus one.");
             }
@@ -78,18 +71,12 @@ namespace netDxf
         /// <summary>
         /// Gets the control points.
         /// </summary>
-        public Vector3[] ControlPoints
-        {
-            get { return this.controlPoints; }
-        }
+        public Vector3[] ControlPoints { get; }
 
         /// <summary>
         /// Gets the bezier curve degree.
         /// </summary>
-        public int Degree
-        {
-            get { return this.degree; }
-        }
+        public int Degree { get; }
 
         #endregion
 

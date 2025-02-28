@@ -466,7 +466,7 @@ namespace CADability.Attribute
         public override void Added(IPropertyPage propertyPage)
         {
             base.Added(propertyPage);
-            base.resourceId = "StyleName";
+            base.resourceIdInternal = "StyleName";
         }
         public override void EndEdit(bool aborted, bool modified, string newValue)
         {
@@ -752,12 +752,12 @@ namespace CADability.Attribute
         public StyleSelectionProperty(IStyle objectWithStyle, string resourceId, StyleList styleList)
         {
             this.objectWithStyle = objectWithStyle;
-            base.resourceId = resourceId;
+            base.resourceIdInternal = resourceId;
             this.styleList = styleList;
             choices = styleList.Names;
             if (objectWithStyle != null && objectWithStyle.Style != null)
             {
-                base.selectedText = objectWithStyle.Style.Name;
+                base.SelectedText = objectWithStyle.Style.Name;
             }
             toWatch = objectWithStyle as IGeoObject;
             if (toWatch != null && objectWithStyle.Style != null)
@@ -768,7 +768,7 @@ namespace CADability.Attribute
                 }
                 else
                 {
-                    base.selectedText = null;
+                    base.SelectedText = null;
                     base.unselectedText = (toWatch as IStyle).Style.Name;
                 }
             }
@@ -807,13 +807,13 @@ namespace CADability.Attribute
                 {
                     if ((toWatch as IStyle).Style.Check(toWatch))
                     {
-                        base.selectedText = (toWatch as IStyle).Style.Name;
+                        base.SelectedText = (toWatch as IStyle).Style.Name;
                         base.unselectedText = null;
                     }
                     else
                     {
                         base.unselectedText = (toWatch as IStyle).Style.Name;
-                        base.selectedText = null;
+                        base.SelectedText = null;
                     }
                     propertyPage.Refresh(this);
                 }
@@ -850,7 +850,7 @@ namespace CADability.Attribute
         public StyleList()
         {
             styles = new SortedList();
-            resourceId = "StyleList";
+            resourceIdInternal = "StyleList";
         }
         public static StyleList GetDefault(IAttributeListContainer container)
         {
@@ -1113,7 +1113,7 @@ namespace CADability.Attribute
                 styles = (SortedList)info.GetValue("Styles", typeof(SortedList));
             }
             current = InfoReader.Read(info, "Current", typeof(Style)) as Style;
-            resourceId = "StyleList";
+            resourceIdInternal = "StyleList";
         }
         /// <summary>
         /// Implements <see cref="ISerializable.GetObjectData"/>

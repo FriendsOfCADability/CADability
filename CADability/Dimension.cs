@@ -2303,14 +2303,15 @@ namespace CADability.GeoObject
             }
             catch (Exception e)
             {
-                if (e is ThreadAbortException) throw (e);
+                if (e is ThreadAbortException) 
+                    throw;
             }
-            catch { }
+            
             QuadTreeCollection res = new QuadTreeCollection(this, projection);
-            for (int i = 0; i < list.Count; ++i)
-            {
-                res.Add(list[i].GetQuadTreeItem(projection, extentPrecision));
-            }
+            
+            foreach (IGeoObject geo in list)
+                res.Add(geo.GetQuadTreeItem(projection, extentPrecision));
+            
             return res;
         }
         /// <summary>

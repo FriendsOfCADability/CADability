@@ -18,7 +18,7 @@ namespace CADability.UserInterface
         private ICommandHandler handleContextMenu;
         public CurvesProperty(string resourceId, IFrame frame)
         {
-            this.resourceId = resourceId;
+            this.resourceIdInternal = resourceId;
             this.frame = frame;
             curves = new ICurve[0]; // leer initialisieren
         }

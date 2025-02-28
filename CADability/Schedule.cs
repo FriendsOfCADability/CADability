@@ -107,7 +107,7 @@ namespace CADability
         {
             this.driveList = driveList;
             steps = new Dictionary<IDrive, SortedList<double, double>>();
-            base.resourceId = "Schedule";
+            base.resourceIdInternal = "Schedule";
         }
         public void AddPosition(IDrive drive, double time, double position)
         {
@@ -405,7 +405,7 @@ namespace CADability
         #region ISerializable Members
         protected Schedule(SerializationInfo info, StreamingContext context)
         {
-            base.resourceId = "Schedule";
+            base.resourceIdInternal = "Schedule";
             name = info.GetString("Name");
             driveList = info.GetValue("DriveList", typeof(DriveList)) as DriveList;
             deserialized = info.GetValue("Steps", typeof(object[])) as object[];
@@ -442,7 +442,7 @@ namespace CADability
         #region IJsonSerialize Members
         protected Schedule()
         {
-            base.resourceId = "Schedule";
+            base.resourceIdInternal = "Schedule";
         }
         public void GetObjectData(IJsonWriteData data)
         {
@@ -682,7 +682,7 @@ namespace CADability
         {
             scheduleList = model.AllSchedules;
             driveList = model.AllDrives;
-            base.resourceId = "Schedule.List";
+            base.resourceIdInternal = "Schedule.List";
             if (scheduleList.Count > 0)
             {
                 active = scheduleList[0];

@@ -10,16 +10,16 @@ using Wintellect.PowerCollections;
 namespace CADability.Shapes
 {
     /// <summary>
-    /// Ein Verbindungspunkt. Die Kurve curve startet oder endet hier. Findet Verwendung
-    /// im Cluster, der i.A. aus mehreren solchen Verbindungspunkten besteht.
+    /// A connection point. The curve `curve` starts or ends here. 
+    /// It is used in the cluster, which generally consists of multiple such connection points.
     /// </summary>
     internal class Joint : IComparable
     {
-        public ICurve2D curve; // die Kurve
-        public Cluster StartCluster; // von hier
-        public Cluster EndCluster; // nach da (isStartPoint wieder entfernen)
-        public double tmpAngle; // ein Winkel für das sortieren
-        public bool forwardUsed; // diese Kante wurde 
+        public ICurve2D curve; // The curve
+        public Cluster StartCluster; // From here
+        public Cluster EndCluster; // To there (remove isStartPoint again)
+        public double tmpAngle; // An angle for sorting
+        public bool forwardUsed; // This edge was used
         public bool reverseUsed;
         public Joint() { }
         public override string ToString()
@@ -68,14 +68,14 @@ namespace CADability.Shapes
         #endregion
     }
 
-    /// <summary>
-    /// Ein oder mehrere Joints, die sehr end beisammenliegen und als identische Punkte
-    /// betrachtet werden.
-    /// </summary>
-    internal class Cluster : IQuadTreeInsertable
-    {
-        public GeoPoint2D center; // der Mittelpunkt aller zugehörigen Joints
-        public List<Joint> Joints; // Liste von Joint[]
+/// <summary>
+/// One or more joints that are located very close together 
+/// and are considered identical points.
+/// </summary>
+internal class Cluster : IQuadTreeInsertable
+{
+    public GeoPoint2D center; // The center point of all associated joints
+    public List<Joint> Joints; // List of Joint objects
         public Cluster()
         {
             Joints = new List<Joint>();
@@ -146,25 +146,25 @@ namespace CADability.Shapes
         }
     }
     /// <summary>
-    /// INTERN:
-    /// Dient zum Erzeugen von Border und SimpleShape/CompoundShape aus einer Liste von
-    /// ICurve2D. Es werden keine Schnittpunkte betrachtet, die müssten zuvor erzeugt und
-    /// die ICurve2D Objekte gesplittet werden.
+    /// INTERNAL:
+    /// Used for generating a Border and SimpleShape/CompoundShape from a list of 
+    /// ICurve2D. Intersections are not considered; they must be created beforehand,
+    /// and the ICurve2D objects must be split accordingly.
     /// </summary>
     internal class CurveGraph
     {
-        private double clusterSize; // maximale Cluster Größe, abhängig von der Ausdehnung alle Objekte
-        private double maxGap; // maximale zu schließende Lücke
-        private QuadTree clusterTree; // QuadTree aller Cluster
-        private UntypedSet clusterSet; // Menge aller Cluster (parallel zum QuadTree)
+        private double clusterSize; // Maximum cluster size, depending on the extent of all objects
+        private double maxGap; // Maximum gap to be closed
+        private QuadTree clusterTree; // QuadTree of all clusters
+        private UntypedSet clusterSet; // Set of all clusters (parallel to the QuadTree)
         /// <summary>
-        /// Liste an unbrauchbaren Objekten die bei erstellen eines CompoundShape angefallen sind
+        /// List of unusable objects that were generated during the creation of a CompoundShape
         /// </summary>
         public List<IGeoObject> DeadObjects { get; } = new List<IGeoObject>();
 
         static public CurveGraph CrackCurves(GeoObjectList l, Plane plane, double maxGap)
-        {   // alle Kurven in l werden in die Ebene plane projiziert. Das ist mal ein erster Ansatz
-            // Man könnte auch gemeinsame Ebenen finden u.s.w.
+        {   // All curves in l are projected onto the plane. This is just a first approach.
+            // One could also find common planes and so on.
             ArrayList curves = new ArrayList();
             BoundingRect ext = BoundingRect.EmptyBoundingRect;
             foreach (IGeoObject go in l)
@@ -175,11 +175,11 @@ namespace CADability.Shapes
                     ICurve2D cv2 = cv.GetProjectedCurve(plane);
                     if (cv2 != null)
                     {
-                        // "3d" wird nur verwendet um hinterher aus den Originalkurven die Ebene zu bestimmen
-                        // in die alles zurücktranformiert wird. Besser würde man vermutlich mit "plane" arbeiten
-                        // so wie es hier reinkommt.
+                        // "3d" is only used to determine the plane from the original curves
+                        // into which everything will be transformed back. It would probably be better
+                        // to work with "plane," as it is provided here.
                         if (cv2 is Path2D && (cv2 as Path2D).GetSelfIntersections().Length > 0)
-                        {   // ein sich selbst überschneidender Pfad muss aufgelöst werden
+                        {   // A self-intersecting path must be resolved
                             ICurve2D[] sub = (cv2 as Path2D).SubCurves;
                             curves.AddRange(sub);
                             for (int i = 0; i < sub.Length; ++i)
@@ -205,7 +205,7 @@ namespace CADability.Shapes
             {
                 qt.AddObject(curves[i] as ICurve2D);
             }
-            // jetzt alle mit allen schneiden und die Schnipsel in eine weitere Liste stecken
+            // Now intersect all with all and put the fragments into another list
             ArrayList snippet = new ArrayList();
             for (int i = 0; i < curves.Count; ++i)
             {
@@ -237,7 +237,7 @@ namespace CADability.Shapes
                 else
                 {
                     intersectionPoints.Add(0.0);
-                    intersectionPoints.Add(1.0); // damit sinds mindesten 3
+                    intersectionPoints.Add(1.0); // This ensures there are at least 3
                     double[] pps = (double[])intersectionPoints.ToArray(typeof(double));
                     Array.Sort(pps);
                     for (int ii = 1; ii < pps.Length; ++ii)
@@ -262,12 +262,12 @@ namespace CADability.Shapes
                     }
                 }
             }
-            // snippet ist jetzt die Liste aller Schnipsel
+            // snippet is now the list of all fragments
             return new CurveGraph((ICurve2D[])snippet.ToArray(typeof(ICurve2D)), maxGap);
         }
 
         public CurveGraph(ICurve2D[] curves, double maxGap)
-        {   // aus den ICurve2D wird eine Clusterliste erzeugt (Start- und Endpunkte)
+        {   // A cluster list is created from the ICurve2D (start and end points)
             this.maxGap = maxGap;
             BoundingRect ext = BoundingRect.EmptyBoundingRect;
             for (int i = 0; i < curves.Length; ++i)
@@ -290,7 +290,7 @@ namespace CADability.Shapes
         }
 
         private void Insert(ICurve2D curve)
-        {   // der Start- bzw. Endpunkt einer Kurve kommt in die Cluster Liste
+        {   // The start or end point of a curve is added to the cluster list
             Joint lp = new Joint();
             lp.curve = curve;
 
@@ -303,7 +303,7 @@ namespace CADability.Shapes
                 if (Geometry.Dist(cl.center, p) < clusterSize)
                 {
                     InsertInto = cl;
-                    clusterTree.RemoveObject(cl); // rausnehmen, da er u.U. größer wird und unten wieder eingefügt wird
+                    clusterTree.RemoveObject(cl); // Remove it, as it might get larger and will be reinserted below
                     break;
                 }
             }
@@ -333,7 +333,7 @@ namespace CADability.Shapes
             InsertInto.center = new GeoPoint2D(x / InsertInto.Joints.Count, y / InsertInto.Joints.Count);
             clusterTree.AddObject(InsertInto);
 
-            // desgleichen mit dem Endpunkt:
+            // The same applies to the endpoint:
             p = curve.EndPoint;
             CheckSp = new BoundingRect(p, clusterSize, clusterSize);
             StartCluster = clusterTree.GetObjectsFromRect(CheckSp);
@@ -343,7 +343,7 @@ namespace CADability.Shapes
                 if (Geometry.Dist(cl.center, p) < clusterSize)
                 {
                     InsertInto = cl;
-                    clusterTree.RemoveObject(cl); // rausnehmen, da er u.U. größer wird und unten wieder eingefügt wird
+                    clusterTree.RemoveObject(cl); // Remove it, as it might get larger and will be reinserted below
                     break;
                 }
             }
@@ -376,7 +376,7 @@ namespace CADability.Shapes
         }
 
         private Cluster FindCluster(ICurve2D curve, GeoPoint2D p, bool RemovePoint)
-        {   // Findet einen Cluster, der den Punkt p und die Kurve curve enthält
+        {   // Finds a cluster that contains the point p and the curve curve
             BoundingRect clip = new BoundingRect(p, clusterSize, clusterSize);
             ICollection col = clusterTree.GetObjectsFromRect(clip);
             foreach (Cluster cl in col)
@@ -396,8 +396,8 @@ namespace CADability.Shapes
             return null;
         }
         private void RemoveAllDeadEnds()
-        {   // Entfernt alle Sackgassen
-            ArrayList ClusterToRemove = new ArrayList(); // damit die Schleife über clusterSet laufen kann
+        {
+            ArrayList ClusterToRemove = new ArrayList(); // So that the loop can iterate over clusterSet
             foreach (Cluster cl in clusterSet)
             {
                 if (cl.Joints.Count < 2)
@@ -418,7 +418,7 @@ namespace CADability.Shapes
                 {
                     DeadObjects.Add(NextCluster.Joints[0].curve.MakeGeoObject(Plane.XYPlane));
 
-                    Joint lp = NextCluster.Joints[0]; // es gibt ja genau einen
+                    Joint lp = NextCluster.Joints[0]; // There is exactly one
                     if (lp.StartCluster == NextCluster) NextCluster = lp.EndCluster;
                     else NextCluster = lp.StartCluster;
                     if (NextCluster != null)
@@ -428,7 +428,7 @@ namespace CADability.Shapes
                             if ((NextCluster.Joints[i]) == lp)
                             {
                                 NextCluster.Joints.RemoveAt(i);
-                                break; // diesen Pfad rausoperiert
+                                break; // Extracted this path
                             }
                         }
                     }
@@ -438,10 +438,9 @@ namespace CADability.Shapes
         }
         //		private void FindCurve(Cluster StartCluster, int PointIndex, Cluster EndCluster, Set UsedClusters, ArrayList result)
         //		{
-        //			// der Cluster StartHere hat mehr als zwei Anschlüsse. Gesucht sind sämtliche Pfade, die von StartHere
-        //			// nach EndHere führen. Das Ergebnis ist in dem Parameter result zu finden. Dieser
-        //			// enthält ein oder mehrerer ArrayLists, wovon jede einzelne eine Abfolge von Cluster und Index ist
-        //			ArrayList SingleCurve = new ArrayList();
+        //			// The cluster StartHere has more than two connections. The goal is to find all paths that lead from StartHere
+        //          // to EndHere. The result can be found in the parameter 'result', which contains one or more ArrayLists,
+        //          // each representing a sequence of clusters and indices.
         //			Cluster LastCluster = StartCluster;
         //			while (PointIndex>=0)
         //			{
@@ -452,43 +451,43 @@ namespace CADability.Shapes
         //				Cluster cl;
         //				if (lp.isStartPoint) cl = FindCluster(lp.curve,lp.curve.EndPoint,false);
         //				else cl = FindCluster(lp.curve,lp.curve.StartPoint,false);
-        //				if (cl==null) break; // nichts gefunden, kann eigentlich nicht vorkommen
+        //				if (cl==null) break; // Nothing found; this should actually never happen
         //				if (cl==EndCluster)
         //				{	// fertig
         //					result.Add(SingleCurve);
         //					break;
         //				}
-        //				if (UsedClusters.Contains(cl)) break; // innerer Kurzschluss, führt nicht zum Anfang
+        //				if (UsedClusters.Contains(cl)) break; // Internal short circuit, does not lead to the start
         //				if (cl.Points.Count==2)
-        //				{	// es geht eindeutig weiter
+        //				{	// It clearly continues
         //					if (((Joint)cl.Points[0]).curve==lp.curve) PointIndex = 1;
         //					else PointIndex = 0;
         //					LastCluster = cl;
-        //					// und weiter gehts
+        //					// And on we go
         //				} 
         //				else
-        //				{	// es gibt mehr als eine Fortsetzung, denn Cluster mit einem Punkt dürfen nicht vorkommen
-        //					// hier werden also verschiedene Fortsetzungen gesucht
+        //				{	// There is more than one continuation, as clusters with a single point should not exist
+        //					// Therefore, different continuations are being searched for here
         //					for (int i=0; i<cl.Points.Count; ++i)
         //					{
         //						if (((Joint)cl.Points[i]).curve!=lp.curve)
         //						{
-        //							ArrayList NextSegment = new ArrayList(); // das neue Ergebnis
+        //							ArrayList NextSegment = new ArrayList(); // The new result
         //							FindCurve(cl,i,EndCluster,UsedClusters.Clone(),NextSegment);
         //							for (int j=0; j<NextSegment.Count; ++j)
         //							{
-        //								ArrayList NextCurve = new ArrayList(SingleCurve); // immer der selbe Anfang
-        //								NextCurve.AddRange((ArrayList)NextSegment[j]); // und verschiedene Enden
+        //								ArrayList NextCurve = new ArrayList(SingleCurve); // Always the same beginning
+        //								NextCurve.AddRange((ArrayList)NextSegment[j]); // And different endings
         //								result.Add(NextCurve);
         //							}
         //						}
         //					}
-        //					break; // fertig
+        //					break; // Done
         //				}
         //			}
         //		}
         private void RemoveJoint(Joint lp, Cluster cl)
-        {   // entfernt einen Joint aus einem Cluster. Wird der Cluster leer, so wird er ganz entfernt
+        {   // Removes a joint from a cluster. If the cluster is empty, it is completely removed
             clusterTree.RemoveObject(cl);
             cl.Joints.Remove(lp);
             if (cl.Joints.Count > 0) clusterTree.AddObject(cl);
@@ -524,15 +523,15 @@ namespace CADability.Shapes
                     if (foundCluster != null) break;
                 }
             }
-            if (foundCluster == null) return null; // sollte nicht vorkommen
+            if (foundCluster == null) return null; // Should not occur
             RemoveJoint(foundJoint, foundCluster);
             return foundCluster;
         }
         //		private Border FindNextBorder()
         //		{
-        //			// Alle Cluster enthalten zwei Punkte. Suche einen Joint, dessen angeschlossener
-        //			// ICurve2D länger als maxGap ist (warum eigentlich?)
-        //			// Gehe solange durch die Cluster, bis wieder der erste Punkt erreicht ist
+        //			// All clusters contain two points. Search for a joint whose connected
+        //			// ICurve2D is longer than maxGap (why actually?)
+        //			// Iterate through the clusters until the first point is reached again
         //			Joint StartWith = null;
         //			foreach (Cluster cl in clusterSet)
         //			{
@@ -547,7 +546,7 @@ namespace CADability.Shapes
         //				}
         //				if (StartWith!=null) break;
         //			}
-        //			if (StartWith==null) return null; // keinen Anfang gefunden
+        //			if (StartWith==null) return null; // No beginning found
         //			Joint LastPoint = StartWith; 
         //			Cluster goon = null;
         //			BorderBuilder makeBorder = new BorderBuilder();
@@ -555,9 +554,9 @@ namespace CADability.Shapes
         //			while ((goon = ExtractCurve(LastPoint.curve,!LastPoint.isStartPoint))!=null)
         //			{
         //				makeBorder.AddSegment(LastPoint.curve.CloneReverse(!LastPoint.isStartPoint));
-        //				if (goon.Points.Count==0) break; // auf den letzten und ersten Punkt gestoßen
-        //				LastPoint = (Joint)goon.Points[0]; // es sollte ja nur diesen einen geben
-        //				RemoveJoint(LastPoint,goon); // damit müsste dieser Cluster verschwinden
+        //				if (goon.Points.Count==0) break; // Encountered the last and first point
+        //				LastPoint = (Joint)goon.Points[0]; // There should only be this one
+        //				RemoveJoint(LastPoint,goon); // This should make this cluster disappear
         //			}
         //			return makeBorder.BuildBorder();
         //		}
@@ -565,7 +564,7 @@ namespace CADability.Shapes
         //		{
         //			Set tmpUsedJoints = new Set();
         //			tmpUsedJoints.Add(new UsedJoint(startWith,forward));
-        //			// Anfangskante gefunden, wie gehts weiter
+        //			// Starting edge found, what’s next
         //			BorderBuilder bb = new BorderBuilder();
         //			bb.Precision = clusterSize;
         //			if (forward) bb.AddSegment(startWith.Clone());
@@ -574,13 +573,13 @@ namespace CADability.Shapes
         //			while (!bb.IsClosed)
         //			{
         //				Cluster cl = FindCluster(startWith, bb.EndPoint, false);
-        //				if (cl==null) return false; // eine angefangene Border geht nicht weiter, sollte nicht passieren, da keine Sackgassen
+        //				if (cl==null) return false; // A started border does not continue, this should not happen as there are no dead ends
         //				int ind = -1;
         //				double sa = -1.0;
         //				for (int i=0; i<cl.Points.Count; ++i)
         //				{
         //					Joint j = cl.Points[i] as Joint;
-        //					if (j.curve==startWith) continue; // nicht auf der Stelle rückwärts weiter
+        //					if (j.curve==startWith) continue; // Do not move backward immediately
         //					UsedJoint uj = new UsedJoint(j.curve,j.isStartPoint);
         //					if (!UsedJoints.Contains(uj) && !tmpUsedJoints.Contains(uj))
         //					{
@@ -589,7 +588,7 @@ namespace CADability.Shapes
         //						else d = new SweepAngle(bb.EndDirection,j.curve.EndDirection.Opposite());
         //						// d zwischen -PI und +PI
         //						if (d+Math.PI > sa)
-        //						{	// je mehr nach links umso größer is d
+        //						{	// The further to the left, the larger d becomes
         //							sa = d+Math.PI;
         //							ind = i;
         //						}
@@ -605,7 +604,7 @@ namespace CADability.Shapes
         //				}
         //				else
         //				{
-        //					return false; // kein weitergehen möglich
+        //					return false; // No further progression possible
         //				}
         //			}
         //			if (bb.IsOriented)
@@ -629,10 +628,10 @@ namespace CADability.Shapes
         //		}
         //		private bool FindSimpleBorder(Set clusterSet, ArrayList AllBorders, Set UsedJoints)
         //		{
-        //			// es wird eine minimale Border gesucht: von irgend einem Cluster ausgehend immer
-        //			// linksrum bis man wieder am Anfang ist. 
-        //			// UsedJoints enthält UsedJoint objekte, damit man feststellen kann, ob eine Kante bereits
-        //			// benutzt ist oder nicht
+        //          // A minimal border is being searched: starting from any cluster, 
+        //          // always move to the left until you are back at the start. 
+        //          // UsedJoints contains UsedJoint objects to determine 
+        //          // whether an edge has already been used or not.
         //			ICurve2D startWith = null; 
         //			bool forward = false;
         //			foreach (Cluster cl in clusterSet)
@@ -663,13 +662,13 @@ namespace CADability.Shapes
         //			return false;
         //		}
         private Joint[] SortCluster()
-        {   // sortiert die Kanten (Joints) in einem Cluster im Gegenuhrzeigersinn
-            // liefert alle Kanten
+        {   // Sorts the edges (joints) in a cluster counterclockwise
+            // Returns all edges
 
-            // Verwerfen von identischen Kanten:
-            // Zwei Kanten in einem Cluster, die das selbe "Gegencluster" haben
-            // stehen im Verdacht identisch zu sein. Ihre Mittelpunkte werden auf
-            // identität überprüft und die Kanten werden ggf. entfernt.
+            // Discarding identical edges:
+            // Two edges in a cluster that share the same "opposite cluster"
+            // are suspected to be identical. Their center points are checked
+            // for identity, and the edges are removed if necessary.
             foreach (Cluster cl in clusterSet)
             {
                 for (int i = 0; i < cl.Joints.Count - 1; ++i)
@@ -686,10 +685,10 @@ namespace CADability.Shapes
                         if (j2.StartCluster == cl) cl2 = j2.EndCluster;
                         else cl2 = j2.StartCluster;
                         if (cl1 == cl2)
-                        {   // zwei Kanten verbinden dieselben Cluster. Sie könnten identisch sein
+                        {   // Two edges connect the same clusters. They might be identical.
                             ICurve2D curve1 = j1.curve.CloneReverse(j1.StartCluster != cl);
                             ICurve2D curve2 = j2.curve.CloneReverse(j2.StartCluster != cl);
-                            // curve1 und curve2 haben jetzt die selbe Richtung
+                            // curve1 and curve2 now have the same direction
                             GeoPoint2D p1 = curve1.PointAt(0.5);
                             GeoPoint2D p2 = curve2.PointAt(0.5);
                             if (Geometry.Dist(p1, p2) < clusterSize)
@@ -705,7 +704,7 @@ namespace CADability.Shapes
                     }
                 }
             }
-            // zu kurze Joints werden entfern
+            // Joints that are too short will be removed
             foreach (Cluster cl in clusterSet)
             {
                 for (int i = cl.Joints.Count - 1; i >= 0; --i)
@@ -729,7 +728,7 @@ namespace CADability.Shapes
                     }
                     continue;
                 }
-                // zwei Punkte im cluster muss man nicht sortieren
+                // Two points in the cluster do not need to be sorted
                 double minDist = double.MaxValue;
                 foreach (Joint j in cl.Joints)
                 {
@@ -771,13 +770,13 @@ namespace CADability.Shapes
                     }
                     else
                     {
-                        // darf nicht vorkommen, eine Kante schneidet nicht den Kreis um
-                        // den Knoten mit halbem Radius zum nächsten knoten
-                        // der Sortierwert bleibt halt 0.0, aber man sollte solche Kanten 
-                        // entfernen ...
-                        // kommt vor, das Problem liegt bei regle4!!!
+                        // Should not occur: an edge does not intersect the circle around 
+                        // the node with half the radius to the next node.
+                        // The sorting value remains 0.0, but such edges 
+                        // should be removed...
+                        // It happens; the problem lies with rule4!!!
                         if (j.StartCluster == cl)
-                        {   // curve startet hier
+                        {   // Curve starts here
                             j.tmpAngle = j.curve.StartDirection.Angle;
                         }
                         else
@@ -786,18 +785,18 @@ namespace CADability.Shapes
                         }
                     }
                 }
-                cl.Joints.Sort(); // es wird nach tmpAngle sortiert
+                cl.Joints.Sort(); // Sorting is done based on tmpAngle
             }
             Joint[] res = new Joint[allJoints.Count];
             int ii = 0;
             foreach (Joint j in allJoints)
-            {   // die Kurve exakt ausrichten
+            {   // Precisely align the curve
                 try
                 {
                     j.curve.StartPoint = j.StartCluster.center;
                     j.curve.EndPoint = j.EndCluster.center;
                 }
-                catch (Curve2DException) { } // z.B. Kreise endpunkt setzen
+                catch (Curve2DException) { } // For example, set the endpoint of circles
                 res[ii] = j;
                 ++ii;
             }
@@ -807,7 +806,7 @@ namespace CADability.Shapes
         {
             BorderBuilder bb = new BorderBuilder();
             bb.Precision = clusterSize;
-            if (startWith.curve.Length == 0.0) return null; // sollte nicht vorkommen, kommt aber vor
+            if (startWith.curve.Length == 0.0) return null; // Should not occur, but it does
             bb.AddSegment(startWith.curve.CloneReverse(!forward));
             Cluster cl;
             Cluster startCluster;
@@ -815,15 +814,15 @@ namespace CADability.Shapes
             {
                 cl = startWith.EndCluster;
                 startCluster = startWith.StartCluster;
-                // hier sollte eine Exception geworfen werden wenn schon benutzt!!
-                if (startWith.forwardUsed) return null; // schon benutzt, sollte nicht vorkommen
+                // An exception should be thrown here if already used!!
+                if (startWith.forwardUsed) return null; // Already used, should not occur
                 startWith.forwardUsed = true;
             }
             else
             {
                 cl = startWith.StartCluster;
                 startCluster = startWith.EndCluster;
-                if (startWith.reverseUsed) return null; // schon benutzt, sollte nicht vorkommen
+                if (startWith.reverseUsed) return null; // Already used, should not occur
                 startWith.reverseUsed = true;
             }
             while (cl != startCluster)
@@ -840,19 +839,19 @@ namespace CADability.Shapes
                 }
                 startWith = cl.Joints[ind] as Joint;
                 forward = (startWith.StartCluster == cl);
-                if (startWith.curve.Length == 0.0) return null; // sollte nicht vorkommen, kommt aber vor
+                if (startWith.curve.Length == 0.0) return null; // Should not happen, but it does
                 bb.AddSegment(startWith.curve.CloneReverse(!forward));
                 if (forward)
                 {
                     cl = startWith.EndCluster;
-                    if (startWith.forwardUsed) return null; // schon benutzt, innere Schleife
+                    if (startWith.forwardUsed) return null; // Already used, inner loop
                     startWith.forwardUsed = true;
                 }
                 else
                 {
                     cl = startWith.StartCluster;
-                    if (startWith.reverseUsed) return null; // schon benutzt, innere Schleife
-                    startWith.reverseUsed = true; // auch hier Exception, wenn es schon benutzt war!!
+                    if (startWith.reverseUsed) return null; // Already used, inner loop
+                    startWith.reverseUsed = true; // Here too, throw an exception if it was already used!!
                 }
             }
             return bb;
@@ -936,19 +935,17 @@ namespace CADability.Shapes
 #endif
         public CompoundShape CreateCompoundShape(bool useInnerPoint, GeoPoint2D innerPoint, ConstrHatchInside.HatchMode mode, bool partInPart)
         {
-            // 1. Die offenen Enden mit anderen offenen Enden verbinden, wenn Abstand kleiner maxGap.
-            // 2. Alle verbleibenden Sackgassen entfernen (alle einzelpunkte sammeln und von dort aus "aufessen".)
-            // 3. Es entstehen jetzt zusammenhängende Punktmengen.
-            // 4. die Kanten bestimmen und Verweise auf die Cluster setzen (das lässt sich vielleicht
-            //    in einen der vorhergehenden Schritte integrieren)
-            // 5. In den Clustern die Kanten linksherum sortieren
-            //		jetzt haben wir einen (oder mehrere) überschneidungsfreien Graphen, in denen man leicht
-            //		durch linksrumgehen die Border findet. Zusätzlich findet man auch noch für jeden
-            //		Graphen die Hülle. Die erkennt man daran, dass sie rechtrum geht.
-            // 6. Wenn useInnerPoint == false && partInPart == true dann werden auch verschachtelte Teile gesucht und zurückgegeben
+            // 1. Connect open ends with other open ends if the distance is less than maxGap.
+            // 2. Remove all remaining dead ends (collect all single points and "consume" them from there).
+            // 3. This results in connected point sets.
+            // 4. Determine the edges and set references to their clusters (this step might be integrated into one of the previous steps).
+            // 5. Sort the edges counterclockwise within each cluster:
+            //    At this point, we have one or more non-overlapping graphs, where finding the border is easy by walking counterclockwise.
+            //    Additionally, for each graph, the hull can be found. It can be identified as it follows a clockwise direction.
+            // 6. If useInnerPoint == false && partInPart == true, then nested parts are also searched for and returned.
 
-            // Lückenschließer einfügen, und zwar die kürzestmöglichen
-            // und nur an offenen Enden
+            // Insert gap fillers, specifically the shortest possible ones, 
+            // and only at open ends.
             ArrayList CurvesToInsert = new ArrayList();
             foreach (Cluster cl in clusterSet)
             {
@@ -975,11 +972,11 @@ namespace CADability.Shapes
                 Insert(curve);
             }
 
-            // hier könnten nun noch auf Wunsch mit ICurve2D.MinDistance zusätzliche Joints
-            // eingefügt werden, die als echte Lückenschließer dienen könnten und z.B.
-            // auch einen Flaschenhals aus zwei Kreisbögen schließen würden
+            // Here, additional joints could optionally be added using ICurve2D.MinDistance,
+            // which could serve as true gap closers, e.g., closing a bottleneck formed
+            // by two circular arcs.
 
-            // alle Sackgassen entfernen
+            // Remove all dead ends
             RemoveAllDeadEnds();
 
             Joint[] AllJoints = SortCluster();
@@ -990,13 +987,13 @@ namespace CADability.Shapes
             bool inner = (mode != ConstrHatchInside.HatchMode.hull);
             Border[] AllBorders = FindAllBorders(AllJoints, inner);
             Array.Sort(AllBorders, new BorderAreaComparer());
-            // der größe nach sortieren, zuerst kommt das kleinste
+            // Sort by size, starting with the smallest
 
             if (useInnerPoint)
             {
                 int bestBorder = -1;
                 if (inner)
-                {	// suche die kleinste umgebende Umrandung:
+                {	// Find the smallest surrounding boundary:
                     for (int i = 0; i < AllBorders.Length; ++i)
                     {
                         if (AllBorders[i].GetPosition(innerPoint) == Border.Position.Inside)
@@ -1007,8 +1004,8 @@ namespace CADability.Shapes
                     }
                 }
                 else
-                {	// suche die größte umgebende Umrandung:
-                    // also rückwärts durch das array
+                {	// Find the largest surrounding boundary:
+                    // Iterate backwards through the array
                     for (int i = AllBorders.Length - 1; i >= 0; --i)
                     {
                         if (AllBorders[i].GetPosition(innerPoint) == Border.Position.Inside)
@@ -1022,7 +1019,7 @@ namespace CADability.Shapes
                 {
                     if (mode == ConstrHatchInside.HatchMode.excludeHoles)
                     {
-                        // nur die kleineren Borders betrachten, die größeren können ja keine Löcher sein
+                        // Only consider the smaller borders, as the larger ones cannot be holes
                         SimpleShape ss = new SimpleShape(AllBorders[bestBorder]);
                         CompoundShape cs = new CompoundShape(ss);
                         for (int j = 0; j < bestBorder; ++j)
@@ -1046,7 +1043,7 @@ namespace CADability.Shapes
             }
             else
             {
-                // wenn nicht "useInnerPoint", dann die erste (größte) Border liefern
+                // If "useInnerPoint" is not enabled, return the first (largest) border
 
                 if (AllBorders.Length == 0)
                     return null;
@@ -1054,18 +1051,18 @@ namespace CADability.Shapes
                 if (AllBorders.Length == 1)                    
                     return new CompoundShape(new SimpleShape(AllBorders[0]));                    
                 
-                //Bei mehr als einer Border
-                Array.Reverse(AllBorders); // das größte zuerst
+                // If there is more than one border
+                Array.Reverse(AllBorders); // The largest one first
                 List<Border> toIterate = new List<Border>(AllBorders);
 
-                if (!partInPart) //Hier werden Teile die in Teilen liegen entfernt
+                if (!partInPart) // Here, parts that lie within other parts are removed
                 {
                     CompoundShape res = new CompoundShape();
                     while (toIterate.Count > 0)
                     {
                         SimpleShape ss = new SimpleShape(toIterate[0]);
                         CompoundShape cs = new CompoundShape(ss);
-                        // das erste ist der Rand, die folgenden die Löcher
+                        // The first is the edge, the following are the holes
                         for (int i = toIterate.Count - 1; i > 0; --i)
                         {
                             SimpleShape ss1 = new SimpleShape(toIterate[i]);
@@ -1080,32 +1077,32 @@ namespace CADability.Shapes
                     }
                     return res;
                 }
-                else //Hier werden Teile in Teilen als neues SimpleShape zurückgegeben
+                else // Here, parts within other parts are returned as a new SimpleShape
                 {
                     CompoundShape cs = new CompoundShape(new SimpleShape(toIterate[0]));
-                    //Von groß nach klein
+                    // From large to small
                     for (int i = 1; i < toIterate.Count; i++)
                     {
                         SimpleShape innerShape = new SimpleShape(toIterate[i]);
 
-                        //Position des innerShape bestimmen
+                        // Determine the position of the innerShape
                         var shapePos = SimpleShape.GetPosition(cs.SimpleShapes[0], innerShape);
 
                         switch (shapePos)
                         {
                             case SimpleShape.Position.firstcontainscecond:
-                                //innerShape aus outerShape ausschneiden weil dieses vollständig innerhalb liegt
+                                // Cut innerShape from outerShape because it is completely inside
                                 cs.Subtract(innerShape); 
                                 break;
                             case SimpleShape.Position.intersecting:
-                                //sollten sich Teile überschneiden werden diese zusammengefügt
+                                // If parts overlap, they are merged
                                 cs = CompoundShape.Union(cs, new CompoundShape(innerShape)); 
                                 break;                                
                             case SimpleShape.Position.disjunct:
-                                //die Teile liegen vollständig unabhängig
+                                // The parts are completely independent
                                 
                                 bool shapeHandled = false;
-                                //aber vielleicht liegt das Teil innerhalb eines der anderen SimpleShapes?
+                                // But maybe the part is inside one of the other SimpleShapes?
                                 for (int j = 1; j < cs.SimpleShapes.Length; j++)
                                 {
                                     var shapePos2 = SimpleShape.GetPosition(cs.SimpleShapes[j], innerShape);
@@ -1130,7 +1127,7 @@ namespace CADability.Shapes
                     return cs;
                 }
             }
-            // was sollen wir liefern, wenn nicht useInnerPoint gegeben ist und mehrere Borders gefunden wurden?
+            // What should we return if useInnerPoint is not provided and multiple borders were found?
             return null;
         }
     }

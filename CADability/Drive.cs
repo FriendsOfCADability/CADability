@@ -162,7 +162,7 @@ namespace CADability
         private ModOp toPosition;
         internal CurveDrive()
         {   // für interaktiv
-            base.resourceId = "CurveDrive";
+            base.resourceIdInternal = "CurveDrive";
             movedObjects = new ListWithEvents<IGeoObject>();
             movedObjects.OnAdded += new ListWithEvents<IGeoObject>.AddedDelegate(OnMovedObjectsAdded);
             movedObjects.OnRemoved += new ListWithEvents<IGeoObject>.RemovedDelegate(OnMovedObjectsRemoved);
@@ -631,7 +631,7 @@ namespace CADability
         IGeoObject[] movedObjectsDeserialized;
         public DualCurveDrive()
         {
-            base.resourceId = "DualCurveDrive";
+            base.resourceIdInternal = "DualCurveDrive";
             movedObjects = new ListWithEvents<IGeoObject>();
         }
         public DualCurveDrive(CurveDrive drive1, CurveDrive drive2) : this()
@@ -1255,7 +1255,7 @@ namespace CADability
         #region IJsonSerialize Members
         protected AxisDrive()// for JSON deserialisation
         {
-            base.resourceId = "AxisDrive";
+            base.resourceIdInternal = "AxisDrive";
         }
         public void GetObjectData(IJsonWriteData data)
         {
@@ -1295,7 +1295,7 @@ namespace CADability
         public ShowPropertyDrives(DriveList driveList)
         {
             this.driveList = driveList;
-            base.resourceId = "DriveList";
+            base.resourceIdInternal = "DriveList";
         }
         #region IPropertyEntry implementation
         public override PropertyEntryType Flags => PropertyEntryType.ContextMenu | PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
@@ -1455,11 +1455,10 @@ namespace CADability
     internal class CurveDriveCurveProperty : PropertyEntryImpl, ICommandHandler
     {
         CurveDrive curveDrive;
-        bool isDragging;
         public CurveDriveCurveProperty(CurveDrive curveDrive)
         {
             this.curveDrive = curveDrive;
-            base.resourceId = "CurveDrive.Curve";
+            base.resourceIdInternal = "CurveDrive.Curve";
         }
         #region IPropertyEntry implementation
         public override PropertyEntryType Flags => PropertyEntryType.ContextMenu | PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries | PropertyEntryType.AllowDrag;
@@ -1548,11 +1547,10 @@ namespace CADability
     internal class AxisDriveCurveProperty : PropertyEntryImpl, ICommandHandler
     {
         AxisDrive AxisDrive;
-        bool isDragging;
         public AxisDriveCurveProperty(AxisDrive AxisDrive)
         {
             this.AxisDrive = AxisDrive;
-            base.resourceId = "AxisDrive.Curve";
+            base.resourceIdInternal = "AxisDrive.Curve";
         }
         #region IPropertyEntry implementation
         public override PropertyEntryType Flags => PropertyEntryType.ContextMenu | PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries | PropertyEntryType.AllowDrag;

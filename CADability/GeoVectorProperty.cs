@@ -83,7 +83,6 @@ namespace CADability.UserInterface
         private Plane drawingPlane; // spiegelt die aktuelle drawingplane wieder
         private bool displayZComponent; // true: z-Wert darstellen, false: nur x,y-Werte darstellen
         private bool alwaysAbsoluteCoordinateSystem; // immer im basoluten Koordinatensystem darstellen
-        private bool alwaysZComponent; // immer z-Wert darstellen
 
         /// <summary>
         /// Delegate definition for the <see cref="SelectionChangedEvent"/>
@@ -134,7 +133,6 @@ namespace CADability.UserInterface
                 displayZComponent = true;
             }
             alwaysAbsoluteCoordinateSystem = false;
-            alwaysZComponent = false;
             displayMode = (DisplayMode)frame.GetIntSetting("Formatting.Vector.Mode", 0);
             numberFormatInfo = (NumberFormatInfo)CultureInfo.CurrentCulture.NumberFormat.Clone();
             int decsym = Settings.GlobalSettings.GetIntValue("Formatting.Decimal", 0); // Systemeinstellung | Punkt | Komma

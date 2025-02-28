@@ -36,10 +36,6 @@ namespace netDxf.GTE
 {
     public abstract class ParametricSurface
     {
-        protected double uMin, uMax, vMin, vMax;
-        protected bool isRectangular;
-        protected bool isConstructed;
-
         // Abstract base class for a parameterized surface X(u,v).  The
         // parametric domain is either rectangular or triangular.  Valid
         // (u,v) values for a rectangular domain satisfy
@@ -49,12 +45,12 @@ namespace netDxf.GTE
         //   (vmax-vmin)*(u-umin)+(umax-umin)*(v-vmax) <= 0
         protected ParametricSurface(double umin, double umax, double vmin, double vmax, bool isRectangular)
         {
-            this.uMin = umin;
-            this.uMax = umax;
-            this.vMin = vmin;
-            this.vMax = vmax;
-            this.isRectangular = isRectangular;
-            this.isConstructed = false;
+            UMin = umin;
+            UMax = umax;
+            VMin = vmin;
+            VMax = vmax;
+            IsRectangular = isRectangular;
+            IsConstructed = false;
         }
 
         // Member access.
@@ -62,35 +58,17 @@ namespace netDxf.GTE
         // To validate construction, create an object as shown:
         //     DerivedClassSurface<Real> surface(parameters);
         //     if (!surface) { <constructor failed, handle accordingly>; }
-        public bool IsConstructed
-        {
-            get { return this.isConstructed; }
-        }
+        public bool IsConstructed { get; protected set; }
 
-        public double UMin
-        {
-            get { return this.uMin; }
-        }
+        public double UMin { get; protected set; }
 
-        public double UMax
-        {
-            get { return this.uMax; }
-        }
+        public double UMax { get; protected set; }
 
-        public double VMin
-        {
-            get { return this.vMin; }
-        }
+        public double VMin { get; protected set; }
 
-        public double VMax
-        {
-            get { return this.vMax; }
-        }
+        public double VMax { get; protected set; }
 
-        public bool IsIsRectangular
-        {
-            get { return this.isRectangular; }
-        }
+        public bool IsRectangular { get; protected set; }
 
         // Evaluation of the surface.  The function supports derivative
         // calculation through order 2; that is, order <= 2 is required.  If
@@ -100,7 +78,7 @@ namespace netDxf.GTE
         // maximum order.  The values are ordered as: position X; first-order
         // derivatives dX/du, dX/dv; second-order derivatives d2X/du2,
         // d2X/dudv, d2X/dv2.
-        public const int SUP_ORDER = 6;
+        public const int SupOrder = 6;
 
         public abstract void Evaluate(double u, double v, int order, out Vector3[] jet);
 

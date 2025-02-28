@@ -328,7 +328,7 @@ namespace CADability.GeoObject
             }
             else
             {
-                ClipRect clr = new ClipRect(ref rect);
+                ClipRect clr = new ClipRect(rect);
                 return clr.LineHitTest(projection.ProjectUnscaled(startPoint), projection.ProjectUnscaled(endPoint));
             }
         }
@@ -877,7 +877,6 @@ namespace CADability.GeoObject
     internal class QuadTreeLine : IQuadTreeInsertableZ
     {
         GeoPoint2D sp, ep;
-        double fx, fy, c; // beschreibt die Ebene für den Z-Wert
         IGeoObject go;
         Plane plane;
         double zmax;
@@ -972,7 +971,7 @@ namespace CADability.GeoObject
 
         bool IQuadTreeInsertable.HitTest(ref BoundingRect rect, bool includeControlPoints)
         {
-            ClipRect clr = new ClipRect(ref rect);
+            ClipRect clr = new ClipRect(rect);
             return clr.LineHitTest(sp, ep);
         }
 
@@ -1014,7 +1013,7 @@ namespace CADability.GeoObject
             }
             else
             {
-                ClipRect clr = new ClipRect(ref rect);
+                ClipRect clr = new ClipRect(rect);
                 // eine Linie machen, die bestimmt über das rechteck hinaus geht
                 GeoPoint2D sp2d = projection.ProjectUnscaled(start);
                 GeoVector2D dir2d = projection.ProjectUnscaled(dir);
@@ -1081,7 +1080,7 @@ namespace CADability.GeoObject
             }
             else
             {
-                ClipRect clr = new ClipRect(ref rect);
+                ClipRect clr = new ClipRect(rect);
                 // eine Linie machen, die bestimmt über das rechteck hinaus geht
                 GeoPoint2D sp2d = projection.ProjectUnscaled(start);
                 GeoVector2D dir2d = projection.ProjectUnscaled(dir);

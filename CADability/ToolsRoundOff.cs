@@ -16,7 +16,6 @@ namespace CADability.Actions
         private GeoPoint objectPoint; // der  Pickpunkt zum Runden
         private GeoPoint objectPoint1; // der Pickpunkt der zweiten Curve
         private GeoPoint objectPointSav; // der  Pickpunkt zum Runden als Merker für onDone
-        private GeoPoint radiusPoint; // der Pickpunkt der Aufteil-Curve
         private ICurve iCurve1; // lokales Element
         private ICurve iCurve2; // lokales Element
         private ICurve iCurveComposedSplit; // lokales Element
@@ -26,7 +25,6 @@ namespace CADability.Actions
         private CurveInput roundObject2;
         private LengthInput roundRadius;
         private double roundRad; // der globale RundungsRadius
-        private double roundRadCalc; // der globale RundungsRadius berechnet
         private Ellipse arc;
         private IGeoObjectOwner owner;
         private IGeoObjectOwner ownerCreated;

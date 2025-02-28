@@ -12,17 +12,15 @@ namespace CADability.UserInterface
     {
         private object ObjectWithName;
         private PropertyInfo TheProperty;
-        private bool IsSetting;
 
         public NameProperty(object ObjectWithName, string PropertyName, string resourceId)
         {
-            IsSetting = false;
             this.ObjectWithName = ObjectWithName;
-            base.resourceId = resourceId;
+            base.resourceIdInternal = resourceId;
             TheProperty = ObjectWithName.GetType().GetProperty(PropertyName);
             if (TheProperty == null) TheProperty = ObjectWithName.GetType().BaseType.GetProperty(PropertyName); // besser rekursiv
         }
-        
+
         private void SetName(string s)
         {
             MethodInfo mi = TheProperty.GetSetMethod();
@@ -30,13 +28,13 @@ namespace CADability.UserInterface
             prm[0] = s;
             try
             {
-                IsSetting = true;
                 mi.Invoke(ObjectWithName, prm);
             }
             finally
             {
-                IsSetting = false;
+
             }
+
         }
         private string GetName()
         {

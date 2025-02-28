@@ -46,11 +46,9 @@ namespace CADability.Forms
         bool useLineWidth;
         double precision;
         double pixelToWorld;
-        double[] linePattern;
         const int selectBufSize = 1000; // const ist immer auch static
         int[] selectBuf;
         int clientwidth, clientheight;
-        Dictionary<System.Drawing.Bitmap, byte[]> iconCache;
         struct state
         {   // der state wird in einem Stack gehalten und wieder restauriert
             // da können noch mehr Dinge dazukommen
@@ -69,7 +67,7 @@ namespace CADability.Forms
         IntPtr deviceContext = IntPtr.Zero, renderContext = IntPtr.Zero;
         IntPtr controlHandle = IntPtr.Zero;
         Graphics graphics = null;
-        byte accumBits = 0, colorBits = 32, depthBits = 16, stencilBits = 0;
+        byte accumBits = 0, colorBits = 32, depthBits = 16;
         static IntPtr MainRenderContext = IntPtr.Zero;
         static IntPtr LastRenderContext = IntPtr.Zero;
         private static List<System.Drawing.Bitmap> bitmapList = null;
@@ -625,7 +623,6 @@ namespace CADability.Forms
                     // Wgl.wglGetCurrentContext();
                     // bool ok = Wgl.wglMakeCurrent(deviceContext, renderContext);
                     // if (ok) 
-                    bool ok = false;
                     // xxx ok = Wgl.wglDeleteContext(renderContext);
                     // man darf ihn hier nicht löschen, da er noch als Context für die SharedLists gebraucht wird
                     lock (ContextsToDelete)

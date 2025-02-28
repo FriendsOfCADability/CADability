@@ -23,22 +23,22 @@ namespace CADability
     /// <typeparam name="T"></typeparam>
     public abstract class IArrayImpl<T> : IArray<T>
     {
-        abstract public T this[int index] { get; set; }
-        abstract public int Length { get; }
+        public abstract T this[int index] { get; set; }
+        public abstract int Length { get; }
 
         public T First { get => (this as IArray<T>)[0]; set => (this as IArray<T>)[0] = value; }
         public T Last { get => (this as IArray<T>)[(this as IArray<T>).Length - 1]; set => (this as IArray<T>)[(this as IArray<T>).Length - 1] = value; }
 
-        class EnumeratorView<T> : IEnumerator<T>
+        class EnumeratorView<TU> : IEnumerator<TU>
         {
-            IArrayImpl<T> a;
-            int ind;
-            public EnumeratorView(IArrayImpl<T> a)
+            private readonly IArrayImpl<TU> a;
+            private int ind;
+            public EnumeratorView(IArrayImpl<TU> a)
             {
                 this.a = a;
                 ind = -1;
             }
-            public T Current => a[ind];
+            public TU Current => a[ind];
 
             object IEnumerator.Current => a[ind];
 
@@ -57,6 +57,7 @@ namespace CADability
                 ind = -1;
             }
         }
+
         public IEnumerator<T> GetEnumerator()
         {
             return new EnumeratorView<T>(this);

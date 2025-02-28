@@ -38,13 +38,6 @@ namespace CADability
             else if (p.y > Top) res = res | ClipTop;
             return res;
         }
-        public ClipRect(ref BoundingRect r)
-        {	// warum mit ref???
-            Left = r.Left;
-            Right = r.Right;
-            Bottom = r.Bottom;
-            Top = r.Top;
-        }
         public ClipRect(BoundingRect r)
         {
             Left = r.Left;

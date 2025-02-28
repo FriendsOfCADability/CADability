@@ -110,10 +110,10 @@ namespace CADability.Attribute
         private HatchStyleSolid hatchStyleSolid; // nicht persistent, ein HatchStyle für gefüllte Pfeile
 
         private DimensionStyleList parent; // die Liste, in der dieser DimensionStyle steckt.
-        internal DimensionStyleList Parent
+        internal new DimensionStyleList Parent
         {
-            get { return parent; }
-            set { parent = value; }
+            get => parent;
+            set => parent = value;
         }
         IAttributeList INamedAttribute.Parent
         {
@@ -147,7 +147,7 @@ namespace CADability.Attribute
             res.dimLineColor = ColorDef.GetDefault();
             res.dimLineWidth = null;
             res.extLineColor = res.dimLineColor;
-            res.fontColor = res.fontColor;
+            res.fontColor = null;
             res.extLineWidth = null;
             res.textFlags = (ETextFlag)(0);
             res.types = ETypeFlag.DimAllTypes;
@@ -1662,7 +1662,7 @@ namespace CADability.Attribute
         public override void Added(IPropertyPage propertyTreeView)
         {	// erfolgt als erster Aufruf, hier werden die subentries erzeugt
             base.Added(propertyTreeView); // schon hier, damit Frame gesetzt ist
-            base.resourceId = "DimensionStyleName";
+            base.resourceIdInternal = "DimensionStyleName";
 
         }
         /// <summary>

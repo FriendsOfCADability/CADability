@@ -150,7 +150,7 @@ namespace CADability
         public event IsLayerVisibleDelegate IsLayerVisibleEvent;
         public VisibleLayers(string resourceId, LayerList layerList)
         {
-            base.resourceId = resourceId;
+            base.resourceIdInternal = resourceId;
             this.layerList = layerList;
             layerList.LayerAddedEvent += new LayerList.LayerAddedDelegate(OnLayerAdded);
             layerList.LayerRemovedEvent += new LayerList.LayerRemovedDelegate(OnLayerRemoved);
@@ -389,7 +389,6 @@ namespace CADability
 
         private ProjectedModel projectedModel;
         private Project project;
-        private string name; // der Name für die Darstellung im ControlCenter
         private bool zAxisUp;
         internal bool projectedModelNeedsRecalc; // Ansicht wurde mit der Maus gedreht, Quadtree muss berechnet werden
         private static bool UseOpenGl = Settings.GlobalSettings.GetBoolValue("UseOpenGl", true);
@@ -416,7 +415,7 @@ namespace CADability
         public ModelView(Project project)
         {
             this.project = project;
-            base.resourceId = "ModelView";
+            base.resourceIdInternal = "ModelView";
             project.LayerList.LayerAddedEvent += new LayerList.LayerAddedDelegate(OnLayerListLayerAdded);
             project.LayerList.LayerRemovedEvent += new LayerList.LayerRemovedDelegate(OnLayerListLayerRemoved);
             project.LayerList.DidModifyEvent += new DidModifyDelegate(OnLayerListDidModify);

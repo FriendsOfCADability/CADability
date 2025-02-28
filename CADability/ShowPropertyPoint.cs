@@ -27,7 +27,7 @@ namespace CADability.UserInterface
 
             attributeProperties = point.GetAttributeProperties(Frame);
 
-            resourceId = "Point.Object";
+            resourceIdInternal = "Point.Object";
         }
 
         private void OnPointDidChange(IGeoObject Sender, GeoObjectChange Change)

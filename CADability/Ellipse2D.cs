@@ -27,9 +27,7 @@ namespace CADability.Curve2D
         internal ModOp2D fromUnitCircle; // diese Abbildung bildet den Einheitskreis auf die Ellipse ab
         internal GeoPoint2D left, right, bottom, top; // die Extrempunkte
         internal double majrad, minrad, majaxsin, majaxcos;
-        // im folgenden Daten für IVisibleSegments (z_Position)
-        private Plane zPosition; // die Raum-Ebene, in deren Mittelpunkt der Kreis bezüglich seine 2d Darstellung liegt
-
+        
         internal void RecalcUnitCircle()
         {
             // berechnen der beiden ModOps fromUnitCircle und toUnitCircle 
@@ -386,7 +384,7 @@ namespace CADability.Curve2D
             Angle majorang = majorAxis.Angle;
             double radiusx = majorAxis.Length;
             double radiusy = minorAxis.Length;
-            ClipRect clr = new ClipRect(ref Rect);
+            ClipRect clr = new ClipRect(Rect);
             if (clr.EllipseArcHitTest(center, radiusx, radiusy, majorang, 0, right, top)) return true;
             if (clr.EllipseArcHitTest(center, radiusx, radiusy, majorang, 1, top, left)) return true;
             if (clr.EllipseArcHitTest(center, radiusx, radiusy, majorang, 2, left, bottom)) return true;
@@ -756,7 +754,7 @@ namespace CADability.Curve2D
                 MinimizationResult mres = nm.FindMinimum(iof, new DenseVector(new double[] { position }));
                 return mres.MinimizingPoint[0];
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return iof.Point[0];
             }

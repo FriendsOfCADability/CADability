@@ -324,6 +324,8 @@ namespace CADability
             res.Add(pl);
             return res;
         }
+
+        [CLSCompliant(false)]
         public static DebuggerContainer Show(GeoPoint[,] points)
         {
             DebuggerContainer res = new DebuggerContainer();

@@ -403,9 +403,8 @@ namespace CADability.GeoObject
                     }
                 }
             }
-            else if (faceShellOrPath is Face)
+            else if (faceShellOrPath is Face fc)
             {
-                Face fc = faceShellOrPath as Face;
                 if (fc.Area.HasSingleSegmentBorder())
                 {
                     // nur eine geschlossene Kante. Besser zwei Kanten machen
@@ -420,7 +419,11 @@ namespace CADability.GeoObject
                     if (edg.SecondaryFace != null) mustBeCloned = true;
                 }
                 if (mustBeCloned) fc = fc.Clone() as Face; // neue Edges
+                
                 return Solid.MakeSolid(MakeBrutePrism(fc, extrusion));
+
+                //Unreachable code
+                /*
                 GeoVector normal = fc.Surface.GetNormal(fc.Area.GetExtent().GetCenter());
                 if (normal * extrusion > 0)
                 {
@@ -582,6 +585,7 @@ namespace CADability.GeoObject
                 sld.SetShell(sh);
                 if (project != null) project.SetDefaults(sld);
                 return sld; // Testweise wieder mit OCAS, da ein Problem bei ???
+                */
             }
             return null;
         }
@@ -1273,7 +1277,6 @@ namespace CADability.GeoObject
                 res.SetFaces(new Face[] { fc });
                 return res;
             }
-            return null;
         }
         public static Face MakeFace(Path path, Project project)
         {
@@ -1582,7 +1585,7 @@ namespace CADability.GeoObject
 
             // make the bottom and the top cover to close the solid
             Edge e0 = null, e1 = null;
-            foreach (Edge edg in fc0.AllEdgesIterated())
+            foreach (Edge edg in fc0.Edges)
             {
                 if (edg.Curve3D is Ellipse)
                 {
@@ -1590,7 +1593,7 @@ namespace CADability.GeoObject
                     break;
                 }
             }
-            foreach (Edge edg in fc1.AllEdgesIterated())
+            foreach (Edge edg in fc1.Edges)
             {
                 if (edg.Curve3D is Ellipse)
                 {
@@ -1606,7 +1609,7 @@ namespace CADability.GeoObject
             faces.Add(bfc);
 
             Edge e2 = null, e3 = null;
-            foreach (Edge edg in fc2.AllEdgesIterated())
+            foreach (Edge edg in fc2.Edges)
             {
                 if (edg.Curve3D is Ellipse)
                 {
@@ -1614,7 +1617,7 @@ namespace CADability.GeoObject
                     break;
                 }
             }
-            foreach (Edge edg in fc3.AllEdgesIterated())
+            foreach (Edge edg in fc3.Edges)
             {
                 if (edg.Curve3D is Ellipse)
                 {
@@ -1927,7 +1930,7 @@ namespace CADability.GeoObject
         {
             result.Add(startWith);
             allFaces.Remove(startWith);
-            foreach (Edge edge in startWith.AllEdgesIterated())
+            foreach (Edge edge in startWith.Edges)
             {
                 if (allFaces.Contains(edge.PrimaryFace))
                 {

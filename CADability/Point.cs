@@ -364,7 +364,6 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public override double Position(GeoPoint fromHere, GeoVector direction, double precision)
         {
-            double pos1, pos2;
             GeoPoint p = Geometry.DropPL(location, fromHere, direction);
             if ((p | location) <= 10 * precision) return Geometry.LinePar(fromHere, direction, p);
             else return double.MaxValue;

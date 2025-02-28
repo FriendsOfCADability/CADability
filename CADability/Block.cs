@@ -751,7 +751,7 @@ namespace CADability.GeoObject
                 name = (string)info.GetValue("Name", typeof(string));
                 // FinishDeserialization.AddToContext(context,this);
             }
-            catch (SerializationException ex)
+            catch (SerializationException)
             {
                 SerializationInfoEnumerator e = info.GetEnumerator();
                 while (e.MoveNext())

@@ -263,7 +263,7 @@ namespace CADability.Curve2D
         /// <returns></returns>
         public override bool HitTest(ref BoundingRect Rect, bool IncludeControlPoints)
         {
-            ClipRect clr = new ClipRect(ref Rect);
+            ClipRect clr = new ClipRect(Rect);
             for (int i = 1; i < vertex.Length; ++i)
             {
                 GeoPoint2D sp = vertex[i - 1];

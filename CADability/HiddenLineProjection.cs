@@ -75,10 +75,6 @@ namespace CADability
 
         class ProjectedEdge : IQuadTreeInsertable
         {
-            ICurve2D curve2d;
-            ICurve curve3d;
-            Edge edge;
-
             public ProjectedEdge(Edge edge, Projection projection)
             {
             }

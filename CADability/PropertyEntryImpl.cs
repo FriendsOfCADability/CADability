@@ -7,8 +7,8 @@ namespace CADability.UserInterface
 {
     public abstract class PropertyEntryImpl : IPropertyEntry, IShowProperty
     {
-        protected string resourceId;
-        protected string labelText;
+        protected string resourceIdInternal;
+        private string labelText;
         private IFrame frame;
         private readonly IShowPropertyImpl dumy = null; // will never be set. Dummy implementation of IShowProperty
 
@@ -26,7 +26,7 @@ namespace CADability.UserInterface
         /// <param name="resourceId"></param>
         public PropertyEntryImpl(string resourceId)
         {
-            this.resourceId = resourceId;
+            this.resourceIdInternal = resourceId;
         }
         protected void PropertyEntryChangedState(StateChangedArgs args)
         {
@@ -71,7 +71,7 @@ namespace CADability.UserInterface
             get
             {
                 if (LabelText != null) return LabelText;
-                if (resourceId != null) return StringTable.GetString(resourceId);
+                if (resourceIdInternal != null) return StringTable.GetString(resourceIdInternal);
                 throw new NotImplementedException("A label text must be provided");
             }
         }
@@ -96,7 +96,7 @@ namespace CADability.UserInterface
         {
             get
             {
-                return resourceId;
+                return resourceIdInternal;
             }
         }
 

@@ -29,7 +29,6 @@ namespace CADability.GeoObject
         private bool vPeriodic;
         private int upoles, vpoles;
         private double uMinRestrict = 0.0, uMaxRestrict = 0.0, vMinRestrict = 0.0, vMaxRestrict = 0.0; // restriction for periodic surfaces
-        private ImplicitPSurface[,] implicitSurface;
         // nur einer von beiden NURBS Helfern ist besetzt
         private Nurbs<GeoPoint, GeoPointPole> nubs;
         private Nurbs<GeoPointH, GeoPointHPole> nurbs;
@@ -1976,7 +1975,7 @@ namespace CADability.GeoObject
                     {
                         reparametrisation = ModOp2D.Fit(srcf, dstf, true);
                     }
-                    catch (ModOpException mex)
+                    catch (ModOpException)
                     {
                         return false;
                     }
@@ -2120,15 +2119,12 @@ namespace CADability.GeoObject
             {   // Test aut Kugel oder Torus
                 double[] us = GetUSingularities();
                 double[] vs = GetVSingularities();
-                double du;
                 GeoPoint[,] points = new GeoPoint[3, 3];
                 GeoVector[,] normals = new GeoVector[3, 3];
                 double[] upars = GetPars(umin, umax, IsUPeriodic, us, 3);
                 double[] vpars = GetPars(vmin, vmax, IsVPeriodic, vs, 3);
                 GeoPoint[] cnt = new GeoPoint[6];
                 double[] rad = new double[6];
-                double minrad = 0.0;
-                double maxrad = 0.0;
                 bool ok = true;
                 int curvesok = 0;
 #if DEBUG
@@ -2291,7 +2287,6 @@ namespace CADability.GeoObject
             {
                 double[] us = GetUSingularities();
                 double[] vs = GetVSingularities();
-                double du;
                 GeoPoint[,] points = new GeoPoint[3, 3];
                 GeoVector[,] normals = new GeoVector[3, 3];
                 double[] upars = GetPars(umin, umax, IsUPeriodic, us, 3);
@@ -2832,7 +2827,7 @@ namespace CADability.GeoObject
                         if (!isPlane) break;
                     }
                 }
-                catch (ModOpException mex)
+                catch (ModOpException)
                 {
                     isPlane = false;
                 }
@@ -4857,6 +4852,8 @@ namespace CADability.GeoObject
             //    List<double[]> sol = Polynom.Solve(equations, new(double min, double max)[] { (UKnots[0], UKnots[UKnots.Length - 1]), (VKnots[0], VKnots[VKnots.Length - 1]), (0.0, 1.0) });
             //}
 #endif
+            //Unreachable code
+            /*
             if (false)
             // if (curve is IExplicitPCurve3D) // keine guten Ergebnisse!
             {
@@ -4920,6 +4917,7 @@ namespace CADability.GeoObject
                     return;
                 }
             }
+            */
             base.Intersect(curve, uvExtent, out ips, out uvOnFaces, out uOnCurve3Ds);
         }
         /// <summary>
@@ -5457,7 +5455,6 @@ namespace CADability.GeoObject
 #endif
         static double findBestFitCone(GeoPoint[] samples, GeoVector[] normals, out GeoPoint location, out GeoVector direction, out double halfAngle)
         {
-            double maxError = double.MaxValue;
             for (int i = 0; i < normals.Length; i++)
             {
                 normals[i].NormIfNotNull();

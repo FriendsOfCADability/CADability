@@ -457,7 +457,7 @@ namespace CADability.GeoObject
                     }
                 }
             }
-            catch (ApplicationException ex) { }
+            catch (ApplicationException) { }
             return sol.ToArray();
         }
         /// <summary>
@@ -480,7 +480,7 @@ namespace CADability.GeoObject
                 if (d - (1 + minorRadius) >= -Precision.eps)
                 {
                     // System.Diagnostics.Trace.WriteLine("Das Ebene trifft nicht den Torus oder nur im einem Punkt");
-                    return new IDualSurfaceCurve[0];
+                    return Array.Empty<IDualSurfaceCurve>();
                 }
                 if (d <= Precision.eps)
                 #region Zwei Kreis
@@ -823,120 +823,123 @@ namespace CADability.GeoObject
                 }
                 else
                 {
-                    return new IDualSurfaceCurve[0];
+                    return Array.Empty<IDualSurfaceCurve>();
                 }
 
-                GeoPoint onz = pln.Intersect(GeoPoint.Origin, GeoVector.ZAxis);
-                double d = onz.z;
-                if (Math.Abs(d) - Math.Abs(minorRadius) > Precision.eps)
-                #region nichts
-                {
-                    return new IDualSurfaceCurve[0];
-                }
-                #endregion
-                if (Math.Abs(d) - Math.Abs(minorRadius) > -Precision.eps)
-                #region ein Kreis
-                {
-                    // System.Diagnostics.Trace.WriteLine("ein Kreis ");
-                    GeoVector majax = new GeoVector(1, 0, 0);
-                    GeoVector minax = new GeoVector(0, 1, 0);
-                    GeoPoint cnt = new GeoPoint(0, 0, d);
-                    GeoPoint center = toTorus * cnt;
-                    GeoVector majaxis = toTorus * majax;
-                    GeoVector minaxis = toTorus * minax;
-                    //im Weltsystem
-                    Ellipse elli = Ellipse.Construct();
-                    elli.SetEllipseCenterAxis(center, majaxis, minaxis);
-                    GeoPoint2D centerOnPl = pl.PositionOf(center);
-                    //Auf der Ebene
-                    GeoPoint2D p1OnPl = pl.PositionOf(center + majaxis);
-                    GeoPoint2D p2OnPl = pl.PositionOf(center - minaxis);
-                    Ellipse2D elli2d = Geometry.Ellipse2P2T(p1OnPl, p2OnPl, p2OnPl - centerOnPl, p1OnPl - centerOnPl);
-                    ICurve2D c2dpl = elli2d.Trim(0.0, 1.0);
-                    //Im (u,v) System
-                    GeoPoint2D[] pnts = new GeoPoint2D[50];
-                    double f = Math.PI / 2;
-                    if (d < 0)
-                        f = 3 * Math.PI / 2;
-                    for (int i = 0; i < pnts.Length; i++)
-                    {
-                        pnts[i].x = i * 2 * Math.PI / (pnts.Length - 1);
-                        pnts[i].y = f;
-                    }
-                    BSpline2D c2d = new BSpline2D(pnts, 2, false);
-                    DualSurfaceCurve dsc = new DualSurfaceCurve(elli, this, c2d, pl, c2dpl);
-                    return new IDualSurfaceCurve[] { dsc };
-                }
-                #endregion
-                else
-                #region zwei Kreis
-                {
-                    // System.Diagnostics.Trace.WriteLine("zwei Kreis ");
-                    double f = Math.Sqrt(minorRadius * minorRadius - d * d);
-                    double rmax = 1 + f;
-                    double rmin = 1 - f;
-                    double amax = Math.Atan2(Math.Abs(d), f);
-                    //Erste Kreis
-                    GeoVector majax = new GeoVector(rmax, 0, 0);
-                    GeoVector minax = new GeoVector(0, rmax, 0);
-                    GeoPoint cnt = new GeoPoint(0, 0, d);
-                    GeoPoint center = toTorus * cnt;
-                    GeoVector majaxis = toTorus * majax;
-                    GeoVector minaxis = toTorus * minax;
-                    //im Weltsystem
-                    Ellipse elli1 = Ellipse.Construct();
-                    elli1.SetEllipseCenterAxis(center, majaxis, minaxis);
-                    elli1.StartParameter = 0.0; // wird mit obigem nicht gesetzt
-                    elli1.SweepParameter = 2.0 * Math.PI;
-                    GeoPoint2D centerOnPl = pl.PositionOf(center);
-                    //Auf der Ebene
-                    GeoPoint2D p1OnPl = pl.PositionOf(center + majaxis);
-                    GeoPoint2D p2OnPl = pl.PositionOf(center - minaxis);
-                    Ellipse2D elli2d = Geometry.Ellipse2P2T(p1OnPl, p2OnPl, p2OnPl - centerOnPl, p1OnPl - centerOnPl);
-                    ICurve2D c2dpl1 = elli2d.Trim(0.0, 1.0);
-                    //Im (u,v) System
-                    GeoPoint2D[] pnts = new GeoPoint2D[50];
-                    f = amax;
-                    if (d < 0)
-                        f = 2 * Math.PI - amax;
-                    for (int i = 0; i < pnts.Length; i++)
-                    {
-                        pnts[i].x = i * 2 * Math.PI / (pnts.Length - 1);
-                        pnts[i].y = f;
-                    }
-                    BSpline2D c2d1 = new BSpline2D(pnts, 2, false);
-                    DualSurfaceCurve dsc1 = new DualSurfaceCurve(elli1, this, c2d1, pl, c2dpl1);
-                    //zeite Kreis
-                    majax = new GeoVector(rmin, 0, 0);
-                    minax = new GeoVector(0, rmin, 0);
-                    majaxis = toTorus * majax;
-                    minaxis = toTorus * minax;
-                    //im Weltsystem
-                    Ellipse elli2 = Ellipse.Construct();
-                    elli2.SetEllipseCenterAxis(center, majaxis, minaxis);
-                    elli2.StartParameter = 0.0; // wird mit obigem nicht gesetzt
-                    elli2.SweepParameter = Math.PI * 2.0;
-                    //GeoPoint2D centerOnPl = pl.PositionOf(center);
-                    //Auf der Ebene
-                    p1OnPl = pl.PositionOf(center + majaxis);
-                    p2OnPl = pl.PositionOf(center - minaxis);
-                    elli2d = Geometry.Ellipse2P2T(p1OnPl, p2OnPl, p2OnPl - centerOnPl, p1OnPl - centerOnPl);
-                    ICurve2D c2dpl2 = elli2d.Trim(0.0, 1.0);
-                    //Im (u,v) System
-                    f = Math.PI - amax;
-                    if (d < 0)
-                        f = Math.PI + amax;
-                    for (int i = 0; i < pnts.Length; i++)
-                    {
-                        pnts[i].x = i * 2 * Math.PI / (pnts.Length - 1);
-                        pnts[i].y = f;
-                    }
-                    BSpline2D c2d2 = new BSpline2D(pnts, 2, false);
-                    DualSurfaceCurve dsc2 = new DualSurfaceCurve(elli2, this, c2d2, pl, c2dpl2);
-                    return new IDualSurfaceCurve[] { dsc1, dsc2 };
-                    // return base.GetPlaneIntersection(pl, umin, umax, vmin, vmax);
-                }
-                #endregion
+                //Unreachable code
+                /*
+                                GeoPoint onz = pln.Intersect(GeoPoint.Origin, GeoVector.ZAxis);
+                                double d = onz.z;
+                                if (Math.Abs(d) - Math.Abs(minorRadius) > Precision.eps)
+                                #region nichts
+                                {
+                                    return new IDualSurfaceCurve[0];
+                                }
+                                #endregion
+                                if (Math.Abs(d) - Math.Abs(minorRadius) > -Precision.eps)
+                                #region ein Kreis
+                                {
+                                    // System.Diagnostics.Trace.WriteLine("ein Kreis ");
+                                    GeoVector majax = new GeoVector(1, 0, 0);
+                                    GeoVector minax = new GeoVector(0, 1, 0);
+                                    GeoPoint cnt = new GeoPoint(0, 0, d);
+                                    GeoPoint center = toTorus * cnt;
+                                    GeoVector majaxis = toTorus * majax;
+                                    GeoVector minaxis = toTorus * minax;
+                                    //im Weltsystem
+                                    Ellipse elli = Ellipse.Construct();
+                                    elli.SetEllipseCenterAxis(center, majaxis, minaxis);
+                                    GeoPoint2D centerOnPl = pl.PositionOf(center);
+                                    //Auf der Ebene
+                                    GeoPoint2D p1OnPl = pl.PositionOf(center + majaxis);
+                                    GeoPoint2D p2OnPl = pl.PositionOf(center - minaxis);
+                                    Ellipse2D elli2d = Geometry.Ellipse2P2T(p1OnPl, p2OnPl, p2OnPl - centerOnPl, p1OnPl - centerOnPl);
+                                    ICurve2D c2dpl = elli2d.Trim(0.0, 1.0);
+                                    //Im (u,v) System
+                                    GeoPoint2D[] pnts = new GeoPoint2D[50];
+                                    double f = Math.PI / 2;
+                                    if (d < 0)
+                                        f = 3 * Math.PI / 2;
+                                    for (int i = 0; i < pnts.Length; i++)
+                                    {
+                                        pnts[i].x = i * 2 * Math.PI / (pnts.Length - 1);
+                                        pnts[i].y = f;
+                                    }
+                                    BSpline2D c2d = new BSpline2D(pnts, 2, false);
+                                    DualSurfaceCurve dsc = new DualSurfaceCurve(elli, this, c2d, pl, c2dpl);
+                                    return new IDualSurfaceCurve[] { dsc };
+                                }
+                                #endregion
+                                else
+                                #region zwei Kreis
+                                {
+                                    // System.Diagnostics.Trace.WriteLine("zwei Kreis ");
+                                    double f = Math.Sqrt(minorRadius * minorRadius - d * d);
+                                    double rmax = 1 + f;
+                                    double rmin = 1 - f;
+                                    double amax = Math.Atan2(Math.Abs(d), f);
+                                    //Erste Kreis
+                                    GeoVector majax = new GeoVector(rmax, 0, 0);
+                                    GeoVector minax = new GeoVector(0, rmax, 0);
+                                    GeoPoint cnt = new GeoPoint(0, 0, d);
+                                    GeoPoint center = toTorus * cnt;
+                                    GeoVector majaxis = toTorus * majax;
+                                    GeoVector minaxis = toTorus * minax;
+                                    //im Weltsystem
+                                    Ellipse elli1 = Ellipse.Construct();
+                                    elli1.SetEllipseCenterAxis(center, majaxis, minaxis);
+                                    elli1.StartParameter = 0.0; // wird mit obigem nicht gesetzt
+                                    elli1.SweepParameter = 2.0 * Math.PI;
+                                    GeoPoint2D centerOnPl = pl.PositionOf(center);
+                                    //Auf der Ebene
+                                    GeoPoint2D p1OnPl = pl.PositionOf(center + majaxis);
+                                    GeoPoint2D p2OnPl = pl.PositionOf(center - minaxis);
+                                    Ellipse2D elli2d = Geometry.Ellipse2P2T(p1OnPl, p2OnPl, p2OnPl - centerOnPl, p1OnPl - centerOnPl);
+                                    ICurve2D c2dpl1 = elli2d.Trim(0.0, 1.0);
+                                    //Im (u,v) System
+                                    GeoPoint2D[] pnts = new GeoPoint2D[50];
+                                    f = amax;
+                                    if (d < 0)
+                                        f = 2 * Math.PI - amax;
+                                    for (int i = 0; i < pnts.Length; i++)
+                                    {
+                                        pnts[i].x = i * 2 * Math.PI / (pnts.Length - 1);
+                                        pnts[i].y = f;
+                                    }
+                                    BSpline2D c2d1 = new BSpline2D(pnts, 2, false);
+                                    DualSurfaceCurve dsc1 = new DualSurfaceCurve(elli1, this, c2d1, pl, c2dpl1);
+                                    //zeite Kreis
+                                    majax = new GeoVector(rmin, 0, 0);
+                                    minax = new GeoVector(0, rmin, 0);
+                                    majaxis = toTorus * majax;
+                                    minaxis = toTorus * minax;
+                                    //im Weltsystem
+                                    Ellipse elli2 = Ellipse.Construct();
+                                    elli2.SetEllipseCenterAxis(center, majaxis, minaxis);
+                                    elli2.StartParameter = 0.0; // wird mit obigem nicht gesetzt
+                                    elli2.SweepParameter = Math.PI * 2.0;
+                                    //GeoPoint2D centerOnPl = pl.PositionOf(center);
+                                    //Auf der Ebene
+                                    p1OnPl = pl.PositionOf(center + majaxis);
+                                    p2OnPl = pl.PositionOf(center - minaxis);
+                                    elli2d = Geometry.Ellipse2P2T(p1OnPl, p2OnPl, p2OnPl - centerOnPl, p1OnPl - centerOnPl);
+                                    ICurve2D c2dpl2 = elli2d.Trim(0.0, 1.0);
+                                    //Im (u,v) System
+                                    f = Math.PI - amax;
+                                    if (d < 0)
+                                        f = Math.PI + amax;
+                                    for (int i = 0; i < pnts.Length; i++)
+                                    {
+                                        pnts[i].x = i * 2 * Math.PI / (pnts.Length - 1);
+                                        pnts[i].y = f;
+                                    }
+                                    BSpline2D c2d2 = new BSpline2D(pnts, 2, false);
+                                    DualSurfaceCurve dsc2 = new DualSurfaceCurve(elli2, this, c2d2, pl, c2dpl2);
+                                    return new IDualSurfaceCurve[] { dsc1, dsc2 };
+                                    // return base.GetPlaneIntersection(pl, umin, umax, vmin, vmax);
+                                }
+                                #endregion
+                */
             }
             #endregion
 
@@ -2482,9 +2485,9 @@ namespace CADability.GeoObject
                     }
                 }
             }
-            if (other is CylindricalSurface cylindricalSurface) 
+            if (other is CylindricalSurface cylindricalSurface)
             {   // we need tangential points to split the result there
-                return cylindricalSurface.GetDualSurfaceCurves(otherBounds,this,thisBounds,seeds,extremePositions);
+                return cylindricalSurface.GetDualSurfaceCurves(otherBounds, this, thisBounds, seeds, extremePositions);
             }
             return base.GetDualSurfaceCurves(thisBounds, other, otherBounds, seeds, extremePositions);
         }

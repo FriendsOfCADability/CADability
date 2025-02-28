@@ -113,8 +113,6 @@ namespace CADability
         {
             double[] minLocation = startParameters.Clone() as double[];
             minError = double.MaxValue;
-            double minErrorDifference = double.MaxValue;
-            double minUpdateLength = 0.0;
             numIterations = 0;
             errorFunction(startParameters, out Error);
             minError = dot(Error, Error);

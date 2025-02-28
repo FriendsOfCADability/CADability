@@ -20,13 +20,11 @@ namespace CADability.Actions
     {
 
         private GeoPointProperty geoPointProperty;
-        private GeoVectorInput vec;
         private GeoPointInput startPointInput;
         private AngleInput ang;
         private LengthInput len;
         private GeoPoint startPoint;
         private Angle angPolar;
-        private GeoPoint endPoint;
         private GeoPoint currentPoint;
         private double lengthPolar;
         private GeoPoint actualPoint;

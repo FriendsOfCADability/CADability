@@ -7137,7 +7137,7 @@ namespace CADability.Actions
          * in der Callback Methode ausführen. Dann kann man immer noch Escape drücken, wenns zu lange dauart (Vervielfältigen, Schraffur)
          */
         Thread backgroundTask;
-        bool finishedBackgroundTask, syncCallBack;
+        bool finishedBackgroundTask;
         Delegate CallbackOnDone;
         private void StartThread(object pars)
         {   // das läuft im background thread
@@ -7165,7 +7165,6 @@ namespace CADability.Actions
         {
             //System.Diagnostics.Trace.WriteLine("StartBackgroundTask");
             backgroundTask = new Thread(new ParameterizedThreadStart(StartThread));
-            syncCallBack = true;
             backgroundTask.Start(new object[] { MethodToInvoke, CallbackOnDone, invokeParameters });
             //System.Diagnostics.Trace.WriteLine("StartBackgroundTask-Done");
         }
@@ -7196,8 +7195,8 @@ namespace CADability.Actions
                 bool stop = false;
                 lock (this)
                 {   // sind wir schon über den kritischen Punkt in der Ausführung, d.h. ist die Berechnung schon fertig
-                    if (finishedBackgroundTask) stop = true;
-                    else syncCallBack = false;
+                    if (finishedBackgroundTask) 
+                        stop = true;
                 }
                 if (stop)
                 {   // hier abbrechen, da wir schon über den kritischen Punkt sind und syncCallBack nicht mehr rechtzeitig gesetzt werden konnte

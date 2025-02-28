@@ -1678,7 +1678,9 @@ namespace CADability
             // PC is distance between P and C, pc2 is PC^2
             var pc2 = dx * dx + dy * dy;
             var pc = Math.Sqrt(pc2);
-            if (pc < radius) return new GeoPoint2D[0]; // no solution
+
+            if (pc < radius - Precision.eps) 
+                return new GeoPoint2D[0]; // no solution
 
             // R is radius of  circle centered in P, r2 is R^2
             var r2 = pc2 - radius * radius;
@@ -1741,6 +1743,9 @@ namespace CADability
             dc.Add(new Circle2D(center2, radius2));
 #endif
             GeoPoint2D[] tan = TangentPointCircle(center1, center2, radius2 - radius1); // must be two points
+            if (tan == null || tan.Length != 2)
+                throw new InvalidOperationException("TangentPointCircle did not return the expected tangent points.");
+
             // must be 2 points
             GeoVector2D v = tan[0] - center2;
             v.Length = radius1;
@@ -1759,7 +1764,13 @@ namespace CADability
                 v.Length = radius1 * d / (radius1 + radius2);
                 GeoPoint2D c = center1 + v; // homothetic center 
                 GeoPoint2D[] tan1 = TangentPointCircle(c, center1, radius1);
+                if (tan1 == null || tan1.Length != 2)
+                    throw new InvalidOperationException("TangentPointCircle did not return the expected tangent points.");
+                
                 GeoPoint2D[] tan2 = TangentPointCircle(c, center2, radius2);
+                if (tan2 == null || tan2.Length != 2)
+                    throw new InvalidOperationException("TangentPointCircle did not return the expected tangent points.");
+
                 // must be two points for each
                 if (Geometry.OnSameSide(tan1[0], tan2[0], center1, center2))
                 {
@@ -3081,8 +3092,8 @@ namespace CADability
         /// <param name="radius">radius of the circle</param>
         /// <returns>maximum error</returns>
         public static double CircleFit(GeoPoint2D[] points, out GeoPoint2D center, out double radius)
-        {   // aus GeometricTools, siehe dort auch "Wm4ApprQuadraticFit2.h" für besseren Startwert
-            int maxIterations = 10;
+        {   
+            // aus GeometricTools, siehe dort auch "Wm4ApprQuadraticFit2.h" für besseren Startwert
 
             // initial guess
             // Startwert hier als Schnittpunkt der Mittelsenkrechten

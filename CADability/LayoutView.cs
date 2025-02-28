@@ -124,7 +124,7 @@ namespace CADability
             if (printToGDI)
             {
                 PrintToGDI pdg = new PrintToGDI(this);
-                pd.PrintPage += new PrintPageEventHandler(pdg.OnPrintPage);
+                pd.PrintPage += pdg.OnPrintPage;
                 try
                 {
                     pd.Print();
@@ -132,11 +132,11 @@ namespace CADability
                 catch (Exception)
                 {
                 }
-                pd.PrintPage -= new PrintPageEventHandler(pdg.OnPrintPage);
+                pd.PrintPage -= pdg.OnPrintPage;
             }
             else
             {
-                pd.PrintPage += new PrintPageEventHandler(OnPrintPage);
+                pd.PrintPage += OnPrintPage;
                 try
                 {
                     pd.Print();
@@ -144,7 +144,7 @@ namespace CADability
                 catch (Exception)
                 {
                 }
-                pd.PrintPage -= new PrintPageEventHandler(OnPrintPage);
+                pd.PrintPage -= OnPrintPage;
             }
         }
 
@@ -256,12 +256,12 @@ namespace CADability
                 if (subEntries == null)
                 {   // man könnte auch die Events bei Added setzen und bei Removed wieder entfernen ...
                     subEntries = new IShowProperty[2 + layout.PatchCount];
-                    paperWidth = new DoubleProperty("Layout.PaperWidth", base.Frame);
-                    paperWidth.GetDoubleEvent += new CADability.UserInterface.DoubleProperty.GetDoubleDelegate(OnGetPaperWidth);
-                    paperWidth.SetDoubleEvent += new CADability.UserInterface.DoubleProperty.SetDoubleDelegate(OnSetPaperWidth);
-                    paperHeight = new DoubleProperty("Layout.PaperHeight", base.Frame);
-                    paperHeight.GetDoubleEvent += new CADability.UserInterface.DoubleProperty.GetDoubleDelegate(OnGetPaperHeight);
-                    paperHeight.SetDoubleEvent += new CADability.UserInterface.DoubleProperty.SetDoubleDelegate(OnSetPaperHeight);
+                    paperWidth = new DoubleProperty(base.Frame, "Layout.PaperWidth");
+                    paperWidth.OnGetValue = () => layout.PaperWidth;
+					paperWidth.OnSetValue = val => layout.PaperWidth = val;
+                    paperHeight = new DoubleProperty(base.Frame, "Layout.PaperHeight");
+					paperHeight.OnGetValue = () => layout.PaperHeight;
+					paperHeight.OnSetValue = val => layout.PaperHeight = val;
                     paperWidth.Refresh();
                     paperHeight.Refresh();
                     subEntries[0] = paperWidth;
@@ -1049,25 +1049,7 @@ namespace CADability
                 // printDocument = printDialog.Document; update in ShowPrintDlg
             }
         }
-        private double OnGetPaperWidth(DoubleProperty sender)
-        {
-            return layout.PaperWidth;
-        }
-        private void OnSetPaperWidth(DoubleProperty sender, double l)
-        {
-            layout.PaperWidth = l;
-        }
-        private double OnGetPaperHeight(DoubleProperty sender)
-        {
-            return layout.PaperHeight;
-        }
-        private void OnSetPaperHeight(DoubleProperty sender, double l)
-        {
-            layout.PaperHeight = l;
-        }
-        private void OnFocusChanged(IPropertyTreeView sender, IShowProperty NewFocus, IShowProperty OldFocus)
-        {
-        }
+        
         internal void Repaint()
         {
             if (!IsInitialized) ZoomTotal(1.1);

@@ -668,7 +668,7 @@ namespace CADability.GeoObject
         }
         #endregion
 #if DEBUG
-        internal void Debug()
+        internal new void Debug()
         {
             // DEBUG
             System.GC.Collect();

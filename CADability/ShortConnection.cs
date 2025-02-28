@@ -172,7 +172,7 @@ namespace CADability
             public connection first;
             public connection second;
             public double saved;
-            public int hashCode;
+            //public int hashCode;
             public crossing(connection first, connection second)
             {
                 this.first = first;

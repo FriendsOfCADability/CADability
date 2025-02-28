@@ -3,9 +3,7 @@ using CADability.GeoObject;
 using System;
 using System.Collections;
 using System.IO;
-using System.Reflection;
 using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
 #if WEBASSEMBLY
 using CADability.WebDrawing;
 #else
@@ -933,35 +931,54 @@ namespace CADability
             }
             return null;
         }
-        public double GetDoubleValue(string Name, double DefaultValue)
+        public double GetDoubleValue(string name, double defaultValue)
         {
-            object o = GetValue(Name);
-            if (o is double) return (double)o;
-            if (o is DoubleProperty) return (o as DoubleProperty).DoubleValue;
-            else return DefaultValue;
+            object o = GetValue(name);
+            if (o is double d) 
+	            return d;
+            if (o is DoubleProperty property) 
+	            return property.GetDouble();
+
+            return defaultValue;
         }
-        public int GetIntValue(string Name, int DefaultValue)
+        public int GetIntValue(string name, int defaultValue)
         {
-            object o = GetValue(Name);
-            if (o is int) return (int)o;
-            if (o is double) return (int)(double)o;
-            if (o is IntegerProperty) return (int)(o as IntegerProperty);
-            if (o is MultipleChoiceSetting) return (o as MultipleChoiceSetting).CurrentSelection;
-            else return DefaultValue;
+            object o = GetValue(name);
+            switch (o)
+            {
+	            case int i:
+		            return i;
+	            case double d:
+		            return (int)d;
+	            case IntegerProperty property:
+		            return (int)property;
+	            case MultipleChoiceSetting setting:
+		            return setting.CurrentSelection;
+	            default:
+		            return defaultValue;
+            }
         }
-        public bool GetBoolValue(string Name, bool DefaultValue)
+        public bool GetBoolValue(string name, bool defaultValue)
         {
-            object o = GetValue(Name);
-            if (o is bool) return (bool)o;
-            if (o is BooleanProperty) return ((BooleanProperty)o).BooleanValue;
-            return DefaultValue;
+            object o = GetValue(name);
+            switch (o)
+            {
+	            case bool b:
+		            return b;
+	            case BooleanProperty property:
+		            return property.BooleanValue;
+	            default:
+		            return defaultValue;
+            }
         }
-        public string GetStringValue(string Name, string DefaultValue)
+        public string GetStringValue(string name, string defaultValue)
         {
-            object o = GetValue(Name);
-            if (o is StringProperty) return (o as StringProperty).GetString();
-            if (o != null) return o.ToString();
-            else return DefaultValue;
+            object o = GetValue(name);
+            if (o is StringProperty property) 
+	            return property.GetString();
+            if (o != null) 
+	            return o.ToString();
+            return defaultValue;
         }
         public string[] GetAllKeys()
         {
@@ -970,9 +987,9 @@ namespace CADability
             {
                 Pair p = sortedEntries[i] as Pair;
                 res.Add(p.Name + " (" + p.Value.ToString() + ")");
-                if (p.Value is Settings)
+                if (p.Value is Settings settings)
                 {
-                    string[] sub = (p.Value as Settings).GetAllKeys();
+                    string[] sub = settings.GetAllKeys();
                     for (int j = 0; j < sub.Length; j++)
                     {
                         res.Add(p.Name + "." + sub[j]);
@@ -981,15 +998,15 @@ namespace CADability
             }
             return res.ToArray();
         }
-        public void SetValue(string Name, object NewValue)
+        public void SetValue(string name, object newValue)
         {
-            SetValue(Name, NewValue, false);
-            OnSettingChanged(Name, NewValue);
+            SetValue(name, newValue, false);
+            OnSettingChanged(name, newValue);
         }
-        private void SetValue(string Name, object NewValue, bool notify)
+        private void SetValue(string name, object NewValue, bool notify)
         {
             // wenn der Name mit Punkten getrennt ist, so handelt es sich um SubSettings
-            string[] Parts = Name.Split(new Char[] { '.' }, 2); // beim 1. Punkt auftrennen
+            string[] Parts = name.Split(new Char[] { '.' }, 2); // beim 1. Punkt auftrennen
             if (Parts.Length == 2)
             {
                 Settings SubSettings = entries[Parts[0]] as Settings;
@@ -1002,44 +1019,44 @@ namespace CADability
                 if (NewValue == null)
                 {
                 }
-                else if (entries.ContainsKey(Name))
+                else if (entries.ContainsKey(name))
                 {
-                    if (NewValue.GetType() == entries[Name].GetType())
+                    if (NewValue.GetType() == entries[name].GetType())
                     {
-                        entries[Name] = NewValue; // damit sind die primitiven Typen abgedeckt
+                        entries[name] = NewValue; // damit sind die primitiven Typen abgedeckt
                     }
                     else
                     {	// der Key existiert, aber hat einen anderen Typ. Das sind die Fälle
                         // in denen ein IShowProperty Typ existiert. Wenn der cast von NewValue
                         // nicht klappt, dann gibt es halt eine exception, aber das ist explizit
                         // so gewollt
-                        if (entries[Name].GetType() == typeof(BooleanProperty))
+                        if (entries[name].GetType() == typeof(BooleanProperty))
                         {
-                            ((BooleanProperty)(entries[Name])).BooleanValue = (bool)NewValue;
+                            ((BooleanProperty)(entries[name])).BooleanValue = (bool)NewValue;
                         }
-                        else if (entries[Name].GetType() == typeof(IntegerProperty) && NewValue is int)
+                        else if (entries[name].GetType() == typeof(IntegerProperty) && NewValue is int value)
                         {
-                            ((IntegerProperty)(entries[Name])).SetInt((int)NewValue);
+                            ((IntegerProperty)(entries[name])).SetInt(value);
                         }
-                        else if (entries[Name].GetType() == typeof(DoubleProperty) && NewValue is double)
+                        else if (entries[name].GetType() == typeof(DoubleProperty) && NewValue is double newValue)
                         {
-                            ((DoubleProperty)(entries[Name])).SetDouble((double)NewValue);
+                            ((DoubleProperty)(entries[name])).SetDouble(newValue);
                         }
-                        else if (entries[Name].GetType() == typeof(ColorSetting))
+                        else if (entries[name].GetType() == typeof(ColorSetting))
                         {
-                            ((ColorSetting)(entries[Name])).Color = (Color)NewValue;
+                            ((ColorSetting)(entries[name])).Color = (Color)NewValue;
                         }
-                        else if (entries[Name].GetType() == typeof(MultipleChoiceSetting))
+                        else if (entries[name].GetType() == typeof(MultipleChoiceSetting))
                         {
-                            ((MultipleChoiceSetting)(entries[Name])).SetSelection((int)NewValue);
+                            ((MultipleChoiceSetting)(entries[name])).SetSelection((int)NewValue);
                         }
-                        else if (entries[Name].GetType() == typeof(bool) && NewValue is BooleanProperty)
+                        else if (entries[name].GetType() == typeof(bool) && NewValue is BooleanProperty)
                         {
-                            entries[Name] = NewValue;
+                            entries[name] = NewValue;
                         }
-                        else if (entries[Name].GetType() == typeof(double) && NewValue is int)
+                        else if (entries[name].GetType() == typeof(double) && NewValue is int)
                         {   // maybe was read as a double from global settings
-                            entries[Name] = NewValue;
+                            entries[name] = NewValue;
                         }
                         // TODO: andere PropertyTypen implementieren
                         else
@@ -1051,9 +1068,9 @@ namespace CADability
                     for (int i = 0; i < sortedEntries.Count; ++i)
                     {
                         Pair p = sortedEntries[i] as Pair;
-                        if (p.Name == Name)
+                        if (p.Name == name)
                         {
-                            p.Value = entries[Name];
+                            p.Value = entries[name];
                             break;
                         }
                     }
@@ -1061,7 +1078,7 @@ namespace CADability
                 }
                 else
                 {
-                    this.AddSetting(Name, NewValue);
+                    this.AddSetting(name, NewValue);
                 }
             }
             else
@@ -1091,16 +1108,18 @@ namespace CADability
             if (TheValue.GetType() == typeof(MultipleChoiceSetting)) return (TheValue as MultipleChoiceSetting).CurrentSelection;
             else return (int)TheValue; // auf die Gefahr hin, dass der cast nicht geht
         }
-        public static double GetDoubleValue(object TheValue)
+        public static double GetDoubleValue(object theValue)
         {
-            if (TheValue is double) return (double)TheValue;
-            if (TheValue is DoubleProperty) return (TheValue as DoubleProperty).DoubleValue;
-            return (double)TheValue;
+            if (theValue is double value) 
+	            return value;
+            if (theValue is DoubleProperty property) 
+	            return property.GetDouble();
+            return (double)theValue;
         }
         public Settings GetSubSetting(string Name)
         {
             object o = GetValue(Name);
-            if (o is Settings) return o as Settings;
+            if (o is Settings settings) return settings;
             return null;
         }
         public bool Modified
@@ -1172,14 +1191,14 @@ namespace CADability
                     ArrayList al = new ArrayList();
                     foreach (Pair p in sortedEntries)
                     {
-                        if (p.Value is IShowProperty)
+                        if (p.Value is IShowProperty value)
                         {
-                            if (p.Value is Settings)
+                            if (value is Settings settings)
                             {
-                                if ((p.Value as Settings).resourceIdInternal == null) continue;
-                                if ((p.Value as Settings).resourceIdInternal.Length == 0) continue;
+                                if (settings.resourceIdInternal == null) continue;
+                                if (settings.resourceIdInternal.Length == 0) continue;
                             }
-                            al.Add(p.Value as IShowProperty);
+                            al.Add(value);
                         }
                     }
                     ShowProperties = (IShowProperty[])al.ToArray(typeof(IShowProperty));
@@ -1374,9 +1393,9 @@ namespace CADability
                 if (myName != null) SettingChangedEvent(myName + "." + Name, NewValue);
                 else SettingChangedEvent(Name, NewValue);
             }
-            if (myName == null && Name == "Solid.OctTreeAlsoCheckInside" && NewValue is bool)
+            if (myName == null && Name == "Solid.OctTreeAlsoCheckInside" && NewValue is bool value)
             {
-                Solid.octTreeAlsoCheckInside = (bool)NewValue;
+                Solid.octTreeAlsoCheckInside = value;
             }
             modified = true;
         }
@@ -1410,10 +1429,10 @@ namespace CADability
             int i = 0;
             foreach (DictionaryEntry list in entries)
             {
-                if (list.Value is IAttributeList)
+                if (list.Value is IAttributeList value)
                 {
                     if (i == keyIndex)
-                        return list.Value as IAttributeList;
+                        return value;
                     i++;
                 }
             }

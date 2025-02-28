@@ -2,16 +2,17 @@
 using CADability.Attribute;
 using CADability.UserInterface;
 using System;
+using System.Collections.Generic;
 using System.Runtime.Serialization;
 
 namespace CADability.GeoObject
 {
     internal class ShowPropertyBlockRef : IShowPropertyImpl, ICommandHandler, IGeoObjectShowProperty
     {
-        BlockRef blockRef;
-        GeoPointProperty positionProp;
+        private readonly BlockRef blockRef;
+        private GeoPointProperty positionProp;
         private IPropertyEntry[] attributeProperties; // Anzeigen für die Attribute (Ebene, Farbe u.s.w)
-        IFrame frame;
+        private readonly IFrame frame;
         public ShowPropertyBlockRef(BlockRef theBlockRef, IFrame theFrame)
         {
             blockRef = theBlockRef;
@@ -19,8 +20,6 @@ namespace CADability.GeoObject
             resourceIdInternal = "BlockRef.Object";
             attributeProperties = blockRef.GetAttributeProperties(frame);
         }
-
-
 
         #region IShowPropertyImpl overrides
         public override string LabelText
@@ -37,35 +36,36 @@ namespace CADability.GeoObject
         /// <summary>
         /// Overrides <see cref="IShowPropertyImpl.Added"/>
         /// </summary>
-        /// <param name="propertyTreeView"></param>
-        public override void Added(IPropertyPage propertyTreeView)
+        /// <param name="page"></param>
+        public override void Added(IPropertyPage page)
         {
-            base.Added(propertyTreeView);
+            base.Added(page);
             if (positionProp == null)
-                positionProp = new GeoPointProperty("BlockRef.Position", frame, true);
-            positionProp.GetGeoPointEvent += new GeoPointProperty.GetGeoPointDelegate(OnGetLocation);
-            positionProp.SetGeoPointEvent += new GeoPointProperty.SetGeoPointDelegate(OnSetLocation);
-            positionProp.ModifyWithMouseEvent += new ModifyWithMouseDelegate(OnPositionModifyWithMouse);
-            blockRef.UserData.UserDataAddedEvent += new UserData.UserDataAddedDelegate(OnUserDataAdded);
-            blockRef.UserData.UserDataRemovedEvent += new UserData.UserDataRemovedDelegate(OnUserDataAdded);
+                positionProp = new GeoPointProperty(frame, "BlockRef.Position");
+            positionProp.OnGetValue = OnGetLocation;
+            positionProp.OnSetValue = OnSetLocation;
+            positionProp.ModifyWithMouse += OnPositionModifyWithMouse;
+            blockRef.UserData.UserDataAddedEvent += OnUserDataAdded;
+            blockRef.UserData.UserDataRemovedEvent += OnUserDataAdded;
 
 
         }
         /// <summary>
         /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.Removed (IPropertyTreeView)"/>
         /// </summary>
-        /// <param name="propertyTreeView"></param>
-        public override void Removed(IPropertyTreeView propertyTreeView)
+        /// <param name="page"></param>
+        public override void Removed(IPropertyTreeView page)
         {
-            positionProp.GetGeoPointEvent -= new GeoPointProperty.GetGeoPointDelegate(OnGetLocation);
-            positionProp.SetGeoPointEvent -= new GeoPointProperty.SetGeoPointDelegate(OnSetLocation);
-            positionProp.ModifyWithMouseEvent -= new ModifyWithMouseDelegate(OnPositionModifyWithMouse);
-            blockRef.UserData.UserDataAddedEvent -= new UserData.UserDataAddedDelegate(OnUserDataAdded);
-            blockRef.UserData.UserDataRemovedEvent -= new UserData.UserDataRemovedDelegate(OnUserDataAdded);
+            positionProp.OnGetValue = null;
+            positionProp.OnSetValue = null;
+            positionProp.ModifyWithMouse -= OnPositionModifyWithMouse;
+            blockRef.UserData.UserDataAddedEvent -= OnUserDataAdded;
+            blockRef.UserData.UserDataRemovedEvent -= OnUserDataAdded;
 
-            base.Removed(propertyTreeView);
+            base.Removed(page);
         }
-        void OnUserDataAdded(string name, object value)
+
+        private void OnUserDataAdded(string name, object value)
         {
             attributeProperties = blockRef.GetAttributeProperties(frame);
             propertyTreeView.Refresh(this);
@@ -75,78 +75,66 @@ namespace CADability.GeoObject
             get
             {
                 if (positionProp == null)
-                    positionProp = new GeoPointProperty("BlockRef.Position", frame, true);
+                    positionProp = new GeoPointProperty(frame, "BlockRef.Position");
                 return PropertyEntryImpl.Concat(new IPropertyEntry[] { positionProp }, attributeProperties);
             }
         }
 
-        public override ShowPropertyEntryType EntryType
-        {
-            get
-            {
-                return ShowPropertyEntryType.GroupTitle;
-            }
-        }
+        public override ShowPropertyEntryType EntryType => ShowPropertyEntryType.GroupTitle;
+
         /// <summary>
         /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
         /// </summary>
-        public override ShowPropertyLabelFlags LabelType
-        {
-            get
-            {
-                return ShowPropertyLabelFlags.ContextMenu | ShowPropertyLabelFlags.Selectable;
-            }
-        }
+        public override ShowPropertyLabelFlags LabelType => ShowPropertyLabelFlags.ContextMenu | ShowPropertyLabelFlags.Selectable;
+
         public override MenuWithHandler[] ContextMenu
         {
             get
             {
-                return MenuResource.LoadMenuDefinition("MenuId.Object.BlockRef", false, this);
-                // some mor to implement, see below
+                List<MenuWithHandler> items = new List<MenuWithHandler>(MenuResource.LoadMenuDefinition("MenuId.Object.BlockRef", false, this));
+                CreateContextMenueEvent?.Invoke(this, items);
+                blockRef.GetAdditionalContextMenue(this, Frame, items);
+                return items.ToArray();
             }
         }
-#endregion
-        private GeoPoint OnGetLocation(GeoPointProperty sender)
+        #endregion
+        private GeoPoint OnGetLocation()
         {
             return blockRef.RefPoint;
         }
-        private void OnSetLocation(GeoPointProperty sender, GeoPoint p)
+        private void OnSetLocation(GeoPoint p)
         {
             blockRef.RefPoint = p;
         }
 
-        private void OnPositionModifyWithMouse(IPropertyEntry sender, bool StartModifying)
+        private void OnPositionModifyWithMouse(IPropertyEntry sender, bool startModifying)
         {
             GeneralGeoPointAction gpa = new GeneralGeoPointAction(positionProp, blockRef);
             frame.SetAction(gpa);
         }
 
 
-#region ICommandHandler Members
+        #region ICommandHandler Members
 
         /// <summary>
         /// Implements <see cref="CADability.UserInterface.ICommandHandler.OnCommand (string)"/>
         /// </summary>
-        /// <param name="MenuId"></param>
+        /// <param name="menuId"></param>
         /// <returns></returns>
-        virtual public bool OnCommand(string MenuId)
+        public virtual bool OnCommand(string menuId)
         {
-            switch (MenuId)
+            switch (menuId)
             {
                 case "MenuId.Explode":
-                    if (frame.ActiveAction is SelectObjectsAction)
+                    if (frame.ActiveAction is SelectObjectsAction soa)
                     {
                         using (frame.Project.Undo.UndoFrame)
                         {
-                            IGeoObjectOwner addTo = blockRef.Owner;
-                            if (addTo == null) addTo = frame.ActiveView.Model;
+                            IGeoObjectOwner addTo = blockRef.Owner ?? frame.ActiveView.Model;
                             addTo.Remove(blockRef);
-                            //IGeoObject go = blockRef.ReferencedBlock.Clone();
-                            //go.PropagateAttributes(blockRef.Layer, blockRef.ColorDef);
                             GeoObjectList l = blockRef.Decompose();
                             addTo.Add(l[0]);
-                            SelectObjectsAction soa = frame.ActiveAction as SelectObjectsAction;
-                            soa.SetSelectedObjects(l); // alle Teilobjekte markieren
+                            soa.SetSelectedObjects(l);
                         }
                     }
                     return true;
@@ -157,15 +145,15 @@ namespace CADability.GeoObject
         /// <summary>
         /// Implements <see cref="CADability.UserInterface.ICommandHandler.OnUpdateCommand (string, CommandState)"/>
         /// </summary>
-        /// <param name="MenuId"></param>
-        /// <param name="CommandState"></param>
+        /// <param name="menuId"></param>
+        /// <param name="commandState"></param>
         /// <returns></returns>
-        virtual public bool OnUpdateCommand(string MenuId, CommandState CommandState)
+        public virtual bool OnUpdateCommand(string menuId, CommandState commandState)
         {
-            switch (MenuId)
+            switch (menuId)
             {
                 case "MenuId.Explode":
-                    CommandState.Enabled = true; // naja isses ja immer
+                    commandState.Enabled = true;
                     return true;
             }
             return false;
@@ -174,7 +162,9 @@ namespace CADability.GeoObject
 
         #endregion
         #region IGeoObjectShowProperty Members
+
         public event CADability.GeoObject.CreateContextMenueDelegate CreateContextMenueEvent;
+
         IGeoObject IGeoObjectShowProperty.GetGeoObject()
         {
             return blockRef;
@@ -183,19 +173,19 @@ namespace CADability.GeoObject
         {
             return "MenuId.Object.BlockRef";
         }
-#endregion
+        #endregion
     }
     /// <summary>
     /// 
     /// </summary>
     [Serializable()]
-    public class BlockRef : IGeoObjectImpl, IColorDef, IGeoObjectOwner, ISerializable
+    public class BlockRef : IGeoObjectImpl, IColorDef, IGeoObjectOwner
     {
         private Block idea;
         private ModOp insertion;
-        WeakReference flattened, flattenedP;
-        BoundingCube? extent;
-#region polymorph construction
+        private WeakReference flattened, flattenedP;
+        private BoundingCube? extent;
+        #region polymorph construction
         public delegate BlockRef ConstructionDelegate(Block referredBlock);
         public static ConstructionDelegate Constructor;
         public static BlockRef Construct(Block referredBlock)
@@ -203,21 +193,21 @@ namespace CADability.GeoObject
             if (Constructor != null) return Constructor(referredBlock);
             return new BlockRef(referredBlock);
         }
-#endregion
+        #endregion
         protected BlockRef(Block referredBlock)
         {
             idea = referredBlock;
             insertion = ModOp.Translate(0.0, 0.0, 0.0);
         }
 
-        private void OnWillChange(IGeoObject Sender, GeoObjectChange Change)
+        private void OnWillChange(IGeoObject sender, GeoObjectChange change)
         {
-            FireWillChange(Change);
+            FireWillChange(change);
         }
-        private void OnDidChange(IGeoObject Sender, GeoObjectChange Change)
+        private void OnDidChange(IGeoObject sender, GeoObjectChange change)
         {
             if (flattened != null) flattened.Target = null;
-            FireDidChange(Change);
+            FireDidChange(change);
         }
 
         /// <summary>
@@ -229,15 +219,16 @@ namespace CADability.GeoObject
             using (new Changing(this, "ModifyInverse", m))
             {
                 insertion = m * insertion;
-                if (flattened != null) flattened.Target = null;
+
+                if (flattened != null)
+                    flattened.Target = null;
+
                 extent = null;
 
-                if (flattenedP != null && flattenedP.Target != null)
-                {
-                    (flattenedP.Target as Block).Modify(m);
-                }
-
+                if (flattenedP?.Target is Block block)
+                    block.Modify(m);
             }
+
         }
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Clone ()"/>
@@ -275,14 +266,14 @@ namespace CADability.GeoObject
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.CopyGeometry (IGeoObject)"/>
         /// </summary>
-        /// <param name="ToCopyFrom"></param>
-        public override void CopyGeometry(IGeoObject ToCopyFrom)
+        /// <param name="toCopyFrom"></param>
+        public override void CopyGeometry(IGeoObject toCopyFrom)
         {
             using (new Changing(this))
             {
-                BlockRef CopyFromBlockRef = (BlockRef)ToCopyFrom;
-                idea = CopyFromBlockRef.idea;
-                insertion = CopyFromBlockRef.Insertion;
+                BlockRef copyFromBlockRef = (BlockRef)toCopyFrom;
+                idea = copyFromBlockRef.idea;
+                insertion = copyFromBlockRef.Insertion;
                 if (flattened != null) flattened.Target = null;
                 extent = null;
             }
@@ -290,11 +281,11 @@ namespace CADability.GeoObject
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetShowProperties (IFrame)"/>
         /// </summary>
-        /// <param name="Frame"></param>
+        /// <param name="frame"></param>
         /// <returns></returns>
-        public override IPropertyEntry GetShowProperties(IFrame Frame)
+        public override IPropertyEntry GetShowProperties(IFrame frame)
         {
-            return new ShowPropertyBlockRef(this, Frame);
+            return new ShowPropertyBlockRef(this, frame);
         }
         public override string Description
         {
@@ -310,17 +301,18 @@ namespace CADability.GeoObject
         /// <param name="lists"></param>
         public override void PaintTo3DList(IPaintTo3D paintTo3D, ICategorizedDislayLists lists)
         {
-            //paintTo3D.PushMultModOp(insertion);
-            //// TODO: hier dem paint3D noch Layer und Color mitgeben für LayerByBlock bzw. ColorByBlock
-            //CategorizedDislayLists tmp = new CategorizedDislayLists();
-            //idea.PaintTo3DList(paintTo3D, tmp);
-            //paintTo3D.PopModOp();
-            //tmp.AddToDislayLists(paintTo3D, UniqueId, lists);
-            // jetzt auf flattened zeichnen, da sind alle ModOps schon drin, das ist hier einfacher
-            // eine bessere aber aufwendigere Lösung wäre evtl. in ICategorizedDislayLists die ModOp zu pushen und popen
+            // paintTo3D.PushMultModOp(insertion);
+            //// TODO: Pass layer and color to paint3D for LayerByBlock or ColorByBlock
+            // CategorizedDislayLists tmp = new CategorizedDislayLists();
+            // idea.PaintTo3DList(paintTo3D, tmp);
+            // paintTo3D.PopModOp();
+            // tmp.AddToDislayLists(paintTo3D, UniqueId, lists);
+            // Now draw on flattened, as all ModOps are already applied, making this easier
+            // A better but more complex solution might be to push and pop the ModOp in ICategorizedDislayLists
             Block blk = Flattened;
             blk.PaintTo3DList(paintTo3D, lists);
         }
+
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PrePaintTo3D (IPaintTo3D)"/>
         /// </summary>
@@ -338,31 +330,35 @@ namespace CADability.GeoObject
         public override void PaintTo3D(IPaintTo3D paintTo3D)
         {
             if (OnPaintTo3D != null && OnPaintTo3D(this, paintTo3D)) return;
-            //paintTo3D.PushMultModOp(insertion);
-            //idea.PaintTo3D(paintTo3D);
-            //paintTo3D.PopModOp();
-            // hier nicht Flatten aufrufen, denn beim Verschieben über ClipBoard
-            // wird sonst immer Clone gemacht, und das geht in die Zeit und außerdem mag
-            // Mauell das nicht bei DRPSymbolen
+            // paintTo3D.PushMultiModOp(insertion);
+            // idea.PaintTo3D(paintTo3D);
+            // paintTo3D.PopModOp();
+            // Do not call Flatten here, because when moving via Clipboard,
+            // it always creates a clone, which takes time and is not ideal.
+            // Additionally, manual handling does not work well with DRPSymbols.
             Block blk = FlattenedP;
             blk.PaintTo3D(paintTo3D);
         }
+
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PrepareDisplayList (double)"/>
         /// </summary>
         /// <param name="precision"></param>
         public override void PrepareDisplayList(double precision)
         {
-            Flattened.PrepareDisplayList(precision); // kann halt wieder verloren gehen, wird wohl bis zum Paint halten???
+            Flattened.PrepareDisplayList(precision); // Might get lost again, but should last until painting???
         }
+
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.FindSnapPoint (SnapPointFinder)"/>
         /// </summary>
         /// <param name="spf"></param>
         public override void FindSnapPoint(SnapPointFinder spf)
-        {   // besser wäre es den SnapPointFinder mit einer ModOp auszustatten, die überschrieben werden kann
+        {
+            // It would be better to equip the SnapPointFinder with a ModOp that can be overridden
             Flattened.FindSnapPoint(spf);
         }
+
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetQuadTreeItem (Projection, ExtentPrecision)"/>
         /// </summary>
@@ -386,7 +382,7 @@ namespace CADability.GeoObject
         {
             return Flattened.GetExtent(projection, extentPrecision);
         }
-#region IOctTreeInsertable members
+        #region IOctTreeInsertable members
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (double)"/>
         /// </summary>
@@ -438,7 +434,7 @@ namespace CADability.GeoObject
         {
             return Flattened.Position(fromHere, direction, precision);
         }
-#endregion
+        #endregion
         public ModOp Insertion
         {
             get
@@ -476,12 +472,12 @@ namespace CADability.GeoObject
                 {
                     if (idea != null)
                     {
-                        ((IGeoObject)idea).WillChangeEvent -= new ChangeDelegate(OnWillChange);
-                        ((IGeoObject)idea).DidChangeEvent -= new ChangeDelegate(OnDidChange);
+                        ((IGeoObject)idea).WillChangeEvent -= OnWillChange;
+                        ((IGeoObject)idea).DidChangeEvent -= OnDidChange;
                     }
                     idea = value;
-                    ((IGeoObject)idea).WillChangeEvent += new ChangeDelegate(OnWillChange);
-                    ((IGeoObject)idea).DidChangeEvent += new ChangeDelegate(OnDidChange);
+                    ((IGeoObject)idea).WillChangeEvent += OnWillChange;
+                    ((IGeoObject)idea).DidChangeEvent += OnDidChange;
                     if (flattened != null) flattened.Target = null;
                     extent = null;
                 }
@@ -489,108 +485,108 @@ namespace CADability.GeoObject
         }
         /// <summary>
         /// Returns a new Block with the Insertion applied and also the ByBlock colors and layers applied
-        /// Usually the result is only used temporaryly.
+        /// Usually the result is only used temporarily.
         /// </summary>
         public Block Flattened
         {
             get
             {
-                if (flattened == null) flattened = new WeakReference(null);
+                if (flattened == null)
+                    flattened = new WeakReference(null);
+
                 try
                 {
-                    if (flattened.Target != null)
-                    {
-                        return flattened.Target as Block;
-                    }
+                    if (flattened.Target is Block block)
+                        return block;
                 }
-                catch (InvalidOperationException) { }
+                catch (InvalidOperationException)
+                {
+                    // Handle or log the exception if needed
+                }
 
                 IGeoObject clone = idea.Clone();
-                clone.Owner = this; // owner muss gesetzt werden, damit der richtige selectionindex gesetzt wird
-                if (this.Layer != null || this.colorDef != null)
-                {   // bei Drag and Drop sind diese null und PropagateAttributes kostet viel Zeit ohne was zu tun
-                    clone.PropagateAttributes(this.Layer, this.colorDef); // ByParent und null für ColorDef und Layer werden hier ersetzt
+                clone.Owner = this; // Owner must be set to ensure the correct selection index is assigned
+
+                if (Layer != null || colorDef != null)
+                {
+                    // During Drag and Drop, these can be null, and PropagateAttributes is expensive without doing anything useful
+                    clone.PropagateAttributes(Layer, colorDef); // Replaces ByParent and null for ColorDef and Layer
                 }
+
                 clone.Modify(insertion);
                 flattened.Target = clone;
                 return clone as Block;
             }
         }
+
         private Block FlattenedP
         {
             get
             {
-                if (flattenedP == null) flattenedP = new WeakReference(null);
+                if (flattenedP == null)
+                    flattenedP = new WeakReference(null);
+
                 try
                 {
-                    if (flattenedP.Target != null)
-                    {
-                        return flattenedP.Target as Block;
-                    }
+                    if (flattenedP.Target is Block block)
+                        return block;
                 }
-                catch (InvalidOperationException) { }
-                // System.Diagnostics.Trace.WriteLine("berechne flattnedP. " + this.UniqueId.ToString());
-                Block fp = Block.ConstructInternal(); // das ist ja nur ne Liste, vielleicht wärs ohnehin besser nur ne Liste zu machen
-                AddPrimitiveToBlock(fp, this.Layer, this.colorDef, insertion, idea);
+                catch (InvalidOperationException)
+                {
+                    // Handle or log the exception if needed
+                }
+
+                Block fp = Block.ConstructInternal(); // This is just a list, maybe it would be better to use only a list
+                AddPrimitiveToBlock(fp, Layer, colorDef, insertion, idea);
                 flattenedP.Target = fp;
-                return fp as Block;
-                //if (flattenedP == null)
-                //{
-                //    flattenedP = Block.ConstructInternal(); // das ist ja nur ne Liste, vielleicht wärs ohnehin besser nur ne Liste zu machen
-                //    AddPrimitiveToBlock(flattenedP, this.Layer, this.colorDef, insertion, idea);
-                //}
-                //return flattenedP;
+                return fp;
             }
         }
 
-        private void AddPrimitiveToBlock(Block addTo, Layer layer, ColorDef colorDef, ModOp mod, IGeoObject toAdd)
+        private void AddPrimitiveToBlock(Block addTo, Layer layer, ColorDef color, ModOp mod, IGeoObject toAdd)
         {
-            if (toAdd is BlockRef)
+            switch (toAdd)
             {
-                BlockRef br = (toAdd as BlockRef);
-                AddPrimitiveToBlock(addTo, br.Layer, br.ColorDef, mod * br.insertion, br.idea);
-            }
-            else if (toAdd is Hatch && toAdd.NumChildren == 0)
-            {   // sonst kann man in ERSACAD nicht per drag and drop verschieben
-                IGeoObject clone = toAdd.Clone(); // das ist ja jetzt ein Primitives
-                if (clone is ILayer)
+                case BlockRef br:
+                    // Recursively process BlockRef with its transformation
+                    AddPrimitiveToBlock(addTo, br.Layer, br.ColorDef, mod * br.insertion, br.idea);
+                    break;
+                case Hatch _ when toAdd.NumChildren == 0:
+                    // Prevents drag and drop issues in ERSACAD
+                    AddCloneToBlock(addTo, toAdd, layer, color, mod);
+                    break;
+                case Block blk:
                 {
-                    if (clone.Layer == null) clone.Layer = layer;
+                    // Process each child of the block
+                    Layer blkLayer = blk.Layer ?? layer;
+                    ColorDef blkColor = blk.ColorDef ?? color;
+
+                    foreach (var child in blk.Children)
+                        AddPrimitiveToBlock(addTo, blkLayer, blkColor, mod, child);
+
+                    break;
                 }
-                if (clone is IColorDef)
-                {
-                    if ((clone as IColorDef).ColorDef == null) (clone as IColorDef).ColorDef = colorDef;
-                }
-                clone.Modify(mod);
-                addTo.Add(clone);
-            }
-            else if (toAdd is Block)
-            {
-                Block blk = (toAdd as Block);
-                Layer l = blk.Layer;
-                ColorDef c = blk.ColorDef;
-                if (l == null) l = layer;
-                if (c == null) c = colorDef;
-                for (int i = 0; i < blk.Children.Count; i++)
-                {
-                    AddPrimitiveToBlock(addTo, l, c, mod, blk.Child(i));
-                }
-            }
-            else
-            {
-                IGeoObject clone = toAdd.Clone(); // das ist ja jetzt ein Primitives
-                if (clone is ILayer)
-                {
-                    if (clone.Layer == null) clone.Layer = layer;
-                }
-                if (clone is IColorDef)
-                {
-                    if ((clone as IColorDef).ColorDef == null) (clone as IColorDef).ColorDef = colorDef;
-                }
-                clone.Modify(mod);
-                addTo.Add(clone);
+                default:
+                    AddCloneToBlock(addTo, toAdd, layer, color, mod);
+                    break;
             }
         }
+
+        private void AddCloneToBlock(Block addTo, IGeoObject toAdd, Layer layer, ColorDef color, ModOp mod)
+        {
+            // Clone the object and apply necessary attributes
+            IGeoObject clone = toAdd.Clone();
+
+            if (clone is ILayer layerObj && layerObj.Layer == null)
+                layerObj.Layer = layer;
+
+            if (clone is IColorDef colorObj && colorObj.ColorDef == null)
+                colorObj.ColorDef = color;
+
+            clone.Modify(mod);
+            addTo.Add(clone);
+        }
+
 
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.AttributeChanged (INamedAttribute)"/>
@@ -609,7 +605,7 @@ namespace CADability.GeoObject
             }
             return false;
         }
-#region IColorDef Members
+        #region IColorDef Members
         private ColorDef colorDef;
         public ColorDef ColorDef
         {
@@ -633,8 +629,8 @@ namespace CADability.GeoObject
         {
             (this as IColorDef).SetTopLevel(newValue);
         }
-#endregion
-#region IGeoObjectOwner Members
+        #endregion
+        #region IGeoObjectOwner Members
         public void Remove(IGeoObject toRemove)
         {
             toRemove.Owner = null;
@@ -643,8 +639,8 @@ namespace CADability.GeoObject
         {
             toAdd.Owner = this;
         }
-#endregion
-#region ISerializable Members
+        #endregion
+        #region ISerializable Members
         /// <summary>
         /// Constructor required by deserialization
         /// </summary>
@@ -657,19 +653,19 @@ namespace CADability.GeoObject
             insertion = (ModOp)InfoReader.Read(info, "Insertion", typeof(ModOp));
             colorDef = ColorDef.Read(info, context);
         }
+
         /// <summary>
         /// Implements <see cref="ISerializable.GetObjectData"/>
         /// </summary>
         /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
         /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
-        public void GetObjectData(SerializationInfo info, StreamingContext context)
+        public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
             info.AddValue("Idea", idea);
             info.AddValue("Insertion", insertion);
             info.AddValue("ColorDef", colorDef);
         }
-
-#endregion
+        #endregion
     }
 }

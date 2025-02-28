@@ -4554,7 +4554,7 @@ namespace CADability.GeoObject
             AssertOutwardOrientation();
             return HasFreeEdges();
         }
-        public void Debug()
+        public new void Debug()
         {
             Edge[] oe = OpenEdges;
             Set<Edge> edgeset = new Set<Edge>();

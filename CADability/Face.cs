@@ -10148,9 +10148,9 @@ namespace CADability.GeoObject
         }
 
 #if DEBUG
-        public void Debug(ICurve intersectWith)
-        {   // zum DEbuggen, kann man immer wieder ändern
-        }
+        //public void Debug(ICurve intersectWith)
+        //{   // zum DEbuggen, kann man immer wieder ändern
+        //}
 
         public string neighbours
         {

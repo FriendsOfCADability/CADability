@@ -233,46 +233,63 @@ namespace CADability.Attribute
         {
             get
             {
-                if (subItems == null)
-                {
-                    subItems = new IPropertyEntry[9];
-                    AngleProperty ap = new AngleProperty("HatchStyleLines.Angle", base.propertyPage.GetFrame(), false);
-                    ap.GetAngleEvent += new AngleProperty.GetAngleDelegate(OnPropertyGetAngle);
-                    ap.SetAngleEvent += new AngleProperty.SetAngleDelegate(OnPropertySetAngle);
-                    ap.ShowMouseButton = false;
-                    ap.AngleChanged();
-                    subItems[0] = ap;
-                    LengthProperty lp = new LengthProperty("HatchStyleLines.Distance", base.propertyPage.GetFrame(), false);
-                    lp.GetLengthEvent += new CADability.UserInterface.LengthProperty.GetLengthDelegate(OnPropertyGetDistance);
-                    lp.SetLengthEvent += new CADability.UserInterface.LengthProperty.SetLengthDelegate(OnPropertySetDistance);
-                    lp.LengthChanged();
-                    lp.ShowMouseButton = false;
-                    subItems[1] = lp;
-                    LengthProperty mp = new LengthProperty("HatchStyleLines.MarginOffset", base.propertyPage.GetFrame(), false);
-                    mp.GetLengthEvent += new CADability.UserInterface.LengthProperty.GetLengthDelegate(OnPropertyGetMarginOffset);
-                    mp.SetLengthEvent += new CADability.UserInterface.LengthProperty.SetLengthDelegate(OnPropertySetMarginOffset);
-                    mp.Refresh();
-                    mp.ShowMouseButton = false;
-                    subItems[2] = mp;
-                    IntegerProperty on = new IntegerProperty(this, "Number", "HatchStyleLines.OffsetNumber");
-                    subItems[3] = on;
-                    AngleProperty of = new AngleProperty(this, "AOffset", "HatchStyleLines.Offset", base.propertyPage.GetFrame(), false);
-                    subItems[4] = of;
-                    BooleanProperty al = new BooleanProperty(this, "Alternate", "HatchStyleLines.Alternate");
-                    subItems[5] = al;
+                if (subItems != null) 
+                    return subItems;
 
-                    Project pr = base.propertyPage.GetFrame().Project;
-                    LineWidthSelectionProperty lws = new LineWidthSelectionProperty("HatchStyleLines.LineWidth", pr.LineWidthList, this.lineWidth);
-                    lws.LineWidthChangedEvent += new CADability.UserInterface.LineWidthSelectionProperty.LineWidthChangedDelegate(OnLineWidthChanged);
-                    subItems[6] = lws;
-                    LinePatternSelectionProperty lps = new LinePatternSelectionProperty("HatchStyleLines.LinePattern", pr.LinePatternList, this.linePattern);
-                    lps.LinePatternChangedEvent += new CADability.UserInterface.LinePatternSelectionProperty.LinePatternChangedDelegate(OnLinePatternChanged);
-                    subItems[7] = lps;
-                    ColorSelectionProperty csp = new ColorSelectionProperty("HatchStyleLines.Color", pr.ColorList, colorDef, ColorList.StaticFlags.allowUndefined);
-                    csp.ShowAllowUndefinedGray = false;
-                    csp.ColorDefChangedEvent += new ColorSelectionProperty.ColorDefChangedDelegate(OnColorDefChanged);
-                    subItems[8] = csp;
-                }
+                subItems = new IPropertyEntry[9];
+                AngleProperty ap = new AngleProperty(base.propertyPage.GetFrame(),"HatchStyleLines.Angle");
+                ap.OnGetValue = () => lineAngle;
+                ap.OnSetValue = (a) =>
+                {
+                    var oldValue = lineAngle;
+                    lineAngle = a;
+                    FireDidChange("LineAngle", oldValue);
+                };
+                    
+                ap.ShowMouseButton = false;
+                ap.AngleChanged();
+                subItems[0] = ap;
+                LengthProperty lp = new LengthProperty(base.propertyPage.GetFrame(), "HatchStyleLines.Distance");
+                lp.OnGetValue = () => lineDistance;
+                lp.OnSetValue = (l) =>
+                {
+                    var oldValue = lineDistance;
+                    lineDistance = l;
+                    FireDidChange("LineDistance", oldValue);
+                };
+                lp.LengthChanged();
+                lp.ShowMouseButton = false;
+                subItems[1] = lp;
+                LengthProperty mp = new LengthProperty(base.propertyPage.GetFrame(), "HatchStyleLines.MarginOffset");
+                mp.OnGetValue = () => marginOffset;
+                mp.OnSetValue = (l) =>
+                {
+                    var oldValue = marginOffset;
+                    marginOffset = l;
+                    FireDidChange("MarginOffset", oldValue);
+                };
+                    
+                mp.Refresh();
+                mp.ShowMouseButton = false;
+                subItems[2] = mp;
+                IntegerProperty on = new IntegerProperty(this, "Number", "HatchStyleLines.OffsetNumber");
+                subItems[3] = on;
+                AngleProperty of = new AngleProperty(this, "AOffset", "HatchStyleLines.Offset", base.propertyPage.GetFrame(), false);
+                subItems[4] = of;
+                BooleanProperty al = new BooleanProperty(this, "Alternate", "HatchStyleLines.Alternate");
+                subItems[5] = al;
+
+                Project pr = base.propertyPage.GetFrame().Project;
+                LineWidthSelectionProperty lws = new LineWidthSelectionProperty("HatchStyleLines.LineWidth", pr.LineWidthList, this.lineWidth);
+                lws.LineWidthChangedEvent += OnLineWidthChanged;
+                subItems[6] = lws;
+                LinePatternSelectionProperty lps = new LinePatternSelectionProperty("HatchStyleLines.LinePattern", pr.LinePatternList, this.linePattern);
+                lps.LinePatternChangedEvent += OnLinePatternChanged;
+                subItems[7] = lps;
+                ColorSelectionProperty csp = new ColorSelectionProperty("HatchStyleLines.Color", pr.ColorList, colorDef, ColorList.StaticFlags.allowUndefined);
+                csp.ShowAllowUndefinedGray = false;
+                csp.ColorDefChangedEvent += OnColorDefChanged;
+                subItems[8] = csp;
                 return subItems;
             }
         }
@@ -287,9 +304,9 @@ namespace CADability.Attribute
         }
 
         #endregion
-        internal override void Update(bool AddMissingToList)
+        internal override void Update(bool addMissingToList)
         {
-            if (Parent != null && Parent.Owner != null)
+            if (Parent?.Owner != null)
             {
                 ColorList cl = Parent.Owner.ColorList;
                 if (cl != null && colorDef != null)
@@ -297,7 +314,7 @@ namespace CADability.Attribute
                     ColorDef cd = cl.Find(colorDef.Name);
                     if (cd != null)
                         colorDef = cd;
-                    else if (AddMissingToList)
+                    else if (addMissingToList)
                         cl.Add(colorDef);
                 }
                 LineWidthList ll = Parent.Owner.LineWidthList;
@@ -306,7 +323,7 @@ namespace CADability.Attribute
                     LineWidth lw = ll.Find(lineWidth.Name);
                     if (lw != null)
                         lineWidth = lw;
-                    else if (AddMissingToList)
+                    else if (addMissingToList)
                         ll.Add(lineWidth);
                 }
                 LinePatternList pl = Parent.Owner.LinePatternList;
@@ -315,41 +332,12 @@ namespace CADability.Attribute
                     LinePattern lw = pl.Find(linePattern.Name);
                     if (lw != null)
                         linePattern = lw;
-                    else if (AddMissingToList)
+                    else if (addMissingToList)
                         pl.Add(linePattern);
                 }
             }
         }
-        private Angle OnPropertyGetAngle()
-        {
-            return lineAngle;
-        }
-        private void OnPropertySetAngle(Angle a)
-        {
-            Angle oldlineAngle = lineAngle;
-            lineAngle = a;
-            FireDidChange("LineAngle", lineAngle);
-        }
-        private double OnPropertyGetDistance(LengthProperty sender)
-        {
-            return lineDistance;
-        }
-        private void OnPropertySetDistance(LengthProperty sender, double l)
-        {
-            double oldLineDistance = lineDistance;
-            lineDistance = l;
-            FireDidChange("LineDistance", oldLineDistance);
-        }
-        private double OnPropertyGetMarginOffset(LengthProperty sender)
-        {
-            return marginOffset;
-        }
-        private void OnPropertySetMarginOffset(LengthProperty sender, double l)
-        {
-            double oldMarginOffset = marginOffset;
-            marginOffset = l;
-            FireDidChange("MarginOffset", oldMarginOffset);
-        }
+        
         #region ISerializable Members
         /// <summary>
         /// Constructor required by deserialization
@@ -375,7 +363,7 @@ namespace CADability.Attribute
             try
             {
                 number = (int)info.GetValue("NumberOffset", typeof(int));
-                offset = (double)info.GetValue("Offset", typeof(double)); // warum ist das double?
+                offset = (double)info.GetValue("Offset", typeof(double));
                 alternate = (bool)info.GetValue("Alternate", typeof(bool));
             }
             catch (SerializationException)
@@ -394,10 +382,10 @@ namespace CADability.Attribute
         {
             base.GetObjectData(info, context);
             info.AddValue("LineDistance", lineDistance);
-            info.AddValue("LineAngle", lineAngle, typeof(Angle)); // sonst nimmte er ein double!
+            info.AddValue("LineAngle", lineAngle, typeof(Angle));
             info.AddValue("MarginOffset", marginOffset);
             info.AddValue("NumberOffset", number);
-            info.AddValue("Offset", offset); // warum wird das double?
+            info.AddValue("Offset", offset);
             info.AddValue("Alternate", alternate);
             info.AddValue("ColorDef", colorDef);
             info.AddValue("LineWidth", lineWidth);

@@ -51,9 +51,6 @@ Target = typeof(CADability.Curve2D.GeneralCurve2D), Description = "CADability Ge
 [assembly: System.Diagnostics.DebuggerVisualizer(typeof(CADability.DebuggerVisualizers.Curve2DVisualizer), typeof(VisualizerObjectSource),
 Target = typeof(CADability.Curve2DAspect), Description = "CADability Curve2DAspect Visualizer")]
 
-[assembly: System.Diagnostics.DebuggerVisualizer(typeof(CADability.DebuggerVisualizers.Curve2DVisualizer), typeof(VisualizerObjectSource),
-Target = typeof(CADability.Curve2D.GeneralCurve2Dold), Description = "CADability Curve2DAspect Visualizer")]
-
 //IGeoObject Implementations
 [assembly: System.Diagnostics.DebuggerVisualizer(typeof(CADability.DebuggerVisualizers.GeoObjectVisualizer), typeof(VisualizerObjectSource),
 Target = typeof(CADability.GeoObject.IGeoObjectImpl), Description = "CADability IGeoObject Visualizer")]

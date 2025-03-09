@@ -44,7 +44,7 @@ namespace CADability.GeoObject
             get
             {
                 List<MenuWithHandler> menuWithHandlers = new List<MenuWithHandler>();
-
+                CreateContextMenueEvent?.Invoke(this, menuWithHandlers);
                 face.GetAdditionalContextMenue(this, Frame, menuWithHandlers);
                 return menuWithHandlers.ToArray();
             }
@@ -10148,9 +10148,9 @@ namespace CADability.GeoObject
         }
 
 #if DEBUG
-        public void Debug(ICurve intersectWith)
-        {   // zum DEbuggen, kann man immer wieder ändern
-        }
+        //public void Debug(ICurve intersectWith)
+        //{   // zum DEbuggen, kann man immer wieder ändern
+        //}
 
         public string neighbours
         {

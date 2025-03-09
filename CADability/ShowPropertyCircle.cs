@@ -3,46 +3,43 @@ using CADability.GeoObject;
 using System.Collections;
 using System.Collections.Generic;
 
-
-
 namespace CADability.UserInterface
 {
     /// <summary>
     /// Shows the properties of a circle.
     /// </summary>
-
     public class ShowPropertyCircle : PropertyEntryImpl, IDisplayHotSpots, ICommandHandler, IGeoObjectShowProperty
     {
-        private Ellipse circle;
-        private GeoPointProperty centerProperty;
-        private LengthProperty radiusProperty;
-        private LengthProperty diameterProperty;
-        private LengthHotSpot[] radiusHotSpots;
-        private AngleProperty startAngleProperty;
-        private AngleProperty endAngleProperty;
-        private GeoPointProperty startPointProperty;
-        private GeoPointProperty endPointProperty;
-        private LengthProperty arcLengthProperty;
-        private BooleanProperty directionProperty;
-        private AngleHotSpot startAngleHotSpot;
-        private AngleHotSpot endAngleHotSpot;
+        private readonly Ellipse circle;
+        private readonly GeoPointProperty centerProperty;
+        private readonly LengthProperty radiusProperty;
+        private readonly LengthProperty diameterProperty;
+        private readonly LengthHotSpot[] radiusHotSpots;
+        private readonly AngleProperty startAngleProperty;
+        private readonly AngleProperty endAngleProperty;
+        private readonly GeoPointProperty startPointProperty;
+        private readonly GeoPointProperty endPointProperty;
+        private readonly LengthProperty arcLengthProperty;
+        private readonly BooleanProperty directionProperty;
+        private readonly AngleHotSpot startAngleHotSpot;
+        private readonly AngleHotSpot endAngleHotSpot;
         private IPropertyEntry[] subEntries;
         private IPropertyEntry[] attributeProperties; 
 
         public ShowPropertyCircle(Ellipse circle, IFrame frame): base(frame)
         {
             this.circle = circle;
-            centerProperty = new GeoPointProperty("Circle.Center", Frame, true);
-            centerProperty.GetGeoPointEvent += new CADability.UserInterface.GeoPointProperty.GetGeoPointDelegate(OnGetCenter);
-            centerProperty.SetGeoPointEvent += new CADability.UserInterface.GeoPointProperty.SetGeoPointDelegate(OnSetCenter);
-            centerProperty.ModifyWithMouseEvent += new ModifyWithMouseDelegate(ModifyCenterWithMouse);
-            centerProperty.PropertyEntryChangedStateEvent+= new PropertyEntryChangedStateDelegate(OnStateChanged);
+            centerProperty = new GeoPointProperty(Frame, "Circle.Center");
+            centerProperty.OnGetValue = OnGetCenter;
+            centerProperty.OnSetValue = OnSetCenter;
+            centerProperty.ModifyWithMouse += ModifyCenterWithMouse;
+            centerProperty.PropertyEntryChangedStateEvent+= OnStateChanged;
 
-            radiusProperty = new LengthProperty("Circle.Radius", Frame, true);
-            radiusProperty.GetLengthEvent += new CADability.UserInterface.LengthProperty.GetLengthDelegate(OnGetRadius);
-            radiusProperty.SetLengthEvent += new CADability.UserInterface.LengthProperty.SetLengthDelegate(OnSetRadius);
-            radiusProperty.ModifyWithMouseEvent += new ModifyWithMouseDelegate(ModifyRadiusWithMouse);
-            radiusProperty.PropertyEntryChangedStateEvent+= new PropertyEntryChangedStateDelegate(OnStateChanged);
+            radiusProperty = new LengthProperty(Frame, "Circle.Radius");
+            radiusProperty.OnGetValue = OnGetRadius;
+			radiusProperty.OnSetValue = OnSetRadius;
+            radiusProperty.ModifyWithMouse += ModifyRadiusWithMouse;
+            radiusProperty.PropertyEntryChangedStateEvent+= OnStateChanged;
             radiusHotSpots = new LengthHotSpot[4];
             for (int i = 0; i < 4; ++i)
             {
@@ -64,75 +61,75 @@ namespace CADability.UserInterface
                 }
             }
 
-            diameterProperty = new LengthProperty("Circle.Diameter", Frame, true);
-            diameterProperty.GetLengthEvent += new CADability.UserInterface.LengthProperty.GetLengthDelegate(OnGetDiameter);
-            diameterProperty.SetLengthEvent += new CADability.UserInterface.LengthProperty.SetLengthDelegate(OnSetDiameter);
-            diameterProperty.ModifyWithMouseEvent += new ModifyWithMouseDelegate(ModifyRadiusWithMouse);
-            diameterProperty.PropertyEntryChangedStateEvent+= new PropertyEntryChangedStateDelegate(OnStateChanged);
+            diameterProperty = new LengthProperty(Frame, "Circle.Diameter");
+            diameterProperty.OnGetValue = OnGetDiameter;
+			diameterProperty.OnSetValue = OnSetDiameter;
+            diameterProperty.ModifyWithMouse += ModifyRadiusWithMouse;
+            diameterProperty.PropertyEntryChangedStateEvent+= OnStateChanged;
 
             if (circle.IsArc)
             {
-                startAngleProperty = new AngleProperty("Arc.StartAngle", Frame, true);
-                startAngleProperty.GetAngleEvent += new AngleProperty.GetAngleDelegate(OnGetStartAngle);
-                startAngleProperty.SetAngleEvent += new AngleProperty.SetAngleDelegate(OnSetStartAngle);
-                startAngleProperty.ModifyWithMouseEvent += new ModifyWithMouseDelegate(ModifyStartAngleWithMouse);
-                startAngleProperty.PropertyEntryChangedStateEvent+= new PropertyEntryChangedStateDelegate(OnStateChanged);
+                startAngleProperty = new AngleProperty(Frame, "Arc.StartAngle");
+                startAngleProperty.OnGetValue = OnGetStartAngle;
+                startAngleProperty.OnSetValue = OnSetStartAngle;
+                startAngleProperty.ModifyWithMouse += ModifyStartAngleWithMouse;
+                startAngleProperty.PropertyEntryChangedStateEvent+= OnStateChanged;
                 startAngleHotSpot = new AngleHotSpot(startAngleProperty);
                 startAngleHotSpot.Position = circle.StartPoint;
 
-                endAngleProperty = new AngleProperty("Arc.EndAngle", Frame, true);
-                endAngleProperty.GetAngleEvent += new AngleProperty.GetAngleDelegate(OnGetEndAngle);
-                endAngleProperty.SetAngleEvent += new AngleProperty.SetAngleDelegate(OnSetEndAngle);
-                endAngleProperty.ModifyWithMouseEvent += new ModifyWithMouseDelegate(ModifyEndAngleWithMouse);
-                endAngleProperty.PropertyEntryChangedStateEvent+= new PropertyEntryChangedStateDelegate(OnStateChanged);
+                endAngleProperty = new AngleProperty(Frame, "Arc.EndAngle");
+				endAngleProperty.OnGetValue = OnGetEndAngle;
+                endAngleProperty.OnSetValue = OnSetEndAngle;
+                endAngleProperty.ModifyWithMouse += ModifyEndAngleWithMouse;
+                endAngleProperty.PropertyEntryChangedStateEvent+= OnStateChanged;
                 endAngleHotSpot = new AngleHotSpot(endAngleProperty);
                 endAngleHotSpot.Position = circle.EndPoint;
                 base.resourceIdInternal = "CircleArc.Object";
 
                 directionProperty = new BooleanProperty("Arc.Direction", "Arc.Direction.Values");
                 directionProperty.BooleanValue = circle.SweepParameter > 0.0;
-                directionProperty.GetBooleanEvent += new CADability.UserInterface.BooleanProperty.GetBooleanDelegate(OnGetDirection);
-                directionProperty.SetBooleanEvent += new CADability.UserInterface.BooleanProperty.SetBooleanDelegate(OnSetDirection);
+                directionProperty.GetBooleanEvent += OnGetDirection;
+                directionProperty.SetBooleanEvent += OnSetDirection;
                 // hat keinen Hotspot
-                startPointProperty = new GeoPointProperty("Arc.StartPoint", Frame, false);
-                startPointProperty.GetGeoPointEvent += new CADability.UserInterface.GeoPointProperty.GetGeoPointDelegate(OnGetStartPoint);
+                startPointProperty = new GeoPointProperty(Frame, "Arc.StartPoint");
+                startPointProperty.OnGetValue = OnGetStartPoint;
                 startPointProperty.ReadOnly = true;
-                startPointProperty.PropertyEntryChangedStateEvent+= new PropertyEntryChangedStateDelegate(OnStateChanged);
-                endPointProperty = new GeoPointProperty("Arc.EndPoint", Frame, false);
-                endPointProperty.GetGeoPointEvent += new CADability.UserInterface.GeoPointProperty.GetGeoPointDelegate(OnGetEndPoint);
+                startPointProperty.PropertyEntryChangedStateEvent+= OnStateChanged;                
+                endPointProperty = new GeoPointProperty(Frame, "Arc.EndPoint");
+                endPointProperty.OnGetValue = OnGetEndPoint;
                 endPointProperty.ReadOnly = true;
-                endPointProperty.PropertyEntryChangedStateEvent+= new PropertyEntryChangedStateDelegate(OnStateChanged);
+                endPointProperty.PropertyEntryChangedStateEvent+= OnStateChanged;
             }
             else
             {
                 if (Settings.GlobalSettings.GetBoolValue("CircleShowStartPointProperty", false))
                 {
-                    startAngleProperty = new AngleProperty("Arc.StartAngle", Frame, true);
-                    startAngleProperty.GetAngleEvent += new AngleProperty.GetAngleDelegate(OnGetStartAngle);
-                    startAngleProperty.SetAngleEvent += new AngleProperty.SetAngleDelegate(OnSetStartAngle);
-                    startAngleProperty.ModifyWithMouseEvent += new ModifyWithMouseDelegate(ModifyStartAngleWithMouse);
-                    startAngleProperty.PropertyEntryChangedStateEvent+= new PropertyEntryChangedStateDelegate(OnStateChanged);
+                    startAngleProperty = new AngleProperty(Frame, "Arc.StartAngle");
+                    startAngleProperty.OnGetValue = OnGetStartAngle;
+					startAngleProperty.OnSetValue = OnSetStartAngle;
+                    startAngleProperty.ModifyWithMouse += ModifyStartAngleWithMouse;
+                    startAngleProperty.PropertyEntryChangedStateEvent+= OnStateChanged;
                     startAngleHotSpot = new AngleHotSpot(startAngleProperty);
                     startAngleHotSpot.Position = circle.StartPoint;
 
                     directionProperty = new BooleanProperty("Arc.Direction", "Arc.Direction.Values");
                     directionProperty.BooleanValue = circle.SweepParameter > 0.0;
-                    directionProperty.GetBooleanEvent += new CADability.UserInterface.BooleanProperty.GetBooleanDelegate(OnGetDirection);
-                    directionProperty.SetBooleanEvent += new CADability.UserInterface.BooleanProperty.SetBooleanDelegate(OnSetDirection);
+                    directionProperty.GetBooleanEvent += OnGetDirection;
+                    directionProperty.SetBooleanEvent += OnSetDirection;
                     // hat keinen Hotspot
-                    startPointProperty = new GeoPointProperty("Arc.StartPoint", Frame, false);
-                    startPointProperty.GetGeoPointEvent += new CADability.UserInterface.GeoPointProperty.GetGeoPointDelegate(OnGetStartPoint);
+                    startPointProperty = new GeoPointProperty(Frame, "Arc.StartPoint");
+                    startPointProperty.OnGetValue = OnGetStartPoint;
                     startPointProperty.ReadOnly = true;
-                    startPointProperty.PropertyEntryChangedStateEvent+= new PropertyEntryChangedStateDelegate(OnStateChanged);
+                    startPointProperty.PropertyEntryChangedStateEvent+= OnStateChanged;
                 }
                 base.resourceIdInternal = "Circle.Object";
             }
-            arcLengthProperty = new LengthProperty("Circle.ArcLength", Frame, true);
-            arcLengthProperty.GetLengthEvent += new CADability.UserInterface.LengthProperty.GetLengthDelegate(OnGetArcLength);
+            arcLengthProperty = new LengthProperty(Frame, "Circle.ArcLength");
+            arcLengthProperty.OnGetValue = OnGetArcLength;
             arcLengthProperty.ReadOnly = true;
             attributeProperties = circle.GetAttributeProperties(Frame);
         }
-        private void OnGeoObjectDidChange(IGeoObject Sender, GeoObjectChange Change)
+        private void OnGeoObjectDidChange(IGeoObject sender, GeoObjectChange change)
         {
             centerProperty.GeoPointChanged();
             radiusProperty.LengthChanged();
@@ -154,7 +151,7 @@ namespace CADability.UserInterface
             if (startAngleProperty != null)
             {
                 startAngleProperty.AngleChanged();
-                if (endAngleProperty != null) endAngleProperty.AngleChanged();
+                endAngleProperty?.AngleChanged();
                 startPointProperty.Refresh();
                 if (endAngleProperty != null) endPointProperty.Refresh();
                 startAngleHotSpot.Position = circle.StartPoint;
@@ -165,15 +162,8 @@ namespace CADability.UserInterface
                     if (endAngleProperty != null) HotspotChangedEvent(endAngleHotSpot, HotspotChangeMode.Moved);
                 }
             }
-            if (arcLengthProperty != null)
-            {
-                arcLengthProperty.Refresh();
-            }
-            if (directionProperty != null)
-            {
-                directionProperty.Refresh();
-            }
-
+            arcLengthProperty?.Refresh();
+            directionProperty?.Refresh();
         }
 
         #region PropertyEntryImpl Overrides
@@ -242,16 +232,16 @@ namespace CADability.UserInterface
         /// <param name="propertyTreeView">the IPropertyTreeView from which it was removed</param>
         public override void Removed(IPropertyPage propertyTreeView)
         {
-            this.circle.DidChangeEvent -= new ChangeDelegate(OnGeoObjectDidChange);
-            circle.UserData.UserDataAddedEvent -= new UserData.UserDataAddedDelegate(OnUserDataAdded);
-            circle.UserData.UserDataRemovedEvent -= new UserData.UserDataRemovedDelegate(OnUserDataAdded);
+            this.circle.DidChangeEvent -= OnGeoObjectDidChange;
+            circle.UserData.UserDataAddedEvent -= OnUserDataAdded;
+            circle.UserData.UserDataRemovedEvent -= OnUserDataAdded;
             base.Removed(propertyTreeView);
         }
         public override void Added(IPropertyPage propertyTreeView)
         {
-            this.circle.DidChangeEvent += new ChangeDelegate(OnGeoObjectDidChange);
-            circle.UserData.UserDataAddedEvent += new UserData.UserDataAddedDelegate(OnUserDataAdded);
-            circle.UserData.UserDataRemovedEvent += new UserData.UserDataRemovedDelegate(OnUserDataAdded);
+            this.circle.DidChangeEvent += OnGeoObjectDidChange;
+            circle.UserData.UserDataAddedEvent += OnUserDataAdded;
+            circle.UserData.UserDataRemovedEvent += OnUserDataAdded;
             base.Added(propertyTreeView);
         }
         void OnUserDataAdded(string name, object value)
@@ -287,48 +277,48 @@ namespace CADability.UserInterface
 
 #endregion
 
-        private GeoPoint OnGetEndPoint(GeoPointProperty sender)
+        private GeoPoint OnGetEndPoint()
         {
             return circle.EndPoint;
         }
-        private GeoPoint OnGetStartPoint(GeoPointProperty sender)
+        private GeoPoint OnGetStartPoint()
         {
             return circle.StartPoint;
         }
-        private GeoPoint OnGetCenter(GeoPointProperty sender)
+        private GeoPoint OnGetCenter()
         {
             return circle.Center;
         }
-        private void OnSetCenter(GeoPointProperty sender, GeoPoint p)
+        private void OnSetCenter(GeoPoint p)
         {
             circle.Center = p;
         }
-        private void ModifyCenterWithMouse(IPropertyEntry sender, bool StartModifying)
+        private void ModifyCenterWithMouse(IPropertyEntry sender, bool startModifying)
         {
             GeneralGeoPointAction gpa = new GeneralGeoPointAction(centerProperty, circle);
             Frame.SetAction(gpa);
         }
-        private double OnGetRadius(LengthProperty sender)
+        private double OnGetRadius()
         {
             return circle.Radius;
         }
-        private double OnGetDiameter(LengthProperty sender)
+        private double OnGetDiameter()
         {
             return circle.Radius * 2.0;
         }
-        private double OnGetArcLength(LengthProperty sender)
+        private double OnGetArcLength()
         {
             return circle.Length;
         }
-        private void OnSetRadius(LengthProperty sender, double l)
+        private void OnSetRadius(double l)
         {
             circle.Radius = l;
         }
-        private void OnSetDiameter(LengthProperty sender, double l)
+        private void OnSetDiameter(double l)
         {
             circle.Radius = l / 2.0;
         }
-        private void ModifyRadiusWithMouse(IPropertyEntry sender, bool StartModifying)
+        private void ModifyRadiusWithMouse(IPropertyEntry sender, bool startModifying)
         {
             GeneralLengthAction gla = new GeneralLengthAction(radiusProperty, circle.Center, circle);
             Frame.SetAction(gla);
@@ -341,7 +331,7 @@ namespace CADability.UserInterface
         {
             circle.StartParameter = a.Radian;
         }
-        private void ModifyStartAngleWithMouse(IPropertyEntry sender, bool StartModifying)
+        private void ModifyStartAngleWithMouse(IPropertyEntry sender, bool startModifying)
         {
             GeneralAngleAction gaa = new GeneralAngleAction(startAngleProperty, circle.Plane);
             Frame.SetAction(gaa);
@@ -370,7 +360,7 @@ namespace CADability.UserInterface
                 if (circle.SweepParameter > 0.0) (circle as ICurve).Reverse();
             }
         }
-        private void ModifyEndAngleWithMouse(IPropertyEntry sender, bool StartModifying)
+        private void ModifyEndAngleWithMouse(IPropertyEntry sender, bool startModifying)
         {
             GeneralAngleAction gaa = new GeneralAngleAction(endAngleProperty, circle.Plane);
             Frame.SetAction(gaa);

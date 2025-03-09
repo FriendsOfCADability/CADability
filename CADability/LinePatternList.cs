@@ -227,10 +227,6 @@ namespace CADability.Attribute
             }
             return res;
         }
-        /// <summary>
-        /// Provide a handler here to be notified when when a line pattern is beeing removed from this list.
-        /// </summary>
-        public event RemovingFromListDelegate RemovingFromListEvent;
         public event CADability.DidModifyDelegate DidModifyEvent;
         //Hilfsfunktion für Import
         internal LinePattern CreateOrFind(double[] pattern, LinePattern.Scaling scale)

@@ -78,7 +78,7 @@
                 return project;
             }
         }
-        public void Refresh()
+        public override void Refresh()
         {
             subEntries = null;
             if (propertyTreeView != null)

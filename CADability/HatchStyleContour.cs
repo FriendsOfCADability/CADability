@@ -869,52 +869,52 @@ namespace CADability.Attribute
                 {
                     subItems = new IPropertyEntry[9];
 
-                    LengthProperty lp = new LengthProperty("HatchStyleContour.LineDistance", Frame, false);
-                    lp.GetLengthEvent += new CADability.UserInterface.LengthProperty.GetLengthDelegate(OnPropertyGetLineDistance);
-                    lp.SetLengthEvent += new CADability.UserInterface.LengthProperty.SetLengthDelegate(OnPropertySetLineDistance);
+                    LengthProperty lp = new LengthProperty(Frame, "HatchStyleContour.LineDistance");
+                    lp.OnGetValue = () => lineDistance;
+                    lp.OnSetValue = l => lineDistance = l;
                     lp.Refresh();
                     lp.ShowMouseButton = false;
                     subItems[0] = lp;
 
-                    LengthProperty fd = new LengthProperty("HatchStyleContour.FirstDistance", Frame, false);
-                    fd.GetLengthEvent += new CADability.UserInterface.LengthProperty.GetLengthDelegate(OnPropertyGetFirstDistance);
-                    fd.SetLengthEvent += new CADability.UserInterface.LengthProperty.SetLengthDelegate(OnPropertySetFirstDistance);
+                    LengthProperty fd = new LengthProperty(Frame, "HatchStyleContour.FirstDistance");
+                    fd.OnGetValue = () => firstDistance;
+                    fd.OnSetValue = l => firstDistance = l;
                     fd.Refresh();
                     fd.ShowMouseButton = false;
                     subItems[1] = fd;
 
                     MultipleChoiceProperty eh = new MultipleChoiceProperty("HatchStyleContour.ExcludeHoles", (int)holeMode);
-                    eh.ValueChangedEvent += new ValueChangedDelegate(ExcludeHolesValueChanged);
+                    eh.ValueChangedEvent += ExcludeHolesValueChanged;
                     subItems[2] = eh;
 
                     MultipleChoiceProperty sm = new MultipleChoiceProperty("HatchStyleContour.SpiralMode", (int)spiralMode);
-                    sm.ValueChangedEvent += new ValueChangedDelegate(SpiralModeValueChanged);
+                    sm.ValueChangedEvent += SpiralModeValueChanged;
                     subItems[3] = sm;
 
                     BooleanProperty cc = new BooleanProperty("HatchStyleContour.CounterClock", "HatchStyleContour.CounterClock.Values");
-                    cc.GetBooleanEvent += new CADability.UserInterface.BooleanProperty.GetBooleanDelegate(OnGetCounterClock);
-                    cc.SetBooleanEvent += new CADability.UserInterface.BooleanProperty.SetBooleanDelegate(OnSetCounterClock);
+                    cc.GetBooleanEvent += OnGetCounterClock;
+                    cc.SetBooleanEvent += OnSetCounterClock;
                     cc.Refresh();
                     subItems[4] = cc;
 
                     BooleanProperty ib = new BooleanProperty("HatchStyleContour.Inbound", "HatchStyleContour.Inbound.Values");
-                    ib.GetBooleanEvent += new CADability.UserInterface.BooleanProperty.GetBooleanDelegate(OnGetInbound);
-                    ib.SetBooleanEvent += new CADability.UserInterface.BooleanProperty.SetBooleanDelegate(OnSetInbound);
+                    ib.GetBooleanEvent += OnGetInbound;
+                    ib.SetBooleanEvent += OnSetInbound;
                     ib.Refresh();
                     subItems[5] = ib;
 
                     Project pr = Frame.Project;
                     LineWidthSelectionProperty lws = new LineWidthSelectionProperty("HatchStyleLines.LineWidth", pr.LineWidthList, this.lineWidth);
-                    lws.LineWidthChangedEvent += new CADability.UserInterface.LineWidthSelectionProperty.LineWidthChangedDelegate(OnLineWidthChanged);
+                    lws.LineWidthChangedEvent += OnLineWidthChanged;
                     subItems[6] = lws;
 
                     LinePatternSelectionProperty lps = new LinePatternSelectionProperty("HatchStyleLines.LinePattern", pr.LinePatternList, this.linePattern);
-                    lps.LinePatternChangedEvent += new CADability.UserInterface.LinePatternSelectionProperty.LinePatternChangedDelegate(OnLinePatternChanged);
+                    lps.LinePatternChangedEvent += OnLinePatternChanged;
                     subItems[7] = lps;
 
                     ColorSelectionProperty csp = new ColorSelectionProperty("HatchStyleLines.Color", pr.ColorList, colorDef, ColorList.StaticFlags.allowUndefined);
                     csp.ShowAllowUndefinedGray = false;
-                    csp.ColorDefChangedEvent += new ColorSelectionProperty.ColorDefChangedDelegate(OnColorDefChanged);
+                    csp.ColorDefChangedEvent += OnColorDefChanged;
                     subItems[8] = csp;
 
                 }
@@ -937,7 +937,7 @@ namespace CADability.Attribute
         }
 
         #endregion
-        internal override void Update(bool AddMissingToList)
+        internal override void Update(bool addMissingToList)
         {
             if (Parent != null && Parent.Owner != null)
             {
@@ -947,7 +947,7 @@ namespace CADability.Attribute
                     ColorDef cd = cl.Find(colorDef.Name);
                     if (cd != null)
                         colorDef = cd;
-                    else if (AddMissingToList)
+                    else if (addMissingToList)
                         cl.Add(colorDef);
                 }
                 LineWidthList ll = Parent.Owner.LineWidthList;
@@ -956,7 +956,7 @@ namespace CADability.Attribute
                     LineWidth lw = ll.Find(lineWidth.Name);
                     if (lw != null)
                         lineWidth = lw;
-                    else if (AddMissingToList)
+                    else if (addMissingToList)
                         ll.Add(lineWidth);
                 }
                 LinePatternList pl = Parent.Owner.LinePatternList;
@@ -965,7 +965,7 @@ namespace CADability.Attribute
                     LinePattern lw = pl.Find(linePattern.Name);
                     if (lw != null)
                         linePattern = lw;
-                    else if (AddMissingToList)
+                    else if (addMissingToList)
                         pl.Add(linePattern);
                 }
             }
@@ -1055,22 +1055,6 @@ namespace CADability.Attribute
         private void OnColorDefChanged(ColorDef selected)
         {
             colorDef = selected;
-        }
-        private double OnPropertyGetLineDistance(LengthProperty sender)
-        {
-            return lineDistance;
-        }
-        private void OnPropertySetLineDistance(LengthProperty sender, double l)
-        {
-            lineDistance = l;
-        }
-        private double OnPropertyGetFirstDistance(LengthProperty sender)
-        {
-            return firstDistance;
-        }
-        private void OnPropertySetFirstDistance(LengthProperty sender, double l)
-        {
-            firstDistance = l;
         }
     }
 }

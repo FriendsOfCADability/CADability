@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Runtime.Serialization;
 using CADability.Curve2D;
 using CADability.UserInterface;
@@ -42,10 +41,9 @@ namespace CADability.GeoObject
         {
             return new ConicalSurfaceNP(location, xAxis, yAxis, zAxis);
         }
-        public override void CopyData(ISurface CopyFrom)
+        public override void CopyData(ISurface copyFrom)
         {
-            ConicalSurfaceNP cnp = CopyFrom as ConicalSurfaceNP;
-            if (cnp != null)
+            if (copyFrom is ConicalSurfaceNP cnp)
             {
                 location = cnp.location;
                 xAxis = cnp.xAxis;
@@ -53,13 +51,13 @@ namespace CADability.GeoObject
                 zAxis = cnp.zAxis;
             }
         }
-        public override ICurve FixedU(double u, double vmin, double vmax)
+        public override ICurve FixedU(double u, double vMin, double vMax)
         {
-            return Make3dCurve(new Line2D(new GeoPoint2D(u, vmin), new GeoPoint2D(u, vmax)));
+            return Make3dCurve(new Line2D(new GeoPoint2D(u, vMin), new GeoPoint2D(u, vMax)));
         }
-        public override ICurve FixedV(double v, double umin, double umax)
+        public override ICurve FixedV(double v, double uMin, double uMax)
         {
-            return Make3dCurve(new Line2D(new GeoPoint2D(umin, v), new GeoPoint2D(umax, v)));
+            return Make3dCurve(new Line2D(new GeoPoint2D(uMin, v), new GeoPoint2D(uMax, v)));
         }
         public override ISurface GetModified(ModOp m)
         {   // m must be orthogonal
@@ -156,7 +154,7 @@ namespace CADability.GeoObject
                 }
                 else
                 {
-                    // this is a intersection with a plane. 
+                    // this is an intersection with a plane. 
                     GeoPoint2D[] fp2d = new GeoPoint2D[5];
                     double n = 5.0;
                     if (elli.IsArc) n = 4.0;
@@ -170,20 +168,22 @@ namespace CADability.GeoObject
             }
             return base.GetProjectedCurve(curve, precision);
         }
-        public override ICurve2D[] GetTangentCurves(GeoVector direction, double umin, double umax, double vmin, double vmax)
+        public override ICurve2D[] GetTangentCurves(GeoVector direction, double uMin, double uMax, double vMin, double vMax)
         {
             if (Precision.SameDirection(direction, zAxis, false))
-            {
-                return new ICurve2D[0];
-            }
+                return Array.Empty<ICurve2D>();
+            
             GeoPoint2D uv = PositionOf(location + zAxis + (direction ^ zAxis));
             GeoVector2D dir2d = uv.ToVector();
-            dir2d.Length = Math.Max(Math.Max(Math.Abs(umax), Math.Abs(umin)), Math.Max(Math.Abs(vmax), Math.Abs(vmin))) * 1.1;
-            ClipRect clr = new ClipRect(umin, umax, vmin, vmax);
+            dir2d.Length = Math.Max(Math.Max(Math.Abs(uMax), Math.Abs(uMin)), Math.Max(Math.Abs(vMax), Math.Abs(vMin))) * 1.1;
+            ClipRect clr = new ClipRect(uMin, uMax, vMin, vMax);
             GeoPoint2D sp = GeoPoint2D.Origin - dir2d;
             GeoPoint2D ep = GeoPoint2D.Origin + dir2d;
-            if (clr.ClipLine(ref sp, ref ep)) return new ICurve2D[] { new Line2D(sp, ep) };
-            else return new ICurve2D[0];
+
+            if (clr.ClipLine(ref sp, ref ep)) 
+                return new ICurve2D[] { new Line2D(sp, ep) };
+            
+            return Array.Empty<ICurve2D>();
         }
         public override GeoPoint PointAt(GeoPoint2D uv)
         {
@@ -236,9 +236,7 @@ namespace CADability.GeoObject
         }
         public override ModOp2D ReverseOrientation()
         {   // flip x and y axis, keep z axis, left handed system
-            GeoVector tmp = xAxis;
-            xAxis = yAxis;
-            yAxis = tmp;
+            (xAxis, yAxis) = (yAxis, xAxis);
             return new ModOp2D(0, 1, 0, 1, 0, 0);
         }
         public override bool IsUPeriodic => false;
@@ -258,29 +256,24 @@ namespace CADability.GeoObject
             }
             return base.SameGeometry(thisBounds, other, otherBounds, precision, out firstToSecond);
         }
-        public double OpeningAngle
-        {
-            get
-            {
-                return 2 * Math.Atan2(xAxis.Length, zAxis.Length);
-            }
-        }
+        public double OpeningAngle => 2 * Math.Atan2(xAxis.Length, zAxis.Length);
+
         public override GeoPoint2D[] PerpendicularFoot(GeoPoint fromHere)
         {
             try
             {
                 Plane pln = new Plane(location, zAxis, fromHere - location);
                 // in this plane the x-axis is the conical axis, the origin is the apex of the cone
-                Angle dira = OpeningAngle / 2.0;
-                // this line through origin with angle dira and -dira are the envelope lines of the cone
+                Angle dirA = OpeningAngle / 2.0;
+                // this line through origin with angle dirA and -dirA are the envelope lines of the cone
                 GeoPoint2D fromHere2d = pln.Project(fromHere);
-                GeoPoint2D fp1 = Geometry.DropPL(fromHere2d, GeoPoint2D.Origin, new GeoVector2D(dira));
-                GeoPoint2D fp2 = Geometry.DropPL(fromHere2d, GeoPoint2D.Origin, new GeoVector2D(-dira));
+                GeoPoint2D fp1 = Geometry.DropPL(fromHere2d, GeoPoint2D.Origin, new GeoVector2D(dirA));
+                GeoPoint2D fp2 = Geometry.DropPL(fromHere2d, GeoPoint2D.Origin, new GeoVector2D(-dirA));
                 return new GeoPoint2D[] { PositionOf(pln.ToGlobal(fp1)), PositionOf(pln.ToGlobal(fp2)) };
             }
             catch
             {   // fromHere is on the axis
-                return new GeoPoint2D[0];
+                return Array.Empty<GeoPoint2D>();
             }
         }
         public override Polynom GetImplicitPolynomial()
@@ -316,23 +309,23 @@ namespace CADability.GeoObject
         public override IPropertyEntry GetPropertyEntry(IFrame frame)
         {
             List<IPropertyEntry> se = new List<IPropertyEntry>();
-            GeoPointProperty location = new GeoPointProperty("ConicalSurface.Location", frame, false);
-            location.ReadOnly = true;
-            location.GetGeoPointEvent += delegate (GeoPointProperty sender) { return this.location; };
-            se.Add(location);
-            GeoVectorProperty dirx = new GeoVectorProperty("ConicalSurface.DirectionX", frame, false);
-            dirx.ReadOnly = true;
-            dirx.IsAngle = false;
-            dirx.GetGeoVectorEvent += delegate (GeoVectorProperty sender) { return xAxis; };
-            se.Add(dirx);
-            GeoVectorProperty diry = new GeoVectorProperty("ConicalSurface.DirectionY", frame, false);
-            diry.ReadOnly = true;
-            diry.IsAngle = false;
-            diry.GetGeoVectorEvent += delegate (GeoVectorProperty sender) { return yAxis; };
-            se.Add(diry);
-            AngleProperty openingAngle = new AngleProperty("ConicalSurface.OpeningAngle", frame, false);
+            GeoPointProperty csLocation = new GeoPointProperty(frame,"ConicalSurface.Location");
+            csLocation.ReadOnly = true;
+            csLocation.OnGetValue = () => this.location;
+            se.Add(csLocation);
+            GeoVectorProperty dirX = new GeoVectorProperty(frame, "ConicalSurface.DirectionX");
+            dirX.ReadOnly = true;
+            dirX.IsAngle = false;
+            dirX.OnGetValue = () => xAxis;
+            se.Add(dirX);
+            GeoVectorProperty dirY = new GeoVectorProperty(frame, "ConicalSurface.DirectionY");
+            dirY.ReadOnly = true;
+            dirY.IsAngle = false;
+            dirY.OnGetValue = () => yAxis;
+            se.Add(dirY);
+            AngleProperty openingAngle = new AngleProperty(frame, "ConicalSurface.OpeningAngle");
             openingAngle.ReadOnly = true;
-            openingAngle.GetAngleEvent += delegate () { return OpeningAngle; };
+            openingAngle.OnGetValue = () => OpeningAngle;
             se.Add(openingAngle);
             return new GroupProperty("ConicalSurface", se.ToArray());
         }
@@ -374,7 +367,4 @@ namespace CADability.GeoObject
         }
         #endregion
     }
-
-    /*
-     */
 }

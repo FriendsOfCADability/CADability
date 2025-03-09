@@ -197,7 +197,7 @@ namespace CADability.Attribute
                 FireDidChange("Name", OldName);
             }
         }
-        public IAttributeList Parent
+        public new IAttributeList Parent
         {
             get
             {

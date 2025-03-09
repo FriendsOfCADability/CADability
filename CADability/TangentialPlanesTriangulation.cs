@@ -26,7 +26,7 @@ namespace CADability
             internal List<TangentPlane> other; // andere Ebene, die zu dieser Schnittlinie gehört
             // bis hierher synchron
 
-            internal List<GeoPoint2D> polygon; // das konvexe Polygon, welches diese Ebene eingrenzt
+            //internal List<GeoPoint2D> polygon; // das konvexe Polygon, welches diese Ebene eingrenzt
             public readonly ModOp toThis;
 
             public TangentPlane(TangentialPlanesTriangulation tpt, GeoPoint2D uv, GeoPoint location, GeoVector udirection, GeoVector vdirection)

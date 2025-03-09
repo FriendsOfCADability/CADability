@@ -13,7 +13,7 @@ namespace CADability.GeoObject
     /// Usually you would center the referenced object at the origin so this object will be centered at the <see cref="Location"/>.
     /// In contrast to the <see cref="Icon"/> object, which always shows its face to the viewer and is much faster, 
     /// because it can be kept in the display list.
-    /// Since this object does not have a well defined size in world coordinates, it is only pickable or selectable
+    /// Since this object does not have a well-defined size in world coordinates, it is only pickable or selectable
     /// at its insertion point. The size of the object is assumed in device units (pixels)
     /// The Layer of this object will be taken into account for the objects visibility, not the layer of the 
     /// referenced object.
@@ -23,8 +23,8 @@ namespace CADability.GeoObject
     [Serializable()]
     public class UnscaledGeoObject : IGeoObjectImpl, ISerializable
     {
-        GeoPoint location; // entspricht dem Nullpunkt des Objektes
-        IGeoObject geoObject;
+        private GeoPoint location; //corresponds to the origin of the object
+        private IGeoObject geoObject;
 
         #region polymorph construction
         /// <summary>
@@ -53,7 +53,7 @@ namespace CADability.GeoObject
         {
             location = GeoPoint.Origin;
             geoObject = null;
-            if (Constructed != null) Constructed(this);
+            Constructed?.Invoke(this);
         }
         #endregion
         /// <summary>
@@ -89,33 +89,31 @@ namespace CADability.GeoObject
                 {
                     if (geoObject != null)
                     {
-                        geoObject.WillChangeEvent -= new ChangeDelegate(OnGeoObjectWillChange);
-                        geoObject.DidChangeEvent -= new ChangeDelegate(OnGeoObjectDidChange);
+                        geoObject.WillChangeEvent -= OnGeoObjectWillChange;
+                        geoObject.DidChangeEvent -= OnGeoObjectDidChange;
                     }
                     geoObject = value;
-                    geoObject.WillChangeEvent += new ChangeDelegate(OnGeoObjectWillChange);
-                    geoObject.DidChangeEvent += new ChangeDelegate(OnGeoObjectDidChange);
-                    // geoObject.Owner = this; 
-                    // nicht Owner setzen, das Objekt soll auch möglicherweise in vielen UnscaledObjects vorkommen können
+                    geoObject.WillChangeEvent += OnGeoObjectWillChange;
+                    geoObject.DidChangeEvent += OnGeoObjectDidChange;
                 }
             }
         }
 
-        void OnGeoObjectDidChange(IGeoObject Sender, GeoObjectChange Change)
+        private void OnGeoObjectDidChange(IGeoObject sender, GeoObjectChange change)
         {
-            FireWillChange(Change);
+            FireWillChange(change);
         }
 
-        void OnGeoObjectWillChange(IGeoObject Sender, GeoObjectChange Change)
+        private void OnGeoObjectWillChange(IGeoObject sender, GeoObjectChange change)
         {
-            FireDidChange(Change);
+            FireDidChange(change);
         }
         /// <summary>
-        /// While the normal <see cref="HitTest(Projection.PickArea, bool)">HitTest</see> only checkes the <see cref="Location"/> of the object
-        /// this method checks the hittest of the object expanded according to the projection in this <paramref name="area"/>
+        /// While the normal <see cref="HitTest(Projection.PickArea, bool)">HitTest</see> only checks the <see cref="Location"/> of the object
+        /// this method checks the hit test of the object expanded according to the projection in this <paramref name="area"/>
         /// </summary>
         /// <param name="area">Pick area to check</param>
-        /// <param name="onlyInside">true, if the whole object must reside inside the pickarea, false if overlapping will suffice</param>
+        /// <param name="onlyInside">true, if the whole object must reside inside the pick area, false if overlapping will suffice</param>
         /// <returns>true when a hit is recognized</returns>
         public bool RealHitTest(Projection.PickArea area, bool onlyInside)
         {
@@ -153,16 +151,23 @@ namespace CADability.GeoObject
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.CopyGeometry (IGeoObject)"/>
         /// </summary>
-        /// <param name="ToCopyFrom"></param>
-        public override void CopyGeometry(IGeoObject ToCopyFrom)
+        /// <param name="toCopyFrom"></param>
+        public override void CopyGeometry(IGeoObject toCopyFrom)
         {
-            UnscaledGeoObject res = ToCopyFrom as UnscaledGeoObject;
-            using (new Changing(this))
+            if (toCopyFrom is UnscaledGeoObject res)
             {
-                location = res.location;
-                geoObject = res.geoObject;
+                using (new Changing(this))
+                {
+                    location = res.location;
+                    geoObject = res.geoObject;
+                }
+            }
+            else
+            {
+                throw new ArgumentException("Invalid object type. Expected UnscaledGeoObject.", nameof(toCopyFrom));
             }
         }
+
         /// <summary>
         /// Implements <see cref="IGeoObject.GetBoundingCube"/> abstract.
         /// Must be overridden.
@@ -177,11 +182,11 @@ namespace CADability.GeoObject
         /// that handles the display and modification of the properties of the IGeoObject derived object.
         /// Default implementation return null.
         /// </summary>
-        /// <param name="Frame"></param>
+        /// <param name="frame"></param>
         /// <returns></returns>
-        public override IPropertyEntry GetShowProperties(IFrame Frame)
+        public override IPropertyEntry GetShowProperties(IFrame frame)
         {
-            return new ShowPropertyUnscaledGeoObject(this, Frame);
+            return new ShowPropertyUnscaledGeoObject(this, frame);
         }
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3D (IPaintTo3D)"/>
@@ -258,7 +263,8 @@ namespace CADability.GeoObject
         /// <param name="onlyInside"></param>
         /// <returns></returns>
         public override bool HitTest(Projection projection, BoundingRect rect, bool onlyInside)
-        {   // egal ob onlyInside, da nur ein Punkt getestet wird
+        {
+            // regardless of onlyInside, since only a single point is being tested
             return projection.ProjectUnscaled(location) <= rect;
         }
         /// <summary>
@@ -300,7 +306,7 @@ namespace CADability.GeoObject
             location = (GeoPoint)info.GetValue("Location", typeof(GeoPoint));
         }
         /// <summary>
-        /// Implements ISerializable.GetObjectData. Saves <see cref="UserData"/>, <see cref="Layer"/> and <see cref="Style"/>.
+        /// Implements ISerializable.GetObjectData. Saves <see cref="UserData"/>, <see cref="CADability.Attribute.Layer"/> and <see cref="CADability.Attribute.Style"/>.
         /// All other properties of the GeoObject must be saved by the derived class. don't forget
         /// to call the base implementation
         /// </summary>
@@ -316,10 +322,10 @@ namespace CADability.GeoObject
 
     internal class ShowPropertyUnscaledGeoObject : PropertyEntryImpl, ICommandHandler, IGeoObjectShowProperty
     {
-        private IPropertyEntry[] attributeProperties; // Anzeigen für die Attribute (Ebene, Farbe u.s.w)
+        private readonly IPropertyEntry[] attributeProperties; // Display for the attributes (layer, color, etc.)
         private IPropertyEntry[] subEntries;
-        private UnscaledGeoObject unscaledGeoObject;
-        public ShowPropertyUnscaledGeoObject(UnscaledGeoObject unscaledGeoObject, IFrame frame): base(frame)
+        private readonly UnscaledGeoObject unscaledGeoObject;
+        public ShowPropertyUnscaledGeoObject(UnscaledGeoObject unscaledGeoObject, IFrame frame) : base(frame)
         {
             this.unscaledGeoObject = unscaledGeoObject;
             attributeProperties = unscaledGeoObject.GetAttributeProperties(Frame);
@@ -331,38 +337,38 @@ namespace CADability.GeoObject
         {
             get
             {
-                if (subEntries == null)
-                {
-                    List<IPropertyEntry> prop = new List<IPropertyEntry>();
-                    GeoPointProperty location = new GeoPointProperty("UnscaledGeoObject.Location", Frame, true);
-                    location.GetGeoPointEvent += new CADability.UserInterface.GeoPointProperty.GetGeoPointDelegate(OnGetRefPoint);
-                    location.SetGeoPointEvent += new CADability.UserInterface.GeoPointProperty.SetGeoPointDelegate(OnSetRefPoint);
-                    prop.Add(location);
-                    IPropertyEntry spgo = unscaledGeoObject.GeoObject.GetShowProperties(Frame);
-                    prop.Add(spgo);
-                    IPropertyEntry[] mainProps = prop.ToArray();
-                    subEntries = PropertyEntryImpl.Concat(mainProps, attributeProperties);
-                }
+                if (subEntries != null) 
+                    return subEntries;
+
+                List<IPropertyEntry> prop = new List<IPropertyEntry>();
+                GeoPointProperty location = new GeoPointProperty(Frame, "UnscaledGeoObject.Location");
+                location.OnGetValue = OnGetRefPoint;
+                location.OnSetValue = OnSetRefPoint;
+                prop.Add(location);
+                IPropertyEntry spgo = unscaledGeoObject.GeoObject.GetShowProperties(Frame);
+                prop.Add(spgo);
+                IPropertyEntry[] mainProps = prop.ToArray();
+                subEntries = PropertyEntryImpl.Concat(mainProps, attributeProperties);
                 return subEntries;
             }
         }
-        private GeoPoint OnGetRefPoint(GeoPointProperty sender)
+        private GeoPoint OnGetRefPoint()
         {
             return unscaledGeoObject.Location;
         }
-        private void OnSetRefPoint(GeoPointProperty sender, GeoPoint p)
+        private void OnSetRefPoint(GeoPoint p)
         {
             unscaledGeoObject.Location = p;
         }
         #endregion
         #region ICommandHandler Members
 
-        bool ICommandHandler.OnCommand(string MenuId)
+        bool ICommandHandler.OnCommand(string menuId)
         {
             return false;
         }
 
-        bool ICommandHandler.OnUpdateCommand(string MenuId, CommandState CommandState)
+        bool ICommandHandler.OnUpdateCommand(string menuId, CommandState commandState)
         {
             return false;
         }

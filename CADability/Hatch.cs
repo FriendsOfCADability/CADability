@@ -35,19 +35,19 @@ namespace CADability.GeoObject
         /// Delegate definition for <see cref="Constructor"/>
         /// </summary>
         /// <returns>your derived Hatch Object</returns>
-        public delegate Hatch ConstructionDelegate();
+        public new delegate Hatch ConstructionDelegate();
         /// <summary>
         /// Factory mechanism for constructing Hatch objects
         /// If you have a class derivec from this class (Hatch) and everytime CADability creates a hatch
         /// object your object should be created, you have to register your static construct method here.
         /// </summary>
-        public static ConstructionDelegate Constructor;
+        public new static ConstructionDelegate Constructor;
         /// <summary>
         /// The only way to construct a hatch object. If a <see cref="Constructor"/> is registered,
         /// this constructor will be used, if not a Hatch object is created.
         /// </summary>
         /// <returns></returns>
-        public static Hatch Construct()
+        public new static Hatch Construct()
         {
             if (Constructor != null) return Constructor();
             return new Hatch();
@@ -310,8 +310,8 @@ namespace CADability.GeoObject
             if (Attribute == hatchStyle) return true;
             return base.IsAttributeUsed(Attribute);
         }
-        public delegate bool PaintTo3DDelegate(Hatch toPaint, IPaintTo3D paintTo3D);
-        public static PaintTo3DDelegate OnPaintTo3D;
+        public new delegate bool PaintTo3DDelegate(Hatch toPaint, IPaintTo3D paintTo3D);
+        public new static PaintTo3DDelegate OnPaintTo3D;
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3DList (IPaintTo3D, ICategorizedDislayLists)"/>
         /// </summary>

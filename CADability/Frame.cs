@@ -2615,11 +2615,6 @@ namespace CADability
 
         public delegate bool DragDropDelegate(DragEventArgs e);
         public delegate GeoObjectList DragGetDataDelegate(DragEventArgs e);
-        public event DragDropDelegate FilterDragDrop;
-        public event DragDropDelegate FilterDragEnter;
-        public event DragDropDelegate FilterDragLeave;
-        public event DragDropDelegate FilterDragOver;
-        public event DragGetDataDelegate FilterDragGetData;
         void ControlCenterCreated(IControlCenter cc)
         {
         }

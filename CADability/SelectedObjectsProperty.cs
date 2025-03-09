@@ -415,7 +415,7 @@ namespace CADability.UserInterface
         }
         internal IGeoObject ContextMenuSource; // dieses Objekt ist verantwortlich für das aktuelle Contextmenue
                                                // aufgrund einer Auswahl in einer der ComboBoxen
-        public void Refresh()
+        public override void Refresh()
         {
             showProperties = null;
             if (propertyPage != null)

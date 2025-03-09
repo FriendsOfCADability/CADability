@@ -1,5 +1,4 @@
 ﻿using CADability.Actions;
-using CADability.Attribute;
 using CADability.GeoObject;
 using System.Collections.Generic;
 
@@ -10,7 +9,7 @@ namespace CADability.UserInterface
     /// </summary>
     internal class ShowPropertyHatch : PropertyEntryImpl, ICommandHandler, IGeoObjectShowProperty
     {
-        private Hatch hatch;
+        private readonly Hatch hatch;
         private IPropertyEntry[] subEntries;
         private IPropertyEntry[] attributeProperties; // Anzeigen für die Attribute (Ebene, Farbe u.s.w)
         public ShowPropertyHatch(Hatch hatch, IFrame frame): base(frame)
@@ -31,8 +30,8 @@ namespace CADability.UserInterface
                 if (subEntries == null)
                 {
                     IPropertyEntry[] mainProps = new IPropertyEntry[1];
-                    DoubleProperty dp = new DoubleProperty("Hatch.Area", Frame);
-                    dp.GetDoubleEvent += new CADability.UserInterface.DoubleProperty.GetDoubleDelegate(OnGetArea);
+                    DoubleProperty dp = new DoubleProperty(Frame, "Hatch.Area");
+                    dp.OnGetValue = () => hatch?.CompoundShape?.Area ?? 0.0;
                     dp.Refresh();
                     mainProps[0] = dp;
                     subEntries = PropertyEntryImpl.Concat(mainProps, attributeProperties);
@@ -51,49 +50,43 @@ namespace CADability.UserInterface
                 return items.ToArray();
             }
         }
-        public override void Added(IPropertyPage propertyPage)
+        public override void Added(IPropertyPage page)
         {	// die events müssen in Added angemeldet und in Removed wieder abgemeldet werden,
             // sonst bleibt die ganze ShowProperty für immer an der Linie hängen
-            hatch.UserData.UserDataAddedEvent += new UserData.UserDataAddedDelegate(OnUserDataAdded);
-            hatch.UserData.UserDataRemovedEvent += new UserData.UserDataRemovedDelegate(OnUserDataAdded);
-            base.Added(propertyPage);
+            hatch.UserData.UserDataAddedEvent += OnUserDataAdded;
+            hatch.UserData.UserDataRemovedEvent += OnUserDataAdded;
+            base.Added(page);
         }
-        void OnUserDataAdded(string name, object value)
+        private void OnUserDataAdded(string name, object value)
         {
             this.subEntries = null;
             attributeProperties = hatch.GetAttributeProperties(Frame);
             propertyPage.Refresh(this);
         }
-        public override void Removed(IPropertyPage propertyPage)
+        public override void Removed(IPropertyPage page)
         {
-            hatch.UserData.UserDataAddedEvent -= new UserData.UserDataAddedDelegate(OnUserDataAdded);
-            hatch.UserData.UserDataRemovedEvent -= new UserData.UserDataRemovedDelegate(OnUserDataAdded);
-            base.Removed(propertyPage);
+            hatch.UserData.UserDataAddedEvent -= OnUserDataAdded;
+            hatch.UserData.UserDataRemovedEvent -= OnUserDataAdded;
+            base.Removed(page);
         }
 
 #endregion
-        private void OnHatchStyleSelectionChanged(HatchStyle SelectedHatchstyle)
-        {
-            hatch.HatchStyle = SelectedHatchstyle;
-        }
 #region ICommandHandler Members
-        virtual public bool OnCommand(string MenuId)
+        public virtual bool OnCommand(string menuId)
         {
-            switch (MenuId)
+            switch (menuId)
             {
                 case "MenuId.Explode":
                     if (Frame.ActiveAction is SelectObjectsAction)
                     {
                         using (Frame.Project.Undo.UndoFrame)
                         {
-                            IGeoObjectOwner addTo = hatch.Owner;
-                            if (addTo == null) addTo = Frame.ActiveView.Model;
+                            IGeoObjectOwner addTo = hatch.Owner ?? Frame.ActiveView.Model;
                             GeoObjectList toSelect = hatch.Decompose();
                             addTo.Remove(hatch);
-                            for (int i = 0; i < toSelect.Count; ++i)
-                            {
-                                addTo.Add(toSelect[i]);
-                            }
+                            foreach (var t in toSelect)
+	                            addTo.Add(t);
+                            
                             SelectObjectsAction soa = Frame.ActiveAction as SelectObjectsAction;
                             soa.SetSelectedObjects(toSelect); // alle Teilobjekte markieren
                         }
@@ -102,12 +95,12 @@ namespace CADability.UserInterface
             }
             return false;
         }
-        virtual public bool OnUpdateCommand(string MenuId, CommandState CommandState)
+        public virtual bool OnUpdateCommand(string menuId, CommandState commandState)
         {
-            switch (MenuId)
+            switch (menuId)
             {
                 case "MenuId.Explode":
-                    CommandState.Enabled = true; // hier müssen die Flächen rein
+                    commandState.Enabled = true; // hier müssen die Flächen rein
                     return true;
             }
             return false;
@@ -125,11 +118,5 @@ namespace CADability.UserInterface
             return "MenuId.Object.Hatch";
         }
 #endregion
-        private double OnGetArea(DoubleProperty sender)
-        {
-            if (hatch != null && hatch.CompoundShape != null)
-                return hatch.CompoundShape.Area;
-            return 0.0;
-        }
     }
 }

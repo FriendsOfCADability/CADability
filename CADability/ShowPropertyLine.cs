@@ -10,50 +10,54 @@ namespace CADability.UserInterface
 
     public class ShowPropertyLine : PropertyEntryImpl, IDisplayHotSpots, ICommandHandler, IGeoObjectShowProperty
     {
-        private Line line; // die dargestellte Linie
-        private GeoPointProperty startPointProperty; // Anzeige Startpunkt, gleichzeitig HotSpot
-        private GeoPointProperty endPointProperty; // Anzeige Endpunkt, gleichzeitig HotSpot
-        private LengthProperty lengthProperty; // Anzeige Länge
-        private LengthHotSpot lengthHotSpot; // Hotspot für Länge
-        private GeoVectorProperty directionProperty; // Anzeige Richtung
-        private GeoVectorHotSpot directionHotSpot; // Hotspot für Richtung
-        private IPropertyEntry [] subEntries;
-        private IPropertyEntry[] attributeProperties; // Anzeigen für die Attribute (Ebene, Farbe u.s.w)
-        ~ShowPropertyLine()
-        {
-            // aus irgend einem Grund wird ShowPropertyLine ewig behalten. 
-            // Der Grund ist unklar, muss aber dringend noch erforscht werden...
-        }
-        public ShowPropertyLine(Line line, IFrame frame): base(frame)
+        private readonly Line line; // the displayed line
+        private readonly GeoPointProperty startPointProperty; // display start point, also a hotspot
+        private readonly GeoPointProperty endPointProperty; // display end point, also a hotspot
+        private readonly LengthProperty lengthProperty; // display length
+        private readonly LengthHotSpot lengthHotSpot; // hotspot for length
+        private readonly GeoVectorProperty directionProperty; // display direction
+        private readonly GeoVectorHotSpot directionHotSpot; // hotspot for direction
+        private IPropertyEntry[] subEntries;
+        private IPropertyEntry[] attributeProperties; // displays for the attributes (layer, color, etc.)
+
+        public ShowPropertyLine(Line line, IFrame frame) : base(frame)
         {
             this.line = line;
 
-            startPointProperty = new GeoPointProperty("Line.StartPoint", Frame, true);
-            startPointProperty.GetGeoPointEvent += new CADability.UserInterface.GeoPointProperty.GetGeoPointDelegate(OnGetStartPoint);
-            startPointProperty.SetGeoPointEvent += new CADability.UserInterface.GeoPointProperty.SetGeoPointDelegate(OnSetStartPoint);
-            startPointProperty.ModifyWithMouseEvent += new ModifyWithMouseDelegate(ModifyStartPointWithMouse);
-            startPointProperty.PropertyEntryChangedStateEvent += new PropertyEntryChangedStateDelegate(OnStateChanged);
+            startPointProperty = new GeoPointProperty(Frame, "Line.StartPoint");
+            startPointProperty.OnGetValue = () => line.StartPoint;
+            startPointProperty.OnSetValue = (value) => line.StartPoint = value;
+            startPointProperty.ModifyWithMouse += ModifyStartPointWithMouse;
+            startPointProperty.PropertyEntryChangedStateEvent += OnStateChanged;
 
-            endPointProperty = new GeoPointProperty("Line.EndPoint", Frame, true);
-            endPointProperty.GetGeoPointEvent += new CADability.UserInterface.GeoPointProperty.GetGeoPointDelegate(OnGetEndPoint);
-            endPointProperty.SetGeoPointEvent += new CADability.UserInterface.GeoPointProperty.SetGeoPointDelegate(OnSetEndPoint);
-            endPointProperty.ModifyWithMouseEvent += new ModifyWithMouseDelegate(ModifyEndPointWithMouse);
-            endPointProperty.PropertyEntryChangedStateEvent += new PropertyEntryChangedStateDelegate(OnStateChanged);
-            lengthProperty = new LengthProperty("Line.Length", Frame, true);
-            lengthProperty.GetLengthEvent += new CADability.UserInterface.LengthProperty.GetLengthDelegate(OnGetLength);
-            lengthProperty.SetLengthEvent += new CADability.UserInterface.LengthProperty.SetLengthDelegate(OnSetLength);
-            lengthProperty.ModifyWithMouseEvent += new ModifyWithMouseDelegate(ModifyLengthWithMouse);
-            lengthProperty.PropertyEntryChangedStateEvent += new PropertyEntryChangedStateDelegate(OnStateChanged);
+            endPointProperty = new GeoPointProperty(Frame, "Line.EndPoint");
+            endPointProperty.OnGetValue = () => line.EndPoint;
+            endPointProperty.OnSetValue = (value) => line.EndPoint = value;
+            endPointProperty.ModifyWithMouse += ModifyEndPointWithMouse;
+            endPointProperty.PropertyEntryChangedStateEvent += OnStateChanged;
+            lengthProperty = new LengthProperty(Frame, "Line.Length");
+            lengthProperty.OnGetValue = () => line.Length;
+            lengthProperty.OnSetValue = (value) =>
+            {
+                if (value != 0.0)
+                    line.Length = value;
+            };
+            lengthProperty.ModifyWithMouse += ModifyLengthWithMouse;
+            lengthProperty.PropertyEntryChangedStateEvent += OnStateChanged;
             lengthHotSpot = new LengthHotSpot(lengthProperty);
             lengthHotSpot.Position = line.PointAt(2.0 / 3.0);
 
-            directionProperty = new GeoVectorProperty("Line.Direction", Frame, false);
+            directionProperty = new GeoVectorProperty(Frame, "Line.Direction");
             directionProperty.IsNormedVector = true;
             directionProperty.IsAngle = true;
-            directionProperty.GetGeoVectorEvent += new CADability.UserInterface.GeoVectorProperty.GetGeoVectorDelegate(OnGetDirection);
-            directionProperty.SetGeoVectorEvent += new CADability.UserInterface.GeoVectorProperty.SetGeoVectorDelegate(OnSetDirection);
-            directionProperty.ModifyWithMouseEvent += new ModifyWithMouseDelegate(ModifyDirectionWithMouse);
-            directionProperty.PropertyEntryChangedStateEvent += new PropertyEntryChangedStateDelegate(OnStateChanged);
+            directionProperty.OnGetValue = () => line.StartDirection;
+            directionProperty.OnSetValue = value =>
+            {
+                value.Norm();
+                line.EndPoint = line.StartPoint + line.Length * value;
+            };
+            directionProperty.ModifyWithMouse += ModifyDirectionWithMouse;
+            directionProperty.PropertyEntryChangedStateEvent += OnStateChanged;
             directionHotSpot = new GeoVectorHotSpot(directionProperty);
             directionHotSpot.Position = line.PointAt(1.0 / 3.0);
 
@@ -66,14 +70,15 @@ namespace CADability.UserInterface
 
             base.resourceIdInternal = "Line.Object";
         }
-        private void OnGeoObjectDidChange(IGeoObject Sender, GeoObjectChange Change)
-        {   // wird bei Änderungen von der Linie aufgerufen, Abgleich der Anzeigen
+        private void OnGeoObjectDidChange(IGeoObject sender, GeoObjectChange change)
+        {
+            // Called when the line changes, synchronizes the displays
             startPointProperty.Refresh();
             endPointProperty.Refresh();
             lengthProperty.Refresh();
-            lengthHotSpot.Position = line.PointAt(2.0 / 3.0); // sitzt bei 2/3 der Linie
+            lengthHotSpot.Position = line.PointAt(2.0 / 3.0); // positioned at 2/3 of the line
             directionProperty.Refresh();
-            directionHotSpot.Position = line.PointAt(1.0 / 3.0); // sitzt bei 1/3 der Linie
+            directionHotSpot.Position = line.PointAt(1.0 / 3.0); // positioned at 1/3 of the line
             if (HotspotChangedEvent != null)
             {
                 HotspotChangedEvent(startPointProperty, HotspotChangeMode.Moved);
@@ -83,16 +88,17 @@ namespace CADability.UserInterface
             }
         }
 
-#region IShowPropertyImpl Overrides
+        #region IShowPropertyImpl Overrides
         public override void Added(IPropertyPage pp)
-        {   // die events müssen in Added angemeldet und in Removed wieder abgemeldet werden,
-            // sonst bleibt die ganze ShowProperty für immer an der Linie hängen
-            line.DidChangeEvent += new ChangeDelegate(OnGeoObjectDidChange);
-            line.UserData.UserDataAddedEvent += new UserData.UserDataAddedDelegate(OnUserDataAdded);
-            line.UserData.UserDataRemovedEvent += new UserData.UserDataRemovedDelegate(OnUserDataAdded);
+        {
+            // The events must be registered in Added and deregistered in Removed,  
+            // otherwise, the entire ShowProperty remains attached to the line forever  
+            line.DidChangeEvent += OnGeoObjectDidChange;
+            line.UserData.UserDataAddedEvent += OnUserDataAdded;
+            line.UserData.UserDataRemovedEvent += OnUserDataAdded;
             base.Added(pp);
-            OnGeoObjectDidChange(line, null); // einmal die Hotspots reaktivieren, falls eine
-                                              // andere Zwischenänderung dran war
+            OnGeoObjectDidChange(line, null); // Reactivate the hotspots once in case there was  
+                                                    // another intermediate change
         }
 
         void OnUserDataAdded(string name, object value)
@@ -108,9 +114,9 @@ namespace CADability.UserInterface
         }
         public override void Removed(IPropertyPage pp)
         {
-            line.DidChangeEvent -= new ChangeDelegate(OnGeoObjectDidChange);
-            line.UserData.UserDataAddedEvent -= new UserData.UserDataAddedDelegate(OnUserDataAdded);
-            line.UserData.UserDataRemovedEvent -= new UserData.UserDataRemovedDelegate(OnUserDataAdded);
+            line.DidChangeEvent -= OnGeoObjectDidChange;
+            line.UserData.UserDataAddedEvent -= OnUserDataAdded;
+            line.UserData.UserDataRemovedEvent -= OnUserDataAdded;
             base.Removed(pp);
         }
         public override PropertyEntryType Flags => PropertyEntryType.ContextMenu | PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
@@ -130,7 +136,7 @@ namespace CADability.UserInterface
             {
                 if (subEntries == null)
                 {
-                    // hier die Anzeigen auffrischen, wurde vor allem beim erstenmal noch nicht gemacht
+                    // Refresh the displays here, as it was not done the first time
                     startPointProperty.GeoPointChanged();
                     endPointProperty.GeoPointChanged();
                     lengthProperty.LengthChanged();
@@ -147,13 +153,14 @@ namespace CADability.UserInterface
                 return subEntries;
             }
         }
-        public override void Opened(bool IsOpen)
-        {   // dient dazu, die Hotspots anzuzeigen bzw. zu verstecken wenn die SubProperties
-            // aufgeklappt bzw. zugeklappt werden. Wenn also mehrere Objekte markiert sind
-            // und diese Linie aufgeklappt wird.
+        public override void Opened(bool isOpen)
+        {
+            // Used to show or hide the hotspots when the sub-properties  
+            // are expanded or collapsed. This applies when multiple objects  
+            // are selected and this line is expanded.
             if (HotspotChangedEvent != null)
             {
-                if (IsOpen)
+                if (isOpen)
                 {
                     HotspotChangedEvent(startPointProperty, HotspotChangeMode.Visible);
                     HotspotChangedEvent(endPointProperty, HotspotChangeMode.Visible);
@@ -168,11 +175,11 @@ namespace CADability.UserInterface
                     HotspotChangedEvent(directionHotSpot, HotspotChangeMode.Invisible);
                 }
             }
-            base.Opened(IsOpen);
+            base.Opened(isOpen);
         }
-#endregion
+        #endregion
 
-#region IDisplayHotSpots Members
+        #region IDisplayHotSpots Members
         public event CADability.HotspotChangedDelegate HotspotChangedEvent;
         public void ReloadProperties()
         {
@@ -182,87 +189,45 @@ namespace CADability.UserInterface
             if (propertyPage != null) propertyPage.Refresh(this);
         }
 
-#endregion
+        #endregion
 
-#region Events der Properties
+        #region Events der Properties
 
-        // ModifyXxxWithMouse melden die IShowProperties, wenn im deren Contextmenue "mit der Maus"
-        // ausgewählt wurde. Ebenso wird beim Ziehen eines Hotspots über IHotSpot.StartDrag
-        // die entsprechende IShowProperty zu diesem Event veranlasst. Es werden GeneralXxxActions
-        // gestartet, die über die IShowProperties kommunizieren.
-        private void ModifyStartPointWithMouse(IPropertyEntry sender, bool StartModifying)
+        // ModifyXxxWithMouse is reported by IShowProperties when "with the mouse"  
+        // is selected in their context menu. Likewise, when dragging a hotspot via  
+        // IHotSpot.StartDrag, the corresponding IShowProperty is triggered for this event.  
+        // GeneralXxxActions are started, which communicate via IShowProperties.
+        private void ModifyStartPointWithMouse(IPropertyEntry sender, bool startModifying)
         {
             GeneralGeoPointAction gpa = new GeneralGeoPointAction(startPointProperty, line);
             Frame.SetAction(gpa);
         }
 
-        private void ModifyEndPointWithMouse(IPropertyEntry sender, bool StartModifying)
+        private void ModifyEndPointWithMouse(IPropertyEntry sender, bool startModifying)
         {
             GeneralGeoPointAction gpa = new GeneralGeoPointAction(endPointProperty, line);
             Frame.SetAction(gpa);
         }
-        private void ModifyLengthWithMouse(IPropertyEntry sender, bool StartModifying)
+        private void ModifyLengthWithMouse(IPropertyEntry sender, bool startModifying)
         {
             GeneralLengthAction gla = new GeneralLengthAction(lengthProperty, line.StartPoint, line);
             Frame.SetAction(gla);
         }
 
-        private void ModifyDirectionWithMouse(IPropertyEntry sender, bool StartModifying)
-        {   // wird entweder durch Menueauswahl in der GeoVectorProperty oder durch ziehen am HotSpot
-            // (läuft auch über die GeoVectorProperty) ausgelöst. Die GeneralGeoVectorAction arbeitet
-            // direkt über die GeoVectorProperty, so dass keine weiteren Events nötig sind.
+        private void ModifyDirectionWithMouse(IPropertyEntry sender, bool startModifying)
+        {
+            // Triggered either by menu selection in the GeoVectorProperty or by dragging the HotSpot  
+            // (which also operates through the GeoVectorProperty). The GeneralGeoVectorAction  
+            // works directly via the GeoVectorProperty, so no additional events are needed.
             GeneralGeoVectorAction gva = new GeneralGeoVectorAction(sender as GeoVectorProperty, line.StartPoint, line);
             Frame.SetAction(gva);
         }
 
-        // OnGetXxx OnSetXxx dient der Kommunikation mit den IShowProperties und somit auch
-        // mit den GeneralXxxActions, die ja den Weg über die IShowProperties nehmen.
-        private GeoPoint OnGetStartPoint(GeoPointProperty sender)
-        {
-            return line.StartPoint;
-        }
-
-        private void OnSetStartPoint(GeoPointProperty sender, GeoPoint p)
-        {
-            line.StartPoint = p;
-        }
-
-        private GeoPoint OnGetEndPoint(GeoPointProperty sender)
-        {
-            return line.EndPoint;
-        }
-
-        private void OnSetEndPoint(GeoPointProperty sender, GeoPoint p)
-        {
-            line.EndPoint = p;
-        }
-
-        private double OnGetLength(LengthProperty sender)
-        {
-            return line.Length;
-        }
-
-        private void OnSetLength(LengthProperty sender, double l)
-        {
-            if (l != 0.0) line.Length = l;
-        }
-        private GeoVector OnGetDirection(GeoVectorProperty sender)
-        {
-            GeoVector res = line.StartDirection;
-            // res.Norm(); warum? Wenn Start- und Endpunkt identisch sind gibts eine Exception, die nicht gefangen wird
-            return res;
-        }
-
-        private void OnSetDirection(GeoVectorProperty sender, GeoVector v)
-        {
-            v.Norm();
-            line.EndPoint = line.StartPoint + line.Length * v;
-        }
-
-        // OnStateChanged wird gleichermaßen für alle IShowProperties angemeldet. Deshalb muss
-        // hier nach dem "sender" unterschieden werden. Hiermit wird geregelt welcher Hotspot
-        // als selektierter Hotspot dargestellt werden soll. Bei MultiGeoPointProperty muss
-        // man hier einen etwas anderen Weg gehen (siehe z.B. ShowPropertxBSpline)
+        // OnStateChanged is registered equally for all IShowProperties.  
+        // Therefore, differentiation based on the "sender" is necessary.  
+        // This determines which hotspot should be displayed as the selected hotspot.  
+        // For MultiGeoPointProperty, a slightly different approach is required  
+        // (see e.g., ShowPropertyBSpline).
         private void OnStateChanged(IPropertyEntry sender, StateChangedArgs args)
         {
             if (HotspotChangedEvent != null)
@@ -307,12 +272,12 @@ namespace CADability.UserInterface
                 }
             }
         }
-#endregion
+        #endregion
 
-#region ICommandHandler Members
-        bool ICommandHandler.OnCommand(string MenuId)
+        #region ICommandHandler Members
+        bool ICommandHandler.OnCommand(string menuId)
         {
-            switch (MenuId)
+            switch (menuId)
             {
                 case "MenuId.Reverse":
                     (line as ICurve).Reverse();
@@ -323,12 +288,12 @@ namespace CADability.UserInterface
             }
             return false;
         }
-        bool ICommandHandler.OnUpdateCommand(string MenuId, CommandState CommandState)
+        bool ICommandHandler.OnUpdateCommand(string menuId, CommandState commandState)
         {
-            switch (MenuId)
+            switch (menuId)
             {
                 case "MenuId.Reverse":
-                    CommandState.Enabled = true; // naja isses ja immer
+                    commandState.Enabled = true;
                     return true;
             }
             return false;
@@ -346,7 +311,7 @@ namespace CADability.UserInterface
         {
             return "MenuId.Object.Line";
         }
-#endregion
+        #endregion
     }
 }
 

@@ -512,9 +512,9 @@ namespace CADability.Attribute
             acceptedTypes = new Hashtable();
             base.resourceIdInternal = "Filter";
         }
-        internal FilterList Parent
+        internal new FilterList Parent
         {
-            set { parent = value; }
+            set => parent = value;
         }
         /// <summary>
         /// Name of the Filter
@@ -553,8 +553,8 @@ namespace CADability.Attribute
         /// Checks whether an <see cref="IGeoObject"/> is accepted by this filter.
         /// To realize custom filters, override this method.
         /// </summary>
-        /// <param name="go">The object beeing tested</param>
-        /// <returns>true if accepted, fale otherwise</returns>
+        /// <param name="go">The object being tested</param>
+        /// <returns>true if accepted, false otherwise</returns>
         public virtual bool Accept(IGeoObject go)
         {
             // jetzt so implementiert: wenn ein Attribut verlangt wird und ein Objekt nicht das

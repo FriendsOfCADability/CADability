@@ -15,7 +15,6 @@ namespace CADability.UserInterface
         private object ObjectWithInt;
         private PropertyInfo TheProperty;
         private string text;
-        private bool readOnly;
         private bool IsSetting;
         private bool highlight;
         private int minValue; // Grenzen für die Eingabe
@@ -28,20 +27,20 @@ namespace CADability.UserInterface
         public delegate int GetIntDelegate(IntegerProperty sender);
         public event GetIntDelegate GetIntEvent;
         public event SetIntDelegate SetIntEvent;
-        private void Initialize(object ObjectWithInt, string PropertyName, string resourceId)
+        private void Initialize(object objectWithInt, string propertyName, string resourceId)
         {
             IsSetting = false;
             if (resourceId != null) this.resourceIdInternal = resourceId;
-            this.ObjectWithInt = ObjectWithInt;
-            TheProperty = ObjectWithInt.GetType().GetProperty(PropertyName);
+            this.ObjectWithInt = objectWithInt;
+            TheProperty = objectWithInt.GetType().GetProperty(propertyName);
             if (TheProperty == null)
             {   // speziell für ERSACAD: dort haben wg. der flexiblen Namensvergabe die Properties manchmal
                 // einen prefix, der nicht entsprechend geändert wird. Hier wird, wenn eine passende Property
                 // nicht gefunden wird, eine solche gesucht, die mit dem namen endet. Ggf könnte man auch den Typ sicherstellen
-                PropertyInfo[] props = ObjectWithInt.GetType().GetProperties();
+                PropertyInfo[] props = objectWithInt.GetType().GetProperties();
                 for (int i = 0; i < props.Length; i++)
                 {
-                    if (props[i].Name.EndsWith(PropertyName, true, CultureInfo.InvariantCulture))
+                    if (props[i].Name.EndsWith(propertyName, true, CultureInfo.InvariantCulture))
                     {
                         TheProperty = props[i];
                         break;
@@ -50,9 +49,9 @@ namespace CADability.UserInterface
             }
             IntChanged();
         }
-        public IntegerProperty(object ObjectWithInt, string PropertyName, string resourceId)
+        public IntegerProperty(object objectWithInt, string propertyName, string resourceId)
         {
-            Initialize(ObjectWithInt, PropertyName, resourceId);
+            Initialize(objectWithInt, propertyName, resourceId);
             NotifyOnLostFocusOnly = false;
         }
         public IntegerProperty(int initialValue, string resourceId)
@@ -111,31 +110,6 @@ namespace CADability.UserInterface
                 }
             }
             SetText(internalValue);
-        }
-        public bool ReadOnly
-        {
-            set
-            {
-                //numericUpDown.Enabled = !value;
-                readOnly = value;
-            }
-            get
-            {
-                //return !numericUpDown.Enabled;
-                return readOnly;
-            }
-        }
-        public bool Highlight
-        {
-            get
-            {
-                return highlight;
-            }
-            set
-            {
-                highlight = value;
-                if (propertyPage != null) propertyPage.Refresh(this);
-            }
         }
         public bool UpDownOnly
         {
@@ -397,13 +371,13 @@ namespace CADability.UserInterface
 		
         #region ICommandHandler Members
 
-        bool ICommandHandler.OnCommand(string MenuId)
+        bool ICommandHandler.OnCommand(string menuId)
         {
             foreach (KeyValuePair<int, string> kv in specialValues)
             {
-                if (kv.Value == MenuId)
+                if (kv.Value == menuId)
                 {
-                    text = StringTable.GetString(MenuId);
+                    text = StringTable.GetString(menuId);
                     if (text.StartsWith("!")) text = text.Substring(1);
                     propertyPage?.Refresh(this);
                     SetInt(kv.Key);
@@ -414,7 +388,7 @@ namespace CADability.UserInterface
             return false;
         }
 
-        bool ICommandHandler.OnUpdateCommand(string MenuId, CommandState CommandState)
+        bool ICommandHandler.OnUpdateCommand(string menuId, CommandState commandState)
         {
             return true;
         }
@@ -425,9 +399,9 @@ namespace CADability.UserInterface
             return val.ToString();
         }
 
-        protected override bool TextToValue(string text, out int val)
+        protected override bool TextToValue(string input, out int val)
         {
-            return int.TryParse(text, out val);
+            return int.TryParse(input, out val);
         }
 
         #endregion

@@ -1,7 +1,5 @@
-﻿using CADability.GeoObject;
-using System;
+﻿using System;
 using System.Globalization;
-using System.Reflection;
 
 namespace CADability.UserInterface
 {
@@ -11,7 +9,7 @@ namespace CADability.UserInterface
 
     public class AngleHotSpot : IHotSpot, ICommandHandler
     {
-        private AngleProperty angleProperty;
+        private readonly AngleProperty angleProperty;
         /// <summary>
         /// The position of the hotspot
         /// </summary>
@@ -62,12 +60,12 @@ namespace CADability.UserInterface
         bool IHotSpot.Hidden { get { return angleProperty.ReadOnly; } }
         #endregion
 
-        virtual public bool OnCommand(string MenuId)
+        public virtual bool OnCommand(string MenuId)
         {
             return ((ICommandHandler)angleProperty).OnCommand(MenuId);
         }
 
-        virtual public bool OnUpdateCommand(string MenuId, CommandState CommandState)
+        public virtual bool OnUpdateCommand(string MenuId, CommandState CommandState)
         {
             return ((ICommandHandler)angleProperty).OnUpdateCommand(MenuId, CommandState);
         }
@@ -313,10 +311,15 @@ namespace CADability.UserInterface
         }
         [Obsolete("method has no functionality, remove this call")]
         public void CheckMouseButton(bool Check) { }
-        public delegate void LabelChangedDelegate(LengthProperty sender, string newLabel);
+
         [Obsolete("use delegate AngleProperty.LabelTextChanged instead")]
+		public new delegate void LabelChangedDelegate(LengthProperty sender, string newLabel);
+		
+        [Obsolete("use delegate AngleProperty.LabelTextChanged instead")]
+#pragma warning disable CS0067 // Event is never used
         public event LabelChangedDelegate LabelChangedEvent;
-#endregion
+#pragma warning restore CS0067 // Event is never used
+        #endregion
 
     }
 }

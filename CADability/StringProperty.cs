@@ -27,6 +27,15 @@ namespace CADability.UserInterface
             return val;
         }
 
+        public void SetString(string val)
+        {
+            SetValue(val, true);
+        }
+        public string GetString()
+        {
+            return GetValue();
+        }
+
         #region deprecated adaption to old implementation of StringProperty
         [Obsolete("use delegate StringProperty.OnSetValue instead")]
         public delegate void SetStringDelegate(StringProperty sender, string newValue);
@@ -67,16 +76,7 @@ namespace CADability.UserInterface
                 DeferUpdate = value;
             }
         }
-        [Obsolete("use SetValue instead")]
-        public void SetString(string val)
-        {
-            SetValue(val, true);
-        }
-        [Obsolete("use GetValue instead")]
-        public string GetString()
-        {
-            return GetValue();
-        }
+        
         [Obsolete("use delegate StringProperty.OnSetValue instead")]
         public delegate void StringChangedDelegate(object sender, EventArgs e);
         [Obsolete("use delegate StringProperty.OnSetValue instead")]

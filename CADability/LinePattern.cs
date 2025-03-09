@@ -1,7 +1,6 @@
 ﻿using CADability.GeoObject;
 using CADability.UserInterface;
 using System;
-using System.Collections;
 using System.Runtime.Serialization;
 
 namespace CADability.Attribute
@@ -18,7 +17,7 @@ namespace CADability.Attribute
         /// Scaling system of the line pattern. 
         /// <list type="bullet">
         /// <item><term>Device</term>
-        /// <description>Pattern specifies the number of pixel, zoom independant</description>
+        /// <description>Pattern specifies the number of pixel, zoom independent</description>
         /// </item>
         /// <item><term>World</term>
         /// <description>Pattern specifies the pattern of the line in the world coordinate system</description>
@@ -37,7 +36,7 @@ namespace CADability.Attribute
         public LinePattern()
         {
             scale = Scaling.Layout;
-            pattern = new double[0];
+            pattern = Array.Empty<double>();
             name = "";
         }
         public LinePattern(string name, params double[] pattern)
@@ -64,7 +63,7 @@ namespace CADability.Attribute
             set
             {
                 double[] oldPattern = (double[])pattern.Clone();
-                if (value == null) pattern = new double[0];
+                if (value == null) pattern = Array.Empty<double>();
                 else if ((value.Length % 2) != 0)
                 {
                     throw new ArgumentException("the number of elements in the pattern must be even", "value");
@@ -86,7 +85,7 @@ namespace CADability.Attribute
             set
             {
                 double[] oldPattern = (double[])pattern.Clone();
-                pattern = new double[0];
+                pattern = Array.Empty<double>();
                 FireDidChange("Pattern", oldPattern);
             }
         }
@@ -177,7 +176,7 @@ namespace CADability.Attribute
             base.Removed(pp);
             if (subEntries != null && subEntries[0] is MultipleChoiceProperty mcp)
             {
-                mcp.ValueChangedEvent -= new ValueChangedDelegate(ScalingChanged);
+                mcp.ValueChangedEvent -= ScalingChanged;
             }
         }
         public override IPropertyEntry[] SubItems
@@ -194,17 +193,15 @@ namespace CADability.Attribute
                         choice = choices[(int)scale];
                     }
                     MultipleChoiceProperty mcp = new MultipleChoiceProperty("LinePattern.Scale", choices, choice);
-                    mcp.ValueChangedEvent += new ValueChangedDelegate(ScalingChanged);
+                    mcp.ValueChangedEvent += ScalingChanged;
                     subEntries[0] = mcp;
                     for (int i = 0; i < pattern.Length; ++i)
                     {
-                        string rid;
-                        if (i % 2 == 0) rid = "LinePattern.Stroke";
-                        else rid = "LinePattern.Gap";
+	                    int currentIndex = i;
+	                    string rid = i % 2 == 0 ? "LinePattern.Stroke" : "LinePattern.Gap";
                         DoubleProperty dp = new DoubleProperty(propertyPage.ActiveView.Canvas.Frame, rid);
-                        dp.UserData.Add("Index", i);
-                        dp.GetDoubleEvent += new CADability.UserInterface.DoubleProperty.GetDoubleDelegate(OnGetPattern);
-                        dp.SetDoubleEvent += new CADability.UserInterface.DoubleProperty.SetDoubleDelegate(OnSetPattern);
+						dp.OnGetValue = () => pattern[currentIndex];
+                        dp.OnSetValue = (d) => OnSetPattern(currentIndex, d);
                         dp.DoubleChanged();
                         subEntries[i + 1] = dp;
                     }
@@ -212,29 +209,19 @@ namespace CADability.Attribute
                 return subEntries;
             }
         }
-        public override MenuWithHandler[] ContextMenu
-        {
-            get
-            {
-                return MenuResource.LoadMenuDefinition("MenuId.LinePatternEntry", false, this);
-            }
-        }
-        private void ScalingChanged(object sender, object NewValue)
+        public override MenuWithHandler[] ContextMenu => MenuResource.LoadMenuDefinition("MenuId.LinePatternEntry", false, this);
+
+        private void ScalingChanged(object sender, object newValue)
         {
             MultipleChoiceProperty mcp = sender as MultipleChoiceProperty;
-            int ind = mcp.ChoiceIndex(NewValue as string);
+            int ind = mcp.ChoiceIndex(newValue as string);
             if (ind >= 0) Scale = (Scaling)ind;
         }
-        private double OnGetPattern(DoubleProperty sender)
-        {
-            int ind = (int)sender.UserData.GetData("Index");
-            return pattern[ind];
-        }
-        private void OnSetPattern(DoubleProperty sender, double l)
+
+        private void OnSetPattern(int index, double l)
         {
             double[] oldPattern = (double[])pattern.Clone();
-            int ind = (int)sender.UserData.GetData("Index");
-            pattern[ind] = l;
+            pattern[index] = l;
             FireDidChange("Pattern", oldPattern);
         }
 #endregion
@@ -256,7 +243,8 @@ namespace CADability.Attribute
                 FireDidChange("Name", OldName);
             }
         }
-        public IAttributeList Parent
+
+        public new IAttributeList Parent
         {
             get
             {
@@ -328,9 +316,9 @@ namespace CADability.Attribute
         }
         #endregion
         #region ICommandHandler Members
-        bool ICommandHandler.OnCommand(string MenuId)
+        bool ICommandHandler.OnCommand(string menuId)
         {
-            switch (MenuId)
+            switch (menuId)
             {
                 case "MenuId.LinePatternEntry.Delete":
                     parent.Remove(this);
@@ -344,7 +332,7 @@ namespace CADability.Attribute
             }
             return false;
         }
-        bool ICommandHandler.OnUpdateCommand(string MenuId, CommandState CommandState)
+        bool ICommandHandler.OnUpdateCommand(string menuId, CommandState commandState)
         {
             // TODO:  Add LinePattern.OnUpdateCommand implementation
             return false;
@@ -354,29 +342,8 @@ namespace CADability.Attribute
 
     }
 
-
     public interface ILinePattern
     {
         LinePattern LinePattern { get; set; }
     }
-    /* Default Implementierung
-#region ILinePattern Members
-	private LinePattern linePattern;
-	public LinePattern LinePattern
-	{
-		get
-		{
-			return linePattern;
-		}
-		set
-		{
-			using (new ChangingAttribute(this,"LinePattern",linePattern))
-			{
-				linePattern = value;
-			}
-		}
-	}
-#endregion
-	*/
-
 }

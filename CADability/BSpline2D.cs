@@ -2922,7 +2922,7 @@ namespace CADability.Curve2D
         /// </summary>
         /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
         /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
-        public void GetObjectData(SerializationInfo info, StreamingContext context)
+        public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Poles", poles, typeof(GeoPoint2D[]));
             info.AddValue("Weights", weights, typeof(double[]));
@@ -2935,7 +2935,7 @@ namespace CADability.Curve2D
         }
 
         #endregion
-        public bool GetSimpleCurve(double precison, out ICurve2D simpleCurve)
+        public bool GetSimpleCurve(double precision, out ICurve2D simpleCurve)
         {
             if (degree == 1)
             {
@@ -2943,16 +2943,16 @@ namespace CADability.Curve2D
                 return true;
             }
             // alle Pole auf einer Linie
-            if (precison == 0.0) precison = Precision.eps;
+            if (precision == 0.0) precision = Precision.eps;
             GeoPoint2D sp = this.StartPoint;
             GeoPoint2D ep = this.EndPoint;
-            if ((sp | ep) > precison)
+            if ((sp | ep) > precision)
             {
                 bool linear = true;
                 // alle inneren Pole testen, der erste und letzte sind ja start- und endpunkt
                 for (int i = 1; i < poles.Length - 1; i++)
                 {
-                    if (Math.Abs(Geometry.DistPL(poles[i], sp, ep)) > precison)
+                    if (Math.Abs(Geometry.DistPL(poles[i], sp, ep)) > precision)
                     {
                         linear = false;
                         break;
@@ -2978,7 +2978,7 @@ namespace CADability.Curve2D
                     if (Math.Abs(a2d.Sweep) < Math.PI / 10) ok = false; // ein Kreisbogen sollte größer als 10 Grad sein, sonst sind die ungenauigkeiten zu groß
                     if (ok) for (int i = 0; i < 10; i++)
                         {
-                            if (a2d.Distance(PointAt(i / 10.0)) > precison) ok = false;
+                            if (a2d.Distance(PointAt(i / 10.0)) > precision) ok = false;
                         }
                     if (ok)
                     {
@@ -2996,7 +2996,7 @@ namespace CADability.Curve2D
                         Circle2D c2d = new Circle2D(a2d.Center, a2d.Radius);
                         for (int i = 0; i < 10; i++)
                         {
-                            if (c2d.Distance(PointAt(i / 10.0)) > precison) ok = false;
+                            if (c2d.Distance(PointAt(i / 10.0)) > precision) ok = false;
                         }
                         if (ok)
                         {

@@ -53,7 +53,7 @@
     <RemoveFiles Include="log.txt" />
     <RemoveFiles Include="_ToDo.txt" />
 
-    <RemoveFiles Include="WebDrawing.cs" Condition="'$(Configuration)'!='WebDebug'"/>
+    <RemoveFiles Include="WebDrawing.cs" Condition="'$(Configuration)'!='WebDebug'" />
 
     <!-- ..and exclude it from all potential compile types -->
     <EmbeddedResource Remove="@(RemoveFiles)" />
@@ -71,14 +71,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="docfx.console" Version="2.59.4">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
     <PackageReference Include="MathNet.Numerics.Signed" Version="5.0.0" />
-    <PackageReference Include="System.Drawing.Common" Version="5.0.3" />
-    <PackageReference Include="System.Text.Encoding.CodePages" Version="6.0.0" />
-    <PackageReference Include="System.Text.Encoding.CodePages" Version="6.0.0" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.14" />
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
     <Reference Include="Microsoft.VisualStudio.DebuggerVisualizers">
       <HintPath>$(VsInstallRoot)\Common7\IDE\PublicAssemblies\Microsoft.VisualStudio.DebuggerVisualizers.dll</HintPath>
     </Reference>

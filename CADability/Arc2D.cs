@@ -480,24 +480,25 @@ namespace CADability.Curve2D
         /// <summary>
         /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Trim (double, double)"/>
         /// </summary>
-        /// <param name="StartPos"></param>
-        /// <param name="EndPos"></param>
+        /// <param name="startPos"></param>
+        /// <param name="endPos"></param>
         /// <returns></returns>
-        public override ICurve2D Trim(double StartPos, double EndPos)
+        public override ICurve2D Trim(double startPos, double endPos)
         {
-            //bool reversed = false;
-            //if (StartPos>EndPos)
-            //{
-            //    double tmp = StartPos;
-            //    StartPos = EndPos;
-            //    EndPos = tmp;
-            //    reversed = true;
-            //}
+	        //If both parameters are 0.0d, this would produce an invalid arc
+			if (startPos == 0.0d && endPos == 0.0d)
+		        return null;
+
             Arc2D res = new Arc2D(Center, Radius, start, sweep);
-            Angle st = start + StartPos * sweep;
-            Angle end = start + EndPos * sweep;
-            res.sweep = new SweepAngle(st, end, (sweep > 0.0) ^ (StartPos > EndPos));
+            Angle st = start + startPos * sweep;
+            Angle end = start + endPos * sweep;
+            res.sweep = new SweepAngle(st, end, (sweep > 0.0) ^ (startPos > endPos));
             res.start = st;
+
+            //Return null if the trimmed Arc2D would be invalid.
+            if(Math.Abs(res.Sweep) < Precision.eps)
+                return null;
+
             return res;
         }
         /// <summary>

@@ -190,7 +190,7 @@ namespace CADability.UserInterface
             LabelTextChanged?.Invoke(this, newText);
         }
         /// <summary>
-        /// Tries to get the value of the property beeing handled from the object 
+        /// Tries to get the value of the property being handled from the object 
         /// </summary>
         /// <returns></returns>
         protected T GetValue()

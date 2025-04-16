@@ -434,87 +434,10 @@ namespace CADability
             //paintTo3D.Point2D((int)pf.X - width, (int)pf.Y + width);
             //paintTo3D.Point2D((int)pf.X - width, (int)pf.Y - width);
         }
-        static List<Bitmap> bitmapList;
-        internal static List<Bitmap> BitmapList
-        {
-            get
-            {
-                if (bitmapList == null)
-                {
-                    // must be moved to CADability.Forms
-                    //bitmapList = new List<Bitmap>();
-                    //Bitmap bmp;
-                    //bmp = BitmapTable.GetBitmap("PointSymbols.bmp");
-                    //// Die Datei PointSymbols.bmp muss so aufgebaut sein:
-                    //// sie enthält 6 Symbole nebeneinader, die alle quadratisch sind
-                    //// am besten mit ungerder Seitenlänge, dann ist es am einfachsten zu platzieren
-                    //// das erste Pixel links oben ist die transparentfarbe, am besten einfach s/w
-                    //Color clr = bmp.GetPixel(0, 0);
-                    //if (clr.A != 0) bmp.MakeTransparent(clr);
-                    //int h = bmp.Height;
-                    //ImageList imageList = new ImageList();
-                    //imageList.ImageSize = new Size(h, h);
-                    //imageList.Images.AddStrip(bmp); // die dünnen
-                    //if (Settings.GlobalSettings.GetBoolValue("PointSymbolsBold", false))
-                    //{
-                    //    bmp = BitmapTable.GetBitmap("PointSymbolsB.bmp"); // die dicken
-                    //    clr = bmp.GetPixel(0, 0);
-                    //    if (clr.A != 0) bmp.MakeTransparent(clr);
-                    //    imageList.Images.AddStrip(bmp);
-                    //}
-                    //else
-                    //{   // nochmal die dünnen
-                    //    imageList.Images.AddStrip(bmp);
-                    //}
-                    //// ein vollflächiges Bitmap, der zum Markieren verwendet wird.
-                    //bmp = new Bitmap(h, h);
-                    //for (int i = 0; i < h; i++)
-                    //{
-                    //    for (int j = 0; j < h; j++)
-                    //    {
-                    //        bmp.SetPixel(i, j, Color.Black);
-                    //    }
-                    //}
-                    //imageList.Images.Add(bmp);
-                    //for (int i = 0; i < imageList.Images.Count; ++i)
-                    //{
-                    //    bitmapList.Add(imageList.Images[i] as Bitmap);
-                    //}
-                    // jetzt ist es so: die ersten 6 sind die dünnen, die zweiten 6 die dicken oder dünnen
-                    // un der letzt vollflächig
-                }
-                return bitmapList;
-            }
-        }
-        //static ImageList ImageList
-        //{
-        //    get
-        //    {
-        //        if (imageList == null)
-        //        {
-        //            Bitmap bmp;
-        //            if (Settings.GlobalSettings.GetBoolValue("PointSymbolsBold", false))
-        //            {
-        //                bmp = BitmapTable.GetBitmap("PointSymbolsB.bmp");
-        //            }
-        //            else
-        //            {
-        //                bmp = BitmapTable.GetBitmap("PointSymbols.bmp");
-        //            }
-        //            // Die Datei PointSymbols.bmp muss so aufgebaut sein:
-        //            // sie enthält 6 Symbole nebeneinader, die alle quadratisch sind
-        //            // am besten mit ungerder Seitenlänge, dann ist es am einfachsten zu platzieren
-        //            // das erste Pixel links oben ist die transparentfarbe, am besten einfach s/w
-        //            Color clr = bmp.GetPixel(0, 0);
-        //            if (clr.A != 0) bmp.MakeTransparent(clr);
-        //            int h = bmp.Height;
-        //            imageList = new ImageList();
-        //            imageList.ImageSize = new Size(h, h);
-        //            imageList.Images.AddStrip(bmp);
-        //        }
-        //        return imageList;
-        //    }
-        //}
+
+		//Not implemented?
+		internal static List<Bitmap> BitmapList => null;
+
         public static void PointSymbol(IPaintTo3D paintTo3D, GeoPoint location, double size, GeoObject.PointSymbol symbol)
         {
             Bitmap bmp = null;

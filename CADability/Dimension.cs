@@ -462,7 +462,7 @@ namespace CADability.GeoObject
             }
         }
         private Text MakeText(GeoPoint2D location, Angle direction, double textSize, Text.AlignMode alignement, string text)
-        {	
+        {
             Text res = Text.Construct();
             res.Location = plane.ToGlobal(location);
             res.SetDirections(plane.ToGlobal(direction.Direction), plane.ToGlobal(direction.Direction.ToLeft()));
@@ -1799,9 +1799,17 @@ namespace CADability.GeoObject
         }
         public void SetDimText(int index, string text)
         {
+            string newValue = text;
+
+            if (string.IsNullOrEmpty(text))
+                newValue = null;
+
+            if (dimText[index] == newValue)
+                return;
+
             using (new Changing(this, "SetDimText", index, dimText))
             {
-                dimText[index] = text;
+                dimText[index] = newValue;
             }
         }
         public string GetTolPlusText(int index)
@@ -1813,10 +1821,17 @@ namespace CADability.GeoObject
         }
         public void SetTolPlusText(int index, string txt)
         {
+            string newValue = txt;
+
+            if (string.IsNullOrEmpty(txt))
+                newValue = null;
+
+            if (tolPlusText[index] == newValue)
+                return;
+
             using (new Changing(this, "SetTolPlusText", index, tolPlusText[index]))
             {
-                // if (txt == null) txt = "";
-                tolPlusText[index] = txt;
+                tolPlusText[index] = newValue;
             }
         }
         public string GetTolMinusText(int index)
@@ -1828,9 +1843,17 @@ namespace CADability.GeoObject
         }
         public void SetTolMinusText(int index, string txt)
         {
+            string newValue = txt;
+
+            if (string.IsNullOrEmpty(txt))
+                newValue = null;
+
+            if (tolMinusText[index] == newValue)
+                return;
+
             using (new Changing(this, "SetTolMinusText", index, tolMinusText[index]))
             {
-                tolMinusText[index] = txt;
+                tolMinusText[index] = newValue;
             }
         }
         public string GetPrefix(int index)
@@ -1840,9 +1863,17 @@ namespace CADability.GeoObject
         }
         public void SetPrefix(int index, string txt)
         {
+            string newValue = txt;
+
+            if (string.IsNullOrEmpty(txt))
+                newValue = null;
+
+            if (prefix[index] == newValue)
+                return;
+
             using (new Changing(this, "SetPrefix", index, prefix[index]))
             {
-                prefix[index] = txt;
+                prefix[index] = newValue;
             }
         }
         public string GetPostfix(int index)
@@ -1852,9 +1883,17 @@ namespace CADability.GeoObject
         }
         public void SetPostfix(int index, string txt)
         {
+            string newValue = txt;
+
+            if (string.IsNullOrEmpty(txt))
+                newValue = null;
+
+            if (postfix[index] == newValue)
+                return;
+
             using (new Changing(this, "SetPostfix", index, postfix[index]))
             {
-                postfix[index] = txt;
+                postfix[index] = newValue;
             }
         }
         public string GetPostfixAlt(int index)
@@ -1864,9 +1903,17 @@ namespace CADability.GeoObject
         }
         public void SetPostfixAlt(int index, string txt)
         {
+            string newValue = txt;
+
+            if (string.IsNullOrEmpty(txt))
+                newValue = null;
+
+            if (postfixAlt[index] == newValue)
+                return;
+
             using (new Changing(this, "SetPostfixAlt", index, postfixAlt[index]))
             {
-                postfixAlt[index] = txt;
+                postfixAlt[index] = newValue;
             }
         }
         public GeoVector Normal
@@ -2303,15 +2350,15 @@ namespace CADability.GeoObject
             }
             catch (Exception e)
             {
-                if (e is ThreadAbortException) 
+                if (e is ThreadAbortException)
                     throw;
             }
-            
+
             QuadTreeCollection res = new QuadTreeCollection(this, projection);
-            
+
             foreach (IGeoObject geo in list)
                 res.Add(geo.GetQuadTreeItem(projection, extentPrecision));
-            
+
             return res;
         }
         /// <summary>

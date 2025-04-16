@@ -647,429 +647,429 @@ namespace CADability
             IterateAction Iterate(ref BoundingRect rect, HashSet<T> objects, bool hasSubNodes);
         }
 
-        class QuadNode<T> where T : class, IQuadTreeInsertable
-        {
-            public QuadNode<T> TopRight;
-            public QuadNode<T> TopLeft;
-            public QuadNode<T> BottomLeft;
-            public QuadNode<T> BottomRight;
-            // wird das gebraucht? public QuadNode Parent; // Parent, ist beim Root null
-            public GeoPoint2D Center; // Mittelpunkt des Rechtecks
-            public double halfWidth, halfHeight; // halbe Breite und Höhe des Rechtecks
-            public BoundingRect rect; // das Rechteck selbst
-            public QuadTree<T> root; // der QuadTree mit seinen Infos zu MaxListlen u.s.w.
-            List<T> objectList; // existiert nur, wenn es ein Blatt ist, war vorher ein Set, Set ist aber viel aufwendiger als List
-            // (außer bei Remove). Man darf dasselbe Objekt nicht zweimal in den QuadTree hängen, sonst ist es zweimal in der Liste
-            // aber das scheint keine große Einschränkung zu sein, oder?
-            int deepth; // die Tiefe des Baums
-            bool IsRoot
-            {
-                get
-                {
-                    return object.Equals(root.root, this);
-                }
-            }
-            public void AddObject(T ObjectToAdd)
-            {
-                if (IsRoot && TopRight == null)
-                {	// der Baum ist noch unreif, da er nur aus einer Liste besteht
-                    // das von der Wurzel überdeckte Rechteck kann also noch beliebig manipuliert
-                    // werden. Es soll 10% größer sein als alle Objekte in der Wurzel
-                    BoundingRect ext = ObjectToAdd.GetExtent();
-                    if (ext.IsEmpty()) return; // welche Fälle sind das, nichts wird eingefügt?
-                    if (objectList.Count == 0)
-                    {	// das erste Objekt wird eingefügt
-                        if (!root.initialRect.IsEmpty())
-                        {
-                            rect = root.initialRect;
-                            if (ext <= rect)
-                            {
-                                Center = rect.GetCenter();
-                                halfWidth = rect.Width / 2.0;
-                                halfHeight = rect.Height / 2.0;
-                            }
-                            else
-                            {	// vorgegebenes Rechteck ist schon zu klein
-                                Center = ext.GetCenter();
-                                halfWidth = ext.Width / 2.0 * 1.1;
-                                halfHeight = ext.Height / 2.0 * 1.1; // 10% größer
-                                rect = new BoundingRect(Center, halfWidth, halfHeight);
-                            }
-                        }
-                        else
-                        {
-                            Center = ext.GetCenter();
-                            halfWidth = ext.Width / 2.0 * 1.1;
-                            halfHeight = ext.Height / 2.0 * 1.1; // 10% größer
-                            rect = new BoundingRect(Center, halfWidth, halfHeight);
-                            // Breite und/oder Höhe kann immer noch 0.0 sein
-                        }
-                    }
-                    else
-                    {	// ein weiteres Objekt wird zugefügt
-                        // wenn ein Rechteck vorgegeben ist und es groß genug ist,
-                        // wird es hier nicht verändert
-                        BoundingRect total = rect;
-                        ext = ext * 1.1; // 10% größer, wenn es aber leer ist (Punkt), dann greift folgende Zeile:
-                        // if (ext.Width == 0.0 && ext.Height == 0.0) ext.Inflate(Size / 1000);
-                        total.MinMax(ext);
-                        Center = total.GetCenter();
-                        halfWidth = total.Width / 2.0 * 1.1;
-                        halfHeight = total.Height / 2.0 * 1.1; // 10% größer
-                        rect = new BoundingRect(Center, halfWidth, halfHeight);
-                    }
-                }
-                // nach den Vorbereitungen für die Wurzel beginnt hier das normale Zufügen
-                if (ObjectToAdd.HitTest(ref rect, true))
-                {
-                    if (TopRight == null)
-                    {	// es ist ein Blatt und kein Knoten
-                        // Ein Blatt wird aufgeteilt, wenn es zu viele Objekte hat (MaxListlen), aber nicht, wenn
-                        // die breite oder Höhe noch nicht bestimmt sind, oder wenn der baum zu tief würde
-                        bool split = false;
-                        if (root.MaxDeepth <= 0)
-                        {   // dynamische Aufteilung, MaxDeepth gibt die Stärke an
-                            // MaxDeepth ist negativ, der shift Faktor wird so bestimmt
-                            int shift = Math.Max(0, deepth + root.MaxDeepth);
-                            if (objectList.Count > (1 << deepth)) split = true;
-                        }
-                        // if ((root.MaxDeepth < 0 && (objectList.Count > (1 << deepth)))) split = true;
-                        if ((root.MaxDeepth > 0 && deepth < root.MaxDeepth && objectList.Count >= root.MaxListLen && halfHeight > 0.0 && halfWidth > 0.0)) split = true;
-                        if (split)
-                        // if (deepth < root.MaxDeepth && objectList.Count >= root.MaxListLen && halfHeight > 0.0 && halfWidth > 0.0)
-                        {	// das Blatt wird zum Knoten
-                            // Untereinträge erzeugen
-                            double quarterWidth = halfWidth / 2.0;
-                            double quarterHeight = halfHeight / 2.0;
-                            TopRight = new QuadNode<T>(root, new GeoPoint2D(Center, quarterWidth, quarterHeight), quarterWidth, quarterHeight, deepth + 1);
-                            TopLeft = new QuadNode<T>(root, new GeoPoint2D(Center, -quarterWidth, quarterHeight), quarterWidth, quarterHeight, deepth + 1);
-                            BottomLeft = new QuadNode<T>(root, new GeoPoint2D(Center, -quarterWidth, -quarterHeight), quarterWidth, quarterHeight, deepth + 1);
-                            BottomRight = new QuadNode<T>(root, new GeoPoint2D(Center, quarterWidth, -quarterHeight), quarterWidth, quarterHeight, deepth + 1);
-                            // die vorhanden Objekte aufteilen (for ist marginal schneller als foreach)
-                            foreach (T obj in objectList)
-                            {
-                                TopRight.AddObject(obj);
-                                TopLeft.AddObject(obj);
-                                BottomLeft.AddObject(obj);
-                                BottomRight.AddObject(obj);
-                            }
-                            // das neue Objekt ebenfalls zufügen
-                            TopRight.AddObject(ObjectToAdd);
-                            TopLeft.AddObject(ObjectToAdd);
-                            BottomLeft.AddObject(ObjectToAdd);
-                            BottomRight.AddObject(ObjectToAdd);
-                            // die Liste wird nicht mehr gebraucht
-                            objectList = null;
-                        }
-                        else
-                        {	// es bleibt ein Blatt, einfach in die Liste damit
-                            objectList.Add(ObjectToAdd);
-                        }
-                    }
-                    else
-                    {
-                        TopRight.AddObject(ObjectToAdd);
-                        TopLeft.AddObject(ObjectToAdd);
-                        BottomLeft.AddObject(ObjectToAdd);
-                        BottomRight.AddObject(ObjectToAdd);
-                    }
-                }
-            }
-            public void RemoveObject(T ObjectToRemove)
-            {
-                if (TopRight == null)
-                {	// damit ist der Fall des Root Objektes, wenn noch kein Rechteck vorliegt, abgedeckt
-                    objectList.Remove(ObjectToRemove);
-                }
-                else if (ObjectToRemove.HitTest(ref rect, true))
-                {
-                    TopRight.RemoveObject(ObjectToRemove);
-                    TopLeft.RemoveObject(ObjectToRemove);
-                    BottomLeft.RemoveObject(ObjectToRemove);
-                    BottomRight.RemoveObject(ObjectToRemove);
-                    if (TopRight.FirstObject == null && TopLeft.FirstObject == null && BottomRight.FirstObject == null && BottomLeft.FirstObject == null)
-                    {   // alle 4 Unterknoten sind leer
-                        TopRight = TopLeft = BottomRight = BottomLeft = null;
-                        objectList = new List<T>();
-                    }
-                }
-            }
-            public IEnumerable<T> AllObjects()
-            {
-                if (objectList != null)
-                {
-                    foreach (T obj in objectList)
-                    {
-                        yield return obj;
-                    }
-                }
-                else if (TopRight != null)
-                {
-                    foreach (T obj in TopRight.AllObjects())
-                    {
-                        yield return obj;
-                    }
-                    foreach (T obj in TopLeft.AllObjects())
-                    {
-                        yield return obj;
-                    }
-                    foreach (T obj in BottomLeft.AllObjects())
-                    {
-                        yield return obj;
-                    }
-                    foreach (T obj in BottomRight.AllObjects())
-                    {
-                        yield return obj;
-                    }
-                }
-            }
-            public IEnumerable<T> ObjectsFromRect(BoundingRect r)
-            {
-                if (!BoundingRect.Disjoint(r, rect))
-                {
-                    if (objectList != null)
-                    {
-                        foreach (T obj in objectList)
-                        {
-                            yield return obj;
-                        }
-                    }
-                    else if (TopRight != null)
-                    {
-                        foreach (T obj in TopRight.ObjectsFromRect(r))
-                        {
-                            yield return obj;
-                        }
-                        foreach (T obj in TopLeft.ObjectsFromRect(r))
-                        {
-                            yield return obj;
-                        }
-                        foreach (T obj in BottomLeft.ObjectsFromRect(r))
-                        {
-                            yield return obj;
-                        }
-                        foreach (T obj in BottomRight.ObjectsFromRect(r))
-                        {
-                            yield return obj;
-                        }
-                    }
-                }
-            }
-            public IEnumerable<T> ObjectsCloseTo(IQuadTreeInsertable CloseToThis)
-            {   // liefert alle also auch mehrfach
-                if (CloseToThis.HitTest(ref rect, true))
-                {
-                    if (objectList != null)
-                    {
-                        foreach (T obj in objectList)
-                        {
-                            yield return obj;
-                        }
-                    }
-                    else if (TopRight != null)
-                    {
-                        foreach (T obj in TopRight.ObjectsCloseTo(CloseToThis))
-                        {
-                            yield return obj;
-                        }
-                        foreach (T obj in TopLeft.ObjectsCloseTo(CloseToThis))
-                        {
-                            yield return obj;
-                        }
-                        foreach (T obj in BottomLeft.ObjectsCloseTo(CloseToThis))
-                        {
-                            yield return obj;
-                        }
-                        foreach (T obj in BottomRight.ObjectsCloseTo(CloseToThis))
-                        {
-                            yield return obj;
-                        }
-                    }
-                }
-            }
-            public IEnumerable<List<T>> AllLists
-            {
-                get
-                {
-                    if (objectList != null) yield return objectList;
-                    else if (TopRight != null)
-                    {
-                        foreach (List<T> list in TopRight.AllLists)
-                        {
-                            yield return list;
-                        }
-                        foreach (List<T> list in TopLeft.AllLists)
-                        {
-                            yield return list;
-                        }
-                        foreach (List<T> list in BottomRight.AllLists)
-                        {
-                            yield return list;
-                        }
-                        foreach (List<T> list in BottomLeft.AllLists)
-                        {
-                            yield return list;
-                        }
-                    }
-                }
-            }
-            public T FirstObject
-            {
-                get
-                {
-                    if (objectList != null)
-                    {
-                        if (objectList.Count > 0) return objectList[0];
-                        //foreach (T res in objectList)
-                        //{
-                        //    return res; // läuft halt nur einmal und liefert das erste
-                        //}
-                    }
-                    else if (TopRight != null)
-                    {
-                        T res = TopRight.FirstObject;
-                        if (res != null) return res;
-                        res = TopLeft.FirstObject;
-                        if (res != null) return res;
-                        res = BottomLeft.FirstObject;
-                        if (res != null) return res;
-                        res = BottomRight.FirstObject;
-                        if (res != null) return res;
-                    }
-                    return null;
-                }
-            }
-            internal void SetNodes(QuadNode<T> qn0, QuadNode<T> qn1, QuadNode<T> qn2, QuadNode<T> qn3)
-            {
-                TopRight = qn0;
-                TopLeft = qn1;
-                BottomLeft = qn2;
-                BottomRight = qn3;
-                TopRight.root = root;
-                TopLeft.root = root;
-                BottomLeft.root = root;
-                BottomRight.root = root;
-                objectList = null;
-            }
+		class QuadNode<U> where U : class, IQuadTreeInsertable
+		{
+			public QuadNode<U> TopRight;
+			public QuadNode<U> TopLeft;
+			public QuadNode<U> BottomLeft;
+			public QuadNode<U> BottomRight;
+			// wird das gebraucht? public QuadNode Parent; // Parent, ist beim Root null
+			public GeoPoint2D Center; // Mittelpunkt des Rechtecks
+			public double halfWidth, halfHeight; // halbe Breite und Höhe des Rechtecks
+			public BoundingRect rect; // das Rechteck selbst
+			public QuadTree<U> root; // der QuadTree mit seinen Infos zu MaxListlen u.s.w.
+			List<U> objectList; // existiert nur, wenn es ein Blatt ist, war vorher ein Set, Set ist aber viel aufwendiger als List
+								// (außer bei Remove). Man darf dasselbe Objekt nicht zweimal in den QuadTree hängen, sonst ist es zweimal in der Liste
+								// aber das scheint keine große Einschränkung zu sein, oder?
+			int deepth; // die Tiefe des Baums
+			bool IsRoot
+			{
+				get
+				{
+					return object.Equals(root.root, this);
+				}
+			}
+			public void AddObject(U ObjectToAdd)
+			{
+				if (IsRoot && TopRight == null)
+				{   // der Baum ist noch unreif, da er nur aus einer Liste besteht
+					// das von der Wurzel überdeckte Rechteck kann also noch beliebig manipuliert
+					// werden. Es soll 10% größer sein als alle Objekte in der Wurzel
+					BoundingRect ext = ObjectToAdd.GetExtent();
+					if (ext.IsEmpty()) return; // welche Fälle sind das, nichts wird eingefügt?
+					if (objectList.Count == 0)
+					{   // das erste Objekt wird eingefügt
+						if (!root.initialRect.IsEmpty())
+						{
+							rect = root.initialRect;
+							if (ext <= rect)
+							{
+								Center = rect.GetCenter();
+								halfWidth = rect.Width / 2.0;
+								halfHeight = rect.Height / 2.0;
+							}
+							else
+							{   // vorgegebenes Rechteck ist schon zu klein
+								Center = ext.GetCenter();
+								halfWidth = ext.Width / 2.0 * 1.1;
+								halfHeight = ext.Height / 2.0 * 1.1; // 10% größer
+								rect = new BoundingRect(Center, halfWidth, halfHeight);
+							}
+						}
+						else
+						{
+							Center = ext.GetCenter();
+							halfWidth = ext.Width / 2.0 * 1.1;
+							halfHeight = ext.Height / 2.0 * 1.1; // 10% größer
+							rect = new BoundingRect(Center, halfWidth, halfHeight);
+							// Breite und/oder Höhe kann immer noch 0.0 sein
+						}
+					}
+					else
+					{   // ein weiteres Objekt wird zugefügt
+						// wenn ein Rechteck vorgegeben ist und es groß genug ist,
+						// wird es hier nicht verändert
+						BoundingRect total = rect;
+						ext = ext * 1.1; // 10% größer, wenn es aber leer ist (Punkt), dann greift folgende Zeile:
+										 // if (ext.Width == 0.0 && ext.Height == 0.0) ext.Inflate(Size / 1000);
+						total.MinMax(ext);
+						Center = total.GetCenter();
+						halfWidth = total.Width / 2.0 * 1.1;
+						halfHeight = total.Height / 2.0 * 1.1; // 10% größer
+						rect = new BoundingRect(Center, halfWidth, halfHeight);
+					}
+				}
+				// nach den Vorbereitungen für die Wurzel beginnt hier das normale Zufügen
+				if (ObjectToAdd.HitTest(ref rect, true))
+				{
+					if (TopRight == null)
+					{   // es ist ein Blatt und kein Knoten
+						// Ein Blatt wird aufgeteilt, wenn es zu viele Objekte hat (MaxListlen), aber nicht, wenn
+						// die breite oder Höhe noch nicht bestimmt sind, oder wenn der baum zu tief würde
+						bool split = false;
+						if (root.MaxDeepth <= 0)
+						{   // dynamische Aufteilung, MaxDeepth gibt die Stärke an
+							// MaxDeepth ist negativ, der shift Faktor wird so bestimmt
+							int shift = Math.Max(0, deepth + root.MaxDeepth);
+							if (objectList.Count > (1 << deepth)) split = true;
+						}
+						// if ((root.MaxDeepth < 0 && (objectList.Count > (1 << deepth)))) split = true;
+						if ((root.MaxDeepth > 0 && deepth < root.MaxDeepth && objectList.Count >= root.MaxListLen && halfHeight > 0.0 && halfWidth > 0.0)) split = true;
+						if (split)
+						// if (deepth < root.MaxDeepth && objectList.Count >= root.MaxListLen && halfHeight > 0.0 && halfWidth > 0.0)
+						{   // das Blatt wird zum Knoten
+							// Untereinträge erzeugen
+							double quarterWidth = halfWidth / 2.0;
+							double quarterHeight = halfHeight / 2.0;
+							TopRight = new QuadNode<U>(root, new GeoPoint2D(Center, quarterWidth, quarterHeight), quarterWidth, quarterHeight, deepth + 1);
+							TopLeft = new QuadNode<U>(root, new GeoPoint2D(Center, -quarterWidth, quarterHeight), quarterWidth, quarterHeight, deepth + 1);
+							BottomLeft = new QuadNode<U>(root, new GeoPoint2D(Center, -quarterWidth, -quarterHeight), quarterWidth, quarterHeight, deepth + 1);
+							BottomRight = new QuadNode<U>(root, new GeoPoint2D(Center, quarterWidth, -quarterHeight), quarterWidth, quarterHeight, deepth + 1);
+							// die vorhanden Objekte aufteilen (for ist marginal schneller als foreach)
+							foreach (U obj in objectList)
+							{
+								TopRight.AddObject(obj);
+								TopLeft.AddObject(obj);
+								BottomLeft.AddObject(obj);
+								BottomRight.AddObject(obj);
+							}
+							// das neue Objekt ebenfalls zufügen
+							TopRight.AddObject(ObjectToAdd);
+							TopLeft.AddObject(ObjectToAdd);
+							BottomLeft.AddObject(ObjectToAdd);
+							BottomRight.AddObject(ObjectToAdd);
+							// die Liste wird nicht mehr gebraucht
+							objectList = null;
+						}
+						else
+						{   // es bleibt ein Blatt, einfach in die Liste damit
+							objectList.Add(ObjectToAdd);
+						}
+					}
+					else
+					{
+						TopRight.AddObject(ObjectToAdd);
+						TopLeft.AddObject(ObjectToAdd);
+						BottomLeft.AddObject(ObjectToAdd);
+						BottomRight.AddObject(ObjectToAdd);
+					}
+				}
+			}
+			public void RemoveObject(U ObjectToRemove)
+			{
+				if (TopRight == null)
+				{   // damit ist der Fall des Root Objektes, wenn noch kein Rechteck vorliegt, abgedeckt
+					objectList.Remove(ObjectToRemove);
+				}
+				else if (ObjectToRemove.HitTest(ref rect, true))
+				{
+					TopRight.RemoveObject(ObjectToRemove);
+					TopLeft.RemoveObject(ObjectToRemove);
+					BottomLeft.RemoveObject(ObjectToRemove);
+					BottomRight.RemoveObject(ObjectToRemove);
+					if (TopRight.FirstObject == null && TopLeft.FirstObject == null && BottomRight.FirstObject == null && BottomLeft.FirstObject == null)
+					{   // alle 4 Unterknoten sind leer
+						TopRight = TopLeft = BottomRight = BottomLeft = null;
+						objectList = new List<U>();
+					}
+				}
+			}
+			public IEnumerable<U> AllObjects()
+			{
+				if (objectList != null)
+				{
+					foreach (U obj in objectList)
+					{
+						yield return obj;
+					}
+				}
+				else if (TopRight != null)
+				{
+					foreach (U obj in TopRight.AllObjects())
+					{
+						yield return obj;
+					}
+					foreach (U obj in TopLeft.AllObjects())
+					{
+						yield return obj;
+					}
+					foreach (U obj in BottomLeft.AllObjects())
+					{
+						yield return obj;
+					}
+					foreach (U obj in BottomRight.AllObjects())
+					{
+						yield return obj;
+					}
+				}
+			}
+			public IEnumerable<U> ObjectsFromRect(BoundingRect r)
+			{
+				if (!BoundingRect.Disjoint(r, rect))
+				{
+					if (objectList != null)
+					{
+						foreach (U obj in objectList)
+						{
+							yield return obj;
+						}
+					}
+					else if (TopRight != null)
+					{
+						foreach (U obj in TopRight.ObjectsFromRect(r))
+						{
+							yield return obj;
+						}
+						foreach (U obj in TopLeft.ObjectsFromRect(r))
+						{
+							yield return obj;
+						}
+						foreach (U obj in BottomLeft.ObjectsFromRect(r))
+						{
+							yield return obj;
+						}
+						foreach (U obj in BottomRight.ObjectsFromRect(r))
+						{
+							yield return obj;
+						}
+					}
+				}
+			}
+			public IEnumerable<U> ObjectsCloseTo(IQuadTreeInsertable CloseToThis)
+			{   // liefert alle also auch mehrfach
+				if (CloseToThis.HitTest(ref rect, true))
+				{
+					if (objectList != null)
+					{
+						foreach (U obj in objectList)
+						{
+							yield return obj;
+						}
+					}
+					else if (TopRight != null)
+					{
+						foreach (U obj in TopRight.ObjectsCloseTo(CloseToThis))
+						{
+							yield return obj;
+						}
+						foreach (U obj in TopLeft.ObjectsCloseTo(CloseToThis))
+						{
+							yield return obj;
+						}
+						foreach (U obj in BottomLeft.ObjectsCloseTo(CloseToThis))
+						{
+							yield return obj;
+						}
+						foreach (U obj in BottomRight.ObjectsCloseTo(CloseToThis))
+						{
+							yield return obj;
+						}
+					}
+				}
+			}
+			public IEnumerable<List<U>> AllLists
+			{
+				get
+				{
+					if (objectList != null) yield return objectList;
+					else if (TopRight != null)
+					{
+						foreach (List<U> list in TopRight.AllLists)
+						{
+							yield return list;
+						}
+						foreach (List<U> list in TopLeft.AllLists)
+						{
+							yield return list;
+						}
+						foreach (List<U> list in BottomRight.AllLists)
+						{
+							yield return list;
+						}
+						foreach (List<U> list in BottomLeft.AllLists)
+						{
+							yield return list;
+						}
+					}
+				}
+			}
+			public U FirstObject
+			{
+				get
+				{
+					if (objectList != null)
+					{
+						if (objectList.Count > 0) return objectList[0];
+						//foreach (U res in objectList)
+						//{
+						//    return res; // läuft halt nur einmal und liefert das erste
+						//}
+					}
+					else if (TopRight != null)
+					{
+						U res = TopRight.FirstObject;
+						if (res != null) return res;
+						res = TopLeft.FirstObject;
+						if (res != null) return res;
+						res = BottomLeft.FirstObject;
+						if (res != null) return res;
+						res = BottomRight.FirstObject;
+						if (res != null) return res;
+					}
+					return null;
+				}
+			}
+			internal void SetNodes(QuadNode<U> qn0, QuadNode<U> qn1, QuadNode<U> qn2, QuadNode<U> qn3)
+			{
+				TopRight = qn0;
+				TopLeft = qn1;
+				BottomLeft = qn2;
+				BottomRight = qn3;
+				TopRight.root = root;
+				TopLeft.root = root;
+				BottomLeft.root = root;
+				BottomRight.root = root;
+				objectList = null;
+			}
 
-            public QuadNode(QuadTree<T> root, GeoPoint2D center, double halfWidth, double halfHeight, int deepth)
-            {
-                this.root = root;
-                this.objectList = new List<T>();
-                this.deepth = deepth;
-                this.Center = center;
-                this.halfWidth = halfWidth;
-                this.halfHeight = halfHeight;
-                this.rect = new BoundingRect(Center, halfWidth, halfHeight);
-            }
-            public QuadNode(QuadTree<T> root)
-            {
-                this.halfWidth = 0.0;
-                this.halfHeight = 0.0;
-                this.root = root;
-                this.rect = BoundingRect.EmptyBoundingRect;
-                this.deepth = 0;
-                this.objectList = new List<T>();
-            }
+			public QuadNode(QuadTree<U> root, GeoPoint2D center, double halfWidth, double halfHeight, int deepth)
+			{
+				this.root = root;
+				this.objectList = new List<U>();
+				this.deepth = deepth;
+				this.Center = center;
+				this.halfWidth = halfWidth;
+				this.halfHeight = halfHeight;
+				this.rect = new BoundingRect(Center, halfWidth, halfHeight);
+			}
+			public QuadNode(QuadTree<U> root)
+			{
+				this.halfWidth = 0.0;
+				this.halfHeight = 0.0;
+				this.root = root;
+				this.rect = BoundingRect.EmptyBoundingRect;
+				this.deepth = 0;
+				this.objectList = new List<U>();
+			}
 #if DEBUG
-            internal void Debug(DebuggerContainer dc)
-            {
-                dc.Add(new Line2D(Center + new GeoVector2D(-halfWidth, -halfHeight), Center + new GeoVector2D(-halfWidth, halfHeight)));
-                dc.Add(new Line2D(Center + new GeoVector2D(-halfWidth, -halfHeight), Center + new GeoVector2D(halfWidth, -halfHeight)));
-                dc.Add(new Line2D(Center + new GeoVector2D(halfWidth, halfHeight), Center + new GeoVector2D(-halfWidth, halfHeight)));
-                dc.Add(new Line2D(Center + new GeoVector2D(halfWidth, halfHeight), Center + new GeoVector2D(halfWidth, -halfHeight)));
-                if (TopRight != null)
-                {
-                    TopRight.Debug(dc);
-                    TopLeft.Debug(dc);
-                    BottomRight.Debug(dc);
-                    BottomLeft.Debug(dc);
-                }
-            }
+			internal void Debug(DebuggerContainer dc)
+			{
+				dc.Add(new Line2D(Center + new GeoVector2D(-halfWidth, -halfHeight), Center + new GeoVector2D(-halfWidth, halfHeight)));
+				dc.Add(new Line2D(Center + new GeoVector2D(-halfWidth, -halfHeight), Center + new GeoVector2D(halfWidth, -halfHeight)));
+				dc.Add(new Line2D(Center + new GeoVector2D(halfWidth, halfHeight), Center + new GeoVector2D(-halfWidth, halfHeight)));
+				dc.Add(new Line2D(Center + new GeoVector2D(halfWidth, halfHeight), Center + new GeoVector2D(halfWidth, -halfHeight)));
+				if (TopRight != null)
+				{
+					TopRight.Debug(dc);
+					TopLeft.Debug(dc);
+					BottomRight.Debug(dc);
+					BottomLeft.Debug(dc);
+				}
+			}
 #endif
 
-            internal bool Check(IQuadTreeInsertable closeTo, QuadTree<T>.CheckOne check)
-            {
-                if (closeTo.HitTest(ref rect, true))
-                {
-                    if (objectList != null)
-                    {
-                        foreach (T obj in objectList)
-                        {
-                            if (check(obj)) return true;
-                        }
-                    }
-                    else if (TopRight != null)
-                    {
-                        if (TopRight.Check(closeTo, check)) return true;
-                        if (TopLeft.Check(closeTo, check)) return true;
-                        if (BottomRight.Check(closeTo, check)) return true;
-                        if (BottomLeft.Check(closeTo, check)) return true;
-                    }
-                }
-                return false;
-            }
+			internal bool Check(IQuadTreeInsertable closeTo, QuadTree<U>.CheckOne check)
+			{
+				if (closeTo.HitTest(ref rect, true))
+				{
+					if (objectList != null)
+					{
+						foreach (U obj in objectList)
+						{
+							if (check(obj)) return true;
+						}
+					}
+					else if (TopRight != null)
+					{
+						if (TopRight.Check(closeTo, check)) return true;
+						if (TopLeft.Check(closeTo, check)) return true;
+						if (BottomRight.Check(closeTo, check)) return true;
+						if (BottomLeft.Check(closeTo, check)) return true;
+					}
+				}
+				return false;
+			}
 
-            internal void AddList(List<Pair<BoundingRect, T[]>> res)
-            {
-                if (objectList != null)
-                {
-                    if (objectList.Count > 0)
-                        res.Add(new Pair<BoundingRect, T[]>(this.rect, objectList.ToArray()));
-                }
-                else if (TopRight != null)
-                {
-                    TopRight.AddList(res);
-                    TopLeft.AddList(res);
-                    BottomRight.AddList(res);
-                    BottomLeft.AddList(res);
-                }
-            }
+			internal void AddList(List<Pair<BoundingRect, U[]>> res)
+			{
+				if (objectList != null)
+				{
+					if (objectList.Count > 0)
+						res.Add(new Pair<BoundingRect, U[]>(this.rect, objectList.ToArray()));
+				}
+				else if (TopRight != null)
+				{
+					TopRight.AddList(res);
+					TopLeft.AddList(res);
+					BottomRight.AddList(res);
+					BottomLeft.AddList(res);
+				}
+			}
 
-            internal void Iterate(int stepDownLevels, QuadTree<T>.IIterateQuadTreeLists it)
-            {
-                QuadTree<T>.IterateAction action = QuadTree<T>.IterateAction.branchDone;
-                if (stepDownLevels <= 0)
-                {
-                    action = it.Iterate(ref this.rect, new HashSet<T>(AllObjects()), TopRight != null);
-                }
-                else if (objectList != null)
-                {
-                    action = it.Iterate(ref this.rect, new HashSet<T>(objectList), false);
-                }
-                else action = QuadTree<T>.IterateAction.goDeeper;
-                if (action == QuadTree<T>.IterateAction.goDeeperAndSplit && objectList != null)
-                {      // Aufrufer möchte den Knoten aufteilen
-                    // das Blatt wird zum Knoten
-                    // Untereinträge erzeugen
-                    double quarterWidth = halfWidth / 2.0;
-                    double quarterHeight = halfHeight / 2.0;
-                    TopRight = new QuadNode<T>(root, new GeoPoint2D(Center, quarterWidth, quarterHeight), quarterWidth, quarterHeight, deepth + 1);
-                    TopLeft = new QuadNode<T>(root, new GeoPoint2D(Center, -quarterWidth, quarterHeight), quarterWidth, quarterHeight, deepth + 1);
-                    BottomLeft = new QuadNode<T>(root, new GeoPoint2D(Center, -quarterWidth, -quarterHeight), quarterWidth, quarterHeight, deepth + 1);
-                    BottomRight = new QuadNode<T>(root, new GeoPoint2D(Center, quarterWidth, -quarterHeight), quarterWidth, quarterHeight, deepth + 1);
-                    // die vorhanden Objekte aufteilen (for ist marginal schneller als foreach)
-                    foreach (T obj in objectList)
-                    {
-                        TopRight.AddObject(obj);
-                        TopLeft.AddObject(obj);
-                        BottomLeft.AddObject(obj);
-                        BottomRight.AddObject(obj);
-                    }
-                    // die Liste wird nicht mehr gebraucht
-                    objectList = null;
-                }
-                if (action != QuadTree<T>.IterateAction.branchDone && TopRight != null)
-                {
-                    TopRight.Iterate(stepDownLevels - 1, it);
-                    TopLeft.Iterate(stepDownLevels - 1, it);
-                    BottomRight.Iterate(stepDownLevels - 1, it);
-                    BottomLeft.Iterate(stepDownLevels - 1, it);
-                }
-            }
+			internal void Iterate(int stepDownLevels, QuadTree<U>.IIterateQuadTreeLists it)
+			{
+				QuadTree<U>.IterateAction action = QuadTree<U>.IterateAction.branchDone;
+				if (stepDownLevels <= 0)
+				{
+					action = it.Iterate(ref this.rect, new HashSet<U>(AllObjects()), TopRight != null);
+				}
+				else if (objectList != null)
+				{
+					action = it.Iterate(ref this.rect, new HashSet<U>(objectList), false);
+				}
+				else action = QuadTree<U>.IterateAction.goDeeper;
+				if (action == QuadTree<U>.IterateAction.goDeeperAndSplit && objectList != null)
+				{      // Aufrufer möchte den Knoten aufteilen
+					   // das Blatt wird zum Knoten
+					   // Untereinträge erzeugen
+					double quarterWidth = halfWidth / 2.0;
+					double quarterHeight = halfHeight / 2.0;
+					TopRight = new QuadNode<U>(root, new GeoPoint2D(Center, quarterWidth, quarterHeight), quarterWidth, quarterHeight, deepth + 1);
+					TopLeft = new QuadNode<U>(root, new GeoPoint2D(Center, -quarterWidth, quarterHeight), quarterWidth, quarterHeight, deepth + 1);
+					BottomLeft = new QuadNode<U>(root, new GeoPoint2D(Center, -quarterWidth, -quarterHeight), quarterWidth, quarterHeight, deepth + 1);
+					BottomRight = new QuadNode<U>(root, new GeoPoint2D(Center, quarterWidth, -quarterHeight), quarterWidth, quarterHeight, deepth + 1);
+					// die vorhanden Objekte aufteilen (for ist marginal schneller als foreach)
+					foreach (U obj in objectList)
+					{
+						TopRight.AddObject(obj);
+						TopLeft.AddObject(obj);
+						BottomLeft.AddObject(obj);
+						BottomRight.AddObject(obj);
+					}
+					// die Liste wird nicht mehr gebraucht
+					objectList = null;
+				}
+				if (action != QuadTree<U>.IterateAction.branchDone && TopRight != null)
+				{
+					TopRight.Iterate(stepDownLevels - 1, it);
+					TopLeft.Iterate(stepDownLevels - 1, it);
+					BottomRight.Iterate(stepDownLevels - 1, it);
+					BottomLeft.Iterate(stepDownLevels - 1, it);
+				}
+			}
+		}
 
-        }
-        QuadNode<T> root; // hier geht der Quadtree los
+		QuadNode<T> root; // hier geht der Quadtree los
         /// <summary>
         /// The maximum number of objects in a leaf-node unless MaxDeepth has been reached
         /// </summary>

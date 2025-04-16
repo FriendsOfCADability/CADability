@@ -244,7 +244,7 @@ namespace CADability
                     {
                         RecalcGeoObjectData rcod = new RecalcGeoObjectData(toInsert, precision, cancellationToken);
                         runningThreads.Add(rcod.RecalcID);
-                        ThreadPool.QueueUserWorkItem(new WaitCallback(RecalcGeoObject), rcod);
+                        ThreadPool.QueueUserWorkItem(RecalcGeoObject, rcod);
                     }
                 }
             }
@@ -338,7 +338,7 @@ namespace CADability
                     }
                 }
                 cancellationTokenSource = new CancellationTokenSource();
-                manageBackgroundRecalc = new Thread(new ParameterizedThreadStart(DoBackgroundRecalcDisplayList));
+                manageBackgroundRecalc = new Thread(DoBackgroundRecalcDisplayList);
                 manageBackgroundRecalc.Start(new DoBackgroundRecalcDisplayListData() { Precision = recalcPrecision, CancellationToken = cancellationTokenSource.Token }); // /2.0, damit es nicht sooft drankommt
                                                                                                                                                                           //System.Diagnostics.Trace.WriteLine("Background Task gestartet, Genauigkeit: " + paintTo3D.Precision.ToString());
             }
@@ -771,14 +771,14 @@ namespace CADability
             {
                 if (undoRedoSystem != null)
                 {
-                    undoRedoSystem.BeginContinousChangesEvent -= new UndoRedoSystem.BeginContinousChangesDelegate(OnBeginContinousChanges);
-                    undoRedoSystem.EndContinousChangesEvent -= new UndoRedoSystem.EndContinousChangesDelegate(OnEndContinousChanges);
+                    undoRedoSystem.BeginContinousChangesEvent -= OnBeginContinousChanges;
+                    undoRedoSystem.EndContinousChangesEvent -= OnEndContinousChanges;
                 }
                 undoRedoSystem = value;
                 if (undoRedoSystem != null)
                 {
-                    undoRedoSystem.BeginContinousChangesEvent += new UndoRedoSystem.BeginContinousChangesDelegate(OnBeginContinousChanges);
-                    undoRedoSystem.EndContinousChangesEvent += new UndoRedoSystem.EndContinousChangesDelegate(OnEndContinousChanges);
+                    undoRedoSystem.BeginContinousChangesEvent += OnBeginContinousChanges;
+                    undoRedoSystem.EndContinousChangesEvent += OnEndContinousChanges;
                 }
             }
         }
@@ -939,8 +939,8 @@ namespace CADability
             geoObjects.Add(ObjectToAdd);
             ObjectToAdd.Owner = this;
             if (GeoObjectAddedEvent != null) GeoObjectAddedEvent(ObjectToAdd);
-            ObjectToAdd.WillChangeEvent += new ChangeDelegate(OnGeoObjectWillChange);
-            ObjectToAdd.DidChangeEvent += new ChangeDelegate(OnGeoObjectDidChange);
+            ObjectToAdd.WillChangeEvent += OnGeoObjectWillChange;
+            ObjectToAdd.DidChangeEvent += OnGeoObjectDidChange;
             if (ExtentChangedEvent == null) extent = null;
             projectionToExtent.Clear();
             displayListsDirty = true;
@@ -983,8 +983,8 @@ namespace CADability
                 geoObjects.Add(go);
                 go.Owner = this;
                 if (!noSingleAddEvents && GeoObjectAddedEvent != null) GeoObjectAddedEvent(go);
-                go.WillChangeEvent += new ChangeDelegate(OnGeoObjectWillChange);
-                go.DidChangeEvent += new ChangeDelegate(OnGeoObjectDidChange);
+                go.WillChangeEvent += OnGeoObjectWillChange;
+                go.DidChangeEvent += OnGeoObjectDidChange;
                 if (ExtentChangedEvent == null) extent = null;
                 if (octTree != null) AddOctreeObjects(go, octTree);
             }
@@ -1084,8 +1084,8 @@ namespace CADability
                     if (HToRemove.Contains(geoObjects[i]))
                     {
                         geoObjects[i].Owner = null;
-                        geoObjects[i].WillChangeEvent -= new ChangeDelegate(OnGeoObjectWillChange);
-                        geoObjects[i].DidChangeEvent -= new ChangeDelegate(OnGeoObjectDidChange);
+                        geoObjects[i].WillChangeEvent -= OnGeoObjectWillChange;
+                        geoObjects[i].DidChangeEvent -= OnGeoObjectDidChange;
                         if (octTree != null) RemoveOctreeObjects(geoObjects[i], octTree);
 
                         geoObjects.Remove(i);
@@ -1114,8 +1114,8 @@ namespace CADability
                 geoObjects.Remove(ind);
                 ToRemove.Owner = null;
             }
-            ToRemove.WillChangeEvent -= new ChangeDelegate(OnGeoObjectWillChange);
-            ToRemove.DidChangeEvent -= new ChangeDelegate(OnGeoObjectDidChange);
+            ToRemove.WillChangeEvent -= OnGeoObjectWillChange;
+            ToRemove.DidChangeEvent -= OnGeoObjectDidChange;
             if (GeoObjectRemovedEvent != null) GeoObjectRemovedEvent(ToRemove);
             projectionToExtent.Clear();
             displayListsDirty = true;
@@ -1146,8 +1146,8 @@ namespace CADability
                 geoObjects.Remove(ind);
                 ToRemove.Owner = null;
             }
-            ToRemove.WillChangeEvent -= new ChangeDelegate(OnGeoObjectWillChange);
-            ToRemove.DidChangeEvent -= new ChangeDelegate(OnGeoObjectDidChange);
+            ToRemove.WillChangeEvent -= OnGeoObjectWillChange;
+            ToRemove.DidChangeEvent -= OnGeoObjectDidChange;
             if (GeoObjectRemovedEvent != null) GeoObjectRemovedEvent(ToRemove);
             projectionToExtent.Clear();
             displayListsDirty = true;
@@ -1490,8 +1490,8 @@ namespace CADability
             for (int i = 0; i < geoObjects.Count; ++i)
             {
                 geoObjects[i].Owner = this;
-                geoObjects[i].WillChangeEvent += new ChangeDelegate(OnGeoObjectWillChange);
-                geoObjects[i].DidChangeEvent += new ChangeDelegate(OnGeoObjectDidChange);
+                geoObjects[i].WillChangeEvent += OnGeoObjectWillChange;
+                geoObjects[i].DidChangeEvent += OnGeoObjectDidChange;
             }
         }
         #endregion
@@ -1502,8 +1502,8 @@ namespace CADability
             for (int i = 0; i < geoObjects.Count; ++i)
             {
                 geoObjects[i].Owner = this;
-                geoObjects[i].WillChangeEvent += new ChangeDelegate(OnGeoObjectWillChange);
-                geoObjects[i].DidChangeEvent += new ChangeDelegate(OnGeoObjectDidChange);
+                geoObjects[i].WillChangeEvent += OnGeoObjectWillChange;
+                geoObjects[i].DidChangeEvent += OnGeoObjectDidChange;
             }
         }
         #endregion
@@ -1605,14 +1605,15 @@ namespace CADability
                 if (subEntries == null)
                 {   // einmalig erzeugen
                     MultipleChoiceProperty unitProp = new MultipleChoiceProperty("Model.Unit", (int)unit);
-                    unitProp.ValueChangedEvent += new ValueChangedDelegate(UnitChanged);
+                    unitProp.ValueChangedEvent += UnitChanged;
                     // TODO: DoubleProperty durch scaleProperty ersetzen (wird öfter gebraucht)
-                    DoubleProperty defaultScaleProp = new DoubleProperty("Model.DefaultScale", this.Frame);
-                    defaultScaleProp.GetDoubleEvent += new CADability.UserInterface.DoubleProperty.GetDoubleDelegate(OnGetDefaultScale);
-                    defaultScaleProp.SetDoubleEvent += new CADability.UserInterface.DoubleProperty.SetDoubleDelegate(OnSetDefaultScale);
-                    DoubleProperty lineStyleScaleProp = new DoubleProperty("Model.LineStyleScale", this.Frame);
-                    lineStyleScaleProp.GetDoubleEvent += new CADability.UserInterface.DoubleProperty.GetDoubleDelegate(OnGetLineStyleScale);
-                    lineStyleScaleProp.SetDoubleEvent += new CADability.UserInterface.DoubleProperty.SetDoubleDelegate(OnSetLineStyleScale);
+                    DoubleProperty defaultScaleProp = new DoubleProperty(this.Frame, "Model.DefaultScale");
+                    defaultScaleProp.OnGetValue = () => defaultScale;
+                    defaultScaleProp.OnSetValue = (l) => defaultScale = l;
+
+                    DoubleProperty lineStyleScaleProp = new DoubleProperty(this.Frame, "Model.LineStyleScale");
+                    lineStyleScaleProp.OnGetValue = () => lineStyleScale;
+					lineStyleScaleProp.OnSetValue = (l) => lineStyleScale = l;
                     subEntries = new IShowProperty[] { unitProp, defaultScaleProp, lineStyleScaleProp };
                 }
                 return subEntries;
@@ -1664,22 +1665,6 @@ namespace CADability
             {
                 unit = (Units)sel;
             }
-        }
-        private double OnGetDefaultScale(DoubleProperty sender)
-        {
-            return defaultScale;
-        }
-        private void OnSetDefaultScale(DoubleProperty sender, double l)
-        {
-            defaultScale = l;
-        }
-        private double OnGetLineStyleScale(DoubleProperty sender)
-        {
-            return lineStyleScale;
-        }
-        private void OnSetLineStyleScale(DoubleProperty sender, double l)
-        {
-            lineStyleScale = l;
         }
         #region IEnumerable
         IEnumerator IEnumerable.GetEnumerator()

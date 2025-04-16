@@ -1,8 +1,4 @@
-﻿using CADability.Actions;
-using System;
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Text;
+﻿using System;
 
 namespace CADability.UserInterface
 {
@@ -11,43 +7,30 @@ namespace CADability.UserInterface
     /// </summary>
     public class CommandState
     {
-        bool enabled;
-        bool check;
-        bool radio;
-        /// <summary>
+	    /// <summary>
         /// Creates a command state which is enabled, but not checked and no radio
         /// button set.
         /// </summary>
         public CommandState()
         {
-            enabled = true;
-            check = false;
-            radio = false;
+            Enabled = true;
+            Checked = false;
+            Radio = false;
         }
         /// <summary>
         /// Gets or sets the "enabled" state.
         /// </summary>
-        public bool Enabled
-        {
-            get { return enabled; }
-            set { enabled = value; }
-        }
+        public bool Enabled { get; set; }
+
         /// <summary>
         /// Gets or sets the "checked" state.
         /// </summary>
-        public bool Checked
-        {
-            get { return check; }
-            set { check = value; }
-        }
+        public bool Checked { get; set; }
+
         /// <summary>
         /// Gets or sets the "radio" state.
         /// </summary>
-        public bool Radio
-        {
-            get { return radio; }
-            set { radio = value; }
-        }
+        public bool Radio { get; set; }
     }
     /// <summary>
     /// Objects that implement this interface can receive menu command.
@@ -60,30 +43,30 @@ namespace CADability.UserInterface
         /// <summary>
         /// Process the command with the given MenuId. Return true if handled, false otherwise.
         /// </summary>
-        /// <param name="MenuId">Id of the menu command to be processed</param>
+        /// <param name="menuId">Id of the menu command to be processed</param>
         /// <returns>true, if handled, false otherwise</returns>
-        bool OnCommand(string MenuId);
+        bool OnCommand(string menuId);
         /// <summary>
         /// Update the command user interface of the given command. Return true if handled, false otherwise.
         /// </summary>
-        /// <param name="MenuId">Id of the menu command to be processed</param>
-        /// <param name="CommandState">State object to modify if appropriate</param>
+        /// <param name="menuId">Id of the menu command to be processed</param>
+        /// <param name="commandState">State object to modify if appropriate</param>
         /// <returns>true, if handled, false otherwise</returns>
-        bool OnUpdateCommand(string MenuId, CommandState CommandState);
-        /// <summary>
-        /// Notify that the menu item is being selected. No need to react on this notification
-        /// </summary>
-        /// <param name="MenuId">Id of the menu command that was selected</param>
-        /// <param name="selected">true, if selected, false if deselected</param>
-        /// <returns></returns>
-        void OnSelected(MenuWithHandler selectedMenu, bool selected);
+        bool OnUpdateCommand(string menuId, CommandState commandState);
+		/// <summary>
+		/// Notify that the menu item is being selected. No need to react on this notification
+		/// </summary>
+		/// <param name="selectedMenu">Id of the menu command that was selected</param>
+		/// <param name="selected">true, if selected, false if deselected</param>
+		/// <returns></returns>
+		void OnSelected(MenuWithHandler selectedMenu, bool selected);
     }
 
     public class SimpleMenuCommand : ICommandHandler
     {
-        Func<string, bool> OnCommand;
-        Func<string, CommandState , bool> OnUpdateCommand;
-        Action<MenuWithHandler> OnSelected;
+	    private readonly Func<string, bool> onCommand;
+	    private readonly Func<string, CommandState , bool> onUpdateCommand;
+	    //private Action<MenuWithHandler> onSelected;
         public static ICommandHandler HandleCommand(Func<string, bool> action)
         {
             return new SimpleMenuCommand(action);
@@ -95,28 +78,26 @@ namespace CADability.UserInterface
         }
         public SimpleMenuCommand(Func<string, bool> action, Func<string, CommandState, bool> update)
         {
-            this.OnCommand = action;
-            this.OnUpdateCommand = update;
+            onCommand = action;
+            onUpdateCommand = update;
         }
         public SimpleMenuCommand(Func<string, bool> action)
         {
-            this.OnCommand = action;
+            onCommand = action;
         }
-        bool ICommandHandler.OnCommand(string MenuId)
+        bool ICommandHandler.OnCommand(string menuId)
         {
-            if (OnCommand!=null) return OnCommand(MenuId);
-            return false;
-        }
-
-        void ICommandHandler.OnSelected(MenuWithHandler selectedMenu, bool selected) 
-        {
-            if (OnSelected != null) OnSelected(selectedMenu);
+	        return onCommand!=null && onCommand(menuId);
         }
 
-        bool ICommandHandler.OnUpdateCommand(string MenuId, CommandState CommandState)
+        void ICommandHandler.OnSelected(MenuWithHandler selectedMenu, bool selected)
         {
-            if (OnUpdateCommand != null) return OnUpdateCommand(MenuId, CommandState);
-            else return true;
+	        //onSelected?.Invoke(selectedMenu);
+        }
+
+        bool ICommandHandler.OnUpdateCommand(string menuId, CommandState commandState)
+        {
+	        return onUpdateCommand == null || onUpdateCommand(menuId, commandState);
         }
     }
 }

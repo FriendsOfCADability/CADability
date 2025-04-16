@@ -92,12 +92,12 @@ namespace CADability
     {
         private Shell s1;
         private Shell s2;
-        struct IntersectionPoint
-        {
-            public List<Edge> onEdges;
-            public List<Face> onFaces;
-            public GeoPoint position;
-        }
+        //struct IntersectionPoint
+        //{
+        //    public List<Edge> onEdges;
+        //    public List<Face> onFaces;
+        //    public GeoPoint position;
+        //}
 
         public BRepIntersection(Shell s1, Shell s2)
         {

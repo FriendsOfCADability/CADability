@@ -15,7 +15,6 @@ namespace CADability
         class triangle
         {
             public GeoPoint p1, p2, p3;
-            public UInt16 attr;
 
             public triangle(GeoPoint p1, GeoPoint p2, GeoPoint p3, GeoVector normal)
             {

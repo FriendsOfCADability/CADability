@@ -347,7 +347,7 @@ namespace CADability.Attribute
         /// <summary>
         /// The <see cref="StyleList"/> that contains this Style. May be null.
         /// </summary>
-        public StyleList Parent
+        public new StyleList Parent
         {
             get
             {

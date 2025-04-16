@@ -1345,7 +1345,7 @@ namespace CADability.Curve2D
 
         #endregion
 #if DEBUG
-        internal new DebuggerContainer Debug
+        internal DebuggerContainer Debug
         {
             get
             {

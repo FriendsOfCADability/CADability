@@ -95,18 +95,18 @@ namespace CADability
                 if (subEntries == null)
                 {
                     subEntries = new IShowProperty[3];
-                    dxProperty = new DoubleProperty("Grid.XDistance", base.Frame);
-                    dyProperty = new DoubleProperty("Grid.YDistance", base.Frame);
-                    dxProperty.GetDoubleEvent += new CADability.UserInterface.DoubleProperty.GetDoubleDelegate(OnGetDx);
-                    dxProperty.SetDoubleEvent += new CADability.UserInterface.DoubleProperty.SetDoubleDelegate(OnSetDx);
-                    dyProperty.GetDoubleEvent += new CADability.UserInterface.DoubleProperty.GetDoubleDelegate(OnGetDy);
-                    dyProperty.SetDoubleEvent += new CADability.UserInterface.DoubleProperty.SetDoubleDelegate(OnSetDy);
+                    dxProperty = new DoubleProperty(base.Frame,"Grid.XDistance");
+                    dyProperty = new DoubleProperty(base.Frame, "Grid.YDistance");
+                    dxProperty.OnGetValue = () => XDistance;
+                    dxProperty.OnSetValue = l => dx = l;
+					dyProperty.OnGetValue = () => YDistance;
+                    dyProperty.OnSetValue = l => dy = l;
                     dxProperty.Refresh();
                     dyProperty.Refresh();
                     int initial = (int)displayMode + 1;
                     if (!show) initial = 0;
                     displayModeProperty = new MultipleChoiceProperty("Grid.DisplayMode", initial);
-                    displayModeProperty.ValueChangedEvent += new ValueChangedDelegate(OnDisplayModeValueChanged);
+                    displayModeProperty.ValueChangedEvent += OnDisplayModeValueChanged;
                     subEntries[0] = dxProperty;
                     subEntries[1] = dyProperty;
                     subEntries[2] = displayModeProperty;
@@ -119,13 +119,7 @@ namespace CADability
         /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>,
         /// returns the number of subentries in this property view.
         /// </summary>
-        public override int SubEntriesCount
-        {
-            get
-            {
-                return SubEntries.Length;
-            }
-        }
+        public override int SubEntriesCount => SubEntries.Length;
 
         #endregion
         #region ISerializable Members
@@ -156,25 +150,6 @@ namespace CADability
         }
 
         #endregion
-
-        private double OnGetDx(DoubleProperty sender)
-        {
-            return XDistance;
-        }
-
-        private void OnSetDx(DoubleProperty sender, double l)
-        {
-            dx = l;
-        }
-        private double OnGetDy(DoubleProperty sender)
-        {
-            return YDistance;
-        }
-
-        private void OnSetDy(DoubleProperty sender, double l)
-        {
-            dy = l;
-        }
 
         private void OnDisplayModeValueChanged(object sender, object NewValue)
         {

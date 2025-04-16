@@ -246,7 +246,6 @@ namespace CADability.Attribute
             return res;
         }
         public event CADability.DidModifyDelegate DidModifyEvent;
-        public event RemovingFromListDelegate RemovingFromListEvent;
         #region IShowProperty Members (IShowPropertyImpl)
         private IShowProperty[] subEntries;
         /// <summary>

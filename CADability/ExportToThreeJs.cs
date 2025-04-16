@@ -95,14 +95,14 @@ namespace CADability
             [DataMember]
             public uint color;
         }
-        [DataContract]
-        struct JsonDictionary
-        {
-            [DataMember]
-            public string Key;
-            [DataMember]
-            public object Value;
-        }
+        //[DataContract]
+        //struct JsonDictionary
+        //{
+        //    [DataMember]
+        //    public string Key;
+        //    [DataMember]
+        //    public object Value;
+        //}
         [DataContract]
         struct JsonEntities
         {

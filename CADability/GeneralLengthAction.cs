@@ -10,18 +10,18 @@ namespace CADability.Actions
 
     public class GeneralLengthAction : Action
     {
-        private LengthProperty lengthProperty;
-        private double InitialLengthValue;
-        private GeoPoint fixPoint;
-        private GeoPoint linePoint;
-        private GeoVector lineDirection;
-        private enum Mode { fromPoint, fromLine }
-        private Mode mode;
+        private readonly LengthProperty lengthProperty;
+        private double initialLengthValue;
+        private readonly GeoPoint fixPoint;
+        private readonly GeoPoint linePoint;
+        private readonly GeoVector lineDirection;
+        private enum Mode { FromPoint, FromLine }
+        private readonly Mode mode;
         public GeneralLengthAction(LengthProperty lengthProperty, GeoPoint fixPoint)
         {
             this.lengthProperty = lengthProperty;
             this.fixPoint = fixPoint;
-            mode = Mode.fromPoint;
+            mode = Mode.FromPoint;
         }
         public GeneralLengthAction(LengthProperty lengthProperty, GeoPoint fixPoint, IGeoObject ignoreSnap) : this(lengthProperty, fixPoint)
         {
@@ -43,7 +43,7 @@ namespace CADability.Actions
             this.lengthProperty = lengthProperty;
             this.linePoint = linePoint;
             this.lineDirection = lineDirection;
-            mode = Mode.fromLine;
+            mode = Mode.FromLine;
         }
 
         private void SetLength(double l)
@@ -62,7 +62,7 @@ namespace CADability.Actions
         /// </summary>
         public override void OnSetAction()
         {
-            InitialLengthValue = GetLength();
+            initialLengthValue = GetLength();
         }
         /// <summary>
         /// Implements <see cref="Action.OnMouseMove"/>. If you override this method
@@ -74,14 +74,14 @@ namespace CADability.Actions
         {
             using (Frame.Project.Undo.ContextFrame(this))
             {
-                SnapPointFinder.DidSnapModes DidSnap;
+                SnapPointFinder.DidSnapModes didSnap;
                 switch (mode)
                 {
-                    case Mode.fromPoint:
-                        SetLength(Geometry.Dist(base.SnapPoint(e, fixPoint, vw, out DidSnap), fixPoint));
+                    case Mode.FromPoint:
+                        SetLength(Geometry.Dist(base.SnapPoint(e, fixPoint, vw, out didSnap), fixPoint));
                         break;
-                    case Mode.fromLine:
-                        SetLength(Geometry.DistPL(base.SnapPoint(e, fixPoint, vw, out DidSnap), linePoint, lineDirection));
+                    case Mode.FromLine:
+                        SetLength(Geometry.DistPL(base.SnapPoint(e, fixPoint, vw, out didSnap), linePoint, lineDirection));
                         break;
                 }
             }
@@ -110,31 +110,29 @@ namespace CADability.Actions
         public override void OnMouseUp(MouseEventArgs e, IView vw)
         {
             OnMouseMove(e, vw);
-            Frame.Project.Undo.ClearContext(); // also die nächsten Änderungen sind ein neuer undo Schritt
+            Frame.Project.Undo.ClearContext(); //the next changes are a new undo step
             base.RemoveThisAction();
         }
         /// <summary>
         /// Implements <see cref="Action.OnActivate"/>. If you override this method
         /// don't forget to call the bas implementation.
         /// </summary>
-        public override void OnActivate(Action OldActiveAction, bool SettingAction)
+        public override void OnActivate(Action oldActiveAction, bool settingAction)
         {
-            lengthProperty.CheckMouseButton(true);
             lengthProperty.FireModifyWithMouse(true);
         }
         /// <summary>
         /// Implements <see cref="Action.OnInactivate"/>. If you override this method
         /// don't forget to call the bas implementation.
         /// </summary>
-        /// <param name="NewActiveAction"><paramref name="Action.OnInactivate.NewActiveAction"/></param>
-        /// <param name="RemovingAction"><paramref name="Action.OnInactivate.RemovingAction"/></param>
-        public override void OnInactivate(Action NewActiveAction, bool RemovingAction)
+        /// <param name="newActiveAction"><paramref name="Action.OnInactivate.NewActiveAction"/></param>
+        /// <param name="removingAction"><paramref name="Action.OnInactivate.RemovingAction"/></param>
+        public override void OnInactivate(Action newActiveAction, bool removingAction)
         {
             lengthProperty.FireModifyWithMouse(false);
-            lengthProperty.CheckMouseButton(false);
-            if (!RemovingAction)
+            if (!removingAction)
             {
-                SetLength(InitialLengthValue);
+                SetLength(initialLengthValue);
                 base.RemoveThisAction();
             }
         }
@@ -144,7 +142,7 @@ namespace CADability.Actions
         /// </summary>
 		public override bool OnEscape()
         {
-            SetLength(InitialLengthValue);
+            SetLength(initialLengthValue);
             base.RemoveThisAction();
             return true;
         }

@@ -119,48 +119,37 @@ namespace CADability.UserInterface
     /// Anzeige einer einfachen stringbasierten Property. Ein Objekt kann damit gekoppelt sein und 
     /// wird bei dem Event SelectionChangedEvent gemeldet. Ansonsten funktionslos.
     /// </summary>
-    internal class SimpleNameProperty : IShowPropertyImpl, ICommandHandler
+    internal sealed class SimpleNameProperty : IShowPropertyImpl, ICommandHandler
     {
-        private string name;
-        private object associatedObject;
-        private bool IsSelected;
-        private string contextMenuResourceId;
+        private readonly string name;
+
+        private readonly string contextMenuResourceId;
         public SimpleNameProperty(string name, object associatedObject, string resourceId)
         {
             this.name = name;
-            this.associatedObject = associatedObject;
+            this.AssociatedObject = associatedObject;
             IsSelected = false;
             base.resourceIdInternal = resourceId;
         }
         public SimpleNameProperty(string name, object associatedObject, string resourceId, string contextMenuResourceId)
         {
             this.name = name;
-            this.associatedObject = associatedObject;
+            this.AssociatedObject = associatedObject;
             IsSelected = false;
             base.resourceIdInternal = resourceId;
             this.contextMenuResourceId = contextMenuResourceId;
         }
-        public void SetSelected(bool IsSelected)
+        public void SetSelected(bool isSelected)
         {
-            this.IsSelected = IsSelected;
+            this.IsSelected = isSelected;
         }
-        public object AssociatedObject
-        {
-            get
-            {
-                return associatedObject;
-            }
-        }
+        public object AssociatedObject { get; }
+
         public delegate void SelectionChangedDelegate(SimpleNameProperty cp, object associatedObject);
         public event SelectionChangedDelegate SelectionChangedEvent;
         #region IShowPropertyImpl Overrides
-        public override MenuWithHandler[] ContextMenu
-        {
-            get
-            {
-                return MenuResource.LoadMenuDefinition(contextMenuResourceId, false, this);
-            }
-        }
+        public override MenuWithHandler[] ContextMenu => MenuResource.LoadMenuDefinition(contextMenuResourceId, false, this);
+
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -175,51 +164,39 @@ namespace CADability.UserInterface
                 return res;
             }
         }
-        public override ShowPropertyEntryType EntryType
-        {
-            get
-            {
-                return ShowPropertyEntryType.GroupTitle;
-            }
-        }
+        public override ShowPropertyEntryType EntryType => ShowPropertyEntryType.GroupTitle;
+
         public override string LabelText
         {
-            get
-            {
-                return name;
-            }
-            set
-            {
-                base.LabelText = value; // sollte nich vorkommen, oder?
-            }
+            get => name;
+            set => base.LabelText = value;
         }
         /// <summary>
         /// Overrides <see cref="IShowPropertyImpl.Selected"/>
         /// </summary>
         public override void Selected()
         {
-            this.IsSelected = true;
-            if (SelectionChangedEvent != null)
-            {
-                SelectionChangedEvent(this, associatedObject);
-            }
+	        this.IsSelected = true;
+	        SelectionChangedEvent?.Invoke(this, AssociatedObject);
         }
         #endregion
 
         #region ICommandHandler Members
-        public delegate bool OnCommandDelegate(SimpleNameProperty sender, string MenuId);
-        public delegate bool OnUpdateCommandDelegate(SimpleNameProperty sender, string MenuId, CommandState CommandState);
+        public delegate bool OnCommandDelegate(SimpleNameProperty sender, string menuId);
+        public delegate bool OnUpdateCommandDelegate(SimpleNameProperty sender, string menuId, CommandState commandState);
         public event OnCommandDelegate OnCommandEvent;
         public event OnUpdateCommandDelegate OnUpdateCommandEvent;
-        bool ICommandHandler.OnCommand(string MenuId)
+        bool ICommandHandler.OnCommand(string menuId)
         {
-            if (OnCommandEvent != null) return OnCommandEvent(this, MenuId);
+            if (OnCommandEvent != null) 
+	            return OnCommandEvent(this, menuId);
             return false;
         }
 
-        bool ICommandHandler.OnUpdateCommand(string MenuId, CommandState CommandState)
+        bool ICommandHandler.OnUpdateCommand(string menuId, CommandState commandState)
         {
-            if (OnUpdateCommandEvent != null) return OnUpdateCommandEvent(this, MenuId, CommandState);
+            if (OnUpdateCommandEvent != null) 
+	            return OnUpdateCommandEvent(this, menuId, commandState);
             return false;
         }
         void ICommandHandler.OnSelected(MenuWithHandler selectedMenuItem, bool selected) { }

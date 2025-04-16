@@ -4168,107 +4168,107 @@ namespace CADability
     P²(u) == Q(u)
     P²(u)-Q(u) == 0 
     */
-    internal class PolyRootSurface : ISurfaceImpl
-    {
-        double[] uKnots, vKnots;
-        Polynom[,] px, py, pz, pw, qx, qy, qz;
-        // pw, qx, qy, qz können null sein
-        // hat die Form x = (px + sqrt(qx))/pw, y, z analog
-        int uIndex(double u)
-        {
-            int high = uKnots.Length - 1;
-            int low = 0;
-            if (u <= uKnots[low]) return low;
-            int mid = (low + high) / 2;
-            while (u < uKnots[mid] || u >= uKnots[mid + 1])
-            {
-                if (u < uKnots[mid]) high = mid;
-                else low = mid;
-                mid = (low + high) / 2;
-                if (low == high) return low;
-            }
-            return mid;
-        }
-        int vIndex(double v)
-        {
-            int high = vKnots.Length - 1;
-            int low = 0;
-            if (v <= vKnots[low]) return low;
-            int mid = (low + high) / 2;
-            while (v < vKnots[mid] || v >= vKnots[mid + 1])
-            {
-                if (v < vKnots[mid]) high = mid;
-                else low = mid;
-                mid = (low + high) / 2;
-                if (low == high) return low;
-            }
-            return mid;
-        }
-        public override GeoPoint PointAt(GeoPoint2D uv)
-        {
-            int i = uIndex(uv.x);
-            int j = vIndex(uv.y);
-            double x = px[i, j].Eval(uv.x, uv.y);
-            double y = py[i, j].Eval(uv.x, uv.y);
-            double z = pz[i, j].Eval(uv.x, uv.y);
-            if (qx != null)
-            {
-                x += Math.Sqrt(qx[i, j].Eval(uv.x, uv.y));
-                y += Math.Sqrt(qy[i, j].Eval(uv.x, uv.y));
-                z += Math.Sqrt(qz[i, j].Eval(uv.x, uv.y));
-            }
-            if (pw != null)
-            {
-                double w = pw[i, j].Eval(uv.x, uv.y);
-                x /= w;
-                y /= w;
-                z /= w;
-            }
-            return new GeoPoint(x, y, z);
-        }
-        public override GeoVector UDirection(GeoPoint2D uv)
-        {
-            int i = uIndex(uv.x);
-            int j = vIndex(uv.y);
-            Polynom ppx = px[i, j].Derivate(1, 0);
-            Polynom ppy = py[i, j].Derivate(1, 0);
-            Polynom ppz = pz[i, j].Derivate(1, 0);
-            if (qx != null)
-            {
+    //internal class PolyRootSurface : ISurfaceImpl
+    //{
+    //    double[] uKnots, vKnots;
+    //    Polynom[,] px, py, pz, pw, qx, qy, qz;
+    //    // pw, qx, qy, qz können null sein
+    //    // hat die Form x = (px + sqrt(qx))/pw, y, z analog
+    //    int uIndex(double u)
+    //    {
+    //        int high = uKnots.Length - 1;
+    //        int low = 0;
+    //        if (u <= uKnots[low]) return low;
+    //        int mid = (low + high) / 2;
+    //        while (u < uKnots[mid] || u >= uKnots[mid + 1])
+    //        {
+    //            if (u < uKnots[mid]) high = mid;
+    //            else low = mid;
+    //            mid = (low + high) / 2;
+    //            if (low == high) return low;
+    //        }
+    //        return mid;
+    //    }
+    //    int vIndex(double v)
+    //    {
+    //        int high = vKnots.Length - 1;
+    //        int low = 0;
+    //        if (v <= vKnots[low]) return low;
+    //        int mid = (low + high) / 2;
+    //        while (v < vKnots[mid] || v >= vKnots[mid + 1])
+    //        {
+    //            if (v < vKnots[mid]) high = mid;
+    //            else low = mid;
+    //            mid = (low + high) / 2;
+    //            if (low == high) return low;
+    //        }
+    //        return mid;
+    //    }
+    //    public override GeoPoint PointAt(GeoPoint2D uv)
+    //    {
+    //        int i = uIndex(uv.x);
+    //        int j = vIndex(uv.y);
+    //        double x = px[i, j].Eval(uv.x, uv.y);
+    //        double y = py[i, j].Eval(uv.x, uv.y);
+    //        double z = pz[i, j].Eval(uv.x, uv.y);
+    //        if (qx != null)
+    //        {
+    //            x += Math.Sqrt(qx[i, j].Eval(uv.x, uv.y));
+    //            y += Math.Sqrt(qy[i, j].Eval(uv.x, uv.y));
+    //            z += Math.Sqrt(qz[i, j].Eval(uv.x, uv.y));
+    //        }
+    //        if (pw != null)
+    //        {
+    //            double w = pw[i, j].Eval(uv.x, uv.y);
+    //            x /= w;
+    //            y /= w;
+    //            z /= w;
+    //        }
+    //        return new GeoPoint(x, y, z);
+    //    }
+    //    public override GeoVector UDirection(GeoPoint2D uv)
+    //    {
+    //        int i = uIndex(uv.x);
+    //        int j = vIndex(uv.y);
+    //        Polynom ppx = px[i, j].Derivate(1, 0);
+    //        Polynom ppy = py[i, j].Derivate(1, 0);
+    //        Polynom ppz = pz[i, j].Derivate(1, 0);
+    //        if (qx != null)
+    //        {
 
-            }
-            return GeoVector.NullVector;
-        }
-        public override GeoVector VDirection(GeoPoint2D uv)
-        {
-            int i = uIndex(uv.x);
-            int j = vIndex(uv.y);
-            Polynom ppx = px[i, j].Derivate(1, 0);
-            Polynom ppy = py[i, j].Derivate(1, 0);
-            Polynom ppz = pz[i, j].Derivate(1, 0);
-            if (qx != null)
-            {
+    //        }
+    //        return GeoVector.NullVector;
+    //    }
+    //    public override GeoVector VDirection(GeoPoint2D uv)
+    //    {
+    //        int i = uIndex(uv.x);
+    //        int j = vIndex(uv.y);
+    //        Polynom ppx = px[i, j].Derivate(1, 0);
+    //        Polynom ppy = py[i, j].Derivate(1, 0);
+    //        Polynom ppz = pz[i, j].Derivate(1, 0);
+    //        if (qx != null)
+    //        {
 
-            }
-            return GeoVector.NullVector;
-        }
-        public override ICurve FixedU(double u, double vmin, double vmax)
-        {
-            throw new NotImplementedException();
-        }
-        public override ICurve FixedV(double u, double umin, double umax)
-        {
-            throw new NotImplementedException();
-        }
-        public override ISurface GetModified(ModOp m)
-        {
-            throw new NotImplementedException();
-        }
-        public override IPropertyEntry GetPropertyEntry(IFrame frame)
-        {
-            return null;
-        }
-    }
+    //        }
+    //        return GeoVector.NullVector;
+    //    }
+    //    public override ICurve FixedU(double u, double vmin, double vmax)
+    //    {
+    //        throw new NotImplementedException();
+    //    }
+    //    public override ICurve FixedV(double u, double umin, double umax)
+    //    {
+    //        throw new NotImplementedException();
+    //    }
+    //    public override ISurface GetModified(ModOp m)
+    //    {
+    //        throw new NotImplementedException();
+    //    }
+    //    public override IPropertyEntry GetPropertyEntry(IFrame frame)
+    //    {
+    //        return null;
+    //    }
+    //}
 
     public interface IImplicitPSurface
     {

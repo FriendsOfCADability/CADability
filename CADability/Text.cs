@@ -25,31 +25,27 @@ namespace CADability.GeoObject
 
     public class ShowPropertyFont : PropertyEntryImpl
     {
-        private Text text;
+        private readonly Text text;
         private IPropertyEntry[] showProperties;
         public ShowPropertyFont(Text t)
         {
             text = t;
-            //			PropertyDescription = StringTable.GetString("Text.Font.Format");
             resourceIdInternal = "Text.Font.Format";
         }
 
-        private MultipleChoiceProperty initFontList()
+        private MultipleChoiceProperty InitFontList()
         {
-            System.Drawing.FontFamily[] families = System.Drawing.FontFamily.Families;
+            FontFamily[] families = FontFamily.Families;
             string[] choices = new string[families.Length];
-            string testFonts;
             for (int i = 0; i < families.Length; i++)
             {
                 choices[i] = families[i].Name;
                 int emS = families[i].GetEmHeight(FontStyle.Regular);
                 int asc = families[i].GetCellAscent(FontStyle.Regular);
                 int desc = families[i].GetCellDescent(FontStyle.Regular);
-                testFonts = choices[i] + ": " + emS.ToString() + ", " + asc.ToString() + ", " + desc.ToString() + " - " + (asc + desc - emS) as string;
-                // System.Diagnostics.Debug.WriteLine(testFonts);
             }
             MultipleChoiceProperty res = new MultipleChoiceProperty("Text.Font", choices, text.Font);
-            res.ValueChangedEvent += new ValueChangedDelegate(FontChanged);
+            res.ValueChangedEvent += FontChanged;
             return res;
         }
         #region PropertyEntryImpl Overrides
@@ -60,11 +56,11 @@ namespace CADability.GeoObject
                 if (showProperties == null)
                 {
                     showProperties = new IPropertyEntry[5];
-                    showProperties[0] = initFontList();
-                    showProperties[1] = new CADability.UserInterface.BooleanProperty(text, "Bold", "Text.Bold", "Text.Bold.Values");
-                    showProperties[2] = new CADability.UserInterface.BooleanProperty(text, "Italic", "Text.Italic", "Text.Italic.Values");
-                    showProperties[3] = new CADability.UserInterface.BooleanProperty(text, "Underline", "Text.Underline", "Text.Underline.Values");
-                    showProperties[4] = new CADability.UserInterface.BooleanProperty(text, "Strikeout", "Text.Strikeout", "Text.Strikeout.Values");
+                    showProperties[0] = InitFontList();
+                    showProperties[1] = new BooleanProperty(text, "Bold", "Text.Bold", "Text.Bold.Values");
+                    showProperties[2] = new BooleanProperty(text, "Italic", "Text.Italic", "Text.Italic.Values");
+                    showProperties[3] = new BooleanProperty(text, "Underline", "Text.Underline", "Text.Underline.Values");
+                    showProperties[4] = new BooleanProperty(text, "Strikeout", "Text.Strikeout", "Text.Strikeout.Values");
                 }
                 return showProperties;
             }
@@ -73,141 +69,102 @@ namespace CADability.GeoObject
         /// Overrides <see cref="IShowPropertyImpl.EntryType"/>, 
         /// returns <see cref="ShowPropertyEntryType.GroupTitle"/>.
         /// </summary>
-        public override PropertyEntryType Flags
-        {
-            get
-            {
-                return PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
-            }
-        }
+        public override PropertyEntryType Flags => PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
+
         #endregion
-        private void FontChanged(object sender, object NewValue)
+        private void FontChanged(object sender, object newValue)
         {
-            text.Font = NewValue as string;
+            text.Font = newValue as string;
         }
     }
 
 
     public class ShowPropertyText : PropertyEntryImpl, IDisplayHotSpots, ICommandHandler, IGeoObjectShowProperty
     {
-        private Text text;
+        private readonly Text text;
         private IPropertyEntry[] showProperties;
-        private GeoPointProperty locationProperty;
-        private GeoVectorProperty glyphDirectionProperty;
-        private GeoVectorHotSpot glyphDirHotspot;
-        private AngleProperty glyphAngleProp;
-        private StringProperty stringProperty;
-        private GeoVectorProperty lineDirectionProperty;
-        private GeoVectorHotSpot lineDirHotspot; // Hotspot für Richtung
-        private LengthProperty sizeProp;
-        private LengthHotSpot sizeHotspot;
-        public ShowPropertyText(Text t, IFrame Frame): base(Frame)
+        private readonly GeoPointProperty locationProperty;
+        private readonly GeoVectorProperty glyphDirectionProperty;
+        private readonly GeoVectorHotSpot glyphDirHotspot;
+        private readonly AngleProperty glyphAngleProp;
+        private readonly StringProperty stringProperty;
+        private readonly GeoVectorProperty lineDirectionProperty;
+        private readonly GeoVectorHotSpot lineDirHotspot; // Hotspot für Richtung
+        private readonly LengthProperty sizeProp;
+        private readonly LengthHotSpot sizeHotspot;
+        public ShowPropertyText(Text t, IFrame frame) : base(frame)
         {
             text = t;
-            //			PropertyDescription = StringTable.GetString("Text.Label");
             resourceIdInternal = "Text";
 
-            locationProperty = new GeoPointProperty(text, "Location", "Text.Location", Frame, true);
+            locationProperty = new GeoPointProperty(text, "Location", "Text.Location", frame, true);
 
-            glyphDirectionProperty = new GeoVectorProperty(text, "GlyphDirectionKeepSize", "Text.GlyphDirection", Frame, true);
+            glyphDirectionProperty = new GeoVectorProperty(text, "GlyphDirectionKeepSize", "Text.GlyphDirection", frame, true);
             glyphDirHotspot = new GeoVectorHotSpot(glyphDirectionProperty);
             GeoVector vg = text.GlyphDirection;
             GeoPoint gp = text.Location;
             glyphDirHotspot.Position = new GeoPoint(gp, vg.x, vg.y, vg.z);
 
-            lineDirectionProperty = new GeoVectorProperty("Text.LineDirection", Frame, true);
+            lineDirectionProperty = new GeoVectorProperty(frame, "Text.LineDirection");
             lineDirectionProperty.IsNormedVector = true;
             lineDirHotspot = new GeoVectorHotSpot(lineDirectionProperty);
             GeoVector vl = text.LineDirection;
             vl.Length = text.Length;
             lineDirHotspot.Position = new GeoPoint(gp, vl.x, vl.y, vl.z);
 
-            sizeProp = new LengthProperty(text, "TextSize", "Text.TextSize", Frame, true);
+            sizeProp = new LengthProperty(text, "TextSize", "Text.TextSize", frame, true);
             sizeHotspot = new LengthHotSpot(sizeProp);
             vl.Length = text.Length / 2.0;
             sizeHotspot.Position = new GeoPoint(gp, vg.x + vl.x, vg.y + vl.y, vg.z + vl.z);
 
-            glyphAngleProp = new AngleProperty(text, "GlyphAngle", "Text.GlyphAngle", Frame, true);
+            glyphAngleProp = new AngleProperty(text, "GlyphAngle", "Text.GlyphAngle", frame, true);
             glyphAngleProp.PreferNegativeValues = true;
             stringProperty = new StringProperty(text.TextString, "Text.TextString");
-            //Aushängen Editor
-            //stringProperty.StringChangedEvent += new StringProperty.StringChangedDelegate(stringProperty_StringChangedEvent);
-            stringProperty.SetStringEvent += StringProperty_SetStringEvent;
-            stringProperty.GetStringEvent += StringProperty_GetStringEvent;
-            //SelectObjectsAction selAct = Frame.ActiveAction as SelectObjectsAction;
-            //if( selAct != null)
-            //{
-            //    selAct.ClickOnSelectedObjectEvent+=new CADability.Actions.SelectObjectsAction.ClickOnSelectedObjectDelegate(OnClickOnSelectedObject);
-            //}
-
-
-            /* Verlagerung nach TextEditor
-                        if(createEditor)editor = new TextEditor(text,stringProperty,Frame);
-                        stringProperty.TextSelectionEvent +=new Condor.UserInterface.ManagedKeysTextbox.TextSelectionDelegate(OnTextSelectionChanged);
-                        stringProperty.StringChangedEvent +=new Condor.UserInterface.StringProperty.StringChangedDelegate(stringProperty_StringChangedEvent);
-                        selectionStart = -1;
-            */
+            stringProperty.OnGetValue = () => text.TextString;
+            stringProperty.OnSetValue = (string val) => text.TextString = val;
         }
 
-        private string StringProperty_GetStringEvent(StringProperty sender)
-        {
-            return text.TextString;
-        }
-
-        private void StringProperty_SetStringEvent(StringProperty sender, string newValue)
-        {
-            text.TextString = newValue;
-        }
-
-        void stringProperty_StringChangedEvent(object sender, EventArgs e)
-        {
-            StringProperty sp = sender as StringProperty;
-            text.TextString = sp.Value;
-            // System.Diagnostics.Trace.WriteLine("stringProperty_StringChangedEvent: " + sp.GetString());
-
-        }
-        internal string[] getChoicesFromResource(string resID)
+        internal string[] GetChoicesFromResource(string resId)
         {
             string[] res = null;
-            string valuesStr = StringTable.GetString(resID + ".Values");
+            string valuesStr = StringTable.GetString(resId + ".Values");
             char sep = valuesStr[0];
             string[] split = valuesStr.Split(new char[] { sep });
             if (split.Length > 1)
-            {	// das erste Stück ist leer
-
+            {
+                //the first one is empty
                 res = new string[split.Length - 1];
                 for (int i = 1; i < split.Length; i++)
                     res[i - 1] = split[i];
             }
             return res;
-
         }
-        internal MultipleChoiceProperty initializeAlignmentProp(bool isLineAlignment)
+        internal MultipleChoiceProperty InitializeAlignmentProp(bool isLineAlignment)
         {
             string[] choices;
             string selectedStr;
             MultipleChoiceProperty res;
             if (isLineAlignment)
             {
-                choices = getChoicesFromResource("Text.LineAlignment");
+                choices = GetChoicesFromResource("Text.LineAlignment");
                 selectedStr = choices[(int)text.LineAlignment];
                 res = new MultipleChoiceProperty("Text.LineAlignment", choices, selectedStr);
-                res.ValueChangedEvent += new ValueChangedDelegate(LineAlignmentChanged);
+                res.ValueChangedEvent += LineAlignmentChanged;
             }
             else
             {
-                choices = getChoicesFromResource("Text.Alignment");
+                choices = GetChoicesFromResource("Text.Alignment");
                 selectedStr = choices[(int)text.Alignment];
                 res = new MultipleChoiceProperty("Text.Alignment", choices, selectedStr);
-                res.ValueChangedEvent += new ValueChangedDelegate(AlignmentChanged);
+                res.ValueChangedEvent += AlignmentChanged;
             }
             return res;
         }
         internal IPropertyEntry[] GetAdditionalTextProperties()
         {
             List<IPropertyEntry> res = new List<IPropertyEntry>();
-            res.Add(initializeAlignmentProp(false));
-            res.Add(initializeAlignmentProp(true));
+            res.Add(InitializeAlignmentProp(false));
+            res.Add(InitializeAlignmentProp(true));
             res.Add(lineDirectionProperty);
             res.Add(glyphDirectionProperty);
             // Umständlich, da DoubleProperty uninitialisiert kommt
@@ -226,18 +183,13 @@ namespace CADability.GeoObject
         public override void Added(IPropertyPage propertyTreeView)
         {
             base.Added(propertyTreeView);
-            locationProperty.ModifyWithMouseEvent += new ModifyWithMouseDelegate(locationProperty_ModifyWithMouse);
-            glyphDirectionProperty.ModifyWithMouseEvent += new ModifyWithMouseDelegate(DirPropModifyWithMouse);
-            lineDirectionProperty.GetGeoVectorEvent += new CADability.UserInterface.GeoVectorProperty.GetGeoVectorDelegate(lineDirPropOnGetGeoVector);
-            lineDirectionProperty.SetGeoVectorEvent += new CADability.UserInterface.GeoVectorProperty.SetGeoVectorDelegate(lineDirPropOnSetGeoVector);
-            lineDirectionProperty.ModifyWithMouseEvent += new ModifyWithMouseDelegate(DirPropModifyWithMouse);
-            sizeProp.ModifyWithMouseEvent += new ModifyWithMouseDelegate(sizePropModifyWithMouse);
-            text.DidChangeEvent += new ChangeDelegate(textDidChange);
-            stringProperty.StateChangedEvent += new StateChangedDelegate(StringPropertyStateChanged);
-            /*	SelectObjectsAction selectAction = Frame.ActiveAction as SelectObjectsAction;
-            if(selectAction != null)
-                selectAction.OnClickedOnSelectedObject += new Condor.Actions.SelectObjectsAction.ClickedOnSelectedObject(setCarret);
-        */
+            locationProperty.ModifyWithMouse += locationProperty_ModifyWithMouse;
+            glyphDirectionProperty.ModifyWithMouse += DirPropModifyWithMouse;
+            lineDirectionProperty.OnGetValue = () => text.LineDirection;
+            lineDirectionProperty.OnSetValue = v => text.SetLineDirKeepGlyphAngle(v);
+            lineDirectionProperty.ModifyWithMouse += DirPropModifyWithMouse;
+            sizeProp.ModifyWithMouse += SizePropModifyWithMouse;
+            text.DidChangeEvent += TextDidChange;
         }
         /// <summary>
         /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.Removed (IPropertyTreeView)"/>
@@ -246,24 +198,13 @@ namespace CADability.GeoObject
         public override void Removed(IPropertyPage propertyTreeView)
         {
             base.Removed(propertyTreeView);
-            locationProperty.ModifyWithMouseEvent -= new ModifyWithMouseDelegate(locationProperty_ModifyWithMouse);
-            glyphDirectionProperty.ModifyWithMouseEvent -= new ModifyWithMouseDelegate(DirPropModifyWithMouse);
-            lineDirectionProperty.GetGeoVectorEvent -= new CADability.UserInterface.GeoVectorProperty.GetGeoVectorDelegate(lineDirPropOnGetGeoVector);
-            lineDirectionProperty.SetGeoVectorEvent -= new CADability.UserInterface.GeoVectorProperty.SetGeoVectorDelegate(lineDirPropOnSetGeoVector);
-            lineDirectionProperty.ModifyWithMouseEvent -= new ModifyWithMouseDelegate(DirPropModifyWithMouse);
-            sizeProp.ModifyWithMouseEvent -= new ModifyWithMouseDelegate(sizePropModifyWithMouse);
-            text.DidChangeEvent -= new ChangeDelegate(textDidChange);
-            stringProperty.StateChangedEvent -= new StateChangedDelegate(StringPropertyStateChanged);
-            //Aushängen Editor
-            //if(editor != null)
-            //{
-            //    editor.Removed();
-            //    editor = null;
-            //}
-            /*		SelectObjectsAction selectAction = Frame.ActiveAction as SelectObjectsAction;
-                    if(selectAction != null)
-                        selectAction.OnClickedOnSelectedObject -= new Condor.Actions.SelectObjectsAction.ClickedOnSelectedObject(setCarret);
-                    */
+            locationProperty.ModifyWithMouse -= locationProperty_ModifyWithMouse;
+            glyphDirectionProperty.ModifyWithMouse -= DirPropModifyWithMouse;
+            lineDirectionProperty.OnGetValue = () => text.LineDirection;
+            lineDirectionProperty.OnSetValue = v => text.SetLineDirKeepGlyphAngle(v);
+            lineDirectionProperty.ModifyWithMouse -= DirPropModifyWithMouse;
+            sizeProp.ModifyWithMouse -= SizePropModifyWithMouse;
+            text.DidChangeEvent -= TextDidChange;
         }
         public override IPropertyEntry[] SubItems
         {
@@ -273,11 +214,9 @@ namespace CADability.GeoObject
                 {
                     List<IPropertyEntry> list = new List<IPropertyEntry>();
                     list.Add(stringProperty);
-                    //if( editor == null)
-                    //    editor = new TextEditor(text,stringProperty,Frame);
                     list.Add(locationProperty);
-                    list.Add(initializeAlignmentProp(false));
-                    list.Add(initializeAlignmentProp(true));
+                    list.Add(InitializeAlignmentProp(false));
+                    list.Add(InitializeAlignmentProp(true));
                     list.Add(lineDirectionProperty);
                     list.Add(glyphDirectionProperty);
                     // Umständlich, da DoubleProperty uninitialisiert kommt
@@ -295,8 +234,8 @@ namespace CADability.GeoObject
         /// <summary>
         /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.Opened (bool)"/>
         /// </summary>
-        /// <param name="IsOpen"></param>
-        public override void Opened(bool IsOpen)
+        /// <param name="isOpen"></param>
+        public override void Opened(bool isOpen)
         {
             if (HotspotChangedEvent != null)
             {
@@ -329,19 +268,19 @@ namespace CADability.GeoObject
             }
         }
         #endregion
-        private void LineAlignmentChanged(object sender, object NewValue)
+        private void LineAlignmentChanged(object sender, object newValue)
         {
             MultipleChoiceProperty mcp = sender as MultipleChoiceProperty;
             text.LineAlignment = (Text.LineAlignMode)mcp.CurrentIndex;
         }
-        private void AlignmentChanged(object sender, object NewValue)
+        private void AlignmentChanged(object sender, object newValue)
         {
             MultipleChoiceProperty mcp = sender as MultipleChoiceProperty;
             text.Alignment = (Text.AlignMode)mcp.CurrentIndex;
         }
         #region IDisplayHotSpots Members
 
-        public event CADability.HotspotChangedDelegate HotspotChangedEvent;
+        public event HotspotChangedDelegate HotspotChangedEvent;
 
         /// <summary>
         /// Implements <see cref="CADability.IDisplayHotSpots.ReloadProperties ()"/>
@@ -352,7 +291,7 @@ namespace CADability.GeoObject
         }
 
         #endregion
-        private void textDidChange(IGeoObject Sender, GeoObjectChange Change)
+        private void TextDidChange(IGeoObject sender, GeoObjectChange change)
         {
             GeoPoint gp = text.Location;
             GeoVector vg = text.GlyphDirection;
@@ -371,33 +310,17 @@ namespace CADability.GeoObject
             stringProperty.Refresh();
             lineDirectionProperty.Refresh();
         }
-        private void locationProperty_ModifyWithMouse(IPropertyEntry sender, bool StartModifying)
+        private void locationProperty_ModifyWithMouse(IPropertyEntry sender, bool startModifying)
         {
             GeneralGeoPointAction gpa = new GeneralGeoPointAction(locationProperty, text);
             Frame.SetAction(gpa);
         }
-        private GeoVector lineDirPropOnGetGeoVector(GeoVectorProperty sender)
-        {
-            return text.LineDirection;
-        }
-        private void lineDirPropOnSetGeoVector(GeoVectorProperty sender, GeoVector v)
-        {
-            if (v.IsNullVector()) return;
-            text.SetLineDirKeepGlyphAngle(v);
-            //Angle a = text.GlyphAngle;
-            //v.Length = text.LineDirection.Length;
-            //using (Frame.Project.Undo.UndoFrame)
-            //{
-            //    text.LineDirection = v;
-            //    text.GlyphAngle = a;
-            //}
-        }
-        private void DirPropModifyWithMouse(IPropertyEntry sender, bool StartModifying)
+        private void DirPropModifyWithMouse(IPropertyEntry sender, bool startModifying)
         {
             GeneralGeoVectorAction gpa = new GeneralGeoVectorAction(sender as GeoVectorProperty, text.Location);
             Frame.SetAction(gpa);
         }
-        private void sizePropModifyWithMouse(IPropertyEntry sender, bool StartModifying)
+        private void SizePropModifyWithMouse(IPropertyEntry sender, bool startModifying)
         {
             GeoVector vl = text.LineDirection;
             GeoVector vg = text.GlyphDirection;
@@ -407,149 +330,28 @@ namespace CADability.GeoObject
             GeneralLengthAction gla = new GeneralLengthAction(sizeProp, new GeoPoint(gp, vl.x, vl.y, vl.z));
             Frame.SetAction(gla);
         }
-        #region Editor
-        /* verschoben nach TextEditor
-        void PaintSelection(Rectangle Extent, ICondorView View, PaintToGDI PaintToDrawing)
-        {
-            if(paintText == null)
-            {
-                paintText = text.Get2DRepresentation(View.Projection,null)[0] as Text2D;
-                calcCarretFlags = 2;
-            }
-            switch (calcCarretFlags )
-            {
-                case 0: break;
-                case 1:
-                {
-                    CharacterRange charRange = paintText.CalcSelectionRange(calcCarretFlags,  mouseStartPos, mouseEndPos, PaintToDrawing);
-                    if(charRange.First >=0)
-                        stringProperty.SetSelection(charRange.First,charRange.Length);
-                }break;
-                case 2:
-                    if(selectionStart != -1)
-                        paintText.CalcSelectionPos(new CharacterRange(selectionStart, selectionLength), PaintToDrawing);
-                    break;
-            }
-            calcCarretFlags = 0;
-            if(selectionLength == 0 )
-            {
-                if(displayCarret)paintText.PaintCarret(PaintToDrawing);
-            }else
-                paintText.Paint(PaintToDrawing);
-            
-        }
-        private void carretTimer_Tick(object sender, EventArgs e)
-        {
-            Text2D t2d;
-            if(paintText == null)
-                t2d = text.Get2DRepresentation(Frame.ActiveView.Projection,null)[0] as Text2D;
-            else
-                t2d = paintText;
-                //Frame.ActiveView.InvalidateAll();
-            BoundingRect rc = t2d.GetExtent();
-            Frame.ActiveView.Invalidate(PaintBuffer.DrawingAspect.Active,Frame.ActiveView.Projection.DeviceRect(rc));
-            displayCarret = !displayCarret;
-        }
 
-        private void OnTextSelectionChanged(Condor.UserInterface.ManagedKeysTextbox.TextSelectionArgs args)
-        {
-            if((selectionStart !=args.SelectStart || selectionLength != args.SelectLength) && calcCarretFlags == 0)
-                calcCarretFlags = 2;
-            if( selectionStart == -1 &&  args.SelectStart!= selectionStart)
-            {
-                foreach( ICondorView view in Frame.AllViews)
-                    view.SetPaintHandler( PaintBuffer.DrawingAspect.Active ,new RepaintView(PaintSelection));
-                if(selectionLength == 0) 
-                {
-                    if( carretTimer == null )
-                    {
-                        carretTimer = new Timer();
-                        carretTimer.Interval = 500;
-                        carretTimer.Tick += new EventHandler(carretTimer_Tick);
-                    }
-                    displayCarret = true;
-                    if(!carretTimer.Enabled)
-                        carretTimer.Start();
-                }
-                else if( carretTimer != null )
-                    carretTimer.Stop();
-            }
-            else if( args.SelectStart  == -1 && args.SelectStart != selectionStart)
-            {
-                foreach( ICondorView view in Frame.AllViews)
-                    view.RemovePaintHandler( PaintBuffer.DrawingAspect.Active,new RepaintView(PaintSelection));
-                if( carretTimer != null )
-                    carretTimer.Stop();
-            }
-            selectionStart = args.SelectStart;
-            selectionLength = args.SelectLength;
-            displayCarret = true;
-            carretTimer_Tick(null,null);
-        }
-
-        private void setCarret(IGeoObject selected, ICondorView vw, MouseEventArgs e, ref bool handled)
-        {
-            if( text == selected && e.Button == MouseButtons.Left )
-            {
-                Plane pl = new Plane( new GeoPoint(0.0,0.0,0.0), text.LineDirection, text.GlyphDirection);//text.Location
-                mouseStartPos  = vw.Projection.PlanePoint(pl,new System.Drawing.Point(e.X,e.Y));
-                calcCarretFlags = 1;
-                
-                stringProperty.SetFocus();//löst OnTextSelectionChanged aus
-                handled = true;
-            }else
-                handled = false;
-        }
-
-        private void stringProperty_StringChangedEvent(object sender, EventArgs e)
-        {
-            StringProperty sp = sender as StringProperty;
-            displayCarret = true;
-            //carretTimer_Tick(null,null);// invalidate auf den alten Extent
-            text.TextString =  sp.StringValue;
-        }
-        */
-        #endregion
-        private void StringPropertyStateChanged(IShowProperty sender, StateChangedArgs args)
-        {
-            //Aushängen Editor
-            //switch( args.EventState)
-            //{
-            //    case StateChangedArgs.State.Selected:
-            //        if( editor == null)
-            //        {
-            //            editor = new TextEditor(text,stringProperty,Frame);
-            //        }break;
-            //    case StateChangedArgs.State.UnSelected:
-            //        if( editor != null)
-            //        {
-            //            editor.Removed();
-            //            editor = null;
-            //        }break;			
-            //}
-        }
         #region ICommandHandler Members
         /// <summary>
         /// Implements <see cref="CADability.UserInterface.ICommandHandler.OnCommand (string)"/>
         /// </summary>
-        /// <param name="MenuId"></param>
+        /// <param name="menuId"></param>
         /// <returns></returns>
-        virtual public bool OnCommand(string MenuId)
+        public virtual bool OnCommand(string menuId)
         {
-            switch (MenuId)
+            switch (menuId)
             {
                 case "MenuId.Outline":
                     if (Frame.ActiveAction is SelectObjectsAction)
                     {
                         using (Frame.Project.Undo.UndoFrame)
                         {
-                            IGeoObjectOwner addTo = text.Owner;
-                            if (addTo == null) addTo = Frame.ActiveView.Model;
+                            IGeoObjectOwner addTo = text.Owner ?? Frame.ActiveView.Model;
                             GeoObjectList list = text.GetOutline();
-                            for (int i = 0; i < list.Count; ++i)
+                            foreach (var t in list)
                             {
-                                list[i].CopyAttributes(text);
-                                addTo.Add(list[i]);
+                                t.CopyAttributes(text);
+                                addTo.Add(t);
                             }
                             addTo.Remove(text);
                             SelectObjectsAction soa = Frame.ActiveAction as SelectObjectsAction;
@@ -563,15 +365,15 @@ namespace CADability.GeoObject
         /// <summary>
         /// Implements <see cref="CADability.UserInterface.ICommandHandler.OnUpdateCommand (string, CommandState)"/>
         /// </summary>
-        /// <param name="MenuId"></param>
-        /// <param name="CommandState"></param>
+        /// <param name="menuId"></param>
+        /// <param name="commandState"></param>
         /// <returns></returns>
-        virtual public bool OnUpdateCommand(string MenuId, CommandState CommandState)
+        public virtual bool OnUpdateCommand(string menuId, CommandState commandState)
         {
-            switch (MenuId)
+            switch (menuId)
             {
                 case "MenuId.Outline":
-                    CommandState.Enabled = true; // naja isses ja immer
+                    commandState.Enabled = true;
                     return true;
             }
             return false;
@@ -579,7 +381,7 @@ namespace CADability.GeoObject
         void ICommandHandler.OnSelected(MenuWithHandler selectedMenuItem, bool selected) { }
         #endregion
         #region IGeoObjectShowProperty Members
-        public event CADability.GeoObject.CreateContextMenueDelegate CreateContextMenueEvent;
+        public event CreateContextMenueDelegate CreateContextMenueEvent;
         IGeoObject IGeoObjectShowProperty.GetGeoObject()
         {
             return text;
@@ -593,21 +395,21 @@ namespace CADability.GeoObject
 
     internal class FontCache
     {
-        // Hält CompundShapes für alle Zeichen, die bis jetzt angefordert wurden
-        // und eine Kerning Tabelle für alle bislang verwendeten Fonts
-        // Hält einen DeviceContext über die ganze Lebensdauer, in dem nur ein Font gewechselt wird.
-        // Die einheiten des Fonts ist die Größe 1.0 so kann man bequem ohne Skalierung arbeiten
-        // Die Faces werden allerdings erst bei einem string generiert. 
-        // Denkbar wäre noch, dass man für jedes zeichen eine Liste von Faces hält mit verschiedenen Größen, 
-        // denn oft gibt es nur wenige verschiedene Größen in einem Modell
+        // Holds CompoundShapes for all characters requested so far  
+        // and a kerning table for all fonts used so far  
+        // Maintains a DeviceContext throughout its lifetime, where only one font is switched.  
+        // The unit of the font is size 1.0, allowing easy work without scaling.  
+        // However, the faces are only generated when a string is created.  
+        // It might also be possible to keep a list of faces for each character in different sizes,  
+        // as there are often only a few different sizes in a model.
         public static FontCache GlobalFontCache = new FontCache();
         static int FontPrecision;
         static bool displayAsPath = false;
         struct DictKey
         {
-            public string fontName;
-            public int fontStyle;
-            public char c;
+            public readonly string fontName;
+            public readonly int fontStyle;
+            public readonly char c;
             public DictKey(string fontName, int fontStyle, char c)
             {
                 this.fontName = fontName;
@@ -630,8 +432,8 @@ namespace CADability.GeoObject
         }
         struct FontKey
         {
-            public string fontName;
-            public int fontStyle;
+            public readonly string fontName;
+            public readonly int fontStyle;
             public FontKey(string fontName, int fontStyle)
             {
                 this.fontName = fontName;
@@ -653,8 +455,8 @@ namespace CADability.GeoObject
         }
         struct KerningKey
         {
-            public string fontName;
-            public int fontStyle;
+            public readonly string fontName;
+            public readonly int fontStyle;
             public KerningKey(string fontName, int fontStyle)
             {
                 this.fontName = fontName;
@@ -666,9 +468,8 @@ namespace CADability.GeoObject
             }
             public override bool Equals(object obj)
             {
-                if (obj is KerningKey)
+                if (obj is KerningKey other)
                 {
-                    KerningKey other = (KerningKey)obj;
                     return other.fontName == fontName && other.fontStyle == fontStyle;
                 }
                 return false;
@@ -693,11 +494,12 @@ namespace CADability.GeoObject
             public double topLineMin, topLineMax;
             public double strokeWidth;
         }
-        Dictionary<DictKey, DictVal> cache; // Cache von CompundShapes und Breiten für einzelne zeichen
-        Dictionary<DictKey, CenterLineVal> centerLineCache; // Cache für die CenterLines, Größe 1
-        Dictionary<FontKey, FontCharacteristics> fontCharacteristicsCache; // Cache für die FontCharacteristics
-        Dictionary<KerningKey, Dictionary<Pair<char, char>, double>> kerning; // Kerningtabellen
-        IntPtr hDC; // fseter DeviceContext (für die ganze Lebensdauer)
+
+        readonly Dictionary<DictKey, DictVal> cache; // Cache von CompundShapes und Breiten für einzelne zeichen
+        readonly Dictionary<DictKey, CenterLineVal> centerLineCache; // Cache für die CenterLines, Größe 1
+        readonly Dictionary<FontKey, FontCharacteristics> fontCharacteristicsCache; // Cache für die FontCharacteristics
+        readonly Dictionary<KerningKey, Dictionary<Pair<char, char>, double>> kerning; // Kerningtabellen
+        readonly IntPtr hDC; // fester DeviceContext (für die ganze Lebensdauer)
         public FontCache()
         {
             FontPrecision = Settings.GlobalSettings.GetIntValue("Font.Precision", 1); // |grob|mittel|fein
@@ -2305,7 +2107,7 @@ namespace CADability.GeoObject
             }
         }
         #region Properties
-        new private class Changing : IGeoObjectImpl.Changing
+        private new class Changing : IGeoObjectImpl.Changing
         {
             private Text text;
             public Changing(Text text)
@@ -2394,6 +2196,9 @@ namespace CADability.GeoObject
 
         public void SetLineDirKeepGlyphAngle(GeoVector ld)
         {
+            if (ld.IsNullVector())
+                return;
+
             using (new Changing(this))
             {
                 Angle a = GlyphAngle;
@@ -2655,7 +2460,7 @@ namespace CADability.GeoObject
                 return lowerLeft | lowerRight;
             }
         }
-        internal void Set(GeoVector lineDirection, GeoVector glyphDirection, GeoPoint location, string fontName, string textString, System.Drawing.FontStyle fontStyle, CADability.GeoObject.Text.AlignMode alignment, CADability.GeoObject.Text.LineAlignMode lineAlignment)
+        internal void Set(GeoVector lineDirection, GeoVector glyphDirection, GeoPoint location, string fontName, string textString, FontStyle fontStyle, AlignMode alignment, LineAlignMode lineAlignment)
         {   // ohne changing, nur intern benutzen
             this.lineDirection = lineDirection;
             this.glyphDirection = glyphDirection;

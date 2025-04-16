@@ -180,7 +180,6 @@ namespace CADability.Attribute
             get { return owner; }
             set { owner = value; }
         }
-        public event RemovingFromListDelegate RemovingFromListEvent;
         public event CADability.DidModifyDelegate DidModifyEvent;
         #region IPropertyEntry Members
         public override PropertyEntryType Flags

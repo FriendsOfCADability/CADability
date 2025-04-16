@@ -415,16 +415,10 @@ namespace CADability.Attribute
             }
         }
 
-        public new StaticFlags Usage
+        public StaticFlags Usage
         {
-            get
-            {
-                return staticFlags;
-            }
-            set
-            {
-                staticFlags = value;
-            }
+            get => staticFlags;
+            set => staticFlags = value;
         }
         public string GetNewName(string startWith)
         {

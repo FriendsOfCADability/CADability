@@ -1,14 +1,12 @@
 ﻿using System;
 using System.Globalization;
-using System.Reflection;
-using CADability.GeoObject;
 using Action = CADability.Actions.Action;
 
 namespace CADability.UserInterface
 {
     public class GeoVectorHotSpot : IHotSpot, ICommandHandler
     {
-        private GeoVectorProperty geoVectorProperty;
+        private readonly GeoVectorProperty geoVectorProperty;
         public GeoPoint Position;
         public GeoVectorHotSpot(GeoVectorProperty geoVectorProperty)
         {
@@ -114,25 +112,23 @@ namespace CADability.UserInterface
 
         private void InitFormat(IFrame frame)
         {
-            MultipleChoiceSetting formattingSystem = frame.GetSetting("Formatting.System") as MultipleChoiceSetting;
-            if (formattingSystem != null && formattingSystem.CurrentSelection >= 0)
-            {
-                displayCoordinateSystem = (DisplayCoordinateSystem)formattingSystem.CurrentSelection;
-            }
-            else
-            {
-                displayCoordinateSystem = DisplayCoordinateSystem.local;
-            }
-            MultipleChoiceSetting formattingZValue = frame.GetSetting("Formatting.Coordinate.ZValue") as MultipleChoiceSetting;
-            if (formattingZValue != null && formattingZValue.CurrentSelection >= 0)
-            {
-                displayZComponent = formattingZValue.CurrentSelection == 0;
-            }
-            else
-            {
-                displayZComponent = true;
-            }
-            alwaysAbsoluteCoordinateSystem = false;
+			if (frame.GetSetting("Formatting.System") is MultipleChoiceSetting formattingSystem && formattingSystem.CurrentSelection >= 0)
+			{
+				displayCoordinateSystem = (DisplayCoordinateSystem)formattingSystem.CurrentSelection;
+			}
+			else
+			{
+				displayCoordinateSystem = DisplayCoordinateSystem.local;
+			}
+			if (frame.GetSetting("Formatting.Coordinate.ZValue") is MultipleChoiceSetting formattingZValue && formattingZValue.CurrentSelection >= 0)
+			{
+				displayZComponent = formattingZValue.CurrentSelection == 0;
+			}
+			else
+			{
+				displayZComponent = true;
+			}
+			alwaysAbsoluteCoordinateSystem = false;
             displayMode = (DisplayMode)frame.GetIntSetting("Formatting.Vector.Mode", 0);
             numberFormatInfo = (NumberFormatInfo)CultureInfo.CurrentCulture.NumberFormat.Clone();
             int decsym = Settings.GlobalSettings.GetIntValue("Formatting.Decimal", 0); // Systemeinstellung | Punkt | Komma
@@ -214,36 +210,36 @@ namespace CADability.UserInterface
             ModOp rot = ModOp.Rotate(nl ^ Frame.ActiveView.Projection.DrawingPlane.Normal, a); // cross product correct?
             SetValue(Frame.ActiveView.Projection.DrawingPlane.ToGlobal(rot * nl), true);
         }
-        private double OnGetX(DoubleProperty sender)
+        private double OnGetX()
         {
             GeoVector p = GlobalToLocal(GetValue());
             return p.x;
         }
-        private void OnSetX(DoubleProperty sender, double l)
+        private void OnSetX(double l)
         {
             GeoVector p = GlobalToLocal(GetValue());
             p.x = l;
             InputFromSubEntries |= EInputFromSubEntries.z;
             SetValue(LocalToGlobal(p), true);
         }
-        private double OnGetY(DoubleProperty sender)
+        private double OnGetY()
         {
             GeoVector p = GlobalToLocal(GetValue());
             return p.y;
         }
-        private void OnSetY(DoubleProperty sender, double l)
+        private void OnSetY(double l)
         {
             GeoVector p = GlobalToLocal(GetValue());
             p.y = l;
             InputFromSubEntries |= EInputFromSubEntries.z;
             SetValue(LocalToGlobal(p), true);
         }
-        private double OnGetZ(DoubleProperty sender)
+        private double OnGetZ()
         {
             GeoVector p = GlobalToLocal(GetValue());
             return p.z;
         }
-        private void OnSetZ(DoubleProperty sender, double l)
+        private void OnSetZ(double l)
         {
             GeoVector p = GlobalToLocal(GetValue());
             p.z = l;
@@ -497,46 +493,46 @@ namespace CADability.UserInterface
                                 case DisplayMode.ShowAngle:
                                     {
                                         subItems = new IPropertyEntry[1];
-                                        AngleProperty ap0 = new AngleProperty("GeoVector.Longitude", Frame, false);
+                                        AngleProperty ap0 = new AngleProperty(Frame, "GeoVector.Longitude");
                                         subItems[0] = ap0;
-                                        ap0.GetAngleEvent += new AngleProperty.GetAngleDelegate(OnGetLongitude);
-                                        ap0.SetAngleEvent += new AngleProperty.SetAngleDelegate(OnSetLongitude);
+                                        ap0.OnGetValue = OnGetLongitude;
+										ap0.OnSetValue = OnSetLongitude;
                                         ap0.AngleChanged(); // erstmalig initialisieren
                                     }
                                     break;
                                 case DisplayMode.ShowPolar:
                                     {
                                         subItems = new IPropertyEntry[2];
-                                        AngleProperty ap0 = new AngleProperty("GeoVector.Longitude", Frame, false);
+                                        AngleProperty ap0 = new AngleProperty(Frame, "GeoVector.Longitude");
                                         subItems[0] = ap0;
-                                        ap0.GetAngleEvent += new AngleProperty.GetAngleDelegate(OnGetLongitude);
-                                        ap0.SetAngleEvent += new AngleProperty.SetAngleDelegate(OnSetLongitude);
+										ap0.OnGetValue = OnGetLongitude;
+                                        ap0.OnSetValue = OnSetLongitude;
                                         ap0.AngleChanged(); // erstmalig initialisieren
-                                        AngleProperty ap1 = new AngleProperty("GeoVector.Latitude", Frame, false);
+                                        AngleProperty ap1 = new AngleProperty(Frame, "GeoVector.Latitude");
                                         subItems[1] = ap1;
-                                        ap1.GetAngleEvent += new AngleProperty.GetAngleDelegate(OnGetLatitude);
-                                        ap1.SetAngleEvent += new AngleProperty.SetAngleDelegate(OnSetLatitude);
+                                        ap1.OnGetValue = OnGetLongitude;
+										ap1.OnSetValue = OnSetLongitude;
                                         ap1.AngleChanged(); // erstmalig initialisieren
                                     }
                                     break;
                                 case DisplayMode.ShowComponents:
                                     {
                                         subItems = new IPropertyEntry[3];
-                                        DoubleProperty dp0 = new DoubleProperty("GeoVector.XValue", Frame);
-                                        dp0.GetDoubleEvent += new CADability.UserInterface.DoubleProperty.GetDoubleDelegate(OnGetX);
-                                        dp0.SetDoubleEvent += new CADability.UserInterface.DoubleProperty.SetDoubleDelegate(OnSetX);
+                                        DoubleProperty dp0 = new DoubleProperty(Frame, "GeoVector.XValue");
+                                        dp0.OnGetValue = OnGetX;
+                                        dp0.OnSetValue = OnSetX;
                                         dp0.DecimalDigits = componentsDigits;
                                         dp0.Refresh(); // erstmalig initialisieren
                                         subItems[0] = dp0;
-                                        DoubleProperty dp1 = new DoubleProperty("GeoVector.YValue", Frame);
-                                        dp1.GetDoubleEvent += new CADability.UserInterface.DoubleProperty.GetDoubleDelegate(OnGetY);
-                                        dp1.SetDoubleEvent += new CADability.UserInterface.DoubleProperty.SetDoubleDelegate(OnSetY);
+                                        DoubleProperty dp1 = new DoubleProperty(Frame, "GeoVector.YValue");
+                                        dp1.OnGetValue = OnGetY;
+                                        dp1.OnSetValue = OnSetY;
                                         dp1.DecimalDigits = componentsDigits;
                                         dp1.Refresh(); // erstmalig initialisieren
                                         subItems[1] = dp1;
-                                        DoubleProperty dp2 = new DoubleProperty("GeoVector.ZValue", Frame);
-                                        dp2.GetDoubleEvent += new CADability.UserInterface.DoubleProperty.GetDoubleDelegate(OnGetZ);
-                                        dp2.SetDoubleEvent += new CADability.UserInterface.DoubleProperty.SetDoubleDelegate(OnSetZ);
+                                        DoubleProperty dp2 = new DoubleProperty(Frame, "GeoVector.ZValue");
+                                        dp2.OnGetValue = OnGetZ;
+										dp2.OnSetValue = OnSetZ;
                                         dp2.DecimalDigits = componentsDigits;
                                         dp2.Refresh(); // erstmalig initialisieren
                                         subItems[2] = dp2;
@@ -545,15 +541,15 @@ namespace CADability.UserInterface
                                 case DisplayMode.ShowComponents2D:
                                     {
                                         subItems = new IPropertyEntry[2];
-                                        DoubleProperty dp0 = new DoubleProperty("GeoVector.XValue", Frame);
-                                        dp0.GetDoubleEvent += new CADability.UserInterface.DoubleProperty.GetDoubleDelegate(OnGetX);
-                                        dp0.SetDoubleEvent += new CADability.UserInterface.DoubleProperty.SetDoubleDelegate(OnSetX);
+                                        DoubleProperty dp0 = new DoubleProperty(Frame, "GeoVector.XValue");
+                                        dp0.OnGetValue = OnGetX;
+										dp0.OnSetValue = OnSetX;
                                         dp0.DecimalDigits = componentsDigits;
                                         dp0.DoubleChanged(); // erstmalig initialisieren
                                         subItems[0] = dp0;
-                                        DoubleProperty dp1 = new DoubleProperty("GeoVector.YValue", Frame);
-                                        dp1.GetDoubleEvent += new CADability.UserInterface.DoubleProperty.GetDoubleDelegate(OnGetY);
-                                        dp1.SetDoubleEvent += new CADability.UserInterface.DoubleProperty.SetDoubleDelegate(OnSetY);
+                                        DoubleProperty dp1 = new DoubleProperty(Frame, "GeoVector.YValue");
+										dp1.OnGetValue = OnGetY;
+                                        dp1.OnSetValue = OnSetY;
                                         dp1.DecimalDigits = componentsDigits;
                                         dp1.DoubleChanged(); // erstmalig initialisieren
                                         subItems[1] = dp1;
@@ -567,15 +563,15 @@ namespace CADability.UserInterface
                         if (displayMode == DisplayMode.ShowComponents2D)
                         {
                             subItems = new IPropertyEntry[2];
-                            DoubleProperty dp0 = new DoubleProperty("GeoVector.XValue", Frame);
-                            dp0.GetDoubleEvent += new CADability.UserInterface.DoubleProperty.GetDoubleDelegate(OnGetX);
-                            dp0.SetDoubleEvent += new CADability.UserInterface.DoubleProperty.SetDoubleDelegate(OnSetX);
+                            DoubleProperty dp0 = new DoubleProperty(Frame, "GeoVector.XValue");
+                            dp0.OnGetValue = OnGetX;
+							dp0.OnSetValue = OnSetX;
                             dp0.DecimalDigits = componentsDigits;
                             dp0.DoubleChanged(); // erstmalig initialisieren
                             subItems[0] = dp0;
-                            DoubleProperty dp1 = new DoubleProperty("GeoVector.YValue", Frame);
-                            dp1.GetDoubleEvent += new CADability.UserInterface.DoubleProperty.GetDoubleDelegate(OnGetY);
-                            dp1.SetDoubleEvent += new CADability.UserInterface.DoubleProperty.SetDoubleDelegate(OnSetY);
+                            DoubleProperty dp1 = new DoubleProperty(Frame, "GeoVector.YValue");
+							dp1.OnGetValue = OnGetY;
+                            dp1.OnSetValue = OnSetY;
                             dp1.DecimalDigits = componentsDigits;
                             dp1.DoubleChanged(); // erstmalig initialisieren
                             subItems[1] = dp1;
@@ -583,21 +579,21 @@ namespace CADability.UserInterface
                         else
                         {
                             subItems = new IPropertyEntry[3];
-                            DoubleProperty dp0 = new DoubleProperty("GeoVector.XValue", Frame);
-                            dp0.GetDoubleEvent += new CADability.UserInterface.DoubleProperty.GetDoubleDelegate(OnGetX);
-                            dp0.SetDoubleEvent += new CADability.UserInterface.DoubleProperty.SetDoubleDelegate(OnSetX);
+                            DoubleProperty dp0 = new DoubleProperty(Frame, "GeoVector.XValue");
+                            dp0.OnGetValue = OnGetX;
+							dp0.OnSetValue = OnSetX;
                             dp0.DecimalDigits = componentsDigits;
                             dp0.DoubleChanged(); // erstmalig initialisieren
                             subItems[0] = dp0;
-                            DoubleProperty dp1 = new DoubleProperty("GeoVector.YValue", Frame);
-                            dp1.GetDoubleEvent += new CADability.UserInterface.DoubleProperty.GetDoubleDelegate(OnGetY);
-                            dp1.SetDoubleEvent += new CADability.UserInterface.DoubleProperty.SetDoubleDelegate(OnSetY);
+                            DoubleProperty dp1 = new DoubleProperty(Frame, "GeoVector.YValue");
+							dp1.OnGetValue = OnGetY;
+                            dp1.OnSetValue = OnSetY;
                             dp1.DecimalDigits = componentsDigits;
                             dp1.DoubleChanged(); // erstmalig initialisieren
                             subItems[1] = dp1;
-                            DoubleProperty dp2 = new DoubleProperty("GeoVector.ZValue", Frame);
-                            dp2.GetDoubleEvent += new CADability.UserInterface.DoubleProperty.GetDoubleDelegate(OnGetZ);
-                            dp2.SetDoubleEvent += new CADability.UserInterface.DoubleProperty.SetDoubleDelegate(OnSetZ);
+                            DoubleProperty dp2 = new DoubleProperty(Frame, "GeoVector.ZValue");
+							dp2.OnGetValue = OnGetZ;
+                            dp2.OnSetValue = OnSetZ;
                             dp0.DecimalDigits = componentsDigits;
                             dp2.DoubleChanged(); // erstmalig initialisieren
                             subItems[2] = dp2;
@@ -645,8 +641,8 @@ namespace CADability.UserInterface
             switch (MenuId)
             {
                 case "MenuId.Vector.ModifyWithMouse":
-                    if (ModifyWithMouse != null) ModifyWithMouse(this, false);
-                    return true;
+					ModifyWithMouse?.Invoke(this, false);
+					return true;
                 case "MenuId.Vector.DirectionOfCurve":
                     Frame.SetAction(new CADability.Actions.ConstructDirectionOfCurve(this));
                     return true;
@@ -812,8 +808,8 @@ namespace CADability.UserInterface
         public event ModifiedByActionDelegate ModifiedByActionEvent;
         internal void ModifiedByAction(Action action)
         {
-            if (ModifiedByActionEvent != null) ModifiedByActionEvent(this);
-        }
+			ModifiedByActionEvent?.Invoke(this);
+		}
         public bool ForceAbsolute { get; internal set; }
         // the following should be removed and the caller should call SetContextMenu with itself as commandhandler
         public string ContextMenuId { get => GetContextMenuId(); set => SetContextMenu(value, this); }

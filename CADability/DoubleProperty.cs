@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Reflection;
 using System.Runtime.Serialization;
 
 namespace CADability.UserInterface
@@ -261,9 +259,12 @@ namespace CADability.UserInterface
         }
         [Obsolete("method has no functionality, remove this call")]
         public void CheckMouseButton(bool Check) { }
-        public delegate void LabelChangedDelegate(DoubleProperty sender, string newLabel);
         [Obsolete("use delegate DoubleProperty.LabelTextChanged instead")]
+		public new delegate void LabelChangedDelegate(DoubleProperty sender, string newLabel);
+        [Obsolete("use delegate DoubleProperty.LabelTextChanged instead")]
+#pragma warning disable CS0067 // Event is never used
         public event LabelChangedDelegate LabelChangedEvent;
+#pragma warning restore CS0067 // Event is never used
         #endregion
         #region IJsonSerialize implementation (when this property is used as a setting)
         /// <summary>

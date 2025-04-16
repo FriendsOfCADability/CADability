@@ -43,7 +43,7 @@ namespace CADability
         private SortedDictionary<int, List<IGeoObject>> sortedGeoObjectsByDisplayOrder;
         private bool deferRefresh; // bei Änderungen nich Darstellen
         // für andere Actionen
-        public event PaintView PaintDrawingEvent;
+        //public event PaintView PaintDrawingEvent;
         public event PaintView PaintSelectEvent;
         public event PaintView PaintActiveEvent;
         public event PaintView PaintBackgroundEvent;
@@ -1388,24 +1388,24 @@ namespace CADability
             canvas?.Invalidate();
             modelNeedsRepaint = true;
         }
-        void IView.SetPaintHandler(PaintBuffer.DrawingAspect aspect, PaintView PaintHandler)
+        void IView.SetPaintHandler(PaintBuffer.DrawingAspect aspect, PaintView paintHandler)
         {
             switch (aspect)
             {
-                case PaintBuffer.DrawingAspect.Background: PaintBackgroundEvent += PaintHandler; break;
-                case PaintBuffer.DrawingAspect.Drawing: PaintDrawingEvent += PaintHandler; break;
-                case PaintBuffer.DrawingAspect.Select: PaintSelectEvent += PaintHandler; break;
-                case PaintBuffer.DrawingAspect.Active: PaintActiveEvent += PaintHandler; break;
+                case PaintBuffer.DrawingAspect.Background: PaintBackgroundEvent += paintHandler; break;
+                //case PaintBuffer.DrawingAspect.Drawing: PaintDrawingEvent += paintHandler; break;
+                case PaintBuffer.DrawingAspect.Select: PaintSelectEvent += paintHandler; break;
+                case PaintBuffer.DrawingAspect.Active: PaintActiveEvent += paintHandler; break;
             }
         }
-        void IView.RemovePaintHandler(PaintBuffer.DrawingAspect aspect, PaintView PaintHandler)
+        void IView.RemovePaintHandler(PaintBuffer.DrawingAspect aspect, PaintView paintHandler)
         {
             switch (aspect)
             {
-                case PaintBuffer.DrawingAspect.Background: PaintBackgroundEvent -= PaintHandler; break;
-                case PaintBuffer.DrawingAspect.Drawing: PaintDrawingEvent -= PaintHandler; break;
-                case PaintBuffer.DrawingAspect.Select: PaintSelectEvent -= PaintHandler; break;
-                case PaintBuffer.DrawingAspect.Active: PaintActiveEvent -= PaintHandler; break;
+                case PaintBuffer.DrawingAspect.Background: PaintBackgroundEvent -= paintHandler; break;
+                //case PaintBuffer.DrawingAspect.Drawing: PaintDrawingEvent -= paintHandler; break;
+                case PaintBuffer.DrawingAspect.Select: PaintSelectEvent -= paintHandler; break;
+                case PaintBuffer.DrawingAspect.Active: PaintActiveEvent -= paintHandler; break;
             }
         }
         System.Drawing.Rectangle IView.DisplayRectangle

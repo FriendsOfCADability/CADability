@@ -1907,7 +1907,7 @@ namespace CADability.GeoObject
             return new GroupProperty("ConicalSurface", se.ToArray());
         }
 #if DEBUG
-        Face DebugAsFace
+        new Face DebugAsFace
         {
             get
             {

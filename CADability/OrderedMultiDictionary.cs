@@ -430,7 +430,7 @@ namespace Wintellect.PowerCollections
                 return tree;
             }
         }
-        internal KeyValuePair<TKey, TValue>[] Debug
+        internal new KeyValuePair<TKey, TValue>[] Debug
         {
             get
             {

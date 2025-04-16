@@ -21,7 +21,7 @@ namespace CADability.Attribute
     {
         private string name;
         private HatchStyleList parent;
-        public IAttributeList Parent
+        public new IAttributeList Parent
         {
             set { parent = value as HatchStyleList; }
             get { return parent; }

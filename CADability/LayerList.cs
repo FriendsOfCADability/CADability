@@ -804,10 +804,10 @@ namespace CADability.Attribute
         }
         void ICommandHandler.OnSelected(MenuWithHandler selectedMenuItem, bool selected) { }
         #endregion
-        public void Refresh()
+        public override void Refresh()
         {
             subEntries = null;
-            if (propertyPage != null) propertyPage.Refresh(this);
+            propertyPage?.Refresh(this);
         }
         /// <summary>
         /// Returns all checked Layers

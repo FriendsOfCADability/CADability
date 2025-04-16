@@ -1,12 +1,10 @@
 ﻿using System;
-using System.Globalization;
-using System.Reflection;
 using System.Runtime.Serialization;
 
 namespace CADability.UserInterface
 {
     [Serializable()]
-    public class StringProperty : EditableProperty<string>, ISerializable, ISettingChanged
+    public class StringProperty : EditableProperty<string>, ISerializable
     {
         public StringProperty(object ObjectWithProperty, string PropertyName, string resourceId) : base(ObjectWithProperty, PropertyName, resourceId)
         {
@@ -27,6 +25,15 @@ namespace CADability.UserInterface
         protected override string ValueToText(string val)
         {
             return val;
+        }
+
+        public void SetString(string val)
+        {
+            SetValue(val, true);
+        }
+        public string GetString()
+        {
+            return GetValue();
         }
 
         #region deprecated adaption to old implementation of StringProperty
@@ -69,16 +76,7 @@ namespace CADability.UserInterface
                 DeferUpdate = value;
             }
         }
-        [Obsolete("use SetValue instead")]
-        public void SetString(string val)
-        {
-            SetValue(val, true);
-        }
-        [Obsolete("use GetValue instead")]
-        public string GetString()
-        {
-            return GetValue();
-        }
+        
         [Obsolete("use delegate StringProperty.OnSetValue instead")]
         public delegate void StringChangedDelegate(object sender, EventArgs e);
         [Obsolete("use delegate StringProperty.OnSetValue instead")]
@@ -105,10 +103,6 @@ namespace CADability.UserInterface
             info.AddValue("InternalValue", GetValue(), typeof(string));
             info.AddValue("ResourceId", resourceIdInternal, typeof(string));
         }
-        #endregion
-
-        #region ISettingChanged Members
-        public event CADability.SettingChangedDelegate SettingChangedEvent;
         #endregion
     }
 }

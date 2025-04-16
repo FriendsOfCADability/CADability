@@ -596,7 +596,7 @@ namespace CADability.GeoObject
                     if ((OrderedCurves[i] as ICurve).IsClosed) OrderedCurves.RemoveAt(i);
                 }
             }
-            if (OrderedCurves.Count == 1 && moreThanOne) return false;
+            if (OrderedCurves.Count == 0 || (OrderedCurves.Count == 1 && moreThanOne)) return false;
             for (int i = 0; i < OrderedCurves.Count; ++i)
             {
                 ICurve c = OrderedCurves[i] as ICurve;
@@ -606,10 +606,7 @@ namespace CADability.GeoObject
                 // TODO: wo ist das Remove, wo ist Changing???
                 // Add macht das mit dem Owner
             }
-            if (OrderedCurves.Count > 0)
-            {
-                this.CopyAttributes(OrderedCurves[0] as IGeoObject);
-            }
+            this.CopyAttributes(OrderedCurves[0] as IGeoObject);
             Recalc();
             return true;
         }
@@ -1151,20 +1148,20 @@ namespace CADability.GeoObject
                 return res.ToArray();
             }
         }
-		#region IGeoObjectImpl
-		public override Style.EDefaultFor PreferredStyle
-		{
-			get
-			{
-				return Style.EDefaultFor.Curves;
-			}
-		}
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetShowProperties (IFrame)"/>
-		/// </summary>
-		/// <param name="Frame"></param>
-		/// <returns></returns>
-		public override IPropertyEntry GetShowProperties(IFrame Frame)
+        #region IGeoObjectImpl
+        public override Style.EDefaultFor PreferredStyle
+        {
+            get
+            {
+                return Style.EDefaultFor.Curves;
+            }
+        }
+        /// <summary>
+        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetShowProperties (IFrame)"/>
+        /// </summary>
+        /// <param name="Frame"></param>
+        /// <returns></returns>
+        public override IPropertyEntry GetShowProperties(IFrame Frame)
         {
             return new ShowPropertyPath(this, Frame);
         }

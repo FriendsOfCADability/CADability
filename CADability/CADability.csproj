@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
+    <NoWarn>$(NoWarn);SYSLIB0011</NoWarn>
     <BuildDocFx Condition=" '$(Configuration)'!='RelWithDoc' ">false</BuildDocFx>
     <Configurations>Debug;Release;RelWithDoc;WebDebug</Configurations>
     <SignAssembly>true</SignAssembly>

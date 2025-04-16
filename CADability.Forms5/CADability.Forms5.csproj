@@ -1,12 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
 
   <PropertyGroup>
-    <TargetFramework>net6.0-windows</TargetFramework>
-	  <UseWindowsForms>true</UseWindowsForms>
-	  <RootNamespace>CADability.Forms</RootNamespace>
-	  <AssemblyName>UICADability.W</AssemblyName>
-	  <BaseOutputPath>..\..\..\bin</BaseOutputPath>
-	  <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <TargetFramework>net8.0-windows7.0</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>CADability.Forms</RootNamespace>
+    <AssemblyName>UICADability.W</AssemblyName>
+    <BaseOutputPath>..\..\..\bin</BaseOutputPath>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

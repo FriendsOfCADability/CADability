@@ -771,41 +771,57 @@ namespace CADability.GeoObject
                 return false;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Position (GeoPoint, GeoVector, double)"/>
-        /// </summary>
-        /// <param name="fromHere"></param>
-        /// <param name="direction"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
-        public override double Position(GeoPoint fromHere, GeoVector direction, double precision)
-        {   // noch nicht getestet
-            if ((this as ICurve).GetPlanarState() == PlanarState.Planar)
-            {
-                GeoPoint p = GetPlane().Intersect(fromHere, direction);
-                return Geometry.LinePar(fromHere, direction, p); // nicht getestet ob Polyline auch getroffen
-            }
-            else
-            {
-                double res = double.MaxValue;
-                for (int i = 0; i < vertex.Length - 1; ++i)
-                {
-                    double pos1, pos2;
-                    double d = Geometry.DistLL(vertex[i], vertex[i + 1] - vertex[i], fromHere, direction, out pos1, out pos2);
-                    if (pos1 >= 0.0 && pos1 <= 1.0 && pos2 < res) res = pos2;
-                }
-                if (closed)
-                {
-                    double pos1, pos2;
-                    double d = Geometry.DistLL(vertex[vertex.Length - 1], vertex[0] - vertex[vertex.Length - 1], fromHere, direction, out pos1, out pos2);
-                    if (pos1 >= 0.0 && pos1 <= 1.0 && pos2 < res) res = pos2;
-                }
-                return res;
-            }
-        }
-        #endregion
-        #region IColorDef Members
-        public ColorDef ColorDef
+		/// <summary>
+		/// Computes the parameter value along the given ray (fromHere + t * direction)
+		/// where it intersects the polyline (if any). Returns <c>double.MaxValue</c>
+		/// if no intersection is found or if the polyline is planar and the ray is parallel to the plane.
+		/// </summary>
+		/// <param name="fromHere">Start point of the ray.</param>
+		/// <param name="direction">Direction of the ray.</param>
+		/// <param name="precision">Tolerance for intersection tests (not used here).</param>
+		/// <returns>The parameter t where the intersection occurs, or <c>double.MaxValue</c> if no hit.</returns>
+		public override double Position(GeoPoint fromHere, GeoVector direction, double precision)
+		{
+			// Check if the polyline lies in a single plane
+			if ((this as ICurve).GetPlanarState() == PlanarState.Planar)
+			{
+				try
+				{
+					// Attempt to intersect with the plane
+					GeoPoint p = GetPlane().Intersect(fromHere, direction);
+					// Return parameter t on the ray for the intersection point
+					return Geometry.LinePar(fromHere, direction, p);
+				}
+				catch (PlaneException)
+				{
+					// Ray is parallel to the plane → no intersection
+					return double.MaxValue;
+				}
+			}
+
+			// Not planar: manually test each segment for intersection
+			double res = double.MaxValue;
+			for (int i = 0; i < vertex.Length - 1; ++i)
+			{
+				Geometry.DistLL(vertex[i], vertex[i + 1] - vertex[i], fromHere, direction, out double pos1, out double pos2);
+				if (pos1 >= 0.0 && pos1 <= 1.0 && pos2 < res) 
+					res = pos2;
+			}
+
+			// If closed, check the last-to-first segment
+			if (closed)
+			{
+				Geometry.DistLL(vertex[vertex.Length - 1], vertex[0] - vertex[vertex.Length - 1], fromHere, direction, out double pos1, out double pos2);
+				if (pos1 >= 0.0 && pos1 <= 1.0 && pos2 < res) 
+					res = pos2;
+			}
+
+			return res;
+		}
+
+		#endregion
+		#region IColorDef Members
+		public ColorDef ColorDef
         {
             get
             {

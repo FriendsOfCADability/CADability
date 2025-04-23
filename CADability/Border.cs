@@ -896,7 +896,7 @@ namespace CADability.Shapes
         {	// Berechnet QuadTree, segmentToIndex und extent. Erwartet wird das segment Array
             // in korrekter Reihenfolge. Bei geschlossenen Borders wird ggf. umgedreht
             reversed = false;
-			quadTree = null;
+            quadTree = null;
             BoundingRect ext = new BoundingRect(System.Double.MaxValue, System.Double.MaxValue, System.Double.MinValue, System.Double.MinValue);
             // BoundingRect.EmptyBoundingRect;
             segmentToIndex = new Hashtable(segment.Length);
@@ -2141,31 +2141,34 @@ namespace CADability.Shapes
                 {	// nur ein Segment wird benötigt
                     ICurve2D TheOnlyCurve = segment[StartIndex].Clone();
                     TheOnlyCurve = TheOnlyCurve.Trim(lastPos - StartIndex, nextPos - StartIndex);
-                    if (i > 0) TheOnlyCurve.StartPoint = points[i - 1]; // Punkte noch nachbessern
-                    if (i < Parameter.Length) TheOnlyCurve.EndPoint = points[i];
-                    TheOnlyCurve.UserData.CloneFrom(segment[StartIndex].UserData);
-                    if (TheOnlyCurve.Length > Precision.eps)
+                    if (TheOnlyCurve != null)
                     {
-                        Border toAdd = new Border(new ICurve2D[] { TheOnlyCurve });
-                        if (i == 0)
+                        if (i > 0) TheOnlyCurve.StartPoint = points[i - 1]; // Punkte noch nachbessern
+                        if (i < Parameter.Length) TheOnlyCurve.EndPoint = points[i];
+                        TheOnlyCurve.UserData.CloneFrom(segment[StartIndex].UserData);
+                        if (TheOnlyCurve.Length > Precision.eps)
                         {
-                            if (orientation[i] > 1e-6) toAdd.orientation = Orientation.negative;
-                            else if (orientation[i] < -1e-6) toAdd.orientation = Orientation.positive;
-                            else toAdd.orientation = Orientation.unknown;
+                            Border toAdd = new Border(new ICurve2D[] { TheOnlyCurve });
+                            if (i == 0)
+                            {
+                                if (orientation[i] > 1e-6) toAdd.orientation = Orientation.negative;
+                                else if (orientation[i] < -1e-6) toAdd.orientation = Orientation.positive;
+                                else toAdd.orientation = Orientation.unknown;
+                            }
+                            else if (i == Parameter.Length)
+                            {
+                                if (orientation[i - 1] > 1e-6) toAdd.orientation = Orientation.positive;
+                                else if (orientation[i - 1] < -1e-6) toAdd.orientation = Orientation.negative;
+                                else toAdd.orientation = Orientation.unknown;
+                            }
+                            else
+                            {
+                                if (orientation[i] > 1e-6 && orientation[i - 1] < -1e-6) toAdd.orientation = Orientation.negative;
+                                else if (orientation[i] < -1e-6 && orientation[i - 1] > 1e-6) toAdd.orientation = Orientation.positive;
+                                else toAdd.orientation = Orientation.unknown;
+                            }
+                            res.Add(toAdd);
                         }
-                        else if (i == Parameter.Length)
-                        {
-                            if (orientation[i - 1] > 1e-6) toAdd.orientation = Orientation.positive;
-                            else if (orientation[i - 1] < -1e-6) toAdd.orientation = Orientation.negative;
-                            else toAdd.orientation = Orientation.unknown;
-                        }
-                        else
-                        {
-                            if (orientation[i] > 1e-6 && orientation[i - 1] < -1e-6) toAdd.orientation = Orientation.negative;
-                            else if (orientation[i] < -1e-6 && orientation[i - 1] > 1e-6) toAdd.orientation = Orientation.positive;
-                            else toAdd.orientation = Orientation.unknown;
-                        }
-                        res.Add(toAdd);
                     }
                 }
                 else

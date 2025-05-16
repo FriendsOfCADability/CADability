@@ -30,6 +30,8 @@ namespace CADability.UserInterface
                 this.Select();
                 propertyTreeView.Refresh(this);
                 if (geoObjects.Length > 0) propertyTreeView.OpenSubEntries(this, true);
+                SimpleNameProperty subEntry = GetGeoObjectNameSubEntry(selectedGeoObject);
+                if (subEntry != null) propertyTreeView.SelectEntry(subEntry);
             }
         }
         public void SetSelectedGeoObject(IGeoObject geoObject)
@@ -100,7 +102,6 @@ namespace CADability.UserInterface
                     for (int i = 0; i < geoObjects.Length; ++i)
                     {
                         SimpleNameProperty cp = new SimpleNameProperty(geoObjects[i].Description, geoObjects[i], "GeoObject.Object");
-                        cp.SetSelected(geoObjects[i] == selectedGeoObject);
                         cp.SelectionChangedEvent += new CADability.UserInterface.SimpleNameProperty.SelectionChangedDelegate(OnGeoObjectSelectionChanged);
                         subEntries[i] = cp;
                     }
@@ -112,6 +113,24 @@ namespace CADability.UserInterface
         private void OnGeoObjectSelectionChanged(SimpleNameProperty cp, object selectedGeoObject)
         {
             if (SelectionChangedEvent != null) SelectionChangedEvent(this, selectedGeoObject as IGeoObject);
+        }
+        private SimpleNameProperty GetGeoObjectNameSubEntry(IGeoObject selectedGeoObject)
+        {
+            SimpleNameProperty subEntry = null;
+
+            foreach (IShowProperty sp in SubEntries)
+            {
+                if (sp is SimpleNameProperty snp)
+                {
+                    if (snp.AssociatedObject == selectedGeoObject)
+                    {
+                        subEntry = snp;
+                        break;
+                    }
+                }
+            }
+
+            return subEntry;
         }
     }
 
@@ -128,20 +147,14 @@ namespace CADability.UserInterface
         {
             this.name = name;
             this.AssociatedObject = associatedObject;
-            IsSelected = false;
             base.resourceIdInternal = resourceId;
         }
         public SimpleNameProperty(string name, object associatedObject, string resourceId, string contextMenuResourceId)
         {
             this.name = name;
             this.AssociatedObject = associatedObject;
-            IsSelected = false;
             base.resourceIdInternal = resourceId;
             this.contextMenuResourceId = contextMenuResourceId;
-        }
-        public void SetSelected(bool isSelected)
-        {
-            this.IsSelected = isSelected;
         }
         public object AssociatedObject { get; }
 
@@ -176,8 +189,8 @@ namespace CADability.UserInterface
         /// </summary>
         public override void Selected()
         {
-	        this.IsSelected = true;
-	        SelectionChangedEvent?.Invoke(this, AssociatedObject);
+            this.IsSelected = true;
+            SelectionChangedEvent?.Invoke(this, AssociatedObject);
         }
         #endregion
 
@@ -189,14 +202,14 @@ namespace CADability.UserInterface
         bool ICommandHandler.OnCommand(string menuId)
         {
             if (OnCommandEvent != null) 
-	            return OnCommandEvent(this, menuId);
+                return OnCommandEvent(this, menuId);
             return false;
         }
 
         bool ICommandHandler.OnUpdateCommand(string menuId, CommandState commandState)
         {
             if (OnUpdateCommandEvent != null) 
-	            return OnUpdateCommandEvent(this, menuId, commandState);
+                return OnUpdateCommandEvent(this, menuId, commandState);
             return false;
         }
         void ICommandHandler.OnSelected(MenuWithHandler selectedMenuItem, bool selected) { }

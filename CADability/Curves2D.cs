@@ -97,9 +97,37 @@ namespace CADability.Curve2D
                                         }
                                         else if (!outerTangent && t.Length == 8)
                                         {
-                                            throw new NotImplementedException("implement crossing tangent lines of two curves!");
+	                                        // Use the inner (crossing) tangent lines from the circle solution.
+	                                        // t[4]-t[7] are the tangency points for the two crossing tangents.
+	                                        // Determine which pair is closer to the current curve points.
+	                                        double error1 = (t[4] | loc1) + (t[5] | loc2);
+	                                        double error2 = (t[6] | loc1) + (t[7] | loc2);
+	                                        if (error1 < error2)
+	                                        {
+		                                        // First inner tangent is closer
+		                                        par1 = first.PositionOf(t[4]);
+		                                        par2 = second.PositionOf(t[5]);
+	                                        }
+	                                        else
+	                                        {
+		                                        // Second inner tangent is closer
+		                                        par1 = first.PositionOf(t[6]);
+		                                        par2 = second.PositionOf(t[7]);
+	                                        }
+	                                        // Compute distance error for this choice
+	                                        double dd = (first.PointAt(par1) | t[(error1 < error2 ? 4 : 6)])
+	                                                    + (second.PointAt(par2) | t[(error1 < error2 ? 5 : 7)]);
+	                                        if (dd < mindist)
+	                                        {
+		                                        mindist = dd;
+		                                        // Continue refining in the while loop (next iteration will recompute new osculating circles)
+	                                        }
+	                                        else
+	                                        {
+		                                        break; // if no improvement, break out of refinement loop
+	                                        }
                                         }
-                                        else break; // no solution
+										else break; // no solution
                                     }
                                     else break;
                                 }
@@ -112,7 +140,7 @@ namespace CADability.Curve2D
                     }
                 }
             }
-            return new GeoPoint2D[0];
+            return Array.Empty<GeoPoint2D>();
         }
         /// <summary>
         /// Calculates the start- and endpoints of lines that are tangential to the given

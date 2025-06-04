@@ -782,7 +782,7 @@ namespace CADability.Curve2D
                 minorAxis = m * (Radius * GeoVector2D.YAxis);
                 if (Math.Abs(majorAxis.Length - minorAxis.Length) < (majorAxis.Length + minorAxis.Length) * 1e-6)
                 {
-                    return new Arc2D(m * Center, Math.Abs(m.Determinant * Radius), m * StartPoint, m * EndPoint, cc);
+                    return new Arc2D(m * Center, Math.Abs(m.Factor * Radius), m * StartPoint, m * EndPoint, cc);
                 }
                 Geometry.PrincipalAxis(m * Center, m * (Radius * GeoVector2D.XAxis), m * (Radius * GeoVector2D.YAxis), out majorAxis, out minorAxis, out left, out right, out bottom, out top, false);
                 double a1 = GeoVector2D.Area(m * (Radius * GeoVector2D.XAxis), m * (Radius * GeoVector2D.YAxis));

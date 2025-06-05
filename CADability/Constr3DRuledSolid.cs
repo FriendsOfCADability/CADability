@@ -5,7 +5,7 @@ using System.Collections;
 
 namespace CADability.Actions
 {
-    internal class Constr3DRuledSolid : ConstructAction
+    public class Constr3DRuledSolid : ConstructAction
     {
         private GeoObjectInput geoObjectInput1;
         private GeoObjectInput geoObjectInput2;
@@ -81,6 +81,23 @@ namespace CADability.Actions
             }
         }
 
+        static public bool ruledSolidDo(Path p1, Path p2, IFrame frame)
+        { // im Falle zweier selektierter Pfade: alles machen ohne Aktion!
+            Solid ss = null;
+            if ((p1 != null) && (p2 != null))
+                ss = Make3D.MakeRuledSolid(p1, p2, frame.Project);
+            if (ss != null)
+            {
+                using (frame.Project.Undo.UndoFrame)
+                {
+                    ss.CopyAttributes(p1);
+                    frame.Project.GetActiveModel().Add(ss); // einfügen
+                }
+                return true;
+            }
+            return false;
+        }
+
         static public bool ruledSolidTest(GeoObjectList geoObjectList, Model model)
         { // Tested für SelectedObjectsAction, ob Eintrag enabled oder nicht
             bool temp;
@@ -104,6 +121,18 @@ namespace CADability.Actions
             return false;
         }
 
+        static public bool ruledSolidTest(Path p1, Path p2)
+        { // Tested für SelectedObjectsAction, ob Eintrag enabled oder nicht
+            if ((p1 != null) && (p2 != null))
+            {
+                if ((p1.GetPlanarState() == PlanarState.Planar) && (p2.GetPlanarState() == PlanarState.Planar)) // jeder Pfad in sich in einer Ebene
+                { // beide eben, jetzt nur noch: unterschiedliche Ebenen:
+                    if (!Precision.IsEqual(p1.GetPlane(), p2.GetPlane()))
+                        return true;
+                }
+            }
+            return false;
+        }
 
         public Constr3DRuledSolid(GeoObjectList geoObjectList, IFrame frame)
         { // constructor für SelectedObjectsAction, ein selektierter Pfad
@@ -137,6 +166,10 @@ namespace CADability.Actions
             selectedMode = 0;
         }
 
+        public override bool AutoRepeat()
+        {   // only repeat, when this action was started without any objects selected
+            return selectedMode == 0;
+        }
 
         private static Path findPath(IGeoObject iGeoObjectSel, Model model, out bool createdFromModel)
         {  // macht geeigneten Pfad:

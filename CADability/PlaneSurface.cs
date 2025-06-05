@@ -411,10 +411,12 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public override ISurface GetOffsetSurface(double offset)
         {
-            GeoVector n = fromUnitPlane * GeoVector.ZAxis;
-            n.Norm();
-            ModOp newToUnit = toUnitPlane * ModOp.Translate(-offset * n);
-            return new PlaneSurface(newToUnit.GetInverse());
+            return new PlaneSurface(Location + offset * GetNormal(GeoPoint2D.Origin).Normalized, this.DirectionX, this.DirectionY);
+            // the old code was wrong for fromUnitPlane with negative determinant:
+            //GeoVector n = fromUnitPlane * GeoVector.ZAxis;
+            //n.Norm();
+            //ModOp newToUnit = toUnitPlane * ModOp.Translate(-offset * n);
+            //return new PlaneSurface(newToUnit.GetInverse());
         }
         public override bool Oriented
         {

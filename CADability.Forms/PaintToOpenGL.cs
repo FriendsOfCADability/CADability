@@ -36,6 +36,7 @@ namespace CADability.Forms
         bool paintSurfaces;
         bool paintEdges;
         bool paintSurfaceEdges;
+        bool triangulateText = true;
         bool selectMode;
         bool delayText;
         bool delayAll;
@@ -61,6 +62,9 @@ namespace CADability.Forms
         Color backgroundColor; // Die Hintergrundfarbe um sicherzustellen, dass nicht mit dieser farbe
                                // gezeichnet wird
         Color selectColor;
+        Color lastColor; // if twice the same color was selected with alpha==0, then this is color override state
+        bool colorOverride = false;
+        Color overrideColor;
 
         // Glu.GLUnurbs nurbsRenderer;
         OpenGlList currentList;
@@ -547,7 +551,8 @@ namespace CADability.Forms
         }
         bool IPaintTo3D.TriangulateText
         {
-            get { return true; }
+            get { return triangulateText; }
+            set { triangulateText = value; }
         }
         bool IPaintTo3D.DontRecalcTriangulation
         {
@@ -855,19 +860,24 @@ namespace CADability.Forms
             //    list.Add(p3d.CloseList());
             //}
         }
-        void IPaintTo3D.SetColor(Color color)
+        void IPaintTo3D.SetColor(Color color, int lockColor)
         {
-            if (color.R == backgroundColor.R && color.G == backgroundColor.G && color.B == backgroundColor.B)
+            if (!colorOverride)
             {
-                if (color.R + color.G + color.B < 3 * 128)
-                    Gl.glColor4ub(255, 255, 255, color.A);
+                if (color.R == backgroundColor.R && color.G == backgroundColor.G && color.B == backgroundColor.B)
+                {
+                    if (color.R + color.G + color.B < 3 * 128)
+                        Gl.glColor4ub(255, 255, 255, color.A);
+                    else
+                        Gl.glColor4ub(0, 0, 0, color.A);
+                }
                 else
-                    Gl.glColor4ub(0, 0, 0, color.A);
+                {
+                    Gl.glColor4ub(color.R, color.G, color.B, color.A);
+                }
             }
-            else
-            {
-                Gl.glColor4ub(color.R, color.G, color.B, color.A);
-            }
+            if (lockColor == 1) colorOverride = true;
+            else if (lockColor == -1) colorOverride = false;
             CheckError();
         }
         void IPaintTo3D.SetLineWidth(LineWidth lineWidth)
@@ -1394,7 +1404,7 @@ namespace CADability.Forms
                     if (fdl.TryGetValue(textString[i], out cdl))
                     {
                         Gdi.GLYPHMETRICSFLOAT gm = cdl.glyphmetrics;
-                        dx += gm.gmfBlackBoxX;
+                        dx += gm.gmfCellIncX;
                         dy += gm.gmfBlackBoxY;
                         yoffset = gm.gmfptGlyphOrigin.Y;
                     }
@@ -1676,7 +1686,11 @@ namespace CADability.Forms
                 Gl.glTranslated(-2 * precision * projectionDirection.x, -2 * precision * projectionDirection.y, -2 * precision * projectionDirection.z);
 
                 //Gl.glEnable(Gl.GL_TEXTURE_2D); 
-                if (wobbleRadius == -1) Gl.glClear(Gl.GL_DEPTH_BUFFER_BIT); // Select findet über den Objekten statt, alte ZBuffer Inhalte werden gelöscht
+                if (wobbleRadius == -1)
+                {   // we must find a different solution, clearing the depth buffer makes all subsequent calls to normal 
+                    // depth drawing overwrite existing drawing
+                    // Gl.glClear(Gl.GL_DEPTH_BUFFER_BIT); // Select findet über den Objekten statt, alte ZBuffer Inhalte werden gelöscht
+                }
                 Gl.glEnable(Gl.GL_DEPTH_TEST);
 
                 Gl.glEnable(Gl.GL_BLEND); // damit der Alpha Kanal berücksichtigt wird
@@ -1986,7 +2000,7 @@ namespace CADability.Forms
                 {
                     Gl.glMatrixMode(Gl.GL_MODELVIEW);
                     Gl.glLoadIdentity();
-                    Gl.glTranslated(precision * projectionDirection.x, precision * projectionDirection.y, precision * projectionDirection.z);
+                    Gl.glTranslated(2 * precision * projectionDirection.x, 2 * precision * projectionDirection.y, 2 * precision * projectionDirection.z);
                 }
                 paintSurfaces = true;
                 paintEdges = false;
@@ -2174,7 +2188,7 @@ namespace CADability.Forms
                 }
 #if DEBUG
                 //System.Diagnostics.Trace.Write("still open: ");
-                foreach (KeyValuePair<int,string> l in openLists)
+                foreach (KeyValuePair<int, string> l in openLists)
                 {
                     //System.Diagnostics.Trace.Write(l.Value + ", ");
                 }
@@ -2218,7 +2232,7 @@ namespace CADability.Forms
                 if (isDeleted)
                     return;
 
-                isDeleted = true;                
+                isDeleted = true;
             }
             openLists.Remove(ListNumber);
 #if DEBUG

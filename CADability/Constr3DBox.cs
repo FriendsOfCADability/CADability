@@ -1,5 +1,5 @@
 ﻿using CADability.GeoObject;
-
+using System;
 
 namespace CADability.Actions
 {
@@ -72,10 +72,12 @@ namespace CADability.Actions
         private double LengthCalculate(GeoPoint MousePosition)
         {  // falls die Länge über einen Punkt im Raum über der jetzigen Box bestimmt wird:
             // der Lotfußpunkt von MousePosition auf die Ebene Y-Z
-            Plane pl = new Plane(boxStartPoint, boxDirY, boxDirZ);
+            double rh = (boxDirX ^ boxDirY) * boxDirZ;
+            Plane pl;
+            if (rh>0) pl = new Plane(boxStartPoint, boxDirY, boxDirZ);
+            else pl = new Plane(boxStartPoint, boxDirZ, boxDirY);
             double l = pl.ToLocal(MousePosition).z;
-            //            if (Math.Abs(l) > Precision.eps) geht nicht in MakeBox
-            if (l > Precision.eps)
+            if (Math.Abs(l) > Precision.eps)
             {	// Neue Box 
                 boxLengthX = l;
                 box = Make3D.MakeBox(boxStartPoint, boxLengthX * boxDirX.Normalized, boxDirY, boxDirZ);
@@ -89,12 +91,10 @@ namespace CADability.Actions
 
         private bool Length(double length)
         {
-            //            if (Math.Abs(length) > Precision.eps) geht nicht in MakeBox
-            if (length > Precision.eps)
+            if (Math.Abs(length) > Precision.eps)
             {
                 boxLengthX = length;
-                boxDirX = boxLengthX * boxDirX.Normalized;
-                box = Make3D.MakeBox(boxStartPoint, boxDirX, boxDirY, boxDirZ);
+                box = Make3D.MakeBox(boxStartPoint, boxLengthX * boxDirX.Normalized, boxDirY, boxDirZ);
                 box.CopyAttributes(base.ActiveObject);
                 base.ActiveObject = box;
                 return true;
@@ -109,11 +109,13 @@ namespace CADability.Actions
 
         private double WidthCalculate(GeoPoint MousePosition)
         {  // falls die Breite über einen Punkt im Raum über der jetzigen Box bestimmt wird:
-            // der Lotfußpunkt von MousePosition auf die Ebene Z-X
-            Plane pl = new Plane(boxStartPoint, boxDirZ, boxDirX);
+           // der Lotfußpunkt von MousePosition auf die Ebene Z-X
+            double rh = (boxDirX ^ boxDirY) * boxDirZ;
+            Plane pl;
+            if (rh > 0) pl = new Plane(boxStartPoint, boxDirZ, boxDirX);
+            else pl = new Plane(boxStartPoint, boxDirX, boxDirZ);
             double l = pl.ToLocal(MousePosition).z;
-            //            if (Math.Abs(l) > Precision.eps) geht nicht in MakeBox
-            if (l > Precision.eps)
+            if (Math.Abs(l) > Precision.eps)
             {	// Neue Box 
                 boxLengthY = l;
                 box = Make3D.MakeBox(boxStartPoint, boxDirX, boxLengthY * boxDirY.Normalized, boxDirZ);
@@ -127,11 +129,10 @@ namespace CADability.Actions
 
         private bool Width(double length)
         {
-            if (length > Precision.eps)
+            if (Math.Abs(length) > Precision.eps)
             {
                 boxLengthY = length;
-                boxDirY = boxLengthY * boxDirY.Normalized;
-                box = Make3D.MakeBox(boxStartPoint, boxDirX, boxDirY, boxDirZ);
+                box = Make3D.MakeBox(boxStartPoint, boxDirX, boxLengthY * boxDirY.Normalized, boxDirZ);
                 box.CopyAttributes(base.ActiveObject);
                 base.ActiveObject = box;
                 return true;
@@ -146,12 +147,18 @@ namespace CADability.Actions
 
 
         private double HeightCalculate(GeoPoint MousePosition)
-        {  // falls die Höhe über einen Punkt im Raum über der jetzigen Box bestimmt wird:
-            // der Lotfußpunkt von MousePosition auf die Ebene X-Y
-            Plane pl = new Plane(boxStartPoint, boxDirX, boxDirY);
-            double l = pl.ToLocal(MousePosition).z;
-            //            if (Math.Abs(l) > Precision.eps) geht nicht in MakeBox
-            if (l > Precision.eps)
+        {  // if the length and the width of the box have already been defined, the height is determined along an axis
+            // perpendicular to the base plane of the box in the center of the bas face
+            double rh = (boxDirX ^ boxDirY) * boxDirZ;
+            Plane pl;
+            if (rh > 0) pl = new Plane(boxStartPoint, boxDirX, boxDirY);
+            else pl = new Plane(boxStartPoint, boxDirY, boxDirX);
+            GeoPoint cnt = boxStartPoint + 0.5 * boxDirX + 0.5 * boxDirY;
+            GeoVector perp = pl.Normal.Normalized;
+            Axis beamFromMouse = base.CurrentMouseView.Projection.PointBeam(base.CurrentMousePoint);
+            Geometry.DistLL(cnt, perp, beamFromMouse.Location, beamFromMouse.Direction, out double par1, out double par2);
+            double l = par1;
+            if (l != double.MaxValue)
             {	// Neue Box 
                 boxLengthZ = l;
                 box = Make3D.MakeBox(boxStartPoint, boxDirX, boxDirY, boxLengthZ * boxDirZ.Normalized);
@@ -165,11 +172,10 @@ namespace CADability.Actions
 
         private bool Height(double length)
         {
-            if (length > Precision.eps)
+            if (Math.Abs(length) > Precision.eps)
             {
                 boxLengthZ = length;
-                boxDirZ = boxLengthZ * boxDirZ.Normalized;
-                box = Make3D.MakeBox(boxStartPoint, boxDirX, boxDirY, boxDirZ);
+                box = Make3D.MakeBox(boxStartPoint, boxDirX, boxDirY, boxLengthZ * boxDirZ.Normalized);
                 box.CopyAttributes(base.ActiveObject);
                 base.ActiveObject = box;
                 return true;
@@ -258,12 +264,16 @@ namespace CADability.Actions
         {
             box = Solid.Construct();
             base.BasePoint = ConstrDefaults.DefaultStartPoint;
-            boxLengthX = ConstrDefaults.DefaultRectWidth;
-            boxLengthY = ConstrDefaults.DefaultRectHeight;
-            boxLengthZ = ConstrDefaults.DefaultBoxHeight;
+            boxLengthX = Math.Abs(ConstrDefaults.DefaultRectWidth);
+            boxLengthY = Math.Abs(ConstrDefaults.DefaultRectHeight);
+            boxLengthZ = Math.Abs(ConstrDefaults.DefaultBoxHeight);
             boxDirX = boxLengthX * base.ActiveDrawingPlane.DirectionX;
             boxDirY = boxLengthY * base.ActiveDrawingPlane.DirectionY;
             boxDirZ = boxLengthZ * (base.ActiveDrawingPlane.DirectionX ^ base.ActiveDrawingPlane.DirectionY);
+            // construct a box (cuboid) parallel to the axis of the drawing plane
+            // the boxDirX and boxDirY should point away from the user, so the startPoint is not hidden by the box
+            if (CurrentMouseView.Projection.Direction * boxDirX < 0) boxDirX = -boxDirX;
+            if (CurrentMouseView.Projection.Direction * boxDirY < 0) boxDirY = -boxDirY;
             box = Make3D.MakeBox(ConstrDefaults.DefaultStartPoint, boxDirX, boxDirY, boxDirZ);
 
             base.ActiveObject = box;
@@ -292,7 +302,7 @@ namespace CADability.Actions
             height.DefaultLength = ConstrDefaults.DefaultBoxHeight;
             height.SetLengthEvent += new ConstructAction.LengthInput.SetLengthDelegate(Height);
             height.GetLengthEvent += new LengthInput.GetLengthDelegate(GetHeight);
-            height.CalculateLengthEvent += new CADability.Actions.ConstructAction.LengthInput.CalculateLengthDelegate(HeightCalculate);
+            height.CalculateLengthEvent += new LengthInput.CalculateLengthDelegate(HeightCalculate);
             height.ForwardMouseInputTo = startPointInput;
 
 

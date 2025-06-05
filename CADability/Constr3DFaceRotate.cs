@@ -3,12 +3,11 @@ using CADability.Shapes;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-
-
+using System.Linq;
 
 namespace CADability.Actions
 {
-    internal class Constr3DFaceRotate : ConstructAction
+    public class Constr3DFaceRotate : ConstructAction
     {
         private GeoObjectInput geoObjectInput;
         private GeoPointInput innerPointInput;
@@ -69,7 +68,7 @@ namespace CADability.Actions
 
         public Constr3DFaceRotate(Constr3DFaceRotate autorepeat) : this()
         {
-            if (autorepeat.selectedMode) throw new ApplicationException();
+            // if (autorepeat.selectedMode) throw new ApplicationException();
             selectedMode = false;
         }
 
@@ -282,28 +281,25 @@ namespace CADability.Actions
 
 
         private bool RotateAxis(CurveInput sender, ICurve[] Curves, bool up)
-        {   // ... nur die sinnvolen Kurven verwenden
-            ArrayList usableCurves = new ArrayList();
-            for (int i = 0; i < Curves.Length; ++i)
-            {
-                Line l = Curves[i] as Line;
-                if (l != null)
-                {
-                    usableCurves.Add(Curves[i]);
-                }
-            }
-            // ...hier wird der ursprüngliche Parameter überschrieben. Hat ja keine Auswirkung nach außen.
-            Curves = (ICurve[])usableCurves.ToArray(typeof(ICurve));
+        {   // only use curves, which can define an axis
+            List<ICurve> usableCurves = new List<ICurve>();
+            Curves = Curves.Where(c => c is Line || c is Ellipse).ToArray();
             if (up)
-                if (Curves.Length == 0) sender.SetCurves(Curves, null); // ...die werden jetzt im ControlCenter dargestellt (nur bei up)
+                if (Curves.Length == 0) sender.SetCurves(Curves, null); // will be displayed in property grid
                 else sender.SetCurves(Curves, Curves[0]);
-            // erstmal den Urprungszustand herstellen, "block" ist ja schon gespiegelt 
             if (Curves.Length > 0)
             {   // einfach die erste Kurve nehmen
-                ICurve iCurve = Curves[0];
-                axisPoint = iCurve.StartPoint;
-                axisVector = iCurve.StartDirection;
-                axisOrLine = false;
+                if (Curves[0] is Line line)
+                {
+                    axisPoint = line.StartPoint;
+                    axisVector = line.StartDirection;
+                    axisOrLine = false;
+                } else if (Curves[0] is Ellipse elli)
+                {
+                    axisPoint = elli.Center;
+                    axisVector = elli.Plane.Normal;
+                    axisOrLine = false;
+                }
                 updateOptional();
                 return rotateOrg(true);
             }
@@ -314,8 +310,17 @@ namespace CADability.Actions
 
         private void RotateAxisChanged(CurveInput sender, ICurve SelectedCurve)
         {
-            axisPoint = SelectedCurve.StartPoint;
-            axisVector = SelectedCurve.StartDirection;
+            if (SelectedCurve is Line line)
+            {
+                axisPoint = SelectedCurve.StartPoint;
+                axisVector = SelectedCurve.StartDirection;
+            }
+            else if (SelectedCurve is Ellipse elli)
+            {
+                axisPoint = elli.Center;
+                axisVector = elli.Plane.Normal;
+            }
+            else return;
             rotateOrg(false);
         }
 

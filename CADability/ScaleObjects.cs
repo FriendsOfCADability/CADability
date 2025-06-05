@@ -15,7 +15,7 @@ namespace CADability.Actions
     /// <summary>
     /// 
     /// </summary>
-    internal class ScaleObjects : ConstructAction
+    public class ScaleObjects : ConstructAction
     {
         private Block block; // der Arbeitsblock
         private GeoObjectList originals; // die übergebenen Originale

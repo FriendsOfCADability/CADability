@@ -2635,7 +2635,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 								item.val = null; // nothing to do
 								break;
 							}
-							Shell.connectFaces(faces.ToArray(), Precision.eps);
+							Shell.ConnectFaces(faces.ToArray(), Precision.eps);
 							Shell shell = Shell.MakeShell(faces.ToArray());
 							shell.Name = item.SubString(0);
 							if (Settings.GlobalSettings.GetBoolValue("StepImport.CombineFaces", true)) shell.CombineConnectedFaces();
@@ -2745,7 +2745,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 									if (o is Face[]) faces.AddRange(o as Face[]);
 								}
 							}
-							Shell.connectFaces(faces.ToArray(), Precision.eps);
+							Shell.ConnectFaces(faces.ToArray(), Precision.eps);
 							Shell shell = Shell.MakeShell(faces.ToArray());
 							shell.Name = item.SubString(0);
 							if (Settings.GlobalSettings.GetBoolValue("StepImport.CombineFaces", false)) shell.CombineConnectedFaces();
@@ -4412,7 +4412,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 								if (startParameter != double.MinValue && masterRepresentation != "CARTESIAN")
 								{
 									// trimmed curve defined by start- and endParameter
-									if (basisCurve is Ellipse)
+									if (basisCurve is Ellipse elli)
 									{
 										if (context != null)
 										{

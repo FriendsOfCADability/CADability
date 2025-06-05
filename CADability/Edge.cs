@@ -220,6 +220,7 @@ namespace CADability
         private Vertex v1, v2;
         private bool oriented; // obsolete, if false (forwardOnPrimaryFace, forwardOnSecondaryFace) have not yet been calculated
         enum EdgeKind { unknown, sameSurface, tangential, sharp }
+        private EdgeKind kind = EdgeKind.unknown;
         internal BRepOperation.EdgeInfo edgeInfo; // only used for BRepOperation
         // TODO: überprüfen, ob isPartOf und startAtOriginal, endAtOriginal noch gebraucht wird (evtl. zu einem Objekt machen)
         // TODO: ist owner nicht immer primaryFace?
@@ -819,7 +820,7 @@ namespace CADability
         {
             hashCode = hashCodeCounter++; // 
 #if DEBUG
-            if (hashCode == 1214)
+            if (hashCode == 901 || hashCode == 903)
             {
             }
 #endif
@@ -886,6 +887,7 @@ namespace CADability
             {
                 this.curveOnPrimaryFace = primaryFace.Surface.GetProjectedCurve(curve3d, 0.0);
                 if (!forwardOnPrimaryFace) this.curveOnPrimaryFace.Reverse();
+                if (primaryFace.Surface.IsUPeriodic || primaryFace.Surface.IsVPeriodic) SurfaceHelper.AdjustPeriodic(primaryFace.Surface, primaryFace.Domain, this.curveOnPrimaryFace);
             }
             else
             {
@@ -1979,8 +1981,24 @@ namespace CADability
             // so we now use only black
             if (go != null)
             {
-                paintTo3D.SetColor(Color.Black);
-                go.PaintTo3D(paintTo3D);
+                if (kind == EdgeKind.unknown)
+                {
+                    if (secondaryFace != null)
+                    {
+                        if (primaryFace.Surface.SameGeometry(primaryFace.Domain, secondaryFace.Surface, secondaryFace.Domain, Precision.eps, out ModOp2D _)) kind = EdgeKind.sameSurface;
+                        else kind = EdgeKind.sharp; // we could also implement tangential looking at normal vectors, but how would we differentiate?
+                    }
+                    else
+                    {
+                        kind = EdgeKind.sharp;
+                    }
+                }
+                // don't paint same surface edges, like on a split cylinder
+                if (kind != EdgeKind.sameSurface)
+                {
+                    paintTo3D.SetColor(Color.Black);
+                    go.PaintTo3D(paintTo3D);
+                }
             }
             //if (edgeKind == EdgeKind.unknown)
             //{
@@ -2058,7 +2076,7 @@ namespace CADability
                 secondaryFace = value;
             }
         }
-        internal IGeoObject Owner
+        public IGeoObject Owner
         {
             get
             {
@@ -2369,10 +2387,21 @@ namespace CADability
         {
             return primaryFace == secondaryFace;
         }
-        internal bool ConnectsSameSurfaces()
+        public bool ConnectsSameSurfaces()
         {
-            if (secondaryFace == null) return false;
-            return primaryFace.SameSurface(secondaryFace);
+            if (kind == EdgeKind.unknown)
+            {
+                if (secondaryFace != null)
+                {
+                    if (primaryFace.Surface.SameGeometry(primaryFace.Domain, secondaryFace.Surface, secondaryFace.Domain, Precision.eps, out ModOp2D _)) kind = EdgeKind.sameSurface;
+                    else kind = EdgeKind.sharp; // we could also implement tangential looking at normal vectors, but how would we differentiate?
+                }
+                else
+                {
+                    kind = EdgeKind.sharp;
+                }
+            }
+            return kind == EdgeKind.sameSurface;
         }
         internal GeoPoint2D[] GetTriangulationBasis(Face face, double precision, ICurve2D c2d)
         {   // liefert die 2D Polygone für diese Kante in der richtigen Richtung
@@ -3635,6 +3664,19 @@ namespace CADability
             mhdist.Text = StringTable.GetString("MenuId.Parametrics.DistanceTo", StringTable.Category.label);
             mhdist.Target = new ParametricsDistanceActionOld(this, frame);
             return new MenuWithHandler[] { mhdist };
+        }
+        /// <summary>
+        /// Returns the face of this edge, which is not in <paramref name="forbiddenFaces"/>.
+        /// Returns null if both or none of primary and secondary face is in forbiddenFaces;
+        /// </summary>
+        /// <param name="forbiddenFaces"></param>
+        /// <returns></returns>
+        internal Face OtherFace(HashSet<Face> forbiddenFaces)
+        {
+            bool pf = forbiddenFaces.Contains(primaryFace);
+            bool sf = secondaryFace != null && forbiddenFaces.Contains(secondaryFace);
+            if (pf == sf) return null;
+            return pf ? secondaryFace : primaryFace;
         }
 #if DEBUG
         public bool IsDebug

@@ -64,6 +64,12 @@ namespace CADability.Actions
                 ListDefault(selectedObjectsList.Count); // setzt alle Listen auf gleiche Länge, Inhalte "null"
             };
         }
+        public Constr3DPathExtrude(Face face) : this()
+        {
+            selectedMode = false;
+            this.selectedObjectsList = new GeoObjectList(face);
+            ListDefault(selectedObjectsList.Count); // initializes the lists
+        }
 
         public Constr3DPathExtrude(Constr3DPathExtrude autorepeat) : this()
         {

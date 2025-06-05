@@ -7,7 +7,7 @@ using System.Linq;
 
 namespace CADability.UserInterface
 {
-    internal class MultiObjectsProperties
+    public class MultiObjectsProperties
     {
         GeoObjectList selectedObjects;
         IFrame frame;

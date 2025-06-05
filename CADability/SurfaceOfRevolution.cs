@@ -698,6 +698,10 @@ namespace CADability.GeoObject
                 else return 0.0;
             }
         }
+        public override bool IsRotated(Axis rotationAxis)
+        {
+            return Precision.SameAxis(new Axis(Location, Axis), rotationAxis);
+        }
         public class HyperbolaHelp : GeneralCurve2D
         {
             public double a, b, yoffset, tmin, tmax, ymin, ymax;

@@ -3,6 +3,7 @@ using CADability.Shapes;
 using CADability.UserInterface;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.Serialization;
 using Wintellect.PowerCollections;
 
@@ -458,8 +459,23 @@ namespace CADability.GeoObject
 				}
 
 			}
+			if (other is ISurfaceOfRevolution rev)
+			{
+				List<ICurve> res = new List<ICurve>();
+				if (Precision.SameAxis(rev.Axis, (this as ISurfaceOfRevolution).Axis))
+				{   // two surfaces of revolution with the same axis
+					Intersect(rev.Curve, thisBounds, out GeoPoint[] ips, out GeoPoint2D[] uvOnFaces, out double[] uOnCurve3Ds);
+					for (int i = 0; i < uvOnFaces.Length; i++)
+					{
+						res.Add(FixedV(uvOnFaces[i].y, thisBounds.Left, thisBounds.Right));
+					}
+				}
+				if (res.Count > 0) return res.ToArray();
+			}
+
 			{
 				GetExtremePositions(thisBounds, other, otherBounds, out List<Tuple<double, double, double, double>> extremePositions);
+				if (usedArea.IsInfinite || usedArea.IsEmpty()) usedArea = thisBounds;
 				return BoxedSurfaceEx.Intersect(thisBounds, other, otherBounds, null, extremePositions); // allgemeine Lösung
 			}
 		}
@@ -481,7 +497,9 @@ namespace CADability.GeoObject
 				for (int i = 0; i < ip.Length; ++i)
 				{
 					double par = curve.PositionOf(PointAt(ip[i]));
-					if (par >= -1e-6 && par <= 1.0 + 1e-6)
+					// if (par >= -1e-6 && par <= 1.0 + 1e-6)
+					// not sure why the curve parameter must be on the line and not on the extension. In the parametric this is a problem,
+					// there we need also the intersections in the extension of the line
 					{
 						SurfaceHelper.AdjustPeriodic(this, uvExtent, ref ip[i]);
 						luOnCurve.Add(par);
@@ -721,49 +739,50 @@ namespace CADability.GeoObject
 				}
 				else
 				{
-					int n = Math.Max(3, (int)((umax - umin) / (Math.PI * 2) * 500));
-					double u1 = PositionOf(elli.Center + elli.MajorAxis).x;
-					double u2 = PositionOf(elli.Center - elli.MajorAxis).x;
-					double u3 = PositionOf(elli.Center + elli.MinorAxis).x;
-					double u4 = PositionOf(elli.Center - elli.MinorAxis).x;
-					while (u1 < umin) u1 += Math.PI;
-					while (u1 > umax) u1 -= Math.PI;
-					while (u2 < umin) u2 += Math.PI;
-					while (u2 > umax) u2 -= Math.PI;
-					while (u3 < umin) u3 += Math.PI;
-					while (u3 > umax) u3 -= Math.PI;
-					while (u4 < umin) u4 += Math.PI;
-					while (u4 > umax) u4 -= Math.PI;
-					List<double> uvals = new List<double>(n + 4);
-					double du = (umax - umin) / (n - 1);
-					for (int i = 0; i < n; i++)
+					//int n = Math.Max(3, (int)((umax - umin) / (Math.PI * 2) * 500));
+					//double u1 = PositionOf(elli.Center + elli.MajorAxis).x;
+					//double u2 = PositionOf(elli.Center - elli.MajorAxis).x;
+					//double u3 = PositionOf(elli.Center + elli.MinorAxis).x;
+					//double u4 = PositionOf(elli.Center - elli.MinorAxis).x;
+					//while (u1 < umin) u1 += Math.PI;
+					//while (u1 > umax) u1 -= Math.PI;
+					//while (u2 < umin) u2 += Math.PI;
+					//while (u2 > umax) u2 -= Math.PI;
+					//while (u3 < umin) u3 += Math.PI;
+					//while (u3 > umax) u3 -= Math.PI;
+					//while (u4 < umin) u4 += Math.PI;
+					//while (u4 > umax) u4 -= Math.PI;
+					//List<double> uvals = new List<double>(n + 4);
+					//double du = (umax - umin) / (n - 1);
+					//for (int i = 0; i < n; i++)
+					//{
+					//    uvals.Add(umin + i * du);
+					//}
+					//if (u1 > umin && u1 < umax) uvals.Add(u1);
+					//if (u2 > umin && u2 < umax) uvals.Add(u2);
+					//if (u3 > umin && u3 < umax) uvals.Add(u3);
+					//if (u4 > umin && u4 < umax) uvals.Add(u4);
+					//uvals.Sort();
+					//for (int i = 1; i < uvals.Count; i++)
+					//{
+					//    if (uvals[i] - uvals[i - 1] < 1e-3)
+					//    {
+					//        uvals.RemoveAt(i);
+					//        --i;
+					//    }
+					//}
+					//if (uvals.Count > 2)
+					if (true)
 					{
-						uvals.Add(umin + i * du);
-					}
-					if (u1 > umin && u1 < umax) uvals.Add(u1);
-					if (u2 > umin && u2 < umax) uvals.Add(u2);
-					if (u3 > umin && u3 < umax) uvals.Add(u3);
-					if (u4 > umin && u4 < umax) uvals.Add(u4);
-					uvals.Sort();
-					for (int i = 1; i < uvals.Count; i++)
-					{
-						if (uvals[i] - uvals[i - 1] < 1e-3)
-						{
-							uvals.RemoveAt(i);
-							--i;
-						}
-					}
-					if (uvals.Count > 2)
-					{
-						GeoPoint2D[] pnts = new GeoPoint2D[uvals.Count];
-						for (int i = 0; i < pnts.Length; ++i)
-						{
-							pnts[i].x = uvals[i];
-							GeoPoint b = new GeoPoint(Math.Cos(pnts[i].x), Math.Sin(pnts[i].x), 0.0);
-							GeoPoint z = pln.Intersect(b, GeoVector.ZAxis);
-							pnts[i].y = z.z;
-						}
-						c2d = new BSpline2D(pnts, 3, false);
+						//GeoPoint2D[] pnts = new GeoPoint2D[uvals.Count];
+						//for (int i = 0; i < pnts.Length; ++i)
+						//{
+						//    pnts[i].x = uvals[i];
+						//    GeoPoint b = new GeoPoint(Math.Cos(pnts[i].x), Math.Sin(pnts[i].x), 0.0);
+						//    GeoPoint z = pln.Intersect(b, GeoVector.ZAxis);
+						//    pnts[i].y = z.z;
+						//}
+						//c2d = new BSpline2D(pnts, 3, false);
 
 						GeoPoint2D ps0 = PositionOf(elli.Center + elli.MajorAxis);
 						GeoPoint2D ps1 = PositionOf(elli.Center - elli.MajorAxis);
@@ -848,8 +867,28 @@ namespace CADability.GeoObject
 			}
 		}
 		public override IDualSurfaceCurve[] GetDualSurfaceCurves(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, List<GeoPoint> seeds, List<Tuple<double, double, double, double>> extremePositions)
-		{   // hier sollten die Schnitte mit Ebene und Cylinder gelöst werden
-			// mit höheren Flächen sollte bei diesen (also z.B. Kugel) implementiert werden
+		{
+			if (seeds == null && extremePositions != null)
+			{
+				if (extremePositions.Count > 0)
+				{
+					ICurve crv = null;
+					if (!double.IsNaN(extremePositions[0].Item1)) crv = FixedU(extremePositions[0].Item1, thisBounds.Bottom, thisBounds.Top);
+					else crv = FixedV(extremePositions[0].Item2, thisBounds.Left, thisBounds.Right);
+					if (crv != null)
+					{
+						other.Intersect(crv, otherBounds, out GeoPoint[] ips, out GeoPoint2D[] uvOnFaces, out double[] uOnCurve3Ds);
+						if (ips.Length > 1)
+						{
+							seeds = new List<GeoPoint>(ips);
+						}
+						else
+						{
+							return new IDualSurfaceCurve[0];
+						}
+					}
+				}
+			}
 			if (other is PlaneSurface)
 			{
 				return GetPlaneIntersection(other as PlaneSurface, thisBounds.Left, thisBounds.Right, thisBounds.Bottom, thisBounds.Top, Precision.eps);
@@ -1070,15 +1109,19 @@ namespace CADability.GeoObject
 						GeoPoint2D[] ips = cyl2.GetLineIntersection(loc, cyl1.Axis);
 						if (ips.Length == 2)
 						{
-							if (ips[0].y < ips[1].y)
+							GeoPoint p0 = cyl2.PointAt(ips[0]);
+							GeoPoint p1 = cyl2.PointAt(ips[1]);
+							// The two intersection point belong to different curves. 
+							// We must consider the y component of cyl1, not of cyl2, to sort them into the correct points list.
+							if (cyl1.PositionOf(p0).y < cyl1.PositionOf(p1).y)
 							{
-								pnts1.Add(cyl2.PointAt(ips[0]));
-								pnts2.Add(cyl2.PointAt(ips[1]));
+								pnts1.Add(p0);
+								pnts2.Add(p1);
 							}
 							else
 							{
-								pnts1.Add(cyl2.PointAt(ips[1]));
-								pnts2.Add(cyl2.PointAt(ips[0]));
+								pnts1.Add(p1);
+								pnts2.Add(p0);
 							}
 						}
 						else if (ips.Length == 1)
@@ -1142,11 +1185,88 @@ namespace CADability.GeoObject
 			{
 				if (Math.Abs(torus.MinorRadius - XAxis.Length) < Precision.eps)
 				{
-					if (Geometry.DistPL(torus.Location, Location, ZAxis) < Precision.eps && Precision.IsPerpendicular(torus.ZAxis, ZAxis, false))
-					{   // special case: tangential intersection
-
+					if (Math.Abs(torus.MajorRadius - Geometry.DistPL(torus.Location, Location, ZAxis)) < Precision.eps && Precision.IsPerpendicular(torus.ZAxis, ZAxis, false))
+					{   // special case: tangential intersection, the radius of the cylinder and the minor radius of the torus are the same and the axis of the cylinder
+						// is tangential to the torus ring circle (center circle of the tube)
+						// Tangential intersections are a major problem in BRep operations. The solution should be implemented there.Here we have to fix a problem,
+						// which should not occur: we have 3 seed points and should return two curves
+						if (seeds.Count > 2)
+						{   // devide the seeds into two parts:
+							GeoPoint2D[] uvseeds = new GeoPoint2D[seeds.Count];
+							double umin = double.MaxValue;
+							double umax = double.MinValue;
+							for (int i = 0; i < seeds.Count; i++)
+							{
+								uvseeds[i] = PositionOf(seeds[i]);
+								SurfaceHelper.AdjustPeriodic(this, thisBounds, ref uvseeds[i]);
+								if (uvseeds[i].x < umin) umin = uvseeds[i].x;
+								if (uvseeds[i].x > umax) umax = uvseeds[i].x;
+							}
+							double uMedium = (umin + umax) / 2;
+							List<GeoPoint> upperSeeds = new List<GeoPoint>();
+							List<GeoPoint> lowerSeeds = new List<GeoPoint>();
+							for (int i = 0; i < seeds.Count; i++)
+							{
+								if (uvseeds[i].x < uMedium) lowerSeeds.Add(seeds[i]);
+								else upperSeeds.Add(seeds[i]);
+							}
+							List<IDualSurfaceCurve> tres = new List<IDualSurfaceCurve>();
+							for (int i = 0; i < Math.Max(lowerSeeds.Count, upperSeeds.Count); i++)
+							{
+								tres.AddRange(
+									GetDualSurfaceCurves(thisBounds, other, otherBounds,
+									new List<GeoPoint>(new GeoPoint[] { lowerSeeds[i % lowerSeeds.Count], upperSeeds[i % upperSeeds.Count] }), null));
+							}
+							return tres.ToArray();
+						}
+						GeoPoint axisTouchingPoint = Geometry.DropPL(torus.Location, Location, ZAxis);
+						GeoPoint c = toUnit * axisTouchingPoint;
+						double v = c.z;
+						// ICurve arc = FixedV(v, thisBounds.Left,thisBounds.Right);
+						// the uv curves are the horizontal line for the cylinder at the calculated v
+						GeoPoint2D uvStartThis = this.PositionOf(seeds[0]);
+						GeoPoint2D uvEndThis = this.PositionOf(seeds.Last());
+						SurfaceHelper.AdjustPeriodic(this, thisBounds, ref uvStartThis);
+						SurfaceHelper.AdjustPeriodic(this, thisBounds, ref uvEndThis);
+						// uvStartThis and uvEndThis must have the same y value, it should be the above calculated v
+						uvStartThis.y = uvEndThis.y = v;
+						GeoPoint2D tuv = torus.PositionOf(axisTouchingPoint);
+						GeoPoint2D uvStartTorus = torus.PositionOf(seeds[0]);
+						GeoPoint2D uvEndTorus = torus.PositionOf(seeds.Last());
+						SurfaceHelper.AdjustPeriodic(torus, otherBounds, ref tuv);
+						SurfaceHelper.AdjustPeriodic(torus, otherBounds, ref uvStartTorus);
+						SurfaceHelper.AdjustPeriodic(torus, otherBounds, ref uvEndTorus);
+						// uvStartTorus and uvEndTorus must have the same x value, which should be the x value of tuv. Here we force it
+						uvStartTorus.x = uvEndTorus.x = tuv.x;
+						Line2D l1 = new Line2D(uvStartThis, uvEndThis);
+						this.Make3dCurve(l1);
+						Line2D l2 = new Curve2D.Line2D(uvStartTorus, uvEndTorus);
+						return new IDualSurfaceCurve[] { new DualSurfaceCurve(this.Make3dCurve(l1), this, l1, torus, l2) };
 					}
 				}
+				if (Precision.SameAxis(new Axis(torus.Location, torus.Axis), new Axis(Location, Axis)) && IsRealCylinder) // we assume torus is not elliptical
+				{
+					// special case: cylinder and torus are on a common axis
+					if (Math.Abs(Math.Abs(torus.XAxis.Length - torus.MinorRadius) - RadiusX) < Precision.eps ||
+						Math.Abs(Math.Abs(torus.XAxis.Length + torus.MinorRadius) - RadiusX) < Precision.eps)
+					{   // cylinder touches inner hole of torus or the torus is exactely inside the cylinder
+						if (seeds.Count > 1)
+						{ // the first and last seed is the start and endpoint of the arc of intersection
+							GeoPoint2D uvStartThis = this.PositionOf(seeds[0]);
+							GeoPoint2D uvEndThis = this.PositionOf(seeds.Last());
+							SurfaceHelper.AdjustPeriodic(this, thisBounds, ref uvStartThis);
+							SurfaceHelper.AdjustPeriodic(this, thisBounds, ref uvEndThis);
+							GeoPoint2D uvStartTorus = torus.PositionOf(seeds[0]);
+							GeoPoint2D uvEndTorus = torus.PositionOf(seeds.Last());
+							Line2D l1 = new Line2D(uvStartThis, uvEndThis);
+							this.Make3dCurve(l1);
+							Line2D l2 = new Curve2D.Line2D(uvStartTorus, uvEndTorus);
+							return new IDualSurfaceCurve[] { new DualSurfaceCurve(this.Make3dCurve(l1), this, l1, torus, l2) };
+						}
+					}
+				}
+
+
 
 				ImplicitPSurface ips = (torus as IImplicitPSurface).GetImplicitPSurface();
 				double[] tangentPositions = ips.PerpendicularToGradient(Location, Axis);
@@ -1166,6 +1286,7 @@ namespace CADability.GeoObject
 				}
 				List<GeoPoint> tp = new List<GeoPoint>(); // potential tangent points for the cylinder
 				GeoPoint[] clpd = Geometry.CircleLinePerpDist(e1, Location, Axis);
+				GeoPoint[] dclpd = Geometry.CircleLineDist(e1, Location, Axis);
 				double radiusTorus = torus.MinorRadius;
 				double radiusCylinder = XAxis.Length;
 				List<GeoPoint> touchingPoints = new List<GeoPoint>(2); // two points maximum
@@ -1273,9 +1394,7 @@ namespace CADability.GeoObject
 						{
 							// the torus goes through the cylinder intersection with two curves here 
 							// (and maybe one or two other curves, which are computed with another pair of clpd points)
-							double tu = torus.PositionOf(clpd[i]).x; // u-value for the tourus: one curve has u-values less than tu, the other greater than cu
-							GeoPoint[] crvbelow = new GeoPoint[8];
-							GeoPoint[] crvabove = new GeoPoint[8];
+							List<GeoPoint> potentialPoints = new List<GeoPoint>(); // max. 4 intersections of bigCircle with cylinder
 							double dv = (otherBounds.Top - otherBounds.Bottom) / 7.0; // use 8 big circles intersection with cylinder
 							for (int j = 0; j < 8; j++)
 							{
@@ -1284,49 +1403,62 @@ namespace CADability.GeoObject
 								GeoPoint2D[] uvOnTCylinder;
 								double[] uOnBigCircle;
 								this.Intersect(bigCircle, new BoundingRect(0, double.MinValue, Math.PI * 2.0, double.MaxValue), out ips3d, out uvOnTCylinder, out uOnBigCircle);
-								double valBelow = double.MinValue;
-								double valAbove = double.MaxValue;
-								GeoPoint pntBelow = GeoPoint.Origin;
-								GeoPoint pntAbove = GeoPoint.Origin;
-								for (int k = 0; k < uOnBigCircle.Length; k++)
+								potentialPoints.AddRange(ips3d);
+							}
+							// if we have less than Math.PI in thisBounds u-direction, then the intersectionpoints must lie between first and last seed. If not
+							// we will have to fix something!!!
+							for (int j = potentialPoints.Count - 1; j >= 0; --j)
+							{   // remove all points not between startpoint and endpoint
+								GeoPoint2D uvt = torus.PositionOf(potentialPoints[j]);
+								SurfaceHelper.AdjustPeriodic(torus, otherBounds, ref uvt);
+								GeoPoint2D uvc = this.PositionOf(potentialPoints[j]);
+								SurfaceHelper.AdjustPeriodic(this, thisBounds, ref uvc);
+								double par = Geometry.LinePar(seeds.First(), seeds.Last(), potentialPoints[j]);
+								if (par < -Precision.eps || par > 1 + Precision.eps || !thisBounds.ContainsEps(uvc, -0.01) || !otherBounds.ContainsEps(uvt, -0.01))
 								{
-									double testu = uOnBigCircle[k] * Math.PI * 2 - tu;
-									if (testu > Math.PI) testu -= Math.PI * 2;
-									if (testu < -Math.PI) testu += Math.PI * 2;
-									if (testu >= 0.0)
-									{
-										if (testu < valAbove)
-										{
-											valAbove = testu;
-											pntAbove = ips3d[k];
-										}
-									}
-									if (testu <= 0.0)
-									{
-										if (testu > valBelow)
-										{
-											valBelow = testu;
-											pntBelow = ips3d[k];
-										}
-									}
-								}
-								if (valBelow > double.MinValue && valAbove < double.MaxValue)
-								{   // this must always be the case
-									crvbelow[j] = pntBelow;
-									crvabove[j] = pntAbove;
+									potentialPoints.RemoveAt(j);
 								}
 							}
-							InterpolatedDualSurfaceCurve dsca = new InterpolatedDualSurfaceCurve(this, thisBounds, torus, otherBounds, crvabove);
-							InterpolatedDualSurfaceCurve dscb = new InterpolatedDualSurfaceCurve(this, thisBounds, torus, otherBounds, crvbelow);
-							res.Add(dsca);
-							res.Add(dscb);
+							List<GeoPoint> onCurve = new List<GeoPoint>();
+							// we try to find point between first and last seed, ignoring points too far away
+							onCurve.Add(seeds.First());
+							for (int j = 1; j < seeds.Count - 1; j++)
+							{
+								potentialPoints.Add(seeds[j]); // also use inner seeds
+							}
+							while (true)
+							{
+								double minDist = onCurve.Last() | seeds.Last();
+								int jFound = -1;
+								for (int j = 0; j < potentialPoints.Count; ++j)
+								{
+									double dist = potentialPoints[j] | onCurve.Last();
+									if (dist < minDist)
+									{
+										jFound = j;
+										minDist = dist;
+									}
+								}
+								if (jFound < 0)
+								{
+									if (minDist > Precision.eps) onCurve.Add(seeds.Last());
+									break;
+								}
+								else
+								{
+									if (minDist > Precision.eps) onCurve.Add(potentialPoints[jFound]);
+									potentialPoints.RemoveAt(jFound);
+								}
+							}
+							InterpolatedDualSurfaceCurve dsca = new InterpolatedDualSurfaceCurve(this, thisBounds, torus, otherBounds, onCurve);
+							if (res.Count == 0 || dsca.DistanceTo(res.Last().Curve3D.PointAt(0.5)) > Precision.eps) res.Add(dsca); // only add when different
 						}
 						else
 						{   // the cylinder goes through the torus
-							double tv = PositionOf(clpd[i]).y; // v-value for the cylinder: one curve has v-values less than tv, the other greater than tv
 							GeoPoint[] crvbelow = new GeoPoint[8];
 							GeoPoint[] crvabove = new GeoPoint[8];
 							double du = (thisBounds.Right - thisBounds.Left) / 7.0;
+							List<GeoPoint> potentialPoints = new List<GeoPoint>(); // all intersection points between lines on the cylinder and the torus
 							for (int j = 0; j < 8; j++)
 							{
 								ICurve line = FixedU(thisBounds.Left + j * du, thisBounds.Bottom, thisBounds.Top); // torus.Intersect doesn't use the line length
@@ -1334,41 +1466,55 @@ namespace CADability.GeoObject
 								GeoPoint2D[] uvOnTorus;
 								double[] uOnLine;
 								torus.Intersect(line, new BoundingRect(0, double.MinValue, Math.PI * 2.0, double.MaxValue), out ips3d, out uvOnTorus, out uOnLine);
-								double valBelow = double.MinValue;
-								double valAbove = double.MaxValue;
-								GeoPoint pntBelow = GeoPoint.Origin;
-								GeoPoint pntAbove = GeoPoint.Origin;
-								for (int k = 0; k < uOnLine.Length; k++)
+								potentialPoints.AddRange(ips3d);
+							}
+							// if we have lass than Math.PI in thisBounds u-direction, then the intersectionpoints must lie between first and last seed. If not
+							// we will have to fix something!!!
+							for (int j = potentialPoints.Count - 1; j >= 0; --j)
+							{   // remove all points not between startpoint and endpoint
+								GeoPoint2D uvt = torus.PositionOf(potentialPoints[j]);
+								SurfaceHelper.AdjustPeriodic(torus, otherBounds, ref uvt);
+								GeoPoint2D uvc = this.PositionOf(potentialPoints[j]);
+								SurfaceHelper.AdjustPeriodic(this, thisBounds, ref uvc);
+								double par = Geometry.LinePar(seeds.First(), seeds.Last(), potentialPoints[j]);
+								if (par < -Precision.eps || par > 1 + Precision.eps || !thisBounds.ContainsEps(uvc, -0.01) || !otherBounds.ContainsEps(uvt, -0.01))
 								{
-									double testv = PositionOf(ips3d[k]).y - tv; // don't use uOnLine, it is maybe not in the correct system
-									if (testv >= 0.0)
-									{
-										if (testv < valAbove)
-										{
-											valAbove = testv;
-											pntAbove = ips3d[k];
-										}
-									}
-									if (testv <= 0.0)
-									{
-										if (testv > valBelow)
-										{
-											valBelow = testv;
-											pntBelow = ips3d[k];
-										}
-									}
-								}
-								if (valBelow > double.MinValue && valAbove < double.MaxValue)
-								{   // this must always be the case
-									crvbelow[j] = pntBelow;
-									crvabove[j] = pntAbove;
+									potentialPoints.RemoveAt(j);
 								}
 							}
-							InterpolatedDualSurfaceCurve dsca = new InterpolatedDualSurfaceCurve(this, thisBounds, torus, otherBounds, crvabove);
-							InterpolatedDualSurfaceCurve dscb = new InterpolatedDualSurfaceCurve(this, thisBounds, torus, otherBounds, crvbelow);
-							res.Add(dsca);
-							res.Add(dscb);
-
+							List<GeoPoint> onCurve = new List<GeoPoint>();
+							// we try to find point between first and last seed, ignoring points too far away
+							onCurve.Add(seeds.First());
+							for (int j = 1; j < seeds.Count - 1; j++)
+							{
+								potentialPoints.Add(seeds[j]); // also use inner seeds
+							}
+							while (true)
+							{
+								double minDist = onCurve.Last() | seeds.Last();
+								int jFound = -1;
+								for (int j = 0; j < potentialPoints.Count; ++j)
+								{
+									double dist = potentialPoints[j] | onCurve.Last();
+									if (dist < minDist)
+									{
+										jFound = j;
+										minDist = dist;
+									}
+								}
+								if (jFound < 0)
+								{
+									if (minDist > Precision.eps) onCurve.Add(seeds.Last());
+									break;
+								}
+								else
+								{
+									if (minDist > Precision.eps) onCurve.Add(potentialPoints[jFound]);
+									potentialPoints.RemoveAt(jFound);
+								}
+							}
+							InterpolatedDualSurfaceCurve dsca = new InterpolatedDualSurfaceCurve(this, thisBounds, torus, otherBounds, onCurve);
+							if (res.Count == 0 || dsca.DistanceTo(res.Last().Curve3D.PointAt(0.5)) > Precision.eps) res.Add(dsca); // only add when different
 						}
 					}
 				}
@@ -1433,7 +1579,7 @@ namespace CADability.GeoObject
 						tpOnTorus.RemoveAt(i);
 					}
 				}
-				if (tpOnTorus.Count > 0)
+				if (tpOnTorus.Count > 1)
 				{
 					// we have to split the bounds at the found positions and create new seedpoints
 					double[] cu = new double[tpOnTorus.Count];
@@ -1453,14 +1599,14 @@ namespace CADability.GeoObject
 					Array.Sort(tv);
 					List<BoundingRect> thisParts = new List<BoundingRect>();
 					List<BoundingRect> otherParts = new List<BoundingRect>();
-					for (int i = 0; i < cu.Length; i++)
+					for (int i = 0; i < cu.Length - 1; i++)
 					{
 						double left, right;
 						if (i == 0) left = thisBounds.Left;
 						else left = cu[i];
 						if (i < cu.Length - 1) right = cu[i + 1];
 						else right = thisBounds.Right;
-						for (int j = 0; j < cv.Length; j++)
+						for (int j = 0; j < cv.Length - 1; j++)
 						{
 							double bottom, top;
 							if (j == 0) bottom = thisBounds.Bottom;
@@ -1470,14 +1616,14 @@ namespace CADability.GeoObject
 							thisParts.Add(new BoundingRect(left, bottom, right, top));
 						}
 					}
-					for (int i = 0; i < tu.Length; i++)
+					for (int i = 0; i < tu.Length - 1; i++)
 					{
 						double left, right;
 						if (i == 0) left = otherBounds.Left;
 						else left = tu[i];
 						if (i < tu.Length - 1) right = tu[i + 1];
 						else right = otherBounds.Right;
-						for (int j = 0; j < tv.Length; j++)
+						for (int j = 0; j < tv.Length - 1; j++)
 						{
 							double bottom, top;
 							if (j == 0) bottom = otherBounds.Bottom;
@@ -1490,7 +1636,7 @@ namespace CADability.GeoObject
 					List<GeoPoint2D> seedsUvThis = new List<GeoPoint2D>();
 					List<GeoPoint2D> seedsUvOther = new List<GeoPoint2D>();
 					seeds.AddRange(touchingPoints);
-					for (int i = 0; i < seeds.Count; i++)
+					for (int i = 0; i < touchingPoints.Count; i++)
 					{
 						seedsUvThis.Add(PositionOf(touchingPoints[i], thisBounds));
 						seedsUvOther.Add(torus.PositionOf(touchingPoints[i], otherBounds));
@@ -1532,8 +1678,8 @@ namespace CADability.GeoObject
 							}
 						}
 					}
-					return res.ToArray();
 				}
+				if (res.Count > 0) return res.ToArray();
 			}
 			return base.GetDualSurfaceCurves(thisBounds, other, otherBounds, seeds, extremePositions);
 		}
@@ -2152,11 +2298,14 @@ namespace CADability.GeoObject
 					}
 				case CylindricalSurface cs:
 					{
-						Geometry.DistLL(Location, ZAxis, cs.Location, cs.ZAxis, out double par1, out double par2);
 						extremePositions = new List<Tuple<double, double, double, double>>();
-						if (par1 >= thisBounds.Bottom && par1 <= thisBounds.Top) extremePositions.Add(new Tuple<double, double, double, double>(double.NaN, par1, double.NaN, double.NaN));
-						if (par2 >= otherBounds.Bottom && par2 <= otherBounds.Top) extremePositions.Add(new Tuple<double, double, double, double>(double.NaN, double.NaN, double.NaN, par2));
-						// these are fixed u curves (circles) on both cylinders
+						if (!Precision.SameDirection(ZAxis, cs.ZAxis, false))
+						{
+							Geometry.DistLL(Location, ZAxis, cs.Location, cs.ZAxis, out double par1, out double par2);
+							if (par1 >= thisBounds.Bottom && par1 <= thisBounds.Top) extremePositions.Add(new Tuple<double, double, double, double>(double.NaN, par1, double.NaN, double.NaN));
+							if (par2 >= otherBounds.Bottom && par2 <= otherBounds.Top) extremePositions.Add(new Tuple<double, double, double, double>(double.NaN, double.NaN, double.NaN, par2));
+							// these are fixed u curves (circles) on both cylinders
+						}
 						return extremePositions.Count;
 					}
 				case ConicalSurface cos:
@@ -2212,6 +2361,10 @@ namespace CADability.GeoObject
 		public override bool IsExtruded(GeoVector direction)
 		{
 			return Precision.SameDirection(Axis, direction, false);
+		}
+		public override bool IsRotated(Axis rotationAxis)
+		{
+			return Precision.SameDirection(Axis, rotationAxis.Direction, false);
 		}
 
 		#endregion

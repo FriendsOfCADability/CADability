@@ -29,7 +29,7 @@ namespace CADability
             uvposition = new Dictionary<Face, GeoPoint2D>();
             hashCode = hashCodeCounter++;
 #if DEBUG
-            if (hashCode == 952)
+            if (hashCode == 3329)
             {
 
             }
@@ -284,7 +284,7 @@ namespace CADability
 
         BoundingCube IOctTreeInsertable.GetExtent(double precision)
         {
-            
+
             return new BoundingCube(position);
         }
 
@@ -502,6 +502,23 @@ namespace CADability
                 export.VertexToDefInd[this] = vn;
             }
             return vn;
+        }
+        /// <summary>
+        /// Check whether this vertex is a periodic vertex, i.e. there is another edge on another face, which has the same geometry
+        /// Like a vertex on the seam of a cylinder
+        /// </summary>
+        /// <param name="face"></param>
+        /// <returns></returns>
+        internal bool IsPeriodicOnFace(Face face)
+        {
+            foreach (Edge edge in AllEdges)
+            {
+                if (edge.PrimaryFace == face || edge.SecondaryFace == face)
+                {
+                    if (edge.ConnectsSameSurfaces()) return true;
+                }
+            }
+            return false;
         }
 
         #endregion

@@ -176,11 +176,14 @@ namespace CADability.UserInterface
             {
                 return GetIntEvent(this);
             }
-            else
+            else if (TheProperty!=null)
             {
                 MethodInfo mi = TheProperty.GetGetMethod();
                 object[] prm = new Object[0];
                 return (int)mi.Invoke(ObjectWithInt, prm);
+            } else
+            {
+                return internalValue;
             }
         }
 

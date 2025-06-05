@@ -1,6 +1,7 @@
 ﻿using CADability.Attribute;
 using CADability.Curve2D;
 using CADability.Shapes;
+using MathNet.Numerics.Distributions;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -419,7 +420,7 @@ namespace CADability.GeoObject
                     if (edg.SecondaryFace != null) mustBeCloned = true;
                 }
                 if (mustBeCloned) fc = fc.Clone() as Face; // neue Edges
-                
+
                 return Solid.MakeSolid(MakeBrutePrism(fc, extrusion));
 
                 //Unreachable code
@@ -608,7 +609,7 @@ namespace CADability.GeoObject
             upper.Modify(ModOp.Translate(extrusion));
             res.Add(upper);
             Face[] fcs = res.ToArray();
-            Shell.connectFaces(fcs, minLen * 1e-3);
+            Shell.ConnectFaces(fcs, minLen * 1e-3);
             Shell shell = Shell.Construct();
             shell.SetFaces(fcs);
             shell.RecalcVertices();
@@ -772,6 +773,8 @@ namespace CADability.GeoObject
             {
                 secondPath.Set(secondPath.Split(0.5));
             }
+            firstPath.Flatten();
+            secondPath.Flatten();
             if (makeSolid && firstPath.IsClosed && secondPath.IsClosed && firstPath.GetPlanarState() == PlanarState.Planar && secondPath.GetPlanarState() == PlanarState.Planar)
             {
                 Plane firstpln = firstPath.GetPlane();
@@ -896,13 +899,15 @@ namespace CADability.GeoObject
             return shell;
         }
 
-        private static ISurface MakeRuledSurface(ICurve curve1, ICurve curve2)
+        public static ISurface MakeRuledSurface(ICurve curve1, ICurve curve2)
         {
             if (curve1 is Line && curve2 is Line)
             {
                 if (Precision.SameDirection(curve1.StartDirection, curve2.StartDirection, false))
                 {   // two lines in a common plane
-                    return new PlaneSurface(curve1.StartPoint, curve1.EndPoint, curve2.StartPoint);
+                    Plane pln = new Plane(curve1.StartPoint, curve1.StartDirection, curve2.StartPoint - curve1.StartPoint);
+                    return new PlaneSurface(pln);
+                    // return new PlaneSurface(curve1.StartPoint, curve1.EndPoint, curve2.StartPoint);
                 }
             }
             else if (curve1 is Ellipse && curve2 is Ellipse)
@@ -919,7 +924,9 @@ namespace CADability.GeoObject
                     {
                         Line l1 = Line.TwoPoints(e1.Center, e2.Center);
                         Line l2 = Line.TwoPoints(e1.StartPoint, e2.StartPoint);
-                        if (Curves.GetCommonPlane(new ICurve[] { l1, l2 }, out Plane pln))
+                        Line l3 = Line.TwoPoints(e1.EndPoint, e2.EndPoint);
+                        // ensure the arcs start and end at the same angle
+                        if (Curves.GetCommonPlane(new ICurve[] { l1, l2 }, out Plane pln) && Curves.GetCommonPlane(new ICurve[] { l1, l3 }, out _))
                         {
                             double[] ips = Curves.Intersect(l1, l2, false);
                             if (ips.Length == 1)
@@ -933,6 +940,10 @@ namespace CADability.GeoObject
                         }
                     }
                 }
+            }
+            if (Curves.GetCommonPlane(curve1, curve2, out Plane commonPlane))
+            {
+                return new PlaneSurface(commonPlane);
             }
             return new RuledSurface(curve1, curve2);
         }
@@ -983,6 +994,27 @@ namespace CADability.GeoObject
                 // plus add "wedges" at the sharp bends
                 List<Face> pipeFaces = new List<Face>();
                 ModOp fromStartToEnd = ModOp.Identity;
+                if (shell.Faces.Length == 1 && shell.Faces[0].Surface is PlaneSurface ps)
+                {
+                    double[] pars = (along as ICurve).GetPlaneIntersection(ps.Plane);
+                    double pos = -1.0;
+                    for (int i = 0; i < pars.Length; i++)
+                    {
+                        if (pars[i] >= 0.0 && pars[i] <= 1.0)
+                        {
+                            pos = pars[i];
+                            break;
+                        }
+                    }
+                    if (pos >= 0.0)
+                    {   // position the face at the beginning of the curve
+                        GeoVector normal = (along.StartDirection ^ along.EndDirection).Normalized;
+                        GeoVector dir = along.DirectionAt(pos).Normalized;
+                        ModOp m = ModOp.Fit(along.PointAt(pos), new GeoVector[] { dir, normal, normal ^ dir },
+                            along.StartPoint, new GeoVector[] { along.StartDirection.Normalized, normal, normal ^ along.StartDirection.Normalized });
+                        shell.Modify(m);
+                    }
+                }
                 for (int i = 0; i < alongParts.Length; i++)
                 {
                     for (int j = 0; j < openEdges.Length; j++)
@@ -1020,7 +1052,13 @@ namespace CADability.GeoObject
                     pipeFaces.AddRange(sc.Faces);
                 }
                 Shell[] res = SewFaces(pipeFaces.ToArray());
-                if (res.Length == 1) return res[0];
+                if (res.Length == 1)
+                {
+                    Solid sld = Solid.Construct();
+                    sld.SetShell(res[0]);
+                    if (project != null) project.SetDefaults(sld);
+                    return sld;
+                }
                 return null;
             }
             throw new NotImplementedException();
@@ -1735,16 +1773,16 @@ namespace CADability.GeoObject
         {
             throw new NotImplementedException();
         }
-        public static IGeoObject[] MakeFillet(Edge[] edges, double radius, out IGeoObject[] affectedShellsOrSolids)
+        public static Shell MakeFillet(Edge[] edges, double radius, out Shell affectedShell)
         {
             Shell sh = edges[0].PrimaryFace.Owner as Shell;
             if (sh != null)
             {
                 Shell res = BRepOperation.RoundEdges(sh, edges, radius);
-                affectedShellsOrSolids = new IGeoObject[] { sh };
-                if (res != null) return new IGeoObject[] { res };
+                affectedShell = sh;
+                if (res != null) return res;
             }
-            affectedShellsOrSolids = null;
+            affectedShell = null;
             return null;
         }
         public static IGeoObject[] MakeChamfer(Face primaryFace, Edge[] edges, double primaryDist, double secondaryDist, out IGeoObject[] affectedShellsOrSolids)
@@ -1782,6 +1820,14 @@ namespace CADability.GeoObject
         }
         public static Shell[] SewFaces(Face[] faces, bool edgesArUnambiguous = false)
         {
+#if DEBUG
+            for (int i = 0; i < faces.Length; i++)
+            {
+                bool ok = faces[i].CheckConsistency();
+                if (!ok)
+                { }
+            }
+#endif
             // isolate all faces from other faces by making all edges open edges (only PrimaryFace is set)
             for (int i = 0; i < faces.Length; i++)
             {
@@ -1802,6 +1848,14 @@ namespace CADability.GeoObject
                     }
                 }
             }
+#if DEBUG
+            for (int i = 0; i < faces.Length; i++)
+            {
+                bool ok = faces[i].CheckConsistency();
+                if (!ok)
+                { }
+            }
+#endif
             // make all the vertices to only know the edges of faces (from parameter)
             for (int i = 0; i < faces.Length; i++)
             {
@@ -2439,7 +2493,11 @@ namespace CADability.GeoObject
                 SurfaceOfLinearExtrusion le = new SurfaceOfLinearExtrusion(curve, extrusion, 0.0, 1.0);
                 res.Surface = le;
             }
-            res.area = new SimpleShape(Border.MakeRectangle(0, 1, 0, 1)); // Area wird ja nacher neu gemacht, aber der Zugriff auf Surface geht sonst nicht
+            ICurve2D pcurve = res.Surface.GetProjectedCurve(curve, 0.0);
+            BoundingRect ext = pcurve.GetExtent(); // this is important for cylindrical (periodic) surfaces to set the domain
+            if (ext.Width == 0.0) { ext.Left = 0.0; ext.Right = 1.0; }
+            if (ext.Height == 0.0) { ext.Bottom = 0.0; ext.Top = 1.0; }
+            res.area = new SimpleShape(Border.MakeRectangle(ext));
             Edge[] edges = new Edge[4];
             if (edge0 == null)
             {
@@ -2979,6 +3037,18 @@ namespace CADability.GeoObject
                                 else
                                 {
                                     fc.Set(surface, new Edge[] { s2[i], edges[i], s1[i], edges[i + 1] }, null, false);
+                                }
+                                for (int j = 0; j < fc.OutlineEdges.Length; j++)
+                                {
+                                    if (fc.OutlineEdges[j].Curve3D == null)
+                                    {   // a pole: the 2d curve mus be the connection of the previous edge end point with the next edge startpoint
+                                        int next = (j + 1) % fc.OutlineEdges.Length;
+                                        int prev = (j - 1 + fc.OutlineEdges.Length) % fc.OutlineEdges.Length;
+                                        ICurve2D pcurve2d = fc.OutlineEdges[prev].Curve2D(fc);
+                                        ICurve2D ncurve2d = fc.OutlineEdges[next].Curve2D(fc);
+                                        if (fc.OutlineEdges[j].PrimaryFace == fc) fc.OutlineEdges[j].PrimaryCurve2D = new Line2D(pcurve2d.EndPoint, ncurve2d.StartPoint);
+                                        else fc.OutlineEdges[j].SecondaryCurve2D = new Line2D(pcurve2d.EndPoint, ncurve2d.StartPoint);
+                                    }
                                 }
                             }
                             if (fc != null) faces.Add(fc.Clone() as Face); // erstmal clone, damit die edges unabhängig sind. Sonst gibts bei sewfaces einen fehler. Allerdings muss SewFaces gefixt werden

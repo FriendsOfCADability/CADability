@@ -369,6 +369,7 @@
     <MenuItem MenuId="MenuId.DrawingPlane.StandardYZ.Offset" />
     <MenuItem MenuId="MenuId.DrawingPlane.Tangential" />
     <MenuItem MenuId="MenuId.DrawingPlane.Three.Points" />
+    <MenuItem MenuId="MenuId.DrawingPlane.OfCurve" />
     <MenuItem MenuId="MenuId.DrawingPlane.Show" />
     <!-- <MenuItem MenuId="MenuId.DrawingPlane.Point.Direction" /> -->
   </Popup>
@@ -379,7 +380,8 @@
     <MenuItem MenuId="MenuId.DrawingPlane.Three.Points" />
     <MenuItem MenuId="MenuId.Plane.2PointsDrawingPlane" />
     <MenuItem MenuId="MenuId.Plane.OriginNormalPoint" />
-    <MenuItem MenuId="MenuId.DrawingPlane.Tangential" />
+	<MenuItem MenuId="MenuId.DrawingPlane.Tangential" />
+	<MenuItem MenuId="MenuId.Plane.OfCurve" />
     <!-- <MenuItem MenuId="MenuId.DrawingPlane.Point.Direction" /> -->
   </Popup>
 

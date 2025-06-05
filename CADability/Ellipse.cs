@@ -20,8 +20,17 @@ namespace CADability.GeoObject
 
 	public class EllipseException : ApplicationException
 	{
-		public enum tExceptionType { EllipseIsNotACircle, SetCircle3PointsFailed, SetCirclePlane2PointsFailed, SetStartPointFailed, SetEllipse2PointsDirectionsFailed };
+		public enum tExceptionType
+		{
+			EllipseIsNotACircle,
+			SetCircle3PointsFailed,
+			SetCirclePlane2PointsFailed,
+			SetStartPointFailed,
+			SetEllipse2PointsDirectionsFailed
+		};
+
 		public tExceptionType ExceptionType;
+
 		public EllipseException(tExceptionType ExceptionType)
 		{
 			this.ExceptionType = ExceptionType;
@@ -29,8 +38,9 @@ namespace CADability.GeoObject
 	}
 
 	internal class EllipseData2D
-	{   // projizierte Daten in der 2D Welt
-		public GeoPoint2D center;   // der Mittelpunkt
+	{
+		// projizierte Daten in der 2D Welt
+		public GeoPoint2D center; // der Mittelpunkt
 		public GeoVector2D majax; // 1. Hauptachsenrichtung und Länge
 		public GeoVector2D minax; // 2. Hauptachsenrichtung und Länge
 		public double majrad, minrad; // die beiden Radien der Hauptachsen
@@ -42,6 +52,7 @@ namespace CADability.GeoObject
 		public double startParameter; // der Parameter der 2D Ellipse, bei dem es losgeht
 		public double sweepParameter; // der Parameter der 2D Ellipse, der überstrichen wird
 		private ICurve2D curve2D; // die 2d Kurve, wird erst bei Bedarf berechnet
+
 		public ICurve2D Curve2D
 		{
 			get
@@ -53,7 +64,8 @@ namespace CADability.GeoObject
 					else
 					{
 						if (Math.Abs(majrad - minrad) < Precision.eps)
-						{   // es ist ein Kreis oder Kreisbogen
+						{
+							// es ist ein Kreis oder Kreisbogen
 							if (IsArc)
 							{
 								// es ist ein Bogen, jedoch müssen wir noch die Richtung der Hauptachse berücksichtigen
@@ -72,21 +84,26 @@ namespace CADability.GeoObject
 							}
 						}
 						else
-						{   // eine 2d Ellipse
+						{
+							// eine 2d Ellipse
 							if (IsArc)
 							{
-								curve2D = new EllipseArc2D(center, majax, minax, startParameter, sweepParameter, left, right, bottom, top);
+								curve2D = new EllipseArc2D(center, majax, minax, startParameter, sweepParameter, left,
+									right, bottom, top);
 							}
 							else
 							{
-								curve2D = new Ellipse2D(center, majax, minax, sweepParameter > 0.0, left, right, bottom, top);
+								curve2D = new Ellipse2D(center, majax, minax, sweepParameter > 0.0, left, right, bottom,
+									top);
 							}
 						}
 					}
 				}
+
 				return curve2D;
 			}
 		}
+
 		public bool isLine; // die Projektion degeneriert zu einer Linie
 		public GeoPoint2D lineStart, lineEnd; // Start- und Endpunkt der Linie
 	}
@@ -96,9 +113,11 @@ namespace CADability.GeoObject
 	/// </summary>
 	[Serializable]
 	public class Ellipse : IGeoObjectImpl, IColorDef, ILineWidth, ILinePattern, ICurve, ISerializable,
-			IExtentedableCurve, ISimpleCurve, IExplicitPCurve3D, IExportStep, IJsonSerialize
+		IExtentedableCurve, ISimpleCurve, IExplicitPCurve3D, IExportStep, IJsonSerialize
 	{
-		private Plane plane; // die Ebene, in deren Ursprung die Ellipse liegt. Damit ist Mittelpunkt und Achsenwinkel gegeben
+		private Plane
+			plane; // die Ebene, in deren Ursprung die Ellipse liegt. Damit ist Mittelpunkt und Achsenwinkel gegeben
+
 		private double majorRadius, minorRadius; // die Radien in Richtung directionX bzw. directionY der Ebene
 		private double startParameter, sweepParameter; // Startwinkel und Überstreichnungswinkel
 		private BoundingCube extent; // cache für den extent
@@ -106,8 +125,10 @@ namespace CADability.GeoObject
 		private double currentPrecision;
 		private GeoPoint[] currentApproximation;
 		private Dictionary<Projection, EllipseData2D> projectionData; // die zu einer Projektion gehörenden 2D Daten
+
 		new private class Changing : IGeoObjectImpl.Changing
-		{   // TODO: sicherstellen, dass überall using(new Changing ... verwendet wird
+		{
+			// TODO: sicherstellen, dass überall using(new Changing ... verwendet wird
 			public Changing(Ellipse ellipse)
 				: base(ellipse)
 			{
@@ -115,6 +136,7 @@ namespace CADability.GeoObject
 				ellipse.currentApproximation = null;
 				ellipse.extent = BoundingCube.EmptyBoundingCube;
 			}
+
 			public Changing(Ellipse ellipse, string PropertyName)
 				: base(ellipse, PropertyName)
 			{
@@ -122,6 +144,7 @@ namespace CADability.GeoObject
 				ellipse.currentApproximation = null;
 				ellipse.extent = BoundingCube.EmptyBoundingCube;
 			}
+
 			public Changing(Ellipse ellipse, string MethodOrPropertyName, params object[] Parameters)
 				: base(ellipse, MethodOrPropertyName, Parameters)
 			{
@@ -129,14 +152,18 @@ namespace CADability.GeoObject
 				ellipse.currentApproximation = null;
 				ellipse.extent = BoundingCube.EmptyBoundingCube;
 			}
-			public Changing(Ellipse ellipse, Type interfaceForMethod, string MethodOrPropertyName, params object[] Parameters)
+
+			public Changing(Ellipse ellipse, Type interfaceForMethod, string MethodOrPropertyName,
+				params object[] Parameters)
 				: base(ellipse, interfaceForMethod, MethodOrPropertyName, Parameters)
 			{
 				ellipse.projectionData.Clear();
 				ellipse.currentApproximation = null;
 				ellipse.extent = BoundingCube.EmptyBoundingCube;
 			}
-			public Changing(Ellipse ellipse, bool noUndo, bool onlyAttribute, string MethodOrPropertyName, params object[] Parameters)
+
+			public Changing(Ellipse ellipse, bool noUndo, bool onlyAttribute, string MethodOrPropertyName,
+				params object[] Parameters)
 				: base(ellipse, noUndo, onlyAttribute, MethodOrPropertyName, Parameters)
 			{
 				if (!onlyAttribute) ellipse.projectionData.Clear();
@@ -144,6 +171,7 @@ namespace CADability.GeoObject
 				ellipse.extent = BoundingCube.EmptyBoundingCube;
 			}
 		}
+
 		internal virtual EllipseData2D GetProjectionData(Projection pr)
 		{
 			EllipseData2D res;
@@ -152,6 +180,7 @@ namespace CADability.GeoObject
 				res = CalculateProjectionData(pr.ProjectionPlane);
 				projectionData[pr] = res;
 			}
+
 			return res;
 			// return CalculateProjectionData(pr.ProjectionPlane);
 			// ACHTUNG, hier war ein cache, der aber irgendwie nicht funktionierte
@@ -165,6 +194,7 @@ namespace CADability.GeoObject
 			//}
 			//return res;
 		}
+
 		internal virtual EllipseData2D CalculateProjectionData(Plane pr)
 		{
 			EllipseData2D res = new EllipseData2D();
@@ -174,12 +204,14 @@ namespace CADability.GeoObject
 			GeoVector2D minaxorg = pr.Project(minorRadius * plane.DirectionY);
 
 			if (pr.Normal.IsPerpendicular(plane.Normal))
-			{   // die Projektion führt auf eine Linie, Ansicht genau von der Seite
+			{
+				// die Projektion führt auf eine Linie, Ansicht genau von der Seite
 				res.isLine = true;
 				double u = TangentParameter(pr.Normal);
 				// bei u und u+pi sind die Extrempunkte der Ellipse in Bezug zu dieser Projektion
 				if (Math.Abs(sweepParameter) == 2.0 * Math.PI)
-				{   // volle Ellipse, deshalb gelten die beiden Extrempunkte ohne Ausnahme
+				{
+					// volle Ellipse, deshalb gelten die beiden Extrempunkte ohne Ausnahme
 					res.lineStart = pr.Project(this.Point(u));
 					res.lineEnd = pr.Project(this.Point(u + Math.PI));
 				}
@@ -210,12 +242,14 @@ namespace CADability.GeoObject
 							dmin = d;
 							point2d.Insert(1, pr.Project(Point(u)));
 						}
+
 						if (d > dmax)
 						{
 							dmax = d;
 							point2d.Insert(1, pr.Project(Point(u)));
 						}
 					}
+
 					if (spar.Sweeps(new SweepAngle(sweepParameter), new Angle(u + Math.PI)))
 					{
 						d = Geometry.LinePar(res.center, LineDir, pr.Project(Point(u + Math.PI)));
@@ -224,12 +258,14 @@ namespace CADability.GeoObject
 							dmin = d;
 							point2d.Insert(1, pr.Project(Point(u + Math.PI)));
 						}
+
 						if (d > dmax)
 						{
 							dmax = d;
 							point2d.Insert(1, pr.Project(Point(u + Math.PI)));
 						}
 					}
+
 					//res.lineStart = res.center + dmin * LineDir;
 					//res.lineEnd = res.center + dmax * LineDir;
 					// points wären die Punkte für eine 2d polyline, die den ganzen Bogen überdecken
@@ -242,9 +278,11 @@ namespace CADability.GeoObject
 				}
 			}
 			else
-			{   // es entsteht eine Ellipse
+			{
+				// es entsteht eine Ellipse
 				res.isLine = false;
-				Geometry.PrincipalAxis(res.center, majaxorg, minaxorg, out res.majax, out res.minax, out res.left, out res.right, out res.bottom, out res.top, true);
+				Geometry.PrincipalAxis(res.center, majaxorg, minaxorg, out res.majax, out res.minax, out res.left,
+					out res.right, out res.bottom, out res.top, true);
 				res.majrad = res.majax.Length;
 				res.majdir = res.majax.Angle;
 				res.minrad = res.minax.Length;
@@ -294,6 +332,7 @@ namespace CADability.GeoObject
 				{
 					res.startParameter = Math.Atan2(x[1], x[0]);
 				}
+
 				a[0, 0] = res.majax.x;
 				a[0, 1] = res.minax.x;
 				a[1, 0] = res.majax.y;
@@ -326,6 +365,7 @@ namespace CADability.GeoObject
 					}
 				}
 			}
+
 			return res;
 		}
 
@@ -340,6 +380,7 @@ namespace CADability.GeoObject
 				{
 					fp2d[i] = pln.Project(fp3d[i]);
 				}
+
 				Ellipse2D e2d = Ellipse2D.FromFivePoints(fp2d);
 				if (e2d != null)
 				{
@@ -356,8 +397,10 @@ namespace CADability.GeoObject
 							{
 								mindist = p1 - p0;
 							}
+
 							p0 = p1;
 						}
+
 						if (mindist < 0) (elli as ICurve).Reverse();
 						if (!isFull)
 						{
@@ -370,15 +413,18 @@ namespace CADability.GeoObject
 								else elli.Trim(ep, sp);
 							}
 							else
-							{   // to be tested!
+							{
+								// to be tested!
 								if (sp < mp && mp < ep) elli.Trim(ep, sp);
 								else elli.Trim(sp, ep);
 							}
 						}
+
 						return elli;
 					}
 				}
 			}
+
 			return null;
 		}
 
@@ -387,15 +433,16 @@ namespace CADability.GeoObject
 			BSpline bsp = BSpline.Construct();
 			double w = Math.Sqrt(2.0) / 2.0;
 			bsp.SetData(2, new GeoPoint[]
-				{ new GeoPoint(1,0,0),
-				new GeoPoint(1,1,0),
-				new GeoPoint(0,1,0),
-				new GeoPoint(-1,1,0),
-				new GeoPoint(-1,0,0),
-				new GeoPoint(-1,-1,0),
-				new GeoPoint(0,-1,0),
-				new GeoPoint(1,-1,0),
-				new GeoPoint(1,0,0)
+				{
+					new GeoPoint(1, 0, 0),
+					new GeoPoint(1, 1, 0),
+					new GeoPoint(0, 1, 0),
+					new GeoPoint(-1, 1, 0),
+					new GeoPoint(-1, 0, 0),
+					new GeoPoint(-1, -1, 0),
+					new GeoPoint(0, -1, 0),
+					new GeoPoint(1, -1, 0),
+					new GeoPoint(1, 0, 0)
 				},
 				new double[] { 1, w, 1, w, 1, w, 1, w, 1 },
 				new double[] { 0, 0.25, 0.5, 0.75, 1 }, new int[] { 3, 2, 2, 2, 3 }, false);
@@ -406,15 +453,19 @@ namespace CADability.GeoObject
 					ModOp reflect = new ModOp(1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
 					bsp.Modify(reflect); // Richtung umgederht
 				}
+
 				ModOp rotate = ModOp.Rotate(GeoVector.ZAxis, startParameter);
 				bsp.Modify(rotate); // Richtung umgederht
 				double sp = 0.0;
-				double ep = (bsp as ICurve).PositionOf(new GeoPoint(Math.Cos(startParameter + sweepParameter), Math.Sin(startParameter + sweepParameter)));
+				double ep = (bsp as ICurve).PositionOf(new GeoPoint(Math.Cos(startParameter + sweepParameter),
+					Math.Sin(startParameter + sweepParameter)));
 				(bsp as ICurve).Trim(sp, ep);
 			}
+
 			try
 			{
-				ModOp m = ModOp.Fit(new GeoPoint[] { GeoPoint.Origin, new GeoPoint(1.0, 0.0, 0.0), new GeoPoint(0.0, 1.0, 0.0) },
+				ModOp m = ModOp.Fit(
+					new GeoPoint[] { GeoPoint.Origin, new GeoPoint(1.0, 0.0, 0.0), new GeoPoint(0.0, 1.0, 0.0) },
 					new GeoPoint[] { Center, Center + MajorAxis, Center + MinorAxis }, true);
 				bsp.Modify(m);
 				return bsp;
@@ -424,17 +475,25 @@ namespace CADability.GeoObject
 				return null;
 			}
 		}
+
 		#region polymorph construction
+
 		public delegate Ellipse ConstructionDelegate();
+
 		public static ConstructionDelegate Constructor;
+
 		public static Ellipse Construct()
 		{
 			if (Constructor != null) return Constructor();
 			return new Ellipse();
 		}
+
 		public delegate void ConstructedDelegate(Ellipse justConstructed);
+
 		public static event ConstructedDelegate Constructed;
+
 		#endregion
+
 		//redundante Daten
 		/*		private double[] m_Rad;
                 // Die flogenden Funktionen dienen im Wesentlichen dem Strichlieren von Ellipsenbögen.
@@ -470,7 +529,7 @@ namespace CADability.GeoObject
                     // des Ellipsenbogens in diesem Winkelsegment übereinstimmt
                     if (!m_Rad) m_Rad = new double[8];
             double uu = 0.0;
-            for (int i=0; i<8; ++i) 
+            for (int i=0; i<8; ++i)
             {
                 // double a = i*pi/16 + pi/32;
                 m_Rad[i] = s_Sina2[i]*m_MajorRadius + s_Cosa2[i]*m_MinorRadius;
@@ -525,14 +584,14 @@ namespace CADability.GeoObject
                 m_Left = GeoPoint(m_Center.x-m_MajorRadius,m_Center.y);
                 m_Top = GeoPoint(m_Center.x,m_Center.y+m_MinorRadius);
                 m_Bottom = GeoPoint(m_Center.x,m_Center.y-m_MinorRadius);
-            } 
+            }
             else if (fabs(c)<1e-13)
             {	// die Ellipse befindet sich in vertikaler Lage
                 m_Right = GeoPoint(m_Center.x+m_MinorRadius,m_Center.y);
                 m_Left = GeoPoint(m_Center.x-m_MinorRadius,m_Center.y);
                 m_Top = GeoPoint(m_Center.x,m_Center.y+m_MajorRadius);
                 m_Bottom = GeoPoint(m_Center.x,m_Center.y-m_MajorRadius);
-            } 
+            }
             else
             {
                 GeoPoint[] p= new GeoPoint[4];
@@ -589,7 +648,7 @@ namespace CADability.GeoObject
 
         internal void RecalcAxesAndRadius()
         {
-            // sog. Hauptachsentransformation: gesucht sind die beiden Hauptachsen, die 
+            // sog. Hauptachsentransformation: gesucht sind die beiden Hauptachsen, die
             // senkrecht aufeinander stehen und die größte und kleinste Länge haben
             // die Hauptachsenvektoren
             GeoPoint p1 = new GeoPoint(m_Major.x-m_Center.x,m_Major.y-m_Center.y);
@@ -606,7 +665,7 @@ namespace CADability.GeoObject
                 {
                     a = sqrt(1/(1+sqr(g1/g2)));
                     b = -g1*a/g2;
-                } 
+                }
                 else
                 {
                     b = sqrt(1/(1+sqr(g2/g1)));
@@ -646,6 +705,7 @@ namespace CADability.GeoObject
 				this.minorRadius = minorRadius;
 			}
 		}
+
 		public void SetCirclePlaneCenterRadius(Plane plane, GeoPoint center, double majorRadius)
 		{
 			using (new Changing(this, "SetCirclePlaneCenterRadius", this.plane, this.plane.Location, this.majorRadius))
@@ -658,6 +718,7 @@ namespace CADability.GeoObject
 				this.sweepParameter = 2 * Math.PI;
 			}
 		}
+
 		public void SetArcPlaneCenterRadius(Plane plane, GeoPoint center, double majorRadius)
 		{
 			using (new Changing(this, "SetArcPlaneCenterRadius", this.plane, this.plane.Location, this.majorRadius))
@@ -668,9 +729,12 @@ namespace CADability.GeoObject
 				this.minorRadius = majorRadius;
 			}
 		}
-		public void SetArcPlaneCenterRadiusAngles(Plane plane, GeoPoint center, double majorRadius, double startParameter, double sweepParameter)
+
+		public void SetArcPlaneCenterRadiusAngles(Plane plane, GeoPoint center, double majorRadius,
+			double startParameter, double sweepParameter)
 		{
-			using (new Changing(this, "SetArcPlaneCenterRadius", this.plane, this.plane.Location, this.majorRadius, this.startParameter, this.sweepParameter))
+			using (new Changing(this, "SetArcPlaneCenterRadius", this.plane, this.plane.Location, this.majorRadius,
+				       this.startParameter, this.sweepParameter))
 			{
 				this.plane = plane;
 				this.plane.Location = center;
@@ -680,24 +744,29 @@ namespace CADability.GeoObject
 				this.sweepParameter = sweepParameter;
 			}
 		}
-		public void SetArcPlaneCenterStartEndPoint(Plane alignTo, GeoPoint2D center, GeoPoint2D startPoint, GeoPoint2D endPoint, Plane pointsPlane, bool direction)
+
+		public void SetArcPlaneCenterStartEndPoint(Plane alignTo, GeoPoint2D center, GeoPoint2D startPoint,
+			GeoPoint2D endPoint, Plane pointsPlane, bool direction)
 		{
-			using (new Changing(this, "SetArcPlaneCenterRadius", this.plane, this.plane.Location, this.majorRadius, this.startParameter, this.sweepParameter))
+			using (new Changing(this, "SetArcPlaneCenterRadius", this.plane, this.plane.Location, this.majorRadius,
+				       this.startParameter, this.sweepParameter))
 			{
 				GeoPoint centerGl = pointsPlane.ToGlobal(center);
 				GeoPoint startPointGl = pointsPlane.ToGlobal(startPoint);
 				GeoPoint endPointGl = pointsPlane.ToGlobal(endPoint);
 				pointsPlane.Location = centerGl;
-				pointsPlane.Align(alignTo, false, true);  // ausrichten an Drawingplane und gleiche Normalenrichtung
+				pointsPlane.Align(alignTo, false, true); // ausrichten an Drawingplane und gleiche Normalenrichtung
 				this.plane = pointsPlane;
 				startPoint = pointsPlane.Project(startPointGl);
 				endPoint = pointsPlane.Project(endPointGl);
 				this.majorRadius = Geometry.Dist(startPoint, GeoPoint2D.Origin);
 				this.minorRadius = this.majorRadius;
 				this.startParameter = new Angle(startPoint, GeoPoint2D.Origin);
-				this.sweepParameter = new SweepAngle((Angle)this.startParameter, new Angle(endPoint, GeoPoint2D.Origin), direction);
+				this.sweepParameter = new SweepAngle((Angle)this.startParameter, new Angle(endPoint, GeoPoint2D.Origin),
+					direction);
 			}
 		}
+
 		public void SetCircle3Points(GeoPoint circlePoint1, GeoPoint circlePoint2, GeoPoint circlePoint3, Plane alignTo)
 		{
 			using (new Changing(this, "SetArcPlaneCenterRadius", this.plane, this.plane.Location, this.majorRadius))
@@ -711,7 +780,10 @@ namespace CADability.GeoObject
 					GeoPoint2D circlePoint3_2D = P.Project(circlePoint3);
 					GeoPoint2D center_2D = new GeoPoint2D(0, 0);
 
-					if (Geometry.IntersectLL(new GeoPoint2D(circlePoint1_2D, circlePoint2_2D), (circlePoint1_2D - circlePoint2_2D).ToLeft(), new GeoPoint2D(circlePoint1_2D, circlePoint3_2D), (circlePoint1_2D - circlePoint3_2D).ToLeft(), out center_2D))
+					if (Geometry.IntersectLL(new GeoPoint2D(circlePoint1_2D, circlePoint2_2D),
+						    (circlePoint1_2D - circlePoint2_2D).ToLeft(),
+						    new GeoPoint2D(circlePoint1_2D, circlePoint3_2D),
+						    (circlePoint1_2D - circlePoint3_2D).ToLeft(), out center_2D))
 					{
 						this.plane = P;
 						this.plane.Location = P.ToGlobal(center_2D);
@@ -731,9 +803,11 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
 		public void SetArc3Points(GeoPoint circlePoint1, GeoPoint circlePoint2, GeoPoint circlePoint3, Plane alignTo)
 		{
-			using (new Changing(this, "SetArcPlaneCenterRadius", this.plane, this.plane.Location, this.majorRadius, this.startParameter, this.sweepParameter))
+			using (new Changing(this, "SetArcPlaneCenterRadius", this.plane, this.plane.Location, this.majorRadius,
+				       this.startParameter, this.sweepParameter))
 			{
 				try
 				{
@@ -744,14 +818,18 @@ namespace CADability.GeoObject
 					GeoPoint2D circlePoint3_2D = P.Project(circlePoint3);
 					GeoPoint2D center_2D = new GeoPoint2D(0, 0);
 
-					if (Geometry.IntersectLL(new GeoPoint2D(circlePoint1_2D, circlePoint2_2D), (circlePoint1_2D - circlePoint2_2D).ToLeft(), new GeoPoint2D(circlePoint1_2D, circlePoint3_2D), (circlePoint1_2D - circlePoint3_2D).ToLeft(), out center_2D))
+					if (Geometry.IntersectLL(new GeoPoint2D(circlePoint1_2D, circlePoint2_2D),
+						    (circlePoint1_2D - circlePoint2_2D).ToLeft(),
+						    new GeoPoint2D(circlePoint1_2D, circlePoint3_2D),
+						    (circlePoint1_2D - circlePoint3_2D).ToLeft(), out center_2D))
 					{
 						P.Location = P.ToGlobal(center_2D);
 						this.plane = P;
 						this.majorRadius = Geometry.Dist(circlePoint2, this.Center);
 						this.minorRadius = this.majorRadius;
 						this.startParameter = new Angle(circlePoint1_2D, center_2D);
-						this.sweepParameter = new SweepAngle((Angle)this.startParameter, new Angle(circlePoint3_2D, center_2D), true);
+						this.sweepParameter = new SweepAngle((Angle)this.startParameter,
+							new Angle(circlePoint3_2D, center_2D), true);
 						if (Geometry.DistPL(circlePoint2_2D, circlePoint1_2D, circlePoint3_2D) > 0.0)
 						{
 							this.sweepParameter = -(2 * Math.PI - this.sweepParameter);
@@ -768,6 +846,7 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
 		/// <summary>
 		/// Kreis aus Ebene und zwei gegenüberliegenden Punkten auf dem Kreis
 		/// </summary>
@@ -791,9 +870,11 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
 		public void SetArcPlane2Points(Plane p, GeoPoint circlePoint1, GeoPoint circlePoint2)
 		{
-			using (new Changing(this, "SetArcPlaneCenterRadius", this.plane, this.plane.Location, this.majorRadius, this.startParameter, this.sweepParameter))
+			using (new Changing(this, "SetArcPlaneCenterRadius", this.plane, this.plane.Location, this.majorRadius,
+				       this.startParameter, this.sweepParameter))
 			{
 				try
 				{
@@ -810,10 +891,13 @@ namespace CADability.GeoObject
 				}
 			}
 		}
-		public void SetArcPlane2PointsRadiusLocation(Plane p, GeoPoint arcPoint1, GeoPoint arcPoint2, double radius, GeoPoint locationP, int selSol)
+
+		public void SetArcPlane2PointsRadiusLocation(Plane p, GeoPoint arcPoint1, GeoPoint arcPoint2, double radius,
+			GeoPoint locationP, int selSol)
 		{
 			// wegen UNDO
-			using (new Changing(this, "SetArcPlaneCenterRadius", this.plane, this.plane.Location, this.majorRadius, this.startParameter, this.sweepParameter))
+			using (new Changing(this, "SetArcPlaneCenterRadius", this.plane, this.plane.Location, this.majorRadius,
+				       this.startParameter, this.sweepParameter))
 			{
 				try
 				{
@@ -834,47 +918,55 @@ namespace CADability.GeoObject
 					switch (pl.Length)
 					{
 						case 0:
-							{
-								this.majorRadius = dist12;
-								this.minorRadius = this.majorRadius;
-								this.plane.Location = new GeoPoint(arcPoint1, arcPoint2);
-							}
-							; break;
+						{
+							this.majorRadius = dist12;
+							this.minorRadius = this.majorRadius;
+							this.plane.Location = new GeoPoint(arcPoint1, arcPoint2);
+						}
+							;
+							break;
 						case 1: this.plane.Location = p.ToGlobal(pl[0].p); break;
 						case 2:
-							{   // ausserhalb nach dem nächsten Mittelpunkt (=Schnittpunkt) sortieren und umgekehrt
-								if (Geometry.Dist(p.ToGlobal(pl[0].p), locationP) < Geometry.Dist(p.ToGlobal(pl[1].p), locationP))
-								{
-									if (distLoc > dist12) // ausserhalb 
-										centerIndex = 0;
-									else centerIndex = 1;
-								}
-								else
-								{
-									if (distLoc > dist12)
-										centerIndex = 1;
-									else centerIndex = 0;
-								}
-								// falls eine abweichende Lösong gewünscht ist (es gibt vier), 
-								// hier für die selSol-Fälle 1 und drei umkehrung des Mittelpunktes
-								// if ((selSol % 2) != 0)
-								if ((selSol & 0x1) != 0)
-								{
-									if (centerIndex == 1) centerIndex = 0;
-									else centerIndex = 1;
-								}
-								this.plane.Location = p.ToGlobal(pl[centerIndex].p);
-
+						{
+							// ausserhalb nach dem nächsten Mittelpunkt (=Schnittpunkt) sortieren und umgekehrt
+							if (Geometry.Dist(p.ToGlobal(pl[0].p), locationP) <
+							    Geometry.Dist(p.ToGlobal(pl[1].p), locationP))
+							{
+								if (distLoc > dist12) // ausserhalb 
+									centerIndex = 0;
+								else centerIndex = 1;
 							}
-							; break;
+							else
+							{
+								if (distLoc > dist12)
+									centerIndex = 1;
+								else centerIndex = 0;
+							}
+
+							// falls eine abweichende Lösong gewünscht ist (es gibt vier), 
+							// hier für die selSol-Fälle 1 und drei umkehrung des Mittelpunktes
+							// if ((selSol % 2) != 0)
+							if ((selSol & 0x1) != 0)
+							{
+								if (centerIndex == 1) centerIndex = 0;
+								else centerIndex = 1;
+							}
+
+							this.plane.Location = p.ToGlobal(pl[centerIndex].p);
+
+						}
+							;
+							break;
 					}
+
 					this.startParameter = new Angle(this.plane.Project(arcPoint1), this.plane.Project(this.Center));
 					bool dir = (distLoc1 < 0.0);
 					// falls eine abweichende Lösung gewünscht ist (es gibt vier), 
 					// hier für die selSol-Fälle zwei und drei umkehrung der Richtung
 					// if (((selSol % 4) == 2)||((selSol % 4) == 3))  dir = !dir;
 					if ((selSol & 0x2) != 0) dir = !dir;
-					this.sweepParameter = new SweepAngle((Angle)this.startParameter, new Angle(this.plane.Project(arcPoint2), this.plane.Project(this.Center)), dir);
+					this.sweepParameter = new SweepAngle((Angle)this.startParameter,
+						new Angle(this.plane.Project(arcPoint2), this.plane.Project(this.Center)), dir);
 				}
 				catch (PlaneException)
 				{
@@ -882,6 +974,7 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
 		public void SetEllipseCenterPlane(GeoPoint center, Plane plane)
 		{
 			using (new Changing(this, "SetEllipseCenter", center, plane))
@@ -890,6 +983,7 @@ namespace CADability.GeoObject
 				this.plane.Location = center;
 			}
 		}
+
 		public void SetEllipseCenterAxis(GeoPoint Center, GeoVector MajorAxis, GeoVector MinorAxis)
 		{
 			using (new Changing(this)) // mit allen Parametern bringt auch nichts
@@ -902,6 +996,7 @@ namespace CADability.GeoObject
 				sweepParameter = Math.PI * 2.0; // sweep parameter was 0 previously, but it should be a full ellipse
 			}
 		}
+
 		internal void SetElliStartEndPoint(GeoPoint p1, GeoPoint p2)
 		{
 			try
@@ -912,15 +1007,19 @@ namespace CADability.GeoObject
 				plane = new Plane(Center, ma, mi);
 				GeoPoint2D p11 = plane.Project(p1);
 				GeoPoint2D p22 = plane.Project(p2);
-				double a = Math.Sqrt(Math.Abs(((p11.y * p11.y * p22.x * p22.x - p11.x * p11.x * p22.y * p22.y) / (p11.y * p11.y - p22.y * p22.y))));
-				double b = Math.Sqrt((Math.Abs(-(p11.y * p11.y * p22.x * p22.x - p11.x * p11.x * p22.y * p22.y) / (p11.x * p11.x - p22.x * p22.x))));
+				double a = Math.Sqrt(Math.Abs(((p11.y * p11.y * p22.x * p22.x - p11.x * p11.x * p22.y * p22.y) /
+				                               (p11.y * p11.y - p22.y * p22.y))));
+				double b = Math.Sqrt((Math.Abs(-(p11.y * p11.y * p22.x * p22.x - p11.x * p11.x * p22.y * p22.y) /
+				                               (p11.x * p11.x - p22.x * p22.x))));
 				majorRadius = a;
 				minorRadius = b;
 				double sp = ParameterOf(p1);
 				double ep = ParameterOf(p2);
 
-				GeoPoint pp1 = plane.Location + Math.Cos(sp) * majorRadius * plane.DirectionX + Math.Sin(sp) * minorRadius * plane.DirectionY;
-				GeoPoint pp2 = plane.Location + Math.Cos(ep) * majorRadius * plane.DirectionX + Math.Sin(ep) * minorRadius * plane.DirectionY;
+				GeoPoint pp1 = plane.Location + Math.Cos(sp) * majorRadius * plane.DirectionX +
+				               Math.Sin(sp) * minorRadius * plane.DirectionY;
+				GeoPoint pp2 = plane.Location + Math.Cos(ep) * majorRadius * plane.DirectionX +
+				               Math.Sin(ep) * minorRadius * plane.DirectionY;
 				GeoVector2D dir = new GeoVector2D(-majorRadius * Math.Sin(sp), minorRadius * Math.Cos(sp));
 				GeoVector dir1 = plane.ToGlobal(dir);
 				dir = new GeoVector2D(-majorRadius * Math.Sin(ep), minorRadius * Math.Cos(ep));
@@ -935,10 +1034,13 @@ namespace CADability.GeoObject
 				else if (sweepParameter > 0 && sw < 0) sweepParameter = sw + Math.PI * 2;
 				else sweepParameter = sw;
 			}
-			catch { }
+			catch
+			{
+			}
 		}
 
-		public void SetEllipseArcCenterAxis(GeoPoint center, GeoVector majorAxis, GeoVector minorAxis, double startParameter, double sweepParameter)
+		public void SetEllipseArcCenterAxis(GeoPoint center, GeoVector majorAxis, GeoVector minorAxis,
+			double startParameter, double sweepParameter)
 		{
 			using (new Changing(this)) // mit allen Parametern bringt auch nichts
 			{
@@ -949,6 +1051,7 @@ namespace CADability.GeoObject
 				this.sweepParameter = sweepParameter;
 			}
 		}
+
 		public void SetEllipseCenterAxis(GeoPoint Center, GeoVector MajorAxis, GeoVector MinorAxis, Plane alignTo)
 		{
 			using (new Changing(this)) // mit allen Parametern bringt auch nichts
@@ -961,7 +1064,9 @@ namespace CADability.GeoObject
 				sweepParameter = Math.PI * 2.0;
 			}
 		}
-		public Boolean SetEllipse2PointsDirections(GeoPoint point1, GeoVector direction1, GeoPoint point2, GeoVector direction2)
+
+		public Boolean SetEllipse2PointsDirections(GeoPoint point1, GeoVector direction1, GeoPoint point2,
+			GeoVector direction2)
 		{
 			using (new Changing(this)) // mit allen Parametern bringt auch nichts
 			{
@@ -971,10 +1076,12 @@ namespace CADability.GeoObject
 					if (Precision.IsPointOnPlane(point2, plane))
 					{
 						//                        planeT.Align(alignTo, false, true); // ausrichten an Drawingplane und gleiche Normalenrichtung
-						Ellipse2D e2d = Geometry.Ellipse2P2T(planeT.Project(point1), planeT.Project(point2), planeT.Project(direction1), planeT.Project(direction2));
+						Ellipse2D e2d = Geometry.Ellipse2P2T(planeT.Project(point1), planeT.Project(point2),
+							planeT.Project(direction1), planeT.Project(direction2));
 						if (e2d != null)
 						{
-							plane = new Plane(planeT.ToGlobal(e2d.center), planeT.ToGlobal(e2d.majorAxis), planeT.ToGlobal(e2d.minorAxis));
+							plane = new Plane(planeT.ToGlobal(e2d.center), planeT.ToGlobal(e2d.majorAxis),
+								planeT.ToGlobal(e2d.minorAxis));
 							majorRadius = planeT.ToGlobal(e2d.majorAxis).Length;
 							minorRadius = planeT.ToGlobal(e2d.minorAxis).Length;
 							startParameter = 0.0; // diese beiden Zeilen wurden notwendig wg. dwg Import
@@ -988,11 +1095,15 @@ namespace CADability.GeoObject
 					//                    throw new EllipseException(EllipseException.tExceptionType.SetEllipse2PointsDirectionsFailed);
 				}
 			}
+
 			return false;
 		}
-		public Boolean SetEllipseArc2PointsDirections(GeoPoint point1, GeoVector direction1, GeoPoint point2, GeoVector direction2, Boolean arcDir, Plane alignTo)
+
+		public Boolean SetEllipseArc2PointsDirections(GeoPoint point1, GeoVector direction1, GeoPoint point2,
+			GeoVector direction2, Boolean arcDir, Plane alignTo)
 		{
-			using (new Changing(this, "SetEllipseArcCenterAxis", this.Center, this.MajorAxis, this.MinorAxis, this.StartParameter, this.sweepParameter))
+			using (new Changing(this, "SetEllipseArcCenterAxis", this.Center, this.MajorAxis, this.MinorAxis,
+				       this.StartParameter, this.sweepParameter))
 			{
 				try
 				{
@@ -1000,10 +1111,12 @@ namespace CADability.GeoObject
 					if (Precision.IsPointOnPlane(point2, plane))
 					{
 						planeT.Align(alignTo, false, true); // ausrichten an Drawingplane und gleiche Normalenrichtung
-						Ellipse2D e2d = Geometry.Ellipse2P2T(planeT.Project(point1), planeT.Project(point2), planeT.Project(direction1), planeT.Project(direction2));
+						Ellipse2D e2d = Geometry.Ellipse2P2T(planeT.Project(point1), planeT.Project(point2),
+							planeT.Project(direction1), planeT.Project(direction2));
 						if (e2d != null)
 						{
-							plane = new Plane(planeT.ToGlobal(e2d.center), planeT.ToGlobal(e2d.majorAxis), planeT.ToGlobal(e2d.minorAxis));
+							plane = new Plane(planeT.ToGlobal(e2d.center), planeT.ToGlobal(e2d.majorAxis),
+								planeT.ToGlobal(e2d.minorAxis));
 							majorRadius = planeT.ToGlobal(e2d.majorAxis).Length;
 							minorRadius = planeT.ToGlobal(e2d.minorAxis).Length;
 							this.StartPoint = point1;
@@ -1019,8 +1132,10 @@ namespace CADability.GeoObject
 					//                   throw new EllipseException(EllipseException.tExceptionType.SetEllipse2PointsDirectionsFailed);
 				}
 			}
+
 			return false;
 		}
+
 		/// <summary>
 		/// Tangentenpunkte der Ellipse bei vorgegebener Richtung
 		/// </summary>
@@ -1040,19 +1155,19 @@ namespace CADability.GeoObject
 			// Parameter u+pi (bei Atan2 sind die Parameter vertauscht Atan2(y,x))
 			return Math.Atan2(dir.x, -dir.y);
 		}
+
 		public GeoPoint Point(double u)
 		{
-			return (plane.Location + Math.Cos(u) * majorRadius * plane.DirectionX) + Math.Sin(u) * minorRadius * plane.DirectionY;
+			return (plane.Location + Math.Cos(u) * majorRadius * plane.DirectionX) +
+			       Math.Sin(u) * minorRadius * plane.DirectionY;
 		}
+
 		/// <summary>
 		/// gets or sets the center of this circle or ellipse
 		/// </summary>
 		public virtual GeoPoint Center
 		{
-			get
-			{
-				return plane.Location;
-			}
+			get { return plane.Location; }
 			set
 			{
 				using (new Changing(this, "Center"))
@@ -1062,12 +1177,10 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
 		public virtual double MajorRadius
 		{
-			get
-			{
-				return majorRadius;
-			}
+			get { return majorRadius; }
 			set
 			{
 				using (new Changing(this, "MajorRadius"))
@@ -1077,12 +1190,10 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
 		public virtual double MinorRadius
 		{
-			get
-			{
-				return minorRadius;
-			}
+			get { return minorRadius; }
 			set
 			{
 				using (new Changing(this, "MinorRadius"))
@@ -1092,36 +1203,43 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
 		public GeoVector MajorAxis
 		{
 			get { return majorRadius * plane.DirectionX; }
 			set
 			{
 				using (new Changing(this, "MajorAxis"))
-				{   // zwei Fälle: neue Achse ist in der gegebenen Ebene
+				{
+					// zwei Fälle: neue Achse ist in der gegebenen Ebene
 					if (Precision.IsPerpendicular(plane.Normal, value, false))
-					{   // die neue Achse liegt in der alten Ebene, also nur Drehung
+					{
+						// die neue Achse liegt in der alten Ebene, also nur Drehung
 						// das erlaubt insbesondere, dass die neue majorAxis parallel zur alten minorAxis ist
 						plane.DirectionX = value;
 						majorRadius = value.Length;
 					}
 					else
-					{   // es entsteht eine neue Ebene, d.h. die andere Achse wird festgehalten.
+					{
+						// es entsteht eine neue Ebene, d.h. die andere Achse wird festgehalten.
 						plane = new Plane(Center, value, MinorAxis);
 						majorRadius = MajorAxis.Length;
 					}
 				}
 			}
 		}
+
 		public GeoVector MinorAxis
 		{
 			get { return minorRadius * plane.DirectionY; }
 			set
 			{
 				using (new Changing(this, "MinorAxis"))
-				{   // zwei Fälle: neue Achse ist in der gegebenen Ebene
+				{
+					// zwei Fälle: neue Achse ist in der gegebenen Ebene
 					if (Precision.IsPerpendicular(plane.Normal, value, false))
-					{   // die neue Achse liegt in der alten Ebene, also nur Drehung
+					{
+						// die neue Achse liegt in der alten Ebene, also nur Drehung
 						plane.DirectionY = value;
 						minorRadius = value.Length;
 					}
@@ -1133,6 +1251,7 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
 		public GeoVector Normal
 		{
 			get { return plane.Normal; }
@@ -1145,6 +1264,7 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
 		public Plane Plane
 		{
 			get { return plane; }
@@ -1157,6 +1277,12 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
+		public ModOp ToUnitCircle
+		{
+			get { return plane.CoordSys.GlobalToLocal; }
+		}
+
 		private GeoPoint[] GetCashedApproximation(double precision)
 		{
 			lock (lockApproximationRecalc)
@@ -1179,18 +1305,22 @@ namespace CADability.GeoObject
 						{
 							alpha = Math.PI / 2.0; // Viertel
 						}
+
 						int n = Math.Max(2, (int)(Math.Abs(sweepParameter) / alpha));
 						alpha = sweepParameter / n;
 						currentApproximation = new GeoPoint[n + 1];
 						for (int i = 0; i < n; ++i)
 						{
 							double ea = startParameter + i * alpha;
-							currentApproximation[i] = plane.Location + Math.Cos(ea) * majorRadius * plane.DirectionX + Math.Sin(ea) * minorRadius * plane.DirectionY;
+							currentApproximation[i] = plane.Location + Math.Cos(ea) * majorRadius * plane.DirectionX +
+							                          Math.Sin(ea) * minorRadius * plane.DirectionY;
 						}
+
 						currentApproximation[n] = EndPoint;
 					}
 					else
-					{   // dynamische Anpassung bei der Ellipse, geht sicher auch einfacher
+					{
+						// dynamische Anpassung bei der Ellipse, geht sicher auch einfacher
 						ICurve cv = (this as ICurve).Approximate(true, precision);
 						if (cv is Path)
 						{
@@ -1202,13 +1332,16 @@ namespace CADability.GeoObject
 							{
 								currentApproximation[i] = cvs[i].StartPoint;
 							}
+
 							currentApproximation[cvs.Length] = cvs[cvs.Length - 1].EndPoint;
 						}
 					}
+
 					return currentApproximation;
 				}
 			}
 		}
+
 		/// <summary>
 		/// Returns the intersectionpoints of this ellipse with the provided plane <paramref name="toIntersectWith"/>.
 		/// The result is an array with 0 to 2 <see cref="GeoPoint"/>s.
@@ -1239,9 +1372,12 @@ namespace CADability.GeoObject
 					if (par >= 0.0 && par <= 1.0) res.Add(p);
 				}
 			}
+
 			return res.ToArray();
 		}
+
 		#region IGeoObject
+
 		/// <summary>
 		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.CopyGeometry (IGeoObject)"/>
 		/// </summary>
@@ -1259,6 +1395,7 @@ namespace CADability.GeoObject
 				projectionData.Clear();
 			}
 		}
+
 		/// <summary>
 		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Modify (ModOp)"/>
 		/// </summary>
@@ -1281,7 +1418,9 @@ namespace CADability.GeoObject
 						majorRadius = majax.Length;
 						minorRadius = minax.Length;
 					}
-					catch (PlaneException) { }  // wenn die Ebene nicht geht, dann also nichts machen
+					catch (PlaneException)
+					{
+					} // wenn die Ebene nicht geht, dann also nichts machen
 				}
 				else
 				{
@@ -1301,7 +1440,6 @@ namespace CADability.GeoObject
 						}
 						else
 						{
-
 							Plane pln = new Plane(cnt, majax, minax); // geht schief, wenn Ellipse zur Linie degeneriert!
 							GeoVector2D majax2d = pln.Project(majax);
 							GeoVector2D minax2d = pln.Project(minax);
@@ -1321,9 +1459,11 @@ namespace CADability.GeoObject
 					}
 					catch (PlaneException) { }  // wenn die Ebene nicht geht, dann also nichts machen
 				}
+
 				projectionData.Clear();
 			}
 		}
+
 		/// <summary>
 		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Clone ()"/>
 		/// </summary>
@@ -1340,6 +1480,7 @@ namespace CADability.GeoObject
 			result.CopyAttributes(this);
 			return result;
 		}
+
 		/// <summary>
 		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.FindSnapPoint (SnapPointFinder)"/>
 		/// </summary>
@@ -1352,8 +1493,10 @@ namespace CADability.GeoObject
 			{
 				spf.Check(plane.Location, this, SnapPointFinder.DidSnapModes.DidSnapToObjectCenter);
 			}
+
 			if (spf.SnapToObjectSnapPoint)
-			{   // wer spezifiziert die Fangpunkte der Ellipse, Setting??
+			{
+				// wer spezifiziert die Fangpunkte der Ellipse, Setting??
 				spf.Check(plane.Location + MajorAxis, this, SnapPointFinder.DidSnapModes.DidSnapToObjectSnapPoint);
 				spf.Check(plane.Location - MajorAxis, this, SnapPointFinder.DidSnapModes.DidSnapToObjectSnapPoint);
 				spf.Check(plane.Location + MinorAxis, this, SnapPointFinder.DidSnapModes.DidSnapToObjectSnapPoint);
@@ -1368,7 +1511,8 @@ namespace CADability.GeoObject
 						{
 							double a = i * Math.PI / 6.0;
 							if (a > startParameter && a < startParameter + sweepParameter)
-								spf.Check(plane.Location + Math.Cos(a) * MajorAxis + Math.Sin(a) * this.MinorAxis, this, SnapPointFinder.DidSnapModes.DidSnapToObjectSnapPoint);
+								spf.Check(plane.Location + Math.Cos(a) * MajorAxis + Math.Sin(a) * this.MinorAxis, this,
+									SnapPointFinder.DidSnapModes.DidSnapToObjectSnapPoint);
 						}
 					}
 					else
@@ -1377,10 +1521,12 @@ namespace CADability.GeoObject
 						{
 							double a = i * Math.PI / 6.0;
 							if (a < startParameter && a > startParameter + sweepParameter)
-								spf.Check(plane.Location + Math.Cos(a) * MajorAxis + Math.Sin(a) * this.MinorAxis, this, SnapPointFinder.DidSnapModes.DidSnapToObjectSnapPoint);
+								spf.Check(plane.Location + Math.Cos(a) * MajorAxis + Math.Sin(a) * this.MinorAxis, this,
+									SnapPointFinder.DidSnapModes.DidSnapToObjectSnapPoint);
 						}
 					}
 				}
+
 				if (spf.Snap45)
 				{
 					if (sweepParameter > 0.0)
@@ -1389,7 +1535,8 @@ namespace CADability.GeoObject
 						{
 							double a = i * Math.PI / 4.0;
 							if (a > startParameter && a < startParameter + sweepParameter)
-								spf.Check(plane.Location + Math.Cos(a) * MajorAxis + Math.Sin(a) * this.MinorAxis, this, SnapPointFinder.DidSnapModes.DidSnapToObjectSnapPoint);
+								spf.Check(plane.Location + Math.Cos(a) * MajorAxis + Math.Sin(a) * this.MinorAxis, this,
+									SnapPointFinder.DidSnapModes.DidSnapToObjectSnapPoint);
 						}
 					}
 					else
@@ -1398,11 +1545,13 @@ namespace CADability.GeoObject
 						{
 							double a = i * Math.PI / 4.0;
 							if (a < startParameter && a > startParameter + sweepParameter)
-								spf.Check(plane.Location + Math.Cos(a) * MajorAxis + Math.Sin(a) * this.MinorAxis, this, SnapPointFinder.DidSnapModes.DidSnapToObjectSnapPoint);
+								spf.Check(plane.Location + Math.Cos(a) * MajorAxis + Math.Sin(a) * this.MinorAxis, this,
+									SnapPointFinder.DidSnapModes.DidSnapToObjectSnapPoint);
 						}
 					}
 				}
 			}
+
 			if (spf.SnapToObjectPoint)
 			{
 				double par = PositionOf(spf.SourcePoint3D, spf.Projection.ProjectionPlane);
@@ -1411,6 +1560,7 @@ namespace CADability.GeoObject
 					spf.Check(PointAt(par), this, SnapPointFinder.DidSnapModes.DidSnapToObjectPoint);
 				}
 			}
+
 			if (spf.SnapToDropPoint && spf.BasePointValid)
 			{
 				GeoPoint2D p = plane.Project(spf.BasePoint);
@@ -1421,6 +1571,7 @@ namespace CADability.GeoObject
 				tst = new GeoPoint2D(Math.Cos(a) * majorRadius, Math.Sin(a) * minorRadius);
 				spf.Check(plane.ToGlobal(tst), this, SnapPointFinder.DidSnapModes.DidSnapToDropPoint);
 			}
+
 			if (spf.SnapToTangentPoint && spf.BasePointValid)
 			{
 				GeoPoint2D p = plane.Project(spf.BasePoint);
@@ -1440,6 +1591,7 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
 		/// <summary>
 		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.AttributeChanged (INamedAttribute)"/>
 		/// </summary>
@@ -1454,8 +1606,10 @@ namespace CADability.GeoObject
 					return true;
 				}
 			}
+
 			return false;
 		}
+
 		/// <summary>
 		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HasValidData ()"/>
 		/// </summary>
@@ -1467,6 +1621,7 @@ namespace CADability.GeoObject
 			if (Math.Abs(sweepParameter) < Precision.epsa) return false;
 			return true;
 		}
+
 		/// <summary>
 		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetShowProperties (IFrame)"/>
 		/// </summary>
@@ -1483,12 +1638,14 @@ namespace CADability.GeoObject
 				return new ShowPropertyEllipse(this, Frame);
 			}
 		}
+
 		/// <summary>
 		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
 		/// </summary>
 		/// <returns></returns>
 		public override BoundingCube GetBoundingCube()
-		{   // es hilft nichts, man muss in 2-dimensionalen 2Mal die BoundingBox bestimmen
+		{
+			// es hilft nichts, man muss in 2-dimensionalen 2Mal die BoundingBox bestimmen
 			if (extent.IsEmpty)
 			{
 				ICurve2D c2d = (this as ICurve).GetProjectedCurve(Plane.XYPlane);
@@ -1510,10 +1667,14 @@ namespace CADability.GeoObject
 				extent.Zmin = Math.Min(extent.Zmin, br.Bottom);
 				extent.Zmax = Math.Max(extent.Zmax, br.Top);
 			}
+
 			return extent;
 		}
+
 		public delegate bool PaintTo3DDelegate(Ellipse toPaint, IPaintTo3D paintTo3D);
+
 		public static PaintTo3DDelegate OnPaintTo3D;
+
 		/// <summary>
 		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3D (IPaintTo3D)"/>
 		/// </summary>
@@ -1529,6 +1690,7 @@ namespace CADability.GeoObject
 			{
 				if (colorDef != null) paintTo3D.SetColor(colorDef.Color);
 			}
+
 			if (lineWidth != null) paintTo3D.SetLineWidth(lineWidth);
 			if (linePattern != null) paintTo3D.SetLinePattern(linePattern);
 			if ((paintTo3D.Capabilities & PaintCapabilities.CanDoArcs) != 0)
@@ -1542,6 +1704,7 @@ namespace CADability.GeoObject
 				else paintTo3D.Polyline(new GeoPoint[] { StartPoint, EndPoint });
 			}
 		}
+
 		/// <summary>
 		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PrepareDisplayList (double)"/>
 		/// </summary>
@@ -1550,13 +1713,12 @@ namespace CADability.GeoObject
 		{
 			GetCashedApproximation(precision);
 		}
+
 		public override Style.EDefaultFor PreferredStyle
 		{
-			get
-			{
-				return Style.EDefaultFor.Curves;
-			}
+			get { return Style.EDefaultFor.Curves; }
 		}
+
 		/// <summary>
 		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetQuadTreeItem (Projection, ExtentPrecision)"/>
 		/// </summary>
@@ -1569,6 +1731,7 @@ namespace CADability.GeoObject
 			ICurve2D c2d = d2d.Curve2D;
 			return new QuadTreeEllipse(this, this.plane, c2d, projection);
 		}
+
 		/// <summary>
 		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (Projection, ExtentPrecision)"/>
 		/// </summary>
@@ -1580,8 +1743,11 @@ namespace CADability.GeoObject
 			ICurve2D c2d = (this as ICurve).GetProjectedCurve(projection.ProjectionPlane);
 			return c2d.GetExtent();
 		}
+
 		#endregion
+
 		#region IOctTreeInsertable members
+
 		/// <summary>
 		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (double)"/>
 		/// </summary>
@@ -1598,6 +1764,7 @@ namespace CADability.GeoObject
 			//}
 			//return res;
 		}
+
 		/// <summary>
 		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
 		/// </summary>
@@ -1608,6 +1775,7 @@ namespace CADability.GeoObject
 		{
 			return (this as ICurve).HitTest(cube);
 		}
+
 		/// <summary>
 		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection, BoundingRect, bool)"/>
 		/// </summary>
@@ -1627,6 +1795,7 @@ namespace CADability.GeoObject
 				return c2d.HitTest(ref rect, false);
 			}
 		}
+
 		/// <summary>
 		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection.PickArea, bool)"/>
 		/// </summary>
@@ -1649,6 +1818,7 @@ namespace CADability.GeoObject
 					GeoPoint[] ip = PlaneIntersection(area.Bounds[i]);
 					if (ip.Length > 0) return false; // es darf keinen Schnitt geben
 				}
+
 				return true;
 			}
 			else
@@ -1656,7 +1826,7 @@ namespace CADability.GeoObject
 				// entweder der Startpunkt ist drin oder es gibt Schnitte mit den Seitenflächen
 				// natürlich reduziert auf die begrenzten Würfelseiten
 				if (BoundingCube.UnitBoundingCube.Contains(unitsp)) return true; // ein Punkt drin genügt
-																				 // Schnittpunkt mit allen Würfelseiten
+				// Schnittpunkt mit allen Würfelseiten
 				for (int i = 0; i < area.Bounds.Length; ++i)
 				{
 					GeoPoint[] ip = PlaneIntersection(area.Bounds[i]);
@@ -1666,9 +1836,11 @@ namespace CADability.GeoObject
 						if (BoundingCube.UnitBoundingCube.Contains(p, 1e-6)) return true;
 					}
 				}
+
 				return false;
 			}
 		}
+
 		/// <summary>
 		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Position (GeoPoint, GeoVector, double)"/>
 		/// </summary>
@@ -1677,12 +1849,30 @@ namespace CADability.GeoObject
 		/// <param name="precision"></param>
 		/// <returns></returns>
 		public override double Position(GeoPoint fromHere, GeoVector direction, double precision)
-		{   // noch nicht getestet
+		{
+			// noch nicht getestet
 			try
 			{
 				if (Plane.Intersect(fromHere, direction, out GeoPoint p))
 				{
-					return Geometry.LinePar(fromHere, direction, p); // nicht getestet ob Ellipse auch getroffen
+					// double planeDistance = Geometry.LinePar(fromHere, direction, p); // the beam hits the plane at this point
+					double pos = (this as ICurve).PositionOf(p);
+					if (pos >= 0.0 && pos <= 1.0)
+					{
+						GeoPoint pCurve = (this as ICurve).PointAt(pos);
+						return Geometry.LinePar(fromHere, direction, pCurve);
+					}
+					else
+					{
+						if ((p | StartPoint) < (p | EndPoint))
+						{
+							return Geometry.LinePar(fromHere, direction, StartPoint);
+						}
+						else
+						{
+							return Geometry.LinePar(fromHere, direction, EndPoint);
+						}
+					}
 				}
 				else
 				{
@@ -1695,6 +1885,7 @@ namespace CADability.GeoObject
 						double d = Geometry.LinePar(fromHere, direction, ip);
 						if (d < res) res = d;
 					}
+
 					return res;
 				}
 			}
@@ -1703,17 +1894,17 @@ namespace CADability.GeoObject
 				return double.MaxValue;
 			}
 		}
+
 		#endregion
+
 		/// <summary>
 		/// Returns true if both axis of the ellipse have the same length. It may be a circle or a circular arc.
 		/// </summary>
 		public bool IsCircle
 		{
-			get
-			{
-				return Math.Abs(majorRadius - minorRadius) < Precision.eps;
-			}
+			get { return Math.Abs(majorRadius - minorRadius) < Precision.eps; }
 		}
+
 		/// <summary>
 		/// Returns true if it is not a full circle or a full ellipse.
 		/// </summary>
@@ -1725,11 +1916,13 @@ namespace CADability.GeoObject
 				return Math.Abs(sweepParameter) < 2.0d * Math.PI - Precision.eps;
 			}
 		}
+
 		public double Radius
 		{
 			get
 			{
-				if (Math.Abs(majorRadius - minorRadius) > Precision.eps) throw new EllipseException(EllipseException.tExceptionType.EllipseIsNotACircle);
+				if (Math.Abs(majorRadius - minorRadius) > Precision.eps)
+					throw new EllipseException(EllipseException.tExceptionType.EllipseIsNotACircle);
 				return majorRadius;
 			}
 			set
@@ -1740,6 +1933,7 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
 		internal Ellipse[] SplitAtZero()
 		{
 			if (startParameter + sweepParameter > 2.0 * Math.PI)
@@ -1760,16 +1954,17 @@ namespace CADability.GeoObject
 				e2.sweepParameter = startParameter + sweepParameter;
 				return new Ellipse[] { e1, e2 };
 			}
+
 			return null;
 		}
+
 		#region IColorDef Members
+
 		private ColorDef colorDef;
+
 		public ColorDef ColorDef
 		{
-			get
-			{
-				return colorDef;
-			}
+			get { return colorDef; }
 			set
 			{
 				using (new ChangingAttribute(this, "ColorDef", colorDef))
@@ -1778,23 +1973,26 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
 		void IColorDef.SetTopLevel(ColorDef newValue)
 		{
 			colorDef = newValue;
 		}
+
 		void IColorDef.SetTopLevel(ColorDef newValue, bool overwriteChildNullColor)
 		{
 			(this as IColorDef).SetTopLevel(newValue);
 		}
+
 		#endregion
+
 		#region ILineWidth Members
+
 		private LineWidth lineWidth;
+
 		public LineWidth LineWidth
 		{
-			get
-			{
-				return lineWidth;
-			}
+			get { return lineWidth; }
 			set
 			{
 				using (new ChangingAttribute(this, "LineWidth", lineWidth))
@@ -1803,15 +2001,16 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
 		#endregion
+
 		#region ILinePattern Members
+
 		private LinePattern linePattern;
+
 		public LinePattern LinePattern
 		{
-			get
-			{
-				return linePattern;
-			}
+			get { return linePattern; }
 			set
 			{
 				using (new ChangingAttribute(this, "LinePattern", linePattern))
@@ -1820,7 +2019,9 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
 		#endregion
+
 		/// <summary>
 		/// Gets or sets the startparameter of this circular or elliptical arc. The startparameter determins the
 		/// startpoint of this curve according to the formula: Center + cos(StartParameter)*MajorAxis + sin(StartParameter)*MinorAxis
@@ -1828,10 +2029,7 @@ namespace CADability.GeoObject
 		/// </summary>
 		public double StartParameter
 		{
-			get
-			{
-				return startParameter;
-			}
+			get { return startParameter; }
 			set
 			{
 				using (new Changing(this, "StartParameter", startParameter))
@@ -1842,6 +2040,7 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
 		/// <summary>
 		/// Gets or sets the sweep amount of this arc. A full circle or ellipse must have a sweepparameter of
 		/// either 2.0*Math.PI or -2.0*Math.PI, The sweep parameter of circular or elliptical arcs are
@@ -1850,10 +2049,7 @@ namespace CADability.GeoObject
 		/// </summary>
 		public double SweepParameter
 		{
-			get
-			{
-				return sweepParameter;
-			}
+			get { return sweepParameter; }
 			set
 			{
 				using (new Changing(this, "SweepParameter", sweepParameter))
@@ -1864,11 +2060,13 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
 		public GeoPoint StartPoint
 		{
 			get
 			{
-				return plane.Location + Math.Cos(startParameter) * majorRadius * plane.DirectionX + Math.Sin(startParameter) * minorRadius * plane.DirectionY;
+				return plane.Location + Math.Cos(startParameter) * majorRadius * plane.DirectionX +
+				       Math.Sin(startParameter) * minorRadius * plane.DirectionY;
 			}
 			set
 			{
@@ -1888,16 +2086,20 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
 		public GeoPoint EndPoint
 		{
 			get
 			{
 				double ea = startParameter + sweepParameter;
-				return plane.Location + Math.Cos(ea) * majorRadius * plane.DirectionX + Math.Sin(ea) * minorRadius * plane.DirectionY;
+				return plane.Location + Math.Cos(ea) * majorRadius * plane.DirectionX +
+				       Math.Sin(ea) * minorRadius * plane.DirectionY;
 			}
 			set
 			{
-				if (!IsArc) StartPoint = value; // Vollkreise/Ellipsen sollen voll bleiben, Startpunkt und Endpunkt bleiben identisch
+				if (!IsArc)
+					StartPoint =
+						value; // Vollkreise/Ellipsen sollen voll bleiben, Startpunkt und Endpunkt bleiben identisch
 				else
 					using (new Changing(this, "EndPoint"))
 					{
@@ -1907,12 +2109,10 @@ namespace CADability.GeoObject
 					}
 			}
 		}
+
 		public bool CounterClockWise
 		{
-			get
-			{
-				return sweepParameter > 0.0;
-			}
+			get { return sweepParameter > 0.0; }
 			set
 			{
 				using (new Changing(this, "CounterClockWise"))
@@ -1934,10 +2134,9 @@ namespace CADability.GeoObject
 				}
 			}
 		}
-		#region IOcasEdge Members
 
-		#endregion
 		#region ICurve Members
+
 		public GeoVector StartDirection
 		{
 			get
@@ -1950,6 +2149,7 @@ namespace CADability.GeoObject
 				//return res;
 			}
 		}
+
 		public GeoVector EndDirection
 		{
 			get
@@ -1962,6 +2162,7 @@ namespace CADability.GeoObject
 				//return res;
 			}
 		}
+
 		/// <summary>
 		/// Implements <see cref="CADability.GeoObject.ICurve.DirectionAt (double)"/>
 		/// </summary>
@@ -1974,9 +2175,9 @@ namespace CADability.GeoObject
 			GeoVector res = plane.ToGlobal(dir);
 			// if (!CounterClockWise) res = -res;
 			res = sweepParameter * res; // Achtung, wir brauchen eine Ableitung mit echter Länge
-										// sonst funktionieren die Newton Algorithmen nicht, z.B. bei RuledSurface!
-										// Wie weit das für die echte Ellipse stimmt, ist noch nicht geklärt
-										// res.Norm();
+			// sonst funktionieren die Newton Algorithmen nicht, z.B. bei RuledSurface!
+			// Wie weit das für die echte Ellipse stimmt, ist noch nicht geklärt
+			// res.Norm();
 			return res;
 			//GeoVector res = PointAt(Position) - Center;
 			//if (sweepParameter>0) res = res^Normal;
@@ -1984,28 +2185,34 @@ namespace CADability.GeoObject
 			//res.Norm();
 			//return res;
 		}
+
 		bool ICurve.TryPointDeriv2At(double position, out GeoPoint point, out GeoVector deriv1, out GeoVector deriv2)
 		{
 			Angle a = startParameter + position * sweepParameter;
-			point = plane.Location + Math.Cos(a) * majorRadius * plane.DirectionX + Math.Sin(a) * minorRadius * plane.DirectionY;
+			point = plane.Location + Math.Cos(a) * majorRadius * plane.DirectionX +
+			        Math.Sin(a) * minorRadius * plane.DirectionY;
 			GeoVector2D dir = new GeoVector2D(-majorRadius * Math.Sin(a), minorRadius * Math.Cos(a));
 			deriv1 = sweepParameter * plane.ToGlobal(dir); // Achtung, wir brauchen eine Ableitung mit echter Länge
 			GeoVector2D dir2 = new GeoVector2D(-majorRadius * Math.Cos(a), -minorRadius * Math.Sin(a));
 			deriv2 = sweepParameter * plane.ToGlobal(dir2); // Achtung, wir brauchen eine Ableitung mit echter Länge
 			return true;
 		}
+
 		/// <summary>
 		/// Implements <see cref="CADability.GeoObject.ICurve.PointAt (double)"/>
 		/// </summary>
 		/// <param name="Position"></param>
 		/// <returns></returns>
 		public GeoPoint PointAt(double Position)
-		{   // TODO: Ellipsenbogen (und Kreisbogen) müssen sich konsistent verhalten
+		{
+			// TODO: Ellipsenbogen (und Kreisbogen) müssen sich konsistent verhalten
 			// bezüglich Parameter und Punkt: StartParameter < EndParameter
 			// StartPunkt wirklich bezüglich der Richtung u.s.w.
 			double ea = startParameter + Position * sweepParameter;
-			return plane.Location + Math.Cos(ea) * majorRadius * plane.DirectionX + Math.Sin(ea) * minorRadius * plane.DirectionY;
+			return plane.Location + Math.Cos(ea) * majorRadius * plane.DirectionX +
+			       Math.Sin(ea) * minorRadius * plane.DirectionY;
 		}
+
 		/// <summary>
 		/// Returns the point at the provided parameter. 2*pi is the full circle, it starts at the startParameter
 		/// </summary>
@@ -2014,8 +2221,10 @@ namespace CADability.GeoObject
 		public GeoPoint PointAtParam(double param)
 		{
 			double ea = startParameter + param;
-			return plane.Location + Math.Cos(ea) * majorRadius * plane.DirectionX + Math.Sin(ea) * minorRadius * plane.DirectionY;
+			return plane.Location + Math.Cos(ea) * majorRadius * plane.DirectionX +
+			       Math.Sin(ea) * minorRadius * plane.DirectionY;
 		}
+
 		/// <summary>
 		/// Implements <see cref="CADability.GeoObject.ICurve.PositionOf (GeoPoint)"/>
 		/// </summary>
@@ -2040,6 +2249,7 @@ namespace CADability.GeoObject
 			if (Math.Abs(a3 - 0.5) < Math.Abs(ax - 0.5)) ax = a3;
 			return ax;
 		}
+
 		/// <summary>
 		/// Implements <see cref="CADability.GeoObject.ICurve.PositionOf (GeoPoint, double)"/>
 		/// </summary>
@@ -2062,6 +2272,7 @@ namespace CADability.GeoObject
 			if (Math.Abs(a3 - prefer) < Math.Abs(ax - prefer)) ax = a3;
 			return ax;
 		}
+
 		/// <summary>
 		/// Implements <see cref="CADability.GeoObject.ICurve.PositionOf (GeoPoint, Plane)"/>
 		/// </summary>
@@ -2069,18 +2280,22 @@ namespace CADability.GeoObject
 		/// <param name="pl"></param>
 		/// <returns></returns>
 		public double PositionOf(GeoPoint p, Plane pl)
-		{   // das müsste stimmen, solange es in 2d ein Kreis- oder Ellipsenbogen ist
+		{
+			// das müsste stimmen, solange es in 2d ein Kreis- oder Ellipsenbogen ist
 			// wenn es in 2d eine Linie ist, dann ist die Funktion zumindest mehrdeutig
 			ICurve2D c2d = GetProjectedCurve(pl);
 			return c2d.PositionOf(pl.Project(p));
 		}
+
 		GeoPoint ICurve.StartPoint
-		{   // spezielle Implementierung von StartPoint als Eigenschaft von ICurve:
+		{
+			// spezielle Implementierung von StartPoint als Eigenschaft von ICurve:
 			// das setzen des Startpunktes muss den Endpunkt festhalten. Der
 			// SweepAngle soll gleich bleiben
 			get { return this.StartPoint; }
 			set
-			{   // Endpunkt und Winkel sollen bleiben, Ebene kann sich ändern
+			{
+				// Endpunkt und Winkel sollen bleiben, Ebene kann sich ändern
 
 				// Diese Überlegungen gelten so nur für den Kreisbogen. Ob das auch für die Ellipse so stimmt?
 				// Ziemlich sicher NICHT!!!
@@ -2090,16 +2305,19 @@ namespace CADability.GeoObject
 					if (!IsArc) return;
 					throw new EllipseException(EllipseException.tExceptionType.SetStartPointFailed);
 				}
+
 				double paramP = this.PositionOf(value);
 				if (Precision.IsEqual(value, this.PointAt(paramP))) // der Punkt liegt auf dem (virtuellen) Kreis
-				{   // jetzt nur den Startpunkt ändern, Center beibehalten!
+				{
+					// jetzt nur den Startpunkt ändern, Center beibehalten!
 					this.StartPoint = value;
 				}
 				else
 				{
 					Plane pln = plane;
 					if (!Precision.IsPointOnPlane(value, this.plane))
-					{   // die Ebene bleibt nicht erhalten. neue Ebene gegeben durch 
+					{
+						// die Ebene bleibt nicht erhalten. neue Ebene gegeben durch 
 						// Startpunkt, Endpunkt und Richtung senkrecht zum jetzigen Normalenvektor
 						GeoVector diry = (EndPoint - value) ^ plane.Normal;
 						if (Precision.IsNullVector(diry)) diry = plane.DirectionY;
@@ -2111,6 +2329,7 @@ namespace CADability.GeoObject
 							pln.Align(plane, false);
 						}
 					}
+
 					// die Zielebene ist jetzt klar (und meist gleich der Startebene)
 					// gegeben sind jetzt 2 Punkte, der neue Anfangspunkt und der alte
 					// Endpunkt. Der Start und der Endwinkel sollen beibehalten werden
@@ -2118,20 +2337,23 @@ namespace CADability.GeoObject
 					GeoPoint2D ep2 = pln.Project(EndPoint);
 					GeoPoint2D c0 = new GeoPoint2D(sp2, ep2); // Mitte der Verbindung
 					GeoVector2D d0 = (ep2 - sp2).ToLeft(); // senkrecht auf Verbindung sp2, ep2
-														   // GeoVector2D d1 = new GeoVector2D(new Angle(startParameter));
+					// GeoVector2D d1 = new GeoVector2D(new Angle(startParameter));
 					GeoVector2D d1 = new GeoVector2D(new Angle(d0.Angle.Radian - sweepParameter / 2.0));
 					GeoPoint2D ip; // Schnittpunkt, neuer Mittelpunkt
-					if (!Geometry.IntersectLL(c0, d0, sp2, d1, out ip)) throw new EllipseException(EllipseException.tExceptionType.SetStartPointFailed);
+					if (!Geometry.IntersectLL(c0, d0, sp2, d1, out ip))
+						throw new EllipseException(EllipseException.tExceptionType.SetStartPointFailed);
 					SetArcPlaneCenterStartEndPoint(plane, ip, sp2, ep2, pln, sweepParameter > 0.0);
 				}
 
 			}
 		}
+
 		GeoPoint ICurve.EndPoint
 		{
 			get { return this.EndPoint; }
 			set
-			{   // Endpunkt und Winkel sollen bleiben, Ebene kann sich ändern
+			{
+				// Endpunkt und Winkel sollen bleiben, Ebene kann sich ändern
 
 				// Diese Überlegungen gelten so nur für den Kreisbogen. Ob das auch für die Ellipse so stimmt?
 				// Ziemlich sicher NICHT!!!
@@ -2140,18 +2362,21 @@ namespace CADability.GeoObject
 					if (!IsArc) return;
 					throw new EllipseException(EllipseException.tExceptionType.SetStartPointFailed);
 				}
+
 				if (IsCircle)
 				{
 					double paramP = this.PositionOf(value);
 					if (Precision.IsEqual(value, this.PointAt(paramP))) // der Punkt liegt auf dem (virtuellen) Kreis
-					{   // jetzt nur den Endpunkt ändern, Center beibehalten!!
+					{
+						// jetzt nur den Endpunkt ändern, Center beibehalten!!
 						this.EndPoint = value;
 					}
 					else
 					{
 						Plane pln = plane;
 						if (!Precision.IsPointOnPlane(value, this.plane))
-						{   // die Ebene bleibt nicht erhalten. neue Ebene gegeben durch 
+						{
+							// die Ebene bleibt nicht erhalten. neue Ebene gegeben durch 
 							// Startpunkt, Endpunkt und Richtung senkrecht zum jetzigen Normalenvektor
 							GeoVector diry = (StartPoint - value) ^ plane.Normal;
 							if (Precision.IsNullVector(diry)) diry = plane.DirectionY;
@@ -2163,6 +2388,7 @@ namespace CADability.GeoObject
 								pln.Align(plane, false);
 							}
 						}
+
 						// die Zielebene ist jetzt klar (und meist gleich der Startebene)
 						// gegeben sind jetzt 2 Punkte, der neue Anfangspunkt und der alte
 						// Endpunkt. Der Start und der Endwinkel sollen beibehalten werden
@@ -2170,13 +2396,14 @@ namespace CADability.GeoObject
 						GeoPoint2D sp2 = pln.Project(StartPoint);
 						GeoPoint2D c0 = new GeoPoint2D(sp2, ep2); // Mitte der Verbindung
 						GeoVector2D d0 = (ep2 - sp2).ToLeft(); // senkrecht auf Verbindung sp2, ep2
-															   // GeoVector2D d1 = new GeoVector2D(new Angle(startParameter));
+						// GeoVector2D d1 = new GeoVector2D(new Angle(startParameter));
 						GeoVector2D d1 = new GeoVector2D(new Angle(d0.Angle.Radian - sweepParameter / 2.0));
 						GeoPoint2D ip; // Schnittpunkt, neuer Mittelpunkt
 						if (!Geometry.IntersectLL(c0, d0, sp2, d1, out ip))
 						{
 							throw new EllipseException(EllipseException.tExceptionType.SetStartPointFailed);
 						}
+
 						SetArcPlaneCenterStartEndPoint(plane, ip, sp2, ep2, pln, sweepParameter > 0.0);
 					}
 				}
@@ -2184,7 +2411,8 @@ namespace CADability.GeoObject
 				{
 					try
 					{
-						ModOp m = ModOp.Fit(new GeoPoint[] { this.StartPoint, this.EndPoint }, new GeoPoint[] { this.StartPoint, value }, true);
+						ModOp m = ModOp.Fit(new GeoPoint[] { this.StartPoint, this.EndPoint },
+							new GeoPoint[] { this.StartPoint, value }, true);
 						this.Modify(m);
 					}
 					catch (ModOpException)
@@ -2193,6 +2421,7 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
 		/// <summary>
 		/// Returns the Parameter of the given point projected into the plane of this ellipse (pp). 
 		/// For a circle or arc this is the
@@ -2211,7 +2440,11 @@ namespace CADability.GeoObject
 			return a.Radian;
 		}
 
-		private double sqr(double s) { return s * s; }
+		private double sqr(double s)
+		{
+			return s * s;
+		}
+
 		private double ParameterOf(GeoPoint p, double startValue)
 		{
 			double cx = Center.x;
@@ -2224,15 +2457,28 @@ namespace CADability.GeoObject
 			double by = MinorAxis.y;
 			double bz = MinorAxis.z;
 
-			double aa = Geometry.SimpleNewtonApproximation(w =>
-			{
-				return 2 * (az * Math.Sin(w) - bz * Math.Cos(w)) * (-bz * Math.Sin(w) - az * Math.Cos(w) - cz + p.z) + 2 * (ay * Math.Sin(w) - by * Math.Cos(w)) * (-by * Math.Sin(w) - ay * Math.Cos(w) - cy + p.y) + 2 * (ax * Math.Sin(w) - bx * Math.Cos(w)) * (-bx * Math.Sin(w) - ax * Math.Cos(w) - cx + p.x);
-			}, w =>
-			{
-				return 2 * sqr(az * Math.Sin(w) - bz * Math.Cos(w)) + 2 * sqr(ay * Math.Sin(w) - by * Math.Cos(w)) + 2 * sqr(ax * Math.Sin(w) - bx * Math.Cos(w)) + 2 * (-bz * Math.Sin(w) - az * Math.Cos(w) - cz + p.z) * (bz * Math.Sin(w) + az * Math.Cos(w)) + 2 * (-by * Math.Sin(w) - ay * Math.Cos(w) - cy + p.y) * (by * Math.Sin(w) + ay * Math.Cos(w)) + 2 * (-bx * Math.Sin(w) - ax * Math.Cos(w) - cx + p.x) * (bx * Math.Sin(w) + ax * Math.Cos(w));
-			}, startValue);
+			double aa = Geometry.SimpleNewtonApproximation(
+				w =>
+				{
+					return
+						2 * (az * Math.Sin(w) - bz * Math.Cos(w)) * (-bz * Math.Sin(w) - az * Math.Cos(w) - cz + p.z) +
+						2 * (ay * Math.Sin(w) - by * Math.Cos(w)) * (-by * Math.Sin(w) - ay * Math.Cos(w) - cy + p.y) +
+						2 * (ax * Math.Sin(w) - bx * Math.Cos(w)) * (-bx * Math.Sin(w) - ax * Math.Cos(w) - cx + p.x);
+				},
+				w =>
+				{
+					return 2 * sqr(az * Math.Sin(w) - bz * Math.Cos(w)) + 2 * sqr(ay * Math.Sin(w) - by * Math.Cos(w)) +
+					       2 * sqr(ax * Math.Sin(w) - bx * Math.Cos(w)) +
+					       2 * (-bz * Math.Sin(w) - az * Math.Cos(w) - cz + p.z) *
+					       (bz * Math.Sin(w) + az * Math.Cos(w)) +
+					       2 * (-by * Math.Sin(w) - ay * Math.Cos(w) - cy + p.y) *
+					       (by * Math.Sin(w) + ay * Math.Cos(w)) +
+					       2 * (-bx * Math.Sin(w) - ax * Math.Cos(w) - cx + p.x) *
+					       (bx * Math.Sin(w) + ax * Math.Cos(w));
+				}, startValue);
 			return aa;
 		}
+
 		public double Length
 		{
 			get
@@ -2244,6 +2490,7 @@ namespace CADability.GeoObject
 				return c2d.Length;
 			}
 		}
+
 		void ICurve.Reverse()
 		{
 			using (new Changing(this, typeof(ICurve), "Reverse", new object[] { }))
@@ -2254,9 +2501,11 @@ namespace CADability.GeoObject
 					if (startParameter < 0.0) startParameter += 2.0 * Math.PI;
 					if (startParameter > 2.0 * Math.PI) startParameter -= 2.0 * Math.PI;
 				}
+
 				sweepParameter = -sweepParameter;
 			}
 		}
+
 		/// <summary>
 		/// Implements <see cref="CADability.GeoObject.ICurve.Split (double)"/>
 		/// </summary>
@@ -2273,6 +2522,7 @@ namespace CADability.GeoObject
 			e2.sweepParameter = this.sweepParameter * (1.0 - Position);
 			return new ICurve[] { e1, e2 };
 		}
+
 		/// <summary>
 		/// Implements <see cref="CADability.GeoObject.ICurve.Split (double, double)"/>
 		/// </summary>
@@ -2288,6 +2538,7 @@ namespace CADability.GeoObject
 				Position2 = Position1;
 				Position1 = tmp;
 			}
+
 			Ellipse e1 = (Ellipse)this.Clone();
 			Ellipse e2 = (Ellipse)this.Clone();
 			e1.startParameter = this.StartParameter + this.sweepParameter * Position1;
@@ -2296,6 +2547,7 @@ namespace CADability.GeoObject
 			e2.sweepParameter = this.sweepParameter * (1.0 - (Position2 - Position1));
 			return new ICurve[] { e1, e2 };
 		}
+
 		/// <summary>
 		/// Implements <see cref="CADability.GeoObject.ICurve.Trim (double, double)"/>
 		/// </summary>
@@ -2313,27 +2565,29 @@ namespace CADability.GeoObject
 				sweepParameter = newSweepAngle.Radian;
 			}
 		}
-		ICurve ICurve.Clone() { return (ICurve)this.Clone(); }
+
+		ICurve ICurve.Clone()
+		{
+			return (ICurve)this.Clone();
+		}
+
 		ICurve ICurve.CloneModified(ModOp m)
 		{
 			IGeoObject clone = Clone();
 			clone.Modify(m);
 			return (ICurve)clone;
 		}
+
 		public bool IsClosed
 		{
-			get
-			{
-				return !IsArc;
-			}
+			get { return !IsArc; }
 		}
+
 		public bool IsSingular
 		{
-			get
-			{
-				return sweepParameter == 0.0;
-			}
+			get { return sweepParameter == 0.0; }
 		}
+
 		/// <summary>
 		/// Implements <see cref="CADability.GeoObject.ICurve.GetPlanarState ()"/>
 		/// </summary>
@@ -2342,6 +2596,7 @@ namespace CADability.GeoObject
 		{
 			return PlanarState.Planar;
 		}
+
 		/// <summary>
 		/// Implements <see cref="CADability.GeoObject.ICurve.GetPlane ()"/>
 		/// </summary>
@@ -2350,6 +2605,7 @@ namespace CADability.GeoObject
 		{
 			return this.plane;
 		}
+
 		/// <summary>
 		/// Implements <see cref="CADability.GeoObject.ICurve.IsInPlane (Plane)"/>
 		/// </summary>
@@ -2359,6 +2615,7 @@ namespace CADability.GeoObject
 		{
 			return Precision.IsEqual(p, this.plane);
 		}
+
 		/// <summary>
 		/// Implements <see cref="CADability.GeoObject.ICurve.GetProjectedCurve (Plane)"/>
 		/// </summary>
@@ -2370,6 +2627,7 @@ namespace CADability.GeoObject
 			ICurve2D res = d2d.Curve2D;
 			return res;
 		}
+
 		public override string Description
 		{
 			get
@@ -2386,18 +2644,22 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
 		bool ICurve.IsComposed
 		{
 			get { return false; }
 		}
+
 		ICurve[] ICurve.SubCurves
 		{
 			get { return new ICurve[0]; }
 		}
+
 		ICurve ICurve.Approximate(bool linesOnly, double maxError)
 		{
 			if (this.IsCircle && !linesOnly)
-			{   // Kreise und -bögen durch Kreisbögen annähern ist Unsinn
+			{
+				// Kreise und -bögen durch Kreisbögen annähern ist Unsinn
 				return this.Clone() as ICurve;
 			}
 			else
@@ -2416,46 +2678,59 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+
 		double[] ICurve.TangentPosition(GeoVector direction)
 		{
 			List<double> res = new List<double>();
 			if (Precision.IsDirectionInPlane(direction, this.plane))
 			{
 				double u = TangentParameter(direction);
-				GeoPoint p1 = plane.Location + Math.Cos(u) * majorRadius * plane.DirectionX + Math.Sin(u) * minorRadius * plane.DirectionY;
+				GeoPoint p1 = plane.Location + Math.Cos(u) * majorRadius * plane.DirectionX +
+				              Math.Sin(u) * minorRadius * plane.DirectionY;
 				double u1 = PositionOf(p1);
 				if (u1 >= 0.0 && u1 <= 1.0)
 				{
 					res.Add(u1);
 				}
-				GeoPoint p2 = plane.Location + Math.Cos(u + Math.PI) * majorRadius * plane.DirectionX + Math.Sin(u + Math.PI) * minorRadius * plane.DirectionY;
+
+				GeoPoint p2 = plane.Location + Math.Cos(u + Math.PI) * majorRadius * plane.DirectionX +
+				              Math.Sin(u + Math.PI) * minorRadius * plane.DirectionY;
 				double u2 = PositionOf(p2);
 				if (u2 >= 0.0 && u2 <= 1.0)
 				{
 					res.Add(u2);
 				}
 			}
+
 			return res.ToArray();
 		}
+
 		double[] ICurve.GetSelfIntersections()
 		{
 			return new double[0];
 		}
+
 		bool ICurve.SameGeometry(ICurve other, double precision)
 		{
 			if (other is Ellipse)
 			{
 				Ellipse o = other as Ellipse;
 				if ((Center | o.Center) < precision)
-				{   // geändert wg. Dan Swope 18.9.15. gegeneinadner verderehte Kreise und invers orientierte Bögen sollen gleich sein
+				{
+					// geändert wg. Dan Swope 18.9.15. gegeneinadner verderehte Kreise und invers orientierte Bögen sollen gleich sein
 					if (IsCircle && o.IsCircle)
 					{
 						if (this.IsArc)
 						{
-							if (((this.StartPoint | o.StartPoint) < precision && (this.EndPoint | o.EndPoint) < precision) || (this.StartPoint | o.EndPoint) < precision && (this.EndPoint | o.StartPoint) < precision)
+							if (((this.StartPoint | o.StartPoint) < precision &&
+							     (this.EndPoint | o.EndPoint) < precision) ||
+							    (this.StartPoint | o.EndPoint) < precision &&
+							    (this.EndPoint | o.StartPoint) < precision)
 							{
-								return (this.PointAt(0.5) | o.PointAt(0.5)) < precision; // Mittelpunkt muss übereinstimmen
+								return (this.PointAt(0.5) | o.PointAt(0.5)) <
+								       precision; // Mittelpunkt muss übereinstimmen
 							}
+
 							return false;
 						}
 						else
@@ -2467,19 +2742,26 @@ namespace CADability.GeoObject
 					{
 						if (this.IsArc)
 						{
-							if (((this.StartPoint | o.StartPoint) < precision && (this.EndPoint | o.EndPoint) < precision) || (this.StartPoint | o.EndPoint) < precision && (this.EndPoint | o.StartPoint) < precision)
+							if (((this.StartPoint | o.StartPoint) < precision &&
+							     (this.EndPoint | o.EndPoint) < precision) ||
+							    (this.StartPoint | o.EndPoint) < precision &&
+							    (this.EndPoint | o.StartPoint) < precision)
 							{
-								return (this.PointAt(0.5) | o.PointAt(0.5)) < precision; // Mittelpunkt muss übereinstimmen
-																						 // ist eine Ellipse denkbar, die in Mittelpunkt und 3 Punkten übereinstimmt, aber nicht identisch ist?
+								return (this.PointAt(0.5) | o.PointAt(0.5)) <
+								       precision; // Mittelpunkt muss übereinstimmen
+								// ist eine Ellipse denkbar, die in Mittelpunkt und 3 Punkten übereinstimmt, aber nicht identisch ist?
 							}
+
 							return false;
 						}
 						else
 						{
 							if (Precision.SameDirection(MajorAxis, o.MajorAxis, false))
 							{
-								return !o.IsArc && (Math.Abs(this.majorRadius - o.majorRadius) < precision) && (Math.Abs(this.minorRadius - o.minorRadius) < precision);
+								return !o.IsArc && (Math.Abs(this.majorRadius - o.majorRadius) < precision) &&
+								       (Math.Abs(this.minorRadius - o.minorRadius) < precision);
 							}
+
 							return false;
 						}
 					}
@@ -2490,8 +2772,10 @@ namespace CADability.GeoObject
 				TetraederHull th = new TetraederHull(this);
 				return th.SameGeometry(other, precision);
 			}
+
 			return false;
 		}
+
 		double ICurve.PositionAtLength(double position)
 		{
 			if (IsCircle)
@@ -2499,26 +2783,31 @@ namespace CADability.GeoObject
 				return position / Length;
 			}
 			else
-			{   // das ist nicht exakt, kann am Ende probleme machen
+			{
+				// das ist nicht exakt, kann am Ende probleme machen
 				// und es ist sehr ineffizient!!
 				ICurve aprx = (this as ICurve).Approximate(true, (majorRadius + minorRadius) * 1e-4);
 				double par = aprx.PositionAtLength(position);
 				return PositionOf(aprx.PointAt(par));
 			}
 		}
+
 		double ICurve.ParameterToPosition(double parameter)
 		{
 			return (parameter - startParameter) / sweepParameter;
 		}
+
 		double ICurve.PositionToParameter(double position)
 		{
 			return startParameter + position * sweepParameter;
 		}
+
 		bool ICurve.Extend(double atStart, double atEnd)
 		{
 			if (!IsArc) return false;
 			if (IsCircle)
-			{   // valid for circular arcs, but not real ellipses
+			{
+				// valid for circular arcs, but not real ellipses
 				double ds = atStart / majorRadius;
 				double de = atEnd / majorRadius;
 				Angle newStartAngle;
@@ -2533,6 +2822,7 @@ namespace CADability.GeoObject
 					newStartAngle = startParameter + ds;
 					newEndAngle = startParameter + sweepParameter - de;
 				}
+
 				SweepAngle newSweepAngle = new SweepAngle(newStartAngle, newEndAngle, sweepParameter > 0.0);
 				using (new Changing(this, "CopyGeometry", Clone()))
 				{
@@ -2545,9 +2835,14 @@ namespace CADability.GeoObject
 				// this is only an approximate solution
 				Ellipse fullEllipse = Ellipse.Construct();
 				fullEllipse.SetEllipseCenterAxis(Center, MajorAxis, MinorAxis);
-				ICurve aprx = (fullEllipse as ICurve).Approximate(true, (majorRadius + minorRadius) * 1e-4); // a path or polyline
-				double lengthAtStart = aprx.PositionToParameter(aprx.PositionOf(this.StartPoint)); // parameter of polyline or path is its length
-				double lengthAtEnd = aprx.PositionToParameter(aprx.PositionOf(this.EndPoint)); // parameter of polyline or path is its length
+				ICurve aprx =
+					(fullEllipse as ICurve).Approximate(true, (majorRadius + minorRadius) * 1e-4); // a path or polyline
+				double lengthAtStart =
+					aprx.PositionToParameter(
+						aprx.PositionOf(this.StartPoint)); // parameter of polyline or path is its length
+				double lengthAtEnd =
+					aprx.PositionToParameter(
+						aprx.PositionOf(this.EndPoint)); // parameter of polyline or path is its length
 				lengthAtStart -= atStart;
 				if (lengthAtStart < 0) lengthAtStart += aprx.Length;
 				lengthAtEnd += atEnd;
@@ -2562,6 +2857,7 @@ namespace CADability.GeoObject
 				}
 				// this probably doesn't take into account the orientation of the ellipse
 			}
+
 			return true;
 		}
 
@@ -2569,6 +2865,7 @@ namespace CADability.GeoObject
 		{
 			return GetExtent(0.0);
 		}
+
 		bool ICurve.HitTest(BoundingCube bc)
 		{
 			if (!bc.Interferes(this.GetBoundingCube()))
@@ -2585,6 +2882,7 @@ namespace CADability.GeoObject
 				if (plane.Elem(points[i]))
 					l.Add(points[i]);
 			}
+
 			int n = l.Count;
 			GeoPoint[,] bcl = bc.Lines;
 			for (int i = 0; i < 12; ++i)
@@ -2594,9 +2892,11 @@ namespace CADability.GeoObject
 				{
 					b = b && bcl[i, 0] != l[j] && bcl[i, 1] != l[j];
 				}
+
 				if (b)
 					l.AddRange(plane.Interfere(bcl[i, 0], bcl[i, 1]));
 			}
+
 			// im Folgenden wird erwartet, dass majorRadius>=minorRadius. Ist das immer der Fall?
 			Ellipse2D e = new Ellipse2D(new GeoPoint2D(0, 0),
 				majorRadius * GeoVector2D.XAxis, minorRadius * GeoVector2D.YAxis);
@@ -2621,15 +2921,17 @@ namespace CADability.GeoObject
 							{
 								double x = (dip + m) * (2 * Math.PI);
 								if ((sweepParameter > 0 && spar < x && x < spar + sweepParameter)
-									|| (sweepParameter < 0 && spar + sweepParameter < x && x < spar))
+								    || (sweepParameter < 0 && spar + sweepParameter < x && x < spar))
 									return true;
 							}
 						}
 					}
 				}
 			}
+
 			return false;
 		}
+
 		double[] ICurve.GetSavePositions()
 		{
 			int n = (int)Math.Max(2, Math.Ceiling(Math.Abs(sweepParameter) / Math.PI * 2.0) + 1);
@@ -2638,9 +2940,11 @@ namespace CADability.GeoObject
 			{
 				res[i] = i / (double)(n - 1);
 			}
+
 			return res;
 			// return new double[] { 0.0, 0.25, 0.5, 0.75, 1.0 };
 		}
+
 		double[] ICurve.GetExtrema(GeoVector direction)
 		{
 
@@ -2657,12 +2961,15 @@ namespace CADability.GeoObject
 				// so wie linq in CSharp 3.0. Also: man könnte das Punktobjekt fragen nach PositionOnCurve, PositionOnCurve2D/Plane2D, PositionOnSurface
 				// PositionInWorldSpace und dieses Punktobjekt kennt verschiedene daten und andere muss es erst berechnen
 			}
+
 			return res;
 		}
+
 		double[] ICurve.GetPlaneIntersection(Plane plane)
 		{
 			return (this as ISimpleCurve).GetPlaneIntersection(plane);
 		}
+
 		double ICurve.DistanceTo(GeoPoint p)
 		{
 			double pos = (this as ICurve).PositionOf(p);
@@ -2676,6 +2983,7 @@ namespace CADability.GeoObject
 				return Math.Min(p | StartPoint, p | EndPoint);
 			}
 		}
+
 		/// <summary>
 		/// Implements <see cref="CADability.GeoObject.ICurve.TryPointDeriv2At (double, out GeoPoint, out GeoVector, out GeoVector)"/>
 		/// </summary>
@@ -2684,14 +2992,18 @@ namespace CADability.GeoObject
 		/// <param name="deriv"></param>
 		/// <param name="deriv2"></param>
 		/// <returns></returns>
-		public virtual bool TryPointDeriv2At(double position, out GeoPoint point, out GeoVector deriv, out GeoVector deriv2)
+		public virtual bool TryPointDeriv2At(double position, out GeoPoint point, out GeoVector deriv,
+			out GeoVector deriv2)
 		{
 			point = GeoPoint.Origin;
 			deriv = deriv2 = GeoVector.NullVector;
 			return false;
 		}
+
 		#endregion
+
 		#region ISerializable Members
+
 		/// <summary>
 		/// Constructor required by deserialization
 		/// </summary>
@@ -2797,13 +3109,18 @@ namespace CADability.GeoObject
 
 
 		#endregion
+
 		#region ICndHlp3DEdge Members
+
 		#endregion
+
 		#region IExtentedableCurve Members
+
 		IOctTreeInsertable IExtentedableCurve.GetExtendedCurve(ExtentedableCurveDirection direction)
 		{
 			return new FullEllipse(this);
 		}
+
 		#endregion
 
 		#region ISimpleCurve Members
@@ -2816,12 +3133,16 @@ namespace CADability.GeoObject
 			{
 				par[i] = PositionOf(res[i]);
 			}
+
 			return par;
 		}
+
 		#endregion
+
 		ExplicitPCurve3D IExplicitPCurve3D.GetExplicitPCurve3D()
 		{
-			ModOp m = ModOp.Fit(new GeoPoint[] { GeoPoint.Origin, new GeoPoint(1.0, 0.0, 0.0), new GeoPoint(0.0, 1.0, 0.0) },
+			ModOp m = ModOp.Fit(
+				new GeoPoint[] { GeoPoint.Origin, new GeoPoint(1.0, 0.0, 0.0), new GeoPoint(0.0, 1.0, 0.0) },
 				new GeoPoint[] { Center, Center + MajorAxis, Center + MinorAxis }, true);
 			return ExplicitPCurve3D.MakeCircle(m);
 		}
@@ -2840,8 +3161,10 @@ namespace CADability.GeoObject
 			}
 			else
 			{
-				res = export.WriteDefinition("ELLIPSE('',#" + ax.ToString() + "," + export.ToString(MajorRadius) + "," + export.ToString(MinorRadius) + ")");
+				res = export.WriteDefinition("ELLIPSE('',#" + ax.ToString() + "," + export.ToString(MajorRadius) + "," +
+				                             export.ToString(MinorRadius) + ")");
 			}
+
 			if (topLevel)
 			{
 				GeoPoint sp, ep;
@@ -2855,22 +3178,28 @@ namespace CADability.GeoObject
 				int ntc;
 				if (IsArc)
 				{
-					ntc = export.WriteDefinition("TRIMMED_CURVE('',#" + res.ToString() + ",(#" + nsp.ToString() + ",PARAMETER_VALUE(" + export.ToString(spar) + ")),(#" + nep.ToString() + ",PARAMETER_VALUE(" + export.ToString(epar) + ")),.T.,.CARTESIAN.)");
+					ntc = export.WriteDefinition("TRIMMED_CURVE('',#" + res.ToString() + ",(#" + nsp.ToString() +
+					                             ",PARAMETER_VALUE(" + export.ToString(spar) + ")),(#" +
+					                             nep.ToString() +
+					                             ",PARAMETER_VALUE(" + export.ToString(epar) + ")),.T.,.CARTESIAN.)");
 				}
 				else
 				{
 					ntc = res;
 				}
+
 				int gcs = export.WriteDefinition("GEOMETRIC_CURVE_SET('',(#" + ntc.ToString() + "))");
 				ColorDef cd = ColorDef;
 				if (cd == null) cd = new ColorDef("Black", Color.Black);
 				cd.MakeStepStyle(gcs, export);
 				int product = export.WriteDefinition("PRODUCT( '','','',(#2))");
-				int pdf = export.WriteDefinition("PRODUCT_DEFINITION_FORMATION_WITH_SPECIFIED_SOURCE( ' ', 'NONE', #" + product.ToString() + ", .NOT_KNOWN. )");
+				int pdf = export.WriteDefinition("PRODUCT_DEFINITION_FORMATION_WITH_SPECIFIED_SOURCE( ' ', 'NONE', #" +
+				                                 product.ToString() + ", .NOT_KNOWN. )");
 				int pd = export.WriteDefinition("PRODUCT_DEFINITION( 'NONE', 'NONE', #" + pdf.ToString() + ", #3 )");
 				int pds = export.WriteDefinition("PRODUCT_DEFINITION_SHAPE( 'NONE', 'NONE', #" + pd.ToString() + " )");
 				int sr = export.WriteDefinition("SHAPE_REPRESENTATION('', ( #" + gcs.ToString() + "), #4 )");
-				export.WriteDefinition("SHAPE_DEFINITION_REPRESENTATION( #" + pds.ToString() + ", #" + sr.ToString() + ")");
+				export.WriteDefinition("SHAPE_DEFINITION_REPRESENTATION( #" + pds.ToString() + ", #" + sr.ToString() +
+				                       ")");
 				return sr;
 			}
 			else
@@ -2879,150 +3208,165 @@ namespace CADability.GeoObject
 			}
 		}
 
-	}
+		internal class QuadTreeEllipse : IQuadTreeInsertableZ
+		{
+			ICurve2D curve;
 
-	internal class QuadTreeEllipse : IQuadTreeInsertableZ
-	{
-		ICurve2D curve;
-		//double fx, fy, c; // beschreibt die Ebene für den Z-Wert
-		IGeoObject go;
-		Projection projection;
-		Plane plane;
-		public QuadTreeEllipse(IGeoObject go, Plane plane, ICurve2D curve, Projection projection)
-		{
-			this.go = go;
-			this.curve = curve;
-			this.plane = plane;
-			this.plane.Modify(projection.UnscaledProjection);
-			this.projection = projection;
-			// die Berechnung der Matrix dauert zu lange
-			//GeoPoint p1 = projection.UnscaledProjection * plane.Location;
-			//GeoPoint p2 = projection.UnscaledProjection * (plane.Location + plane.DirectionX);
-			//GeoPoint p3 = projection.UnscaledProjection * (plane.Location + plane.DirectionY);
-			// die Werte fx, fy und c bestimmen die Z-Position
-			//double[,] m = new double[3, 3];
-			//m[0, 0] = p1.x;
-			//m[0, 1] = p1.y;
-			//m[0, 2] = 1.0;
-			//m[1, 0] = p2.x;
-			//m[1, 1] = p2.y;
-			//m[1, 2] = 1.0;
-			//m[2, 0] = p3.x;
-			//m[2, 1] = p3.y;
-			//m[2, 2] = 1.0;
-			//double[,] b = new double[,] { { p1.z }, { p2.z }, { p3.z } };
-			//LinearAlgebra.Matrix mx = new CADability.LinearAlgebra.Matrix(m);
-			//try
-			//{
-			//    LinearAlgebra.Matrix s = mx.Solve(new CADability.LinearAlgebra.Matrix(b));
-			//    fx = s[0, 0];
-			//    fy = s[0, 1];
-			//    c = s[0, 2];
-			//}
-			//catch (System.ApplicationException)
-			//{   // sollte nie vorkommen, da die Ebene bei der Projektion nicht verschwindet
-			//    // Z-Wert ist maximum
-			//    fx = 0.0;
-			//    fy = 0.0;
-			//    c = 0.0;
-			//    this.projection = projection; // d.h. es is kein einfacher Zusammenhang (Projektion von der Seite)
-			//}
-		}
-		#region IQuadTreeInsertableZ Members
-		public double GetZPosition(GeoPoint2D p)
-		{
-			// Equation plane.loc + l1*plane.dirx + l2*plane.diry = (p.x,p.y)
-			double[,] m = new double[2, 2];
-			m[0, 0] = plane.DirectionX.x;
-			m[0, 1] = plane.DirectionY.x;
-			m[1, 0] = plane.DirectionX.y;
-			m[1, 1] = plane.DirectionY.y;
-			double[] b = new double[] { p.x - plane.Location.x, p.y - plane.Location.y };
-			Matrix mx = DenseMatrix.OfArray(m);
-			Vector s = (Vector)mx.Solve(new DenseVector(b));
-			if (s.IsValid())
+			//double fx, fy, c; // beschreibt die Ebene für den Z-Wert
+			IGeoObject go;
+			Projection projection;
+			Plane plane;
+
+			public QuadTreeEllipse(IGeoObject go, Plane plane, ICurve2D curve, Projection projection)
 			{
-				double l1 = s[0];
-				double l2 = s[1];
-				return plane.Location.z + l1 * plane.DirectionX.z + l2 * plane.DirectionY.z;
+				this.go = go;
+				this.curve = curve;
+				this.plane = plane;
+				this.plane.Modify(projection.UnscaledProjection);
+				this.projection = projection;
+				// die Berechnung der Matrix dauert zu lange
+				//GeoPoint p1 = projection.UnscaledProjection * plane.Location;
+				//GeoPoint p2 = projection.UnscaledProjection * (plane.Location + plane.DirectionX);
+				//GeoPoint p3 = projection.UnscaledProjection * (plane.Location + plane.DirectionY);
+				// die Werte fx, fy und c bestimmen die Z-Position
+				//double[,] m = new double[3, 3];
+				//m[0, 0] = p1.x;
+				//m[0, 1] = p1.y;
+				//m[0, 2] = 1.0;
+				//m[1, 0] = p2.x;
+				//m[1, 1] = p2.y;
+				//m[1, 2] = 1.0;
+				//m[2, 0] = p3.x;
+				//m[2, 1] = p3.y;
+				//m[2, 2] = 1.0;
+				//double[,] b = new double[,] { { p1.z }, { p2.z }, { p3.z } };
+				//LinearAlgebra.Matrix mx = new CADability.LinearAlgebra.Matrix(m);
+				//try
+				//{
+				//    LinearAlgebra.Matrix s = mx.Solve(new CADability.LinearAlgebra.Matrix(b));
+				//    fx = s[0, 0];
+				//    fy = s[0, 1];
+				//    c = s[0, 2];
+				//}
+				//catch (System.ApplicationException)
+				//{   // sollte nie vorkommen, da die Ebene bei der Projektion nicht verschwindet
+				//    // Z-Wert ist maximum
+				//    fx = 0.0;
+				//    fy = 0.0;
+				//    c = 0.0;
+				//    this.projection = projection; // d.h. es is kein einfacher Zusammenhang (Projektion von der Seite)
+				//}
 			}
 
-			if (projection != null)
-			{   // die Ellipse von der Seite her gesehen (also eine Linie in der Projektion)
-				// hier wird umständlich in die Ebene der Ellipse gerechnet und dort der Schnittpunkt des
-				// Sehstrahls mit der Ellipse genommen
-				GeoPoint pp = projection.ProjectionPlane.ToGlobal(p);
-				Plane pl = (go as ICurve).GetPlane();
-				GeoPoint2D lstart = pl.Project(pp); // in die Ebene der Ellipse
-				GeoVector2D ldir = pl.Project(projection.Direction);
-				ICurve2D c2d = (go as ICurve).GetProjectedCurve(pl); // in die eigene Ebene projiziert
-				GeoPoint2DWithParameter[] ip = c2d.Intersect(lstart, lstart + ldir);
-				double z = double.MinValue;
-				for (int i = 0; i < ip.Length; ++i)
+			#region IQuadTreeInsertableZ Members
+
+			public double GetZPosition(GeoPoint2D p)
+			{
+				// Equation plane.loc + l1*plane.dirx + l2*plane.diry = (p.x,p.y)
+				double[,] m = new double[2, 2];
+				m[0, 0] = plane.DirectionX.x;
+				m[0, 1] = plane.DirectionY.x;
+				m[1, 0] = plane.DirectionX.y;
+				m[1, 1] = plane.DirectionY.y;
+				double[] b = new double[] { p.x - plane.Location.x, p.y - plane.Location.y };
+				Matrix mx = DenseMatrix.OfArray(m);
+				Vector s = (Vector)mx.Solve(new DenseVector(b));
+				if (s.IsValid())
 				{
-					GeoPoint ppp = projection.UnscaledProjection * pl.ToGlobal(ip[i].p);
-					z = Math.Max(z, ppp.z);
+					double l1 = s[0];
+					double l2 = s[1];
+					return plane.Location.z + l1 * plane.DirectionX.z + l2 * plane.DirectionY.z;
 				}
-				return z;
+
+				{
+					if (projection != null)
+					{
+						// die Ellipse von der Seite her gesehen (also eine Linie in der Projektion)
+						// hier wird umständlich in die Ebene der Ellipse gerechnet und dort der Schnittpunkt des
+						// Sehstrahls mit der Ellipse genommen
+						GeoPoint pp = projection.ProjectionPlane.ToGlobal(p);
+						Plane pl = (go as ICurve).GetPlane();
+						GeoPoint2D lstart = pl.Project(pp); // in die Ebene der Ellipse
+						GeoVector2D ldir = pl.Project(projection.Direction);
+						ICurve2D c2d = (go as ICurve).GetProjectedCurve(pl); // in die eigene Ebene projiziert
+						GeoPoint2DWithParameter[] ip = c2d.Intersect(lstart, lstart + ldir);
+						double z = double.MinValue;
+						for (int i = 0; i < ip.Length; ++i)
+						{
+							GeoPoint ppp = projection.UnscaledProjection * pl.ToGlobal(ip[i].p);
+							z = Math.Max(z, ppp.z);
+						}
+
+						return z;
+					}
+
+					//Will always return 0 as fx, fy and c always have the default value of 0.0d
+					return 0.0d;
+					//return fx * p.x + fy * p.y + c;
+				}
 			}
 
-			//Will always return 0 as fx, fy and c always have the default value of 0.0d
-			return 0.0d;
-			//return fx * p.x + fy * p.y + c;
-		}
-		#endregion
-		#region IQuadTreeInsertable Members
-		public BoundingRect GetExtent()
-		{
-			return curve.GetExtent();
-		}
-		public bool HitTest(ref BoundingRect rect, bool includeControlPoints)
-		{
-			return curve.HitTest(ref rect, false);
-		}
-		public object ReferencedObject
-		{
-			get { return go; }
-		}
-		#endregion
-	}
+			#endregion
 
-	internal class FullEllipse : IOctTreeInsertable
-	{
-		Ellipse full;
-		public FullEllipse(Ellipse arc)
-		{
-			full = arc.Clone() as Ellipse;
-			if (arc.SweepParameter > 0) full.SweepParameter = 2.0 * Math.PI;
-			else full.SweepParameter = -2.0 * Math.PI;
-		}
-		#region IOctTreeInsertable Members
+			#region IQuadTreeInsertable Members
 
-		BoundingCube IOctTreeInsertable.GetExtent(double precision)
-		{
-			return full.GetExtent(precision);
+			public BoundingRect GetExtent()
+			{
+				return curve.GetExtent();
+			}
+
+			public bool HitTest(ref BoundingRect rect, bool includeControlPoints)
+			{
+				return curve.HitTest(ref rect, false);
+			}
+
+			public object ReferencedObject
+			{
+				get { return go; }
+			}
+
+			#endregion
 		}
 
-		bool IOctTreeInsertable.HitTest(ref BoundingCube cube, double precision)
+		internal class FullEllipse : IOctTreeInsertable
 		{
-			return full.HitTest(ref cube, precision);
-		}
+			Ellipse full;
 
-		bool IOctTreeInsertable.HitTest(Projection projection, BoundingRect rect, bool onlyInside)
-		{
-			return full.HitTest(projection, rect, onlyInside);
-		}
+			public FullEllipse(Ellipse arc)
+			{
+				full = arc.Clone() as Ellipse;
+				if (arc.SweepParameter > 0) full.SweepParameter = 2.0 * Math.PI;
+				else full.SweepParameter = -2.0 * Math.PI;
+			}
 
-		double IOctTreeInsertable.Position(GeoPoint fromHere, GeoVector direction, double precision)
-		{
-			return full.Position(fromHere, direction, precision);
-		}
+			#region IOctTreeInsertable Members
 
-		bool IOctTreeInsertable.HitTest(Projection.PickArea area, bool onlyInside)
-		{
-			throw new Exception("The method or operation is not implemented.");
-		}
+			BoundingCube IOctTreeInsertable.GetExtent(double precision)
+			{
+				return full.GetExtent(precision);
+			}
 
-		#endregion
+			bool IOctTreeInsertable.HitTest(ref BoundingCube cube, double precision)
+			{
+				return full.HitTest(ref cube, precision);
+			}
+
+			bool IOctTreeInsertable.HitTest(Projection projection, BoundingRect rect, bool onlyInside)
+			{
+				return full.HitTest(projection, rect, onlyInside);
+			}
+
+			double IOctTreeInsertable.Position(GeoPoint fromHere, GeoVector direction, double precision)
+			{
+				return full.Position(fromHere, direction, precision);
+			}
+
+			bool IOctTreeInsertable.HitTest(Projection.PickArea area, bool onlyInside)
+			{
+				throw new Exception("The method or operation is not implemented.");
+			}
+
+			#endregion
+		}
 	}
 }

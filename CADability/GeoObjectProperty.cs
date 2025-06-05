@@ -3,6 +3,122 @@
 namespace CADability.UserInterface
 {
     /// <summary>
+    /// Display of a Brep object in the property grid. The object is represented by its display name, i.e. "vertex", "face" or "edge" and has no sub properties
+    /// </summary>
+    internal class BRepObjectProperty : IShowPropertyImpl
+    {
+        private IFrame frame;
+        private object[] brepObjects; // vertex, edge or face
+        private object selectedBrepObject;
+        private IShowProperty[] subEntries;
+        private bool highlight;
+        public delegate void SelectionChangedDelegate(BRepObjectProperty cp, object selectedBrepObject);
+        public event SelectionChangedDelegate SelectionChangedEvent;
+        public BRepObjectProperty(string resourceId, IFrame frame)
+        {
+            this.resourceIdInternal = resourceId;
+            this.frame = frame;
+            brepObjects = new object[0]; // leer initialisieren
+        }
+        public void SetBRepObjects(object[] geoObjects, object selectedBrepObject)
+        {
+            this.brepObjects = geoObjects;
+            this.selectedBrepObject = selectedBrepObject;
+            subEntries = null; // weg damit, damit es neu gemacht wird
+            if (propertyTreeView != null)
+            {
+                this.Select();
+                propertyTreeView.Refresh(this);
+                if (geoObjects.Length > 0) propertyTreeView.OpenSubEntries(this, true);
+            }
+        }
+        public void SetSelectedBRepObject(object brepObject)
+        {	// funktioniert so nicht, selbst Refresh nutzt nichts.
+            if (subEntries != null)
+            {
+                for (int i = 0; i < brepObjects.Length; ++i)
+                {
+                    BRepObjectProperty cp = subEntries[i] as BRepObjectProperty;
+                    // cp.SetSelected(geoObjects[i] == geoObject);
+                }
+            }
+        }
+        public bool Highlight
+        {
+            get
+            {
+                return highlight;
+            }
+            set
+            {
+                highlight = value;
+                if (propertyTreeView != null) propertyTreeView.Refresh(this);
+            }
+        }
+        #region IShowPropertyImpl Overrides
+        public override ShowPropertyEntryType EntryType
+        {
+            get
+            {
+                return ShowPropertyEntryType.GroupTitle;
+            }
+        }
+        /// <summary>
+        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
+        /// </summary>
+        public override ShowPropertyLabelFlags LabelType
+        {
+            get
+            {
+                ShowPropertyLabelFlags res = ShowPropertyLabelFlags.Selectable;
+                if (highlight) res |= ShowPropertyLabelFlags.Highlight;
+                return res;
+            }
+        }
+        /// <summary>
+        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
+        /// returns the number of subentries in this property view.
+        /// </summary>
+        public override int SubEntriesCount
+        {
+            get
+            {
+                return brepObjects.Length;
+            }
+        }
+        /// <summary>
+        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
+        /// returns the subentries in this property view.
+        /// </summary>
+        public override IShowProperty[] SubEntries
+        {
+            get
+            {
+                if (subEntries == null)
+                {
+                    subEntries = new IShowProperty[brepObjects.Length];
+                    for (int i = 0; i < brepObjects.Length; ++i)
+                    {
+                        string name = "";
+                        if (brepObjects[i] is Vertex) name = StringTable.GetString("Vertex.Displayname", StringTable.Category.label);
+                        else if (brepObjects[i] is Edge) name = StringTable.GetString("Edge.Displayname", StringTable.Category.label);
+                        if (brepObjects[i] is Face) name = StringTable.GetString("Face.Displayname", StringTable.Category.label);
+                        SimpleNameProperty cp = new SimpleNameProperty(name, brepObjects[i], "GeoObject.Object");
+						//cp.SetSelected(brepObjects[i] == selectedBrepObject); //TODO: merge dsn
+						cp.SelectionChangedEvent += new CADability.UserInterface.SimpleNameProperty.SelectionChangedDelegate(OnBrepObjectSelectionChanged);
+                        subEntries[i] = cp;
+                    }
+                }
+                return subEntries;
+            }
+        }
+        #endregion
+        private void OnBrepObjectSelectionChanged(SimpleNameProperty cp, object selectedBrepObject)
+        {
+            if (SelectionChangedEvent != null) SelectionChangedEvent(this, selectedBrepObject);
+        }
+    }
+    /// <summary>
     /// Darstellung eines GeoObjectInputs im ControlCenter
     /// </summary>
     internal class GeoObjectProperty : IShowPropertyImpl

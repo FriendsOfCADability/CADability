@@ -18,6 +18,7 @@ namespace CADability
         private string methodOrPropertyName;
         private object[] parameters;
         private Type interfaceForMethod;
+        private Func<bool> undo; // this is the modern way to do it, all data is captured
         /// <summary>
         /// Creates a ReversibleChange object. MethodOrPropertyName must be the name (casesensitive!)
         /// of a public method or property that reverses the change when called with the parameters
@@ -55,6 +56,12 @@ namespace CADability
             this.parameters = (object[])parameters.Clone();
             this.interfaceForMethod = null;
         }
+        /// <summary>
+        /// The provided funtion knows how to undo the change and has the data, which is needed for the undo, captured
+        /// </summary>
+        /// <param name="undo"></param>
+        public ReversibleChange(Func<bool> undo)
+        { this.undo = undo; }
         private PropertyInfo FindProperty(object o, string propname, Type ret)
         {
             PropertyInfo propertyInfo = o.GetType().GetProperty(propname, ret);
@@ -114,6 +121,7 @@ namespace CADability
         }
         public bool Undo()
         {
+            if (undo != null) return undo(); // this is the modern way
             if (parameters.Length == 1)
             {
                 try

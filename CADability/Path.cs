@@ -5,6 +5,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Runtime.Serialization;
 using System.Threading;
 
@@ -30,7 +31,7 @@ namespace CADability.GeoObject
 	/// </summary>
 	[Serializable()]
 	public class Path : IGeoObjectImpl, IColorDef, ILinePattern, ILineWidth, ICurve,
-		IGeoObjectOwner, ISerializable, IDeserializationCallback, IExtentedableCurve
+		IGeoObjectOwner, ISerializable, IDeserializationCallback, IExtentedableCurve, IJsonSerialize, IJsonSerializeDone
 	{
 		public enum ModificationMode
 		{
@@ -147,6 +148,33 @@ namespace CADability.GeoObject
 				else return null;
 			}
 		}
+		public static List<Path> FromSegments(List<ICurve> curves)
+		{
+			List<Path> res = new List<Path>();
+			GeoObjectList geoObjects = new GeoObjectList();
+			foreach (ICurve crv in curves)
+			{
+				geoObjects.Add(crv as IGeoObject);
+			}
+			bool created = false;
+			do
+			{
+				Path path = Path.Construct();
+				if (path.Set(geoObjects, false, Precision.eps))
+				{
+					created = true;
+					for (int i = 0; i < path.subCurves.Length; i++)
+					{
+						curves.Remove(path.subCurves[i]);
+					}
+					path.Flatten();
+					res.Add(path);
+				}
+				else created = false;
+
+			} while (created);
+			return res;
+		}
 		public delegate void ConstructedDelegate(Path justConstructed);
 		public static event ConstructedDelegate Constructed;
 		#endregion
@@ -168,6 +196,9 @@ namespace CADability.GeoObject
 		//			}
 		//			inPlane = new PlaneRef(pln);
 		//		}
+		/// <summary>
+		/// Needed for JsonSerialize
+		/// </summary>
 		protected Path()
 		{
 			planarState = PlanarState.Unknown;
@@ -607,6 +638,10 @@ namespace CADability.GeoObject
 				// Add macht das mit dem Owner
 			}
 			this.CopyAttributes(OrderedCurves[0] as IGeoObject);
+			for (int i = 0; i < subCurves.Length; i++)
+			{
+				l.Remove(subCurves[i] as IGeoObject);
+			}
 			Recalc();
 			return true;
 		}
@@ -1409,7 +1444,6 @@ namespace CADability.GeoObject
 				return false;
 			}
 		}
-
 		/// <summary>
 		/// Computes the parameter value along the given ray (fromHere + t * direction)
 		/// where it intersects the path (if any). Returns <c>double.MaxValue</c>
@@ -1446,15 +1480,13 @@ namespace CADability.GeoObject
 				if (curve is IOctTreeInsertable insertable)
 				{
 					double d = insertable.Position(fromHere, direction, precision);
-					if (d < res) 
+					if (d < res)
 						res = d;
 				}
 			}
 
 			return res;
 		}
-
-
 		#endregion
 		#region ICurve Members
 		public GeoPoint StartPoint
@@ -2201,6 +2233,26 @@ namespace CADability.GeoObject
 			info.AddValue("LineWidth", lineWidth);
 			info.AddValue("LinePattern", linePattern);
 		}
+
+		public override void GetObjectData(IJsonWriteData data)
+		{
+			base.GetObjectData(data);
+			data.AddProperty("SubCurves", subCurves);
+			if (colorDef != null) data.AddProperty("ColorDef", colorDef);
+			if (lineWidth != null) data.AddProperty("LineWidth", lineWidth);
+			if (linePattern != null) data.AddProperty("LinePattern", linePattern);
+		}
+
+		public override void SetObjectData(IJsonReadData data)
+		{
+			base.SetObjectData(data);
+			subCurves = data.GetProperty<ICurve[]>("SubCurves");
+			colorDef = data.GetPropertyOrDefault<ColorDef>("ColorDef");
+			lineWidth = data.GetPropertyOrDefault<LineWidth>("LineWidth");
+			linePattern = data.GetPropertyOrDefault<LinePattern>("LinePattern");
+			data.RegisterForSerializationDoneCallback(this);
+		}
+
 		#endregion
 		#region IDeserializationCallback Members
 		void IDeserializationCallback.OnDeserialization(object sender)
@@ -2232,6 +2284,25 @@ namespace CADability.GeoObject
 			Recalc(); // die Längen und isClosed wenigstens berechnen
 			if (Constructed != null) Constructed(this);
 		}
+		public void SerializationDone(JsonSerialize jsonSerialize)
+		{
+			for (int i = 0; i < subCurves.Length; ++i)
+			{
+				IGeoObject go = subCurves[i] as IGeoObject;
+				if (go != null)
+				{
+					if (go.Owner != null) go.Owner.Remove(go);
+					go.Owner = this;
+					// nicht nachvollziehbar: die events sind schon gesetzt
+					// deshalb erst entfernen, dann neu setzen:
+					go.DidChangeEvent -= new ChangeDelegate(SubCurveDidChange);
+					go.WillChangeEvent -= new ChangeDelegate(SubCurveWillChange);
+					go.DidChangeEvent += new ChangeDelegate(SubCurveDidChange);
+					go.WillChangeEvent += new ChangeDelegate(SubCurveWillChange);
+				}
+			}
+		}
+
 		#endregion
 		#region IOcasWire Members
 

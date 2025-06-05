@@ -5,12 +5,18 @@ using CADability.WebDrawing;
 using Point = CADability.WebDrawing.Point;
 #else
 using System.Drawing;
+using System.Numerics;
 using Point = System.Drawing.Point;
 #endif
 
 namespace CADability.Actions
 {
-    class ConstructTangentialPlane : ConstructAction, IIntermediateConstruction
+    internal interface IConstructPlane
+    {
+        Plane ConstructedPlane { get; }
+    }
+
+    class ConstructTangentialPlane : ConstructAction, IIntermediateConstruction, IConstructPlane
     {
         private Plane plane;
         private Plane fplane;

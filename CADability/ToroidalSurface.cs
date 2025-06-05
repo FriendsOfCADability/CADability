@@ -77,6 +77,16 @@ namespace CADability.GeoObject
                 return r.Length;
             }
         }
+        /// <summary>
+        /// The ring radius of the torus
+        /// </summary>
+        public double MajorRadius
+        {
+            get
+            {
+                return Math.Abs(toTorus.Factor);
+            }
+        }
         internal ModOp ToUnit
         {
             get
@@ -1788,6 +1798,91 @@ namespace CADability.GeoObject
         /// <param name="uOnCurve3Ds"></param>
         public override void Intersect(ICurve curve, BoundingRect uvExtent, out GeoPoint[] ips, out GeoPoint2D[] uvOnFaces, out double[] uOnCurve3Ds)
         {
+            GeoPoint tangentialFound = GeoPoint.Invalid;
+            if (curve is Line line)
+            {
+                GeoPoint[] tangentialIntersections = Geometry.CircleLineDist(GetAxisEllipse(), line.StartPoint, line.StartDirection);
+                for (int i = 0; i < tangentialIntersections.Length; i += 2)
+                {
+                    double d = tangentialIntersections[i] | tangentialIntersections[i + 1];
+                    if (Math.Abs(d - this.MinorRadius) < Precision.eps)
+                    {   // there is a tangential intersection between this line and the torus
+                        // the pair of point is alway first point on the circle, second on the line
+                        double pos = line.PositionOf(tangentialIntersections[i + 1]);
+                        if (pos > -Precision.eps && pos < 1 + Precision.eps)
+                        {
+                            tangentialFound = tangentialIntersections[i + 1];
+                        }
+                    }
+                }
+            }
+            if (!(curve is Ellipse) && curve is IExplicitPCurve3D iexpc)
+            {
+
+                ImplicitPSurface psurf = (this as IImplicitPSurface).GetImplicitPSurface();
+                GeoPoint[] apnts = psurf.Intersect(iexpc.GetExplicitPCurve3D(), out double[] u);
+                List<double> luOnCurve3Ds = new List<double>();
+                List<GeoPoint2D> luvOnFaces = new List<GeoPoint2D>();
+                List<GeoPoint> lips = new List<GeoPoint>();
+                for (int i = 0; i < apnts.Length; ++i)
+                {
+                    if (Surfaces.NewtonIntersect(this, uvExtent, curve, ref apnts[i])) // polynom root don't yield exactt results. We make it better here
+                    {
+                        double uu = curve.PositionOf(apnts[i]);
+                        GeoPoint2D uv = this.PositionOf(apnts[i]);
+                        SurfaceHelper.AdjustPeriodic(this, uvExtent, ref uv);
+                        double dist = apnts[i] | PointAt(uv);
+                        if (uu > -Precision.eps && uu < 1 + Precision.eps && uvExtent.ContainsEps(uv, -0.01) && dist < 10 * Precision.eps)
+                        {
+                            lips.Add(apnts[i]);
+                            luOnCurve3Ds.Add(uu);
+                            luvOnFaces.Add(uv);
+                        }
+                    }
+                }
+                if (tangentialFound.IsValid)
+                {
+                    bool alreadyFound = false;
+                    // we could have a tangential intersection and two more normal intersections, but the distance would be big
+                    for (int i = 0; i < lips.Count; i++)
+                    {
+                        if ((lips[i] | tangentialFound) < (MajorRadius + MinorRadius) / 100)
+                        {
+                            lips[i] = tangentialFound;
+                            luOnCurve3Ds[i] = curve.PositionOf(tangentialFound);
+                            GeoPoint2D uv = this.PositionOf(tangentialFound);
+                            SurfaceHelper.AdjustPeriodic(this, uvExtent, ref uv);
+                            luvOnFaces[i] = uv;
+                            alreadyFound = true;
+                        }
+                    }
+                    if (!alreadyFound)
+                    {
+                        double uu = curve.PositionOf(tangentialFound);
+                        GeoPoint2D uv = this.PositionOf(tangentialFound);
+                        SurfaceHelper.AdjustPeriodic(this, uvExtent, ref uv);
+                        if (uu > -Precision.eps && uu < 1 + Precision.eps && uvExtent.ContainsEps(uv, -0.01))
+                        {
+                            lips.Add(tangentialFound);
+                            luOnCurve3Ds.Add(uu);
+                            luvOnFaces.Add(uv);
+                        }
+                    }
+                }
+                for (int i = lips.Count - 1; i > 0; --i)
+                {
+                    if (Precision.IsEqual(lips[i], lips[i - 1]))
+                    {
+                        lips.RemoveAt(i);
+                        luvOnFaces.RemoveAt(i);
+                        luOnCurve3Ds.RemoveAt(i);
+                    }
+                }
+                ips = lips.ToArray();
+                uvOnFaces = luvOnFaces.ToArray();
+                uOnCurve3Ds = luOnCurve3Ds.ToArray();
+                return;
+            }
             if (curve is Line)
             {
                 ips = GetLineIntersection3D((curve as Line).StartPoint, (curve as Line).StartDirection);
@@ -1870,8 +1965,44 @@ namespace CADability.GeoObject
                     }
                 }
                 else if (Precision.SameDirection(pln.Normal, GeoVector.ZAxis, false))
-                {   // Schnittpunkt mit den beiden Großkreisen noch implementieren
-                    // horizontale Ebene
+                {   // the ellipse is horizontal in respect to the system of the torus
+                    // we need to intersect with the two horizontal circles of the torus
+                    List<GeoPoint> lips = new List<GeoPoint>();
+                    List<GeoPoint2D> luvOnFaces = new List<GeoPoint2D>();
+                    List<double> luOnCurve3Ds = new List<double>();
+                    Plane epln = new Plane(Plane.StandardPlane.XYPlane, uelli.Center.z);
+                    double s = pln.Location.z / minorRadius;
+                    if (s >= -1.0 && s <= 1.0)
+                    {
+                        double v = Math.Asin(s);
+                        ImplicitPSurface dbg = (this as IImplicitPSurface).GetImplicitPSurface();
+
+                        //ICurve bigCircle1 = FixedV(v, 0, Math.PI * 2);
+                        //ICurve bigCircle2 = FixedV(Math.PI - v, 0, Math.PI * 2);
+                        // two big circles on the torus are in the plane of the ellipse uelli
+                        ICurve2D prelli = uelli.GetProjectedCurve(epln);
+                        double r1 = (1 + minorRadius * Math.Cos(v));
+                        double r2 = (1 + minorRadius * Math.Cos(Math.PI - v));
+                        foreach (Circle2D c2d in new Circle2D[] { new Circle2D(GeoPoint2D.Origin, r1), new Circle2D(GeoPoint2D.Origin, r2) })
+                        {
+                            GeoPoint2DWithParameter[] ips2d = prelli.Intersect(c2d);
+                            for (int i = 0; i < ips2d.Length; i++)
+                            {
+                                GeoPoint ip = epln.ToGlobal(ips2d[i].p);
+                                ip = toTorus * ip;
+                                lips.Add(ip);
+                                GeoPoint2D uv = PositionOf(ip);
+                                SurfaceHelper.AdjustPeriodic(this, uvExtent, ref uv);
+                                luvOnFaces.Add(uv);
+                                luOnCurve3Ds.Add(curve.PositionOf(ip));
+                            }
+                        }
+                    } // otherwise the ellipse is above or below the torus
+
+                    ips = lips.ToArray();
+                    uvOnFaces = luvOnFaces.ToArray();
+                    uOnCurve3Ds = luOnCurve3Ds.ToArray();
+                    return;
                 }
             }
             // ImplicitPSurface().Intersect ist nicht zuverlässig, bei Ellipsen wird der Grad x^8 und die Lösungen ungenau, so dass manche Lösungen verloren gehen
@@ -2334,15 +2465,24 @@ namespace CADability.GeoObject
                 // if (Math.Abs(ZAxis.Length - tsother.ZAxis.Length) > precision) return false; // die Länge der Z-Achse
                 if (Math.Abs(MinorRadius - tsother.MinorRadius) > precision) return false;
                 // fehlt noch die Richtung der Z-Achse, ist aber mit Genauigkeit schwierig
-                GeoPoint2D uv1 = new GeoPoint2D(0.0, 0.0);
-                GeoPoint p1 = PointAt(uv1);
-                GeoPoint2D uv2 = tsother.PositionOf(p1);
-                GeoPoint p2 = tsother.PointAt(uv2);
+                GeoPoint2D[] uvthis = new GeoPoint2D[3];
+                GeoPoint2D[] uvother = new GeoPoint2D[3];
+                uvthis[0] = new GeoPoint2D(0.0, 0.0);
+                uvthis[1] = new GeoPoint2D(0.0, 1.0);
+                uvthis[2] = new GeoPoint2D(1.0, 0.0);
+                GeoPoint p1 = PointAt(uvthis[0]);
+                uvother[0] = tsother.PositionOf(p1);
+                GeoPoint p2 = tsother.PointAt(uvother[0]);
                 if ((p1 | p2) > precision) return false;
                 p1 = PointAt(new GeoPoint2D(Math.PI / 2.0, 0.0)); // bei 90°
                 p2 = tsother.PointAt(tsother.PositionOf(p1));
                 if ((p1 | p2) > precision) return false;
-                firstToSecond = ModOp2D.Translate(uv2 - uv1); // es kann eigentlich nur verschiebung in x geben
+                BoundingRect br = new BoundingRect(uvother[0], Math.PI, Math.PI); // we use three points close to each other
+                uvother[1] = tsother.PositionOf(this.PointAt(uvthis[1]));
+                uvother[2] = tsother.PositionOf(this.PointAt(uvthis[2]));
+                SurfaceHelper.AdjustPeriodic(tsother, br, ref uvother[1]);
+                SurfaceHelper.AdjustPeriodic(tsother, br, ref uvother[2]);
+                firstToSecond = ModOp2D.Fit(uvthis, uvother, true);
                 return true;
             }
             return base.SameGeometry(thisBounds, other, otherBounds, precision, out firstToSecond);
@@ -2428,12 +2568,13 @@ namespace CADability.GeoObject
                 if (Precision.SameDirection(this.Axis, (other as PlaneSurface).Normal, false))
                 {
                     Plane unitPlane = toUnit * (other as PlaneSurface).Plane;
-                    if (Math.Abs(unitPlane.Location.z) <= Math.Abs(minorRadius))
+                    if (Math.Abs(unitPlane.Location.z) <= Math.Abs(minorRadius) + Precision.eps)
                     {
                         List<IDualSurfaceCurve> res = new List<IDualSurfaceCurve>();
-                        double v1 = Math.Asin(unitPlane.Location.z / minorRadius); // -pi/2 ... +pi/2
+                        double v1 = Math.Asin(Math.Max(Math.Min((unitPlane.Location.z / minorRadius), 1), -1)); // -pi/2 ... +pi/2
                         double v2 = Math.PI - v1;
-                        if (Math.Abs(v1 - v2) < 1e-6)
+                        if (v1 < 0) v2 = -Math.PI - v1;
+                        if (Math.Abs(v1 - v2) < 1e-5)
                         {   // single solution
                             double v = Math.PI / 2.0;
                             if (v1 < 0) v = -v;
@@ -2487,7 +2628,24 @@ namespace CADability.GeoObject
             }
             if (other is CylindricalSurface cylindricalSurface)
             {   // we need tangential points to split the result there
-                return cylindricalSurface.GetDualSurfaceCurves(otherBounds, this, thisBounds, seeds, extremePositions);
+                if (extremePositions != null)
+                {
+                    List<Tuple<double, double, double, double>> swapped = new List<Tuple<double, double, double, double>>();
+                    for (int i = 0; i < extremePositions.Count; i++)
+                    {
+                        swapped.Add(new Tuple<double, double, double, double>(extremePositions[0].Item3, extremePositions[0].Item4, extremePositions[0].Item1, extremePositions[0].Item2));
+                    }
+                    extremePositions = swapped;
+                }
+                IDualSurfaceCurve[] res = cylindricalSurface.GetDualSurfaceCurves(otherBounds, this, thisBounds, seeds, extremePositions);
+                if (res != null)
+                {
+                    for (int i = 0; i < res.Length; i++)
+                    {
+                        res[i].SwapSurfaces();
+                    }
+                }
+                return res;
             }
             return base.GetDualSurfaceCurves(thisBounds, other, otherBounds, seeds, extremePositions);
         }

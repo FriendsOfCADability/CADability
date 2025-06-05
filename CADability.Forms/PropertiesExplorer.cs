@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace CADability.Forms
@@ -173,6 +174,8 @@ namespace CADability.Forms
 
         #region textBox
         TextBox textBox; // there is only one TextBox for editing labels or values. It is normally hidden and moved, filled and activated when needed
+        bool endEidtCalled;
+        private ErrorProvider errorProvider = new ErrorProvider();
         public void ShowTextBox(Rectangle screenLocation, string initialText, IPropertyEntry sender, Point screenClickPos)
         {
             if (EntryWithTextBox != null) EntryWithTextBox.EndEdit(true, textBox.Modified, textBox.Text);
@@ -224,7 +227,8 @@ namespace CADability.Forms
                 {
                     bool ok = EntryWithTextBox.EditTextChanged(textBox.Text);
                     textBox.Modified = false; // so on EndEdit we do not update the same value twice
-                    // curly red underlines when OK is false?
+                    if (ok) errorProvider.SetError(textBox, ""); // this mechanism allows to set an error to the input field. 
+                    else errorProvider.SetError(textBox, EntryWithTextBox.GetErrorText()); // Must be implemented in ConstructAction.IInputObject or EditableProperty
                 }
                 finally
                 {
@@ -349,7 +353,21 @@ namespace CADability.Forms
             {
                 if (tabPages[i].TitleId == titleId)
                 {
+                    if (!tabPages[i].Visible) tabPages[i].Show();
                     tabControl.SelectedIndex = i;
+                    return true;
+                }
+            }
+            return false;
+        }
+        public bool RemovePropertyPage(string titleId)
+        {
+            for (int i = 0; i < tabPages.Count; i++)
+            {
+                if (tabPages[i].TitleId == titleId)
+                {
+                    tabControl.TabPages.Remove(tabPages[i].Parent as TabPage);
+                    tabPages.RemoveAt(i);
                     return true;
                 }
             }
@@ -401,7 +419,6 @@ namespace CADability.Forms
             if (EntryWithTextBox != null && EntryWithTextBox != selectedEntry) HideTextBox();
             if (EntryWithListBox != null && EntryWithListBox != selectedEntry) HideListBox();
         }
-
         public void PreProcessKeyDown(Substitutes.KeyEventArgs e)
         {   // this is being called after the ActiveAction has preprocessed (and not handled) the key down message
             // we can handle it here, before it gets handled by maybe and edit text box or something else (menu?)
@@ -473,6 +490,10 @@ namespace CADability.Forms
                         HideListBox();
                         e.Handled = true;
                     }
+                    else if (ActivePropertyPage is PropertyPage pp)
+                    {
+                        e.Handled = pp.OnEscape((e.KeyData & Substitutes.Keys.Control) != 0);
+                    }
                     break;
                 case Substitutes.Keys.Down:
                     e.Handled = SelectNextEntry(true);
@@ -481,8 +502,11 @@ namespace CADability.Forms
                     e.Handled = SelectNextEntry(false);
                     break;
             }
+            if (!e.SuppressKeyPress)
+            {
+                (ActivePropertyPage as PropertyPage).PreProcessKeyDown(e);
+            }
         }
-
         public void HideEntry(string entryId, bool hide)
         {
             if (hide) entriesToHide.Add(entryId);

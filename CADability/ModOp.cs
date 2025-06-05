@@ -1871,6 +1871,21 @@ namespace CADability
                 return true;
             }
         }
+        public bool IsValid
+        {
+            get
+            {
+                double[,] m = Matrix;
+                for (int i = 0; i < 3; i++)
+                {
+                    for (int j = 0; j < 4; j++)
+                    {
+                        if (double.IsNaN(m[i, j])) return false;
+                    }
+                }
+                return true;
+            }
+        }
         /// <summary>
         /// Returns the translation vector of this ModOp
         /// </summary>

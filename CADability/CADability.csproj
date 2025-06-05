@@ -1,15 +1,23 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <NoWarn>$(NoWarn);SYSLIB0011</NoWarn>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <PackageId>CADability</PackageId>
+    <Version>1.0.11</Version>
+    <!-- Update this for each publish -->
+    <Authors>FriendsOfCADability</Authors>
+    <Description>CAD functionality for .NET</Description>
+    <RepositoryUrl>https://github.com/FriendsOfCADability/CADability</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>cad drawing winforms geometry netstandard net48</PackageTags>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+
     <BuildDocFx Condition=" '$(Configuration)'!='RelWithDoc' ">false</BuildDocFx>
     <Configurations>Debug;Release;RelWithDoc;WebDebug</Configurations>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>CADabilityKey.snk</AssemblyOriginatorKeyFile>
     <AssemblyName>CADability</AssemblyName>
-    <BaseOutputPath>..\..\..\bin</BaseOutputPath>
-    <AssemblyVersion>2.0.0.0</AssemblyVersion>
     <Platforms>AnyCPU;x64</Platforms>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
   </PropertyGroup>
@@ -33,7 +41,7 @@
     <DocumentationFile />
   </PropertyGroup>
 
-   <PropertyGroup Condition="'$(Configuration)'=='RelWithDoc'">
+  <PropertyGroup Condition="'$(Configuration)'=='RelWithDoc'">
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DefineConstants>xPARALLEL, xTESTNEWCONTEXTMENU</DefineConstants>
     <Optimize>false</Optimize>
@@ -43,25 +51,29 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- collect the list of files to exclude from build.. -->
+    <None Include="..\README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- exclusions -->
     <RemoveFiles Include="CADability.DXF\**" />
     <RemoveFiles Include="DXF\**" />
     <RemoveFiles Include="_site\**" />
-
     <RemoveFiles Include="OpenGlList.cs" />
     <RemoveFiles Include="Scripting.cs" />
     <RemoveFiles Include="Tangulation.cs" />
-
     <RemoveFiles Include="log.txt" />
     <RemoveFiles Include="_ToDo.txt" />
-
     <RemoveFiles Include="WebDrawing.cs" Condition="'$(Configuration)'!='WebDebug'" />
 
-    <!-- ..and exclude it from all potential compile types -->
     <EmbeddedResource Remove="@(RemoveFiles)" />
     <EmbeddedFiles Remove="@(RemoveFiles)" />
     <Resource Remove="@(RemoveFiles)" />
     <Compile Remove="@(RemoveFiles)" />
+    <Compile Remove="ParametricsExtrudeAction.cs" />
+    <Compile Remove="ParametricsOffsetAction.cs" />
+    <Compile Remove="ParametricsRadiusAction.cs" />
+    <Compile Remove="SelectActionContextMenu.cs" />
     <Content Remove="@(RemoveFiles)" />
     <None Remove="@(RemoveFiles)" />
   </ItemGroup>

@@ -23,6 +23,7 @@ namespace CADability.UserInterface
         IPropertyPage GetPropertyPage(string titleId);
         void DisplayHelp(string helpID);
         bool ShowPropertyPage(string titleId);
+        bool RemovePropertyPage(string titleId);
         IFrame Frame { get; set; }
         void PreProcessKeyDown(KeyEventArgs e);
         void HideEntry(string entryId, bool hide);
@@ -45,7 +46,7 @@ namespace CADability.UserInterface
         public int x, y;
         public int wheelDiff;
     }
-    public enum PropertyEntryButton { contextMenu, dropDown, ok, cancel, check, value, locked };
+    public enum PropertyEntryButton { contextMenu, dropDown, ok, cancel, check, value, locked, directMenu, doubleclick };
     [Flags]
     public enum PropertyEntryType
     {
@@ -129,6 +130,16 @@ namespace CADability.UserInterface
         /// The edit part of this entry displays the lock symbol on the rigth hand side
         /// </summary>
         Lockable = 1 << 19,
+        /// <summary>
+        /// Clicking on the entry calls<see cref="IPropertyEntry.ButtonClicked(PropertyEntryButton)"/> with the flag <see cref="PropertyEntryButton.directMenu", displayed as right arrow/>
+        /// </summary>
+        DirectMenu = 1 << 20,
+        /// <summary>
+        /// This entry may have a shortcut. The shortcut is provided in the <see cref="IPropertyEntry.Label"/> as [[sF]] at the end of the text.
+        /// The Syntax is [[xY]], where x is 's' for shift, 'c' for ctrl 'a' for alt or missing and Y is the key. There may also be two modifiers [[scF]] for Shift+Ctrl+F.
+        /// Even when this flag is provided there may be no shortcut if the label text doesn't contain one
+        /// </summary>
+        Shortcut = 1 << 21,
     }
     /// <summary>
     /// Describes a single line in a tab page in the control center. Must be implemented by displayable properties like GeoPointProperty.
@@ -254,8 +265,20 @@ namespace CADability.UserInterface
         /// Is the lockable entry is currently locked
         /// </summary>
         bool IsLocked { get; set; }
-
+        /// <summary>
+        /// Will be called when <see cref="EditTextChanged"/> returned false. You can provide an error message, which is displayed when the mouse hovers over the 
+        /// error symbol.
+        /// </summary>
+        /// <returns></returns>
+        string GetErrorText();
     }
+    public delegate void PreProcessKeyDown(KeyEventArgs keyEventArgs);
+    /// <summary>
+    /// notifies the event receiver, that the selection has changed
+    /// </summary>
+    /// <param name="unselected">the previous selected item</param>
+    /// <param name="selected">the itam, which just has been selected</param>
+    public delegate void SelectionChanged(IPropertyEntry unselected, IPropertyEntry selected);
     public interface IPropertyPage
     {
         void BringToFront();
@@ -279,6 +302,8 @@ namespace CADability.UserInterface
         #endregion
         bool ContainsEntry(IPropertyEntry entryWithTextBox);
         bool IsOnTop();
+        event PreProcessKeyDown OnPreProcessKeyDown;
+        event SelectionChanged OnSelectionChanged;
     }
 
     public interface IUIService

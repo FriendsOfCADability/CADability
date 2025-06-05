@@ -295,7 +295,7 @@ namespace CADability.Attribute
             get
             {
                 PropertyEntryType flags = PropertyEntryType.LabelEditable | PropertyEntryType.Selectable | PropertyEntryType.ContextMenu | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
-                if (parent.Current != null && parent.Current.Name == Name) flags |= PropertyEntryType.Bold;
+                if (parent!=null && parent.Current != null && parent.Current.Name == Name) flags |= PropertyEntryType.Bold;
                 return flags;
             }
         }

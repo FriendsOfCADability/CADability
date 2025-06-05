@@ -379,5 +379,10 @@ namespace CADability
         {
             throw new NotImplementedException();
         }
+
+        public bool IsRotated(Axis rotationAxis)
+        {
+            return original.IsRotated(rotationAxis);
+        }
     }
 }

@@ -1087,7 +1087,7 @@ namespace CADability
         {
             verbose = Settings.GlobalSettings.GetBoolValue("Json.Verbose", false);
 #if DEBUG
-            //verbose = true;
+            verbose = true;
 #endif
             outStream = new FormattingStreamWriter(stream);
             firstEntry = new Stack<bool>();

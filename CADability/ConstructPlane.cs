@@ -15,7 +15,7 @@ namespace CADability.Actions
     /// 
     /// </summary>
 
-    public class ConstructPlane : CADability.Actions.ConstructAction, IIntermediateConstruction
+    public class ConstructPlane : ConstructAction, IIntermediateConstruction, IConstructPlane
     {
         public class ConstructPlaneException : ApplicationException
         {

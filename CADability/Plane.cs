@@ -847,6 +847,12 @@ namespace CADability
         {
             return Location + p.x * DirectionX + p.y * DirectionY;
         }
+        public GeoPoint FootPoint(GeoPoint fromHere)
+        {
+            GeoPoint onPlane = coordSys.GlobalToLocal* fromHere;
+            onPlane.z = 0.0;
+            return coordSys.LocalToGlobal * onPlane;
+        }
         /// <summary>
         /// Inverse to the appropriate <see cref="ToLocal(GeoPoint)"/> method. The given point 
         /// is assumed in the coordinate ststem of this plane.
@@ -942,7 +948,7 @@ namespace CADability
             Location = ToGlobal(c);
         }
 
-        internal GeoPoint2D Intersect(Axis SourceBeam)
+        public GeoPoint2D Intersect(Axis SourceBeam)
         {
             return this.Project(Intersect(SourceBeam.Location, SourceBeam.Direction));
         }

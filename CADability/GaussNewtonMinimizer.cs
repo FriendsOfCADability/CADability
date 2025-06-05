@@ -5,6 +5,7 @@ using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.LinearAlgebra.Double;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace CADability
 {
@@ -230,7 +231,7 @@ namespace CADability
                 //(2 * (py - ly) * (dy * (lz - pz) - dz * (ly - py)) + 2 * (px - lx) * (dx * (lz - pz) - dz * (lx - px))) / (dz ^ 2 + dy ^ 2 + dx ^ 2) - (2 * dz * ((dy * (lz - pz) - dz * (ly - py)) ^ 2 + (dx * (lz - pz) - dz * (lx - px)) ^ 2 + (dx * (ly - py) - dy * (lx - px)) ^ 2)) / (dz ^ 2 + dy ^ 2 + dx ^ 2) ^ 2;
 
                 derivs = DenseMatrix.Create(points.Length, 6, 0.0); // new Matrix(points.Length, 6); // Jacobi Matrix Ableitungen nach cx, cy, cz und r
-                                                       // (pnts.x-cx)²+(pnts.y-cy)²+(pnts.z-cz)²-r² == 0
+                                                                    // (pnts.x-cx)²+(pnts.y-cy)²+(pnts.z-cz)²-r² == 0
                 double lx = parameters[0];
                 double ly = parameters[1];
                 double lz = parameters[2];
@@ -356,7 +357,7 @@ namespace CADability
             // we need a distance function from a point to the ellipse. This was done with maxima, moving the point to a horizontally aligned ellipse around the origin.
             // Then calculating the angle and using the distance between the point of the ellipse at this angle and the test point.
             // maxima text:
-            
+
             // e(u):=[a * cos(u), b * sin(u)]; /* horizontal ellipse around origin*/
             // s(p):=[(p[1] - cx) * cos(-w) - (p[2] - cy) * sin(-w), (p[1] - cx) * sin(-w) + (p[2] - cy) * cos(-w)]; /* from offset (cx,cy) and rotation (w) to origin and horizontal */
             // u(p):= atan2(s(p)[2] / b, s(p)[1] / a); /* parameter for point u */
@@ -375,7 +376,7 @@ namespace CADability
             // printf(fo, "db=~a;", diff(d(p), b, 1));
             // newline(fo);
             // close(fo);
-            
+
             // The result was passed through CommonSubExpr to make it a little more readable.
 
             // parameters are cx,cy, a,b, w (center, major radius, minor radius, angle)
@@ -481,45 +482,46 @@ namespace CADability
             // sqr(c * pz + b * py + a * px - d) + sqr(a * a + b * b + c * c - 1); ( with (a,b,c)=(nx,ny,nz))
             // also forces the normal vector to have a length of 1
 
+            double dx = 0.0, dy = 0.0, dz = 0.0;
+
             void efunc(double[] parameters, out double[] values)
             {
-                // error: a * px + b * py - c * pz - d (this may be positive or negative. It seems to be ok)
+                // error: a * px + b * py - c * pz - 1 (this may be positive or negative. It seems to be ok)
                 // a * px + b * py - c * pz - d)^2+(a^2+b^2+c^2-1)^2;
                 values = new double[points.Length];
                 double a = parameters[0];
                 double b = parameters[1];
                 double c = parameters[2];
-                double d = parameters[3];
+                double d = -1;
                 for (int i = 0; i < points.Length; i++)
                 {
-                    double px = points[i].x;
-                    double py = points[i].y;
-                    double pz = points[i].z;
-                    values[i] = sqr(c * pz + b * py + a * px - d) + sqr(a * a + b * b + c * c - 1);
+                    double px = points[i].x + dx;
+                    double py = points[i].y + dy;
+                    double pz = points[i].z + dz;
+                    values[i] = c * pz + b * py + a * px - 1;
                 }
             }
             void jfunc(double[] parameters, out Matrix derivs)
             {
 
-                derivs = DenseMatrix.Create(points.Length, 4, 0); // Jacobi Matrix Derivations
+                derivs = DenseMatrix.Create(points.Length, 3, 0); // Jacobi Matrix Derivations
                 double a = parameters[0];
                 double b = parameters[1];
                 double c = parameters[2];
-                double d = parameters[3];
 
                 for (int i = 0; i < points.Length; i++)
                 {
-                    double px = points[i].x;
-                    double py = points[i].y;
-                    double pz = points[i].z;
+                    double px = points[i].x + dx;
+                    double py = points[i].y + dy;
+                    double pz = points[i].z + dz;
 
-                    derivs[i, 0] = 2 * px * (-c * pz + b * py + a * px - d) + 4 * a * (c * c + b * b + a * a - 1);
-                    derivs[i, 1] = 2 * py * (-c * pz + b * py + a * px - d) + 4 * b * (c * c + b * b + a * a - 1);
-                    derivs[i, 2] = 2 * pz * (-c * pz + b * py + a * px - d) + 4 * c * (c * c + b * b + a * a - 1);
-                    derivs[i, 3] = -2 * (-c * pz + b * py + a * px - d);
+                    derivs[i, 0] = px;
+                    derivs[i, 1] = py;
+                    derivs[i, 2] = pz;
                 }
             }
-            double[] sparams = new double[4];
+            double[] sparams = new double[3];
+            bool found = false;
             for (int i = 0; i < points.Length; i++)
             {
                 for (int j = i + 1; j < points.Length; j++)
@@ -534,28 +536,43 @@ namespace CADability
                             Plane pln = new Plane(points[i], dirx, diry);
                             n.Norm();
                             double d = pln.Distance(GeoPoint.Origin);
-                            sparams[0] = n.x;
-                            sparams[1] = n.y;
-                            sparams[2] = n.z;
-                            sparams[3] = -d;
+                            sparams[0] = -n.x * d;
+                            sparams[1] = -n.y * d;
+                            sparams[2] = -n.z * d;
+                            // sparams[3] = -d; d is set to -1
+                            found = true;
                             break;
                         }
                     }
+                    if (found) break;
                 }
+                if (found) break;
             }
             GaussNewtonMinimizer gnm = new GaussNewtonMinimizer(efunc, jfunc);
             bool ok = gnm.Solve(sparams, 30, 1e-6, precision * precision, out double minError, out int numiter, out double[] result);
-            if (ok)
+            if (ok && Math.Abs(result[0]) + Math.Abs(result[1]) + Math.Abs(result[2]) > 1)
             {
                 GeoVector normal = new GeoVector(result[0], result[1], result[2]);
-                GeoPoint loc = new GeoPoint(result[3] * result[0], result[3] * result[1], result[3] * result[2]);
+                GeoPoint loc = new GeoPoint(-result[0], -result[1], -result[2]);
                 plane = new Plane(loc, normal);
                 return Math.Sqrt(minError);
             }
             else
             {
-                plane = Plane.XYPlane;
-                return double.MaxValue;
+                dx = dy = dz = 1.0;
+                ok = gnm.Solve(sparams, 30, 1e-6, precision * precision, out minError, out numiter, out result);
+                if (ok)
+                {
+                    GeoVector normal = new GeoVector(result[0], result[1], result[2]);
+                    GeoPoint loc = new GeoPoint(-result[0] + dx, -result[1] + dy, -result[2] + dz);
+                    plane = new Plane(loc, normal);
+                    return Math.Sqrt(minError);
+                }
+                else
+                {
+                    plane = Plane.XYPlane;
+                    return double.MaxValue;
+                }
             }
         }
         public static double ConeFitNew(IArray<GeoPoint> points, GeoPoint apex, GeoVector axis, double theta, double precision, out ConicalSurface cs)
@@ -996,7 +1013,7 @@ namespace CADability
             void jfunc(double[] parameters, out Matrix derivs)
             {
                 derivs = DenseMatrix.Create(pnts.Length, 3, 0); // Jacobi Matrix Ableitungen nach cx, cy, cz und r
-                                                     // (pnts.x-cx)²+(pnts.y-cy)²+(pnts.z-cz)²-r² == 0
+                                                                // (pnts.x-cx)²+(pnts.y-cy)²+(pnts.z-cz)²-r² == 0
                 double cx = parameters[0];
                 double cy = parameters[1];
                 double cz = parameters[2];
@@ -1165,6 +1182,11 @@ namespace CADability
                 return double.MaxValue;
             }
         }
+        /// <summary>
+        /// Find a quadric, which approximates the provided points. Return the maxerror of the derivation to this quadric.
+        /// </summary>
+        /// <param name="pnts"></param>
+        /// <returns></returns>
         public static double QuadricFit(IArray<GeoPoint> pnts)
         {
             /*  A Quadric according to https://lcvmwww.epfl.ch/PROJECTS/classification_quad.pdf
@@ -1184,7 +1206,6 @@ namespace CADability
                 2*z;
                 1;
             */
-            // parameters: 0: ax, 1: ay, 2: az, 3: dx, 4: dy, 5: dz, 6: r (a: location, d: direction, r: radius)
             void efunc(double[] parameters, out double[] values)
             {
                 values = new double[pnts.Length];
@@ -1271,9 +1292,9 @@ namespace CADability
                         else ++cq;
                     }
                 }
-                Matrix trans = (Matrix)(MQ.Inverse() * DenseMatrix.OfRowArrays(new double[] { D, G, I }));
-                GeoPoint mp = new GeoPoint(trans[0, 0], trans[1, 0], trans[2, 0]);
-                GeoPoint mmp = new GeoPoint(-trans[0, 0], -trans[1, 0], -trans[2, 0]); // der liegt auf der Achse
+                Vector<double> v = MathNet.Numerics.LinearAlgebra.CreateVector.Dense<double>(new double[] { D, G, I });
+                Vector<double> trans = MQ.Inverse() * v;
+                GeoPoint mp = new GeoPoint(trans[0], trans[1], trans[2]);
                 return Math.Sqrt(minError);
             }
             else
@@ -1596,7 +1617,7 @@ namespace CADability
             // parameters uv1.x, uv1.y
             bool checkParameter(double[] parameters)
             {
-                return bounds.ContainsEps(new GeoPoint2D(parameters[0], parameters[1]), bounds.Size * 1e-6) ;
+                return bounds.ContainsEps(new GeoPoint2D(parameters[0], parameters[1]), bounds.Size * 1e-6);
             }
             void curtailParameter(double[] parameters)
             {
@@ -1628,7 +1649,7 @@ namespace CADability
                 derivs[1, 1] = dir.z * sdvv.z + dir.y * sdvv.y + dir.x * sdvv.x;
             }
             GaussNewtonMinimizer gnm = new GaussNewtonMinimizer(efunc, jfunc, checkParameter, curtailParameter);
-            bool ok = gnm.Solve(new double[] { uv.x, uv.y}, 30, 1e-6, 1e-6, out double minError, out int numiter, out double[] result);
+            bool ok = gnm.Solve(new double[] { uv.x, uv.y }, 30, 1e-6, 1e-6, out double minError, out int numiter, out double[] result);
             uv = new GeoPoint2D(result[0], result[1]);
             return minError;
         }

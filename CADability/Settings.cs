@@ -697,7 +697,7 @@ namespace CADability
             {
                 Settings ExperimentalSetting = GlobalSettings.GetSubSetting("Experimental");
                 BooleanProperty TestNewContextMenu = new BooleanProperty("Experimental.TestNewContextMenu", "YesNo.Values", "TestNewContextMenu");
-                TestNewContextMenu.BooleanValue = false;
+                TestNewContextMenu.BooleanValue = true;
                 ExperimentalSetting.AddSetting("TestNewContextMenu", TestNewContextMenu);
             }
         }

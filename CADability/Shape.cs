@@ -4,6 +4,7 @@ using CADability.GeoObject;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading;
 
@@ -147,6 +148,13 @@ namespace CADability.Shapes
                 return (Border[])holes.Clone(); // kopie des Arrays, somit unveränderlich
             }
         }
+        public IEnumerable<ICurve2D> Segments
+        {
+            get
+            {
+                return outline.Segments.Concat(holes.SelectMany(h => h.Segments));
+            }
+        }
         /// <summary>
         /// Returns the area of this simple shape.
         /// </summary>
@@ -188,7 +196,7 @@ namespace CADability.Shapes
             }
             return true;
         }
-        internal Border.Position GetPosition(GeoPoint2D p, double prec = 0.0)
+        public Border.Position GetPosition(GeoPoint2D p, double prec = 0.0)
         {
             Border.Position pos = outline.GetPosition(p, prec);
             if (pos == Border.Position.Outside) return Border.Position.Outside;
@@ -889,6 +897,14 @@ namespace CADability.Shapes
             // Alle Fälle abgedeckt, hierhin gehts nicht
             return Position.disjunct;
         }
+        public static SimpleShape MakeCircle(GeoPoint2D center, double radius)
+        {
+            return new SimpleShape(Border.MakeCircle(center, radius));
+        }
+        public static SimpleShape MakePolygon(GeoPoint2D center, double radius, int numberOfSides)
+        {
+            return new SimpleShape(Border.MakePolygon(center, radius, numberOfSides));
+        }
         public static SimpleShape MakeLongHole(ICurve2D centerLine, double halfWidth, double precision)
         {
             if (!(centerLine is Path2D)) centerLine = new Path2D(new ICurve2D[] { centerLine });
@@ -1338,7 +1354,7 @@ namespace CADability.Shapes
             holes = newholes;
         }
 
-        internal GeoPoint2D GetSomeInnerPoint()
+        public GeoPoint2D GetSomeInnerPoint()
         {
             BoundingRect ext = this.GetExtent() * 1.1;
             // Problem: zwei sich berührende Löcher, die Cliplinie geht genau durch die Berührstelle

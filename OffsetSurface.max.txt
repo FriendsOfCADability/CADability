@@ -1,0 +1,75 @@
+load("vect");
+
+/* Definiere die allgemeine Vektorfunktion f(u, v) */
+f(u, v) := [x(u, v), y(u, v), z(u, v)];
+
+/* Definiere die partiellen Ableitungen */
+dfdu : diff(f(u, v), u);
+dfdv : diff(f(u, v), v);
+dfduu : diff(f(u, v), u, 2);
+dfdvv : diff(f(u, v), v, 2);
+dfduv : diff(f(u, v), v, 1, u, 1);
+dfduuu : diff(f(u, v), u, 3);
+dfdvvv : diff(f(u, v), v, 3);
+dfduvv : diff(f(u, v), v, 2, u, 1);
+dfduuv : diff(f(u, v), v, 1, u, 2);
+
+subst_d : [df_du=dfdu, df_dv=dfdv];
+
+/* Berechne das Kreuzprodukt und normiere es */
+n : dfdu ~ dfdv;
+norm_n : sqrt(n[1]^2 + n[2]^2 + n[3]^2);
+N : n / norm_n;
+
+/* Definiere die neue Funktion o(u, v) */
+o(u, v) := f(u, v) + d * N;
+
+/* Berechne die partiellen Ableitungen von o(u, v) */
+dod_u : diff(o(u, v), u);
+dod_v : diff(o(u, v), v);
+dod_uv: diff(o(u,v),u,1,v,1);
+dod_uu: diff(o(u,v),u,2);
+dod_vv: diff(o(u,v),v,2);
+
+subst(df_du,dfdu,
+subst(df_dv,dfdv,
+subst(df_duu,dfduu,
+subst(df_dvv,dfdvv,
+subst(df_duv,dfduv,dod_u)))));
+
+subst(df_du,dfdu,
+subst(df_dv,dfdv,
+subst(df_duu,dfduu,
+subst(df_dvv,dfdvv,
+subst(df_duv,dfduv,dod_v)))));
+
+subst(df_du,dfdu,
+subst(df_dv,dfdv,
+subst(df_duu,dfduu,
+subst(df_dvv,dfdvv,
+subst(df_duv,dfduv,
+subst(df_duuu,dfduuu,
+subst(df_duuv,dfduuv,
+subst(df_duvv,dfduvv,
+subst(df_dvvv,dfdvvv,dod_uu)))))))));
+
+subst(df_du,dfdu,
+subst(df_dv,dfdv,
+subst(df_duu,dfduu,
+subst(df_dvv,dfdvv,
+subst(df_duv,dfduv,
+subst(df_duuu,dfduuu,
+subst(df_duuv,dfduuv,
+subst(df_duvv,dfduvv,
+subst(df_dvvv,dfdvvv,dod_vv)))))))));
+
+subst(df_du,dfdu,
+subst(df_dv,dfdv,
+subst(df_duu,dfduu,
+subst(df_dvv,dfdvv,
+subst(df_duv,dfduv,
+subst(df_duuu,dfduuu,
+subst(df_duuv,dfduuv,
+subst(df_duvv,dfduvv,
+subst(df_dvvv,dfdvvv,dod_uv)))))))));
+

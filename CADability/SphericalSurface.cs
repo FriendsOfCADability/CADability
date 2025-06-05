@@ -796,6 +796,11 @@ namespace CADability.GeoObject
 		{
 			return new double[] { -Math.PI / 2.0, Math.PI / 2.0 };
 		}
+		public override bool IsRotated(Axis rotationAxis)
+		{
+			return Precision.IsPointOnLine(toSphere * GeoPoint.Origin, rotationAxis.Location, rotationAxis.Location + this.RadiusX * rotationAxis.Direction);
+		}
+
 		public override void Intersect(ICurve curve, BoundingRect uvExtent, out GeoPoint[] ips, out GeoPoint2D[] uvOnFaces, out double[] uOnCurve3Ds)
 		{
 			ips = null;
@@ -1102,6 +1107,34 @@ namespace CADability.GeoObject
 							{
 								SurfaceHelper.AdjustPeriodic(other, otherBounds, ref ips[i]);
 								if (otherBounds.Contains(ips[i])) extremePositions.Add(new Tuple<double, double, double, double>(double.NaN, double.NaN, ips[i].x, ips[i].y));
+							}
+						}
+						return extremePositions.Count;
+					}
+				case ToroidalSurface ts:
+					{
+						extremePositions = new List<Tuple<double, double, double, double>>();
+						if (Precision.IsPointOnLine(Location, ts.Location, ts.Location + ts.Axis)) return 0;
+						Ellipse circle = ts.GetAxisEllipse();
+						double pos = circle.PositionOf(Location); // closest point to torus ring circle
+						GeoPoint closest1 = circle.PointAt(pos);
+						GeoPoint closest2 = circle.PointAt((pos + 0.5) % 1.0); // the farthest point
+						foreach (GeoPoint closest in new GeoPoint[] { closest1, closest2 })
+						{
+							if (!Precision.IsEqual(closest, Location))
+							{
+								GeoPoint2D[] ips = GetLineIntersection(Location, closest - Location);
+								for (int i = 0; i < ips.Length; i++)
+								{
+									SurfaceHelper.AdjustPeriodic(this, thisBounds, ref ips[i]);
+									if (thisBounds.Contains(ips[i])) extremePositions.Add(new Tuple<double, double, double, double>(ips[i].x, ips[i].y, double.NaN, double.NaN));
+								}
+								ips = ts.GetLineIntersection(Location, closest - Location);
+								for (int i = 0; i < ips.Length; i++)
+								{
+									SurfaceHelper.AdjustPeriodic(other, otherBounds, ref ips[i]);
+									if (otherBounds.Contains(ips[i])) extremePositions.Add(new Tuple<double, double, double, double>(double.NaN, double.NaN, ips[i].x, ips[i].y));
+								}
 							}
 						}
 						return extremePositions.Count;

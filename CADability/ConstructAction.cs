@@ -11,18 +11,15 @@ using System.Drawing;
 using Point = System.Drawing.Point;
 #endif
 using MouseEventArgs = CADability.Substitutes.MouseEventArgs;
-using DragEventArgs = CADability.Substitutes.DragEventArgs;
 using MouseButtons = CADability.Substitutes.MouseButtons;
-using DragDropEffects = CADability.Substitutes.DragDropEffects;
 using Keys = CADability.Substitutes.Keys;
 using KeyEventArgs = CADability.Substitutes.KeyEventArgs;
 
 namespace CADability.Actions
 {
-	using CADability.Attribute;
+	using Attribute;
 	using Shapes;
 	using System.Collections.Generic;
-	using System.Text;
 	using System.Threading;
 
 	/// <summary>
@@ -57,8 +54,8 @@ namespace CADability.Actions
 
 	public class ConstructActionException : ApplicationException
 	{
-		internal ConstructActionException(string Message)
-			: base(Message)
+		internal ConstructActionException(string message)
+			: base(message)
 		{
 		}
 	}
@@ -73,7 +70,7 @@ namespace CADability.Actions
 		/// A DefaultLength object is usually used in conjunction with a <see cref="LengthInput"/>
 		/// object (see <see cref="LengthInput.DefaultLength"/>). It specifies a default value
 		/// for the input field as long as the user didn't specify that input via
-		/// keybord or mouse. When the length input is locked, the value is saved in the corresponding DefaultLength
+		/// keyboard or mouse. When the length input is locked, the value is saved in the corresponding DefaultLength
 		/// object. DefaultLength objects are usually static in a ConstructAction to preserve that value
 		/// from one instance of the action to the next instance.
 		/// </summary>
@@ -503,8 +500,8 @@ namespace CADability.Actions
 				startDirection = StartDirection.XAxis;
 				startLength = StartLength.UnitOne;
 				activeAction = null;
-				this.startDirection = StartDirection.XAxis;
-				this.startLength = StartLength.UnitOne;
+				startDirection = StartDirection.XAxis;
+				startLength = StartLength.UnitOne;
 			}
 			/// <summary>
 			/// Creates an uninitialized DefaultGeoVector with a description how to initialize.
@@ -736,7 +733,7 @@ namespace CADability.Actions
 			void SetFixed(bool isFixed);
 		}
 		/// <summary>
-		/// Common base class for input objects for the ConstructAction (see <see cref="SetInput"/>
+		/// Common base class for input objects for the ConstructAction (see <see cref="ConstructAction.SetInput"/>
 		/// </summary>
 		public abstract class InputObject
 		{
@@ -800,7 +797,7 @@ namespace CADability.Actions
 				ReadOnly = false;
 				Optional = false;
 				Fixed = false;
-				this.ResourceId = resourceId;
+				ResourceId = resourceId;
 			}
 			/// <summary>
 			/// Back reference to the ConstructAction this input is used for.
@@ -864,6 +861,11 @@ namespace CADability.Actions
 					return GeoPoint.Origin;
 				}
 			}
+			public virtual void SetError(string errorMessage)
+			{
+
+			}
+
 			#endregion
 		}
 		public class SeparatorInput : InputObject, IInputObject
@@ -884,7 +886,7 @@ namespace CADability.Actions
 			SeperatorProperty sepprop;
 			IPropertyEntry IInputObject.BuildShowProperty()
 			{
-				sepprop = new SeperatorProperty(base.ResourceId);
+				sepprop = new SeperatorProperty(ResourceId);
 				return sepprop;
 			}
 
@@ -940,12 +942,17 @@ namespace CADability.Actions
 			{
 			}
 
+			public override void SetError(string errorMessage)
+			{
+				// no error on this input possible
+			}
+
 			#endregion
 		}
 		public class InputContainer : InputObject, IInputObject
 		/// <summary>
 		/// Input object for the ConstructAction that yields an <see cref="Angle"/>.
-		/// See <see cref="SetInput"/>
+		/// See <see cref="ConstructAction.SetInput"/>
 		/// </summary>
 		{
 			SimplePropertyGroup simplePropertyGroup; // der Container
@@ -964,17 +971,17 @@ namespace CADability.Actions
 				{
 					simplePropertyGroup.RemoveAll();
 					simplePropertyGroup.Add(contents);
-					if (base.constructAction.propertyTreeView != null)
+					if (constructAction.propertyTreeView != null)
 					{
-						base.constructAction.propertyTreeView.Refresh(simplePropertyGroup);
+						constructAction.propertyTreeView.Refresh(simplePropertyGroup);
 					}
 				}
 			}
 			public void Open(bool open)
 			{
-				if (base.constructAction.propertyTreeView != null && simplePropertyGroup != null)
+				if (constructAction.propertyTreeView != null && simplePropertyGroup != null)
 				{
-					base.constructAction.propertyTreeView.OpenSubEntries(simplePropertyGroup, open);
+					constructAction.propertyTreeView.OpenSubEntries(simplePropertyGroup, open);
 				}
 			}
 			public IPropertyEntry[] GetShowProperties()
@@ -997,15 +1004,15 @@ namespace CADability.Actions
 
 			void IInputObject.Refresh()
 			{
-				if (base.constructAction.propertyTreeView != null && simplePropertyGroup != null)
+				if (constructAction.propertyTreeView != null && simplePropertyGroup != null)
 				{
-					base.constructAction.propertyTreeView.Refresh(simplePropertyGroup);
+					constructAction.propertyTreeView.Refresh(simplePropertyGroup);
 				}
 			}
 
 			IPropertyEntry IInputObject.BuildShowProperty()
 			{
-				simplePropertyGroup = new SimplePropertyGroup(base.ResourceId);
+				simplePropertyGroup = new SimplePropertyGroup(ResourceId);
 				if (contents != null) simplePropertyGroup.Add(contents);
 				return simplePropertyGroup;
 			}
@@ -1062,6 +1069,10 @@ namespace CADability.Actions
 
 			void IInputObject.SetFixed(bool isFixed)
 			{
+			}
+			public override void SetError(string errorMessage)
+			{
+
 			}
 
 			#endregion
@@ -1433,6 +1444,10 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			public override void SetError(string errorMessage)
+			{
+				angleProperty.ErrorMessage = errorMessage;
+			}
 			#endregion
 			private Angle AnglePropertyOnGetAngle()
 			{
@@ -1441,6 +1456,7 @@ namespace CADability.Actions
 			private void AnglePropertyOnSetAngle(Angle a)
 			{
 				(this as IInputObject).SetFixed(true);
+				//angleProperty.SetMouseButton(MouseButtonMode.MouseLocked);
 				InternalSetAngle(a);
 				if (defaultAngle != null) defaultAngle.Angle = a;
 			}
@@ -1715,7 +1731,7 @@ namespace CADability.Actions
 			{
 				if (GetLengthEvent != null)
 				{
-					this.Length = GetLengthEvent();
+					Length = GetLengthEvent();
 					if (lengthProperty != null) lengthProperty.LengthChanged();
 				}
 			}
@@ -1728,7 +1744,7 @@ namespace CADability.Actions
 					(this as IInputObject).SetFixed(true);
 					InternalSetLength(l);
 					constructAction.RefreshDependantProperties();
-					if (defaultLength != null) 
+					if (defaultLength != null)
 						defaultLength.Length = l;
 				};
 				lengthProperty.ModifyWithMouse += new ModifyWithMouseDelegate(OnModifyWithMouse);
@@ -1864,7 +1880,12 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
-			#endregion			
+			public override void SetError(string errorMessage)
+			{
+				lengthProperty.ErrorMessage = errorMessage;
+			}
+			#endregion
+			
 			private void OnLockedChanged(bool locked)
 			{
 				if (defaultLength != null) defaultLength.Locked = locked;
@@ -1881,6 +1902,7 @@ namespace CADability.Actions
 					(this as IInputObject).SetFixed(false);
 				}
 			}
+
 		}
 		/// <summary>
 		/// Defines an input object for an action derived from ConstructAction.
@@ -1989,7 +2011,7 @@ namespace CADability.Actions
 				if (SetDoubleEvent == null) return;
 				if (SetDoubleEvent(val))
 				{
-					this.DoubleValue = val;
+					DoubleValue = val;
 				}
 			}
 			private void OnModifyWithMouse(IShowProperty sender, bool StartModifying)
@@ -2187,6 +2209,10 @@ namespace CADability.Actions
 			void IInputObject.SetFixed(bool isFixed)
 			{
 				Fixed = isFixed;
+			}
+			public override void SetError(string errorMessage)
+			{
+				doubleProperty.ErrorMessage = errorMessage;
 			}
 			#endregion
 			private double DoublePropertyOnGetDouble(DoubleProperty sender)
@@ -2650,7 +2676,12 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			public override void SetError(string errorMessage)
+			{
+				geoPointProperty.ErrorMessage = errorMessage;
+			}
 			#endregion
+			
 		}
 		/// <summary>
 		/// Defines an input object for an action derived from ConstructAction.
@@ -3108,6 +3139,10 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			public override void SetError(string errorMessage)
+			{
+				geoVectorProperty.ErrorMessage = errorMessage;
+			}
 			#endregion
 			private void OnLockedChanged(bool locked)
 			{
@@ -3303,7 +3338,7 @@ namespace CADability.Actions
 				}
 				lengthProperty.Refresh();
 				return lengthProperty;
-			}			
+			}
 			void IInputObject.OnMouse(MouseEventArgs e, MouseState mouseState, IView vw)
 			{
 				if (forwardMouseInputTo != null)
@@ -3408,6 +3443,9 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			public override void SetError(string errorMessage)
+			{
+			}
 			#endregion
 
 			#region ICommandHandler Members
@@ -3431,54 +3469,32 @@ namespace CADability.Actions
 						return true;
 					case "MenuId.Plane.2PointsDrawingPlane":
 						ConstructPlane2PointsDrawingPlane cp2 = new ConstructPlane2PointsDrawingPlane();
-						cp2.ActionDoneEvent += new ActionDoneDelegate(OnConstructPlane2PointsDrawingPlaneDone);
+						cp2.ActionDoneEvent += new ActionDoneDelegate(OnConstructPlaneDone);
 						constructAction.Frame.SetAction(cp2);
 						return true;
 					case "MenuId.Plane.OriginNormalPoint":
 						ConstructPlaneOriginNormalPoint cp3 = new ConstructPlaneOriginNormalPoint();
-						cp3.ActionDoneEvent += new ActionDoneDelegate(OnConstructPlaneOriginNormalPointDone);
+						cp3.ActionDoneEvent += new ActionDoneDelegate(OnConstructPlaneDone);
 						constructAction.Frame.SetAction(cp3);
 						return true;
 					case "MenuId.DrawingPlane.Tangential":
 						ConstructTangentialPlane ct = new ConstructTangentialPlane("Construct.DrawingPlane");
-						ct.ActionDoneEvent += new ActionDoneDelegate(OnConstructTangentialPlaneDone);
+						ct.ActionDoneEvent += new ActionDoneDelegate(OnConstructPlaneDone);
 						constructAction.Frame.SetAction(ct);
+						return true;
+					case "MenuId.Plane.OfCurve":
+						ConstructPlaneOfCurve cpc = new ConstructPlaneOfCurve("Construct.Plane.OfCurve");
+						cpc.ActionDoneEvent += new ActionDoneDelegate(OnConstructPlaneDone);
+						constructAction.Frame.SetAction(cpc);
 						return true;
 				}
 				return false;
-			}
-			void OnConstructTangentialPlaneDone(ConstructAction ca, bool success)
-			{
-				if (success)
-				{
-					ForceValue((ca as ConstructTangentialPlane).ConstructedPlane);
-					(this as IInputObject).SetFixed(true);
-					constructAction.SetNextInputIndex(true);
-				}
 			}
 			void OnConstructPlaneDone(ConstructAction ca, bool success)
 			{
 				if (success)
 				{
-					ForceValue((ca as ConstructPlane).ConstructedPlane);
-					(this as IInputObject).SetFixed(true);
-					constructAction.SetNextInputIndex(true);
-				}
-			}
-			void OnConstructPlane2PointsDrawingPlaneDone(ConstructAction ca, bool success)
-			{
-				if (success)
-				{
-					ForceValue((ca as ConstructPlane2PointsDrawingPlane).ConstructedPlane);
-					(this as IInputObject).SetFixed(true);
-					constructAction.SetNextInputIndex(true);
-				}
-			}
-			void OnConstructPlaneOriginNormalPointDone(ConstructAction ca, bool success)
-			{
-				if (success)
-				{
-					ForceValue((ca as ConstructPlaneOriginNormalPoint).ConstructedPlane);
+					ForceValue((ca as IConstructPlane).ConstructedPlane);
 					(this as IInputObject).SetFixed(true);
 					constructAction.SetNextInputIndex(true);
 				}
@@ -3662,8 +3678,8 @@ namespace CADability.Actions
 				booleanProperty = new BooleanProperty(ResourceId, resourceIdValues);
 				booleanProperty.BooleanChangedEvent += new BooleanChangedDelegate(BooleanChanged);
 				booleanProperty.BooleanValue = boolval;
-				booleanProperty.GetBooleanEvent += new BooleanProperty.GetBooleanDelegate(PropertyOnGetBoolean);
-				booleanProperty.SetBooleanEvent += new BooleanProperty.SetBooleanDelegate(PropertyOnSetBoolean);
+				booleanProperty.GetBooleanEvent += new CADability.UserInterface.BooleanProperty.GetBooleanDelegate(PropertyOnGetBoolean);
+				booleanProperty.SetBooleanEvent += new CADability.UserInterface.BooleanProperty.SetBooleanDelegate(PropertyOnSetBoolean);
 				return booleanProperty;
 			}
 			void IInputObject.OnMouse(MouseEventArgs e, MouseState mouseState, IView vw)
@@ -3736,6 +3752,10 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			public override void SetError(string errorMessage)
+			{
+			}
+			#endregion
 			private void BooleanChanged(object sender, bool NewValue)
 			{   // Nachricht vom ShowProperty
 				if (SetBooleanEvent != null) SetBooleanEvent(NewValue);
@@ -3986,6 +4006,9 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			public override void SetError(string errorMessage)
+			{
+			}
 			private void PropertyOnValueChanged(object sender, object NewValue)
 			{
 				int val = (sender as MultipleChoiceProperty).CurrentIndex;
@@ -4206,6 +4229,9 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			public override void SetError(string errorMessage)
+			{
+			}
 			#endregion
 			#region IIndexedGeoPoint Members
 			void IIndexedGeoPoint.SetGeoPoint(int Index, GeoPoint ThePoint)
@@ -4372,10 +4398,10 @@ namespace CADability.Actions
 			/// <param name="selectedCurve">currently selected curve</param>
 			public void SetCurves(ICurve[] curves, ICurve selectedCurve)
 			{
-				if (this.SelectedCurve != null) constructAction.feedBack.RemoveSelected(this.SelectedCurve as IGeoObject);
-				this.Curves = curves;
-				this.SelectedCurve = selectedCurve;
-				if (this.SelectedCurve != null) constructAction.feedBack.AddSelected(this.SelectedCurve as IGeoObject);
+				if (SelectedCurve != null) constructAction.feedBack.RemoveSelected(SelectedCurve as IGeoObject);
+				Curves = curves;
+				SelectedCurve = selectedCurve;
+				if (SelectedCurve != null) constructAction.feedBack.AddSelected(SelectedCurve as IGeoObject);
 				if (curvesProperty != null)
 				{
 					curvesProperty.SetCurves(curves, selectedCurve);
@@ -4684,7 +4710,7 @@ namespace CADability.Actions
 
 			void IInputObject.OnActionDone()
 			{
-				if (this.SelectedCurve != null) constructAction.feedBack.RemoveSelected(this.SelectedCurve as IGeoObject);
+				if (SelectedCurve != null) constructAction.feedBack.RemoveSelected(SelectedCurve as IGeoObject);
 			}
 			IPropertyEntry IInputObject.GetShowProperty()
 			{
@@ -4711,13 +4737,15 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
-			#endregion
+			public override void SetError(string errorMessage)
+			{
+			}
 			private void OnSelectedCurveChanged(CurvesProperty cp, ICurve selectedCurve)
 			{
 				if (CurveSelectionChangedEvent != null) CurveSelectionChangedEvent(this, selectedCurve);
-				if (this.SelectedCurve != null) constructAction.feedBack.RemoveSelected(this.SelectedCurve as IGeoObject);
-				this.SelectedCurve = selectedCurve;
-				if (this.SelectedCurve != null) constructAction.feedBack.AddSelected(this.SelectedCurve as IGeoObject);
+				if (SelectedCurve != null) constructAction.feedBack.RemoveSelected(SelectedCurve as IGeoObject);
+				SelectedCurve = selectedCurve;
+				if (SelectedCurve != null) constructAction.feedBack.AddSelected(SelectedCurve as IGeoObject);
 				constructAction.RefreshDependantProperties();
 			}
 			public void SetContextMenu(string menuId, ICommandHandler handler)
@@ -4799,7 +4827,7 @@ namespace CADability.Actions
 			public void SetGeoObject(IGeoObject[] GeoObjects, IGeoObject selectedGeoObject)
 			{
 				if (this.selectedGeoObject != null) constructAction.feedBack.RemoveSelected(this.selectedGeoObject);
-				this.geoObjects = GeoObjects;
+				geoObjects = GeoObjects;
 				this.selectedGeoObject = selectedGeoObject;
 				if (this.selectedGeoObject != null) constructAction.feedBack.AddSelected(this.selectedGeoObject);
 				if (geoObjectProperty != null)
@@ -4994,7 +5022,7 @@ namespace CADability.Actions
 			Image IInputObject.HotSpotIcon { get { return null; } }
 			void IInputObject.OnActionDone()
 			{
-				if (this.selectedGeoObject != null) constructAction.feedBack.RemoveSelected(this.selectedGeoObject);
+				if (selectedGeoObject != null) constructAction.feedBack.RemoveSelected(selectedGeoObject);
 			}
 			IPropertyEntry IInputObject.GetShowProperty()
 			{
@@ -5022,6 +5050,9 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			public override void SetError(string errorMessage)
+			{
+			}
 			#endregion
 			private void OnSelectedGeoObjectChanged(GeoObjectProperty cp, IGeoObject selectedGeoObject)
 			{
@@ -5029,6 +5060,291 @@ namespace CADability.Actions
 				if (this.selectedGeoObject != null) constructAction.feedBack.RemoveSelected(this.selectedGeoObject);
 				this.selectedGeoObject = selectedGeoObject;
 				if (this.selectedGeoObject != null) constructAction.feedBack.AddSelected(this.selectedGeoObject);
+				constructAction.RefreshDependantProperties();
+			}
+		}
+		public class BRepObjectInput : InputObject, IInputObject
+		{
+			private string hitCursor, failCursor;
+			private BRepObjectProperty bRepObjectProperty; // the property grid display
+			Dictionary<Vertex, GeoObject.Point> vertexRepresentations = new Dictionary<Vertex, GeoObject.Point>(); // to disply vertices as selected
+			/// <summary>
+			/// Creates a BRepObjectInput object.
+			/// </summary>
+			/// <param name="resourceId">the resource id to specify a string from the StringTable.
+			/// ResourceId+".Label": the Label left of the
+			/// edit box. ResourceId+".ShortInfo": a short tooltip text ResourceId+"DetailedInfo":
+			/// a longer tooltip text.
+			/// </param>
+			public BRepObjectInput(string resourceId)
+				: base(resourceId)
+			{
+				hitCursor = "Hand";
+				failCursor = "Arrow";
+				MultipleInput = false;
+			}
+			/// <summary>
+			/// Sets the cursor that will be displayed when a curve is hit
+			/// </summary>
+			public string HitCursor
+			{
+				set { hitCursor = value; }
+			}
+			/// <summary>
+			/// Sets the cursor that will be displayed when no curve is hit
+			/// </summary>
+			public string FailCursor
+			{
+				set { failCursor = value; }
+			}
+			public bool MultipleInput;
+			public Point currentMousePoint;
+			private object[] bRepObjects;
+			private object selectedBRepObject;
+			private IGeoObject BRepObjectToGeoObject(object brep)
+			{
+				if (selectedBRepObject is Vertex vtx)
+				{
+					if (!vertexRepresentations.TryGetValue(vtx, out GeoObject.Point actVertexDisplay)) vertexRepresentations[vtx] = actVertexDisplay = GeoObject.Point.MakePoint(vtx.Position);
+					return actVertexDisplay;
+				}
+				if (brep is Face) return brep as IGeoObject;
+				if (brep is Edge edge) return edge.Curve3D as IGeoObject;
+				if (brep is Line line)
+				{
+					if (line.UserData.ContainsData("CADability.AxisOf")) return line; // axis are also allowed a brep objects
+				}
+				return null;
+			}
+			/// <summary>
+			/// Forces the given geoObjects to be displayed
+			/// </summary>
+			/// <param name="GeoObjects">array of GeoObjects</param>
+			/// <param name="selectedGeoObject">currently selected GeoObject</param>
+			public void SetBRepObject(object[] objects, object selectedBRepObject)
+			{
+				if (this.selectedBRepObject != null) constructAction.feedBack.RemoveSelected(BRepObjectToGeoObject(this.selectedBRepObject));
+				bRepObjects = objects;
+				this.selectedBRepObject = selectedBRepObject;
+				if (this.selectedBRepObject != null) constructAction.feedBack.AddSelected(BRepObjectToGeoObject(this.selectedBRepObject));
+				if (bRepObjectProperty != null)
+				{
+					bRepObjectProperty.SetBRepObjects(objects, selectedBRepObject);
+				}
+			}
+			/// <summary>
+			/// Set the selected GeoObject
+			/// </summary>
+			/// <param name="curve">this curve should be selected</param>
+			public void SetSelectedBRepObject(object bRepObject)
+			{
+				bRepObjectProperty.SetSelectedBRepObject(bRepObject);
+			}
+			/// <summary>
+			///  Gets the currently selected brep objects.
+			/// </summary>
+			/// <returns></returns>
+			public object[] GetBRepObjects()
+			{
+				return bRepObjects;
+			}
+			/// <summary>
+			/// Delegate definition for <see cref="MouseOverGeoObjectsEvent"/>
+			/// </summary>
+			/// <param name="sender">this object</param>
+			/// <param name="TheGeoObjects">GeoObjects under the cursor</param>
+			/// <param name="up">mous was clicked</param>
+			/// <returns>true, if you accept (one of the) GeoObjects</returns>
+			public delegate bool MouseOverBRepObjectsDelegate(BRepObjectInput sender, object[] bRepObjects, bool up);
+			/// <summary>
+			/// Provide a method here to react on the user moving the cursor over GeoObjects.
+			/// </summary>
+			public event MouseOverBRepObjectsDelegate MouseOverBRepObjectsEvent;
+			/// <summary>
+			/// Delegate definition for <see cref="CurveSelectionChangedEvent"/>
+			/// </summary>
+			/// <param name="sender">this object</param>
+			/// <param name="SelectedGeoObject">the user selected GeoObject</param>
+			public delegate void BRepObjectSelectionChangedDelegate(BRepObjectInput sender, object SelectedBRepObject);
+			/// <summary>
+			/// Provide a method here to react on the user selecting a different curve
+			/// </summary>
+			public event BRepObjectSelectionChangedDelegate BRepObjectSelectionChangedEvent;
+			private IInputObject[] forwardMouseInputTo;
+			/// <summary>
+			/// Mouse input should be forwarded to another input object and only processed
+			/// by this input, when the other input object is fixed.
+			/// </summary>
+			public object ForwardMouseInputTo
+			{
+				set
+				{
+					if (value is IInputObject)
+					{
+						forwardMouseInputTo = new IInputObject[] { value as IInputObject };
+					}
+					else if (value is object[])
+					{
+						object[] v = value as object[];
+						forwardMouseInputTo = new IInputObject[v.Length];
+						for (int i = 0; i < v.Length; ++i)
+						{
+							forwardMouseInputTo[i] = v[i] as IInputObject;
+						}
+					}
+				}
+				get
+				{
+					return forwardMouseInputTo;
+				}
+			}
+			#region IInputObject implementation
+			void IInputObject.Init(ConstructAction a)
+			{
+				constructAction = a;
+			}
+			void IInputObject.Refresh()
+			{
+			}
+			IPropertyEntry IInputObject.BuildShowProperty()
+			{
+				bRepObjectProperty = new BRepObjectProperty(ResourceId, constructAction.Frame);
+				bRepObjectProperty.PropertyEntryChangedStateEvent += new PropertyEntryChangedStateDelegate(constructAction.ShowPropertyStateChanged);
+				bRepObjectProperty.SelectionChangedEvent += new BRepObjectProperty.SelectionChangedDelegate(OnSelectedBRepObjectChanged);
+				if (bRepObjects != null) bRepObjectProperty.SetBRepObjects(bRepObjects, selectedBRepObject);
+				if (!Optional && !Fixed)
+				{
+					bRepObjectProperty.Highlight = true;
+				}
+				return bRepObjectProperty;
+			}
+			void IInputObject.OnMouse(MouseEventArgs e, MouseState mouseState, IView vw)
+			{
+				if (forwardMouseInputTo != null)
+				{   // ggf. weiterleiten an einen anderen Input
+					for (int i = 0; i < forwardMouseInputTo.Length; ++i)
+					{
+						if (!forwardMouseInputTo[i].IsFixed())
+						{
+							forwardMouseInputTo[i].OnMouse(e, mouseState, vw);
+							return;
+						}
+					}
+				}
+				Point MousePoint = new Point(e.X, e.Y);
+				currentMousePoint = MousePoint;
+				GeoObjectList l = constructAction.Frame.ActiveView.PickObjects(MousePoint, PickMode.singleFaceAndCurve);
+				List<object> bRepObjectsUnderCursor = new List<object>();
+				for (int i = 0; i < l.Count; ++i)
+				{
+					if (l[i] is Face) bRepObjectsUnderCursor.Add(l[i]);
+					if (l[i] is ICurve)
+					{
+						if ((l[i] as IGeoObject).Owner is Edge edge)
+						{
+							GeoPoint p = constructAction.SnapPoint(e, vw, out SnapPointFinder.DidSnapModes didSnap);
+							int cnt = bRepObjectsUnderCursor.Count;
+							if (didSnap == SnapPointFinder.DidSnapModes.DidSnapToObjectSnapPoint)
+							{   // check, whether this is the start- or endpoint of an edge
+								if (Precision.IsEqual(edge.Vertex1.Position, p)) bRepObjectsUnderCursor.Add(edge.Vertex1);
+								if (Precision.IsEqual(edge.Vertex2.Position, p)) bRepObjectsUnderCursor.Add(edge.Vertex2);
+							}
+							if (cnt == bRepObjectsUnderCursor.Count) bRepObjectsUnderCursor.Add(edge); // no vertex added
+						}
+						if (l[i] is Line line)
+						{
+							if (line.UserData.ContainsData("CADability.AxisOf")) bRepObjectsUnderCursor.Add(line); // axis are also allowed a brep objects
+						}
+					}
+				}
+				if (MouseOverBRepObjectsEvent != null)
+				{
+					bool next = MouseOverBRepObjectsEvent(this, bRepObjectsUnderCursor.ToArray(), mouseState == MouseState.ClickUp);
+					if (constructAction.AutoCursor)
+					{
+						if (next) vw.SetCursor(hitCursor);
+						else vw.SetCursor(failCursor);
+					}
+					if (next && (mouseState == MouseState.ClickUp) && !MultipleInput)
+					{
+						(this as IInputObject).SetFixed(true);
+						constructAction.SetNextInputIndex(true);
+					}
+				}
+				constructAction.RefreshDependantProperties();
+			}
+			void IInputObject.Activate(ActivationMode activationMode)
+			{
+				switch (activationMode)
+				{
+					case ActivationMode.Inactivate:
+						break;
+					case ActivationMode.BySelection:
+						break;
+					case ActivationMode.ByHotspot:
+						break;
+				}
+			}
+			bool IInputObject.AcceptInput(bool acceptOptional)
+			{
+				return base.AcceptInput(acceptOptional);
+			}
+			void IInputObject.MouseLeft() { }
+			bool IInputObject.HasHotspot
+			{
+				get
+				{
+					return false;
+				}
+			}
+			GeoPoint IInputObject.HotspotPosition
+			{
+				get
+				{
+					return GeoPoint.Origin;
+				}
+			}
+			Image IInputObject.HotSpotIcon { get { return null; } }
+			void IInputObject.OnActionDone()
+			{
+				if (selectedBRepObject != null) constructAction.feedBack.RemoveSelected(BRepObjectToGeoObject(selectedBRepObject));
+			}
+			IPropertyEntry IInputObject.GetShowProperty()
+			{
+				return bRepObjectProperty;
+			}
+			bool IInputObject.OnEnter(IPropertyEntry sender, KeyEventArgs args)
+			{
+				if (MultipleInput)
+				{
+					(this as IInputObject).SetFixed(true);
+					constructAction.SetNextInputIndex(true);
+					return true;
+				}
+				return false;
+			}
+			bool IInputObject.IsFixed()
+			{
+				return Fixed;
+			}
+			protected override void AdjustHighlight()
+			{
+				if (bRepObjectProperty != null) bRepObjectProperty.Highlight = !Optional && !Fixed && !ReadOnly;
+			}
+			void IInputObject.SetFixed(bool isFixed)
+			{
+				Fixed = isFixed;
+			}
+			public override void SetError(string errorMessage)
+			{
+			}
+			#endregion
+			private void OnSelectedBRepObjectChanged(BRepObjectProperty cp, object selectedGeoObject)
+			{
+				if (BRepObjectSelectionChangedEvent != null) BRepObjectSelectionChangedEvent(this, selectedGeoObject);
+				if (selectedBRepObject != null) constructAction.feedBack.RemoveSelected(BRepObjectToGeoObject(selectedBRepObject));
+				selectedBRepObject = selectedGeoObject;
+				if (selectedBRepObject != null) constructAction.feedBack.AddSelected(BRepObjectToGeoObject(selectedBRepObject));
 				constructAction.RefreshDependantProperties();
 			}
 		}
@@ -5175,7 +5491,7 @@ namespace CADability.Actions
 			{
 				stringProperty = new StringProperty(Content, ResourceId);
 				stringProperty.OnGetValue = () => {
-					if (GetStringEvent != null) 
+					if (GetStringEvent != null)
 						return GetStringEvent();
 					return null;
 				};
@@ -5279,7 +5595,11 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
-			#endregion			
+			public override void SetError(string errorMessage)
+			{
+				stringProperty.ErrorMessage = errorMessage;
+			}
+			#endregion
 			private void OnStateChanged(IPropertyEntry sender, StateChangedArgs args)
 			{
 				if (constructAction.GetCurrentInputObject() == this)
@@ -5298,7 +5618,7 @@ namespace CADability.Actions
 				{
 					case "MenuId.OpenFileDialog.Show":
 						int filterIndex = 0;
-						if (constructAction.Frame.UIService.ShowOpenFileDlg(this.ResourceId, StringTable.GetString(ResourceId), FileNameFilter, ref filterIndex, out string fileName) == Substitutes.DialogResult.OK)
+						if (constructAction.Frame.UIService.ShowOpenFileDlg(ResourceId, StringTable.GetString(ResourceId), FileNameFilter, ref filterIndex, out string fileName) == Substitutes.DialogResult.OK)
 						{
 							try
 							{
@@ -5466,11 +5786,11 @@ namespace CADability.Actions
 			{
 				switch (activationMode)
 				{
-					case CADability.Actions.ConstructAction.ActivationMode.BySelection:
+					case ActivationMode.BySelection:
 						if (editBox != null)
 							OnEditboxStateChanged(editBox, new StateChangedArgs(StateChangedArgs.State.Selected));
 						break;
-					case CADability.Actions.ConstructAction.ActivationMode.Inactivate:
+					case ActivationMode.Inactivate:
 						OnEditboxStateChanged(editBox, new StateChangedArgs(StateChangedArgs.State.UnSelected));
 						break;
 				}
@@ -5542,6 +5862,10 @@ namespace CADability.Actions
 			{
 				isfixed = isFixed;
 				editBox.Highlight = !isFixed;
+			}
+			public override void SetError(string errorMessage)
+			{
+				editBox.ErrorMessage = errorMessage;
 			}
 			#endregion
 			private void OnEditboxStateChanged(IPropertyEntry sender, StateChangedArgs args)
@@ -5829,6 +6153,10 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			public override void SetError(string errorMessage)
+			{
+				intProperty.ErrorMessage = errorMessage;
+			}
 			#endregion
 
 			//			private void OnStateChanged(IShowProperty sender, StateChangedArgs args)
@@ -5936,7 +6264,7 @@ namespace CADability.Actions
 			showActiveObject = true; // Voreinstellung
 			disassembleBlock = false;
 			autoRepeat = false;
-			base.ViewType = typeof(IActionInputView); // gilt nur für ModelViews
+			ViewType = typeof(IActionInputView); // gilt nur für ModelViews
 													  // nach dem ersten Input muss auch das Modell festgelegt werden
 			UseFilter = false; // must be explicitely set to true, if you want to show the Filter property in this action
 		}
@@ -5963,7 +6291,7 @@ namespace CADability.Actions
 		}
 		private void OnActiveObjectChange(IGeoObject Sender)
 		{   // das Gleiche für Will und DidChange
-			foreach (IView vw in base.Frame.AllViews)
+			foreach (IView vw in Frame.AllViews)
 			{
 				if (vw is IActionInputView)
 				{
@@ -6025,7 +6353,7 @@ namespace CADability.Actions
 			{
 				if (activeObject != null)
 				{   // ein neues Objekt wird gesetzt, das alte muß verschwinden
-					foreach (IView vw in base.Frame.AllViews)
+					foreach (IView vw in Frame.AllViews)
 					{
 						//if (vw.ProjectedModel != null)
 						//{
@@ -6093,7 +6421,7 @@ namespace CADability.Actions
 					}
 					activeObject.DidChangeEvent += new ChangeDelegate(OnActiveObjectDidChange);
 					activeObject.WillChangeEvent += new ChangeDelegate(OnActiveObjectWillChange);
-					foreach (IView vw in base.Frame.AllViews)
+					foreach (IView vw in Frame.AllViews)
 					{
 						if (vw is IActionInputView)
 						{
@@ -6147,7 +6475,7 @@ namespace CADability.Actions
 			//Plane foundOnPlane = CurrentMouseView.Projection.ProjectionPlane; // bei mehreren Fenstern so nicht gut!!!
 			GeoPoint2D onPlane = plane.Project(p);
 			// hier müsste man irgendwie erst wenig picken und wenn nix geht dann immer mehr
-			BoundingRect pickrect = new BoundingRect(onPlane, base.WorldViewSize, base.WorldViewSize);
+			BoundingRect pickrect = new BoundingRect(onPlane, WorldViewSize, WorldViewSize);
 			//GeoObjectList l = Frame.ActiveView.ProjectedModel.GetObjectsFromRect(pickrect, null);
 			GeoObjectList l = Frame.ActiveView.Model.GetObjectsFromRect(pickrect, Frame.ActiveView.Projection, null, PickMode.normal, Frame.Project.FilterList);
 			l.DecomposeBlocks();
@@ -6293,7 +6621,7 @@ namespace CADability.Actions
 					}
 					else
 					{
-						this.CurrentMouseView.Model.Add(blk.Clear());
+						CurrentMouseView.Model.Add(blk.Clear());
 					}
 				}
 				else
@@ -6319,8 +6647,8 @@ namespace CADability.Actions
 			{
 				if (e is ThreadAbortException) throw (e);
 			}
-			base.RemoveThisAction();
-			foreach (IView vw in base.Frame.AllViews)
+			RemoveThisAction();
+			foreach (IView vw in Frame.AllViews)
 			{
 				if (vw is IActionInputView)
 				{
@@ -6367,7 +6695,7 @@ namespace CADability.Actions
 		{
 			if (currentInputIndex >= 0)
 			{
-				lastWorldPoint = base.WorldPoint(e, vw);
+				lastWorldPoint = WorldPoint(e, vw);
 				InputDefinitions[currentInputIndex].OnMouse(e, mouseState, vw);
 			}
 		}
@@ -6587,11 +6915,11 @@ namespace CADability.Actions
 			{
 				ActionDoneEvent(this, false);
 			}
-			base.RemoveThisAction();
+			RemoveThisAction();
 			return true;
 		}
 		/// <summary>
-		/// Overrides <see cref="Action.OnEscape ()"/>
+		/// Overrides <see cref="CADability.Actions.Action.OnEscape ()"/>
 		/// </summary>
 		public override bool OnEscape()
 		{
@@ -6642,7 +6970,7 @@ namespace CADability.Actions
 			}
 		}
 		/// <summary>
-		/// Overrides <see cref="Action.OnEnter ()"/>
+		/// Overrides <see cref="CADability.Actions.Action.OnEnter ()"/>
 		/// </summary>
 		public override bool OnEnter()
 		{
@@ -6656,8 +6984,11 @@ namespace CADability.Actions
 		public override bool OnTab(object sender)
 		{
 			int ci = currentInputIndex;
-			if (InputDefinitions[ci] != null && InputDefinitions[ci].GetShowProperty() != null && InputDefinitions[ci].GetShowProperty().IsOpen) return false;
-			SetNextInputIndex(true, true);
+			if (ci >= 0)
+			{
+				if (InputDefinitions[ci] != null && InputDefinitions[ci].GetShowProperty() != null && InputDefinitions[ci].GetShowProperty().IsOpen) return false;
+				SetNextInputIndex(true, true);
+			}
 			return ci != currentInputIndex; // true (handled), if the input field changed to the next input
 		}
 
@@ -6762,7 +7093,7 @@ namespace CADability.Actions
 		/// </summary>
 		public override void OnSetAction()
 		{   // hier müssen alle InputDefinitions fertig sein!
-			feedBack.Frame = base.Frame;
+			feedBack.Frame = Frame;
 			if (InputDefinitions == null || InputDefinitions.Length <= 0) throw new ConstructActionException("ConstructAction: no input fields defined, call 'SetInput'");
 			if (activeObject != null && ShowAttributes)
 			{
@@ -6804,14 +7135,29 @@ namespace CADability.Actions
 				}
 			}
 			// da OnActivate noch nicht dran war
-			foreach (IView vw in base.Frame.AllViews)
+			foreach (IView vw in Frame.AllViews)
 			{
 				if (vw is IActionInputView)
 				{
 					// vw.SetPaintHandler(PaintBuffer.DrawingAspect.Active, new RepaintView(OnRepaintActive));
 					vw.SetPaintHandler(PaintBuffer.DrawingAspect.Active, new PaintView(OnRepaintActive));
+					if (vw is ModelView mv) mv.DisplayChangedEvent += ProjectionChanged;
 				}
 			}
+		}
+
+		private void ProjectionChanged(object sender, DisplayChangeArg displayChangeArg)
+		{
+			OnDisplayChanged(displayChangeArg);
+		}
+
+		/// <summary>
+		/// Can be overridden to react on zooming and scrolling
+		/// </summary>
+		/// <param name="d"></param>
+		public override void OnDisplayChanged(DisplayChangeArg d)
+		{
+			base.OnDisplayChanged(d);
 		}
 
 		/// <summary>
@@ -6855,7 +7201,7 @@ namespace CADability.Actions
 				}
 			}
 			// das mehrfache Einfügen macht nichts
-			foreach (IView vw in base.Frame.AllViews)
+			foreach (IView vw in Frame.AllViews)
 			{
 				if (vw is IActionInputView)
 				{
@@ -6865,7 +7211,7 @@ namespace CADability.Actions
 			}
 			if (Frame.GetBooleanSetting("Action.AlwaysOpenPointInputs", false))
 			{
-				IPropertyEntry[] se = this.SubProperties;
+				IPropertyEntry[] se = SubProperties;
 				for (int i = 0; i < se.Length; i++)
 				{
 					if (se[i] is GeoPointProperty)
@@ -6887,20 +7233,20 @@ namespace CADability.Actions
 			{
 				if (NewActiveAction is IIntermediateConstruction)
 				{
-					base.Frame.GetPropertyDisplay("Action").Remove(this);
+					Frame.GetPropertyDisplay("Action").Remove(this);
 					base.OnInactivate(NewActiveAction, RemovingAction);
 				}
 				else
 				{
-					base.RemoveThisAction(); // das führt zu einem erneuten Aufruf von OnInactivate
+					RemoveThisAction(); // das führt zu einem erneuten Aufruf von OnInactivate
 				}
 			}
 			else
 			{
-				base.Frame.GetPropertyDisplay("Action").Remove(this);
+				Frame.GetPropertyDisplay("Action").Remove(this);
 				base.OnInactivate(NewActiveAction, RemovingAction);
 			}
-			foreach (IView vw in base.Frame.AllViews)
+			foreach (IView vw in Frame.AllViews)
 			{
 				if (vw is IActionInputView)
 				{
@@ -6925,12 +7271,13 @@ namespace CADability.Actions
 				InputDefinitions[i].Activate(ActivationMode.Inactivate);
 			}
 			feedBack.ClearAll();
-			foreach (IView vw in base.Frame.AllViews)
+			foreach (IView vw in Frame.AllViews)
 			{
 				if (vw is IActionInputView)
 				{
 					//vw.RemovePaintHandler(PaintBuffer.DrawingAspect.Active, new RepaintView(OnRepaintActive));
 					vw.RemovePaintHandler(PaintBuffer.DrawingAspect.Active, new PaintView(OnRepaintActive));
+					if (vw is ModelView mv) mv.DisplayChangedEvent -= ProjectionChanged;
 				}
 			}
 			base.OnRemoveAction();
@@ -6941,7 +7288,7 @@ namespace CADability.Actions
 		/// </summary>
 		public override void OnViewsChanged()
 		{
-			base.RemoveThisAction(); // das machen wir nicht mit
+			RemoveThisAction(); // das machen wir nicht mit
 		}
 		/// <summary>
 		/// Additional posibility for the derived action to specify a tangential point
@@ -6969,12 +7316,12 @@ namespace CADability.Actions
 			if (basePointIsValid) res = base.SnapPoint(e, basePoint, vw, out DidSnap);
 			else res = base.SnapPoint(e, vw, out DidSnap);
 			GeoPoint tan;
-			if (((base.Frame.SnapMode & SnapPointFinder.SnapModes.SnapToTangentPoint) != 0) && FindTangentialPoint(e, vw, out tan))
+			if (((Frame.SnapMode & SnapPointFinder.SnapModes.SnapToTangentPoint) != 0) && FindTangentialPoint(e, vw, out tan))
 			{
-				if (DidSnap == SnapPointFinder.DidSnapModes.DidNotSnap || (res | base.WorldPoint(e.Location)) > (tan | base.WorldPoint(e.Location)))
+				if (DidSnap == SnapPointFinder.DidSnapModes.DidNotSnap || (res | WorldPoint(e.Location)) > (tan | WorldPoint(e.Location)))
 				{
 					DidSnap = SnapPointFinder.DidSnapModes.DidSnapToTangentPoint;
-					base.SetCursor(DidSnap, vw);
+					SetCursor(DidSnap, vw);
 					return tan;
 				}
 			}
@@ -6985,12 +7332,12 @@ namespace CADability.Actions
 			GeoPoint res;
 			res = base.SnapPoint(e, basePoint, vw, out DidSnap);
 			GeoPoint tan;
-			if (((base.Frame.SnapMode & SnapPointFinder.SnapModes.SnapToTangentPoint) != 0) && FindTangentialPoint(e, vw, out tan))
+			if (((Frame.SnapMode & SnapPointFinder.SnapModes.SnapToTangentPoint) != 0) && FindTangentialPoint(e, vw, out tan))
 			{
-				if (DidSnap == SnapPointFinder.DidSnapModes.DidNotSnap || (res | base.WorldPoint(e.Location)) > (tan | base.WorldPoint(e.Location)))
+				if (DidSnap == SnapPointFinder.DidSnapModes.DidNotSnap || (res | WorldPoint(e.Location)) > (tan | WorldPoint(e.Location)))
 				{
 					DidSnap = SnapPointFinder.DidSnapModes.DidSnapToTangentPoint;
-					base.SetCursor(DidSnap, vw);
+					SetCursor(DidSnap, vw);
 					return tan;
 				}
 			}
@@ -7003,7 +7350,7 @@ namespace CADability.Actions
 		{
 			get
 			{
-				return base.CurrentMouseView.LastSnapObject;
+				return CurrentMouseView.LastSnapObject;
 			}
 		}
 		/// <summary>
@@ -7014,7 +7361,7 @@ namespace CADability.Actions
 		{
 			get
 			{
-				return base.CurrentMouseView.LastSnapMode;
+				return CurrentMouseView.LastSnapMode;
 			}
 		}
 		/// <summary>
@@ -7036,10 +7383,10 @@ namespace CADability.Actions
 					RefreshDependantProperties();
 					return true;
 				case "MenuId.Construct.Finish":
-					this.OnEnter();
+					OnEnter();
 					return true;
 				case "MenuId.Construct.Abort":
-					this.OnEscape();
+					OnEscape();
 					return true;
 			}
 			if (MenuId.StartsWith("Construct.Solution."))
@@ -7053,7 +7400,7 @@ namespace CADability.Actions
 			return base.OnCommand(MenuId);
 		}
 		/// <summary>
-		/// Overrides <see cref="Action.OnUpdateCommand (string, CommandState)"/>
+		/// Overrides <see cref="CADability.Actions.Action.OnUpdateCommand (string, CommandState)"/>
 		/// </summary>
 		/// <param name="MenuId"></param>
 		/// <param name="CommandState"></param>
@@ -7227,7 +7574,7 @@ namespace CADability.Actions
 		bool IPropertyEntry.ReadOnly { get; set; }
 		string IPropertyEntry.Label => StringTable.GetString(TitleId + ".Label");
 		string IPropertyEntry.Value => null;
-		string IPropertyEntry.ResourceId => StringTable.GetString(this.TitleId);
+		string IPropertyEntry.ResourceId => StringTable.GetString(TitleId);
 		object IPropertyEntry.Parent { get; set; }
 		int IPropertyEntry.Index { get; set; }
 		int IPropertyEntry.IndentLevel { get; set; }
@@ -7299,7 +7646,10 @@ namespace CADability.Actions
 		{   // cannot be edited
 			throw new NotImplementedException();
 		}
-
+		string IPropertyEntry.GetErrorText()
+		{   // cannot be edited
+			throw new NotImplementedException();
+		}
 		void IPropertyEntry.Selected(IPropertyEntry previousSelected)
 		{
 			// nothing to do

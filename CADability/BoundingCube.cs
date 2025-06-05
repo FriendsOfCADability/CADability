@@ -192,6 +192,20 @@ namespace CADability
             }
             isCube = false;
         }
+        public BoundingCube(IEnumerable<IGeoObject> objects)
+        {
+            Xmin = double.MaxValue;
+            Xmax = double.MinValue;
+            Ymin = double.MaxValue;
+            Ymax = double.MinValue;
+            Zmin = double.MaxValue;
+            Zmax = double.MinValue;
+            isCube = false;
+            foreach (IGeoObject geoObject in objects)
+            {
+                MinMax(geoObject.GetExtent(0.0));
+            }
+        }
         public void Set(double Xmin, double Xmax, double Ymin, double Ymax, double Zmin, double Zmax)
         {
             this.Xmin = Xmin;
@@ -249,6 +263,17 @@ namespace CADability
             if (b.Ymax > Ymax) Ymax = b.Ymax;
             if (b.Zmin < Zmin) Zmin = b.Zmin;
             if (b.Zmax > Zmax) Zmax = b.Zmax;
+        }
+        /// <summary>
+        /// Makes this BoundingCube include all the specified objects
+        /// </summary>
+        /// <param name="objects"></param>
+        public void MinMax(IEnumerable<IGeoObject> objects)
+        {
+            foreach (IGeoObject go in objects)
+            {
+                MinMax(go.GetExtent(0.0));
+            }
         }
         public static BoundingCube operator +(BoundingCube b1, BoundingCube b2)
         {

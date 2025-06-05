@@ -15,7 +15,7 @@ namespace CADability.Actions
     /// 
     /// </summary>
 
-    public class ConstructPlaneOriginNormalPoint : CADability.Actions.ConstructAction, IIntermediateConstruction
+    public class ConstructPlaneOriginNormalPoint : CADability.Actions.ConstructAction, IIntermediateConstruction, IConstructPlane
     {
         public class ConstructPlaneException : ApplicationException
         {

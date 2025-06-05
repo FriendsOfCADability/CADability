@@ -2,6 +2,7 @@
 using CADability.Curve2D;
 using CADability.GeoObject;
 using CADability.UserInterface;
+// using netDxf.Entities;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -53,7 +54,15 @@ namespace CADability
         /// <summary>
         /// If a block is selected return only the selected GeoObjects at the highest level below the block
         /// </summary>
-        singleChild
+        singleChild,
+        /// <summary>
+        /// may return a face and a curve, but both are checked to be above other faces or curves. Used for modelling
+        /// </summary>
+        singleFaceAndCurve,
+        /// <summary>
+        /// return all faces and curves inside the pickarea
+        /// </summary>
+        multipleFacesAndCurves
     }
 
     /// <summary>
@@ -2063,9 +2072,9 @@ namespace CADability
                     {
                         if (go.HitTest(area, false))
                         {
-                            // wenn Kanten gesucht werden, dann sollen auch Kurven geliefert werden, die
-                            // keine eigentlichen kanten sind. Oder?
-                            if (go.Owner is Edge || go is ICurve)
+                            // looking for edges should only return edges, not curves. If you need curves
+                            // use PickMode.normal
+                            if (go.Owner is Edge) // was: "|| go is ICurve" before
                             {
                                 Layer l = go.Layer;
                                 if (l == null && go.Owner is Edge)
@@ -2099,8 +2108,10 @@ namespace CADability
                                     (visibleLayers.Count == 0 || l == null || visibleLayers.Contains(l)))
                                 {
                                     double z = go.Position(area.FrontCenter, area.Direction, displayListPrecision);
-                                    if (z <= zmin && !toAvoid.Contains(go))
-                                    {
+                                    if (z < zmin - Precision.eps)
+                                    {   // the toAvoid array contains already selected objects. For faces it might be difficult to select overlapping
+                                        // faces, so we use toAvoid to find the "other" face, which is currently not selected. For curves
+                                        // there is always a way to pick it on a different position, so we don't use toAvoid here
                                         zmin = z;
                                         singleObject = go;
                                     }
@@ -2132,8 +2143,9 @@ namespace CADability
                                 (visibleLayers.Count == 0 || go.Layer == null || visibleLayers.Contains(go.Layer)))
                             {
                                 double z = go.Position(area.FrontCenter, area.Direction, displayListPrecision);
-                                if (z <= zmin && !toAvoid.Contains(go))
-                                {
+                                if (!toAvoid.Contains(go) && z < zmin - Precision.eps)
+                                {   // if nothing else is closest, use the object ignoring toAvoid, if an object has the same distance as objects in toAvoid, but is not in toAvoid, use this object
+                                    // this helps to get the other object, if two objects overlap
                                     zmin = z;
                                     singleObject = go;
                                 }
@@ -2188,6 +2200,7 @@ namespace CADability
                                     {   // sonst werden auch edges gefunden, was hier bei single click nicht gewünscht
                                         if (!toAvoid.Contains(toInsert) || z < zmin - Precision.eps)
                                         {   // if nothing else is closest, use the object ignoring toAvoid, if an object has the same distance as objects in toAvoid, but is not in toAvoid, use this object
+                                            // this helps to get the other object, if two objects overlap
                                             zmin = z;
                                             singleObject = toInsert;
                                         }
@@ -2218,6 +2231,88 @@ namespace CADability
                     }
                     if (singleObject != null) res.Add(singleObject);
                     return res;
+                case CADability.PickMode.singleFaceAndCurve: // a single edge or curve, but also a face
+                    {
+                        Face singleFace = null;
+                        ICurve singleCurve = null;
+                        double zcurve = double.MaxValue;
+                        double zface = double.MaxValue;
+                        foreach (IGeoObject go in oct)
+                        {
+                            if (go.HitTest(area, false))
+                            {
+                                double z = go.Position(area.FrontCenter, area.Direction, displayListPrecision);
+                                if (z <= zface && go is Face fc)
+                                {
+                                    if ((filterList == null || filterList.Accept(go) || filterList.Accept(go)) &&
+                                        (visibleLayers.Count == 0 || go.Layer == null || visibleLayers.Contains(go.Layer) || visibleLayers.Contains(go.Layer)))
+                                    {
+                                        zface = z;
+                                        singleFace = fc;
+                                    }
+                                }
+                                if (z <= zcurve && go is ICurve crv)
+                                {
+                                    Layer layer = go.Layer;
+                                    if (layer == null && go.Owner is Edge edg) layer = edg.PrimaryFace.Layer;
+                                    if ((filterList == null || filterList.Accept(go) || filterList.Accept(go)) &&
+                                        (visibleLayers.Count == 0 || layer == null || visibleLayers.Contains(layer) ))
+                                    {
+                                        zcurve = z;
+                                        singleCurve = crv;
+                                    }
+                                }
+                            }
+                        }
+                        if (singleFace != null && singleCurve != null)
+                        {   // accept curve only if not too far behind face
+                            if (zcurve <= zface + this.Extent.Size * 1e-3)
+                            {
+                                res.Add(singleFace);
+                                res.Add(singleCurve as IGeoObject);
+                            }
+                            else
+                            {
+                                res.Add(singleFace); // the curve is too far behind the face
+                            }
+                        }
+                        else if (singleFace != null)
+                        {
+                            res.Add(singleFace);
+                        }
+                        else if (singleCurve != null)
+                        {
+                            res.Add(singleCurve as IGeoObject);
+                        }
+                        return res;
+                    }
+                case CADability.PickMode.multipleFacesAndCurves: // all faces and curves inside the pickarea
+                    {
+                        // TODO: we would need a visibility test here, maybe with a different mode "visibleFacesAndCurves"
+                        foreach (IGeoObject go in oct)
+                        {
+                            if (go.HitTest(area, true)) // only completely inside
+                            {
+                                if (go is Face fc)
+                                {
+                                    if ((filterList == null || filterList.Accept(go) || filterList.Accept(go)) &&
+                                        (visibleLayers.Count == 0 || go.Layer == null || visibleLayers.Contains(go.Layer) || visibleLayers.Contains(go.Layer)))
+                                    {
+                                        res.Add(fc);
+                                    }
+                                }
+                                if (go is ICurve crv)
+                                {
+                                    if ((filterList == null || filterList.Accept(go) || filterList.Accept(go)) &&
+                                        (visibleLayers.Count == 0 || go.Layer == null || visibleLayers.Contains(go.Layer) || visibleLayers.Contains(go.Layer)))
+                                    {
+                                        res.Add(go);
+                                    }
+                                }
+                            }
+                        }
+                        return res;
+                    }
                 case CADability.PickMode.children:
                     foreach (IGeoObject go in oct)
                     {
@@ -2236,8 +2331,10 @@ namespace CADability
                     {
                         if (go.HitTest(area, false))
                         {
+                            Layer layer = go.Layer;
+                            if (layer == null && go.Owner is Edge edg) layer = edg.PrimaryFace.Layer;
                             if ((filterList == null || filterList.Accept(go)) &&
-                                (visibleLayers.Count == 0 || go.Layer == null || visibleLayers.Contains(go.Layer)))
+                                (visibleLayers.Count == 0 || layer == null || visibleLayers.Contains(layer)))
                             {
                                 if (go.Owner is Block)
                                 {   // beim Block die Kinder liefern
@@ -2257,6 +2354,48 @@ namespace CADability
                     return res;
             }
             return res;
+        }
+        /// <summary>
+        /// Returns the minimal distance in <paramref name="viewDirection"/> of any visible objects in the model. Returns double.MaxValue when there is nothing in the viewDirection
+        /// </summary>
+        /// <param name="viewDirection"></param>
+        /// <param name="visibleLayers"></param>
+        /// <returns></returns>
+        public double GetPickDistance(Projection.PickArea viewDirection, Set<Layer> visibleLayers)
+        {
+            GeoObjectList res = new GeoObjectList();
+            if (visibleLayers == null) visibleLayers = new Set<Layer>(); // um nicht immer nach null fragen zu müssen
+            if (octTree == null) InitOctTree();
+
+            List<IGeoObject> octl = new List<IGeoObject>(octTree.GetObjectsFromRect(viewDirection, false));
+            for (int i = octl.Count - 1; i >= 0; --i)
+            {   // Unsichtbare ausblenden
+                if (!octl[i].IsVisible) octl.Remove(octl[i]);
+            }
+            double zcurve = double.MaxValue;
+            double zface = double.MaxValue;
+            foreach (IGeoObject go in octl)
+            {
+                if (go.HitTest(viewDirection, false))
+                {
+                    double z = go.Position(viewDirection.FrontCenter, viewDirection.Direction, displayListPrecision);
+                    if (z <= zface && go is Face fc)
+                    {
+                        if (visibleLayers.Count == 0 || go.Layer == null || visibleLayers.Contains(go.Layer))
+                        {
+                            zface = z;
+                        }
+                    }
+                    if (z <= zcurve && go is ICurve crv)
+                    {
+                        if (visibleLayers.Count == 0 || go.Layer == null || visibleLayers.Contains(go.Layer))
+                        {
+                            zcurve = z;
+                        }
+                    }
+                }
+            }
+            return Math.Min(zcurve, zface);
         }
         /// <summary>
         /// Returns all objects of the model that are inside ore close to the provided box.

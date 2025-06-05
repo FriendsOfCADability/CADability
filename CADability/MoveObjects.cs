@@ -15,7 +15,7 @@ namespace CADability.Actions
     /// <summary>
     /// 
     /// </summary>
-    internal class MoveObjects : ConstructAction
+    public class MoveObjects : ConstructAction
     {
         private Block block;
         private GeoObjectList originals;

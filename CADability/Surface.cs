@@ -8,6 +8,8 @@ using CADability.UserInterface;
 using System;
 using System.Collections.Generic;
 using Wintellect.PowerCollections;
+using MathNet.Numerics.LinearAlgebra.Factorization;
+using System.Linq;
 #if WEBASSEMBLY
 using CADability.WebDrawing;
 #else
@@ -478,6 +480,12 @@ namespace CADability.GeoObject
         /// <returns></returns>
         bool IsExtruded(GeoVector direction);
         /// <summary>
+        /// returns true, if the provided direction can be interpreted as a surface of rotation around the provided <paramref name="rotationAxis"/>
+        /// </summary>
+        /// <param name="direction"></param>
+        /// <returns></returns>
+        bool IsRotated(Axis rotationAxis);
+        /// <summary>
         /// Returns a context menu to change certain parameters of the surface of a face
         /// </summary>
         /// <param name="frame"></param>
@@ -522,7 +530,7 @@ namespace CADability.GeoObject
     /// <summary>
     /// Interface of an extrusion surface. All surfaces, that can be interpreted as an extrusion should implement this interface
     /// </summary>
-    internal interface ISurfaceOfExtrusion
+    public interface ISurfaceOfExtrusion
     {
         /// <summary>
         /// The axis of extrusion. The axis must start at the bottom of the domain and go up to the top of the domain (or left and right, depending on <see cref="ExtrusionDirectionIsV"/>).
@@ -548,7 +556,7 @@ namespace CADability.GeoObject
     /// <summary>
     /// This surface interface is mainly for fillets
     /// </summary>
-    internal interface ISurfaceOfArcExtrusion : ISurfaceOfExtrusion
+    public interface ISurfaceOfArcExtrusion : ISurfaceOfExtrusion
     {
         double Radius { get; set; }
     }
@@ -2344,7 +2352,7 @@ namespace CADability.GeoObject
                 }
                 GeoPoint2D c2d = new GeoPoint2D((umax + umin) / 2, (vmax + vmin) / 2);
                 GeoPoint c3d = PointAt(c2d);
-                Line centerNormal = Line.TwoPoints(c3d, c3d + res.GetExtent().Size * 0.1*GetNormal(c2d));
+                Line centerNormal = Line.TwoPoints(c3d, c3d + res.GetExtent().Size * 0.1 * GetNormal(c2d));
                 res.Add(centerNormal);
                 return res;
             }
@@ -3080,11 +3088,11 @@ namespace CADability.GeoObject
                 }
                 return new ProjectedCurve(curve, this, true, restricted, precision);
             }
-            if (!usedArea.IsInfinite) 
+            if (!usedArea.IsInfinite)
                 return new ProjectedCurve(curve, this, true, BoundingRect.EmptyBoundingRect, precision);
-            else 
+            else
                 return new ProjectedCurve(curve, this, true, usedArea, precision);
-            
+
             //Unreachable code
             /*
             int n = 16;
@@ -3945,6 +3953,10 @@ namespace CADability.GeoObject
         {
             return false;
         }
+        public virtual bool IsRotated(Axis rotationAxis)
+        {
+            return false;
+        }
         public virtual MenuWithHandler[] GetContextMenuForParametrics(IFrame frame, Face face)
         {
             return new MenuWithHandler[0];
@@ -4641,7 +4653,7 @@ namespace CADability.GeoObject
                 }
             }
             return max;
-            
+
             //Unreachable code
             /*
             BoxedSurfaceEx.RawPointNormalAt(sp, out sp3d, out sn); // Punkt und Normale auf die Fläche am Startpunkt
@@ -5273,10 +5285,32 @@ namespace CADability.GeoObject
                                             SurfaceHelper.AdjustPeriodic(other, otherBounds, ref oep);
                                             Line2D tc2d = new Line2D(tsp, tep);
                                             Line2D oc2d = new Line2D(osp, oep);
-                                            double pt = c3d.PositionOf(this.PointAt(tc2d.PointAt(0.5)));
-                                            double po = c3d.PositionOf(other.PointAt(oc2d.PointAt(0.5)));
-                                            if ((0 < pt && pt < 1) && (0 < po && po < 1)) // should be 0.5 // && was || before, but this was definitely wrong! we must check, whether tarc and oarc overlap
-                                                dscs.Add(new DualSurfaceCurve(c3d, this, tc2d, other, oc2d));
+                                            // double pt = c3d.PositionOf(this.PointAt(tc2d.PointAt(0.5)));
+                                            // double po = c3d.PositionOf(other.PointAt(oc2d.PointAt(0.5)));
+                                            // if ((0 < pt && pt < 1) && (0 < po && po < 1)) // should be 0.5 // && was || before, but this was definitely wrong! we must check, whether tarc and oarc overlap
+                                            // previous line was wrong, comment was right: we must check, whether tarc and oarc overlap
+                                            // These are two 2d arcs on the same planeso at least two start/endpoints must be within the other arc
+                                            int inside = 0;
+                                            double overlap = 0.0;
+                                            double tp = tarc.PositionOf(oarc.StartPoint);
+                                            overlap += 0.5 - Math.Abs(tp - 0.5);
+                                            if (tp >= 0 && tp <= 1) ++inside;
+                                            tp = tarc.PositionOf(oarc.EndPoint);
+                                            overlap += 0.5 - Math.Abs(tp - 0.5);
+                                            if (tp >= 0 && tp <= 1) ++inside;
+                                            tp = oarc.PositionOf(tarc.StartPoint);
+                                            overlap += 0.5 - Math.Abs(tp - 0.5);
+                                            if (tp >= 0 && tp <= 1) ++inside;
+                                            tp = oarc.PositionOf(tarc.EndPoint);
+                                            overlap += 0.5 - Math.Abs(tp - 0.5);
+                                            if (tp >= 0 && tp <= 1) ++inside;
+                                            // it still might be, that the two arcs touch at all endpoints but describe different halfs of a circle
+                                            // if all tp are 0 or 1, the resulting overlap will be 0
+                                            if (overlap<10*Precision.eps)
+                                            {   // either full identical or opposite arcs
+                                                tp = tarc.PositionOf(oarc.PointAt(0.5));
+                                            }
+                                            if (inside >= 2 && tp>0 && tp<1) dscs.Add(new DualSurfaceCurve(c3d, this, tc2d, other, oc2d));
                                             // else: did choose wrong part of arc, no common intersection curve
                                         }
                                     }
@@ -5296,6 +5330,11 @@ namespace CADability.GeoObject
             ModOp2D mop;
             if (SameGeometry(thisBounds, other, otherBounds, Precision.eps, out mop)) return new IDualSurfaceCurve[0]; // surfaces are identical, no intersection
             ICurve[] cvs = BoxedSurfaceEx.Intersect(thisBounds, other, otherBounds, seeds, extremePositions);
+            if (cvs.Length == 0 && seeds.Count == 2)
+            {
+                InterpolatedDualSurfaceCurve idscv = new InterpolatedDualSurfaceCurve(this, thisBounds, other, otherBounds, seeds[0], seeds[1]);
+                return new IDualSurfaceCurve[] { idscv };
+            }
             DualSurfaceCurve[] res = new DualSurfaceCurve[cvs.Length];
             for (int i = 0; i < res.Length; i++)
             {
@@ -5514,6 +5553,18 @@ namespace CADability.GeoObject
             {
                 ICurve res = Intersect(surface2 as PlaneSurface, bounds2, surface1 as ToroidalSurface, bounds1, points);
                 if (res != null) return res;
+            }
+            {
+                ICurve[] crvs = surface1.Intersect(bounds1, surface2, bounds2);
+                for (int i = 0; i < crvs.Length; i++)
+                {
+                    double dsum = 0.0;
+                    for (int j = 0; j < points.Count; j++)
+                    {
+                        dsum += crvs[i].DistanceTo(points[j]);
+                    }
+                    if (dsum < points.Count * Precision.eps) return crvs[i];
+                }
             }
             // kein bekannter Fall. Hier ist es aber gefährlich wenn wir tangential sind,
             // denn dann funktioniert InterpolatedDualSurfaceCurve sehr schlecht, vor allem die Richtung ger Kurve
@@ -6263,12 +6314,58 @@ namespace CADability.GeoObject
         internal static IDualSurfaceCurve[] IntersectInner(ISurface surface1, BoundingRect ext1, ISurface surface2, BoundingRect ext2)
         {
             int ep = surface1.GetExtremePositions(ext1, surface2, ext2, out List<Tuple<double, double, double, double>> extremePositions);
-            IDualSurfaceCurve[] candidates = surface1.GetDualSurfaceCurves(ext1, surface2, ext2, null, extremePositions);
             List<IDualSurfaceCurve> res = new List<IDualSurfaceCurve>();
-            for (int i = 0; i < candidates.Length; i++)
-            {
-                if (candidates[i].Curve3D.IsClosed) res.Add(candidates[i]);
-                else if (Precision.Equals(candidates[i].Curve3D.StartPoint, candidates[i].Curve3D.EndPoint)) res.Add(candidates[i]);
+            if (extremePositions != null && extremePositions.Count > 0)
+            {   // lets calculate some seeds from the fixed curves on one of the surfaces
+                List<GeoPoint> seeds = new List<GeoPoint>();
+                for (int i = 0; i < extremePositions.Count; i++)
+                {
+                    ICurve crv = null;
+                    if (!double.IsNaN(extremePositions[i].Item1) && ext1.Left <= extremePositions[i].Item1 && ext1.Right >= extremePositions[i].Item1) crv = surface1.FixedU(extremePositions[i].Item1, ext2.Bottom, ext2.Top);
+                    else if (!double.IsNaN(extremePositions[i].Item2) && ext1.Bottom <= extremePositions[i].Item2 && ext1.Top >= extremePositions[i].Item2) crv = surface1.FixedV(extremePositions[i].Item2, ext2.Left, ext2.Right);
+                    if (!double.IsNaN(extremePositions[i].Item3) && ext2.Left <= extremePositions[i].Item3 && ext2.Right >= extremePositions[i].Item3) crv = surface2.FixedU(extremePositions[i].Item3, ext1.Bottom, ext1.Top);
+                    else if (!double.IsNaN(extremePositions[i].Item4) && ext2.Bottom <= extremePositions[i].Item4 && ext2.Top >= extremePositions[i].Item4) crv = surface2.FixedV(extremePositions[i].Item4, ext1.Left, ext1.Right);
+                    if (crv != null)
+                    {
+                        if (!double.IsNaN(extremePositions[i].Item1) && !double.IsNaN(extremePositions[i].Item2))
+                        {
+                            // crv is on surface1
+                            surface2.Intersect(crv, ext2, out GeoPoint[] ips, out GeoPoint2D[] uvOnFaces, out double[] uOnCurve3Ds);
+                            for (int j = 0; j < ips.Length; j++)
+                            {
+                                if (ext2.Contains(uvOnFaces[j]) && uOnCurve3Ds[j] >= 0.0 && uOnCurve3Ds[j] <= 1.0) seeds.Add(ips[j]);
+                            }
+
+                        }
+                        else
+                        {
+                            // crv is on surface2
+                            surface1.Intersect(crv, ext1, out GeoPoint[] ips, out GeoPoint2D[] uvOnFaces, out double[] uOnCurve3Ds);
+                            for (int j = 0; j < ips.Length; j++)
+                            {
+                                if (ext1.Contains(uvOnFaces[j]) && uOnCurve3Ds[j] >= 0.0 && uOnCurve3Ds[j] <= 1.0) seeds.Add(ips[j]);
+                            }
+                        }
+                    }
+                }
+                // seeds are not sorted. The curve must be closed. We simply repeat the first seed as the last seed
+                if (seeds.Count > 1)
+                {   // seeds are not sorted. But if we have 4 seeds, two curves have been used , the first curve created seed 0 and 1, the second 2 and 3
+                    // so we better exchange 1 and 2
+                    if (seeds.Count == 4)
+                    {
+                        GeoPoint tmp = seeds[1];
+                        seeds[1] = seeds[2];
+                        seeds[2] = tmp;
+                    }
+                    seeds.Add(seeds.First());
+                    IDualSurfaceCurve[] candidates = surface1.GetDualSurfaceCurves(ext1, surface2, ext2, seeds, null);
+                    for (int i = 0; i < candidates.Length; i++)
+                    {
+                        if (candidates[i].Curve3D.IsClosed) res.Add(candidates[i]);
+                        else if (Precision.Equals(candidates[i].Curve3D.StartPoint, candidates[i].Curve3D.EndPoint)) res.Add(candidates[i]);
+                    }
+                }
             }
             if (res.Count == 0 && ep == -1)
             {
@@ -6353,8 +6450,34 @@ namespace CADability.GeoObject
             }
             return (dist <= Precision.eps);
         }
+        internal static bool NewtonIntersect(ISurface surface, BoundingRect ext, ICurve crv, ref GeoPoint testPoint)
+        {
+            GeoPoint2D uv = surface.PositionOf(testPoint);
+            SurfaceHelper.AdjustPeriodic(surface, ext, ref uv);
+            double u = crv.PositionOf(testPoint);
+            double dist = surface.PointAt(uv) | crv.PointAt(u);
+            try
+            {
+                int maxIteration = 10;
+                while (maxIteration > 0) // Precision.eps)
+                {
+                    --maxIteration;
+                    Plane pln = new Plane(surface.PointAt(uv), surface.GetNormal(uv));
+                    GeoPoint loc = testPoint;
+                    GeoVector dir = crv.DirectionAt(u);
+                    testPoint = pln.Intersect(testPoint, dir);
+                    uv = surface.PositionOf(testPoint);
+                    u = crv.PositionOf(testPoint);
+                    double newdist = surface.PointAt(uv) | testPoint;
+                    if (newdist >= dist) break;
+                    else dist = newdist;
+                }
+            }
+            catch (PlaneException) { } // we are tangential!
+            return (dist <= Precision.eps);
+        }
 
-        internal static bool NewtonPerpendicular(ISurface surface, ref GeoPoint2D uv, BoundingRect ext, GeoVector dir)
+        internal static bool NewtonPerpendicular(ISurface surface, BoundingRect ext, ICurve crv, ref GeoPoint testPoint)
         {
 
             //GeoVector du, dv, duu, dvv, duv;
@@ -6462,82 +6585,6 @@ namespace CADability.GeoObject
 
             }
             throw new NotImplementedException();
-        }
-        /// <summary>
-        /// Find two points on the surfaces, where the connection is perpendicular to both surfaces. Currently used by parametrics to identify faces where we can
-        /// change the distance
-        /// </summary>
-        /// <param name="surface1"></param>
-        /// <param name="domain1"></param>
-        /// <param name="surface2"></param>
-        /// <param name="domain2"></param>
-        /// <param name="uv1"></param>
-        /// <param name="uv2"></param>
-        /// <returns></returns>
-        internal static bool ParallelDistance(ISurface surface1, BoundingRect domain1, ISurface surface2, BoundingRect domain2, out GeoPoint2D uv1, out GeoPoint2D uv2)
-        {
-            if (surface1 is PlaneSurface pls1)
-            {
-                if (surface2 is PlaneSurface pls2)
-                {
-                    if (Precision.SameDirection(pls1.Normal, pls2.Normal, false))
-                    {
-                        uv1 = domain1.GetCenter();
-                        uv2 = pls2.PositionOf(pls1.PointAt(uv1));
-                        return true;
-                    }
-                }
-                if (surface2 is ICylinder cyl)
-                {
-                    if (Precision.IsPerpendicular(pls1.Normal, cyl.Axis.Direction, false))
-                    {
-                        GeoPoint2D axloc = pls1.PositionOf(cyl.Axis.Location);
-                        GeoVector2D axdir = pls1.PositionOf(cyl.Axis.Location + cyl.Axis.Direction) - axloc;
-                        GeoPoint2D p1 = axloc;
-                        GeoPoint2D p2 = axloc + axdir;
-                        if (p1.x > domain1.Left && Math.Abs(axdir.x) > Precision.eps)
-                        {
-                            double f = (p1.x - domain1.Left) / axdir.x;
-                            p1 = p1 - f * axdir;
-                        }
-                        else if (p2.x < domain1.Right && Math.Abs(axdir.x) > Precision.eps)
-                        {
-                            double f = (axloc.x - domain1.Right) / axdir.x;
-                            p2 = p2 - f * axdir;
-                        }
-                        if (p1.y > domain1.Bottom && Math.Abs(axdir.y) > Precision.eps)
-                        {
-                            double f = (p1.y - domain1.Bottom) / axdir.y;
-                            p1 = p1 - f * axdir;
-                        }
-                        else if (p2.y < domain1.Top && Math.Abs(axdir.y) > Precision.eps)
-                        {
-                            double f = (axloc.y - domain1.Top) / axdir.y;
-                            p2 = p2 - f * axdir;
-                        }
-                        ClipRect clr = new ClipRect(domain1);
-                        if (clr.ClipLine(ref p1, ref p2))
-                        {
-                            GeoPoint2D pm = new GeoPoint2D(p1, p2);
-                            GeoPoint2D[] ips = surface2.GetLineIntersection(pls1.PointAt(pm), pls1.Normal);
-                            for (int i = 0; i < ips.Length; i++)
-                            {
-                                SurfaceHelper.AdjustPeriodic(surface2, domain2, ref ips[i]);
-                                if (domain2.Contains(ips[i]))
-                                {
-                                    uv1 = pm;
-                                    uv2 = ips[i];
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            else if (surface2 is PlaneSurface pls2) return ParallelDistance(surface2, domain2, surface1, domain1, out uv2, out uv1);
-            uv1 = GeoPoint2D.Invalid;
-            uv2 = GeoPoint2D.Invalid;
-            return false;
         }
     }
     internal class FindTangentCurves
@@ -11191,7 +11238,8 @@ namespace CADability.GeoObject
                 {
                     BoundingCube bc = cubes[j].BoundingCube;
                     if (cubes[j].uvPatch.Interferes(ref uvExtent) && (curve as IOctTreeInsertable).HitTest(ref bc, 0.0))
-                    {   // es werden zu viele Würfel geliefert, GetCurveIntersection macht den Test nicht
+                    {   // only check the relevant cubes
+                        // there is a bug: GetCurveIntersection only finds single intersection points where there might be multiple intersections
                         GetCurveIntersection(curve as ISimpleCurve, cubes[j], lips, luvOnFace, luOnCurve);
                     }
                 }
@@ -14630,7 +14678,7 @@ namespace CADability.GeoObject
             yield return srf.FixedV(ext.Top, ext.Left, ext.Right);
 
         }
-        internal static void AdjustPeriodic(double uperiod, double vperiod, ref GeoPoint2D p)
+        public static void AdjustPeriodic(double uperiod, double vperiod, ref GeoPoint2D p)
         {
             if (uperiod > 0.0)
             {
@@ -14667,6 +14715,32 @@ namespace CADability.GeoObject
                 }
             }
 
+        }
+        internal static (double du, double dv) AdjustPeriodic(ISurface surface, BoundingRect bounds, Border bdr)
+        {
+            if (surface.IsUPeriodic || surface.IsVPeriodic)
+            {
+                GeoPoint2D mp = bdr.Extent.GetCenter();
+                double du = 0.0, dv = 0.0;
+                if (surface.IsUPeriodic)
+                {
+                    double um = (bounds.Left + bounds.Right) / 2;
+                    while (Math.Abs(mp.x + du - um) > Math.Abs(mp.x + du - surface.UPeriod - um)) du -= surface.UPeriod;
+                    while (Math.Abs(mp.x + du - um) > Math.Abs(mp.x + du + surface.UPeriod - um)) du += surface.UPeriod;
+                }
+                if (surface.IsVPeriodic)
+                {
+                    double vm = (bounds.Bottom + bounds.Top) / 2;
+                    while (Math.Abs(mp.y + dv - vm) > Math.Abs(mp.y + dv - surface.VPeriod - vm)) dv -= surface.VPeriod;
+                    while (Math.Abs(mp.y + dv - vm) > Math.Abs(mp.y + dv + surface.VPeriod - vm)) dv += surface.VPeriod;
+                }
+                if (du != 0.0 || dv != 0.0)
+                {
+                    bdr.Move(du, dv);
+                }
+                return (du, dv);
+            }
+            return (0, 0);
         }
         public static void AdjustPeriodic(ISurface surface, BoundingRect bounds, ICurve2D cv2d)
         {
@@ -14769,7 +14843,7 @@ namespace CADability.GeoObject
                 }
             }
         }
-        internal static void AdjustPeriodic(ISurface surface, BoundingRect bounds, ref GeoPoint2D p2d)
+        public static void AdjustPeriodic(ISurface surface, BoundingRect bounds, ref GeoPoint2D p2d)
         {
             if (surface.IsUPeriodic || surface.IsVPeriodic)
             {
@@ -14804,6 +14878,83 @@ namespace CADability.GeoObject
                 while (Math.Abs(u - um) > Math.Abs(u - surface.UPeriod - um)) u -= surface.UPeriod;
                 while (Math.Abs(u - um) > Math.Abs(u + surface.UPeriod - um)) u += surface.UPeriod;
             }
+        }
+
+        public static void MinMaxCurvature(ISurface surface, GeoPoint2D uv, out ICurve minCurvature, out ICurve maxCurvature)
+        {   // to be tested
+            surface.Derivation2At(uv, out GeoPoint location, out GeoVector du, out GeoVector dv, out GeoVector duu, out GeoVector dvv, out GeoVector duv);
+            Matrix I = DenseMatrix.Create(2, 2, 0);
+            I[0, 0] = du * du;
+            I[0, 1] = I[1, 0] = du * dv;
+            I[1, 1] = dv * dv;
+            GeoVector n = (du ^ dv).Normalized;
+            Matrix II = DenseMatrix.Create(2, 2, 0);
+            II[0, 0] = duu * n;
+            II[0, 1] = I[1, 0] = duv * n;
+            II[1, 1] = dvv * n;
+            Matrix S = (Matrix)I.Inverse().Multiply(II); // Weingarten
+            Evd<double> evd = S.Evd();
+            Vector<System.Numerics.Complex> eigenValues = evd.EigenValues;
+            Matrix eigenVectors = (Matrix)evd.EigenVectors;
+            minCurvature = maxCurvature = null;
+            if (eigenValues.Count > 0)
+            {
+                if (eigenValues[0].Imaginary == 0.0)
+                {
+                    GeoVector dir = eigenVectors[0, 0] * du + eigenVectors[1, 0] * dv;
+                    if (eigenValues[0].Real != 0.0)
+                    {
+                        double rad = 1.0 / eigenValues[0].Real;
+                        GeoPoint cnt = location + rad * n;
+                        Ellipse elli = Ellipse.Construct();
+                        elli.SetCirclePlaneCenterRadius(new Plane(cnt, n, dir), cnt, Math.Abs(rad));
+                        minCurvature = elli;
+                    }
+                    else
+                    {
+                        Line line = Line.Construct();
+                        line.SetTwoPoints(location, location + dir);
+                        minCurvature = line;
+                    }
+                }
+            }
+            if (eigenValues.Count > 1) // what about a double eigenvalue?
+            {
+                if (eigenValues[1].Imaginary == 0.0)
+                {
+                    GeoVector dir = eigenVectors[0, 1] * du + eigenVectors[1, 1] * dv;
+                    if (eigenValues[1].Real != 0.0)
+                    {
+                        double rad = 1.0 / eigenValues[1].Real;
+                        GeoPoint cnt = location + rad * n;
+                        Ellipse elli = Ellipse.Construct();
+                        elli.SetCirclePlaneCenterRadius(new Plane(cnt, n, dir), cnt, Math.Abs(rad));
+                        minCurvature = elli;
+                    }
+                    else
+                    {
+                        Line line = Line.Construct();
+                        line.SetTwoPoints(location, location + dir);
+                        minCurvature = line;
+                    }
+                }
+            }
+        }
+
+        public static GeoPoint2D[] GetExtrema(ISurface surface, BoundingRect domain, GeoVector dir)
+        {
+            ISurface srf = surface.Clone();
+            if (!Precision.SameDirection(dir, GeoVector.ZAxis, false))
+            {   // modify the surface, so that dir is the z-axis
+                srf.Modify(ModOp.Rotate(GeoPoint.Origin, dir, GeoVector.ZAxis));
+            }
+            GeoPoint2D[] uv = srf.GetExtrema();
+            List<GeoPoint2D> res = new List<GeoPoint2D>();
+            for (int i = 0; i < uv.Length; i++)
+            {
+                if (Precision.SameDirection(srf.GetNormal(uv[i]), GeoVector.ZAxis, false)) res.Add(uv[i]);
+            }
+            return res.ToArray();
         }
     }
 }

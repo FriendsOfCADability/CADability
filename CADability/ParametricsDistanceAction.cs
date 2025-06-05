@@ -4,10 +4,11 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Text;
+using static CADability.Actions.ConstructAction;
 
 namespace CADability.Actions
 {
-    internal class ParametricsDistanceAction : ConstructAction
+    public class ParametricsDistanceAction : ConstructAction
     {
         private GeoPoint point1; // the first point of the line defining the distance
         private GeoPoint point2; // the second point of the line defining the distance. these points are not changed but together with distance they define how facesToMove and facesToKeep have to be moved
@@ -15,6 +16,7 @@ namespace CADability.Actions
         private Shell shell; // the shell containing the edge
         private HashSet<Face> forwardFaces; // list of the faces in the forward direction
         private HashSet<Face> backwardFaces; // list of the faces in the backward direction
+        private Line axis = null; // if an axis is provided, we need another object for the distance
         private bool validResult;
         private LengthInput distanceInput; // input filed of the distance
         private MultipleChoiceInput modeInput; // input field for the mode "forward", backward", "symmetric"
@@ -26,6 +28,7 @@ namespace CADability.Actions
         private Plane feedbackPlane; // the plane in which the feedback arrow is placed
         private StringInput nameInput;
         private string parametricsName;
+        private BooleanInput preserveInput;
         private ParametricDistanceProperty parametricProperty;
 
         //public ParametricsDistanceAction(object distanceFromHere, IFrame frame)
@@ -69,26 +72,22 @@ namespace CADability.Actions
         //    distanceFromHere = null;
         //}
 
-        //public ParametricsDistanceAction(IEnumerable<Face> facesToMove, Line axis, IFrame frame)
-        //{
-        //    this.frame = frame;
-        //    this.faces2 = new List<Face>(facesToMove);
-        //    facesToMoveIsFixed = true;
-        //    this.faces1 = new List<Face>();
-        //    axisToMove = axis;
-        //    shell = this.faces2[0].Owner as Shell;
-
-        //    distanceToHere = axis;
-        //    try
-        //    {
-        //        feedbackPlane = new Plane(axis.StartPoint, axis.StartDirection, axis.StartDirection ^ frame.ActiveView.Projection.DrawingPlane.Normal);
-        //    }
-        //    catch (PlaneException)
-        //    {
-        //        feedbackPlane = frame.ActiveView.Projection.DrawingPlane;
-        //    }
-        //    offsetFeedBack = new GeoObjectList(axis);
-        //}
+        public ParametricsDistanceAction(IEnumerable<Face> facesToMove, Line axis, IFrame frame) : base()
+        {
+            forwardFaces = new HashSet<Face>(facesToMove);
+            backwardFaces = new HashSet<Face>();
+            shell = forwardFaces.First().Owner as Shell;
+            this.axis = axis;
+            try
+            {
+                feedbackPlane = new Plane(axis.StartPoint, axis.StartDirection, axis.StartDirection ^ frame.ActiveView.Projection.DrawingPlane.Normal);
+            }
+            catch (PlaneException)
+            {
+                feedbackPlane = frame.ActiveView.Projection.DrawingPlane;
+            }
+            offsetFeedBack = new GeoObjectList(axis);
+        }
         //public ParametricsDistanceAction(Edge fromHere, Edge toHere, Line feedback, Plane plane, IFrame frame)
         //{
         //    distanceFromHere = fromHere;
@@ -112,7 +111,7 @@ namespace CADability.Actions
         //        if (!fromHere.SecondaryFace.Surface.IsExtruded(originalOffset)) faces1.Add(fromHere.SecondaryFace);
         //    }
         //}
-        public ParametricsDistanceAction(IEnumerable<Face> part1, IEnumerable<Face> part2, GeoPoint point1, GeoPoint point2, IFrame frame): base()
+        public ParametricsDistanceAction(IEnumerable<Face> part1, IEnumerable<Face> part2, GeoPoint point1, GeoPoint point2, IFrame frame) : base()
         {
             //distanceFromHere = fromHere;
             //distanceToHere = toHere;
@@ -148,6 +147,17 @@ namespace CADability.Actions
             if (shell.Layer != null) shell.Layer.Transparency = 128;
             List<InputObject> actionInputs = new List<InputObject>();
 
+            if (axis != null) // we have no object for 
+            {
+                GeoObjectInput toObjectInput = new GeoObjectInput("DistanceTo.ToObject"); // to which object do we calculate the distance of the axis
+                toObjectInput.FacesOnly = true;
+                toObjectInput.EdgesOnly = true;
+                toObjectInput.Points = true;
+                toObjectInput.MouseOverGeoObjectsEvent += ToObject_MouseOverGeoObjectsEvent;
+                //toObjectInput.GeoObjectSelectionChangedEvent += ToObject_GeoObjectSelectionChangedEvent;
+                actionInputs.Add(toObjectInput);
+            }
+
             distance = point1 | point2;
             distanceInput = new LengthInput("DistanceTo.Distance");
             distanceInput.GetLengthEvent += DistanceInput_GetLengthEvent;
@@ -173,13 +183,16 @@ namespace CADability.Actions
             actionInputs.Add(modeInput);
             //modeInput.GetChoiceEvent += ModeInput_GetChoiceEvent;
 
-            SeparatorInput separator = new SeparatorInput("DistanceTo.AssociateParametric");
+            SeparatorInput separator = new SeparatorInput("Parametrics.AssociateParametric");
             actionInputs.Add(separator);
-            nameInput = new StringInput("DistanceTo.ParametricsName");
+            nameInput = new StringInput("Parametrics.ParametricsName");
             nameInput.SetStringEvent += NameInput_SetStringEvent;
             nameInput.GetStringEvent += NameInput_GetStringEvent;
             nameInput.Optional = true;
             actionInputs.Add(nameInput);
+
+            preserveInput = new BooleanInput("Parametrics.PreserveValue", "YesNo.Values", false);
+            actionInputs.Add(preserveInput);
 
             SetInput(actionInputs.ToArray());
             base.OnSetAction();
@@ -232,6 +245,55 @@ namespace CADability.Actions
         {
             return OnMouseOverMoreFaces(sender, theGeoObjects, up, forwardFaces);
         }
+        private bool DistanceFromAxis(IGeoObject[] geoObjects)
+        {
+            double distance = 0.0;
+            for (int i = 0; i < geoObjects.Length; i++)
+            {
+                object candidate = geoObjects[i];
+                if (geoObjects[i].Owner is Edge edg) candidate = edg;
+                if (candidate is Face fc)
+                {   // is it possible to specify a distance between this face and the axis?
+                    if (fc.Surface is PlaneSurface ps && Precision.IsPerpendicular(ps.Normal, axis.StartDirection, false))
+                    {   // we can use the distance to the plane 
+                        point1 = axis.PointAt(0.5);
+                        point2 = ps.Plane.ToGlobal(ps.Plane.Project(point1));
+                        distance = point1 | point2;
+                    }
+                }
+                Line lineToCheck = null;
+                if (candidate is Edge edge && edge.Curve3D is Line line)
+                {
+                    lineToCheck = line;
+                }
+                if (candidate is Line axl && axl.UserData.Contains("CADability.AxisOf"))
+                {
+                    lineToCheck = axl;
+                }
+                if (lineToCheck != null)
+                {
+                    double dist = Geometry.DistLL(axis.StartPoint, axis.StartDirection, lineToCheck.StartPoint, lineToCheck.StartDirection, out double par1, out double par2);
+                    if (par1 != double.MaxValue && dist > 0.0)
+                    {
+                        point1 = axis.StartPoint + par1 * axis.StartDirection;
+                        point2 = lineToCheck.StartPoint + par2 * lineToCheck.StartDirection;
+                        distance = point1 | point2;
+                    }
+                }
+                if (distance > 0.0) return true; // we have found a suitable object
+            }
+            return false;
+        }
+        private bool ToObject_MouseOverGeoObjectsEvent(GeoObjectInput sender, IGeoObject[] geoObjects, bool up)
+        {   // we need to implement more cases here, resulting in faceToMove, faceToKeep (maybe null) and a reference point from where to calculate foot-points for the offset vector
+
+            Projection.PickArea pa = CurrentMouseView.Projection.GetPickSpace(new Rectangle(sender.currentMousePoint.X - 5, sender.currentMousePoint.Y - 5, 10, 10));
+            if (axis != null && DistanceFromAxis(geoObjects))
+            {
+                return true;
+            }
+            return false;
+        }
 
         private int ModeInput_GetChoiceEvent()
         {
@@ -261,6 +323,7 @@ namespace CADability.Actions
                         if (!string.IsNullOrEmpty(parametricsName) && parametricProperty != null)
                         {
                             parametricProperty.Name = parametricsName;
+                            parametricProperty.Preserve = preserveInput.Value;
                             replacement.Shells[0].AddParametricProperty(parametricProperty);
                         }
                     }
@@ -286,7 +349,7 @@ namespace CADability.Actions
         private bool Refresh()
         {
             validResult = false;
-            if (forwardFaces.Count > 0 && backwardFaces.Count > 0 )
+            if (forwardFaces.Count > 0 && backwardFaces.Count > 0)
             {
                 FeedBack.ClearSelected();
                 GeoPoint startPoint = point1;
@@ -401,11 +464,8 @@ namespace CADability.Actions
         private bool DistanceInput_SetLengthEvent(double length)
         {
             validResult = false;
-            if (forwardFaces.Count > 0 && backwardFaces.Count > 0 )
-            {
-                distance = length;
-                return Refresh();
-            }
+            distance = length;
+            return Refresh();
             return false;
         }
 

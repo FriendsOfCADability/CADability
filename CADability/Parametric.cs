@@ -23,7 +23,10 @@ namespace CADability
         private readonly Dictionary<Edge, Edge> edgeDict; // original to cloned edges
         private readonly Dictionary<Vertex, Vertex> vertexDict; // original to cloned vertices
         private readonly HashSet<Edge> edgesToRecalculate; // when all surface modifications are done, these edges have to be recalculated
-        private readonly HashSet<Vertex> verticesToRecalculate; // these vertices need to be recalculated, because the underlying surfaces changed
+        private readonly Dictionary<Vertex, GeoPoint> verticesToRecalculate; // these vertices need to be recalculated, because the underlying surfaces changed
+                                                                             // The vertices are later recalculated by intersection of surfaces. When it is arbitrary, we provide
+                                                                             // a good starting point, which results from the movement or rotation
+        private Dictionary<(Vertex, Face), GeoPoint2D> periodicVertices; // vertices on two halves of a splitted periodic face
         private readonly HashSet<Face> modifiedFaces; // these faces have been (partially) modified, do not modify twice
         private readonly HashSet<Face> constrainedFaces; // these faces must be adapted to their adjacent faces
         private readonly Dictionary<Edge, ICurve> tangentialEdgesModified; // tangential connection between two faces which both have been modified
@@ -41,7 +44,8 @@ namespace CADability
             edgesToRecalculate = new HashSet<Edge>();
             modifiedFaces = new HashSet<Face>();
             constrainedFaces = new HashSet<Face>();
-            verticesToRecalculate = new HashSet<Vertex>();
+            verticesToRecalculate = new Dictionary<Vertex, GeoPoint>(); ;
+            periodicVertices = new Dictionary<(Vertex, Face), GeoPoint2D>();
             tangentialEdgesModified = new Dictionary<Edge, ICurve>();
             affectedObjects = new HashSet<object>();
         }
@@ -51,7 +55,7 @@ namespace CADability
         /// </summary>
         /// <param name="faces">The faces to modify (offset)</param>
         /// <param name="offset">the offset by which the faces are offset</param>
-        internal void OffsetFaces(IEnumerable<Face> faces, double offset)
+        public void OffsetFaces(IEnumerable<Face> faces, double offset)
         {
             foreach (Face face in faces)
             {
@@ -70,8 +74,8 @@ namespace CADability
                             tangentialEdgesModified[edge] = c3d;
                         }
                     }
-                    verticesToRecalculate.Add(edge.Vertex1);
-                    verticesToRecalculate.Add(edge.Vertex2);
+                    verticesToRecalculate[edge.Vertex1] = edge.Vertex1.Position + offset * faceToMove.Surface.GetNormal(faceToMove.Surface.PositionOf(edge.Vertex1.Position)).Normalized;
+                    verticesToRecalculate[edge.Vertex2] = edge.Vertex2.Position + offset * faceToMove.Surface.GetNormal(faceToMove.Surface.PositionOf(edge.Vertex2.Position)).Normalized;
                     edgesToRecalculate.UnionWith(edge.Vertex1.AllEdges);
                     edgesToRecalculate.UnionWith(edge.Vertex2.AllEdges);
                 }
@@ -135,8 +139,8 @@ namespace CADability
                         {   // should we move nontangential connected faces or not. both cases make sense. Now decided by parameter
                             nextLevel[otherFace] = offset; // only if offset is not the extrusion direction of the otherFace
                         }
-                        verticesToRecalculate.Add(edge.Vertex1);
-                        verticesToRecalculate.Add(edge.Vertex2);
+                        verticesToRecalculate[edge.Vertex1] = edge.Vertex1.Position + item.Value; // the offset of the face
+                        verticesToRecalculate[edge.Vertex2] = edge.Vertex2.Position + item.Value; // the offset of the face
                         edgesToRecalculate.UnionWith(edge.Vertex1.AllEdges);
                         edgesToRecalculate.UnionWith(edge.Vertex2.AllEdges);
                     }
@@ -209,13 +213,19 @@ namespace CADability
                         {
                             modifiedSurface = new SphericalSurface(sph.Location, newRadius * sph.XAxis.Normalized, newRadius * sph.YAxis.Normalized, newRadius * sph.ZAxis.Normalized);
                         }
+                        foreach (Vertex vtx in face.Vertices)
+                        {
+                            if (!verticesToRecalculate.ContainsKey(vtx))
+                            {   // add vertices with new positions
+                                verticesToRecalculate[vtx] = modifiedSurface.PointAt(face.Surface.PositionOf(vtx.Position));
+                            }
+                        }
                         face.Surface = modifiedSurface;
                         affectedObjects.Add(face);
-                        verticesToRecalculate.UnionWith(face.Vertices);
                         modifiedFaces.Add(face);
                         alreadyModified.Add(face);
                     }
-                    foreach (Vertex vtx in verticesToRecalculate)
+                    foreach (Vertex vtx in verticesToRecalculate.Keys)
                     {
                         edgesToRecalculate.UnionWith(vtx.AllEdges);
                     }
@@ -303,6 +313,83 @@ namespace CADability
             //}
             //return false;
         }
+        public void RotateFaces(Dictionary<Face, ModOp> toRotate, Axis rotationAxis, bool moveConnected = false)
+        {
+            Dictionary<Face, ModOp> nextLevel = new Dictionary<Face, ModOp>();
+            foreach (KeyValuePair<Face, ModOp> item in toRotate)
+            {
+                Face tm = item.Key;
+                if (!faceDict.TryGetValue(tm, out Face faceToRotate)) faceToRotate = tm; // toMove may be from the original shell or from the cloned shell
+                ModOp rotate = item.Value;
+                if (modifiedFaces.Contains(faceToRotate))
+                {
+                    constrainedFaces.Add(faceToRotate);
+                }
+                else
+                {
+                    modifiedFaces.Add(faceToRotate);
+                    foreach (Edge edge in faceToRotate.Edges)
+                    {
+                        Face otherFace = edge.OtherFace(faceToRotate);
+                        bool tangential = edge.IsTangentialEdge();
+                        if (!modifiedFaces.Contains(otherFace) && tangential)
+                        {
+                            tangentialEdgesModified[edge] = edge.Curve3D.CloneModified(rotate); // these edges play a role in calculating the new vertices
+                                                                                                // the edges will be recalculated in "Result()", but here we need the already modified curve for intersection purposes
+                            if (!otherFace.Surface.IsRotated(rotationAxis))
+                            {
+                                if (nextLevel.ContainsKey(otherFace) && (nextLevel[otherFace] * rotate.GetInverse()).IsIdentity(Precision.eps))
+                                {   // there are two different requirements to move this face. This face may not propagate its movement and must be modified
+                                    // according to the constraints by the surrounding faces
+                                    nextLevel.Remove(otherFace);
+                                    constrainedFaces.Add(otherFace);
+                                }
+                                else
+                                {
+                                    nextLevel[otherFace] = rotate; // 
+                                }
+                            }
+                        }
+                        else if (tangential && !tangentialEdgesModified.ContainsKey(edge))
+                        {
+                            tangentialEdgesModified[edge] = edge.Curve3D.CloneModified(rotate); // these edges play a role in calculating the new vertices
+                        }
+                        else if (!tangential && moveConnected && !modifiedFaces.Contains(otherFace) && !otherFace.Surface.IsRotated(rotationAxis))
+                        {   // should we move nontangential connected faces or not. both cases make sense. Now decided by parameter
+                            nextLevel[otherFace] = rotate; // only if offset is not the extrusion direction of the otherFace
+                        }
+                        verticesToRecalculate[edge.Vertex1] = rotate * edge.Vertex1.Position;
+                        verticesToRecalculate[edge.Vertex2] = rotate * edge.Vertex2.Position;
+                        edgesToRecalculate.UnionWith(edge.Vertex1.AllEdges);
+                        edgesToRecalculate.UnionWith(edge.Vertex2.AllEdges);
+                    }
+                    if (moveConnected)
+                    {
+                        foreach (Vertex vertex in faceToRotate.Vertices)
+                        {   // there might be a face which only shares a vertex with faceToMove but not an edge (typically when there are 4 or more edges in a vertex)
+                            HashSet<Face> facesToTest = vertex.InvolvedFaces;
+                            facesToTest.ExceptWith(modifiedFaces);
+                            facesToTest.ExceptWith(constrainedFaces);
+                            facesToTest.ExceptWith(nextLevel.Keys);
+                            foreach (Face face in facesToTest)
+                            {
+                                if (!(new HashSet<Edge>(face.AllEdges)).Intersect(faceToRotate.AllEdges).Any())
+                                {   // this face has a common vertex with faceToMove, but no common edge
+                                    if (!face.Surface.IsRotated(rotationAxis)) nextLevel[face] = rotate;
+                                }
+                            }
+                        }
+                    }
+                    if (!rotate.IsIdentity(Precision.eps)) faceToRotate.ModifySurfaceOnly(rotate); // rotate after all tangential test have been made, otherwise the tangential tests fail
+                }
+            }
+            foreach (Face item in modifiedFaces)
+            {   // remove those faces from nextLevel and constrainedFaces which already have been modified
+                nextLevel.Remove(item);
+                constrainedFaces.Remove(item);
+            }
+            if (nextLevel.Any()) RotateFaces(nextLevel, rotationAxis, moveConnected);
+        }
 
         private void followCrosswayTangential(Edge edge, ICurve axis, double newRadius)
         {   // one of the faces of edge has been modified, the other face (which should be a ISurfaceOfExtrusion-face) must now be adapted to the correct axis
@@ -314,10 +401,13 @@ namespace CADability
                 ISurfaceOfArcExtrusion modifiedSurface = faceToModify.Surface.Clone() as ISurfaceOfArcExtrusion;
                 modifiedSurface.ModifyAxis(axis.PointAt(0.5));
                 modifiedSurface.Radius = newRadius;
+                foreach (Vertex vtx in faceToModify.Vertices)
+                {
+                    if (!verticesToRecalculate.ContainsKey(vtx)) verticesToRecalculate[vtx] = (modifiedSurface as ISurface).PointAt(faceToModify.Surface.PositionOf(vtx.Position));
+                }
                 faceToModify.Surface = modifiedSurface as ISurface;
                 affectedObjects.Add(faceToModify);
-                verticesToRecalculate.UnionWith(faceToModify.Vertices);
-                foreach (Vertex vtx in verticesToRecalculate)
+                foreach (Vertex vtx in verticesToRecalculate.Keys)
                 {
                     edgesToRecalculate.UnionWith(vtx.AllEdges);
                 }
@@ -410,10 +500,13 @@ namespace CADability
                         ISurfaceOfArcExtrusion modifiedSurface = faceToModify.Surface.Clone() as ISurfaceOfArcExtrusion;
                         modifiedSurface.ModifyAxis(newAxis.PointAt(newAxis.PositionOf(newAxis.PointAt(0.5))));
                         modifiedSurface.Radius = newRadius;
+                        foreach (Vertex vtx in faceToModify.Vertices)
+                        {
+                            if (!verticesToRecalculate.ContainsKey(vtx)) verticesToRecalculate[vtx] = (modifiedSurface as ISurface).PointAt(faceToModify.Surface.PositionOf(vtx.Position));
+                        }
                         faceToModify.Surface = modifiedSurface as ISurface;
                         affectedObjects.Add(faceToModify);
-                        verticesToRecalculate.UnionWith(faceToModify.Vertices);
-                        foreach (Vertex vtx in verticesToRecalculate)
+                        foreach (Vertex vtx in verticesToRecalculate.Keys)
                         {
                             edgesToRecalculate.UnionWith(vtx.AllEdges);
                         }
@@ -482,10 +575,13 @@ namespace CADability
                     {
                         (modifiedSurface as ICylinder).Axis = new Axis(Geometry.DropPL((modifiedSurface as ICylinder).Axis.Location, newAxis.StartPoint, newAxis.StartDirection), newAxis.StartDirection);
 
+                        foreach (Vertex vtx in faceToModify.Vertices)
+                        {
+                            if (!verticesToRecalculate.ContainsKey(vtx)) verticesToRecalculate[vtx] = (modifiedSurface as ISurface).PointAt(faceToModify.Surface.PositionOf(vtx.Position));
+                        }
                         faceToModify.Surface = modifiedSurface as ISurface;
                         affectedObjects.Add(faceToModify);
-                        verticesToRecalculate.UnionWith(faceToModify.Vertices);
-                        foreach (Vertex vtx in verticesToRecalculate)
+                        foreach (Vertex vtx in verticesToRecalculate.Keys)
                         {
                             edgesToRecalculate.UnionWith(vtx.AllEdges);
                         }
@@ -540,6 +636,156 @@ namespace CADability
             }
             return modifiedFaces.Count > 0;
         }
+
+        private void ModifyCylinder(Face face, Edge edge, double newRadius, Ellipse toKeep)
+        {
+            constrainedFaces.Add(face);
+            CylindricalSurface cyl = face.Surface as CylindricalSurface;
+            Ellipse toChange = edge.Curve3D.Clone() as Ellipse;
+            if (Math.Abs(toChange.Radius - newRadius) < Precision.eps) return; // stays a cylinder, nothing to do here
+            GeoVector normalAtStartPoint = cyl.GetNormal(cyl.PositionOf(toChange.StartPoint));
+            double uCylinder = cyl.PositionOf(toChange.StartPoint).x;
+            toChange.Radius = newRadius;
+            ConicalSurface cone = ConicalSurface.FromTwoCircles(toKeep, toChange);
+            double uCone = cone.PositionOf(toChange.StartPoint).x;
+            GeoVector modifiedNormalAtStartPoint = cone.GetNormal(cone.PositionOf(toChange.StartPoint));
+            if (modifiedNormalAtStartPoint * normalAtStartPoint < 0) cone.ReverseOrientation(); // the orientation of the cone (inside/outside) must be the same
+            // the difference in uCylinder and uCone is how we rotate the cone to fit the cylinder in the u coordinates (not sure whether nesessary)
+            ModOp rotate = ModOp.Rotate(cyl.Location, cyl.Axis, new SweepAngle(uCylinder - uCone));
+            cone.Modify(rotate);
+            uCone = cone.PositionOf(toChange.StartPoint).x; // to debig correct rotation
+            foreach (Vertex vtx in face.Vertices)
+            {
+                if (vtx == edge.StartVertex(face))
+                {
+                    if (edge.Forward(face)) verticesToRecalculate[vtx] = toChange.StartPoint;
+                    else verticesToRecalculate[vtx] = toChange.EndPoint;
+                }
+                else if (vtx == edge.EndVertex(face))
+                {
+                    if (edge.Forward(face)) verticesToRecalculate[vtx] = toChange.EndPoint;
+                    else verticesToRecalculate[vtx] = toChange.StartPoint;
+                }
+                else
+                {
+                    verticesToRecalculate[vtx] = vtx.Position;
+                }
+            }
+            face.Surface = cone;
+        }
+        private void ModifyCone(Face face, Edge edge, double newRadius, Ellipse toKeep)
+        {
+            constrainedFaces.Add(face);
+            ConicalSurface cone = face.Surface as ConicalSurface;
+            GeoVector axis = cone.Axis; // to ensure that the new cone has the same axis direction
+            Ellipse toChange = edge.Curve3D.Clone() as Ellipse;
+            GeoVector normalAtStartPoint = cone.GetNormal(cone.PositionOf(toChange.StartPoint));
+            if (Math.Abs(newRadius - toKeep.Radius) < Precision.eps)
+            {   // this cone will be modified to a cylinder
+
+            }
+            else
+            {
+                double uCone1 = cone.PositionOf(toChange.StartPoint).x;
+                toChange.Radius = newRadius;
+                cone = ConicalSurface.FromTwoCircles(toChange, toKeep);
+                if (cone.Axis * axis < 0) cone = new ConicalSurface(cone.Location, cone.XAxis.Normalized, cone.YAxis.Normalized, -cone.ZAxis.Normalized, cone.OpeningAngle / 2); // this reverses the axis
+                GeoVector modifiedNormalAtStartPoint = cone.GetNormal(cone.PositionOf(toChange.StartPoint));
+                if (modifiedNormalAtStartPoint * normalAtStartPoint < 0) cone.ReverseOrientation(); // the orientation of the cone (inside/outside) must be the same
+                double uCone2 = cone.PositionOf(toChange.StartPoint).x;
+                // the difference in uCylinder and uCone is how we rotate the cone to fit the cylinder in the u coordinates (not sure whether nesessary)
+                ModOp rotate = ModOp.Rotate(cone.Location, cone.Axis, new SweepAngle(uCone1 - uCone2));
+                cone.Modify(rotate);
+                uCone2 = cone.PositionOf(toChange.StartPoint).x; // to debig correct rotation
+                GeoPoint testPoint = cone.PointAt(cone.PositionOf(toChange.StartPoint));
+                foreach (Vertex vtx in face.Vertices)
+                {
+                    if (vtx.IsPeriodicOnFace(face)) periodicVertices[(vtx, face)] = vtx.GetPositionOnFace(face);
+                    if (vtx == edge.StartVertex(face))
+                    {
+                        if (edge.Forward(face)) verticesToRecalculate[vtx] = toChange.StartPoint;
+                        else verticesToRecalculate[vtx] = toChange.EndPoint;
+                    }
+                    else if (vtx == edge.EndVertex(face))
+                    {
+                        if (edge.Forward(face)) verticesToRecalculate[vtx] = toChange.EndPoint;
+                        else verticesToRecalculate[vtx] = toChange.StartPoint;
+                    }
+                    else
+                    {
+                        verticesToRecalculate[vtx] = vtx.Position;
+                    }
+                }
+                face.Surface = cone; // this finally changes the face. The state of the face is invalid, because the vertices and edges have to be recalculated
+            }
+        }
+        /// <summary>
+        /// Modify the radius of an edge. There are typically several edges (2 in most cases), but they all describe the same circle, which is splitted because of periodicy.
+        /// </summary>
+        /// <param name="edges"></param>
+        /// <param name="newRadius"></param>
+        /// <returns></returns>
+        public bool ModifyEdgeRadius(IEnumerable<Edge> edges, double newRadius)
+        {
+            edges = edges.Select((ee) => edgeDict[ee]); // we need to consider the edge of the cloned shell
+            Edge edge = edges.First(); // use one of the edges as a reference
+            Ellipse e = edge.Curve3D as Ellipse;
+            if (e == null) return false;
+            double vp = double.NaN; // v value of the edge to modify on the primary face
+            double oppositeVp = double.NaN; // v value of the circle to keep on the primary face (Maybe this could also be specified as a parameter)
+            Ellipse fixP = null, fixS = null; // the two circles that stay fixed
+            double vs = double.NaN; // v value of the edge to modify on the secondary face
+            double oppositeVs = double.NaN; // v value of the circle to keep on the secondary face (Maybe this could also be specified as a parameter)
+            // we look for a fixed part of the cylinder or cone here. It should be at the opposite side of the face
+            ISurface primarySurface = edge.PrimaryFace.Surface.Clone();
+            ISurface secondarySurface = edge.SecondaryFace.Surface.Clone();
+            if (primarySurface is CylindricalSurface || primarySurface is ConicalSurface)
+            {
+                BoundingRect ext = edge.PrimaryFace.Area.GetExtent(); // edge is probably the minimum or the maximum in v of the area. We need the opposite v
+                vp = edge.Curve2D(edge.PrimaryFace).StartPoint.y; // it should be a line
+                if (ext.Top - vp < vp - ext.Bottom) oppositeVp = ext.Bottom;
+                else oppositeVp = ext.Top;
+                fixP = edge.PrimaryFace.Surface.FixedV(oppositeVp, ext.Left, ext.Right) as Ellipse;
+            }
+            if (secondarySurface is CylindricalSurface || secondarySurface is ConicalSurface)
+            {
+                BoundingRect ext = edge.SecondaryFace.Area.GetExtent(); // edge is probably the minimum or the maximum in v of the area. We need the opposite v
+                vs = edge.Curve2D(edge.SecondaryFace).StartPoint.y; // it should be a line
+                if (ext.Top - vs < vs - ext.Bottom) oppositeVs = ext.Bottom;
+                else oppositeVs = ext.Top;
+                fixS = edge.SecondaryFace.Surface.FixedV(oppositeVs, ext.Left, ext.Right) as Ellipse;
+            }
+            // now we call ModifyCylinder or ModifyCone to change the surface of the face
+            foreach (Edge edg in edges)
+            {
+                if (edg.PrimaryFace.Surface.SameGeometry(edg.PrimaryFace.Domain, primarySurface, edge.PrimaryFace.Domain, Precision.eps, out ModOp2D _))
+                {
+                    if (edg.PrimaryFace.Surface is CylindricalSurface) ModifyCylinder(edg.PrimaryFace, edg, newRadius, fixP);
+                    if (edg.PrimaryFace.Surface is ConicalSurface) ModifyCone(edg.PrimaryFace, edg, newRadius, fixP);
+                }
+                if (edg.SecondaryFace.Surface.SameGeometry(edg.SecondaryFace.Domain, primarySurface, edge.PrimaryFace.Domain, Precision.eps, out ModOp2D _))
+                {
+                    if (edg.SecondaryFace.Surface is CylindricalSurface) ModifyCylinder(edg.SecondaryFace, edg, newRadius, fixP);
+                    if (edg.SecondaryFace.Surface is ConicalSurface) ModifyCone(edg.SecondaryFace, edg, newRadius, fixP);
+                }
+                if (edg.PrimaryFace.Surface.SameGeometry(edg.PrimaryFace.Domain, secondarySurface, edge.SecondaryFace.Domain, Precision.eps, out ModOp2D _))
+                {
+                    if (edg.PrimaryFace.Surface is CylindricalSurface) ModifyCylinder(edg.PrimaryFace, edg, newRadius, fixS);
+                    if (edg.PrimaryFace.Surface is ConicalSurface) ModifyCone(edg.PrimaryFace, edg, newRadius, fixS);
+                }
+                if (edg.SecondaryFace.Surface.SameGeometry(edg.SecondaryFace.Domain, secondarySurface, edge.SecondaryFace.Domain, Precision.eps, out ModOp2D _))
+                {
+                    if (edg.SecondaryFace.Surface is CylindricalSurface) ModifyCylinder(edg.SecondaryFace, edg, newRadius, fixS);
+                    if (edg.SecondaryFace.Surface is ConicalSurface) ModifyCone(edg.SecondaryFace, edg, newRadius, fixS);
+                }
+                edgesToRecalculate.UnionWith(edg.PrimaryFace.AllEdges);
+                edgesToRecalculate.UnionWith(edg.SecondaryFace.AllEdges);
+                //e = edg.Curve3D as Ellipse; // we change this edge here and remove it from edgesToRecalculate. Is that correct?
+                //e.Radius = newRadius;
+            }
+            // edgesToRecalculate.ExceptWith(edges);
+            return true;
+        }
         private void ModifyConstrainedFaces()
         {
             while (constrainedFaces.Any())
@@ -561,16 +807,19 @@ namespace CADability
                 ISurface modified = Surfaces.ModifyTangential(toModify.Surface, otherSurfaces);
                 if (modified != null)
                 {
+                    foreach (Vertex vtx in toModify.Vertices)
+                    {
+                        if (!verticesToRecalculate.ContainsKey(vtx)) verticesToRecalculate[vtx] = modified.PointAt(toModify.Surface.PositionOf(vtx.Position));
+                    }
                     toModify.Surface = modified;
                     affectedObjects.Add(toModify);
-                    verticesToRecalculate.UnionWith(toModify.Vertices);
                     edgesToRecalculate.UnionWith(toModify.AllEdges);
                 }
             }
         }
         public Shell Result()
         {
-            foreach (Face face in modifiedFaces)
+            foreach (Face face in clonedShell.Faces)
             {   // checks the topology of the bounds in 2d: no intersection or overlapping, holes inside the outline
                 if (!face.Check2DBounds())
                 {
@@ -591,8 +840,9 @@ namespace CADability
                 ModifyConstrainedFaces();
                 HashSet<Face> involvedFaces = new HashSet<Face>();
                 HashSet<Vertex> irrelevantVertices = new HashSet<Vertex>();
-                foreach (Vertex vertex in verticesToRecalculate)
+                foreach (KeyValuePair<Vertex, GeoPoint> item in verticesToRecalculate)
                 {
+                    Vertex vertex = item.Key;
                     bool done = false;
                     // first lets see, whether two tangential surfaces are involved with this vertex. Then we need to intersect the tangential edge with the third surface
                     HashSet<Edge> tm = new HashSet<Edge>(vertex.AllEdges);
@@ -601,52 +851,103 @@ namespace CADability
                     if (!toTest.Any()) toTest = tm; // preferably use edges from tangentialEdgesModified, if there are none use all edges
                     foreach (Edge edge in toTest) // there are at least three
                     {
-                        ICurve crv; // either a already moved tangential edge or an unmodified edge
-                        if (!tangentialEdgesModified.TryGetValue(edge, out crv) && edge.IsTangentialEdge()) crv = edge.Curve3D;
-                        if (crv != null)
-                        {   // this vertex is the start or end vertex of a tangential edge. We cannot use the intersection of 3 surfaces to calculate its new position
-                            foreach (Face face in vertex.InvolvedFaces)
+                        if (edge.ConnectsSameSurfaces())
+                        {
+                            ICurve crv = null; // either a already moved tangential edge or an unmodified edge
+                            GeoPoint2D uvOnFace = GeoPoint2D.Invalid;
+                            Face onFace = null;
+                            if (periodicVertices.TryGetValue((vertex, edge.PrimaryFace), out GeoPoint2D uv1))
                             {
-                                if (face != edge.PrimaryFace && face != edge.SecondaryFace)
-                                {   // this is the face (or very rare one of the faces) that is not part of the tangential edges
-                                    face.Surface.Intersect(crv, face.Domain, out GeoPoint[] ips, out GeoPoint2D[] uvOnSurface, out double[] uOnCurve); // the domain should only be used for periodic adjustment!
-                                    if (ips.Length == 0)
-                                    {
-                                        BoundingCube ext = face.GetBoundingCube();
-                                        if (crv.Extend(ext.DiagonalLength, ext.DiagonalLength))
-                                        {   // a second try with the extended curve
-                                            face.Surface.Intersect(crv, face.Domain, out ips, out uvOnSurface, out uOnCurve);
-                                        }
-                                    }
-                                    if (ips.Length > 0) // there should always be such an intersection point, otherwise there is no way to modify the shell
-                                    {
-                                        if (ips.Length > 1)
+                                uvOnFace = uv1;
+                                onFace = edge.PrimaryFace;
+                            }
+                            else if (periodicVertices.TryGetValue((vertex, edge.SecondaryFace), out GeoPoint2D uv2))
+                            {
+                                uvOnFace = uv2;
+                                onFace = edge.SecondaryFace;
+                            }
+                            if (onFace != null)
+                            {   // this is a periodic vertex on a split periodic face
+                                // the 2d curve of this edge must be a vertical line (cylinder, cone, sphere, torus) or a horizontal line (sphere, torus)
+                                crv = onFace.Surface.Make3dCurve(edge.Curve2D(onFace)); // the face surface is maybe already modified, so the length of the curve might be wrong
+                                foreach (Face face in vertex.InvolvedFaces)
+                                {
+                                    if (face != edge.PrimaryFace && face != edge.SecondaryFace)
+                                    {   // this is the face (or very rare one of the faces) that is not part of the tangential edges
+                                        face.Surface.Intersect(crv, face.Domain, out GeoPoint[] ips, out GeoPoint2D[] uvOnSurface, out double[] uOnCurve); // the domain should only be used for periodic adjustment!
+                                        if (ips.Length == 0)
                                         {
-                                            // find best point: closer to startpoint or endpoint of crv, depending on vertex, set it on ips[0]
-                                            // the following was sometimes incorrect, we use the old vertex position to find the closest candidate
-                                            //GeoPoint testPoint = GeoPoint.Invalid;
-                                            //if (edge.Vertex1 == vertex) testPoint = crv.StartPoint;
-                                            //else if (edge.Vertex2 == vertex) testPoint = crv.EndPoint;
-                                            //if (testPoint.IsValid)
-                                            //{
-                                            //    ips[0] = Hlp.GetClosest(ips, p => p | testPoint);
-                                            //}
-                                            ips[0] = Hlp.GetClosest(ips, p => p | vertex.Position);
+                                            BoundingCube ext = face.GetBoundingCube();
+                                            if (crv.Extend(ext.DiagonalLength, ext.DiagonalLength))
+                                            {   // a second try with the extended curve
+                                                face.Surface.Intersect(crv, face.Domain, out ips, out uvOnSurface, out uOnCurve);
+                                            }
                                         }
-                                        if (!Precision.IsEqual(ips[0], vertex.Position)) affectedObjects.Add(vertex);
-                                        vertex.Position = ips[0];
-                                        done = true;
-                                        break;
+                                        if (ips.Length > 0) // there should always be such an intersection point, otherwise there is no way to modify the shell
+                                        {
+                                            if (ips.Length > 1)
+                                            {
+                                                ips[0] = Hlp.GetClosest(ips, p => p | item.Value);
+                                            }
+                                            if (!Precision.IsEqual(ips[0], vertex.Position)) affectedObjects.Add(vertex);
+                                            vertex.Position = ips[0];
+                                            done = true;
+                                            break;
+                                        }
                                     }
                                 }
                             }
+                            if (done) break;
                         }
-                        if (done) break;
                     }
+                    if (!done) foreach (Edge edge in toTest) // there are at least three
+                        {
+                            ICurve crv = null; // either a already moved tangential edge or an unmodified edge
+                            if (!tangentialEdgesModified.TryGetValue(edge, out crv) && edge.IsTangentialEdge()) crv = edge.Curve3D;
+                            if (crv != null)
+                            {   // this vertex is the start or end vertex of a tangential edge. We cannot use the intersection of 3 surfaces to calculate its new position
+                                foreach (Face face in vertex.InvolvedFaces)
+                                {
+                                    if (face != edge.PrimaryFace && face != edge.SecondaryFace)
+                                    {   // this is the face (or very rare one of the faces) that is not part of the tangential edges
+                                        face.Surface.Intersect(crv, face.Domain, out GeoPoint[] ips, out GeoPoint2D[] uvOnSurface, out double[] uOnCurve); // the domain should only be used for periodic adjustment!
+                                        if (ips.Length == 0)
+                                        {
+                                            BoundingCube ext = face.GetBoundingCube();
+                                            if (crv.Extend(ext.DiagonalLength, ext.DiagonalLength))
+                                            {   // a second try with the extended curve
+                                                face.Surface.Intersect(crv, face.Domain, out ips, out uvOnSurface, out uOnCurve);
+                                            }
+                                        }
+                                        if (ips.Length > 0) // there should always be such an intersection point, otherwise there is no way to modify the shell
+                                        {
+                                            if (ips.Length > 1)
+                                            {
+                                                // find best point: closer to startpoint or endpoint of crv, depending on vertex, set it on ips[0]
+                                                // the following was sometimes incorrect, we use the old vertex position to find the closest candidate
+                                                //GeoPoint testPoint = GeoPoint.Invalid;
+                                                //if (edge.Vertex1 == vertex) testPoint = crv.StartPoint;
+                                                //else if (edge.Vertex2 == vertex) testPoint = crv.EndPoint;
+                                                //if (testPoint.IsValid)
+                                                //{
+                                                //    ips[0] = Hlp.GetClosest(ips, p => p | testPoint);
+                                                //}
+                                                ips[0] = Hlp.GetClosest(ips, p => p | vertex.Position);
+                                            }
+                                            if (!Precision.IsEqual(ips[0], vertex.Position)) affectedObjects.Add(vertex);
+                                            vertex.Position = ips[0];
+                                            done = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            if (done) break;
+                        }
                     Face[] faces = vertex.InvolvedFaces.ToArray();
                     if (!done && faces.Length >= 3)
                     {   // here we would need to be more selective
-                        GeoPoint ip = vertex.Position;
+                        GeoPoint ip = item.Value; // vertex.Position;
                         // maybe two faces have an identical surface (a split periodic surface)
                         double mindist = double.MaxValue;
                         foreach (Edge edg in vertex.AllEdges)
@@ -662,7 +963,7 @@ namespace CADability
                                     fc.Surface.Intersect(edg.Curve3D, fc.Domain, out GeoPoint[] ips, out GeoPoint2D[] uvOnFaces, out double[] uOnCurve);
                                     for (int i = 0; i < ips.Length; i++)
                                     {
-                                        double d = ips[i] | vertex.Position;
+                                        double d = ips[i] | item.Value; // item.value is the position of the moved or rotated vertex
                                         if (d < mindist)
                                         {
                                             mindist = d;
@@ -702,6 +1003,8 @@ namespace CADability
                         // now we go on, maybe the next operation yields correct vertices again
                     }
                 }
+                clonedShell.CheckConsistency();
+
                 foreach (Edge edge in edgesToRecalculate)
                 {
                     List<GeoPoint> seeds = new List<GeoPoint>(); // for the intersection
@@ -710,7 +1013,7 @@ namespace CADability
                     // remove duplicate seeds
                     if (seeds.Count == 2 && Precision.IsEqual(seeds[0], seeds[1])) seeds.RemoveAt(1);
                     ICurve crv = null;
-                    if (edge.PrimaryFace.Surface.SameGeometry(edge.PrimaryFace.Domain, edge.SecondaryFace.Surface, edge.SecondaryFace.Domain, Precision.eps, out ModOp2D firstToSecond))
+                    if (edge.PrimaryFace.Surface.SameGeometry(edge.PrimaryFace.Domain, edge.SecondaryFace.Surface, edge.SecondaryFace.Domain, Precision.eps, out ModOp2D firstToSecond) && seeds.Count>1)
                     {   // this is probably a seam of two periodic parts with the same surface
                         GeoPoint2D sp = edge.PrimaryFace.Surface.PositionOf(seeds[0]);
                         GeoPoint2D ep = edge.PrimaryFace.Surface.PositionOf(seeds[1]);
@@ -777,12 +1080,14 @@ namespace CADability
                 foreach (Face face in involvedFaces)
                 {
                     face.ForceAreaRecalc();
+                    //face.Modify(ModOp.Identity); // fir did change! we would need access to IGeoObject.FireDidChange here
+                    // why do we need IGeoObject.FireDidChange here? if we call Modify, vertices are newly calculated and maybe make this shell invalid!
                 }
                 foreach (Face face in involvedFaces)
                 {   // checks the topology of the bounds in 2d: no intersection or overlapping, holes inside the outline
                     if (!face.Check2DBounds())
                     {
-                        //return false;
+                        return false;
                     }
                 }
                 if (clonedShell.CheckConsistency())
@@ -791,7 +1096,8 @@ namespace CADability
                 }
                 else
                 {
-                    // return false;
+                    clonedShell.RecalcVertices(); // not sure, why this is necessary, but sometimes it is 
+                    return clonedShell.CheckConsistency();
                 }
                 return true;
             }

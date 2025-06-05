@@ -153,7 +153,7 @@ namespace CADability
             }
         }
     }
-    static partial class Extensions
+    public static partial class Extensions
     {
         public static IEnumerable<T> Combine<T>(params IEnumerable<T>[] enumerators)
         {
@@ -194,13 +194,76 @@ namespace CADability
             return v.Count > 0 && !double.IsNaN(v[0]) && !double.IsInfinity(v[0]);
         }
 
-        public static T[] ToArray<T>(this IEnumerable<T> e)
+        internal static T[] ToArray<T>(this IEnumerable<T> e)
         {
             if (e is T[] t) return t;
             if (e is List<T> l) return l.ToArray();
             List<T> r = new List<T>();
             foreach (T item in e) r.Add(item);
             return r.ToArray();
+        }
+
+        public static TSource MinBy<TSource, TKey>(this IEnumerable<TSource> source, Func<TSource, TKey> selector) where TKey : IComparable<TKey>
+        {
+            bool first = true;
+            TSource minElement = default;
+            TKey minValue = default;
+
+            foreach (var item in source)
+            {
+                var value = selector(item);
+                if (first || value.CompareTo(minValue) < 0)
+                {
+                    first = false;
+                    minValue = value;
+                    minElement = item;
+                }
+            }
+            return minElement;
+        }
+        public static TSource MinByWithDefault<TSource, TKey>(this IEnumerable<TSource> source, TSource def, Func<TSource, TKey> selector) where TKey : IComparable<TKey>
+        {
+            bool first = true;
+            TSource minElement = def;
+            TKey minValue = default;
+
+            foreach (var item in source)
+            {
+                var value = selector(item);
+                if (first || value.CompareTo(minValue) < 0)
+                {
+                    first = false;
+                    minValue = value;
+                    minElement = item;
+                }
+            }
+            return minElement;
+        }
+        public static (TSource Element, TKey Value) MinByElementAndValue<TSource, TKey>(this IEnumerable<TSource> source, Func<TSource, TKey> selector) where TKey : IComparable<TKey>
+        {
+            bool first = true;
+            TSource minElement = default;
+            TKey minValue = default;
+
+            foreach (var item in source)
+            {
+                var value = selector(item);
+                if (first || value.CompareTo(minValue) < 0)
+                {
+                    first = false;
+                    minValue = value;
+                    minElement = item;
+                }
+            }
+            return (minElement, minValue);
+        }
+
+        public static void AddIfNotNull<T>(this ICollection<T> list, T item)
+        {
+            if (item != null)
+            {
+                list.Add(item);
+            }
         }
     }
 }

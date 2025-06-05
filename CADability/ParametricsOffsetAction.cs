@@ -3,13 +3,13 @@ using CADability.GeoObject;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace CADability
+namespace CADability.Actions
 {
     /// <summary>
     /// This action modifies two parts of the solid: frontSide and backSide, which are parallel. Typically used to modify the thickness or gauge of a part.
     /// Parametric.OffsetFaces method according to the provided input
     /// </summary>
-    internal class ParametricsOffset : ConstructAction
+    internal class ParametricsOffsetAction : ConstructAction
     {
         private HashSet<Face> frontSide;
         private HashSet<Face> backSide;
@@ -23,7 +23,7 @@ namespace CADability
         private double gauge;
         private double offset;
 
-        public ParametricsOffset(HashSet<Face> frontSide, HashSet<Face> backSide, IFrame frame, double thickness)
+        public ParametricsOffsetAction(HashSet<Face> frontSide, HashSet<Face> backSide, IFrame frame, double thickness)
         {
             this.frontSide = frontSide;
             this.backSide = backSide;
@@ -56,7 +56,7 @@ namespace CADability
             SetInput(distanceInput, modeInput);
             base.OnSetAction();
 
-            FeedBack.SelectOutline = false;
+            FeedBack.SelectOutline = true;
             validResult = false;
         }
         private int ModeInput_GetChoiceEvent()

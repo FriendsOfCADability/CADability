@@ -59,7 +59,7 @@ namespace CADability.GeoObject
             colorDef = new ColorDef(null, Color.Black);
             if (Constructed != null) Constructed(this);
         }
-        internal static Line TwoPoints(GeoPoint sp, GeoPoint ep)
+        public static Line TwoPoints(GeoPoint sp, GeoPoint ep)
         {
             Line res = Line.Construct();
             res.SetTwoPoints(sp, ep);

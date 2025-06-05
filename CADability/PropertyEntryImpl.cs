@@ -142,6 +142,10 @@ namespace CADability.UserInterface
         {
             return true; // standard: don't care
         }
+        public virtual string GetErrorText()
+        {
+            return "";
+        }
 
         /// <summary>
         /// Must be overridden when Flags contains PropertyEntryType.ValueEditable. See <see cref="IPropertyEntry.EndEdit(bool, bool, string)"/>

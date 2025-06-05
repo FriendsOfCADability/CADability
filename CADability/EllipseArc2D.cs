@@ -100,7 +100,7 @@ namespace CADability.Curve2D
             }
             else
             {
-                if (sweepPar > 0.0) return p.IsLeftOf(endPoint, startPoint);
+                if ((sweepPar > 0.0) == (GeoVector2D.Orientation(majorAxis, minorAxis) > 0)) return p.IsLeftOf(endPoint, startPoint);
                 else return p.IsLeftOf(startPoint, endPoint);
             }
         }

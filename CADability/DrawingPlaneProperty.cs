@@ -180,6 +180,12 @@ namespace CADability.UserInterface
                     frame.SetAction(cp);
                     frame.ShowPropertyDisplay("Action");
                     return true;
+                case "MenuId.DrawingPlane.OfCurve":
+                    ConstructPlaneOfCurve cpc = new ConstructPlaneOfCurve("Construct.DrawingPlane");
+                    cpc.ActionDoneEvent += new CADability.Actions.ConstructAction.ActionDoneDelegate(OnDrawingPlaneDone);
+                    frame.SetAction(cpc);
+                    frame.ShowPropertyDisplay("Action");
+                    return true;
                 case "MenuId.DrawingPlane.Tangential":
                     ConstructTangentialPlane ct = new ConstructTangentialPlane("Construct.DrawingPlane");
                     ct.ActionDoneEvent += new CADability.Actions.ConstructAction.ActionDoneDelegate(OnDrawingPlaneDone);
@@ -212,7 +218,8 @@ namespace CADability.UserInterface
                     CommandState.Enabled = !projection.Direction.IsPerpendicular(new GeoVector(1, 0, 0));
                     return true;
                 case "MenuId.DrawingPlane.Three.Points":
-                    // immer Enabled
+                    return true;
+                case "MenuId.DrawingPlane.OfCurve":
                     return true;
                 case "MenuId.DrawingPlane.Show":
                     CommandState.Checked = projection.ShowDrawingPlane;
@@ -230,15 +237,10 @@ namespace CADability.UserInterface
             if (propertyTreeView != null) propertyTreeView.SelectEntry(this);
             Plane pln = Plane.XYPlane;
             ConstructPlane cp = ca as ConstructPlane;
-            if (ca is ConstructPlane)
+            if (ca is IConstructPlane icp)
             {
-                pln = (ca as ConstructPlane).ConstructedPlane;
+                pln = icp.ConstructedPlane;
             }
-            else if (ca is ConstructTangentialPlane)
-            {
-                pln = (ca as ConstructTangentialPlane).ConstructedPlane;
-            }
-            else return;
             try
             {
                 if (!Precision.IsPerpendicular(projection.Direction, pln.Normal, false))

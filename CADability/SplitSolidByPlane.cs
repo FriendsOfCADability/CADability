@@ -2,7 +2,7 @@
 
 namespace CADability.Actions
 {
-    internal class SplitSolidByPlane : ConstructAction
+    public class SplitSolidByPlane : ConstructAction
     {
         private Plane plane; // die zentrale Ebene
         private Polyline feedBackPolyLine; // Darstellungsrechteck für die Ebene

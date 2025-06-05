@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace CADability.Actions
 {
-    internal class Constr3DFaceExtrude : ConstructAction
+    public class Constr3DFaceExtrude : ConstructAction
     {
         private GeoObjectInput geoObjectInput;
         private GeoPointInput innerPointInput;
@@ -113,6 +113,13 @@ namespace CADability.Actions
             };
         }
 
+        public Constr3DFaceExtrude(Face face)
+            : this()
+        {
+            selectedMode = true;
+            this.selectedObjectsList = new GeoObjectList(face);
+            ListDefault(this.selectedObjectsList.Count); // setzt alle Listen auf gleiche Länge, Inhalte "null"
+        }
         public Constr3DFaceExtrude(Constr3DFaceExtrude autorepeat)
             : this()
         {
@@ -432,6 +439,13 @@ namespace CADability.Actions
                 double h = base.ActiveDrawingPlane.Distance(MousePosition);
                 if (!Precision.IsNull(h)) return h;
             }
+            else
+            {
+                if (geoObjectOrgList.Count>0 && geoObjectOrgList[0] is Face fc && fc.Surface is PlaneSurface ps)
+                {
+                    return ps.Plane.Distance(MousePosition);
+                }
+            }
             return height;
         }
 
@@ -677,6 +691,10 @@ namespace CADability.Actions
         public override string GetID()
         { return "Constr.Solid.FaceExtrude"; }
 
+        public override bool AutoRepeat()
+        {
+            return false; // autorepeating this action seems not pracitcable
+        }
         /// <summary>
         /// Overrides <see cref="CADability.Actions.ConstructAction.OnDone ()"/>
         /// </summary>
@@ -705,7 +723,7 @@ namespace CADability.Actions
                             if (vectorOffset.IsNullVector() && insert && Frame.GetBooleanSetting("Construct.3D_Delete2DBase", false))
                             {
                                 if (geoObjectOrgList[i] != null) // evtl. Einzelobjekt (Object oder Path) als Original rauslöschen
-                                    ownerList[i].Remove(geoObjectOrgList[i] as IGeoObject);
+                                    ownerList[i]?.Remove(geoObjectOrgList[i]);
                                 else
                                 { // die Einzelelemente des CreateFromModel identifizieren
                                     for (int j = 0; j < pathCreatedFromModelList[i].Count; ++j)

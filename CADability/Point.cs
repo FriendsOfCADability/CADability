@@ -450,6 +450,14 @@ namespace CADability.GeoObject
         {
             return new BoundingRect(projection.ProjectUnscaled(location));
         }
+
+        internal static Point MakePoint(GeoPoint position, PointSymbol symbol=PointSymbol.Cross)
+        {
+            Point res = Point.Construct();
+            res.location= position;
+            res.symbol= symbol;
+            return res;
+        }
         #endregion
     }
     internal class PointSymbolAttribute : INamedAttribute

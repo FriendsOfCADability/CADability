@@ -498,7 +498,7 @@ namespace CADability.GeoObject
         #endregion
         protected BSpline()
             : base()
-        {            
+        {
             if (Constructed != null) Constructed(this);
             extent = BoundingCube.EmptyBoundingCube;
         }
@@ -1059,7 +1059,7 @@ namespace CADability.GeoObject
                 for (int i = 0; i < multiplicities.Length; ++i) sum += multiplicities[i];
                 if (poles.Length + degree + 1 != sum) return false;
             }
-            if (startParam > knots[0] || endParam < knots[knots.Length-1])
+            if (startParam > knots[0] || endParam < knots[knots.Length - 1])
             {
                 BSpline trimmed = TrimParam(startParam, endParam);
                 CopyGeometry(trimmed);
@@ -1986,7 +1986,7 @@ namespace CADability.GeoObject
                         break;
                 }
             }
-            extent = BoundingCube.EmptyBoundingCube;            
+            extent = BoundingCube.EmptyBoundingCube;
             if (Constructed != null) Constructed(this);
         }
         /// <summary>
@@ -2797,6 +2797,7 @@ namespace CADability.GeoObject
         }
         ICurve[] ICurve.Split(double Position1, double Position2)
         {
+            if (Math.Abs(Position1 - Position2) < Precision.eps) return new ICurve[0];
             GeoPoint[] newPoles = new GeoPoint[poles.Length * 2 - 1];
             double[] newWeights = new double[weights.Length * 2 - 1];
             double[] newKnots = new double[knots.Length * 2 - 1];
@@ -2835,8 +2836,8 @@ namespace CADability.GeoObject
         {
             Plane pln = getPlane(); // we need this for FromNurbs
             if (!nurbsHelper) MakeNurbsHelper();
-            if (StartPos < 0.0) StartPos = 0.0;
-            if (EndPos > 1.0) EndPos = 1.0;
+            if (StartPos < Precision.eps * 0.01) StartPos = 0.0;
+            if (EndPos > 1.0 + Precision.eps * 0.01) EndPos = 1.0;
             if (StartPos == 0.0 && EndPos == 1.0) return;
             if (EndPos > StartPos)
             {
@@ -2931,18 +2932,18 @@ namespace CADability.GeoObject
                 }
             }
         }
-                
+
         Plane ICurve.GetPlane()
         {
-			if (plane.HasValue) 
+            if (plane.HasValue)
                 return plane.Value;
 
-			lock (planeLock)
+            lock (planeLock)
             {
-				if (plane.HasValue)
-					return plane.Value;
+                if (plane.HasValue)
+                    return plane.Value;
 
-				double MaxDist;
+                double MaxDist;
                 bool isLinear;
                 Plane res = Plane.FromPoints(poles, out MaxDist, out isLinear);
                 if (MaxDist < Precision.eps)
@@ -3351,7 +3352,7 @@ namespace CADability.GeoObject
                     double df = (c2.poles[0] | poles[0]) + (c2.poles[c2.poles.Length - 1] | poles[poles.Length - 1]);
                     double dr = (c2.poles[0] | poles[poles.Length - 1]) + (c2.poles[c2.poles.Length - 1] | poles[0]);
                     bool reverse = df > dr;
-                    if (df<precision && dr<precision)
+                    if (df < precision && dr < precision)
                     {
                         reverse = (this as ICurve).StartDirection * (c2 as ICurve).StartDirection < 0;
                     }
@@ -3379,7 +3380,7 @@ namespace CADability.GeoObject
                 {
                     if ((this as ICurve).DistanceTo(c2.KnotPoints[i]) > precision) return false;
                 }
-                if (KnotPoints.Length<=2 && c2.KnotPoints.Length<=2)
+                if (KnotPoints.Length <= 2 && c2.KnotPoints.Length <= 2)
                 {   // maybe same start and endpoint
                     if ((c2 as ICurve).DistanceTo((this as ICurve).PointAt(0.5)) > precision) return false;
                     if ((this as ICurve).DistanceTo((c2 as ICurve).PointAt(0.5)) > precision) return false;
@@ -4136,7 +4137,7 @@ namespace CADability.GeoObject
                     m[2, 0] = p3.x;
                     m[2, 1] = p3.y;
                     m[2, 2] = 1.0;
-                    double[] b = new double[] {  p1.z ,  p2.z ,  p3.z  };
+                    double[] b = new double[] { p1.z, p2.z, p3.z };
                     Matrix mx = DenseMatrix.OfArray(m);
                     Vector s = (Vector)mx.Solve(new DenseVector(b));
                     if (s != null)

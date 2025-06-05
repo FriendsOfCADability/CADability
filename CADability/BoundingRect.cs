@@ -589,7 +589,7 @@ namespace CADability
             return (uv.x >= Left && uv.x <= Right && uv.y >= Bottom && uv.y <= Top);
         }
 
-        internal bool ContainsEps(GeoPoint2D uv, double eps)
+        public bool ContainsEps(GeoPoint2D uv, double eps)
         {
             double dx, dy;
             if (eps < 0) // Prozentsatz

@@ -75,6 +75,8 @@ namespace CADability.Actions
 
                 bool oldSelectMode = paintTo3D.SelectMode;
                 paintTo3D.SelectMode = true;
+                bool pse = paintTo3D.PaintSurfaceEdges;
+                paintTo3D.PaintSurfaceEdges = false;
                 for (int i = 0; i < paintAsSelected.Count; ++i)
                 {
                     IGeoObjectImpl go = paintAsSelected[i] as IGeoObjectImpl;
@@ -84,9 +86,10 @@ namespace CADability.Actions
                         paintTo3D.OpenList("feedback");
                         go.PaintTo3D(paintTo3D);
                         IPaintTo3DList list = paintTo3D.CloseList();
-                        if (list != null) paintTo3D.SelectedList(list, selectWidth);
+                        if (list != null) paintTo3D.SelectedList(list, -1); // changed from selectWidth to -1 (also show faces which are behind other faces)
                     }
                 }
+                paintTo3D.PaintSurfaceEdges = pse;
                 paintTo3D.SelectMode = oldSelectMode;
             }
 
@@ -137,6 +140,17 @@ namespace CADability.Actions
                     fb.FeedBackChangedEvent += new FeedBackChangedDelegate(OnFeedBackChanged);
                     OnFeedBackChanged(fb);
                 }
+            }
+            return repaintObjects.Count - 1;
+        }
+        public int Add(IEnumerable<IGeoObject> feedBackObjects)
+        {
+            foreach (IGeoObject go in feedBackObjects)
+            {
+                IFeedBack feedBackObject = go as IFeedBack;
+                repaintObjects.Add(feedBackObject);
+                feedBackObject.FeedBackChangedEvent += new FeedBackChangedDelegate(OnFeedBackChanged);
+                OnFeedBackChanged(feedBackObject);
             }
             return repaintObjects.Count - 1;
         }
@@ -275,6 +289,15 @@ namespace CADability.Actions
             paintAsTransparent.Add(feedBackObject);
             (feedBackObject as IFeedBack).FeedBackChangedEvent += new FeedBackChangedDelegate(OnFeedBackChanged);
             OnFeedBackChanged(feedBackObject as IFeedBack);
+        }
+        public void AddTransparent(IEnumerable<IGeoObject> feedBackObjects)
+        {
+            paintAsTransparent.AddRange(feedBackObjects);
+            foreach (var feedBackObject in feedBackObjects)
+            {
+                (feedBackObject as IFeedBack).FeedBackChangedEvent += new FeedBackChangedDelegate(OnFeedBackChanged);
+                OnFeedBackChanged(feedBackObject as IFeedBack);
+            }
         }
         public void RemoveTransparent(IGeoObject feedBackObject)
         {

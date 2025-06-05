@@ -1166,6 +1166,22 @@ namespace CADability
                         ActiveView.ZoomToRect(ActiveView.Model.GetExtentForZoomTotal(ActiveView.Projection) * 1.1);
                         return true;
                     }
+                case "MenuId.DrawingPlane.StandardXY":
+                case "MenuId.DrawingPlane.StandardXY.Offset":
+                case "MenuId.DrawingPlane.StandardXZ":
+                case "MenuId.DrawingPlane.StandardXZ.Offset":
+                case "MenuId.DrawingPlane.StandardYZ":
+                case "MenuId.DrawingPlane.StandardYZ.Offset":
+                case "MenuId.DrawingPlane.Tangential":
+                case "MenuId.DrawingPlane.Three.Points":
+                case "MenuId.DrawingPlane.OfCurve":
+                case "MenuId.DrawingPlane.Show":
+                case "MenuId.DrawingPlane.Point.Direction":
+                    {
+                        DrawingPlaneProperty dp = new DrawingPlaneProperty(ActiveView.Projection, this);
+                        (dp as ICommandHandler).OnCommand(MenuId);
+                        break;
+                    }
                 case "MenuId.File.Print":
                     // OnPrint();
                     return true;
@@ -2075,6 +2091,22 @@ namespace CADability
                         CommandState.Checked = Precision.SameNotOppositeDirection((ActiveView as ModelView).Projection.Direction, iso);
                     }
                     return true;
+                case "MenuId.DrawingPlane.StandardXY":
+                case "MenuId.DrawingPlane.StandardXY.Offset":
+                case "MenuId.DrawingPlane.StandardXZ":
+                case "MenuId.DrawingPlane.StandardXZ.Offset":
+                case "MenuId.DrawingPlane.StandardYZ":
+                case "MenuId.DrawingPlane.StandardYZ.Offset":
+                case "MenuId.DrawingPlane.Tangential":
+                case "MenuId.DrawingPlane.Three.Points":
+                case "MenuId.DrawingPlane.OfCurve":
+                case "MenuId.DrawingPlane.Show":
+                case "MenuId.DrawingPlane.Point.Direction":
+                    {   // it was implemented in DrawingPlaneProperty of ModelView
+                        DrawingPlaneProperty dp = new DrawingPlaneProperty(ActiveView.Projection, this);
+                        (dp as ICommandHandler).OnUpdateCommand(MenuId, CommandState);
+                        break;
+                    }
 
                 default: break;
             }

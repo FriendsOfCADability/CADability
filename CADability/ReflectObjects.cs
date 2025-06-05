@@ -9,7 +9,7 @@ namespace CADability.Actions
     /// <summary>
     /// 
     /// </summary>
-    internal class ReflectObjects : ConstructAction
+    public class ReflectObjects : ConstructAction
     {
         private Block block; // der Arbeitsblock zum Darstellen
         private GeoObjectList originals; // zur Sicherung

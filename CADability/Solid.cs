@@ -1,8 +1,11 @@
 ﻿using CADability.Actions;
 using CADability.Attribute;
+using CADability.Substitutes;
 using CADability.UserInterface;
+using MathNet.Numerics;
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices.ComTypes;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 
@@ -170,8 +173,8 @@ namespace CADability.GeoObject
         internal static bool octTreeAlsoCheckInside = false; // global setting: auch das innere der Solids für den octTree überprüfen (Anforderung von Hilgers)
         private Shell[] shells; // List of Shells defining this Solid. The first (and in most cases only) entry is the outer hull, the following are non intersecting inner holes (faces oriented to point into the inside of the hole)
         private string name; // aus STEP oder IGES kommen benannte solids (Shells, Faces?)
-        [FlagsAttribute] private enum Flags { oriented = 1, unchanged = 2 };
-        private Flags flags;
+        [FlagsAttribute] internal enum Flags { oriented = 1, unchanged = 2 };
+        internal Flags flags;
         private Edge[] edges; // secondary data, not serialized
         /// <summary>
         /// Returns all the edges of this Shell. Each egde is unique in the array 
@@ -1067,53 +1070,6 @@ namespace CADability.GeoObject
                 return base.OnUpdateCommand(MenuId, CommandState);
             }
         }
-        private class BRepOpWith : ICommandHandler
-        {
-            private Solid solid;
-            private List<Solid> other;
-
-            public BRepOpWith(Solid solid, List<Solid> other)
-            {
-                this.solid = solid;
-                this.other = other;
-            }
-
-            bool ICommandHandler.OnCommand(string MenuId)
-            {
-                switch (MenuId)
-                {
-                    case "MenuId.Solid.RemoveFromAll":
-                        foreach (Solid sld in other)
-                        {
-                            Solid[] res = Solid.Subtract(sld, solid);
-                            if (res != null)
-                            {
-                                if (res.Length != 1 || !res[0].flags.HasFlag(Flags.unchanged))
-                                {
-                                    IGeoObjectOwner owner = sld.Owner;
-                                    owner.Remove(sld);
-                                    for (int i = 0; i < res.Length; i++)
-                                    {
-                                        owner.Add(res[i]);
-                                    }
-                                }
-                            }
-                        }
-                        solid.Owner.Remove(solid);
-                        break;
-                }
-                return false;
-            }
-
-            void ICommandHandler.OnSelected(MenuWithHandler selectedMenu, bool selected)
-            {
-            }
-
-            bool ICommandHandler.OnUpdateCommand(string MenuId, CommandState CommandState)
-            {
-                return true;
-            }
-        }
 
         public bool SameGeometry(Solid other)
         {
@@ -1152,8 +1108,13 @@ namespace CADability.GeoObject
                     MenuWithHandler mhSubtractFromAll = new MenuWithHandler();
                     mhSubtractFromAll.ID = "MenuId.Solid.RemoveFromAll";
                     mhSubtractFromAll.Text = StringTable.GetString("MenuId.Solid.RemoveFromAll", StringTable.Category.label);
-                    mhSubtractFromAll.Target = new BRepOpWith(this, otherSolids);
+                    mhSubtractFromAll.Target = new BRepOpWith(this, otherSolids, frame);
                     res.Add(mhSubtractFromAll);
+                    MenuWithHandler mhSubtractAllFromThis = new MenuWithHandler();
+                    mhSubtractAllFromThis.ID = "MenuId.Solid.RemoveAll";
+                    mhSubtractAllFromThis.Text = StringTable.GetString("MenuId.Solid.RemoveAll", StringTable.Category.label);
+                    mhSubtractAllFromThis.Target = new BRepOpWith(this, otherSolids, frame);
+                    res.Add(mhSubtractAllFromThis);
                     MenuWithHandler mhUniteWith = new MenuWithHandler();
                     mhUniteWith.ID = "MenuId.Solid.UniteWith";
                     mhUniteWith.Text = StringTable.GetString("MenuId.Solid.UniteWith", StringTable.Category.label);
@@ -1162,7 +1123,7 @@ namespace CADability.GeoObject
                     MenuWithHandler mhUniteWithAll = new MenuWithHandler();
                     mhUniteWithAll.ID = "MenuId.Solid.UniteWithAll";
                     mhUniteWithAll.Text = StringTable.GetString("MenuId.Solid.UniteWithAll", StringTable.Category.label);
-                    mhUniteWithAll.Target = new BRepOpWith(this, otherSolids);
+                    mhUniteWithAll.Target = new BRepOpWith(this, otherSolids, frame);
                     res.Add(mhUniteWithAll);
                     MenuWithHandler mhIntersectWith = new MenuWithHandler();
                     mhIntersectWith.ID = "MenuId.Solid.IntersectWith";
@@ -1177,7 +1138,7 @@ namespace CADability.GeoObject
                     MenuWithHandler mhSplitWithAll = new MenuWithHandler();
                     mhSplitWithAll.ID = "MenuId.Solid.SplitWithAll";
                     mhSplitWithAll.Text = StringTable.GetString("MenuId.Solid.SplitWithAll", StringTable.Category.label);
-                    mhSplitWithAll.Target = new BRepOpWith(this, otherSolids);
+                    mhSplitWithAll.Target = new BRepOpWith(this, otherSolids, frame);
                     res.Add(mhSplitWithAll);
                 }
             }
@@ -1258,6 +1219,199 @@ namespace CADability.GeoObject
             });
             res.Add(mhremove);
             return res.ToArray();
+        }
+    }
+    public class BRepOpWith : ICommandHandler
+    {
+        private Solid solid;
+        private List<Solid> other;
+        private IFrame frame;
+        public BRepOpWith(Solid solid, List<Solid> other, IFrame frame)
+        {
+            this.solid = solid;
+            this.other = other;
+            this.frame = frame;
+        }
+
+        bool ICommandHandler.OnCommand(string MenuId)
+        {
+            // make a collision detection of the solid with the other solids here. Maybe this object was constructed without ever beeing used as a command target
+            // so the collision detection in the constructor would be unnecessary.
+            // Collision detection is not reliable when the two solid only share a common face, i.e. we want to glue it together
+            //for (int i = other.Count-1; i >=0; --i)
+            //{
+            //    CollisionDetection cd = new CollisionDetection(solid.Shells[0], other[i].Shells[0]);
+            //    if (!cd.GetResult(Precision.eps, out _)) other.RemoveAt(i);
+            //}
+
+            switch (MenuId)
+            {
+                case "MenuId.Solid.RemoveFromAll":
+                    using (frame.Project.Undo.UndoFrame)
+                    {
+                        foreach (Solid sld in other)
+                        {
+                            Solid[] res = Solid.Subtract(sld, solid);
+                            if (res != null)
+                            {
+                                if (res.Length != 1 || !res[0].flags.HasFlag(Solid.Flags.unchanged))
+                                {
+                                    IGeoObjectOwner owner = sld.Owner;
+                                    owner.Remove(sld);
+                                    for (int i = 0; i < res.Length; i++)
+                                    {
+                                        owner.Add(res[i]);
+                                    }
+                                }
+                            }
+                        }
+                        solid.Owner.Remove(solid);
+                    }
+                    break;
+                case "MenuId.Solid.UniteWithAll":
+                    {
+                        using (frame.Project.Undo.UndoFrame)
+                        {
+                            Solid accumulate = solid;
+                            int count = 0;
+                            foreach (Solid sld in other)
+                            {
+                                Solid tmp = Solid.Unite(sld, accumulate);
+                                if (tmp != null)
+                                {
+                                    accumulate = tmp;
+                                    count++;
+                                    sld.Owner.Remove(sld);
+                                }
+                            }
+                            IGeoObjectOwner owner = solid.Owner;
+                            if (owner != null)
+                            {
+                                owner.Remove(solid);
+                                owner.Add(accumulate);
+                            }
+                        }
+                        // if (frame != null) frame.UIService.ShowMessageBox(StringTable.GetString("Menu.NotImplemented", StringTable.Category.label), StringTable.GetString("Error"), MessageBoxButtons.OK);
+                    }
+                    break;
+                case "MenuId.Solid.RemoveAll":
+                    using (frame.Project.Undo.UndoFrame)
+                    {
+                        List<Solid> fragments = new List<Solid>();
+                        fragments.Add(solid);
+                        foreach (Solid sld in other)
+                        {
+                            List<Solid> newfragments = new List<Solid>();
+                            for (int i = 0; i < fragments.Count; i++)
+                            {
+                                Solid[] res = Solid.Subtract(fragments[i], sld);
+                                if (res != null && res.Length > 0)
+                                {
+                                    newfragments.AddRange(res);
+                                }
+                                else
+                                {
+                                    newfragments.Add(fragments[i]);
+                                }
+                            }
+                            fragments = newfragments;
+                        }
+                        IGeoObjectOwner owner = solid.Owner;
+                        owner.Remove(solid);
+                        foreach (Solid sld in other)
+                        {
+                            owner.Remove(sld);
+                        }
+                        for (int i = 0; i < fragments.Count; i++)
+                        {
+                            owner.Add(fragments[i]);
+                        }
+                    }
+                    break;
+                case "MenuId.Solid.SplitWithAll":
+                    {
+                        List<Solid> fragments = new List<Solid>();
+                        fragments.Add(solid);
+                        foreach (Solid sld in other)
+                        {
+                            List<Solid> newfragments = new List<Solid>();
+                            for (int i = 0; i < fragments.Count; i++)
+                            {
+                                Solid[] res1 = Solid.Subtract(fragments[i], sld);
+                                Solid[] res2 = Solid.Subtract(sld, fragments[i]);
+                                Solid[] res3 = Solid.Intersect(fragments[i], sld);
+                                if (res1 != null && res1.Length > 0)
+                                {
+                                    if (res1 != null) newfragments.AddRange(res1);
+                                    if (res2 != null) newfragments.AddRange(res2);
+                                    if (res3 != null) newfragments.AddRange(res3);
+                                }
+                                else
+                                {
+                                    newfragments.Add(fragments[i]);
+                                }
+                            }
+                            fragments = newfragments;
+                        }
+                        IGeoObjectOwner owner = solid.Owner;
+                        owner.Remove(solid);
+                        foreach (Solid sld in other)
+                        {
+                            owner.Remove(sld);
+                        }
+                        for (int i = 0; i < fragments.Count; i++)
+                        {
+                            owner.Add(fragments[i]);
+                        }
+                    }
+                    break;
+                case "MenuId.Solid.IntersectWithAll":
+                    {
+                        List<Solid> fragments = new List<Solid>();
+                        fragments.Add(solid);
+                        foreach (Solid sld in other)
+                        {
+                            List<Solid> newfragments = new List<Solid>();
+                            for (int i = 0; i < fragments.Count; i++)
+                            {
+                                Solid[] res = Solid.Intersect(fragments[i], sld);
+                                if (res != null && res.Length > 0)
+                                {
+                                    newfragments.AddRange(res);
+                                }
+                                else
+                                {
+                                    newfragments.Add(fragments[i]);
+                                }
+                            }
+                            fragments = newfragments;
+                        }
+                        IGeoObjectOwner owner = solid.Owner;
+                        owner.Remove(solid);
+                        foreach (Solid sld in other)
+                        {
+                            owner.Remove(sld);
+                        }
+                        for (int i = 0; i < fragments.Count; i++)
+                        {
+                            owner.Add(fragments[i]);
+                        }
+                    }
+                    break;
+                default:
+                    frame.UIService.ShowMessageBox(StringTable.GetString("Menu.NotImplemented", StringTable.Category.label), StringTable.GetString("Error"), MessageBoxButtons.OK);
+                    break;
+            }
+            return false;
+        }
+
+        void ICommandHandler.OnSelected(MenuWithHandler selectedMenu, bool selected)
+        {
+        }
+
+        bool ICommandHandler.OnUpdateCommand(string MenuId, CommandState CommandState)
+        {
+            return true;
         }
     }
 }

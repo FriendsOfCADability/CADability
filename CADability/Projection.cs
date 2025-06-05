@@ -2,6 +2,7 @@
 using System.Runtime.Serialization;
 using CADability.GeoObject;
 using CADability.Shapes;
+using System.Collections.Generic;
 #if WEBASSEMBLY
 using CADability.WebDrawing;
 #else
@@ -138,7 +139,7 @@ namespace CADability
             {
                 get { return frontCenter; }
             }
-            internal GeoVector Direction
+            public GeoVector Direction
             {
                 get
                 {
@@ -1517,9 +1518,7 @@ namespace CADability
                 {
                     Plane arrowPlane = new Plane(p1, p2 - p1, (p2 - p1) ^ plane.Normal);
                     double headx = arrowPlane.Project(p2).x;
-                    double arrowSize = (Height + Width) * 0.005 * DeviceToWorldFactor; // 1% of the display size 
-                                                                                       //Circle2D start = new Circle2D(GeoPoint2D.Origin,arrowSize);
-                                                                                       //Polyline2D head = new Polyline2D(new GeoPoint2D[] { new GeoPoint2D(headx, 0), new GeoPoint2D(headx - arrowSize, arrowSize), new GeoPoint2D(headx - arrowSize, -arrowSize), new GeoPoint2D(headx, 0) });
+                    double arrowSize = (Height + Width) * 0.008 * DeviceToWorldFactor; // 1% of the display size 
                     res.Add(Line.TwoPoints(p1, p2));
                     res.Add(Face.MakeFace(new PlaneSurface(arrowPlane), new SimpleShape(Border.MakeCircle(GeoPoint2D.Origin, arrowSize))));
                     res.Add(Face.MakeFace(new PlaneSurface(arrowPlane), new SimpleShape(Border.MakePolygon(new GeoPoint2D[] { new GeoPoint2D(headx, 0), new GeoPoint2D(headx - arrowSize, arrowSize), new GeoPoint2D(headx - arrowSize, -arrowSize) }))));
@@ -1528,6 +1527,85 @@ namespace CADability
             }
             return res;
         }
+        /// <summary>
+        /// Make an dimension arrow between p1 and p2. Dimension help line connect to d1 and d2
+        /// </summary>
+        /// <param name="p1"></param>
+        /// <param name="p2"></param>
+        /// <param name="d1"></param>
+        /// <param name="d2"></param>
+        /// <param name="plane"></param>
+        /// <param name="mode"></param>
+        /// <returns></returns>
+        public GeoObjectList MakeArrow(GeoPoint p1, GeoPoint p2, GeoPoint d1, GeoPoint d2, Plane plane, ArrowMode mode)
+        {
+            GeoObjectList res = new GeoObjectList();
+            // we need a plane which contains the line p1-p2 as the x-axis
+            if (plane.IsValid())
+            {
+                try
+                {
+                    Plane arrowPlane = new Plane(p1, p2 - p1, (p2 - p1) ^ plane.Normal);
+                    double headx = arrowPlane.Project(p2).x;
+                    double arrowSize = (Height + Width) * 0.008 * DeviceToWorldFactor; // 1% of the display size 
+                    res.Add(Line.TwoPoints(p1, p2));
+                    res.Add(Face.MakeFace(new PlaneSurface(arrowPlane), new SimpleShape(Border.MakeCircle(GeoPoint2D.Origin, arrowSize))));
+                    res.Add(Face.MakeFace(new PlaneSurface(arrowPlane), new SimpleShape(Border.MakePolygon(new GeoPoint2D[] { new GeoPoint2D(headx, 0), new GeoPoint2D(headx - arrowSize, arrowSize), new GeoPoint2D(headx - arrowSize, -arrowSize) }))));
+                    // paintTo3D.TriangulateText auf false setzen!
+                }
+                catch (PlaneException) { }
+            }
+            return res;
+        }
+        /// <summary>
+        /// make an arrow showing a rotation operation. The rotation is around the <paramref name="axis"/>
+        /// and goes from the vector <paramref name="fromHere"/> to the vector <paramref name="toHere"/>.
+        /// </summary>
+        /// <param name="axis"></param>
+        /// <param name="fromHere"></param>
+        /// <param name="toHere"></param>
+        /// <returns></returns>
+        public GeoObjectList MakeRotationArrow(Axis axis, GeoVector fromHere, GeoVector toHere)
+        {
+            GeoObjectList res = new GeoObjectList();
+            GeoVector axisDirection = axis.Direction.Normalized; // to make further calculation easier
+            fromHere.Norm();
+            toHere.Norm();
+            double arrowSize = (Height + Width) * 0.008 * DeviceToWorldFactor; // 1% of the display size 
+            double radius = arrowSize * 10; // radius of the arc
+            Plane arcPlane = new Plane(axis.Location, axisDirection); // normal to the rotation axis
+            Plane fromPlane = new Plane(axis.Location, fromHere, axisDirection);
+            Plane toPlane = new Plane(axis.Location, toHere, axisDirection);
+            // a rectangular face to display the vector fromHere
+            GeoPoint p1 = axis.Location + arrowSize * axisDirection;
+            GeoPoint p2 = p1 + radius * fromHere;
+            GeoPoint p3 = p2 - 2 * arrowSize * axisDirection;
+            GeoPoint p4 = p3 - radius * fromHere;
+            Face from = Face.MakeFace(p1, p2, p3, p4);
+            p1 = axis.Location + arrowSize * axisDirection;
+            p2 = p1 + radius * toHere;
+            p3 = p2 - 2 * arrowSize * axisDirection;
+            p4 = p3 - radius * toHere;
+            Face to = Face.MakeFace(p1, p2, p3, p4);
+            res.Add(from);
+            res.Add(to);
+            Ellipse e = Ellipse.Construct(); // the arc of the arrow
+            e.SetArcPlaneCenterStartEndPoint(arcPlane, arcPlane.Project(axis.Location), arcPlane.Project(axis.Location + radius * fromHere), arcPlane.Project(axis.Location + radius * toHere), arcPlane, true);
+            if (Math.Abs(e.SweepParameter) > Math.PI)
+                e.SetArcPlaneCenterStartEndPoint(arcPlane, arcPlane.Project(axis.Location), arcPlane.Project(axis.Location + radius * fromHere), arcPlane.Project(axis.Location + radius * toHere), arcPlane, false);
+            // e is too long, we have to shorten it by arrowSize
+            double eParam = (e as ICurve).PositionAtLength(e.Length - arrowSize);
+            e.Trim(0.0, eParam);
+            PlaneSurface ps = new PlaneSurface(fromPlane);
+            Face arrowStart = Face.MakeFace(ps, SimpleShape.MakePolygon(fromPlane.Project(axis.Location + radius * fromHere), arrowSize / 2.0, 5));
+            Path arrowBase = Path.Construct();
+            arrowBase.Set(new ICurve[] { e });
+            res.Add(Make3D.MakePipe(arrowStart, arrowBase, null));
+            GeoVector arrowDir = arrowSize * e.EndDirection.Normalized;
+            res.Add(Make3D.MakeCone(axis.Location + radius * toHere - arrowDir, axisDirection, arrowDir, arrowSize, arrowSize * 0.1));
+            return res;
+        }
+
 
         internal GeoVector horizontalAxis
         {

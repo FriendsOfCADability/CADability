@@ -1,0 +1,39 @@
+name: Publish NuGet Package
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger on version tags like v1.0.0
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore CADability/CADability.csproj
+
+      - name: Build
+        run: dotnet build CADability/CADability.csproj -c Release --no-restore
+
+      - name: List build output
+        run: dir CADability\bin\Release\netstandard2.0
+
+      - name: Pack
+        run: dotnet pack CADability/CADability.csproj -c Release --no-build -o ./nupkgs
+
+      - name: List nupkg
+        run: dir .\nupkgs
+
+      - name: Push NuGet package
+        run: |
+          $pkg = Get-ChildItem -Path ./nupkgs -Filter *.nupkg | Select-Object -First 1
+          dotnet nuget push $pkg.FullName --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json

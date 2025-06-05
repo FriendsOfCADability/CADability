@@ -76,7 +76,6 @@ namespace CADability.UserInterface
             this.contextMenuId = contextMenuId;
             this.contextMenuHandler = this as ICommandHandler; // maybe contextMenuId and contextMenuHandler is null, then there is no standerd context menu for the derived class
         }
-
         public GetValueDelegate OnGetValue { set { getValueDelegate = value; } }
         public SetValueDelegate OnSetValue { set { setValueDelegate = value; } }
         public object GetConnectedObject()
@@ -99,6 +98,7 @@ namespace CADability.UserInterface
                 return userData;
             }
         }
+        public string ErrorMessage { get; set; } = ""; // if this string contains text, then there was an error setting this value
         public bool LabelIsEditable { get; set; } = false;
 
         public GeoPoint GetHotspotPosition()
@@ -309,9 +309,14 @@ namespace CADability.UserInterface
         {
             if (isEditingValue)
             {
-                if (!TextToValue(newValue, out T val)) return false;
+                if (!TextToValue(newValue, out T val))
+                {
+                    ErrorMessage = StringTable.GetString("TextToValue.Failed", StringTable.Category.label);
+                    return false;
+                }
                 else
                 {
+                    ErrorMessage = "";
                     updateDeferred = DeferUpdate;
                     /// ContextFrame and value changes:
                     /// A editable property often represents and is connected to a property of an <see cref="IGeoObject"/>. The value of this property may be changed
@@ -326,9 +331,13 @@ namespace CADability.UserInterface
                         SetValue(val, !DeferUpdate);
                     }
                 }
-                return true;
+                return String.IsNullOrEmpty(ErrorMessage);
             }
             return false;
+        }
+        public override string GetErrorText()
+        {
+            return ErrorMessage;
         }
         public override void EndEdit(bool aborted, bool modified, string newValue)
         {

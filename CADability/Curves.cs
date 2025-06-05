@@ -939,7 +939,7 @@ namespace CADability.GeoObject
             to2 = c2[1];
             return true;
         }
-        internal static bool NewtonMinDist(ICurve curve1, ref double par1, ICurve curve2, ref double par2)
+        public static bool NewtonMinDist(ICurve curve1, ref double par1, ICurve curve2, ref double par2)
         {   // find the points on both curves where the connecting line of the two curves is perpendicular on both
             int numoutside = 0;
             while (numoutside < 3)

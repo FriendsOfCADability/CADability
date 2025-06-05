@@ -17,7 +17,7 @@ namespace CADability.Actions
     /// <summary>
     /// 
     /// </summary>
-    internal class RotateObjects : ConstructAction
+    public class RotateObjects : ConstructAction
     {
         private Block block;
         private GeoObjectList originals;

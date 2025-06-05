@@ -737,10 +737,61 @@ namespace CADability
                     sp.psurface2 = sp.PointOnSurface(surface2, bounds2);
                 points.Add(sp);
             }
-            if (points.Count==2)
+            if (points.Count == 2)
             {   // sometimes we have an ambiguous curve here: a half circle on a rotational surface, which could be either way around.
                 // since "ApproximatePosition" doesn't care about the u/v bounds, we try a different approach here: choose a fixed u or v curve
-                // in the bounds of such a surface and intersect with the other surface
+                // in the bounds of such a surface and intersect with the other surface. The old approach was bad, more use of bounds1 and bounds2
+                // could help further
+                List<GeoPoint> intermediatePoints = new List<GeoPoint>();
+                if (surface1.IsUPeriodic && Math.Abs(points[0].psurface1.x - points[1].psurface1.x) > surface1.UPeriod / 3.0)
+                {   // the curve spans more than 1/3 of a total period
+                    ICurve fixedCurve = surface1.FixedU((points[0].psurface1.x + points[1].psurface1.x) / 2.0, bounds1.Bottom, bounds1.Top);
+                    surface2.Intersect(fixedCurve, bounds2, out GeoPoint[] ips, out GeoPoint2D[] uvOn2, out double[] uOnCurve3Ds);
+                    intermediatePoints.AddRange(ips);
+                }
+                if (surface1.IsVPeriodic && Math.Abs(points[0].psurface1.y + points[1].psurface1.y) > surface1.VPeriod / 3.0)
+                {   // the curve spans more than 1/3 of a total period
+                    ICurve fixedCurve = surface1.FixedV((points[0].psurface1.y + points[1].psurface1.y) / 2.0, bounds1.Left, bounds1.Right);
+                    surface2.Intersect(fixedCurve, bounds2, out GeoPoint[] ips, out GeoPoint2D[] uvOn2, out double[] uOnCurve3Ds);
+                    intermediatePoints.AddRange(ips);
+                }
+                if (surface2.IsUPeriodic && Math.Abs(points[0].psurface2.x - points[1].psurface2.x) > surface2.UPeriod / 3.0)
+                {   // the curve spans more than 1/3 of a total period
+                    ICurve fixedCurve = surface2.FixedU((points[0].psurface2.x + points[1].psurface2.x) / 2.0, bounds2.Bottom, bounds2.Top);
+                    surface1.Intersect(fixedCurve, bounds1, out GeoPoint[] ips, out GeoPoint2D[] uvOn2, out double[] uOnCurve3Ds);
+                    intermediatePoints.AddRange(ips);
+                }
+                if (surface2.IsVPeriodic && Math.Abs(points[0].psurface2.y + points[1].psurface2.y) > surface2.VPeriod / 3.0)
+                {   // the curve spans more than 1/3 of a total period
+                    ICurve fixedCurve = surface2.FixedV((points[0].psurface2.y + points[1].psurface2.y) / 2.0, bounds2.Left, bounds2.Right);
+                    surface1.Intersect(fixedCurve, bounds1, out GeoPoint[] ips, out GeoPoint2D[] uvOn2, out double[] uOnCurve3Ds);
+                    intermediatePoints.AddRange(ips);
+                }
+                if (intermediatePoints.Count > 0)
+                {
+                    double mindist = double.MaxValue;
+                    int ind = -1;
+                    for (int i = 0; i < intermediatePoints.Count; i++)
+                    {
+                        double d = (intermediatePoints[i] | points[0].p3d) + (intermediatePoints[i] | points[1].p3d);
+                        if (d < mindist)
+                        {
+                            mindist = d;
+                            ind = i;
+                        }
+                    }
+                    if (ind >= 0)
+                    {
+                        SurfacePoint sp = new SurfacePoint();
+                        sp.p3d = intermediatePoints[ind];
+                        sp.psurface1 = surface1.PositionOf(sp.p3d);
+                        sp.psurface2 = surface1.PositionOf(sp.p3d);
+                        SurfaceHelper.AdjustPeriodic(surface1, bounds1, ref sp.psurface1);
+                        SurfaceHelper.AdjustPeriodic(surface2, bounds2, ref sp.psurface2);
+                        points.Insert(1, sp);
+                    }
+                }
+                /* old approach:
                 if (!(surface1 is PlaneSurface))
                 {
                     ICurve fixedCurve;
@@ -758,13 +809,13 @@ namespace CADability
                     {   // find the best intersection point
                         GeoPoint2D uv = surface1.PositionOf(ips[i]);
                         double d = Math.Abs(uv.x - cnt.x) / bounds1.Width + Math.Abs(uv.y - cnt.y) / bounds1.Height;
-                        if (d<mind)
+                        if (d < mind)
                         {
                             indFound = i;
                             mind = d;
                         }
                     }
-                    if (indFound>=0)
+                    if (indFound >= 0)
                     {
                         SurfacePoint sp = new SurfacePoint();
                         sp.p3d = ips[indFound];
@@ -804,21 +855,19 @@ namespace CADability
                         sp.psurface1 = uvOn1[indFound];
                         points.Insert(1, sp);
                     }
-                }
+                } */
             }
             basePoints = points.ToArray();
-            // wierum orientiert?
-            // manchmal am Anfang oder Ende tangetial, deshalb besser in der mitte testen
+            // determin the orientation: sometimes both surfaces are tangential at the start or endpoint, so we use an intermedite point when available
             int n = Math.Min(basePoints.Length / 2, basePoints.Length - 2);
             GeoVector v = surface1.GetNormal(basePoints[n].psurface1) ^ surface2.GetNormal(basePoints[n].psurface2);
             GeoVector v0;
             if (n == 0) v0 = basePoints[n + 1].p3d - basePoints[n].p3d; // only two points
             else v0 = basePoints[n + 1].p3d - basePoints[n - 1].p3d;
             Angle a = new Angle(v, v0);
-            forwardOriented = (a.Radian < Math.PI / 2.0); // hier bereits berechnen, wird bei ApproximatePosition gebraucht
+            forwardOriented = (a.Radian < Math.PI / 2.0); // we need this value for ApproximatePosition
 
-            // Ausgangspunkte können ungenau sein, hier genauer machen
-            // geändert in: ersten und letzten Ausgangspunkt unverändert lassen
+            // Recalculate the positions of the inner points, which are sometimes not precise
             for (int i = 1; i < basePoints.Length - 1; ++i)
             {
                 GeoPoint2D uv1, uv2; // do not pass out basePoints[i].psurface1 as parameter, since uv1 is manipulated several times inside ApproximatePosition
@@ -826,6 +875,8 @@ namespace CADability
                 basePoints[i].psurface1 = uv1;
                 basePoints[i].psurface2 = uv2;
             }
+            AdjustPeriodic(bounds1, bounds2);
+
             points.Clear();
             points.AddRange(basePoints); // damit die periodic Änderungen auch dort wirksam sind
             while (points.Count < 9)
@@ -849,7 +900,7 @@ namespace CADability
                 //GeoPoint p = new GeoPoint(points[ind].p3d, points[ind + 1].p3d);
                 points.Insert(ind + 1, new SurfacePoint(p, uv1, uv2));
                 basePoints = points.ToArray(); // damit basePoints für die nächste Runde zu Verfügung steht
-                v = surface1.GetNormal(basePoints[ind+1].psurface1) ^ surface2.GetNormal(basePoints[ind+1].psurface2);
+                v = surface1.GetNormal(basePoints[ind + 1].psurface1) ^ surface2.GetNormal(basePoints[ind + 1].psurface2);
                 v0 = basePoints[ind + 2].p3d - basePoints[ind].p3d;
                 a = new Angle(v, v0);
                 forwardOriented = (a.Radian < Math.PI / 2.0); // recalculate, because for exactly half circles the first result is ambiguous
@@ -897,6 +948,8 @@ namespace CADability
 
             InitApproxPolynom();
             CheckPeriodic(); // erst nach dieser Schleife, denn ApproximatePosition mach die uv-position evtl. falsch
+            // maybe we end up in the wron period
+            AdjustPeriodic(bounds1, bounds2);
             CheckSurfaceExtents();
 #if DEBUG
             GeoPoint2D[] dbgb1 = new GeoPoint2D[basePoints.Length];
@@ -1160,12 +1213,15 @@ namespace CADability
             //}
         }
         internal void AdjustPeriodic(BoundingRect bounds1, BoundingRect bounds2)
-        {
-            for (int i = 0; i < basePoints.Length; i++)
-            {
-                SurfaceHelper.AdjustPeriodic(surface1, bounds1, ref basePoints[i].psurface1);
-                SurfaceHelper.AdjustPeriodic(surface2, bounds2, ref basePoints[i].psurface2);
-            }
+        {   // we need to consider the whole curve, not just individual points, because the bounds may be too narrow and some points fall outside
+            // we expect that the 2d points are in a row and have no periodic jumps
+            GeoPoint2D[] p2d = new GeoPoint2D[basePoints.Length];
+            for (int i = 0; i < basePoints.Length; i++) p2d[i] = basePoints[i].psurface1;
+            SurfaceHelper.AdjustPeriodic(surface1, bounds1, p2d);
+            for (int i = 0; i < basePoints.Length; i++) basePoints[i].psurface1 = p2d[i];
+            for (int i = 0; i < basePoints.Length; i++) p2d[i] = basePoints[i].psurface2;
+            SurfaceHelper.AdjustPeriodic(surface2, bounds2, p2d);
+            for (int i = 0; i < basePoints.Length; i++) basePoints[i].psurface2 = p2d[i];
         }
         private void AdjustPeriodic(ref SurfacePoint toAdjust, int ind)
         {
@@ -1544,7 +1600,7 @@ namespace CADability
             }
         }
 #endif
-#region IGeoObject override
+        #region IGeoObject override
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
         /// </summary>
@@ -1587,6 +1643,25 @@ namespace CADability
             for (int i = 0; i < basePoints.Length; ++i)
             {
                 res.MinMax(basePoints[i].p3d);
+            }
+            return res;
+        }
+        public BoundingRect GetBoundingRect(bool onSurface1)
+        {
+            BoundingRect res = BoundingRect.EmptyBoundingRect;
+            if (onSurface1)
+            {
+                for (int i = 0; i < basePoints.Length; i++)
+                {
+                    res.MinMax(basePoints[i].psurface1);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < basePoints.Length; i++)
+                {
+                    res.MinMax(basePoints[i].psurface2);
+                }
             }
             return res;
         }
@@ -1689,8 +1764,8 @@ namespace CADability
                 }
             }
         }
-#endregion
-#region ICurve Members
+        #endregion
+        #region ICurve Members
         public override GeoPoint StartPoint
         {
             get
@@ -1992,12 +2067,15 @@ namespace CADability
                 // there were some problems with this approach, now it seems to work
                 GeoPoint p1, p2;
                 GeoVector du1, dv1, du2, dv2, n1, n2;
-                surface1.DerivationAt(uv1, out p1, out du1, out dv1);
-                surface2.DerivationAt(uv2, out p2, out du2, out dv2);
-                n1 = (du1 ^ dv1).Normalized;
-                n2 = (du2 ^ dv2).Normalized;
+                //surface1.DerivationAt(uv1, out p1, out du1, out dv1);
+                //surface2.DerivationAt(uv2, out p2, out du2, out dv2);
+                n1 = surface1.GetNormal(uv1); // there is a problem with singularities (cone, sphere), but it seems GetNormal is working
+                n2 = surface2.GetNormal(uv2);
+                n1 = n1.Normalized;
+                n2 = n2.Normalized;
                 double sn1n2 = Math.Abs(Math.Sin((new SweepAngle(n1, n2)).Radian)); // bei gleicher Richtung, also tangential kleiner wert, bei senkrecht 1
-
+                p1 = surface1.PointAt(uv1);
+                p2 = surface2.PointAt(uv2);
                 double mindist = double.MaxValue;
                 d = (p1 | p2);
                 bool didntConvert = false;
@@ -2322,10 +2400,10 @@ namespace CADability
             double ppos = TetraederHull.PositionOf(p);
             if (approxPolynom == null) InitApproxPolynom();
             double pos1 = approxPolynom.PositionOf(p, out double md);
-            
-            if ((PointAt(pos1) | p) < (PointAt(ppos) | p)) 
+
+            if ((pos1 != double.MaxValue) && (PointAt(pos1) | p) < (PointAt(ppos) | p))
                 return pos1;
-            
+
             return ppos;
 
             //Unreachable code
@@ -2813,8 +2891,8 @@ namespace CADability
             }
             return res;
         }
-#endregion
-#region ISerializable members
+        #endregion
+        #region ISerializable members
         protected InterpolatedDualSurfaceCurve(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -2952,6 +3030,6 @@ namespace CADability
             return v;
         }
 
-#endregion
+        #endregion
     }
 }

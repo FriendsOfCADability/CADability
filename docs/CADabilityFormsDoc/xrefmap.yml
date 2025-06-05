@@ -852,6 +852,19 @@ references:
   isSpec: "True"
   fullName: CADability.Forms.CadForm.PropertiesExplorer
   nameWithType: CadForm.PropertiesExplorer
+- uid: CADability.Forms.CadForm.ResetMainMenu(System.String)
+  name: ResetMainMenu(String)
+  href: api/CADability.Forms.CadForm.html#CADability_Forms_CadForm_ResetMainMenu_System_String_
+  commentId: M:CADability.Forms.CadForm.ResetMainMenu(System.String)
+  fullName: CADability.Forms.CadForm.ResetMainMenu(System.String)
+  nameWithType: CadForm.ResetMainMenu(String)
+- uid: CADability.Forms.CadForm.ResetMainMenu*
+  name: ResetMainMenu
+  href: api/CADability.Forms.CadForm.html#CADability_Forms_CadForm_ResetMainMenu_
+  commentId: Overload:CADability.Forms.CadForm.ResetMainMenu
+  isSpec: "True"
+  fullName: CADability.Forms.CadForm.ResetMainMenu
+  nameWithType: CadForm.ResetMainMenu
 - uid: CADability.Forms.CadFrame
   name: CadFrame
   href: api/CADability.Forms.CadFrame.html
@@ -2186,14 +2199,14 @@ references:
   fullName: CADability.Forms.PaintToGDI.CADability.IPaintTo3D.SetClip
   nameWithType: PaintToGDI.IPaintTo3D.SetClip
   nameWithType.vb: PaintToGDI.CADability.IPaintTo3D.SetClip
-- uid: CADability.Forms.PaintToGDI.CADability#IPaintTo3D#SetColor(System.Drawing.Color)
-  name: IPaintTo3D.SetColor(Color)
-  href: api/CADability.Forms.PaintToGDI.html#CADability_Forms_PaintToGDI_CADability_IPaintTo3D_SetColor_System_Drawing_Color_
-  commentId: M:CADability.Forms.PaintToGDI.CADability#IPaintTo3D#SetColor(System.Drawing.Color)
-  name.vb: CADability.IPaintTo3D.SetColor(Color)
-  fullName: CADability.Forms.PaintToGDI.CADability.IPaintTo3D.SetColor(System.Drawing.Color)
-  nameWithType: PaintToGDI.IPaintTo3D.SetColor(Color)
-  nameWithType.vb: PaintToGDI.CADability.IPaintTo3D.SetColor(Color)
+- uid: CADability.Forms.PaintToGDI.CADability#IPaintTo3D#SetColor(System.Drawing.Color,System.Int32)
+  name: IPaintTo3D.SetColor(Color, Int32)
+  href: api/CADability.Forms.PaintToGDI.html#CADability_Forms_PaintToGDI_CADability_IPaintTo3D_SetColor_System_Drawing_Color_System_Int32_
+  commentId: M:CADability.Forms.PaintToGDI.CADability#IPaintTo3D#SetColor(System.Drawing.Color,System.Int32)
+  name.vb: CADability.IPaintTo3D.SetColor(Color, Int32)
+  fullName: CADability.Forms.PaintToGDI.CADability.IPaintTo3D.SetColor(System.Drawing.Color, System.Int32)
+  nameWithType: PaintToGDI.IPaintTo3D.SetColor(Color, Int32)
+  nameWithType.vb: PaintToGDI.CADability.IPaintTo3D.SetColor(Color, Int32)
 - uid: CADability.Forms.PaintToGDI.CADability#IPaintTo3D#SetColor*
   name: IPaintTo3D.SetColor
   href: api/CADability.Forms.PaintToGDI.html#CADability_Forms_PaintToGDI_CADability_IPaintTo3D_SetColor_
@@ -3332,14 +3345,14 @@ references:
   fullName: CADability.Forms.PaintToOpenGL.CADability.IPaintTo3D.SetClip
   nameWithType: PaintToOpenGL.IPaintTo3D.SetClip
   nameWithType.vb: PaintToOpenGL.CADability.IPaintTo3D.SetClip
-- uid: CADability.Forms.PaintToOpenGL.CADability#IPaintTo3D#SetColor(System.Drawing.Color)
-  name: IPaintTo3D.SetColor(Color)
-  href: api/CADability.Forms.PaintToOpenGL.html#CADability_Forms_PaintToOpenGL_CADability_IPaintTo3D_SetColor_System_Drawing_Color_
-  commentId: M:CADability.Forms.PaintToOpenGL.CADability#IPaintTo3D#SetColor(System.Drawing.Color)
-  name.vb: CADability.IPaintTo3D.SetColor(Color)
-  fullName: CADability.Forms.PaintToOpenGL.CADability.IPaintTo3D.SetColor(System.Drawing.Color)
-  nameWithType: PaintToOpenGL.IPaintTo3D.SetColor(Color)
-  nameWithType.vb: PaintToOpenGL.CADability.IPaintTo3D.SetColor(Color)
+- uid: CADability.Forms.PaintToOpenGL.CADability#IPaintTo3D#SetColor(System.Drawing.Color,System.Int32)
+  name: IPaintTo3D.SetColor(Color, Int32)
+  href: api/CADability.Forms.PaintToOpenGL.html#CADability_Forms_PaintToOpenGL_CADability_IPaintTo3D_SetColor_System_Drawing_Color_System_Int32_
+  commentId: M:CADability.Forms.PaintToOpenGL.CADability#IPaintTo3D#SetColor(System.Drawing.Color,System.Int32)
+  name.vb: CADability.IPaintTo3D.SetColor(Color, Int32)
+  fullName: CADability.Forms.PaintToOpenGL.CADability.IPaintTo3D.SetColor(System.Drawing.Color, System.Int32)
+  nameWithType: PaintToOpenGL.IPaintTo3D.SetColor(Color, Int32)
+  nameWithType.vb: PaintToOpenGL.CADability.IPaintTo3D.SetColor(Color, Int32)
 - uid: CADability.Forms.PaintToOpenGL.CADability#IPaintTo3D#SetColor*
   name: IPaintTo3D.SetColor
   href: api/CADability.Forms.PaintToOpenGL.html#CADability_Forms_PaintToOpenGL_CADability_IPaintTo3D_SetColor_
@@ -3537,6 +3550,12 @@ references:
   isSpec: "True"
   fullName: CADability.Forms.PaintToOpenGL.GetHashCode
   nameWithType: PaintToOpenGL.GetHashCode
+- uid: CADability.Forms.PaintToOpenGL.Init(System.Drawing.Bitmap)
+  name: Init(Bitmap)
+  href: api/CADability.Forms.PaintToOpenGL.html#CADability_Forms_PaintToOpenGL_Init_System_Drawing_Bitmap_
+  commentId: M:CADability.Forms.PaintToOpenGL.Init(System.Drawing.Bitmap)
+  fullName: CADability.Forms.PaintToOpenGL.Init(System.Drawing.Bitmap)
+  nameWithType: PaintToOpenGL.Init(Bitmap)
 - uid: CADability.Forms.PaintToOpenGL.Init(System.IntPtr,System.Int32,System.Int32,System.Boolean)
   name: Init(IntPtr, Int32, Int32, Boolean)
   href: api/CADability.Forms.PaintToOpenGL.html#CADability_Forms_PaintToOpenGL_Init_System_IntPtr_System_Int32_System_Int32_System_Boolean_
@@ -3928,6 +3947,19 @@ references:
   isSpec: "True"
   fullName: CADability.Forms.PropertiesExplorer.Refresh
   nameWithType: PropertiesExplorer.Refresh
+- uid: CADability.Forms.PropertiesExplorer.RemovePropertyPage(System.String)
+  name: RemovePropertyPage(String)
+  href: api/CADability.Forms.PropertiesExplorer.html#CADability_Forms_PropertiesExplorer_RemovePropertyPage_System_String_
+  commentId: M:CADability.Forms.PropertiesExplorer.RemovePropertyPage(System.String)
+  fullName: CADability.Forms.PropertiesExplorer.RemovePropertyPage(System.String)
+  nameWithType: PropertiesExplorer.RemovePropertyPage(String)
+- uid: CADability.Forms.PropertiesExplorer.RemovePropertyPage*
+  name: RemovePropertyPage
+  href: api/CADability.Forms.PropertiesExplorer.html#CADability_Forms_PropertiesExplorer_RemovePropertyPage_
+  commentId: Overload:CADability.Forms.PropertiesExplorer.RemovePropertyPage
+  isSpec: "True"
+  fullName: CADability.Forms.PropertiesExplorer.RemovePropertyPage
+  nameWithType: PropertiesExplorer.RemovePropertyPage
 - uid: CADability.Forms.PropertiesExplorer.Selected(CADability.UserInterface.IPropertyEntry)
   name: Selected(IPropertyEntry)
   href: api/CADability.Forms.PropertiesExplorer.html#CADability_Forms_PropertiesExplorer_Selected_CADability_UserInterface_IPropertyEntry_
@@ -4067,6 +4099,23 @@ references:
   isSpec: "True"
   fullName: CADability.Forms.PropertyPage.Add
   nameWithType: PropertyPage.Add
+- uid: CADability.Forms.PropertyPage.CADability#UserInterface#IPropertyPage#BringToFront
+  name: IPropertyPage.BringToFront()
+  href: api/CADability.Forms.PropertyPage.html#CADability_Forms_PropertyPage_CADability_UserInterface_IPropertyPage_BringToFront
+  commentId: M:CADability.Forms.PropertyPage.CADability#UserInterface#IPropertyPage#BringToFront
+  name.vb: CADability.UserInterface.IPropertyPage.BringToFront()
+  fullName: CADability.Forms.PropertyPage.CADability.UserInterface.IPropertyPage.BringToFront()
+  nameWithType: PropertyPage.IPropertyPage.BringToFront()
+  nameWithType.vb: PropertyPage.CADability.UserInterface.IPropertyPage.BringToFront()
+- uid: CADability.Forms.PropertyPage.CADability#UserInterface#IPropertyPage#BringToFront*
+  name: IPropertyPage.BringToFront
+  href: api/CADability.Forms.PropertyPage.html#CADability_Forms_PropertyPage_CADability_UserInterface_IPropertyPage_BringToFront_
+  commentId: Overload:CADability.Forms.PropertyPage.CADability#UserInterface#IPropertyPage#BringToFront
+  isSpec: "True"
+  name.vb: CADability.UserInterface.IPropertyPage.BringToFront
+  fullName: CADability.Forms.PropertyPage.CADability.UserInterface.IPropertyPage.BringToFront
+  nameWithType: PropertyPage.IPropertyPage.BringToFront
+  nameWithType.vb: PropertyPage.CADability.UserInterface.IPropertyPage.BringToFront
 - uid: CADability.Forms.PropertyPage.CADability#UserInterface#IPropertyPage#Selected
   name: IPropertyPage.Selected
   href: api/CADability.Forms.PropertyPage.html#CADability_Forms_PropertyPage_CADability_UserInterface_IPropertyPage_Selected
@@ -4266,6 +4315,19 @@ references:
   isSpec: "True"
   fullName: CADability.Forms.PropertyPage.OnMouseClick
   nameWithType: PropertyPage.OnMouseClick
+- uid: CADability.Forms.PropertyPage.OnMouseDoubleClick(System.Windows.Forms.MouseEventArgs)
+  name: OnMouseDoubleClick(MouseEventArgs)
+  href: api/CADability.Forms.PropertyPage.html#CADability_Forms_PropertyPage_OnMouseDoubleClick_System_Windows_Forms_MouseEventArgs_
+  commentId: M:CADability.Forms.PropertyPage.OnMouseDoubleClick(System.Windows.Forms.MouseEventArgs)
+  fullName: CADability.Forms.PropertyPage.OnMouseDoubleClick(System.Windows.Forms.MouseEventArgs)
+  nameWithType: PropertyPage.OnMouseDoubleClick(MouseEventArgs)
+- uid: CADability.Forms.PropertyPage.OnMouseDoubleClick*
+  name: OnMouseDoubleClick
+  href: api/CADability.Forms.PropertyPage.html#CADability_Forms_PropertyPage_OnMouseDoubleClick_
+  commentId: Overload:CADability.Forms.PropertyPage.OnMouseDoubleClick
+  isSpec: "True"
+  fullName: CADability.Forms.PropertyPage.OnMouseDoubleClick
+  nameWithType: PropertyPage.OnMouseDoubleClick
 - uid: CADability.Forms.PropertyPage.OnMouseDown(System.Windows.Forms.MouseEventArgs)
   name: OnMouseDown(MouseEventArgs)
   href: api/CADability.Forms.PropertyPage.html#CADability_Forms_PropertyPage_OnMouseDown_System_Windows_Forms_MouseEventArgs_
@@ -4318,6 +4380,18 @@ references:
   isSpec: "True"
   fullName: CADability.Forms.PropertyPage.OnPaint
   nameWithType: PropertyPage.OnPaint
+- uid: CADability.Forms.PropertyPage.OnPreProcessKeyDown
+  name: OnPreProcessKeyDown
+  href: api/CADability.Forms.PropertyPage.html#CADability_Forms_PropertyPage_OnPreProcessKeyDown
+  commentId: E:CADability.Forms.PropertyPage.OnPreProcessKeyDown
+  fullName: CADability.Forms.PropertyPage.OnPreProcessKeyDown
+  nameWithType: PropertyPage.OnPreProcessKeyDown
+- uid: CADability.Forms.PropertyPage.OnSelectionChanged
+  name: OnSelectionChanged
+  href: api/CADability.Forms.PropertyPage.html#CADability_Forms_PropertyPage_OnSelectionChanged
+  commentId: E:CADability.Forms.PropertyPage.OnSelectionChanged
+  fullName: CADability.Forms.PropertyPage.OnSelectionChanged
+  nameWithType: PropertyPage.OnSelectionChanged
 - uid: CADability.Forms.PropertyPage.OnSizeChanged(System.EventArgs)
   name: OnSizeChanged(EventArgs)
   href: api/CADability.Forms.PropertyPage.html#CADability_Forms_PropertyPage_OnSizeChanged_System_EventArgs_

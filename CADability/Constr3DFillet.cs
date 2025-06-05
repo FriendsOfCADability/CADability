@@ -1,9 +1,10 @@
 ﻿using CADability.GeoObject;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace CADability.Actions
 {
-    internal class Constr3DFillet : ConstructAction
+    public class Constr3DFillet : ConstructAction
     {
         private GeoObjectInput geoObjectInput;
         private GeoObjectInput faceInput;
@@ -15,6 +16,11 @@ namespace CADability.Actions
         public Constr3DFillet()
         {
             edges = new List<Edge>();
+        }
+
+        public Constr3DFillet(IEnumerable<Edge> preselected)
+        {
+            edges = new List<Edge>(preselected);
         }
 
         public override void OnSetAction()
@@ -46,6 +52,13 @@ namespace CADability.Actions
 
             base.SetInput(geoObjectInput, faceInput, shellInput, radiusInput);
             base.OnSetAction();
+
+            if (edges.Count > 0)
+            {
+                geoObjectInput.SetGeoObject(edges.Select(e => e.Curve3D as IGeoObject).ToArray(), edges[0].Curve3D as IGeoObject);
+                geoObjectInput.Fixed = true;
+                SetFocus(radiusInput, false);
+            }
         }
 
         double OnGetRadius()
@@ -206,43 +219,59 @@ namespace CADability.Actions
         {
             if (edges.Count > 0)
             {
-                IGeoObject[] affected;
-                IGeoObject[] modified = Make3D.MakeFillet(edges.ToArray(), radius, out affected);
-                if (affected!=null && affected.Length > 0)
+                // sort the edges into groups of connected edges, then process each group seperately
+                HashSet<Shell> shells = new HashSet<Shell>(); // all Shells of the edges (usually only one)
+                List<List<Edge>> connectedEdges = new List<List<Edge>>();
+                foreach (Edge edge in edges)
                 {
-                    using (Frame.Project.Undo.UndoFrame)
+                    shells.AddIfNotNull(edge.Owner?.Owner as Shell); // Edge->Face->Shell
+
+                    List<Edge> group = connectedEdges.FirstOrDefault(g =>
+                           g.Any(e => e.Vertex1 == edge.Vertex1 || e.Vertex1 == edge.Vertex2 || e.Vertex2 == edge.Vertex1 || e.Vertex2 == edge.Vertex2));
+
+                    if (group != null)
                     {
-                        IGeoObjectOwner owner = null; // should be a solid if the affected shell is part of a solid, or owner should be the model
-                        // only the edges of a single shell should be rounded!
-                        for (int i = 0; i < affected.Length; ++i)
+                        group.Add(edge);
+                    }
+                    else
+                    {
+                        connectedEdges.Add(new List<Edge> { edge });
+                    }
+                }
+                foreach (Shell shell in shells) { shell.RememberFaces(); }
+                Dictionary<Shell, Shell> modifiedShell = new Dictionary<Shell, Shell>();
+                using (Frame.Project.Undo.UndoFrame)
+                {
+                    for (int k = 0; k < connectedEdges.Count; k++)
+                    {
+                        Shell affected;
+                        Shell owningShell = connectedEdges[k][0].Owner.Owner as Shell;
+                        if (modifiedShell.TryGetValue(owningShell, out Shell m))
                         {
-                            if (owner == null || affected[i].Owner is Model)
+                            for (int i = 0; i < connectedEdges[k].Count; i++)
                             {
-                                owner = affected[i].Owner;
+                                connectedEdges[k][i] = m.GetCorrespondingEdge(connectedEdges[k][i], m.GetRememberedMultiDictionary(owningShell));
                             }
-                            affected[i].Owner.Remove(affected[i]);
                         }
-                        if (owner is Model model)
+                        Shell modified = Make3D.MakeFillet(connectedEdges[k].ToArray(), radius, out affected);
+                        if (affected != null)
                         {
-                            model.Remove(affected);
-                            model.Add(modified);
-                        }
-                        else if (owner is Solid sld)
-                        {
-                            Model m = sld.Owner as Model;
-                            if (m!=null)    // not able to round edges of Solid which is part of a Block?
+                            modifiedShell[owningShell] = modified;
+                            IGeoObjectOwner owner = affected.Owner; // should be a solid if the affected shell is part of a solid, or owner should be the model
+                                                                    // only the edges of a single shell should be rounded!
+                            if (owner is Solid sld)
                             {
-                                m.Remove(sld);
-                                for (int i = 0; i < modified.Length; ++i)
-                                {
-                                    Solid rsld = Solid.Construct();
-                                    rsld.SetShell(modified[i] as Shell);
-                                    m.Add(rsld);
-                                }
+                                sld.SetShell(modified); // removes the old shell and replaces it by the new one
+                            }
+                            else if (owner != null)
+                            {   // a Shell as part of the model or a blck
+                                owner.Remove(affected);
+                                owner.Add(modified);
                             }
                         }
                     }
                 }
+                foreach (Shell shell in shells) { shell.ForgetRememberedFaces(); }
             }
             base.OnDone();
         }

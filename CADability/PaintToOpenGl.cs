@@ -101,7 +101,7 @@ namespace CADability
         /// <summary>
         /// Will text objects be tesselated
         /// </summary>
-        bool TriangulateText { get; }
+        bool TriangulateText { get; set; }
         /// <summary>
         /// Deprecated, currently not used
         /// </summary>
@@ -116,10 +116,10 @@ namespace CADability
         /// </summary>
         void MakeCurrent();
         /// <summary>
-        /// Sets the color for the next paint methods
+        /// Sets the color for the next paint methods, if lockColor == 1: the color is kept unchanged until lockColor==-1 is called, lockColor==0: normal color setting
         /// </summary>
         /// <param name="color">The color to use for drawing</param>
-        void SetColor(Color color);
+        void SetColor(Color color, int lockColor = 0);
         /// <summary>
         /// Never use this color for drawing (because it is the background color)
         /// </summary>

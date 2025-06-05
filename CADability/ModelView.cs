@@ -14,6 +14,7 @@ using DragDropEffects = CADability.Substitutes.DragDropEffects;
 using Keys = CADability.Substitutes.Keys;
 using PaintEventArgs = CADability.Substitutes.PaintEventArgs;
 using CheckState = CADability.Substitutes.CheckState;
+using static CADability.Projection;
 #if WEBASSEMBLY
 using CADability.WebDrawing;
 using Point = CADability.WebDrawing.Point;
@@ -1059,12 +1060,22 @@ namespace CADability
 							SetViewDirection(project, fixPoint, true);
 						else
 						{
-							//GeoPoint p1 = Projection.UnProject(clcenter);
-							//GeoPoint p2 = Projection.DrawingPlanePoint(clcenter);
-							////System.Diagnostics.Debug.WriteLine("UnProject=" + p1);
-							////System.Diagnostics.Debug.WriteLine("DrawingPlanePoint=" + p2);
-							//SetViewDirection(project, p2, true);
-							SetViewDirection(project, Projection.UnProject(clcenter), true);
+							// find a good fixpoint for the rotation of the view:
+							GeoPoint fp = Projection.UnProject(clcenter);
+							PickArea pa = Projection.GetPickSpace(new Rectangle(clcenter.Y - 5, clcenter.Y - 5, 10, 10));
+							double pd = Model.GetPickDistance(pa, null);
+							if (pd != double.MaxValue) fp = pa.FrontCenter + pd * pa.Direction; // the point in the center of the screen, when there is something
+							else
+							{   // when there is nothing in the center, use the point on the drawing plane
+								Axis pb = Projection.PointBeam(clcenter);
+								try
+								{
+									GeoPoint2D dpp = Projection.DrawingPlane.Intersect(pb);
+									fp = Projection.DrawingPlane.ToGlobal(dpp);
+								}
+								catch (PlaneException) { }
+							}
+							SetViewDirection(project, fp, true);
 						}
 					}
 					else
@@ -1105,6 +1116,8 @@ namespace CADability
 					}
 					projectedModelNeedsRecalc = true;
 				}
+				if (DisplayChangedEvent != null) DisplayChangedEvent(this, new DisplayChangeArg(DisplayChangeArg.Reasons.Unknown));
+
 			}
 			else
 			{
@@ -1113,6 +1126,7 @@ namespace CADability
 					projectedModelNeedsRecalc = false;
 					projectedModel.RecalcAll(false);
 					RecalcScrollPosition();
+					if (DisplayChangedEvent != null) DisplayChangedEvent(this, new DisplayChangeArg(DisplayChangeArg.Reasons.Unknown));
 				}
 			}
 			if (!doScroll && !doDirection)
@@ -1157,11 +1171,6 @@ namespace CADability
 		}
 		void IView.OnMouseWheel(MouseEventArgs eIn)
 		{
-#if DEBUG
-			//System.Diagnostics.Trace.WriteLine(Environment.StackTrace);
-			//System.Diagnostics.Trace.WriteLine("----------------- " + eIn.ToString());
-			// System.Diagnostics.Trace.WriteLine("----------------- " + eIn.Delta.ToString()+", "+eIn.Location.ToString());
-#endif
 			MouseEventArgs e = eIn;
 			if (MouseWheel != null) if (MouseWheel(this, ref e)) return;
 
@@ -1178,7 +1187,7 @@ namespace CADability
 			rct.Bottom = p2.y + (rct.Bottom - p2.y) * Factor;
 			rct.Top = p2.y + (rct.Top - p2.y) * Factor;
 			this.ZoomToRect(rct);
-			// FrameInternal.ActionStack.OnMouseWheel(e,this);
+			if (DisplayChangedEvent != null) DisplayChangedEvent(this, new DisplayChangeArg(DisplayChangeArg.Reasons.ZoomIn));
 		}
 		void IView.OnMouseDoubleClick(MouseEventArgs eIn)
 		{
@@ -2208,9 +2217,9 @@ namespace CADability
 			// if (!local && !pr.IsPerspective)
 			{
 				double d = size;
-				PaintToBackground.PrepareText("Arial", "xyz0123456789", FontStyle.Regular); // wg. einem komischen Fehler in PFOCAD:
-																							// dort kommen manchmal die Sortiernummern nicht, da wglUseFontOutlines nicht funktioniert. Wenn hier gleich alle Ziffern
-																							// erzeugt werden, dann passiert das nicht, denn hier geht es immer
+				PaintToBackground.PrepareText("Arial", "xyz0123456789+-°.,", FontStyle.Regular); // wg. einem komischen Fehler in PFOCAD:
+																								 // dort kommen manchmal die Sortiernummern nicht, da wglUseFontOutlines nicht funktioniert. Wenn hier gleich alle Ziffern
+																								 // erzeugt werden, dann passiert das nicht, denn hier geht es immer
 				PaintToBackground.SetColor(infocolor);
 				// die Buchstaben x,y,z am Ende der Achsen in Richtung der ProjectionPlane
 				if (!Precision.SameDirection(pr.ProjectionPlane.Normal, plane.DirectionX, true))

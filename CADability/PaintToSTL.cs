@@ -14,7 +14,7 @@ using Point = System.Drawing.Point;
 
 namespace CADability
 {
-    class PaintToSTL : IDisposable, IPaintTo3D
+    public class PaintToSTL : IDisposable, IPaintTo3D
     {
         string fileName;
         double precision;
@@ -127,6 +127,7 @@ namespace CADability
         bool IPaintTo3D.TriangulateText
         {
             get { return false; }
+            set { }
         }
 
         bool IPaintTo3D.DontRecalcTriangulation
@@ -146,7 +147,7 @@ namespace CADability
             get { return PaintCapabilities.Standard; }
         }
 
-        internal void Init()
+        public void Init()
         {
             stream = File.CreateText(fileName);
             stream.WriteLine("solid " + fileName);
@@ -158,7 +159,7 @@ namespace CADability
 
         }
 
-        void IPaintTo3D.SetColor(Color color)
+        void IPaintTo3D.SetColor(Color color, int lockColor)
         {
             // hier könnte für binärausgabe die Farbe gesetzt werden
         }

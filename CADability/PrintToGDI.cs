@@ -2330,6 +2330,7 @@ namespace CADability
         bool IPaintTo3D.TriangulateText
         {
             get { return false; }
+            set { }
         }
         PaintCapabilities IPaintTo3D.Capabilities
         {
@@ -2362,7 +2363,7 @@ namespace CADability
             throw new NotImplementedException("The method or operation is not implemented.");
         }
 
-        void IPaintTo3D.SetColor(System.Drawing.Color color)
+        void IPaintTo3D.SetColor(System.Drawing.Color color, int lockColor)
         {
             currentColor = color;
         }

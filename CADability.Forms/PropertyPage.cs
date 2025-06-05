@@ -2,6 +2,11 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
 namespace CADability.Forms
@@ -15,7 +20,6 @@ namespace CADability.Forms
      * 
      * Klick auf "TreeViewButton" geht an IPropertyPage
     */
-
     public class PropertyPage : ScrollableControl, IPropertyPage
     {
         List<IPropertyEntry> rootProperties; // a list of all root entries (not including the subentries of opened entries)
@@ -30,10 +34,13 @@ namespace CADability.Forms
         private string currentToolTip;
         private bool dragMiddlePosition = false;  // true, when the user moves the middle position (between label and value) with the pressed mouse button
         private Timer delay;
-		private PropertiesExplorer propertiesExplorer;
+        private PropertiesExplorer propertiesExplorer;
         private Brush _backColorBrush, _foreColorBrush, _indentBrush;
         private Color _indentColor, _separatorColor;
         private Pen _foreColorPen, _separatorPen;
+        private Dictionary<char, string> keyboardModifier;
+        public event PreProcessKeyDown OnPreProcessKeyDown;
+        public event SelectionChanged OnSelectionChanged;
 
         public PropertyPage(string titleId, int iconId, PropertiesExplorer propExplorer)
         {
@@ -56,21 +63,27 @@ namespace CADability.Forms
             UpdateStyles();
             toolTip = new ToolTip();
             toolTip.InitialDelay = 500;
-			propertiesExplorer = propExplorer;
+            propertiesExplorer = propExplorer;
+            string[] keyboardModifierStrings = StringTable.GetSplittedStrings("Shortcuts.Modifier");
+            if (keyboardModifierStrings.Length < 3) keyboardModifierStrings = new string[] { "Ctrl", "Alt", "Shift" };
+            keyboardModifier = new Dictionary<char, string>();
+            keyboardModifier['c'] = keyboardModifierStrings[0];
+            keyboardModifier['a'] = keyboardModifierStrings[1];
+            keyboardModifier['s'] = keyboardModifierStrings[2];
         }
         public Color IndentColor
-		{
-			get { return _indentColor; }
-			set
-			{
+        {
+            get { return _indentColor; }
+            set
+            {
                 if (_indentBrush != null)
                 {
                     _indentBrush.Dispose();
                     _indentBrush = null;
                 }
                 _indentColor = value;
-			}
-		}
+            }
+        }
         public Color SeparatorColor
         {
             get { return _separatorColor; }
@@ -163,6 +176,157 @@ namespace CADability.Forms
             int left = entries[index].IndentLevel * buttonWidth + buttonWidth + 1; // left side of the label text
             return new Rectangle(left, area.Top, area.Right - left, area.Height);
         }
+        private GraphicsPath RoundedRect(Rectangle bounds, int radius)
+        {   // by ChatGPT
+            int diameter = radius * 2;
+            var path = new GraphicsPath();
+
+            // Wenn Radius = 0, einfaches Rechteck
+            if (radius == 0)
+            {
+                path.AddRectangle(bounds);
+                return path;
+            }
+
+            Rectangle arc = new Rectangle(bounds.Location, new Size(diameter, diameter));
+
+            // Top-Left
+            path.AddArc(arc, 180, 90);
+
+            // Top-Right
+            arc.X = bounds.Right - diameter;
+            path.AddArc(arc, 270, 90);
+
+            // Bottom-Right
+            arc.Y = bounds.Bottom - diameter;
+            path.AddArc(arc, 0, 90);
+
+            // Bottom-Left
+            arc.X = bounds.Left;
+            path.AddArc(arc, 90, 90);
+
+            path.CloseFigure();
+            return path;
+        }
+        private void DrawShortcut(Graphics g, Rectangle area, Font font, string modifier, string key)
+        {   // by ChatGPT
+            const int keycapPadding = 0;
+            const int spacing = 0;
+            int cornerRadius = area.Height / 4;
+
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+            // Teile Modifier auf
+            var parts = string.IsNullOrWhiteSpace(modifier)
+                ? new List<string>()
+                : modifier.Split('+').Select(m => m.Trim()).ToList();
+
+            parts.Add(key);
+
+            // Textgrößen berechnen
+            var sizes = parts.Select(p =>
+                TextRenderer.MeasureText(p, font, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding)
+            ).ToList();
+
+            int totalWidth = spacing * (parts.Count - 1) +
+                             sizes.Sum(sz => sz.Width + keycapPadding * 2);
+
+            // Rechtsbündiger Startpunkt
+            int x = area.Right - totalWidth;
+            int y = area.Y + (area.Height - font.Height) / 2;
+
+            for (int i = 0; i < parts.Count; i++)
+            {
+                string text = parts[i];
+                Size sz = sizes[i];
+
+                Rectangle keyRect = new Rectangle(
+                    x,
+                    y,
+                    sz.Width + keycapPadding * 2,
+                    sz.Height + 2
+                );
+
+                using (GraphicsPath path = RoundedRect(keyRect, cornerRadius))
+                {
+                    using (Brush fill = new SolidBrush(Color.White))
+                        g.FillPath(fill, path);
+
+                    using (Pen border = new Pen(SystemColors.ControlDark))
+                        g.DrawPath(border, path);
+
+                    TextRenderer.DrawText(
+                        g,
+                        text,
+                        font,
+                        keyRect,
+                        SystemColors.ControlText,
+                        TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding
+                    );
+                }
+
+                x += keyRect.Width + spacing;
+            }
+        }
+        /// <summary>
+        /// Splits the label text into the visible text portion and the shortcut parts.
+        /// The shortcut syntax is expected to appear at the end of the label in the format [[<modifier1><modifier2><key>]].
+        /// Each modifier is optional and must be one of 's', 'c' or 'a' (for Shift, Ctrl, Alt respectively).
+        /// The key should be an uppercase letter. If any component is missing, '\0' is returned for it.
+        /// </summary>
+        /// <param name="labelText">The full label text, e.g. "LabelText [[scX]]"</param>
+        /// <returns>
+        /// A tuple: (text, firstModifier, secondModifier, key)
+        /// where text is the label text without the shortcut portion,
+        /// and missing modifier(s) and key are represented as '\0'.
+        /// </returns>
+        private (string text, char firstModifier, char secondModifier, string key) SplitLabelText(string labelText)
+        {
+            // Regex pattern:
+            // ^(.*?)                       -> Capture group 1: Alles bis zum Shortcut-Teil (non-greedy)
+            // (?:\s*\[\[                   -> Non-capturing: optionales Leerzeichen + literal "[["
+            //   (?:(?<modifier1>[sca])?    -> Optionaler erster Modifier (s, c oder a)
+            //     (?<modifier2>[sca])?     -> Optionaler zweiter Modifier
+            //     (?<key>                  -> Capture group "key":
+            //         Esc|Del              ->   "Esc" oder "Del"
+            //         |F\d{1,2}            ->   Funktionstasten F1–F99 (praktisch F1–F12)
+            //         |[A-Z]               ->   einzelner Großbuchstabe
+            //     )
+            //   )
+            // \]\])\s*$                    -> literal "]]" + optionales Leerzeichen bis zum String-Ende
+            var regex = new Regex(
+                @"^(.*?)(?:\s*\[\[(?:(?<modifier1>[sca])?(?<modifier2>[sca])?(?<key>Esc|Del|F\d{1,2}|[A-Z]))\]\])\s*$"
+            );
+
+            char firstModifier = '\0';
+            char secondModifier = '\0';
+            string key = string.Empty;
+
+            var match = regex.Match(labelText);
+            if (match.Success)
+            {
+                // Textteil ohne Shortcut
+                string textPart = match.Groups[1].Value.TrimEnd();
+
+                // Falls vorhanden, Modifier auslesen
+                if (match.Groups["modifier1"].Success && match.Groups["modifier1"].Value.Length > 0)
+                    firstModifier = match.Groups["modifier1"].Value[0];
+                if (match.Groups["modifier2"].Success && match.Groups["modifier2"].Value.Length > 0)
+                    secondModifier = match.Groups["modifier2"].Value[0];
+
+                // Key auslesen (kann nun z.B. "Esc" oder "F5" sein)
+                if (match.Groups["key"].Success && match.Groups["key"].Value.Length > 0)
+                    key = match.Groups["key"].Value;
+
+                return (textPart, firstModifier, secondModifier, key);
+            }
+            else
+            {
+                // Kein Shortcut gefunden: Rückgabe mit leerem key
+                return (labelText, '\0', '\0', string.Empty);
+            }
+        }
         private void PaintItem(int index, Graphics graphics)
         {
             int left = 1;
@@ -193,14 +357,20 @@ namespace CADability.Forms
             Rectangle labelRect;
             if (showValue) labelRect = new Rectangle(left, area.Top, middle - left, area.Height);
             else labelRect = new Rectangle(left, area.Top, area.Right - left, area.Height);
-            if (graphics.MeasureString(entries[index].Label, Font).Width > labelRect.Width) labelNeedsExtension[index] = true;
+            string labelText = entries[index].Label;
+            char firstModifier = '\0';
+            char secondModifier = '\0';
+            string shortCutKey = String.Empty;
+            if (entries[index].Flags.HasFlag(PropertyEntryType.Shortcut))
+                (labelText, firstModifier, secondModifier, shortCutKey) = SplitLabelText(labelText);
+            if (graphics.MeasureString(labelText, Font).Width > labelRect.Width) labelNeedsExtension[index] = true;
             if (index == selected)
             {
                 graphics.FillRectangle(SystemBrushes.Highlight, labelRect);
                 if (entries[index].Flags.HasFlag(PropertyEntryType.Bold))
-                    graphics.DrawString(entries[index].Label, new Font(Font, FontStyle.Bold), SystemBrushes.HighlightText, labelRect, stringFormat);
+                    graphics.DrawString(labelText, new Font(Font, FontStyle.Bold), SystemBrushes.HighlightText, labelRect, stringFormat);
                 else
-                    graphics.DrawString(entries[index].Label, Font, SystemBrushes.HighlightText, labelRect, stringFormat);
+                    graphics.DrawString(labelText, Font, SystemBrushes.HighlightText, labelRect, stringFormat);
             }
             else if (entries[index].Flags.HasFlag(PropertyEntryType.Seperator))
             {
@@ -209,16 +379,29 @@ namespace CADability.Forms
                 graphics.DrawLine(SeparatorPen, labelRect.Left, ym, labelRect.Right, ym); // the horizontal separator line
                 StringFormat seperatorFormat = stringFormat.Clone() as StringFormat;
                 seperatorFormat.Alignment = StringAlignment.Center;
-                graphics.DrawString(entries[index].Label, Font, ForeColorBrush, labelRect, seperatorFormat);
+                graphics.DrawString(labelText, Font, ForeColorBrush, labelRect, seperatorFormat);
             }
             else
             {
                 if (entries[index].Flags.HasFlag(PropertyEntryType.Highlight))
-                    graphics.DrawString(entries[index].Label, Font, new SolidBrush(Color.Red), labelRect, stringFormat);
+                    graphics.DrawString(labelText, Font, new SolidBrush(Color.Red), labelRect, stringFormat);
                 else if (entries[index].Flags.HasFlag(PropertyEntryType.Bold))
-                    graphics.DrawString(entries[index].Label, new Font(Font, FontStyle.Bold), ForeColorBrush, labelRect, stringFormat);
+                    graphics.DrawString(labelText, new Font(Font, FontStyle.Bold), ForeColorBrush, labelRect, stringFormat);
                 else
-                    graphics.DrawString(entries[index].Label, Font, ForeColorBrush, labelRect, stringFormat);
+                    graphics.DrawString(labelText, Font, ForeColorBrush, labelRect, stringFormat);
+            }
+            // shortcut
+            if (entries[index].Flags.HasFlag(PropertyEntryType.Shortcut) && shortCutKey != String.Empty)
+            {
+                Font smallerFont = new Font(Font.FontFamily, Font.Size * 0.9f, Font.Style);
+                Size scsz = graphics.MeasureString("X", smallerFont).ToSize(); // height of shortcut text
+                Rectangle scArea = new Rectangle(labelRect.Right - buttonWidth - 2, labelRect.Top + (labelRect.Height - scsz.Height) / 2 - 2, 1, scsz.Height); // width doesn't matter
+                // U+2303 (Ctrl), U+2325 (Alt), U+21E7 (Shift)
+                StringBuilder shortcutModifier = new StringBuilder();
+                if (firstModifier != '\0') shortcutModifier.Append(keyboardModifier[firstModifier] + "+");
+                if (secondModifier != '\0') shortcutModifier.Append(keyboardModifier[secondModifier] + "+");
+                if (shortcutModifier.ToString().EndsWith("+")) shortcutModifier.Remove(shortcutModifier.Length - 1, 1);
+                DrawShortcut(graphics, scArea, smallerFont, shortcutModifier.ToString(), shortCutKey);
             }
             if (showValue)
             {
@@ -241,12 +424,12 @@ namespace CADability.Forms
                 }
                 if (entries[index].Flags.HasFlag(PropertyEntryType.Lockable))
                 {   // test the lock/unlock
-                    buttonRect = new Rectangle(area.Right - buttonWidth- ButtonImages.ButtonImageList.ImageSize.Width, area.Top, ButtonImages.ButtonImageList.ImageSize.Width, area.Height); // square rect at the right end
+                    buttonRect = new Rectangle(area.Right - buttonWidth - ButtonImages.ButtonImageList.ImageSize.Width, area.Top, ButtonImages.ButtonImageList.ImageSize.Width, area.Height); // square rect at the right end
                     ControlPaint.DrawButton(graphics, buttonRect, ButtonState.Flat);
                     dy = (area.Height - ButtonImages.ButtonImageList.ImageSize.Height) / 2;
-                    if (entries[index].IsLocked) ButtonImages.ButtonImageList.Draw(graphics, buttonRect.Left, buttonRect.Top+dy, 154); // the "locked" symbol
-                    else ButtonImages.ButtonImageList.Draw(graphics, buttonRect.Left, buttonRect.Top+dy, 155); // the "unlocked" symbol
-            }
+                    if (entries[index].IsLocked) ButtonImages.ButtonImageList.Draw(graphics, buttonRect.Left, buttonRect.Top + dy, 154); // the "locked" symbol
+                    else ButtonImages.ButtonImageList.Draw(graphics, buttonRect.Left, buttonRect.Top + dy, 155); // the "unlocked" symbol
+                }
             }
             else if (entries[index].Flags.HasFlag(PropertyEntryType.DropDown))
             {   // draw a combo button
@@ -262,6 +445,11 @@ namespace CADability.Forms
                 //    if (w2 == 0) graphics.FillRectangle(ForeColorBrush, xm, ym + i, 1, 1); // a single pixel
                 //    else graphics.DrawLine(ForeColorPen, xm - w2, ym + i, xm + w2, ym + i); // the horizontal "minus" line
                 //}
+            }
+            else if (entries[index].Flags.HasFlag(PropertyEntryType.DirectMenu))
+            {   // draw a combo button
+                Rectangle buttonRect = new Rectangle(area.Right - buttonWidth, area.Top, buttonWidth, area.Height);
+                ControlPaint.DrawScrollButton(graphics, buttonRect, ScrollButton.Right, ButtonState.Flat);
             }
             else if (entries[index].Flags.HasFlag(PropertyEntryType.CancelButton) || entries[index].Flags.HasFlag(PropertyEntryType.OKButton))
             {
@@ -291,7 +479,7 @@ namespace CADability.Forms
                     RectangleF bnds = rgn[0].GetBounds(graphics);
                     SizeF sz = graphics.MeasureString("✔", fontForSymbols);
                     PointF p = new PointF(buttonRect.Left + (buttonRect.Width - bnds.Width) / 2.0f, buttonRect.Top + (buttonRect.Height - bnds.Height) / 2.0f);
-                    graphics.DrawString("✔", fontForSymbols, ForeColorBrush, p, sf); // ✓✔✗✘✕✖⋮⁞
+                    graphics.DrawString("✔", fontForSymbols, ForeColorBrush, p, sf); // ✓✔✗✘✕✖⋮⁞🔒🔓
                 }
                 graphics.TextRenderingHint = txtrendr;
             }
@@ -359,6 +547,11 @@ namespace CADability.Forms
         }
         protected override void OnMouseDown(MouseEventArgs e)
         {
+            if (currentToolTip != null)
+            {
+                HideToolTip();
+                currentToolTip = null;
+            }
             base.OnMouseDown(e);
             (int index, EMousePos position, Rectangle hitItem) = GetMousePosition(e);
             if (position == EMousePos.onMiddleLine)
@@ -406,11 +599,18 @@ namespace CADability.Forms
                     else
                     {
                         if (currentToolTip != null) HideToolTip();
-                        Point mp = LabelArea(index).Location; //  e.Location; // PointToClient(MousePosition);
-                        mp.Y -= Font.Height;
+                        Point mp = LabelArea(index).Location; //  e.Location; //
+                        mp = PointToClient(MousePosition);
+                        mp = PointToClient(PointToScreen(e.Location));
+                        mp.Y -= 2 * Font.Height;
+                        mp.X -= 2 * Font.Height;
                         DelayShowToolTip(toDisplay, mp);
                     }
                     currentToolTip = toDisplay;
+                }
+                else if (delay != null)
+                {   // delay is already running, but the mouse is still moving. So we modify the point, where the tooltip should appear
+                    delay.Tag = new object[] { toDisplay, PointToClient(MousePosition) };
                 }
             }
             else
@@ -434,7 +634,7 @@ namespace CADability.Forms
                     else Cursor = Cursors.Arrow;
                     if (labelNeedsExtension[index])
                     {
-						propertiesExplorer.ShowLabelExtension(RectangleToScreen(IndentedItemArea(index)), entries[index].Label, entries[index]);
+                        propertiesExplorer.ShowLabelExtension(RectangleToScreen(IndentedItemArea(index)), entries[index].Label, entries[index]);
                         showLabelExtension = true;
                     }
                     break;
@@ -451,13 +651,12 @@ namespace CADability.Forms
             }
             if (!showLabelExtension && propertiesExplorer.EntryWithLabelExtension != null) propertiesExplorer.HideLabelExtension();
         }
-
         private void DelayShowToolTip(string toDisplay, Point mp)
         {
             if (delay == null)
             {
                 delay = new Timer();
-                delay.Interval = 500;
+                delay.Interval = 1000;
                 delay.Tick += Delay_Tick;
                 delay.Tag = new object[] { toDisplay, mp };
                 delay.Start();
@@ -478,6 +677,12 @@ namespace CADability.Forms
             object[] oa = (sender as Timer).Tag as object[];
             string toDisplay = oa[0] as string;
             Point mp = (Point)oa[1];
+            Point currentMousePosition = PointToClient(MousePosition);
+            if (currentMousePosition.Y < mp.Y + 2 * Font.Height) // 
+            {   // I don't know, why this happens, because the tooltip is generated with the correct mouse position.
+                // it only happens, when the cursor enters the item from below
+                mp.Y = currentMousePosition.Y - 2 * Font.Height;
+            }
             toolTip.Show(toDisplay, this, mp);
             delay.Stop();
             delay.Tick -= Delay_Tick;
@@ -495,7 +700,18 @@ namespace CADability.Forms
             (sender as Timer).Tick -= ToolTipOff_Tick;
             // currentToolTip = null; makes tooltip go on repeatedly
         }
-
+        protected override void OnMouseDoubleClick(MouseEventArgs e)
+        {
+            base.OnMouseDoubleClick(e);
+            (int index, EMousePos position, Rectangle hitItem) = GetMousePosition(e);
+            if (position == EMousePos.onLabel)
+            {
+                if (selected == index)
+                {
+                    entries[index].ButtonClicked(PropertyEntryButton.doubleclick);
+                }
+            }
+        }
         protected override void OnMouseClick(MouseEventArgs e)
         {
             base.OnMouseClick(e);
@@ -527,6 +743,9 @@ namespace CADability.Forms
                     break;
                 case EMousePos.onLockButton:
                     entries[index].ButtonClicked(PropertyEntryButton.locked);
+                    break;
+                case EMousePos.onDirectMenu:
+                    entries[index].ButtonClicked(PropertyEntryButton.directMenu);
                     break;
                 case EMousePos.onContextMenu:
                     if (entries[index].ContextMenu == null)
@@ -583,7 +802,7 @@ namespace CADability.Forms
             if (propertiesExplorer.EntryWithListBox == entries[index])
             {
                 // is already shown
-				propertiesExplorer.HideListBox();
+                propertiesExplorer.HideListBox();
             }
             else
             {
@@ -598,7 +817,7 @@ namespace CADability.Forms
                         break;
                     }
                 }
-				propertiesExplorer.ShowListBox(RectangleToScreen(ValueArea(index)), dropDownList, selind, entries[index]);
+                propertiesExplorer.ShowListBox(RectangleToScreen(ValueArea(index)), dropDownList, selind, entries[index]);
             }
         }
         private void OpenOrCloseSubEntries(int index)
@@ -611,7 +830,7 @@ namespace CADability.Forms
             }
             (this as IPropertyPage).Selected = selectedEntry;
         }
-        enum EMousePos { outside, onTreeButton, onLabel, onValue, onDropDownButton, onContextMenu, onOkButton, onCancelButton, onLockButton, onMiddleLine, onCheckbox }
+        enum EMousePos { outside, onTreeButton, onLabel, onValue, onDropDownButton, onContextMenu, onOkButton, onCancelButton, onLockButton, onMiddleLine, onCheckbox, onDirectMenu }
         private (int index, EMousePos position, Rectangle hitItem) GetMousePosition(MouseEventArgs e)
         {
             if (entries == null) return (-1, EMousePos.outside, Rectangle.Empty);
@@ -627,11 +846,12 @@ namespace CADability.Forms
             if (entries[index].Flags.HasFlag(PropertyEntryType.HasSubEntries) && e.Location.X >= treeLeft && e.Location.X <= treeRight) return (index, EMousePos.onTreeButton, new Rectangle(treeLeft, bottom, treeRight - treeLeft, lineHeight));
             if (entries[index].Value != null && e.Location.X >= treeLeft && e.Location.X <= middle) return (index, EMousePos.onLabel, new Rectangle(treeLeft, bottom, middle - treeLeft, lineHeight));
             if (entries[index].Flags.HasFlag(PropertyEntryType.ContextMenu) && e.Location.X >= ClientRectangle.Width - buttonWidth) return (index, EMousePos.onContextMenu, new Rectangle(ClientRectangle.Width - buttonWidth, bottom, buttonWidth, lineHeight));
+            if (entries[index].Flags.HasFlag(PropertyEntryType.DirectMenu) && e.Location.X >= ClientRectangle.Width - buttonWidth) return (index, EMousePos.onDirectMenu, new Rectangle(ClientRectangle.Width - buttonWidth, bottom, buttonWidth, lineHeight));
             if (entries[index].Flags.HasFlag(PropertyEntryType.DropDown) && e.Location.X >= ClientRectangle.Width - buttonWidth) return (index, EMousePos.onDropDownButton, new Rectangle(middle, bottom, ClientRectangle.Width - middle, lineHeight));
             if (entries[index].Flags.HasFlag(PropertyEntryType.CancelButton) && e.Location.X >= ClientRectangle.Width - lineHeight) return (index, EMousePos.onCancelButton, new Rectangle(ClientRectangle.Width - lineHeight, bottom, lineHeight, lineHeight));
             if (entries[index].Flags.HasFlag(PropertyEntryType.OKButton) && e.Location.X >= ClientRectangle.Width - 2 * lineHeight) return (index, EMousePos.onOkButton, new Rectangle(ClientRectangle.Width - 2 * lineHeight, bottom, lineHeight, lineHeight)); //OK and Cancel buttons have width = lineHeight (18)
-			if (entries[index].Flags.HasFlag(PropertyEntryType.Lockable) && e.Location.X >= ClientRectangle.Width - ButtonImages.ButtonImageList.ImageSize.Width - buttonWidth) return (index, EMousePos.onLockButton, new Rectangle(ClientRectangle.Width - 2 * lineHeight, bottom, lineHeight, lineHeight)); //Lock button has width of the image and is before ContextMenu, context menu has width = buttonWidth
-			if (entries[index].Value == null && e.Location.X >= treeLeft) return (index, EMousePos.onLabel, new Rectangle(treeLeft, bottom, ClientSize.Width - treeLeft, lineHeight));
+            if (entries[index].Flags.HasFlag(PropertyEntryType.Lockable) && e.Location.X >= ClientRectangle.Width - ButtonImages.ButtonImageList.ImageSize.Width - buttonWidth) return (index, EMousePos.onLockButton, new Rectangle(ClientRectangle.Width - 2 * lineHeight, bottom, lineHeight, lineHeight)); //Lock button has width of the image and is before ContextMenu, context menu has width = buttonWidth
+            if (entries[index].Value == null && e.Location.X >= treeLeft) return (index, EMousePos.onLabel, new Rectangle(treeLeft, bottom, ClientSize.Width - treeLeft, lineHeight));
             if (entries[index].Value != null && e.Location.X >= middle) return (index, EMousePos.onValue, new Rectangle(middle, bottom, ClientRectangle.Width - middle, lineHeight));
             return (index, EMousePos.outside, Rectangle.Empty);
         }
@@ -827,6 +1047,8 @@ namespace CADability.Forms
                     }
                     propertiesExplorer.Selected(entries[selected]);
                 }
+                OnSelectionChanged?.Invoke((wasSelected >= 0 && wasSelected < entries.Length) ? entries[wasSelected] : null,
+                    (selected >= 0 && selected < entries.Length) ? entries[selected] : null);
             }
         }
         IPropertyEntry IPropertyPage.Selected
@@ -879,7 +1101,19 @@ namespace CADability.Forms
                 {
                     OpenOrCloseSubEntries(selected);
                 }
+                else if (selectedEntry.Flags.HasFlag(PropertyEntryType.DirectMenu))
+                {   // execute the menu as if the direct menu button had been clicked
+                    selectedEntry.ButtonClicked(PropertyEntryButton.directMenu);
+                }
             }
+        }
+        internal bool OnEscape(bool ctrl)
+        {
+            return false;
+        }
+        void IPropertyPage.BringToFront()
+        {
+            propertiesExplorer.ShowPropertyPage(this.TitleId);
         }
         public void OpenSubEntries(IPropertyEntry toOpenOrClose, bool open)
         {
@@ -951,7 +1185,7 @@ namespace CADability.Forms
             if (searchTreeAndOpen)
             {
                 IPropertyEntry found = Search(helpResourceID);
-                if (found!=null) return found;
+                if (found != null) return found;
             }
             return null;
         }
@@ -969,13 +1203,13 @@ namespace CADability.Forms
             if (propertiesExplorer.EntryWithTextBox == entries[index]) return; // is already shown (maybe this is beeing called twice)
             entries[index].StartEdit(false);
             Rectangle labelRect = LabelArea(index);
-			propertiesExplorer.ShowTextBox(RectangleToScreen(labelRect), entries[index].Label, entries[index], PointToScreen(new Point(labelRect.Right, labelRect.Top)));
+            propertiesExplorer.ShowTextBox(RectangleToScreen(labelRect), entries[index].Label, entries[index], PointToScreen(new Point(labelRect.Right, labelRect.Top)));
         }
 
         #region quick adaption to IPropertyTreeView, remove later
         public IView ActiveView => Frame.ActiveView;
         public IPropertyEntry GetParent(IShowProperty child)
-        {
+        {   // this is a work around, because Parent is not correct implemented. It is always the property page, but it is also used in that way
             return (child as IPropertyEntry).Parent as IPropertyEntry;
         }
         public IFrame GetFrame()
@@ -999,6 +1233,11 @@ namespace CADability.Forms
                 entries[i].Removed(this);
             }
             base.Dispose(disposing);
+        }
+
+        internal void PreProcessKeyDown(Substitutes.KeyEventArgs e)
+        {
+            OnPreProcessKeyDown?.Invoke(e);
         }
     }
 }

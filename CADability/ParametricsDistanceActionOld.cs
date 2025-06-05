@@ -21,7 +21,7 @@ namespace CADability
     /// First we calculate the offset vector: vertex->face: perpendicular foot point, vertex->edge: perpendicular foot point, vertex->vertex: connection
     /// edge->edge: minimum distance, edge->face: minimum distance, face->face: parallel or minimum distance. (objects with axis should also offer their axis for distance)
     /// </summary>
-    internal class ParametricsDistanceActionOld : ConstructAction
+    public class ParametricsDistanceActionOld : ConstructAction
     {
         private object distanceFromHere, distanceToHere; // the two objects which define the distance (may be vertices, edges or faces)
         private GeoVector originalOffset; // the offset vector between the facesToMove and facesToKeep

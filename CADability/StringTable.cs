@@ -31,6 +31,9 @@ namespace CADability.UserInterface
         private static Dictionary<string, Dictionary<string, Strings>> allStrings; // stringId -> languageId -> text
         private static string activeLanguage;
         private static string defaultLanguage;
+#if DEBUG
+        private static HashSet<string> notifiedMissingString = new HashSet<string>();
+#endif
         static StringTable()
         {
             allLanguages = new Dictionary<string, string>();
@@ -81,6 +84,9 @@ namespace CADability.UserInterface
             }
             AddString("deutsch", "MenuId.ToggleDebugFlag", Category.label, "Debug Flag");
             AddString("english", "MenuId.ToggleDebugFlag", Category.label, "Debug Flag");
+#if DEBUG
+            File.Delete(@"C:\Temp\MissingString.txt");
+#endif
         }
 
         public static void AddStrings(System.IO.Stream str)
@@ -238,6 +244,7 @@ namespace CADability.UserInterface
                         case Category.info: res = found.info; break;
                         case Category.tip: res = found.tip; break;
                     }
+                    if (cat == Category.tip && String.IsNullOrEmpty(res)) res = found.info;
                 }
                 else
                 {
@@ -249,6 +256,7 @@ namespace CADability.UserInterface
                             case Category.info: res = found.info; break;
                             case Category.tip: res = found.tip; break;
                         }
+                        if (cat == Category.tip && String.IsNullOrEmpty(res)) res = found.info;
                     }
                     else
                     {
@@ -267,9 +275,24 @@ namespace CADability.UserInterface
             else
             {
                 if (string.IsNullOrWhiteSpace(Name)) return "";
+#if DEBUG
+                if (!notifiedMissingString.Contains(Name))
+                {
+                    notifiedMissingString.Add(Name);
+                    string txt = $@"
+    <data name=""{Name}"">
+		<label>???</label>
+		<info>???</info>
+	</data>";
+                    File.AppendAllText(@"C:\Temp\MissingString.txt", txt);
+                }
+#endif
                 return "missing string: " + Name;
             }
-            if (res == null) return "missing string: " + Name;
+            if (res == null)
+            {
+                return "missing string: " + Name;
+            }
             return res;
         }
         /// <summary>

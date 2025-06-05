@@ -338,7 +338,7 @@ namespace CADability
                 uvOnSurface = new GeoPoint2D(mres.MinimizingPoint[0], mres.MinimizingPoint[1]);
                 uOnCurve = mres.MinimizingPoint[2];
                 ip = lastip;
-                return true;
+                return mres.ReasonForExit==ExitCondition.Converged;
             }
             catch
             {
@@ -462,11 +462,19 @@ namespace CADability
             try
             {
                 NonlinearMinimizationResult mres = lm.FindMinimum(iom, new DenseVector(new double[] { uv1.x, uv1.y, uv2.x, uv2.y, uv3.x, uv3.y }));
-                uv1 = new GeoPoint2D(mres.MinimizingPoint[0], mres.MinimizingPoint[1]);
-                uv2 = new GeoPoint2D(mres.MinimizingPoint[2], mres.MinimizingPoint[3]);
-                uv3 = new GeoPoint2D(mres.MinimizingPoint[4], mres.MinimizingPoint[5]);
-                ip = new GeoPoint(surface1.PointAt(uv1), surface2.PointAt(uv2), surface3.PointAt(uv3));
-                return true;
+                if (mres.ReasonForExit == ExitCondition.Converged)
+                {
+                    uv1 = new GeoPoint2D(mres.MinimizingPoint[0], mres.MinimizingPoint[1]);
+                    uv2 = new GeoPoint2D(mres.MinimizingPoint[2], mres.MinimizingPoint[3]);
+                    uv3 = new GeoPoint2D(mres.MinimizingPoint[4], mres.MinimizingPoint[5]);
+                    GeoPoint p1 = surface1.PointAt(uv1);
+                    ip = new GeoPoint(surface1.PointAt(uv1), surface2.PointAt(uv2), surface3.PointAt(uv3));
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
             }
             catch
             {
@@ -825,7 +833,7 @@ namespace CADability
             double a = Math.Atan2(axis.y, axis.x);
             double b = Math.Atan2(axis.z, Math.Sqrt(axis.x * axis.x + axis.y * axis.y));
             NonlinearMinimizationResult mres = lm.FindMinimum(iom, new DenseVector(new double[] { apex.x, apex.y, apex.z, a, b, theta }));
-            if (mres.ReasonForExit == ExitCondition.Converged || mres.ReasonForExit == ExitCondition.RelativeGradient)
+            if ((mres.ReasonForExit == ExitCondition.Converged || mres.ReasonForExit == ExitCondition.RelativeGradient) && mres.StandardErrors != null)
             {
                 GeoVector dir = new GeoVector(Math.Cos(mres.MinimizingPoint[4]) * Math.Cos(mres.MinimizingPoint[3]), Math.Cos(mres.MinimizingPoint[4]) * Math.Sin(mres.MinimizingPoint[3]), Math.Sin(mres.MinimizingPoint[4]));
                 dir.ArbitraryNormals(out GeoVector dirx, out GeoVector diry);

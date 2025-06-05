@@ -504,7 +504,7 @@ namespace CADability.Forms
             }
             if (!e.SuppressKeyPress)
             {
-                (ActivePropertyPage as PropertyPage).PreProcessKeyDown(e);
+                (ActivePropertyPage as PropertyPage)?.PreProcessKeyDown(e); //Can be null if the selected tab is not a PropertyPage.
             }
         }
         public void HideEntry(string entryId, bool hide)

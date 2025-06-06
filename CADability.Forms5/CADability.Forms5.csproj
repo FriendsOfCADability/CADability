@@ -115,7 +115,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CADability\CADability.csproj" />
+    <ProjectReference Include="..\CADability\CADability_Core.csproj" />
   </ItemGroup>
 
 </Project>

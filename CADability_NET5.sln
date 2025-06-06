@@ -1,13 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.29920.165
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36202.13
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CADability", "CADability\CADability.csproj", "{B234840A-1F1C-4C53-9789-4EEB82349F98}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CADability.App5", "CADability.App5\CADability.App5.csproj", "{D97EA3EB-DB8F-49FC-AA51-4E30FC5F01DC}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CADability.Forms5", "CADability.Forms5\CADability.Forms5.csproj", "{ACB835FF-7AC8-4C49-9AC2-606C8E508E5E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CADability_Core", "CADability\CADability_Core.csproj", "{C696B613-C5F5-4808-1196-12FFC4274BAE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,10 +15,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{B234840A-1F1C-4C53-9789-4EEB82349F98}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{B234840A-1F1C-4C53-9789-4EEB82349F98}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{B234840A-1F1C-4C53-9789-4EEB82349F98}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B234840A-1F1C-4C53-9789-4EEB82349F98}.Release|Any CPU.Build.0 = Release|Any CPU
 		{D97EA3EB-DB8F-49FC-AA51-4E30FC5F01DC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{D97EA3EB-DB8F-49FC-AA51-4E30FC5F01DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D97EA3EB-DB8F-49FC-AA51-4E30FC5F01DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -27,6 +23,10 @@ Global
 		{ACB835FF-7AC8-4C49-9AC2-606C8E508E5E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{ACB835FF-7AC8-4C49-9AC2-606C8E508E5E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{ACB835FF-7AC8-4C49-9AC2-606C8E508E5E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C696B613-C5F5-4808-1196-12FFC4274BAE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C696B613-C5F5-4808-1196-12FFC4274BAE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C696B613-C5F5-4808-1196-12FFC4274BAE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C696B613-C5F5-4808-1196-12FFC4274BAE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

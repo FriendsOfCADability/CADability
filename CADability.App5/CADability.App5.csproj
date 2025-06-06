@@ -24,7 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CADability.Forms5\CADability.Forms5.csproj" />
-    <ProjectReference Include="..\CADability\CADability.csproj" />
+    <ProjectReference Include="..\CADability\CADability_Core.csproj" />
   </ItemGroup>
 
 </Project>

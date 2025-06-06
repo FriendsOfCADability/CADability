@@ -1,0 +1,89 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <NoWarn>$(NoWarn);SYSLIB0011</NoWarn>
+    <BuildDocFx Condition=" '$(Configuration)'!='RelWithDoc' ">false</BuildDocFx>
+    <Configurations>Debug;Release;RelWithDoc;WebDebug</Configurations>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>CADabilityKey.snk</AssemblyOriginatorKeyFile>
+    <AssemblyName>CADability</AssemblyName>
+    <BaseOutputPath>..\..\..\bin</BaseOutputPath>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <Platforms>AnyCPU;x64</Platforms>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <RootNamespace>CADability</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>TRACE;DEBUG;xTESTNEWCONTEXTMENU, xUSENONPRIODICSURFACES</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='WebDebug'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>TRACE;xPARALLEL, xTESTNEWCONTEXTMENU, xUSENONPRIODICSURFACES, WEBASSEMBLY</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>xTESTNEWCONTEXTMENU</DefineConstants>
+    <Optimize>false</Optimize>
+    <DebugType>full</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <DocumentationFile />
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='RelWithDoc'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>xPARALLEL, xTESTNEWCONTEXTMENU</DefineConstants>
+    <Optimize>false</Optimize>
+    <DebugType>full</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <DocumentationFile />
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- exclusions -->
+    <RemoveFiles Include="CADability.DXF\**" />
+    <RemoveFiles Include="DXF\**" />
+    <RemoveFiles Include="_site\**" />
+    <RemoveFiles Include="OpenGlList.cs" />
+    <RemoveFiles Include="Scripting.cs" />
+    <RemoveFiles Include="Tangulation.cs" />
+    <RemoveFiles Include="log.txt" />
+    <RemoveFiles Include="_ToDo.txt" />
+    <RemoveFiles Include="WebDrawing.cs" Condition="'$(Configuration)'!='WebDebug'" />
+
+    <EmbeddedResource Remove="@(RemoveFiles)" />
+    <EmbeddedFiles Remove="@(RemoveFiles)" />
+    <Resource Remove="@(RemoveFiles)" />
+    <Compile Remove="@(RemoveFiles)" />
+    <Compile Remove="ParametricsExtrudeAction.cs" />
+    <Compile Remove="ParametricsOffsetAction.cs" />
+    <Compile Remove="ParametricsRadiusAction.cs" />
+    <Compile Remove="SelectActionContextMenu.cs" />
+    <Content Remove="@(RemoveFiles)" />
+    <None Remove="@(RemoveFiles)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="MenuResource.xml" />
+    <EmbeddedResource Include="StringTableDeutsch.xml" />
+    <EmbeddedResource Include="StringTableEnglish.xml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MathNet.Numerics.Signed" Version="5.0.0" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.14" />
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+    <Reference Include="Microsoft.VisualStudio.DebuggerVisualizers">
+      <HintPath>$(VsInstallRoot)\Common7\IDE\PublicAssemblies\Microsoft.VisualStudio.DebuggerVisualizers.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

@@ -557,7 +557,7 @@ namespace CADability
 
         public void AdjustPoint(SnapPointFinder spf)
         {	// find relevant objects in octtree
-            GeoObjectList l = model.GetObjectsFromRect(spf.pickArea, new Set<Layer>(GetVisibleLayers()), PickMode.singleFaceAndCurve, null);
+            GeoObjectList l = model.GetObjectsFromRect(spf.pickArea, new Set<Layer>(GetVisibleLayers()), PickMode.children, null);
             for (int i = 0; i < l.Count; ++i)
             {
                 if (spf.IgnoreList != null && spf.IgnoreList.Contains(l[i])) continue;

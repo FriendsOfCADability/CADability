@@ -366,12 +366,20 @@ namespace CADability.GeoObject
         public override ICurve FixedU(double u, double vmin, double vmax)
         {
             Ellipse e = Ellipse.Construct();
-            GeoPoint p = new GeoPoint(Math.Cos(u), Math.Sin(u), 0.0);
-            Plane pln = new Plane(p, p - GeoPoint.Origin, GeoVector.ZAxis);
-            e.SetCirclePlaneCenterRadius(pln, p, minorRadius);
-            e.StartParameter = vmin;
-            e.SweepParameter = vmax - vmin;
-            e.Modify(toTorus);
+            // the following sometimes returned arcs with 180° offset. 
+            //GeoPoint p = new GeoPoint(Math.Cos(u), Math.Sin(u), 0.0);
+            //Plane pln = new Plane(p, p - GeoPoint.Origin, GeoVector.ZAxis);
+            //e.SetCirclePlaneCenterRadius(pln, p, minorRadius);
+            //e.StartParameter = vmin;
+            //e.SweepParameter = vmax - vmin;
+            //e.Modify(toTorus);
+
+            // this is not very elegant, could be improved, but returns the correct arc
+            GeoPoint pstart = PointAt(new GeoPoint2D(u, vmin));
+            GeoPoint pEnd = PointAt(new GeoPoint2D(u, vmax));
+            GeoPoint pcenter = toTorus * (GeoPoint.Origin + (Math.Cos(u) * GeoVector.XAxis + Math.Sin(u) * GeoVector.YAxis));
+            Plane plane = new Plane(pcenter, PointAt(new GeoPoint2D(u, 0)) - pcenter, PointAt(new GeoPoint2D(u, Math.PI / 2.0)) - pcenter);
+            e.SetArcPlaneCenterStartEndPoint(plane, GeoPoint2D.Origin, plane.Project(pstart), plane.Project(pEnd), plane, vmin < vmax);
             return e;
 
         }

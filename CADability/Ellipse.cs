@@ -2794,7 +2794,11 @@ namespace CADability.GeoObject
 
 		double ICurve.ParameterToPosition(double parameter)
 		{
-			return (parameter - startParameter) / sweepParameter;
+			double dp = parameter - startParameter;
+			if (dp < 0) dp += 2 * Math.PI;
+			if (dp>2*Math.PI) dp -= 2 * Math.PI;
+
+            return dp / sweepParameter;
 		}
 
 		double ICurve.PositionToParameter(double position)

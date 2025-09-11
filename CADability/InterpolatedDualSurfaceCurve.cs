@@ -27,7 +27,7 @@ namespace CADability
     /// Internal: ein Kante, gegeben durch zwei Oberflächen und ein Array von 3d/2d/2d Punkten
     /// </summary>
     [Serializable()]
-    internal class InterpolatedDualSurfaceCurve : GeneralCurve, IDualSurfaceCurve, IJsonSerialize, IExportStep, IJsonSerializeDone, IDeserializationCallback, IOrientation
+    public class InterpolatedDualSurfaceCurve : GeneralCurve, IDualSurfaceCurve, IJsonSerialize, IExportStep, IJsonSerializeDone, IDeserializationCallback, IOrientation
     {
         ISurface surface1;
         ISurface surface2;
@@ -102,7 +102,7 @@ namespace CADability
         int id;
 #endif
         [Serializable()]
-        internal class ProjectedCurve : GeneralCurve2D, ISerializable, IJsonSerialize
+        public class ProjectedCurve : GeneralCurve2D, ISerializable, IJsonSerialize
         {
             InterpolatedDualSurfaceCurve curve3d;
             bool onSurface1;

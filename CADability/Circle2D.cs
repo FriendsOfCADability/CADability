@@ -213,6 +213,17 @@ namespace CADability.Curve2D
             center.x += dx;
             center.y += dy;
         }
+        public override ICurve2D GetModified(ModOp2D m)
+        {
+            if (m.IsIsogonal)
+            {
+                return new Circle2D(m * Center, m.Factor * Radius);
+            }
+            else
+            {
+                return new Ellipse2D(m * Center, m * Radius * GeoVector2D.XAxis, m * Radius * GeoVector2D.YAxis);
+            }
+        }
         /// <summary>
         /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.TangentPoints (GeoPoint2D, GeoPoint2D)"/>
         /// </summary>

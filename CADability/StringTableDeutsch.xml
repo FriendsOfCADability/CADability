@@ -4765,6 +4765,9 @@
 	<data name="File.STEP.Filter">
 		<label>STEP Dateien (*.step,*.stp)|*.step;*.stp</label>
 	</data>
+	<data name="File.SVG.Filter">
+		<label>SVG Dateien (*.svg)|*.svg</label>
+	</data>
 	<data name="File.BREP.Filter">
 		<label>BREP Dateien (*.brep)|*.brep</label>
 	</data>
@@ -6064,5 +6067,13 @@
 	<data name="MenuId.DrawingPlane.OfCurve">
 		<label>Ebene einer Kurve</label>
 		<info>Ebene einer Kurve, z.B. eines Kreisbogens</info>
+	</data>
+	<data name="Construct.Plane.DircetionX">
+		<label>X-Achse der Ebene</label>
+		<info>X-Achse der Ebene</info>
+	</data>
+	<data name="Construct.Plane.DircetionY">
+		<label>Y-Achse der Ebene</label>
+		<info>Y-Achse der Ebene</info>
 	</data>
 </root>

@@ -254,9 +254,11 @@ namespace CADability.Actions
             base.TitleId = "ToolsTrim";
             trimObject = new CurveInput("ToolsTrim.SourceObject");
             trimObject.Optional = true;
+            trimObject.ModifiableOnly = true;
             trimObject.MouseOverCurvesEvent += new CurveInput.MouseOverCurvesDelegate(TrimSourceObject);
             trimObject.CurveSelectionChangedEvent += new CurveInput.CurveSelectionChangedDelegate(TrimSourceObjectChanged);
             CurveInput curveInput = new CurveInput("ToolsTrim.Object");
+            curveInput.ModifiableOnly = true;
             curveInput.HitCursor = CursorTable.GetCursor("Trim.cur");
             curveInput.MouseOverCurvesEvent += new CurveInput.MouseOverCurvesDelegate(TrimObject);
             curveInput.CurveSelectionChangedEvent += new CurveInput.CurveSelectionChangedDelegate(TrimObjectChanged);

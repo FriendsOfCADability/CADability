@@ -2349,6 +2349,7 @@ namespace CADability
                     StringTable.GetString("File.Dxf.Filter") + "|" +
                     StringTable.GetString("File.Dwg.Filter") + "|" +
                     StringTable.GetString("File.STEP.Filter");
+                    StringTable.GetString("File.STL.Filter");
                 int filterIndex = lastFileType;
                 if (UIService.ShowOpenFileDlg("MenuId.File.Open", StringTable.GetString("MenuId.File.Open"), filter, ref filterIndex, out fileName) == Substitutes.DialogResult.OK)
                 {
@@ -2508,6 +2509,7 @@ namespace CADability
                 StringTable.GetString("File.Dxf.Filter") + "|" +
                 StringTable.GetString("File.Dwg.Filter") + "|" +
                 StringTable.GetString("File.STEP.Filter") + "|" +
+                StringTable.GetString("File.SVG.Filter") + "|" +
                 StringTable.GetString("File.STL.Filter");
             int filterIndex = lastFileType;
             if (UIService.ShowOpenFileDlg("MenuId.Import", StringTable.GetString("MenuId.Import"), filter, ref filterIndex, out string fileName) == Substitutes.DialogResult.OK)
@@ -2522,6 +2524,18 @@ namespace CADability
                     case 3: newproject = CADability.Project.ReadFromFile(fileName, "dwg"); break;
                     case 4: newproject = CADability.Project.ReadFromFile(fileName, "stp"); break;
                     case 5:
+                        {
+                            ImportSVG importSvg = new ImportSVG();
+                            GeoObjectList svgImport = importSvg.Import(fileName);
+                            if (svgImport!=null)
+                            {
+                                newproject = CADability.Project.CreateSimpleProject();
+                                Model model = newproject.GetModel(0);
+                                model.Add(svgImport);
+                            }
+                            break;
+                        }
+                    case 6:
                         {
                             ImportSTL importSTL = new ImportSTL();
                             Shell[] shells = importSTL.Read(fileName);

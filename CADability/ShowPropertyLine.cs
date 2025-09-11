@@ -53,8 +53,11 @@ namespace CADability.UserInterface
             directionProperty.OnGetValue = () => line.StartDirection;
             directionProperty.OnSetValue = value =>
             {
-                value.Norm();
-                line.EndPoint = line.StartPoint + line.Length * value;
+                if (!value.IsNullVector())
+                {
+                    value.Norm();
+                    line.EndPoint = line.StartPoint + line.Length * value;
+                }
             };
             directionProperty.ModifyWithMouse += ModifyDirectionWithMouse;
             directionProperty.PropertyEntryChangedStateEvent += OnStateChanged;

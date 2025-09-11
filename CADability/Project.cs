@@ -1801,7 +1801,9 @@ namespace CADability
         {
             using (ConvertToDxfAutoCad2000 converted = new ConvertToDxfAutoCad2000(filename, "dxf"))
             {
-                CADability.DXF.Import import = new DXF.Import(converted.DxfFileName);
+                string fn = converted.DxfFileName;
+                if (string.IsNullOrEmpty(fn)) fn = filename;
+                CADability.DXF.Import import = new DXF.Import(fn); // DEBUGGING! change to fn again
                 return import.Project;
             }
         }

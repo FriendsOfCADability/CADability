@@ -5,6 +5,8 @@
 //   Microsoft.VisualStudio.TestPlatform.MSTest.TestAdapter
 // do not show in the test window but the calling method,
 // which is what we want to achive.
+using System.Runtime.CompilerServices;
+
 namespace Microsoft.VisualStudio.TestTools.UnitTesting
 {
 
@@ -24,7 +26,7 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
             return (T)value;
         }
 
-        public static void BitmapsAreEqual(this Assert assert, Bitmap expected, Bitmap actual)
+        public static void BitmapsAreEqual(this Assert assert, Bitmap expected, Bitmap actual, [CallerMemberName] string testName = null)
         {
             Assert.AreEqual(expected.Size, actual.Size);
 
@@ -52,16 +54,29 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
 
                 if (fail)
                 {
-                    var fileName = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".bmp");
-                    using (var result = new Bitmap(expected.Width * 3, expected.Height))
-                    using (var gr = Graphics.FromImage(result))
-                    {
-                        gr.DrawImageUnscaled(expected, new Point(0, 0));
-                        gr.DrawImageUnscaled(actual, new Point(expected.Width, 0));
-                        gr.DrawImageUnscaled(diff, new Point(expected.Width * 2, 0));
-                        result.Save(fileName, System.Drawing.Imaging.ImageFormat.Bmp);
-                    }
-                    Assert.Fail($"result does not match expected output, see {fileName} for comparison");
+
+                    // in case of an error we save all files to a dedicated directory
+                    var outDir = Path.Combine("out", testName ?? Guid.NewGuid().ToString());
+                    Directory.CreateDirectory(outDir);
+
+                    var expectedFile = Path.Combine(outDir, "expected.png");
+                    var actualFile = Path.Combine(outDir, "actual.png");
+                    var diffFile = Path.Combine(outDir, "diff.png");
+                    //var mergeFile = Path.Combine(outDir, "merge.png");
+
+                    //using (var result = new Bitmap(expected.Width * 3, expected.Height))
+                    //using (var gr = Graphics.FromImage(result))
+                    //{
+                    //    gr.DrawImageUnscaled(expected, new Point(0, 0));
+                    //    gr.DrawImageUnscaled(actual, new Point(expected.Width, 0));
+                    //    gr.DrawImageUnscaled(diff, new Point(expected.Width * 2, 0));
+                    //    result.Save(mergeFile, System.Drawing.Imaging.ImageFormat.Png);
+                    //}
+
+                    expected.Save(expectedFile, System.Drawing.Imaging.ImageFormat.Png);
+                    actual.Save(actualFile, System.Drawing.Imaging.ImageFormat.Png);
+                    diff.Save(diffFile, System.Drawing.Imaging.ImageFormat.Png);
+                    Assert.Fail($"result does not match expected output, see {Path.GetFullPath(outDir)} for comparison");
                 }
             }
         }

@@ -4629,6 +4629,7 @@ namespace CADability.Actions
 					{   // keine Teilobjekte von Blockrefs liefern
 						IGeoObject go = cv as IGeoObject;
 						if (IGeoObjectImpl.IsOwnedByBlockRef(go)) cv = null;
+						if (go.Owner is Edge) cv = null;
 					}
 					if (cv != null && constructAction.UseFilter)
 					{

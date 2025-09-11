@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackageId>CADability</PackageId>
-    <Version>1.0.11</Version>
+    <Version>1.0.22</Version>
     <!-- Update this for each publish -->
     <Authors>FriendsOfCADability</Authors>
     <Description>CAD functionality for .NET</Description>
@@ -24,7 +24,7 @@
 
   <PropertyGroup Condition="'$(Configuration)'=='Debug'">
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <DefineConstants>TRACE;DEBUG;xTESTNEWCONTEXTMENU, xUSENONPRIODICSURFACES</DefineConstants>
+    <DefineConstants>NET4X;TRACE;DEBUG;xTESTNEWCONTEXTMENU, xUSENONPRIODICSURFACES</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)'=='WebDebug'">
@@ -34,7 +34,7 @@
 
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <DefineConstants>xTESTNEWCONTEXTMENU</DefineConstants>
+    <DefineConstants>NET4X;xTESTNEWCONTEXTMENU</DefineConstants>
     <Optimize>false</Optimize>
     <DebugType>full</DebugType>
     <DebugSymbols>true</DebugSymbols>

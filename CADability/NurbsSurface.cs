@@ -371,9 +371,10 @@ namespace CADability.GeoObject
             GeoPoint dbg = PointAt(new GeoPoint2D(this.uKnots[0], this.vKnots[0]));
 #endif
         }
-        internal NurbsSurface(Ellipse[] throughEllis)
+        public NurbsSurface(Ellipse[] throughEllis, double[] knots=null)
         {
-            GeoPoint[,] rawpoles = new GeoPoint[9, throughEllis.Length];
+            GeoPoint[,] rawpoles = null;
+            int numEPoles = 0;
 #if DEBUG
             DebuggerContainer dc = new DebuggerContainer();
 #endif
@@ -385,20 +386,24 @@ namespace CADability.GeoObject
                 double[] eknots;
                 int edegree;
                 bsp.GetData(out epoles, out eweights, out eknots, out edegree);
+                if (i == 0)
+                {
+                    numEPoles = epoles.Length;
+                    rawpoles = new GeoPoint[numEPoles, throughEllis.Length];
+                }
 #if DEBUG
                 Polyline pl = Polyline.Construct();
                 pl.SetPoints(epoles, false);
                 dc.Add(pl);
 #endif
                 if (i == 0) uKnots = eknots; // nur einmal
-                for (int j = 0; j < 9; j++)
+                for (int j = 0; j < epoles.Length; j++)
                 {
                     rawpoles[j, i] = epoles[j];
                 }
             }
-
-            poles = new GeoPoint[9, throughEllis.Length];
-            for (int i = 0; i < 9; i++)
+            poles = new GeoPoint[numEPoles, throughEllis.Length];
+            for (int i = 0; i < numEPoles; i++)
             {
                 GeoPoint[] tp = new GeoPoint[throughEllis.Length];
                 for (int j = 0; j < tp.Length; j++)
@@ -406,7 +411,7 @@ namespace CADability.GeoObject
                     tp[j] = rawpoles[i, j];
                 }
                 BSpline diru = BSpline.Construct();
-                diru.ThroughPoints(tp, 3, false);
+                diru.ThroughPoints(tp, 3, false, knots);
                 GeoPoint[] upoles;
                 double[] uweights;
                 double[] uknots;
@@ -423,8 +428,8 @@ namespace CADability.GeoObject
                 }
             }
             double w = Math.Sqrt(2.0) / 2.0;
-            weights = new double[9, throughEllis.Length];
-            for (int i = 0; i < 9; i++)
+            weights = new double[numEPoles, throughEllis.Length];
+            for (int i = 0; i < numEPoles; i++)
             {
                 for (int j = 0; j < throughEllis.Length; j++)
                 {
@@ -475,6 +480,13 @@ namespace CADability.GeoObject
             this.uPeriodic = true;
 
             Init();
+#if DEBUG
+            BoxedSurfaceEx bex = this.BoxedSurfaceEx;
+            Face dbg = this.DebugAsFace;
+            dbg.AssureTriangles(0.1);
+            DebuggerContainer dct = dbg.DebugTriangulation3D;
+            DebuggerContainer dc2t = dbg.DebugTriangulation;
+#endif
         }
 #if DEBUG
         public
@@ -5011,7 +5023,7 @@ namespace CADability.GeoObject
             }
             else
             {
-                if (curve is BSpline)
+                if (curve is BSpline) // || curve is Ellipse) // ellipse on a nurbs which was made from ellipses
                 {
                     // special case to get a horinzontal or vertical 2d line when the curve is close to a fixed curve of the NURBS surface
                     // this is often the case with STEP import

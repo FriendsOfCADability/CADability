@@ -1,4 +1,5 @@
-﻿using CADability.GeoObject;
+﻿using System;
+using CADability.GeoObject;
 
 namespace CADability.UserInterface
 {
@@ -18,19 +19,21 @@ namespace CADability.UserInterface
         {
             this.resourceIdInternal = resourceId;
             this.frame = frame;
-            brepObjects = new object[0]; // leer initialisieren
+            brepObjects = Array.Empty<object>(); // leer initialisieren
         }
-        public void SetBRepObjects(object[] geoObjects, object selectedBrepObject)
+        public void SetBRepObjects(object[] geoObjects, object brepObject)
         {
             this.brepObjects = geoObjects;
-            this.selectedBrepObject = selectedBrepObject;
+            this.selectedBrepObject = brepObject;
             subEntries = null; // weg damit, damit es neu gemacht wird
             if (propertyTreeView != null)
             {
                 this.Select();
                 propertyTreeView.Refresh(this);
                 if (geoObjects.Length > 0) propertyTreeView.OpenSubEntries(this, true);
-            }
+                SimpleNameProperty subEntry = GetObjectNameSubEntry(brepObject);
+                if (subEntry != null) propertyTreeView.SelectEntry(subEntry);
+			}
         }
         public void SetSelectedBRepObject(object brepObject)
         {	// funktioniert so nicht, selbst Refresh nutzt nichts.
@@ -52,7 +55,7 @@ namespace CADability.UserInterface
             set
             {
                 highlight = value;
-                if (propertyTreeView != null) propertyTreeView.Refresh(this);
+                propertyTreeView?.Refresh(this);
             }
         }
         #region IShowPropertyImpl Overrides
@@ -117,7 +120,26 @@ namespace CADability.UserInterface
         {
             if (SelectionChangedEvent != null) SelectionChangedEvent(this, selectedBrepObject);
         }
-    }
+
+        private SimpleNameProperty GetObjectNameSubEntry(object selectedGeoObject)
+        {
+	        SimpleNameProperty subEntry = null;
+
+	        foreach (IShowProperty sp in SubEntries)
+	        {
+		        if (sp is SimpleNameProperty snp)
+		        {
+			        if (snp.AssociatedObject == selectedGeoObject)
+			        {
+				        subEntry = snp;
+				        break;
+			        }
+		        }
+	        }
+
+	        return subEntry;
+        }
+	}
     /// <summary>
     /// Darstellung eines GeoObjectInputs im ControlCenter
     /// </summary>
@@ -134,23 +156,23 @@ namespace CADability.UserInterface
         {
             this.resourceIdInternal = resourceId;
             this.frame = frame;
-            geoObjects = new IGeoObject[0]; // leer initialisieren
+            geoObjects = Array.Empty<IGeoObject>(); // leer initialisieren
         }
         public void SetGeoObjects(IGeoObject[] geoObjects, IGeoObject selectedGeoObject)
         {
-            this.geoObjects = geoObjects;
-            this.selectedGeoObject = selectedGeoObject;
-            subEntries = null; // weg damit, damit es neu gemacht wird
-            if (propertyTreeView != null)
-            {
-                this.Select();
-                propertyTreeView.Refresh(this);
-                if (geoObjects.Length > 0) propertyTreeView.OpenSubEntries(this, true);
-                SimpleNameProperty subEntry = GetGeoObjectNameSubEntry(selectedGeoObject);
-                if (subEntry != null) propertyTreeView.SelectEntry(subEntry);
-            }
+	        this.geoObjects = geoObjects;
+	        this.selectedGeoObject = selectedGeoObject;
+	        subEntries = null; // weg damit, damit es neu gemacht wird
+	        if (propertyTreeView != null)
+	        {
+		        this.Select();
+		        propertyTreeView.Refresh(this);
+		        if (geoObjects.Length > 0) propertyTreeView.OpenSubEntries(this, true);
+		        SimpleNameProperty subEntry = GetGeoObjectNameSubEntry(selectedGeoObject);
+		        if (subEntry != null) propertyTreeView.SelectEntry(subEntry);
+	        }
         }
-        public void SetSelectedGeoObject(IGeoObject geoObject)
+		public void SetSelectedGeoObject(IGeoObject geoObject)
         {	// funktioniert so nicht, selbst Refresh nutzt nichts.
             if (subEntries != null)
             {

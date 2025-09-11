@@ -1239,7 +1239,7 @@ namespace CADability.GeoObject
                     return new IDualSurfaceCurve[] { dsc1, dsc2 };
                 }
                 #endregion
-                if (Math.Abs(a.Radian) <= Precision.epsa || Math.Abs(a.Radian - 2 * Math.PI) <= Precision.epsa)
+                if (Math.Abs(a.Radian) <= Precision.epsa || Math.Abs(a.Radian - Math.PI) <= Precision.epsa)
                 #region Kreis
                 {
                     // es kommt ein Kreis oder nichts

@@ -4765,6 +4765,9 @@
 	<data name="File.STEP.Filter">
 		<label>STEP files (*.step,*.stp)|*.step;*.stp</label>
 	</data>
+	<data name="File.SVG.Filter">
+		<label>SVG files (*.svg)|*.svg</label>
+	</data>
 	<data name="File.BREP.Filter">
 		<label>BREP files (*.brep)|*.brep</label>
 	</data>

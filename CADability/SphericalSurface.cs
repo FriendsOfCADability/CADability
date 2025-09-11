@@ -1049,6 +1049,7 @@ namespace CADability.GeoObject
 			{
 				if (toSphere.Determinant > 0)
 				{   // outward oriented surface
+					if (Math.Abs(offset + RadiusX) < Precision.eps) return null;
 					if (offset < 0 && -offset > RadiusX)
 					{   // reversing the orientation
 						GeoVector xx = (offset + RadiusX) * XAxis.Normalized;

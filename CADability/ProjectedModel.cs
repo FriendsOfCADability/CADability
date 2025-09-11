@@ -560,24 +560,21 @@ namespace CADability
             GeoObjectList l = model.GetObjectsFromRect(spf.pickArea, new Set<Layer>(GetVisibleLayers()), PickMode.children, null);
             for (int i = 0; i < l.Count; ++i)
             {
-                if (spf.IgnoreList != null && spf.IgnoreList.Contains(l[i])) continue;
-                l[i].FindSnapPoint(spf);
+	            if (spf.IgnoreList != null && spf.IgnoreList.Contains(geo)) continue;
+	            geo.FindSnapPoint(spf);
             }
-            // die Überprüfung der Schnittpunkte erfolgt hier in einer Doppelschleife
-            // das wird nicht den einzelnen Objekten überlassen, da die nichts von
-            // den andern Objekten wissen.
-            if (spf.SnapToIntersectionPoint)
+			// The intersection check is done here in a double loop
+			// This is not delegated to the individual objects, since they have no knowledge
+			// of the other objects.
+			if (spf.SnapToIntersectionPoint)
             {
-                for (int i = 0; i < l.Count - 1; ++i)
+                for (int i = 0; i < objectsFromRect.Count - 1; ++i)
                 {
-                    for (int j = i; j < l.Count; ++j)
+                    for (int j = i; j < objectsFromRect.Count; ++j)
                     {
-                        ICurve c1 = l[i] as ICurve;
-                        ICurve c2 = l[j] as ICurve;
-                        if (c1 != null && c2 != null)
+	                    if (objectsFromRect[i] is ICurve c1 && objectsFromRect[j] is ICurve c2)
                         {
-                            Plane pln;
-                            if (Curves.GetCommonPlane(c1, c2, out pln))
+	                        if (Curves.GetCommonPlane(c1, c2, out Plane pln))
                             {
                                 ICurve2D c21 = c1.GetProjectedCurve(pln);
                                 ICurve2D c22 = c2.GetProjectedCurve(pln);
@@ -586,7 +583,7 @@ namespace CADability
                                 {
                                     if (c21.IsParameterOnCurve(isp[k].par1) && c22.IsParameterOnCurve(isp[k].par2))
                                     {
-                                        spf.Check(pln.ToGlobal(isp[k].p), l[i], SnapPointFinder.DidSnapModes.DidSnapToIntersectionPoint);
+                                        spf.Check(pln.ToGlobal(isp[k].p), objectsFromRect[i], SnapPointFinder.DidSnapModes.DidSnapToIntersectionPoint);
                                     }
                                 }
                             }
@@ -596,13 +593,13 @@ namespace CADability
             }
             if (spf.AdjustOrtho && spf.BasePointValid)
             {
-                // der orthogonalmodus hat nichts mit anderen Objekten zu tun und
-                // wird nur gerechnet, wenn noch kein Fangpunkt gefunden wurde
-                Plane pln = new Plane(spf.BasePoint, spf.Projection.DrawingPlane.DirectionX, spf.Projection.DrawingPlane.DirectionY);
-                // pln ist DrawingPlane durch den BasePoint
-                GeoPoint p0 = spf.Projection.ProjectionPlane.ToGlobal(spf.SourcePoint);
+				// The orthogonal mode is unrelated to other objects and
+				// is only calculated if no snap point has been found yet.
+				Plane pln = new Plane(spf.BasePoint, spf.Projection.DrawingPlane.DirectionX, spf.Projection.DrawingPlane.DirectionY);
+				// pln is the DrawingPlane passing through the BasePoint
+				GeoPoint p0 = spf.Projection.ProjectionPlane.ToGlobal(spf.SourcePoint);
                 GeoVector dir = spf.Projection.Direction;
-                GeoPoint p1 = pln.Intersect(p0, dir); // Punkt in pln;
+                GeoPoint p1 = pln.Intersect(p0, dir); // Point in pln;
                 double dx = Geometry.DistPL(p1, spf.BasePoint, spf.Projection.DrawingPlane.DirectionX);
                 double dy = Geometry.DistPL(p1, spf.BasePoint, spf.Projection.DrawingPlane.DirectionY);
                 if (dx < dy) spf.Check(Geometry.DropPL(p1, spf.BasePoint, spf.Projection.DrawingPlane.DirectionX), null, SnapPointFinder.DidSnapModes.DidAdjustOrtho);

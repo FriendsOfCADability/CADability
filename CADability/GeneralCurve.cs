@@ -2721,5 +2721,57 @@ namespace CADability.GeoObject
                 // if not, we would have to use bisection
             }
         }
+
+        /// <summary>
+        /// Computes the curvature circle at a given parameter on a 3D curve.
+        /// </summary>
+        /// <param name="curve">The curve to evaluate.</param>
+        /// <param name="u">The curve parameter.</param>
+        /// <returns>
+        /// A tuple containing:
+        /// - center: the center point of the osculating circle,
+        /// - normal: the normal vector of the osculating plane,
+        /// - radius: the curvature radius (1 / curvature).
+        /// </returns>
+        public (GeoPoint center, GeoVector normal, double radius) CurvatureAt(ICurve curve, double u)
+        {
+            if (!curve.TryPointDeriv2At(u, out GeoPoint point, out GeoVector deriv1, out GeoVector deriv2))
+            {
+                throw new ArgumentException("Curve does not support second derivative at the given parameter.");
+            }
+
+            double deriv1Length = deriv1.Length;
+            if (deriv1Length < 1e-12)
+            {
+                throw new ArgumentException("First derivative is too small to determine curvature.");
+            }
+
+            // Tangent vector
+            GeoVector T = deriv1 / deriv1Length;
+
+            // Normal component of second derivative
+            GeoVector proj = (deriv2 * T) * T;
+            GeoVector normalComponent = deriv2 - proj;
+
+            double normalLength = normalComponent.Length;
+            if (normalLength < 1e-12)
+            {
+                // Curve is locally straight (e.g. line)
+                return (point, GeoVector.NullVector, double.PositiveInfinity);
+            }
+
+            // Unit normal vector (direction to curvature center)
+            GeoVector N = normalComponent / normalLength;
+
+            // Curvature and radius
+            double curvature = normalLength / (deriv1Length * deriv1Length);
+            double radius = 1.0 / curvature;
+
+            // Center of curvature
+            GeoPoint center = point + radius * N;
+
+            return (center, (deriv1 ^ deriv2).Normalized, radius);
+        }
+
     }
 }

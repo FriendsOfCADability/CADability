@@ -904,9 +904,12 @@ namespace CADability.Forms
                 for (int i = 0; i < pe.SubItems.Length; i++)
 
                 {
-                    pe.SubItems[i].IndentLevel = level + 1;
-                    res.Add(pe.SubItems[i]);
-                    res.AddRange(GetSubEntries(pe.SubItems[i], level + 1));
+                    if (pe.SubItems[i] != null)
+                    {
+                        pe.SubItems[i].IndentLevel = level + 1;
+                        res.Add(pe.SubItems[i]);
+                        res.AddRange(GetSubEntries(pe.SubItems[i], level + 1));
+                    }
                 }
             }
             return res;

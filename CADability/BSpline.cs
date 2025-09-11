@@ -586,11 +586,6 @@ namespace CADability.GeoObject
             public override void Dispose()
             {
                 base.Dispose();
-#if DEBUG
-                if (bSpline.knots.Length == 2 && bSpline.knots[0] == bSpline.knots[1])
-                {
-                }
-#endif
             }
 
         }
@@ -604,7 +599,7 @@ namespace CADability.GeoObject
         /// <param name="maxDegree">maximum degree for the BSpline. Must be between 3 an 25</param>
         /// <param name="closed">true if the resulting BSpline should be closed</param>
         /// <returns>success</returns>
-        public bool ThroughPoints(GeoPoint[] points, int maxDegree, bool closed)
+        public bool ThroughPoints(GeoPoint[] points, int maxDegree, bool closed, double[] throughPointKnots = null)
         {
             try
             {
@@ -612,7 +607,7 @@ namespace CADability.GeoObject
                 if (points.Length == 2 && (points[0] | points[1]) < Precision.eps) return false;
 
                 maxDegree = Math.Min(maxDegree, points.Length - 1); // bei 2 Punkten nur 1. Grad, also Linie, u.s.w
-                Nurbs<GeoPoint, GeoPointPole> tmp = new Nurbs<GeoPoint, GeoPointPole>(maxDegree, points, (points.Length > 2) && closed, out throughPointsParam, true); // Hennings neue Methode
+                Nurbs<GeoPoint, GeoPointPole> tmp = new Nurbs<GeoPoint, GeoPointPole>(maxDegree, points, (points.Length > 2) && closed, out throughPointsParam, true, throughPointKnots); // Hennings neue Methode
                 // kann in der Zeile vorher rausfliegen, also nubs3d dort noch nicht überschreiben
                 using (new Changing(this))
                 {

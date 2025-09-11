@@ -35,5 +35,6 @@ jobs:
 
       - name: Push NuGet package
         run: |
-          $pkg = Get-ChildItem -Path ./nupkgs -Filter *.nupkg | Select-Object -First 1
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          $pkg = Get-ChildItem -Path ./nupkgs -Filter "*$version.nupkg" | Select-Object -First 1
           dotnet nuget push $pkg.FullName --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json

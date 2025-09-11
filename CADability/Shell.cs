@@ -6890,7 +6890,7 @@ namespace CADability.GeoObject
         /// <param name="bounds"></param>
         private void CollectConnected(Face startWith, HashSet<Face> featureFaces, HashSet<Edge> bounds)
         {
-            if (featureFaces.Add(startWith))
+            if (startWith!=null && featureFaces.Add(startWith))
             {
                 foreach (Edge edge in startWith.AllEdges)
                 {

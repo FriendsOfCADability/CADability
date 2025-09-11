@@ -245,7 +245,7 @@ namespace CADability.GeoObject
             extent = BoundingCube.EmptyBoundingCube;
             if (Constructed != null) Constructed(this);
 #if DEBUG
-            if (hashCode >= 76)
+            if (hashCode == 288)
             {
 
             }
@@ -10230,7 +10230,7 @@ namespace CADability.GeoObject
         /// </summary>
         /// <param name="toUse"></param>
         /// <returns>true, if edge was replaced</returns>
-        internal bool UseEdge(Edge toUse)
+        public bool UseEdge(Edge toUse)
         {
             if (toUse.Curve3D == null) return false;
             GeoPoint startPoint = toUse.Curve3D.StartPoint;

@@ -2937,7 +2937,7 @@ namespace CADability
         // angewendet, die den Vorteil hat, dass das entstehende Gleichungssystem gut konditioniert ist, aber den Nachteil,
         // dass der Startpunkt der Kurve (Parameterwert 0) nicht mit dem ersten Durchgangspunkt übereinstimmt
         // (vgl. Artikel "Choosing nodes and knots in closed B-spline curve interpolation to point data" von H. Park, Computer-Aided Design 33 (2001) ).
-        public Nurbs(int degree, T[] throughpoints, bool periodic, out double[] throughpointsparam, bool test)
+        public Nurbs(int degree, T[] throughpoints, bool periodic, out double[] throughpointsparam, bool test, double[] initialKnots = null)
         {// "test" ist nur ein Dummy-Parameter, um den neuen Konstruktor vom alten zu unterscheiden
             calc = new C();
             degree = Math.Min(degree, throughpoints.Length - 1); // bei 2 Punkten nur 1. Grad, also Linie, u.s.w
@@ -2946,38 +2946,46 @@ namespace CADability
             {   // In diesem Fall wird ein geschlossener B-Spline erzeugt, der überall (degree-1)-mal stetig differenzierbar ist
                 int n = (calc.Dist(throughpoints[0], throughpoints[throughpoints.Length - 1]) > Precision.eps) ? throughpoints.Length : throughpoints.Length - 1;
                 // Abstände für die Parameterwerte der Durchgangspunkte:
-                double[] k = new double[n - 1];
-                double lastk = 0.0;
-                bool kIsOK = true;
-                for (int i = 0; i < k.Length; ++i)
+                if (initialKnots == null)
                 {
-                    double d = calc.Dist(throughpoints[i + 1], throughpoints[i]);
-                    if (d == 0.0)
+                    double[] k = new double[n - 1];
+                    double lastk = 0.0;
+                    bool kIsOK = true;
+                    for (int i = 0; i < k.Length; ++i)
                     {
-                        kIsOK = false;
-                        break;
+                        double d = calc.Dist(throughpoints[i + 1], throughpoints[i]);
+                        if (d == 0.0)
+                        {
+                            kIsOK = false;
+                            break;
+                        }
+                        k[i] = lastk + d;
+                        lastk = k[i];
                     }
-                    k[i] = lastk + d;
-                    lastk = k[i];
-                }
-                double dlast = calc.Dist(throughpoints[0], throughpoints[n - 1]);
-                if (dlast == 0.0) kIsOK = false;
-                throughpointsparam = new double[n + 1];
-                if (!kIsOK)
-                {   // wenn zwei aufeinanderfolgende Punkte identisch sind, werden die Parameterwerte gleichmäßig zwischen 0 und 1 verteilt (Notlösung)
-                    for (int i = 0; i < throughpointsparam.Length; ++i)
-                    {
-                        throughpointsparam[i] = (double)i / (double)n;
+                    double dlast = calc.Dist(throughpoints[0], throughpoints[n - 1]);
+                    if (dlast == 0.0) kIsOK = false;
+                    throughpointsparam = new double[n + 1];
+                    if (!kIsOK)
+                    {   // wenn zwei aufeinanderfolgende Punkte identisch sind, werden die Parameterwerte gleichmäßig zwischen 0 und 1 verteilt (Notlösung)
+                        for (int i = 0; i < throughpointsparam.Length; ++i)
+                        {
+                            throughpointsparam[i] = (double)i / (double)n;
+                        }
+                    }
+                    else
+                    {   // sonst werden die Parameterwerte nach der "chordlength-Methode" verteilt
+                        double chordlength = k[n - 2] + dlast; // Länge des geschlossenen Polygonzugs
+                        for (int i = 1; i < n; ++i)
+                        {
+                            throughpointsparam[i] = k[i - 1] / chordlength;
+                        }
+                        throughpointsparam[n] = 1.0;
                     }
                 }
                 else
-                {   // sonst werden die Parameterwerte nach der "chordlength-Methode" verteilt
-                    double chordlength = k[n - 2] + dlast; // Länge des geschlossenen Polygonzugs
-                    for (int i = 1; i < n; ++i)
-                    {
-                        throughpointsparam[i] = k[i - 1] / chordlength;
-                    }
-                    throughpointsparam[n] = 1.0;
+                {
+                    if (initialKnots.Length != n + 1) throw new NurbsException("unable to construct NURBS with provided knots");
+                    throughpointsparam = initialKnots;
                 }
                 uknots = new double[n + 2 * degree + 1];
                 for (int i = uknots.Length - degree - 1; i < uknots.Length; ++i)
@@ -3077,35 +3085,43 @@ namespace CADability
                 // Nicht-periodischer Fall:
                 int n = throughpoints.Length - 1; // Durchgangspunkte sind indiziert von 0 bis n
                 // 1. Abstände für die Parameterwerte der Durchgangspunkte
-                double[] k = new double[n];
-                double lastk = 0.0;
-                bool kIsOK = true;
-                for (int i = 0; i < n; ++i)
+                if (initialKnots == null)
                 {
-                    double d = calc.Dist(throughpoints[i + 1], throughpoints[i]);
-                    if (d == 0.0)
+                    double[] k = new double[n];
+                    double lastk = 0.0;
+                    bool kIsOK = true;
+                    for (int i = 0; i < n; ++i)
                     {
-                        kIsOK = false;
-                        break;
+                        double d = calc.Dist(throughpoints[i + 1], throughpoints[i]);
+                        if (d == 0.0)
+                        {
+                            kIsOK = false;
+                            break;
+                        }
+                        k[i] = lastk + d;
+                        lastk = k[i];
                     }
-                    k[i] = lastk + d;
-                    lastk = k[i];
-                }
-                throughpointsparam = new double[n + 1];
-                if (!kIsOK)
-                {   // wenn zwei aufeinanderfolgende Punkte identisch sind, werden die Parameterwerte gleichmäßig zwischen 0 und 1 verteilt (Notlösung)
-                    for (int i = 0; i <= n; ++i)
-                    {
-                        throughpointsparam[i] = (double)i / (double)n;
+                    throughpointsparam = new double[n + 1];
+                    if (!kIsOK)
+                    {   // wenn zwei aufeinanderfolgende Punkte identisch sind, werden die Parameterwerte gleichmäßig zwischen 0 und 1 verteilt (Notlösung)
+                        for (int i = 0; i <= n; ++i)
+                        {
+                            throughpointsparam[i] = (double)i / (double)n;
+                        }
+                    }
+                    else
+                    {   // sonst werden die Parameterwerte nach der "chordlength" Methode verteilt
+                        double chordlength = k[n - 1]; // Länge des Polygonzugs der Durchgangspunkte
+                        for (int i = 1; i <= n; ++i)
+                        {
+                            throughpointsparam[i] = k[i - 1] / chordlength;
+                        }
                     }
                 }
                 else
-                {   // sonst werden die Parameterwerte nach der "chordlength" Methode verteilt
-                    double chordlength = k[n - 1]; // Länge des Polygonzugs der Durchgangspunkte
-                    for (int i = 1; i <= n; ++i)
-                    {
-                        throughpointsparam[i] = k[i - 1] / chordlength;
-                    }
+                {
+                    if (initialKnots.Length != n + 1) throw new NurbsException("unable to construct NURBS with provided knots");
+                    throughpointsparam = initialKnots;
                 }
                 // 2. daraus den Knotenvektor nach der "averaging" Methode
                 uknots = new double[n + degree + 2];

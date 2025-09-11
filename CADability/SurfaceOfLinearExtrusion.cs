@@ -91,8 +91,12 @@ namespace CADability.GeoObject
                 {   // this aproach is only valid, when the extrusion direction is normal to the plane
                     if (direction * pln.Normal < 0) pln.Reverse();
                     ICurve2D c2d = basisCurve.GetProjectedCurve(pln);
-                    ICurve2D c2dp = c2d.Parallel(offset, false, Precision.eps, Math.PI);
-                    if (c2dp != null) return new SurfaceOfLinearExtrusion(c2dp.MakeGeoObject(pln) as ICurve, direction, curveStartParameter, curveEndParameter);
+                    try
+                    {
+                        ICurve2D c2dp = c2d.Parallel(offset, false, Precision.eps, Math.PI);
+                        if (c2dp != null) return new SurfaceOfLinearExtrusion(c2dp.MakeGeoObject(pln) as ICurve, direction, curveStartParameter, curveEndParameter);
+                    }
+                    catch (Exception ex) { } // some curves don't implement Parallel (e.g. EllipseArc2D)
                 }
             }
             return new OffsetSurface(this, offset);
@@ -521,6 +525,18 @@ namespace CADability.GeoObject
             InterpolatedDualSurfaceCurve idsc = new InterpolatedDualSurfaceCurve(this, pl, sp, true);
             return new IDualSurfaceCurve[] { idsc.ToDualSurfaceCurve() };
             //return base.GetPlaneIntersection(pl, umin, umax, vmin, vmax, precision);
+        }
+
+        public override IDualSurfaceCurve[] GetDualSurfaceCurves(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, List<GeoPoint> seeds, List<Tuple<double, double, double, double>> extremePositions)
+        {
+            if (other is PlaneSurface ps)
+            {
+                IDualSurfaceCurve[] res = GetPlaneIntersection(ps, thisBounds.Left, thisBounds.Right, thisBounds.Bottom, thisBounds.Top, Precision.eps);
+                // don't swao, order is correct: for (int i = 0; i < res.Length; i++) res[i].SwapSurfaces();
+                return res;
+                
+            }
+            return base.GetDualSurfaceCurves(thisBounds, other, otherBounds, seeds, extremePositions);
         }
         public override bool IsUPeriodic
         {

@@ -185,13 +185,15 @@ namespace netDxf.IO
                         }
                         catch
                         {
-                            encoding = Encoding.GetEncoding(Encoding.ASCII.WindowsCodePage);
+                            encoding = Encoding.UTF8; // not working otherwise
+                            // encoding = Encoding.GetEncoding(Encoding.ASCII.WindowsCodePage);
                             Debug.Assert(false, "Invalid or not compatible code page defined in the DXF.");
                         }
                     }
                     else
                     {
-                        encoding = Encoding.GetEncoding(Encoding.ASCII.WindowsCodePage);
+                        encoding = Encoding.UTF8;
+                        // encoding = Encoding.GetEncoding(Encoding.ASCII.WindowsCodePage);
                         Debug.Assert(false, "Invalid code page defined in the DXF.");
                     }
                 }

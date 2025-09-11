@@ -557,24 +557,24 @@ namespace CADability
 
         public void AdjustPoint(SnapPointFinder spf)
         {	// find relevant objects in octtree
-            GeoObjectList l = model.GetObjectsFromRect(spf.pickArea, new Set<Layer>(GetVisibleLayers()), PickMode.children, null);
-            for (int i = 0; i < l.Count; ++i)
+            GeoObjectList objectsFromRect = model.GetObjectsFromRect(spf.pickArea, new Set<Layer>(GetVisibleLayers()), PickMode.children, null);
+            foreach (IGeoObject geo in objectsFromRect)
             {
-	            if (spf.IgnoreList != null && spf.IgnoreList.Contains(geo)) continue;
-	            geo.FindSnapPoint(spf);
+                if (spf.IgnoreList != null && spf.IgnoreList.Contains(geo)) continue;
+                geo.FindSnapPoint(spf);
             }
-			// The intersection check is done here in a double loop
-			// This is not delegated to the individual objects, since they have no knowledge
-			// of the other objects.
-			if (spf.SnapToIntersectionPoint)
+            // The intersection check is done here in a double loop
+            // This is not delegated to the individual objects, since they have no knowledge
+            // of the other objects.
+            if (spf.SnapToIntersectionPoint)
             {
                 for (int i = 0; i < objectsFromRect.Count - 1; ++i)
                 {
                     for (int j = i; j < objectsFromRect.Count; ++j)
                     {
-	                    if (objectsFromRect[i] is ICurve c1 && objectsFromRect[j] is ICurve c2)
+                        if (objectsFromRect[i] is ICurve c1 && objectsFromRect[j] is ICurve c2)
                         {
-	                        if (Curves.GetCommonPlane(c1, c2, out Plane pln))
+                            if (Curves.GetCommonPlane(c1, c2, out Plane pln))
                             {
                                 ICurve2D c21 = c1.GetProjectedCurve(pln);
                                 ICurve2D c22 = c2.GetProjectedCurve(pln);
@@ -593,11 +593,11 @@ namespace CADability
             }
             if (spf.AdjustOrtho && spf.BasePointValid)
             {
-				// The orthogonal mode is unrelated to other objects and
-				// is only calculated if no snap point has been found yet.
-				Plane pln = new Plane(spf.BasePoint, spf.Projection.DrawingPlane.DirectionX, spf.Projection.DrawingPlane.DirectionY);
-				// pln is the DrawingPlane passing through the BasePoint
-				GeoPoint p0 = spf.Projection.ProjectionPlane.ToGlobal(spf.SourcePoint);
+                // The orthogonal mode is unrelated to other objects and
+                // is only calculated if no snap point has been found yet.
+                Plane pln = new Plane(spf.BasePoint, spf.Projection.DrawingPlane.DirectionX, spf.Projection.DrawingPlane.DirectionY);
+                // pln is the DrawingPlane passing through the BasePoint
+                GeoPoint p0 = spf.Projection.ProjectionPlane.ToGlobal(spf.SourcePoint);
                 GeoVector dir = spf.Projection.Direction;
                 GeoPoint p1 = pln.Intersect(p0, dir); // Point in pln;
                 double dx = Geometry.DistPL(p1, spf.BasePoint, spf.Projection.DrawingPlane.DirectionX);

@@ -6174,10 +6174,10 @@ namespace CADability.GeoObject
         private void Triangulate(double precision)
         {
             SimpleShape ss = Area; // damit es sicher bestimmt ist
-                                   // wenn die Fläche Knicke hat, dann entlang der Knicke aufteilen
+								   // wenn die Fläche Knicke hat, dann entlang der Knicke aufteilen
 
-            //Code unreachable
-            /*
+			//Code unreachable
+			/*
             ICurve2D[] discontinuities;
             
             if (false)
@@ -6234,6 +6234,7 @@ namespace CADability.GeoObject
             */
 
 #if DEBUG
+			GetFaceCounter(out int fc);
             // System.Diagnostics.Trace.WriteLine("Triangulate: " + hashCode.ToString() + ", prec: " + precision.ToString() + ", " + (System.Environment.TickCount / 100).ToString());
 #endif
             int tc0 = System.Environment.TickCount;

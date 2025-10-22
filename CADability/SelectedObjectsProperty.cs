@@ -119,27 +119,30 @@ namespace CADability.UserInterface
             }
 
             //If all objects are the same, you can change common attributes
-            Type firstObjectType = selectedObjects[0].GetType();
-            bool isAllSameType = selectedObjects.All(o => o.GetType() == firstObjectType);
-
-            if (isAllSameType)
+            if (selectedObjects.Count > 0)
             {
-                IGeoObject geoObject = selectedObjects[0];
-                IPropertyEntry sp = geoObject.GetShowProperties(frame);
-                //Add all common properties to the attributeProperties
-                foreach (var prop in sp.SubItems)
+                Type firstObjectType = selectedObjects[0].GetType();
+                bool isAllSameType = selectedObjects.All(o => o.GetType() == firstObjectType);
+
+                if (isAllSameType)
                 {
-                    switch (prop)
+                    IGeoObject geoObject = selectedObjects[0];
+                    IPropertyEntry sp = geoObject.GetShowProperties(frame);
+                    //Add all common properties to the attributeProperties
+                    foreach (var prop in sp.SubItems)
                     {
-                        //LengthProperty e.g. Radius, Diameter, arc length
-                        case LengthProperty lp:
-                            if (lp.ReadOnly) continue; //Only add writeable properties
-                            LengthProperty commonPropLength = new LengthProperty(frame, prop.ResourceId);
-                            commonPropLength.OnSetValue = delegate (double l) { CommonProp_SetLengthEvent(commonPropLength.ResourceId, l); };
-                            commonPropLength.OnGetValue = delegate () { return CommonProp_GetLengthEvent(commonPropLength.ResourceId); };
-                            attributeProperties.Add(commonPropLength);
-                            break;
-                            //TODO: Add more cases
+                        switch (prop)
+                        {
+                            //LengthProperty e.g. Radius, Diameter, arc length
+                            case LengthProperty lp:
+                                if (lp.ReadOnly) continue; //Only add writeable properties
+                                LengthProperty commonPropLength = new LengthProperty(frame, prop.ResourceId);
+                                commonPropLength.OnSetValue = delegate (double l) { CommonProp_SetLengthEvent(commonPropLength.ResourceId, l); };
+                                commonPropLength.OnGetValue = delegate () { return CommonProp_GetLengthEvent(commonPropLength.ResourceId); };
+                                attributeProperties.Add(commonPropLength);
+                                break;
+                                //TODO: Add more cases
+                        }
                     }
                 }
             }
@@ -613,7 +616,7 @@ namespace CADability.UserInterface
         /// <summary>
         /// Implements <see cref="CADability.IDisplayHotSpots.ReloadProperties ()"/>
         /// </summary>
-		public void ReloadProperties()
+        public void ReloadProperties()
         {
             if (showProperties != null)
             {

@@ -1156,6 +1156,7 @@ namespace CADability
                     WriteToStream(stream);
                 }
                 stream.Close();
+                isModified = false;
             }
             return true;
         }
@@ -1660,6 +1661,7 @@ namespace CADability
             JsonSerialize js = new JsonSerialize();
             Project res = js.FromStream(stream) as Project;
             AttributeListContainer.UpdateLists(res, true);
+            res.isModified = false;
             return res;
         }
         private static Project ReadConvertedFile(string FileName, bool useProgress)

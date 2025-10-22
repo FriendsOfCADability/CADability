@@ -6619,6 +6619,9 @@ namespace CADability.GeoObject
             }
             catch (ApplicationException)
             {   // something went wrong with the triangulation. This should not happen and needs to be debugged and fixed
+#if DEBUG
+                System.Diagnostics.Debug.WriteLine($"TriangulationException fc={fc} {surface.GetType()}");
+#endif
             }
             triangleExtent = BoundingCube.EmptyBoundingCube; // needs to be recalculated
         }
@@ -7128,7 +7131,7 @@ namespace CADability.GeoObject
 #if DEBUG
             if (GetFaceCounter(out int fc))
             {
-                System.Diagnostics.Debug.WriteLine($"Face.PaintFaceTo3D fc={fc}  {surface.GetType()}");
+                //System.Diagnostics.Debug.WriteLine($"Face.PaintFaceTo3D fc={fc}  {surface.GetType()}");
                 //if (fc == 164 || fc == 165 || fc == 168 || fc == 596)
                 //{
                 //    System.Diagnostics.Debug.WriteLine("  face skipped");

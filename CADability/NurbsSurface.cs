@@ -822,14 +822,14 @@ namespace CADability.GeoObject
         {
             return nurbs;
         }
-        internal void SetPeriodic(bool uperiodic, bool vperiodic)
+        public void SetPeriodic(bool uperiodic, bool vperiodic)
         {   // es scheint so, als sollte man so mit den NURBS umgehen: sie sind immer "clamped", periodic zeigt nur, dass der Parameter
             // ggf. um die Periode versetzt werden muss, um den richtigen Wert zu liefern.
             // diese Methode wird nur nach dem Konstruktor aufgerufen
             uPeriodic = uperiodic;
             vPeriodic = vperiodic;
         }
-        internal void SetPeriodicRestriction(bool uperiodic, bool vperiodic, double uMinRestrict, double uMaxRestrict, double vMinRestrict, double vMaxRestrict)
+        public void SetPeriodicRestriction(bool uperiodic, bool vperiodic, double uMinRestrict, double uMaxRestrict, double vMinRestrict, double vMaxRestrict)
         {
             this.uMinRestrict = uMinRestrict;
             this.uMaxRestrict = uMaxRestrict;
@@ -2189,23 +2189,23 @@ namespace CADability.GeoObject
                     double r1 = Math.Abs(rad[0] - rad[1]) + Math.Abs(rad[1] - rad[2]) + Math.Abs(rad[2] - rad[0]);
                     double r2 = Math.Abs(rad[3] - rad[4]) + Math.Abs(rad[4] - rad[5]) + Math.Abs(rad[5] - rad[3]);
                     ToroidalSurface ts = null;
-                    if ((d1 > d2) && (r1 < r2))
-                    {   // die ersten 3 Kreise sin "v" Kreise
-                        Plane pln = new Plane(cnt[0], cnt[1], cnt[2]); // Ebene der Mittelpunkte der 3 kleinen Kreise
-                                                                       // die Location der Ebene stimmt noch nicht
-                        GeoPoint tcnt = new GeoPoint(pln.ToGlobal(pln.Project(cnt[3])), pln.ToGlobal(pln.Project(cnt[4])), pln.ToGlobal(pln.Project(cnt[5])));
-                        // GeoPoint tcnt = new GeoPoint(cnt[0], cnt[1], cnt[2]);
-                        pln = new Plane(tcnt, cnt[0], cnt[2]);
-
-                        //GeoPoint tcnt = new GeoPoint(cnt[3], cnt[4], cnt[5]);
-                        //GeoVector dirx = cnt[0] - tcnt;
-                        //GeoVector diry = cnt[2] - tcnt;
-                        //Plane pln = new Plane(tcnt, cnt[0], cnt[2]);
-                        ts = new ToroidalSurface(tcnt, pln.DirectionX, pln.DirectionY, pln.Normal, ((cnt[0] | tcnt) + (cnt[1] | tcnt) + (cnt[2] | tcnt)) / 3, (rad[0] + rad[1] + rad[2]) / 3);
-                    }
-                    else if ((d1 < d2) && (r1 > r2) && r2 < precision)
+                    try
                     {
-                        try
+                        if ((d1 > d2) && (r1 < r2))
+                        {   // die ersten 3 Kreise sin "v" Kreise
+                            Plane pln = new Plane(cnt[0], cnt[1], cnt[2]); // Ebene der Mittelpunkte der 3 kleinen Kreise
+                                                                           // die Location der Ebene stimmt noch nicht
+                            GeoPoint tcnt = new GeoPoint(pln.ToGlobal(pln.Project(cnt[3])), pln.ToGlobal(pln.Project(cnt[4])), pln.ToGlobal(pln.Project(cnt[5])));
+                            // GeoPoint tcnt = new GeoPoint(cnt[0], cnt[1], cnt[2]);
+                            pln = new Plane(tcnt, cnt[0], cnt[2]);
+
+                            //GeoPoint tcnt = new GeoPoint(cnt[3], cnt[4], cnt[5]);
+                            //GeoVector dirx = cnt[0] - tcnt;
+                            //GeoVector diry = cnt[2] - tcnt;
+                            //Plane pln = new Plane(tcnt, cnt[0], cnt[2]);
+                            ts = new ToroidalSurface(tcnt, pln.DirectionX, pln.DirectionY, pln.Normal, ((cnt[0] | tcnt) + (cnt[1] | tcnt) + (cnt[2] | tcnt)) / 3, (rad[0] + rad[1] + rad[2]) / 3);
+                        }
+                        else if ((d1 < d2) && (r1 > r2) && r2 < precision)
                         {
                             Plane pln = new Plane(cnt[3], cnt[4], cnt[5]); // Ebene der Mittelpunkte der 3 kleinen Kreise
                                                                            // die Location der Ebene stimmt noch nicht
@@ -2215,10 +2215,10 @@ namespace CADability.GeoObject
 
                             ts = new ToroidalSurface(tcnt, pln.DirectionX, pln.DirectionY, pln.Normal, ((cnt[3] | tcnt) + (cnt[4] | tcnt) + (cnt[5] | tcnt)) / 3, (rad[3] + rad[4] + rad[5]) / 3);
                         }
-                        catch
-                        {
-                            return false;
-                        }
+                    }
+                    catch
+                    {
+                        return false;
                     }
                     if (ts != null)
                     {
@@ -2279,7 +2279,7 @@ namespace CADability.GeoObject
                     dst[1] = sph.PositionOf(PointAt(src[1]));
                     dst[2] = sph.PositionOf(PointAt(src[2]));
                     reparametrisation = ModOp2D.Fit(src, dst, true);
-                    if (reparametrisation.Determinant == 0.0)
+                    if (Math.Abs(reparametrisation.Determinant) < 1e-16)
                     {
                         double umin1 = umin + 0.25 * (umax - umin);
                         double umax1 = umin + 0.75 * (umax - umin);

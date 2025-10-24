@@ -260,11 +260,11 @@ namespace CADability.UserInterface
             {
                 try
                 {
-                    //Scripting s = new Scripting();
-                    //val = s.GetGeoPoint(Frame.Project.NamedValues, trimmed); // always global
-                    //return true;
+                    Scripting s = new Scripting();
+                    val = s.GetGeoPoint(Frame.Project.NamedValues, trimmed); // always global
+                    return true;
                 }
-                catch //(ScriptingException)
+                catch (ScriptingException)
                 {
                 }
             }

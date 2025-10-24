@@ -155,17 +155,17 @@ namespace CADability.UserInterface
             {
                 try
                 {
-                    //Scripting s = new Scripting();
-                    //IFrame Frame = propertyPage.Frame;
-                    //if (Frame != null)
-                    //{
-                    //    if (numberFormatInfo.NumberDecimalSeparator == ",") text = text.Replace(",", "."); // this is ambiguous: there might be function calls with commas, 
-                    //    // which are destroyed here, but I don't know what to do. When using formulas, the user should be forced to have "." as decimal separator
-                    //    val = s.GetDouble(Frame.Project.NamedValues, text);
-                    //    success = true;
-                    //}
+                    Scripting s = new Scripting();
+                    IFrame Frame = propertyPage.Frame;
+                    if (Frame != null)
+                    {
+                        if (numberFormatInfo.NumberDecimalSeparator == ",") text = text.Replace(",", "."); // this is ambiguous: there might be function calls with commas, 
+                                                                                                           // which are destroyed here, but I don't know what to do. When using formulas, the user should be forced to have "." as decimal separator
+                        val = s.GetDouble(Frame.Project.NamedValues, text);
+                        success = true;
+                    }
                 }
-                catch //(ScriptingException)
+                catch (ScriptingException)
                 {
                 }
             }
@@ -260,7 +260,7 @@ namespace CADability.UserInterface
         [Obsolete("method has no functionality, remove this call")]
         public void CheckMouseButton(bool Check) { }
         [Obsolete("use delegate DoubleProperty.LabelTextChanged instead")]
-		public new delegate void LabelChangedDelegate(DoubleProperty sender, string newLabel);
+        public new delegate void LabelChangedDelegate(DoubleProperty sender, string newLabel);
         [Obsolete("use delegate DoubleProperty.LabelTextChanged instead")]
 #pragma warning disable CS0067 // Event is never used
         public event LabelChangedDelegate LabelChangedEvent;

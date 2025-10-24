@@ -144,14 +144,14 @@ namespace CADability.UserInterface
             {
                 try
                 {
-                    //Scripting s = new Scripting();
-                    //if (Frame != null)
-                    //{
-                    //    l = s.GetDouble(Frame.Project.NamedValues, trimmed);
-                    //    success = true;
-                    //}
+                    Scripting s = new Scripting();
+                    if (Frame != null)
+                    {
+                        l = s.GetDouble(Frame.Project.NamedValues, trimmed);
+                        success = true;
+                    }
                 }
-                catch //(ScriptingException)
+                catch (ScriptingException)
                 {
                 }
             }
@@ -313,8 +313,8 @@ namespace CADability.UserInterface
         public void CheckMouseButton(bool Check) { }
 
         [Obsolete("use delegate AngleProperty.LabelTextChanged instead")]
-		public new delegate void LabelChangedDelegate(LengthProperty sender, string newLabel);
-		
+        public new delegate void LabelChangedDelegate(LengthProperty sender, string newLabel);
+        
         [Obsolete("use delegate AngleProperty.LabelTextChanged instead")]
 #pragma warning disable CS0067 // Event is never used
         public event LabelChangedDelegate LabelChangedEvent;

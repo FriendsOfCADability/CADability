@@ -53,7 +53,6 @@
     <RemoveFiles Include="DXF\**" />
     <RemoveFiles Include="_site\**" />
     <RemoveFiles Include="OpenGlList.cs" />
-    <RemoveFiles Include="Scripting.cs" />
     <RemoveFiles Include="Tangulation.cs" />
     <RemoveFiles Include="log.txt" />
     <RemoveFiles Include="_ToDo.txt" />
@@ -79,6 +78,7 @@
 
   <ItemGroup>
     <PackageReference Include="MathNet.Numerics.Signed" Version="5.0.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.13.0" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.14" />
     <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
     <Reference Include="Microsoft.VisualStudio.DebuggerVisualizers">

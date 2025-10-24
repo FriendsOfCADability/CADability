@@ -1,7 +1,8 @@
-﻿using Microsoft.CSharp;
+﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using System;
-using System.CodeDom.Compiler;
 using System.Collections;
+using System.IO;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -14,30 +15,9 @@ namespace CADability
         {
         }
     }
-    /* !!! Scripting could work with .NET Standard 2.1 !!!
-     * 
-     */
 
-    /// <summary>
-    /// 
-    /// </summary>
     internal class Scripting
     {
-        private ICodeCompiler compiler;
-        private CompilerParameters compilerParams;
-        public Scripting()
-        {
-            CodeDomProvider codeProvider = new CSharpCodeProvider();
-            compiler = codeProvider.CreateCompiler();
-            compilerParams = new CompilerParameters();
-            compilerParams.CompilerOptions = "/target:library";
-            compilerParams.GenerateExecutable = false;
-            compilerParams.GenerateInMemory = true;
-            compilerParams.IncludeDebugInformation = false;
-            compilerParams.ReferencedAssemblies.Add("mscorlib.dll");
-            compilerParams.ReferencedAssemblies.Add("System.dll");
-            compilerParams.ReferencedAssemblies.Add("CADability.dll");
-        }
         private object GetValue(NamedValuesProperty namedValues, string typename, string formula)
         {
             if (Settings.GlobalSettings.GetBoolValue("Scripting.ForceFloat", false))
@@ -45,37 +25,54 @@ namespace CADability
                 formula = Regex.Replace(formula, @"(?<=/)(\d+)\b(?!\.)", "$1.0"); // macht aus "1/2" "1/2.0"
             }
             string code = @"
-				using System;
-				using System.Collections;
-				using CADability;
-				public class ScriptClass
-				{
-					double sin(double d) { return Math.Sin(d); }
-					double cos(double d) { return Math.Cos(d); }
-					double tan(double d) { return Math.Tan(d); }
-					double Sin(double d) { return Math.Sin(d/180*Math.PI); }
-					double Cos(double d) { return Math.Cos(d/180*Math.PI); }
-					double Tan(double d) { return Math.Tan(d/180*Math.PI); }
-					GeoVector v(double x, double y, double z) { return new GeoVector(x,y,z); }
-					GeoPoint p(double x, double y, double z) { return new GeoPoint(x,y,z); }
-					%namedValues%
-					Hashtable namedValues;
-					public ScriptClass(Hashtable namedValues)
-					{
-						this.namedValues = namedValues;
-					}
-					public %type% Calculate()
-					{
-						return %formula%;
-					}
-				}
-				";
+                using System;
+                using System.Collections;
+                using CADability;
+                public class ScriptClass
+                {
+                    double sin(double d) { return Math.Sin(d); }
+                    double cos(double d) { return Math.Cos(d); }
+                    double tan(double d) { return Math.Tan(d); }
+                    double Sin(double d) { return Math.Sin(d/180*Math.PI); }
+                    double Cos(double d) { return Math.Cos(d/180*Math.PI); }
+                    double Tan(double d) { return Math.Tan(d/180*Math.PI); }
+                    GeoVector v(double x, double y, double z) { return new GeoVector(x,y,z); }
+                    GeoPoint p(double x, double y, double z) { return new GeoPoint(x,y,z); }
+                    %namedValues%
+                    Hashtable namedValues;
+                    public ScriptClass(Hashtable namedValues)
+                    {
+                        this.namedValues = namedValues;
+                    }
+                    public %type% Calculate()
+                    {
+                        return %formula%;
+                    }
+                }
+                ";
             code = code.Replace("%formula%", formula);
             code = code.Replace("%type%", typename);
             code = code.Replace("%namedValues%", namedValues.GetCode());
-            CompilerResults results = compiler.CompileAssemblyFromSource(compilerParams, code);
-            if (results.Errors.Count > 0) throw new ScriptingException("CompileAssemblyFromSource error");
-            Assembly generatedAssembly = results.CompiledAssembly;
+
+
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                "out.dll",
+                new SyntaxTree[] { SyntaxFactory.ParseSyntaxTree(Microsoft.CodeAnalysis.Text.SourceText.From(code, System.Text.Encoding.UTF8), CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp8)) },
+                new MetadataReference[] {
+                    MetadataReference.CreateFromFile(Assembly.Load("mscorlib").Location),
+                    MetadataReference.CreateFromFile(Assembly.Load("System").Location),
+                    MetadataReference.CreateFromFile(Assembly.Load("System.Private.CoreLib").Location),
+                    MetadataReference.CreateFromFile(Assembly.Load("System.Runtime").Location),
+                    MetadataReference.CreateFromFile(Assembly.Load("CADability").Location)},
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary).WithOverflowChecks(true).WithOptimizationLevel(OptimizationLevel.Release));
+            Assembly generatedAssembly = null;
+            MemoryStream ms = new MemoryStream();
+            Microsoft.CodeAnalysis.Emit.EmitResult result = compilation.Emit(ms);
+            if (result.Success)
+                generatedAssembly = Assembly.Load(ms.GetBuffer());
+            else
+                throw new ScriptingException("CompileAssemblyFromSource error");
+
             try
             {
                 Module[] mods = generatedAssembly.GetModules(false);

@@ -2042,6 +2042,13 @@ namespace CADability.GeoObject
                     pl.Location = loc + pl.ToGlobal(new GeoVector2D(-umin, -vmin)); // verschiebe so, dass der Nullpunkt passt
                     reparametrisation = ModOp2D.Fit(new GeoPoint2D[] { new GeoPoint2D(umin, vmin), new GeoPoint2D(umax, vmin), new GeoPoint2D(umin, vmax) },
                         new GeoPoint2D[] { pl.Project(loc), pl.Project(posx), pl.Project(posy) }, true);
+                    //It is a plane only if all poles are on the plane. There are surfaces with both degrees = 1 shaped like square bracket
+                    foreach (GeoPoint p in poles)
+                    {
+                        double dist = pl.Distance(p);
+                        if(dist > precision)
+                            return false;
+                    }
                     simpleSurface = new PlaneSurface(pl);
                     return true;
                 }

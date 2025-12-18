@@ -6458,7 +6458,7 @@ namespace CADability.GeoObject
                         dc.Add(l2d);
                     }
                 }
-                GeoObjectsSave.SaveToFileDBG(@$"C:\temp\dbgCADability\{fc.ToString("0000")}_polylines.cdb", dc.toShow);
+                //GeoObjectsSave.SaveToFileDBG(@$"C:\temp\dbgCADability\{fc.ToString("0000")}_polylines.cdb", dc.toShow);
                 // double dbga = this.area.Area;
 #endif
                 Triangulation t = new Triangulation(polylines.ToArray(), surface, precision * 5.0, 0.17);
@@ -6523,7 +6523,7 @@ namespace CADability.GeoObject
                         ln.SetTwoPoints(cnt3d, cnt3d + n);
                         dc3d.Add(ln, System.Drawing.Color.Red, triangleIndex[i]);
                     }
-                    GeoObjectsSave.SaveToFileDBG(@$"C:\temp\dbgCADability\{fc.ToString("0000")}_triangles.cdb", dc3d.toShow);
+                    //GeoObjectsSave.SaveToFileDBG(@$"C:\temp\dbgCADability\{fc.ToString("0000")}_triangles.cdb", dc3d.toShow);
 #endif
                 }
                 else

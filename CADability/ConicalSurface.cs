@@ -1623,12 +1623,20 @@ namespace CADability.GeoObject
                 if (Precision.SameDirection(ZAxis, cother.ZAxis, false) &&
                     (Geometry.DistPL(cother.Location, Location, ZAxis.Normalized) < precision) &&
                     Precision.IsEqual(OpeningAngle, cother.OpeningAngle))
-                {   // es kann sich hier nur um eine Verschiebung von u handeln, in v kann nicht verschoben werden
-                    GeoPoint2D pu = cother.PositionOf(PointAt(new GeoPoint2D(0.0, 1.0)));
+                {   // the transformation can only be a translation in u-direction and possibly a mirroring in u-direction
+
+                    GeoPoint2D pu0 = cother.PositionOf(PointAt(new GeoPoint2D(0.0, 1.0)));
+                    GeoPoint2D pu1 = cother.PositionOf(PointAt(new GeoPoint2D(Math.PI / 2, 1.0)));
+                    if (pu0.x - pu1.x < -Math.PI) pu1.x -= 2 * Math.PI;
+                    if (pu0.x - pu1.x > Math.PI) pu0.x -= 2 * Math.PI;
+                    // a*0.0 + b = pu0.x
+                    // a*(PI/2) + b = pu1.x
+                    double b = pu0.x;
+                    double a = (pu1.x - pu0.x) / (Math.PI / 2);
                     // pu.y muss 1.0 sein, oder?
-                    if (Math.Abs(pu.y - 1.0) < 1e-7)
-                    {
-                        firstToSecond = ModOp2D.Translate(pu.x, 0.0);
+                    if (Math.Abs(pu0.y - 1.0) < 1e-7 && Math.Abs(pu0.y - 1.0) < 1e-7 && Math.Abs(Math.Abs(a)-1) <1e-7)
+                    {   // this should always be the case
+                        firstToSecond = new ModOp2D(a, 0.0, b, 0.0, 1.0, 0.0);
                         return true;
                     }
                     else
@@ -1640,6 +1648,7 @@ namespace CADability.GeoObject
                 else
                 {   // if it failed, check the four cornerpoints on the other surface
                     // (if they are different, the first check will fail in most cases
+                    // the following did not reflct inversion of the cone
                     firstToSecond = ModOp2D.Null;
                     GeoPoint pt = PointAt(thisBounds.GetLowerLeft());
                     GeoPoint po = cother.PointAt(cother.PositionOf(pt));
@@ -1668,9 +1677,25 @@ namespace CADability.GeoObject
                     if ((pt | po) > precision) return false;
 
                     // all points fit on the other surface within precision
-                    GeoPoint2D pu = cother.PositionOf(PointAt(new GeoPoint2D(0.0, 1.0)));
-                    firstToSecond = ModOp2D.Translate(pu.x, 0.0);
-                    return true;
+                    GeoPoint2D pu0 = cother.PositionOf(PointAt(new GeoPoint2D(0.0, 1.0)));
+                    GeoPoint2D pu1 = cother.PositionOf(PointAt(new GeoPoint2D(Math.PI / 2, 1.0)));
+                    if (pu0.x - pu1.x < -Math.PI) pu1.x += 2 * Math.PI;
+                    if (pu0.x - pu1.x > Math.PI) pu0.x -= 2 * Math.PI;
+                    // a*0.0 + b = pu0.x
+                    // a*(PI/2) + b = pu1.x
+                    double b = pu0.x;
+                    double a = (pu1.x - pu0.x) / (Math.PI / 2);
+                    // pu.y muss 1.0 sein, oder?
+                    if (Math.Abs(pu0.y - 1.0) < 1e-7 && Math.Abs(pu0.y - 1.0) < 1e-7 && Math.Abs(Math.Abs(a) - 1) < 1e-7)
+                    {   // this should always be the case
+                        firstToSecond = new ModOp2D(a, 0.0, b, 0.0, 1.0, 0.0);
+                        return true;
+                    }
+                    else
+                    {
+                        firstToSecond = ModOp2D.Null;
+                        return false;
+                    }
                 }
             }
             return base.SameGeometry(thisBounds, other, otherBounds, precision, out firstToSecond);
@@ -1773,6 +1798,23 @@ namespace CADability.GeoObject
             {
                 return GetPlaneIntersection(other as PlaneSurface, thisBounds.Left, thisBounds.Right, thisBounds.Bottom, thisBounds.Top, Precision.eps);
 
+            }
+            if (other is ISurfaceOfRevolution sr)
+            {
+                if (Precision.SameAxis(sr.Axis, (this as ISurfaceOfRevolution).Axis))
+                {   // two surfaces of revolution with the same axis
+                    List<IDualSurfaceCurve> res = new List<IDualSurfaceCurve>();
+                    Intersect(sr.Curve, thisBounds, out GeoPoint[] ips, out GeoPoint2D[] uvOnFace, out double[] uOnCurve3D);
+                    for (int i = 0; i < uvOnFace.Length; i++)
+                    {
+                        ICurve cv = FixedV(uvOnFace[i].y, thisBounds.Left, thisBounds.Right);
+                        ICurve2D cv2dOnThis = new Line2D(new GeoPoint2D(thisBounds.Left, uvOnFace[i].y), new GeoPoint2D(thisBounds.Right, uvOnFace[i].y));
+                        ICurve2D cv2dOnOther = other.GetProjectedCurve(cv, Precision.eps);
+                        DualSurfaceCurve dsc = new DualSurfaceCurve(cv, this, cv2dOnThis, other, cv2dOnOther);
+                        res.Add(dsc);
+                    }
+                    return res.ToArray();
+                }
             }
             return base.GetDualSurfaceCurves(thisBounds, other, otherBounds, seeds, extremePositions);
         }

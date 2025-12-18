@@ -2835,6 +2835,10 @@ namespace CADability.GeoObject
         {
             get
             {
+                if (!usedArea.IsEmpty() && !usedArea.IsInfinite && !usedArea.IsInvalid())
+                {
+                    return FixedU(0, usedArea.Bottom, usedArea.Top);
+                }
                 return FixedU(0, 0, 2 * Math.PI);
             }
         }

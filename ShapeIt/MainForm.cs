@@ -320,7 +320,7 @@ namespace ShapeIt
 #if DEBUG
         private void AutoDebug()
         {
-            return;
+           // return;
             string? filename = null; // @"F:\Zeichnungen\RoundTest5.cdb.json";
             // add code here to be executed automatically upon start in debug mode
             // there is no mouse interaction before this code is finished
@@ -366,26 +366,30 @@ namespace ShapeIt
             }
             if (operand1 != null && operand2 != null)
             {
-                if (difference.Count > 0)
-                {
-                    Solid[] sres = NewBooleanOperation.Subtract(operand1, operand2);
-                    if (sres.Length > 0)
-                    {
-                        Project proj = Project.CreateSimpleProject();
-                        proj.GetActiveModel().Add(sres);
-                        proj.WriteToFile("c:\\Temp\\subtract.cdb.json");
-                    }
-                }
-                if (command.StartsWith("Difference",StringComparison.OrdinalIgnoreCase))
-                {
-                    Solid[] sres = NewBooleanOperation.Subtract(operand1, operand2);
-                }
+                //if (difference.Count > 0)
+                //{
+                //    Solid[] sres = NewBooleanOperation.Subtract(operand1, operand2);
+                //    if (sres.Length > 0)
+                //    {
+                //        Project proj = Project.CreateSimpleProject();
+                //        proj.GetActiveModel().Add(sres);
+                //        proj.WriteToFile("c:\\Temp\\subtract.cdb.json");
+                //    }
+                //}
+                //if (command.StartsWith("Difference",StringComparison.OrdinalIgnoreCase))
+                //{
+                //    Solid[] sres = NewBooleanOperation.Subtract(operand1, operand2);
+                //}
             }
             if (operand1 != null && operand2 != null)
             {
                 if (command.Equals("Difference", StringComparison.OrdinalIgnoreCase))
                 {
                     Solid[] sres = NewBooleanOperation.Subtract(operand1, operand2);
+                }
+                if (command.Equals("Union", StringComparison.OrdinalIgnoreCase))
+                {
+                    Solid sres = NewBooleanOperation.Unite(operand1, operand2);
                 }
             }
             if (slds.Count == 2)

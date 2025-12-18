@@ -765,6 +765,7 @@ namespace CADability.GeoObject
                 this.startParameter = new Angle(startPoint, GeoPoint2D.Origin);
                 this.sweepParameter = new SweepAngle((Angle)this.startParameter, new Angle(endPoint, GeoPoint2D.Origin),
                     direction);
+                if (sweepParameter == 0.0) sweepParameter = 2 * Math.PI;
             }
         }
 

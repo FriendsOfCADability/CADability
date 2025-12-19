@@ -2041,6 +2041,7 @@ namespace CADability.GeoObject
                         else if (curve.DistanceTo(PointAt(sc4.PointAt(1.0 / 3.0))) < (RadiusX + RadiusY) * 1e-5 && curve.DistanceTo(PointAt(sc4.PointAt(2.0 / 3.0))) < (RadiusX + RadiusY) * 1e-5) sc = sc4;
                         if (sc != null)
                         {
+                            sc.StartAt(testPoints[0]);
                             if (!usedArea.IsEmpty()) SurfaceHelper.AdjustPeriodic(this, usedArea, sc); // must be adjusted to usedArea
                             return sc;
                         }

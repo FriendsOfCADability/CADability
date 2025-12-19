@@ -75,9 +75,9 @@ namespace CADability.Curve2D
                 );
                 ModOp2D fromUnit = new ModOp2D(fx, 0, tx, 0, fy, ty);
                 ModOp2D toUnit = fromUnit.GetInverse();
-                double ustart = toUnit*points.First().x;
-                double uend = toUnit*points.Last().x;
-                return new SineCurve2D(0, 2*Math.PI, fromUnit);
+                double ustart = toUnit * points.First().x;
+                double uend = toUnit * points.Last().x;
+                return new SineCurve2D(0, 2 * Math.PI, fromUnit);
                 return new SineCurve2D(ustart, uend - ustart, fromUnit);
             }
             catch
@@ -218,7 +218,7 @@ namespace CADability.Curve2D
                 double u = 0.0;
                 while (u < ustart) u += Math.PI / 2;
                 while (u > ustart) u -= Math.PI / 2;
-                while (u > ustart + udiff+1e-4)
+                while (u > ustart + udiff + 1e-4)
                 {
                     if (u < uvalues[uvalues.Count - 1] - 1e-4) uvalues.Add(u);
                     u -= Math.PI / 2;
@@ -229,7 +229,7 @@ namespace CADability.Curve2D
                 double u = 0.0;
                 while (u > ustart) u -= Math.PI / 2;
                 while (u < ustart) u += Math.PI / 2;
-                while (u < ustart + udiff -1e-4)
+                while (u < ustart + udiff - 1e-4)
                 {
                     if (u > uvalues[uvalues.Count - 1] + 1e-4) uvalues.Add(u);
                     u += Math.PI / 2;
@@ -284,8 +284,14 @@ namespace CADability.Curve2D
         {   // not yet tested
             point = fromUnit * new GeoPoint2D(position, Math.Sin(ustart + position * udiff));
             deriv = fromUnit * new GeoVector2D(1, udiff * Math.Cos(ustart + position * udiff));
-            deriv2 = fromUnit * new GeoVector2D(1, -udiff *udiff * Math.Sin(ustart + position * udiff));
+            deriv2 = fromUnit * new GeoVector2D(1, -udiff * udiff * Math.Sin(ustart + position * udiff));
             return true;
+        }
+
+        internal void StartAt(GeoPoint2D p2d)
+        {
+            double d = PositionOf(p2d);
+            ustart += d * udiff;
         }
 
         #endregion

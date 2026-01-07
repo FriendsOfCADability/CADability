@@ -103,8 +103,6 @@ namespace CADability
                     return "Stack underflow - An attempt has been made to perform an operation that would cause an internal stack to underflow";
                 case Gl.GL_OUT_OF_MEMORY:
                     return "Out of memory - There is not enough memory left to execute the command";
-                case Gl.GL_INVALID_FRAMEBUFFER_OPERATION:
-                    return "Invalid framebuffer operation - The framebuffer object is not complete";
                 default:
                     return $"Unknown error code: {errorCode:X}";
             }

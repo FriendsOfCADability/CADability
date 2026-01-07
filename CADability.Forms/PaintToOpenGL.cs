@@ -14,6 +14,9 @@ using MathNet.Numerics.LinearAlgebra.Double;
 
 namespace CADability.Forms
 {
+    /// <summary>
+    /// Exception thrown when OpenGL-specific errors occur during initialization or rendering
+    /// </summary>
     public class PaintToOpenGLException : ApplicationException
     {
         internal PaintToOpenGLException(String msg)
@@ -23,9 +26,22 @@ namespace CADability.Forms
                 MessageBox.Show(msg);
         }
     }
+    
     /// <summary>
-    /// Implementation of <see cref="IPaintTo3D"/> via OpenGL
+    /// Implementation of <see cref="IPaintTo3D"/> interface using OpenGL for hardware-accelerated 3D rendering.
+    /// This class manages OpenGL contexts, display lists, textures, and the complete rendering pipeline.
     /// </summary>
+    /// <remarks>
+    /// Key Features:
+    /// - Display list management for efficient rendering
+    /// - Texture and bitmap caching
+    /// - Font rendering with outline fonts
+    /// - Error checking and resource tracking
+    /// - Support for both window and bitmap rendering
+    /// 
+    /// Threading: OpenGL operations must occur on the thread that created the rendering context.
+    /// Resource Management: Uses display lists for compiled geometry, automatically manages cleanup via GC.
+    /// </remarks>
     public class PaintToOpenGL : IPaintTo3D
     {
         #region IPaintTo3D data
@@ -202,10 +218,19 @@ namespace CADability.Forms
             }
             return res;
         }
+        /// <summary>
+        /// Initializes a new instance of PaintToOpenGL with specified precision for tessellation
+        /// </summary>
+        /// <param name="precision">Precision value for curve approximation and surface tessellation (default: 1e-6)</param>
+        /// <remarks>
+        /// This constructor initializes the rendering state but does not create an OpenGL context.
+        /// Call <see cref="Init(Control)"/> or <see cref="Init(IntPtr, int, int, bool)"/> to create the context.
+        /// </remarks>
         public PaintToOpenGL(double precision = 1e-6)
         {
             try
-            {   // hier gab es noch keinen OpenGL Aufruf, einmal CheckError nullt diesen
+            {
+                // Clear any existing OpenGL errors from previous operations
                 CheckError(true);
             }
             catch { }
@@ -217,7 +242,7 @@ namespace CADability.Forms
             currentList = null;
             selectColor = Color.Yellow;
             stateStack = new Stack<state>();
-            selectBuf = new int[selectBufSize]; // statisch für selektion
+            selectBuf = new int[selectBufSize];
             lineWidthFactor = 10.0;
             icons = new Dictionary<System.Drawing.Bitmap, IPaintTo3DList>();
         }
@@ -575,10 +600,25 @@ namespace CADability.Forms
         Dictionary<System.Drawing.Bitmap, IPaintTo3DList> icons;
         static Dictionary<System.Drawing.Bitmap, IPaintTo3DList> bitmaps = new Dictionary<System.Drawing.Bitmap, IPaintTo3DList>();
         static Dictionary<System.Drawing.Bitmap, uint> textures = new Dictionary<System.Drawing.Bitmap, uint>();
+        
+        /// <summary>
+        /// Initializes OpenGL rendering for a Windows Forms control
+        /// </summary>
+        /// <param name="ctrl">The control to render into</param>
+        /// <exception cref="PaintToOpenGLException">Thrown if the control handle is not created or OpenGL initialization fails</exception>
+        /// <remarks>
+        /// This method:
+        /// - Creates an OpenGL rendering context for the control
+        /// - Sets up display list sharing across multiple contexts
+        /// - Configures pixel format and rendering parameters
+        /// - Registers for cleanup when the control is destroyed
+        /// 
+        /// The control must have its handle created before calling this method.
+        /// </remarks>
         internal void Init(Control ctrl)
         {
 
-            //Setup the control's styles -- wird im CondorControl implementiert
+            //Setup the control's styles -- implemented in the control itself
             //Make sure the handle for this control has been created
             if (ctrl.Handle == IntPtr.Zero)
             {
@@ -588,9 +628,9 @@ namespace CADability.Forms
             controlHandle = ctrl.Handle;
             Init(User.GetDC(ctrl.Handle), ctrl.ClientSize.Width, ctrl.ClientSize.Height, false);
 
-            // ctrl.Disposed += new EventHandler(OnDisposed);
-            ctrl.HandleDestroyed += new EventHandler(OnDisposed); // hofentlich kommt der synchron (im selben thread), denn OnDisposed kommt manchmal asynchron
-                                                                  // und das macht OpenGL nicht mit
+            // Register for cleanup when control is destroyed
+            // Must happen synchronously on same thread due to OpenGL context requirements
+            ctrl.HandleDestroyed += new EventHandler(OnDisposed);
 
             Gl.glPixelStorei(Gl.GL_UNPACK_ALIGNMENT, 1);
             Gl.glPixelStorei(Gl.GL_PACK_ALIGNMENT, 1);
@@ -2058,6 +2098,26 @@ namespace CADability.Forms
             }
         }
         #endregion
+        
+        /// <summary>
+        /// Renders a collection of geometric objects to a bitmap using OpenGL
+        /// </summary>
+        /// <param name="list">The list of geometric objects to render</param>
+        /// <param name="viewDirection">The direction from which to view the objects (e.g., (0,0,-1) for top view)</param>
+        /// <param name="width">Width of the resulting bitmap in pixels</param>
+        /// <param name="height">Height of the resulting bitmap in pixels</param>
+        /// <param name="extent">Optional bounding cube defining the extents. If null, computed from objects</param>
+        /// <returns>A bitmap containing the rendered image</returns>
+        /// <remarks>
+        /// This method:
+        /// - Creates a temporary OpenGL context for off-screen rendering
+        /// - Automatically fits the objects into the view with 10% padding
+        /// - Cleans up all resources after rendering
+        /// - Flips the bitmap vertically to correct for OpenGL coordinate system
+        /// 
+        /// The resulting bitmap has a white background. Objects are rendered with
+        /// hardware acceleration if available, falling back to software rendering otherwise.
+        /// </remarks>
         public static Bitmap PaintToBitmap(GeoObjectList list, GeoVector viewDirection, int width, int height, BoundingCube? extent = null)
         {
             Bitmap bmp = new Bitmap(width, height);
@@ -2100,6 +2160,22 @@ namespace CADability.Forms
         }
     }
 
+    /// <summary>
+    /// Represents an OpenGL display list for efficient rendering of compiled geometry
+    /// </summary>
+    /// <remarks>
+    /// OpenGL display lists provide optimized rendering by compiling a sequence of OpenGL
+    /// commands into a single callable unit. This class manages the lifecycle of display lists,
+    /// including creation, tracking, and cleanup.
+    /// 
+    /// Key Features:
+    /// - Automatic resource tracking and cleanup via finalizer
+    /// - Deferred deletion to avoid threading issues
+    /// - Global list management for shared contexts
+    /// - Integration with OpenGLResourceManager for leak detection
+    /// 
+    /// Thread Safety: Display list operations must occur on the OpenGL context thread.
+    /// </remarks>
     internal class OpenGlList : IPaintTo3DList
     {
         static List<int> toDelete = new List<int>();

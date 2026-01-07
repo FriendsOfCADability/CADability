@@ -657,55 +657,19 @@ namespace CADability.Forms
 #if DEBUG_OPENGL
             if (MainThread != Thread.CurrentThread)
             {
-                MessageBox.Show("Different thread in OpenGL calls. Some OpenGL implementations only accepts single threaded applications");
+                OpenGLErrorHandler.LogWarning("OpenGL call from different thread. Some implementations only support single-threaded applications");
             }
 #endif
-            int error = Gl.glGetError();
-            if (error == 0) return;
-            // für Hilgers Debug:
-            //if (!dontDebug)
-            //{
-            //    using (StreamWriter w = File.AppendText(@"C:\Temp\" + Environment.UserName.ToUpper() + ".CADability.log"))
-            //    {
-            //        w.WriteLine(DateTime.Now.ToShortTimeString() + ": error in OpenGl (" + error.ToString("X") + ")");
-            //        System.Diagnostics.StackTrace st = new System.Diagnostics.StackTrace(true);
-            //        string str = "";
-            //        for (int i = 0; i < st.FrameCount; i++)
-            //        {
-            //            System.Diagnostics.StackFrame sf = st.GetFrame(i);
-            //            str += " Method: "+ sf.GetMethod().ToString() + ", " + sf.GetFileName() +", "+ sf.GetFileLineNumber().ToString();
-            //    }
-            //        w.WriteLine(str);
-            //    }
-            //}
-            // Ende Hilgers Debug 
-            if (error == Gl.GL_OUT_OF_MEMORY)
+            // Use the new centralized error handler
+            if (OpenGLErrorHandler.CheckError())
             {
-                currentList = null; // die bleibt sonst offen
-                                    // System.Diagnostics.Trace.WriteLine("GL_OUT_OF_MEMORY");
-                                    //System.Diagnostics.StackTrace st = new System.Diagnostics.StackTrace(true);
-                                    //string stackIndent = "";
-                                    //for (int i = 0; i < st.FrameCount; i++)
-                                    //{
-                                    //    System.Diagnostics.StackFrame sf = st.GetFrame(i);
-                                    //    Console.WriteLine();
-                                    //    Console.WriteLine(stackIndent + " Method: {0}",
-                                    //        sf.GetMethod());
-                                    //    Console.WriteLine(stackIndent + " File: {0}",
-                                    //        sf.GetFileName());
-                                    //    Console.WriteLine(stackIndent + " Line Number: {0}",
-                                    //        sf.GetFileLineNumber());
-                                    //    stackIndent += "  ";
-                                    //}
-                                    //throw new PaintTo3DOutOfMemory();
+                // Special handling for out-of-memory: close any open list
+                int error = Gl.glGetError();
+                if (error == Gl.GL_OUT_OF_MEMORY)
+                {
+                    currentList = null; // Close any open list
+                }
             }
-            else
-            {
-#if DEBUG_OPENGL
-                throw new ApplicationException("DEBUG: error in OpenGl (" + error.ToString("X") + ")");
-#endif
-            }
-
         }
         void IPaintTo3D.Dispose()
         {
@@ -1294,19 +1258,18 @@ namespace CADability.Forms
             {
                 Gl.glPixelStorei(Gl.GL_UNPACK_ALIGNMENT, 1);
                 Gl.glPixelStorei(Gl.GL_PACK_ALIGNMENT, 1);
-                uint texName; //  = new uint[1];
+                uint texName;
                 Gl.glGenTextures(1, out texName);
                 Gl.glBindTexture(Gl.GL_TEXTURE_2D, texName);
                 Gl.glTexParameteri(Gl.GL_TEXTURE_2D, Gl.GL_TEXTURE_WRAP_S, Gl.GL_REPEAT);
                 Gl.glTexParameteri(Gl.GL_TEXTURE_2D, Gl.GL_TEXTURE_WRAP_T, Gl.GL_REPEAT);
                 Gl.glTexParameteri(Gl.GL_TEXTURE_2D, Gl.GL_TEXTURE_MAG_FILTER, Gl.GL_NEAREST);
                 Gl.glTexParameteri(Gl.GL_TEXTURE_2D, Gl.GL_TEXTURE_MIN_FILTER, Gl.GL_NEAREST);
-                // int[] pixels = new int[bitmap.Width * bitmap.Height];
-#if DEBUG
-                //System.Diagnostics.Trace.WriteLine("Texture: " + texName.ToString());
-#endif
+                
                 byte[] pixels;
                 bool alpha = Settings.GlobalSettings.GetBoolValue("OpenGLAlpha", true);
+                int bytesPerPixel = alpha ? 4 : 3;
+                
                 if (alpha)
                 {
                     pixels = new byte[bitmap.Width * bitmap.Height * 4];
@@ -1314,28 +1277,25 @@ namespace CADability.Forms
                     {
                         for (int j = 0; j < bitmap.Width; ++j)
                         {
-                            Color clr = bitmap.GetPixel(j, bitmap.Height - i - 1); // auf den Kopf stellen, Bitmap y geht nach unten
-                                                                                   // pixels[i * bitmap.Width + j] = (clr.R << 24) + (clr.G << 16) + (clr.B << 8) + clr.A;
+                            Color clr = bitmap.GetPixel(j, bitmap.Height - i - 1);
                             pixels[(i * bitmap.Width + j) * 4 + 0] = clr.R;
                             pixels[(i * bitmap.Width + j) * 4 + 1] = clr.G;
                             pixels[(i * bitmap.Width + j) * 4 + 2] = clr.B;
                             pixels[(i * bitmap.Width + j) * 4 + 3] = clr.A;
                         }
                     }
-                    Gl.glEnable(Gl.GL_ALPHA_TEST); // damit der Alpha Kanal berücksichtigt wird
-                    Gl.glAlphaFunc(Gl.GL_GREATER, 0.5f); // Sollte eigentlich immer so eingestellt sein
-                                                         // Gl.glTexImage2D(Gl.GL_TEXTURE_2D, 0, Gl.GL_RGBA, bitmap.Width, bitmap.Height, 0, Gl.GL_RGBA, Gl.GL_UNSIGNED_INT_8_8_8_8, pixels);
+                    Gl.glEnable(Gl.GL_ALPHA_TEST);
+                    Gl.glAlphaFunc(Gl.GL_GREATER, 0.5f);
                     Gl.glTexImage2D(Gl.GL_TEXTURE_2D, 0, Gl.GL_RGBA, bitmap.Width, bitmap.Height, 0, Gl.GL_RGBA, Gl.GL_UNSIGNED_BYTE, pixels);
                 }
                 else
                 {
-
                     pixels = new byte[bitmap.Width * bitmap.Height * 3];
                     for (int i = 0; i < bitmap.Height; ++i)
                     {
                         for (int j = 0; j < bitmap.Width; ++j)
                         {
-                            Color clr = bitmap.GetPixel(j, bitmap.Height - i - 1); // auf den Kopf stellen, Bitmap y geht nach unten
+                            Color clr = bitmap.GetPixel(j, bitmap.Height - i - 1);
                             pixels[(i * bitmap.Width + j) * 3 + 0] = clr.R;
                             pixels[(i * bitmap.Width + j) * 3 + 1] = clr.G;
                             pixels[(i * bitmap.Width + j) * 3 + 2] = clr.B;
@@ -1343,7 +1303,13 @@ namespace CADability.Forms
                     }
                     Gl.glTexImage2D(Gl.GL_TEXTURE_2D, 0, Gl.GL_RGB, bitmap.Width, bitmap.Height, 0, Gl.GL_RGB, Gl.GL_UNSIGNED_BYTE, pixels);
                 }
+                
                 textures[bitmap] = texName;
+                
+                // Register texture with resource manager
+                OpenGLResourceManager.RegisterTexture(texName, $"Bitmap_{texName}", bitmap.Width, bitmap.Height, bytesPerPixel);
+                OpenGLErrorHandler.LogDebug($"Texture created: {texName} ({bitmap.Width}x{bitmap.Height}, {bytesPerPixel} BPP)");
+                
                 CheckError();
             }
         }
@@ -2147,11 +2113,13 @@ namespace CADability.Forms
             if (name != null) this.name = name;
             else this.name = "NoName_" + ListNumber.ToString();
             openLists[ListNumber] = this.name;
-            // System.Diagnostics.Debug.WriteLine($"Add new List. Count:{openLists.Count}");
+            
+            // Register with resource manager for tracking
+            OpenGLResourceManager.RegisterDisplayList(ListNumber, this.name, "OpenGlList.Constructor");
+            
 #if DEBUG
             //System.Diagnostics.Trace.WriteLine("+++++ OpenGl List Nr.: " + ListNumber.ToString() + " (" + openLists.Count.ToString() + ") " + name);
 #endif
-            // Gl.glIsList()
         }
         ~OpenGlList()
         {
@@ -2168,18 +2136,23 @@ namespace CADability.Forms
                 {
                     for (int i = 0; i < toDelete.Count; ++i)
                     {
-                        System.Diagnostics.Debug.WriteLine($"Delete List. Count:{openLists.Count}");
 #if DEBUG
                         //System.Diagnostics.Trace.WriteLine("----- OpenGl List Nr.: " + toDelete[i].ToString());
 #endif
                         openLists.Remove(toDelete[i]);
+                        
+                        // Unregister from resource manager
+                        OpenGLResourceManager.UnregisterDisplayList(toDelete[i]);
+                        
                         try
                         {
                             Gl.glDeleteLists(toDelete[i], 1);
+                            OpenGLErrorHandler.CheckError($"Deleting display list {toDelete[i]}");
                         }
                         catch (Exception e)
                         {
                             if (e is System.Threading.ThreadAbortException) throw (e);
+                            OpenGLErrorHandler.LogError($"Exception while deleting display list {toDelete[i]}: {e.Message}");
                         }
                     }
                     toDelete.Clear();

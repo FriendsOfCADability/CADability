@@ -700,14 +700,19 @@ namespace CADability.Forms
                 OpenGLErrorHandler.LogWarning("OpenGL call from different thread. Some implementations only support single-threaded applications");
             }
 #endif
-            // Use the new centralized error handler
-            if (OpenGLErrorHandler.CheckError())
+            // Check for errors and get the error code in one call
+            int error = Gl.glGetError();
+            if (error != Gl.GL_NO_ERROR)
             {
+                // Log the error with context
+                string errorMsg = OpenGLErrorHandler.GetErrorString(error);
+                OpenGLErrorHandler.LogError($"OpenGL Error {error:X}: {errorMsg}");
+                
                 // Special handling for out-of-memory: close any open list
-                int error = Gl.glGetError();
                 if (error == Gl.GL_OUT_OF_MEMORY)
                 {
                     currentList = null; // Close any open list
+                    // Note: Original code did not throw exception here
                 }
             }
         }

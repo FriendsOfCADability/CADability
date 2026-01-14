@@ -28,9 +28,11 @@ namespace CADability
         }
         static public void FreeLists()
         {
-            if (toDelete.Count > 0)
+            // CRITICAL: Must lock BEFORE checking Count to avoid race condition
+            // Thread A could read Count > 0, then Thread B clears the list, then A proceeds with stale data
+            lock (toDelete)
             {
-                lock (toDelete)
+                if (toDelete.Count > 0)
                 {
                     for (int i = 0; i < toDelete.Count; ++i)
                     {
@@ -95,8 +97,24 @@ namespace CADability
         public void Delete()
         {
             // System.Diagnostics.Trace.WriteLine("Direct Deleting OpenGl List Nr.: " + listNumber.ToString());
-            isDeleted = true;
-            Gl.glDeleteLists(listNumber, 1);
+            // CRITICAL: Double-checked locking to prevent multiple deletions
+            if (isDeleted) return;
+            
+            lock (toDelete)
+            {
+                // Re-check after acquiring lock
+                if (isDeleted) return;
+                isDeleted = true;
+            }
+            
+            try
+            {
+                Gl.glDeleteLists(listNumber, 1);
+            }
+            catch (Exception e)
+            {
+                if (e is System.Threading.ThreadAbortException) throw;
+            }
         }
         #region IPaintTo3DList Members
         private string name;

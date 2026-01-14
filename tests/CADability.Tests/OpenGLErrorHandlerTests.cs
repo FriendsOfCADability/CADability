@@ -32,7 +32,7 @@ namespace CADability.Tests
         [TestMethod]
         public void GetErrorString_ReturnsUnknownForInvalidCode()
         {
-            string result = OpenGLErrorHandler.GetErrorString(0xDEADBEEF);
+            string result = OpenGLErrorHandler.GetErrorString(unchecked((int)0xDEADBEEF));
             Assert.IsTrue(result.Contains("Unknown"));
         }
 

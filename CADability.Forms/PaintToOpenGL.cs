@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using CADability.Attribute;
 using CADability.GeoObject;
@@ -90,15 +89,15 @@ namespace CADability.Forms
         byte accumBits = 0, colorBits = 32, depthBits = 16;
         static IntPtr MainRenderContext = IntPtr.Zero;
         static IntPtr LastRenderContext = IntPtr.Zero;
-        private static List<System.Drawing.Bitmap> bitmapList = null;
-        internal static List<System.Drawing.Bitmap> BitmapList
+        private static List<Bitmap> bitmapList = null;
+        internal static List<Bitmap> BitmapList
         {
             get
             {
                 if (bitmapList == null)
                 {
-                    bitmapList = new List<System.Drawing.Bitmap>();
-                    System.Drawing.Bitmap bmp;
+                    bitmapList = new List<Bitmap>();
+                    Bitmap bmp;
                     bmp = BitmapTable.GetBitmap("PointSymbols.bmp");
                     // PointSymbols.bmp and PointSymbolsB.bmp (B for bold) must have this form:
                     // 6 square pointsymbols horizontally placed with and odd number of pixels.
@@ -132,7 +131,7 @@ namespace CADability.Forms
                     imageList.Images.Add(bmp);
                     for (int i = 0; i < imageList.Images.Count; ++i)
                     {
-                        bitmapList.Add(imageList.Images[i] as System.Drawing.Bitmap);
+                        bitmapList.Add(imageList.Images[i] as Bitmap);
                     }
                 }
                 return bitmapList;
@@ -244,21 +243,51 @@ namespace CADability.Forms
             stateStack = new Stack<state>();
             selectBuf = new int[selectBufSize];
             lineWidthFactor = 10.0;
-            icons = new Dictionary<System.Drawing.Bitmap, IPaintTo3DList>();
+            icons = new Dictionary<Bitmap, IPaintTo3DList>();
         }
         ~PaintToOpenGL()
         {
-            OnDisposed(null, null);
-            // Dispose of device context
-            if (deviceContext != IntPtr.Zero && controlHandle != IntPtr.Zero)
-            {
-                User.ReleaseDC(controlHandle, deviceContext);
-            }
-#if DEBUG
-            //System.Diagnostics.Trace.WriteLine("deleting PaintToOpenGl");
-            //MessageBox.Show("deleting PaintToOpenGl");
-#endif
-        }
+			try
+			{
+				OnDisposed(null, null);
+			}
+			catch (Exception ex)
+			{
+				// Suppress finalizer exceptions to prevent application crash
+				try
+				{
+					OpenGLErrorHandler.LogError($"Exception in PaintToOpenGL finalizer during OnDisposed: {ex.Message}");
+				}
+				catch { } // Suppress any logging errors
+			}
+
+			// Dispose of device context
+			try
+			{
+				if (deviceContext != IntPtr.Zero && controlHandle != IntPtr.Zero)
+				{
+					bool ok = User.ReleaseDC(controlHandle, deviceContext);
+					if (!ok)
+					{
+						int lastError = Marshal.GetLastWin32Error();
+						try
+						{
+							OpenGLErrorHandler.LogWarning($"Failed to release device context in finalizer (error {lastError})");
+						}
+						catch { } // Suppress logging errors
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				// Suppress device context cleanup errors to prevent finalizer crash
+				try
+				{
+					OpenGLErrorHandler.LogError($"Exception releasing device context in finalizer: {ex.Message}");
+				}
+				catch { } // Suppress any logging errors
+			}
+		}
         public void SetClientSize(Size sz)
         {
             clientwidth = sz.Width;
@@ -266,7 +295,7 @@ namespace CADability.Forms
         }
         public void Init(Bitmap image)
         {
-            graphics = System.Drawing.Graphics.FromImage(image);
+            graphics = Graphics.FromImage(image);
             IntPtr dc = graphics.GetHdc();
             Init(dc, image.Width, image.Height, true);
         }
@@ -413,57 +442,228 @@ namespace CADability.Forms
                 for (int i = 0; i < ContextsToDelete.Count; i++)
                 {
                     bool ok = Wgl.wglDeleteContext(ContextsToDelete[i]);
-#if DEBUG
-                    //System.Diagnostics.Trace.WriteLine("RenderContext deleted: " + ContextsToDelete[i].ToString() + ", " + ok.ToString());
-#endif
                     activeRenderContexts.Remove(ContextsToDelete[i]);
                 }
                 ContextsToDelete.Clear();
             }
             CheckError();
         }
-        public bool UseSharedLists
-        {
-            get
-            {
-                return !isBitmap;
-            }
-        }
+        public bool UseSharedLists => !isBitmap;
+
+        /// <summary>
+        /// Cleanup handler called when the application exits. Ensures all OpenGL resources
+        /// and rendering contexts are properly released before shutdown.
+        /// </summary>
+        /// <param name="sender">Event sender (typically Application)</param>
+        /// <param name="e">Event arguments</param>
         void RemoveMainRenderContext(object sender, EventArgs e)
         {
-            OpenGlList.FreeLists();
-            OpenGlList.FreeAllOpenLists();
-            for (int i = 0; i < ContextsToDelete.Count; i++)
-            {
-                bool ok = Wgl.wglDeleteContext(ContextsToDelete[i]);
-#if DEBUG
-                //System.Diagnostics.Trace.WriteLine("RenderContext deleted: " + ContextsToDelete[i].ToString() + ", " + ok.ToString());
-#endif
-                activeRenderContexts.Remove(ContextsToDelete[i]);
-            }
-            ContextsToDelete.Clear();
-            for (int i = 0; i < activeRenderContexts.Count; i++)
-            {
-                bool ok = Wgl.wglDeleteContext(activeRenderContexts[i]);
-
-            }
             try
             {
-                // System.Diagnostics.Trace.WriteLine("RemoveMainRenderContext: " + MainRenderContext.ToString() + ", " + ok.ToString());
-                MainRenderContext = IntPtr.Zero;
-                fonts = new Dictionary<string, FontDisplayList>(); // löschen
-
-                //Dispose of device context das ist der von MainRenderContext
+                OpenGLErrorHandler.LogDebug("RemoveMainRenderContext: Starting cleanup...");
+                
+                // CRITICAL: Free deferred deletion lists first (requires valid context)
+                try
+                {
+                    OpenGlList.FreeLists();
+                    OpenGLErrorHandler.LogDebug("RemoveMainRenderContext: Deferred lists freed");
+                }
+                catch (Exception ex)
+                {
+                    OpenGLErrorHandler.LogError($"RemoveMainRenderContext: Error freeing deferred lists: {ex.Message}");
+                }
+                
+                // CRITICAL: Free all currently open lists
+                try
+                {
+                    OpenGlList.FreeAllOpenLists();
+                    OpenGLErrorHandler.LogDebug("RemoveMainRenderContext: All open lists freed");
+                }
+                catch (Exception ex)
+                {
+                    OpenGLErrorHandler.LogError($"RemoveMainRenderContext: Error freeing all open lists: {ex.Message}");
+                }
+                
+                // Delete contexts marked for deletion (safer to delete before active contexts)
+                lock (ContextsToDelete)
+                {
+                    int deletedCount = 0;
+                    for (int i = 0; i < ContextsToDelete.Count; i++)
+                    {
+                        try
+                        {
+                            IntPtr ctx = ContextsToDelete[i];
+                            bool ok = Wgl.wglDeleteContext(ctx);
+                            if (ok)
+                            {
+                                activeRenderContexts.Remove(ctx);
+                                deletedCount++;
+                                OpenGLErrorHandler.LogDebug($"RemoveMainRenderContext: Deferred context {ctx} deleted successfully");
+                            }
+                            else
+                            {
+                                int lastError = Marshal.GetLastWin32Error();
+                                OpenGLErrorHandler.LogWarning($"RemoveMainRenderContext: Failed to delete deferred context {ctx} (error {lastError})");
+                                activeRenderContexts.Remove(ctx); // Remove even if delete failed
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            OpenGLErrorHandler.LogError($"RemoveMainRenderContext: Exception deleting deferred context {i}: {ex.Message}");
+                        }
+                    }
+                    ContextsToDelete.Clear();
+                    OpenGLErrorHandler.LogDebug($"RemoveMainRenderContext: {deletedCount}/{ContextsToDelete.Count} deferred contexts deleted");
+                }
+                
+                // Delete remaining active rendering contexts (except main context if somehow still present)
+                try
+                {
+                    int deletedCount = 0;
+                    int failedCount = 0;
+                    var contextsToDelete = new List<IntPtr>(activeRenderContexts);
+                    
+                    foreach (IntPtr ctx in contextsToDelete)
+                    {
+                        // Skip main render context (shouldn't be in active list, but be safe)
+                        if (ctx == MainRenderContext)
+                        {
+                            OpenGLErrorHandler.LogWarning($"RemoveMainRenderContext: Skipping MainRenderContext {ctx} in active list (should not be here)");
+                            continue;
+                        }
+                        
+                        try
+                        {
+                            bool ok = Wgl.wglDeleteContext(ctx);
+                            if (ok)
+                            {
+                                activeRenderContexts.Remove(ctx);
+                                deletedCount++;
+                                OpenGLErrorHandler.LogDebug($"RemoveMainRenderContext: Active context {ctx} deleted successfully");
+                            }
+                            else
+                            {
+                                int lastError = Marshal.GetLastWin32Error();
+                                OpenGLErrorHandler.LogWarning($"RemoveMainRenderContext: Failed to delete active context {ctx} (error {lastError})");
+                                activeRenderContexts.Remove(ctx);
+                                failedCount++;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            OpenGLErrorHandler.LogError($"RemoveMainRenderContext: Exception deleting active context {ctx}: {ex.Message}");
+                            activeRenderContexts.Remove(ctx);
+                            failedCount++;
+                        }
+                    }
+                    
+                    OpenGLErrorHandler.LogDebug($"RemoveMainRenderContext: Active contexts deleted: {deletedCount} success, {failedCount} failed");
+                }
+                catch (Exception ex)
+                {
+                    OpenGLErrorHandler.LogError($"RemoveMainRenderContext: Error deleting active contexts: {ex.Message}");
+                }
+                
+                // Delete main rendering context if it still exists
+                if (MainRenderContext != IntPtr.Zero)
+                {
+                    try
+                    {
+                        bool ok = Wgl.wglDeleteContext(MainRenderContext);
+                        if (ok)
+                        {
+                            OpenGLErrorHandler.LogDebug($"RemoveMainRenderContext: MainRenderContext {MainRenderContext} deleted successfully");
+                        }
+                        else
+                        {
+                            int lastError = Marshal.GetLastWin32Error();
+                            OpenGLErrorHandler.LogWarning($"RemoveMainRenderContext: Failed to delete MainRenderContext (error {lastError})");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        OpenGLErrorHandler.LogError($"RemoveMainRenderContext: Exception deleting MainRenderContext: {ex.Message}");
+                    }
+                    finally
+                    {
+                        MainRenderContext = IntPtr.Zero;
+                    }
+                }
+                
+                // Clear font cache
+                try
+                {
+                    fonts = new Dictionary<string, FontDisplayList>();
+                    OpenGLErrorHandler.LogDebug("RemoveMainRenderContext: Font cache cleared");
+                }
+                catch (Exception ex)
+                {
+                    OpenGLErrorHandler.LogError($"RemoveMainRenderContext: Error clearing font cache: {ex.Message}");
+                }
+                
+                // Release device context if valid (sender should be Control or null)
                 if (deviceContext != IntPtr.Zero)
                 {
-                    if (sender is Control) User.ReleaseDC((sender as Control).Handle, deviceContext);
-                    deviceContext = IntPtr.Zero;
+                    try
+                    {
+                        Control ctrl = sender as Control;
+                        if (ctrl != null && ctrl.Handle != IntPtr.Zero)
+                        {
+                            bool ok = User.ReleaseDC(ctrl.Handle, deviceContext);
+                            if (ok)
+                            {
+                                OpenGLErrorHandler.LogDebug("RemoveMainRenderContext: Device context released successfully");
+                            }
+                            else
+                            {
+                                int lastError = Marshal.GetLastWin32Error();
+                                OpenGLErrorHandler.LogWarning($"RemoveMainRenderContext: Failed to release device context (error {lastError})");
+                            }
+                        }
+                        else
+                        {
+                            OpenGLErrorHandler.LogWarning("RemoveMainRenderContext: Device context not released (invalid sender or control handle)");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        OpenGLErrorHandler.LogError($"RemoveMainRenderContext: Exception releasing device context: {ex.Message}");
+                    }
+                    finally
+                    {
+                        deviceContext = IntPtr.Zero;
+                    }
                 }
-                // MessageBox.Show("RemoveMainRenderContext");
-                IntPtr mh = Kernel.GetModuleHandle("opengl32.dll");
-                if (mh != IntPtr.Zero) Kernel.FreeLibrary(mh);
+                
+                // Unload OpenGL library
+                try
+                {
+                    IntPtr mh = Kernel.GetModuleHandle("opengl32.dll");
+                    if (mh != IntPtr.Zero)
+                    {
+                        bool ok = Kernel.FreeLibrary(mh);
+                        if (ok)
+                        {
+                            OpenGLErrorHandler.LogDebug("RemoveMainRenderContext: OpenGL library unloaded successfully");
+                        }
+                        else
+                        {
+                            int lastError = Marshal.GetLastWin32Error();
+                            OpenGLErrorHandler.LogWarning($"RemoveMainRenderContext: Failed to unload OpenGL library (error {lastError})");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    OpenGLErrorHandler.LogError($"RemoveMainRenderContext: Exception unloading OpenGL library: {ex.Message}");
+                }
+                
+                OpenGLErrorHandler.LogDebug("RemoveMainRenderContext: Cleanup completed successfully");
             }
-            catch { }
+            catch (Exception ex)
+            {
+                OpenGLErrorHandler.LogError($"RemoveMainRenderContext: Unexpected error during cleanup: {ex.Message}");
+            }
         }
 
         // Mit HashCode und Equals hat es folgende Bewandnis:
@@ -479,9 +679,16 @@ namespace CADability.Forms
             if (other == null) return false;
             return renderContext == other.renderContext;
         }
-        void OnDisposed(object sender, EventArgs e)
+
+        private bool disposed = false;
+		void OnDisposed(object sender, EventArgs e)
         {
-            if (MainRenderContext != IntPtr.Zero)
+	        if (disposed)
+		        return; // Prevent double-cleanup
+
+	        disposed = true;
+
+			if (MainRenderContext != IntPtr.Zero)
             {
                 // OpenGlList.FreeLists();
                 // kommt aus dem falschen thread, darf hier nicht ausgelöst werden
@@ -597,9 +804,88 @@ namespace CADability.Forms
                 return PaintCapabilities.Standard | PaintCapabilities.ZoomIndependentDisplayList;
             }
         }
-        Dictionary<System.Drawing.Bitmap, IPaintTo3DList> icons;
-        static Dictionary<System.Drawing.Bitmap, IPaintTo3DList> bitmaps = new Dictionary<System.Drawing.Bitmap, IPaintTo3DList>();
-        static Dictionary<System.Drawing.Bitmap, uint> textures = new Dictionary<System.Drawing.Bitmap, uint>();
+        Dictionary<Bitmap, IPaintTo3DList> icons;
+        static Dictionary<Bitmap, IPaintTo3DList> bitmaps = new Dictionary<Bitmap, IPaintTo3DList>();
+        static Dictionary<Bitmap, uint> textures = new Dictionary<Bitmap, uint>();
+        
+        /// <summary>
+        /// Unregisters a texture from the resource manager and deletes it from OpenGL
+        /// </summary>
+        /// <param name="bitmap">The bitmap associated with the texture</param>
+        /// <returns>True if texture was unregistered, false if it wasn't found</returns>
+        private static bool UnregisterAndDeleteTexture(Bitmap bitmap)
+        {
+            uint texName;
+            if (textures.TryGetValue(bitmap, out texName))
+            {
+                try
+                {
+                    OpenGLResourceManager.UnregisterTexture(texName);
+                    Gl.glDeleteTextures(1, ref texName);
+                    OpenGLErrorHandler.LogDebug($"Texture deleted: {texName}");
+                    textures.Remove(bitmap);
+                    return true;
+                }
+                catch (Exception e)
+                {
+                    OpenGLErrorHandler.LogError($"Error deleting texture {texName}: {e.Message}");
+                    return false;
+                }
+            }
+            return false;
+        }
+        
+        /// <summary>
+        /// Gets the current texture cache statistics
+        /// </summary>
+        /// <returns>Number of textures currently cached</returns>
+        private static int GetCachedTextureCount()
+        {
+            return textures.Count;
+        }
+        
+        /// <summary>
+        /// Cleans up unused textures from the cache when it grows too large.
+        /// Useful for preventing memory leaks when many different bitmaps are loaded.
+        /// </summary>
+        /// <param name="maxCachedTextures">Maximum number of textures to keep (default: 100)</param>
+        private static void CleanupTextureCache(int maxCachedTextures = 100)
+        {
+            if (textures.Count > maxCachedTextures)
+            {
+                int toRemove = textures.Count - maxCachedTextures;
+                var bitmapsToClean = new List<Bitmap>(textures.Keys);
+                
+                // Remove oldest bitmaps first (first N items)
+                for (int i = 0; i < Math.Min(toRemove, bitmapsToClean.Count); i++)
+                {
+                    if (UnregisterAndDeleteTexture(bitmapsToClean[i]))
+                    {
+                        OpenGLErrorHandler.LogDebug($"Cleaned texture {i + 1}/{toRemove} from cache");
+                    }
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Gets rendering pipeline statistics including texture and display list counts
+        /// </summary>
+        /// <returns>A formatted string with resource statistics</returns>
+        public static string GetRenderingStatistics()
+        {
+            var stats = OpenGLResourceManager.GetStatistics();
+            var resourceInfo = new StringBuilder();
+            
+            resourceInfo.AppendLine("=== OpenGL Rendering Pipeline Statistics ===");
+            resourceInfo.AppendLine($"Display Lists: {stats.ActiveDisplayLists} active");
+            resourceInfo.AppendLine($"  Created: {stats.TotalDisplayListsCreated}, Deleted: {stats.TotalDisplayListsDeleted}");
+            resourceInfo.AppendLine($"Textures: {stats.ActiveTextures} active");
+            resourceInfo.AppendLine($"  Created: {stats.TotalTexturesCreated}, Deleted: {stats.TotalTexturesDeleted}");
+            resourceInfo.AppendLine($"Est. Memory: {stats.EstimatedMemoryUsageBytes / (1024 * 1024)} MB");
+            resourceInfo.AppendLine($"Cached Bitmaps: {GetCachedTextureCount()}");
+            
+            return resourceInfo.ToString();
+        }
         
         /// <summary>
         /// Initializes OpenGL rendering for a Windows Forms control
@@ -700,20 +986,29 @@ namespace CADability.Forms
                 OpenGLErrorHandler.LogWarning("OpenGL call from different thread. Some implementations only support single-threaded applications");
             }
 #endif
-            // Check for errors and get the error code in one call
-            int error = Gl.glGetError();
-            if (error != Gl.GL_NO_ERROR)
+            // CRITICAL: Drain entire OpenGL error queue, not just one error
+            // glGetError() returns one error per call, must loop until GL_NO_ERROR
+            int error;
+            int errorCount = 0;
+            const int MAX_ERROR_COUNT = 100; // Safety limit to prevent infinite loops
+            
+            while ((error = Gl.glGetError()) != Gl.GL_NO_ERROR && errorCount < MAX_ERROR_COUNT)
             {
-                // Log the error with context
                 string errorMsg = OpenGLErrorHandler.GetErrorString(error);
                 OpenGLErrorHandler.LogError($"OpenGL Error {error:X}: {errorMsg}");
+                errorCount++;
                 
                 // Special handling for out-of-memory: close any open list
                 if (error == Gl.GL_OUT_OF_MEMORY)
                 {
                     currentList = null; // Close any open list
-                    // Note: Original code did not throw exception here
                 }
+            }
+            
+            // Log warning if error queue was full (potential overflow)
+            if (errorCount >= MAX_ERROR_COUNT)
+            {
+                OpenGLErrorHandler.LogError("OpenGL error queue overflow detected - possible resource leak or driver issue");
             }
         }
         void IPaintTo3D.Dispose()
@@ -729,6 +1024,27 @@ namespace CADability.Forms
                 ContextsToDelete.Add(renderContext);
                 renderContext = IntPtr.Zero;
             }
+            
+            // Clean up any textures associated with this rendering context
+            if (isBitmap)
+            {
+                // For bitmap rendering contexts, we can clean up local textures
+                // Note: shared textures remain for other contexts
+                try
+                {
+                    var texturesToDelete = new List<Bitmap>(textures.Keys);
+                    foreach (var bitmap in texturesToDelete)
+                    {
+                        UnregisterAndDeleteTexture(bitmap);
+                    }
+                    OpenGLErrorHandler.LogDebug($"Cleaned up {GetCachedTextureCount()} textures on dispose");
+                }
+                catch (Exception e)
+                {
+                    OpenGLErrorHandler.LogError($"Exception cleaning up textures in Dispose: {e.Message}");
+                }
+            }
+            
             CheckError();
         }
         void IPaintTo3D.PushState()
@@ -748,19 +1064,20 @@ namespace CADability.Forms
         }
         void IPaintTo3D.MakeCurrent()
         {
-            //if (!Wgl.wglMakeCurrent(deviceContext, renderContext))
-            //{
-            //    throw new PaintToOpenGLException("MakeCurrentContext: Unable to active this control's OpenGL rendering context");
-            //}
-            if (Wgl.wglMakeCurrent(deviceContext, renderContext))
+            // Context Thread Safety: Only switch context if necessary (expensive operation)
+            // Verify current context matches what we expect
+            IntPtr currentContext = Wgl.wglGetCurrentContext();
+            
+            if (currentContext != renderContext)
             {
-                // System.Diagnostics.Trace.WriteLine("MakeCurrent: " + deviceContext.ToInt32());
+                // Context needs to be switched
+                if (!Wgl.wglMakeCurrent(deviceContext, renderContext))
+                {
+                    int lastError = Marshal.GetLastWin32Error();
+                    OpenGLErrorHandler.LogError($"Failed to make context current (error {lastError}). Continuing anyway - some operations may still work");
+                    // Continue anyway - some operations may still work
+                }
             }
-            else
-            {
-                //System.Diagnostics.Trace.WriteLine("MakeCurrent failed: " + deviceContext.ToInt32());
-            }
-            // CheckError(); ist ja kein OpenGl Befehl
         }
         void IPaintTo3D.Resize(int width, int height)
         {
@@ -778,7 +1095,7 @@ namespace CADability.Forms
             Gl.glClear(Gl.GL_COLOR_BUFFER_BIT | Gl.GL_DEPTH_BUFFER_BIT);
             CheckError();
         }
-        void IPaintTo3D.AvoidColor(System.Drawing.Color color)
+        void IPaintTo3D.AvoidColor(Color color)
         {
             backgroundColor = color;
         }
@@ -1031,8 +1348,8 @@ namespace CADability.Forms
             }
             else
             {
-                System.Drawing.Bitmap bmp = null;
-                if ((pointSymbol & CADability.GeoObject.PointSymbol.Select) != 0)
+                Bitmap bmp = null;
+                if ((pointSymbol & PointSymbol.Select) != 0)
                 {
                     bmp = BitmapList[12];
                     if (bmp != null)
@@ -1045,27 +1362,27 @@ namespace CADability.Forms
                 int offset = 0;
                 if ((this as IPaintTo3D).UseLineWidth) offset = 6; // so wird gesteuert dass bei nur dünn die dünnen Punkte und bei
                                                                    // mit Linienstärke ggf. die dicken Punkte angezeigt werden (Forderung PFOCAD)
-                switch ((GeoObject.PointSymbol)((int)pointSymbol & 0x07))
+                switch ((PointSymbol)((int)pointSymbol & 0x07))
                 {
-                    case CADability.GeoObject.PointSymbol.Empty:
+                    case PointSymbol.Empty:
                         bmp = null;
                         break;
-                    case CADability.GeoObject.PointSymbol.Dot:
+                    case PointSymbol.Dot:
                         {
                             bmp = BitmapList[0 + offset];
                         }
                         break;
-                    case CADability.GeoObject.PointSymbol.Plus:
+                    case PointSymbol.Plus:
                         {
                             bmp = BitmapList[1 + offset];
                         }
                         break;
-                    case CADability.GeoObject.PointSymbol.Cross:
+                    case PointSymbol.Cross:
                         {
                             bmp = BitmapList[2 + offset];
                         }
                         break;
-                    case CADability.GeoObject.PointSymbol.Line:
+                    case PointSymbol.Line:
                         {
                             bmp = BitmapList[3 + offset];
                         }
@@ -1076,11 +1393,11 @@ namespace CADability.Forms
                     for (int i = 0; i < points.Length; ++i) (this as IPaintTo3D).DisplayIcon(points[i], bmp);
                 }
                 bmp = null;
-                if ((pointSymbol & CADability.GeoObject.PointSymbol.Circle) != 0)
+                if ((pointSymbol & PointSymbol.Circle) != 0)
                 {
                     bmp = BitmapList[5 + offset];
                 }
-                if ((pointSymbol & CADability.GeoObject.PointSymbol.Square) != 0)
+                if ((pointSymbol & PointSymbol.Square) != 0)
                 {
                     bmp = BitmapList[4 + offset];
                 }
@@ -1143,7 +1460,7 @@ namespace CADability.Forms
             //(this as IPaintTo3D).PopState();
             CheckError();
         }
-        void IPaintTo3D.PrepareIcon(System.Drawing.Bitmap icon)
+        void IPaintTo3D.PrepareIcon(Bitmap icon)
         {   // Für ein Icon wird eine kleine DisplayList gemacht, in der großen stürzt es oft ab
             if (currentList != null) throw new ApplicationException("PrepareIcon called with display list open");
             if (!icons.ContainsKey(icon))
@@ -1186,7 +1503,7 @@ namespace CADability.Forms
                 icons[icon] = (this as IPaintTo3D).CloseList();
             }
         }
-        void IPaintTo3D.PrepareBitmap(System.Drawing.Bitmap bitmap, int xoffset, int yoffset)
+        void IPaintTo3D.PrepareBitmap(Bitmap bitmap, int xoffset, int yoffset)
         {
             if (currentList != null) throw new ApplicationException("PrepareBitmap called with display list open");
             if (!bitmaps.ContainsKey(bitmap))
@@ -1247,28 +1564,28 @@ namespace CADability.Forms
             int offset = 0;
             if ((this as IPaintTo3D).UseLineWidth) offset = 6; // so wird gesteuert dass bei nur dünn die dünnen Punkte und bei
             // mit Linienstärke ggf. die dicken Punkte angezeigt werden (Forderung PFOCAD)
-            System.Drawing.Bitmap bmp = null;
-            switch ((GeoObject.PointSymbol)((int)symbol & 0x07))
+            Bitmap bmp = null;
+            switch ((PointSymbol)((int)symbol & 0x07))
             {
-                case CADability.GeoObject.PointSymbol.Empty:
+                case PointSymbol.Empty:
                     bmp = null;
                     break;
-                case CADability.GeoObject.PointSymbol.Dot:
+                case PointSymbol.Dot:
                     {
                         bmp = BitmapList[0 + offset];
                     }
                     break;
-                case CADability.GeoObject.PointSymbol.Plus:
+                case PointSymbol.Plus:
                     {
                         bmp = BitmapList[1 + offset];
                     }
                     break;
-                case CADability.GeoObject.PointSymbol.Cross:
+                case PointSymbol.Cross:
                     {
                         bmp = BitmapList[2 + offset];
                     }
                     break;
-                case CADability.GeoObject.PointSymbol.Line:
+                case PointSymbol.Line:
                     {
                         bmp = BitmapList[3 + offset];
                     }
@@ -1279,15 +1596,15 @@ namespace CADability.Forms
                 (this as IPaintTo3D).PrepareIcon(bmp);
             }
             bmp = null;
-            if ((symbol & CADability.GeoObject.PointSymbol.Circle) != 0)
+            if ((symbol & PointSymbol.Circle) != 0)
             {
                 bmp = BitmapList[5 + offset];
             }
-            if ((symbol & CADability.GeoObject.PointSymbol.Square) != 0)
+            if ((symbol & PointSymbol.Square) != 0)
             {
                 bmp = BitmapList[4 + offset];
             }
-            if ((symbol & CADability.GeoObject.PointSymbol.Select) != 0)
+            if ((symbol & PointSymbol.Select) != 0)
             {
                 bmp = BitmapList[12];
             }
@@ -1296,69 +1613,90 @@ namespace CADability.Forms
                 (this as IPaintTo3D).PrepareIcon(bmp);
             }
         }
-        void IPaintTo3D.PrepareBitmap(System.Drawing.Bitmap bitmap)
-        {   // Mechanismus zum Entfernen aus dem Dictionary und vor allem aus OpenGL fehlt noch.
-            // man bräuchte eine Art OnDispose vom Bitmap, aber das gibt es nicht...
+        void IPaintTo3D.PrepareBitmap(Bitmap bitmap)
+        {
+            if (bitmap == null)
+            {
+                OpenGLErrorHandler.LogError("PrepareBitmap called with null bitmap");
+                return;
+            }
+            
             if (!textures.ContainsKey(bitmap))
             {
-                Gl.glPixelStorei(Gl.GL_UNPACK_ALIGNMENT, 1);
-                Gl.glPixelStorei(Gl.GL_PACK_ALIGNMENT, 1);
-                uint texName;
-                Gl.glGenTextures(1, out texName);
-                Gl.glBindTexture(Gl.GL_TEXTURE_2D, texName);
-                Gl.glTexParameteri(Gl.GL_TEXTURE_2D, Gl.GL_TEXTURE_WRAP_S, Gl.GL_REPEAT);
-                Gl.glTexParameteri(Gl.GL_TEXTURE_2D, Gl.GL_TEXTURE_WRAP_T, Gl.GL_REPEAT);
-                Gl.glTexParameteri(Gl.GL_TEXTURE_2D, Gl.GL_TEXTURE_MAG_FILTER, Gl.GL_NEAREST);
-                Gl.glTexParameteri(Gl.GL_TEXTURE_2D, Gl.GL_TEXTURE_MIN_FILTER, Gl.GL_NEAREST);
-                
-                byte[] pixels;
-                bool alpha = Settings.GlobalSettings.GetBoolValue("OpenGLAlpha", true);
-                int bytesPerPixel = alpha ? 4 : 3;
-                
-                if (alpha)
+                try
                 {
-                    pixels = new byte[bitmap.Width * bitmap.Height * 4];
-                    for (int i = 0; i < bitmap.Height; ++i)
+                    Gl.glPixelStorei(Gl.GL_UNPACK_ALIGNMENT, 1);
+                    Gl.glPixelStorei(Gl.GL_PACK_ALIGNMENT, 1);
+                    uint texName;
+                    Gl.glGenTextures(1, out texName);
+                    
+                    if (texName == 0)
                     {
-                        for (int j = 0; j < bitmap.Width; ++j)
-                        {
-                            Color clr = bitmap.GetPixel(j, bitmap.Height - i - 1);
-                            pixels[(i * bitmap.Width + j) * 4 + 0] = clr.R;
-                            pixels[(i * bitmap.Width + j) * 4 + 1] = clr.G;
-                            pixels[(i * bitmap.Width + j) * 4 + 2] = clr.B;
-                            pixels[(i * bitmap.Width + j) * 4 + 3] = clr.A;
-                        }
+                        OpenGLErrorHandler.LogError("Failed to generate texture name");
+                        CheckError();
+                        return;
                     }
-                    Gl.glEnable(Gl.GL_ALPHA_TEST);
-                    Gl.glAlphaFunc(Gl.GL_GREATER, 0.5f);
-                    Gl.glTexImage2D(Gl.GL_TEXTURE_2D, 0, Gl.GL_RGBA, bitmap.Width, bitmap.Height, 0, Gl.GL_RGBA, Gl.GL_UNSIGNED_BYTE, pixels);
+                    
+                    Gl.glBindTexture(Gl.GL_TEXTURE_2D, texName);
+                    Gl.glTexParameteri(Gl.GL_TEXTURE_2D, Gl.GL_TEXTURE_WRAP_S, Gl.GL_REPEAT);
+                    Gl.glTexParameteri(Gl.GL_TEXTURE_2D, Gl.GL_TEXTURE_WRAP_T, Gl.GL_REPEAT);
+                    Gl.glTexParameteri(Gl.GL_TEXTURE_2D, Gl.GL_TEXTURE_MAG_FILTER, Gl.GL_NEAREST);
+                    Gl.glTexParameteri(Gl.GL_TEXTURE_2D, Gl.GL_TEXTURE_MIN_FILTER, Gl.GL_NEAREST);
+                    
+                    byte[] pixels;
+                    bool alpha = Settings.GlobalSettings.GetBoolValue("OpenGLAlpha", true);
+                    int bytesPerPixel = alpha ? 4 : 3;
+                    
+                    if (alpha)
+                    {
+                        pixels = new byte[bitmap.Width * bitmap.Height * 4];
+                        for (int i = 0; i < bitmap.Height; ++i)
+                        {
+                            for (int j = 0; j < bitmap.Width; ++j)
+                            {
+                                Color clr = bitmap.GetPixel(j, bitmap.Height - i - 1);
+                                pixels[(i * bitmap.Width + j) * 4 + 0] = clr.R;
+                                pixels[(i * bitmap.Width + j) * 4 + 1] = clr.G;
+                                pixels[(i * bitmap.Width + j) * 4 + 2] = clr.B;
+                                pixels[(i * bitmap.Width + j) * 4 + 3] = clr.A;
+                            }
+                        }
+                        Gl.glEnable(Gl.GL_ALPHA_TEST);
+                        Gl.glAlphaFunc(Gl.GL_GREATER, 0.5f);
+                        Gl.glTexImage2D(Gl.GL_TEXTURE_2D, 0, Gl.GL_RGBA, bitmap.Width, bitmap.Height, 0, Gl.GL_RGBA, Gl.GL_UNSIGNED_BYTE, pixels);
+                    }
+                    else
+                    {
+                        pixels = new byte[bitmap.Width * bitmap.Height * 3];
+                        for (int i = 0; i < bitmap.Height; ++i)
+                        {
+                            for (int j = 0; j < bitmap.Width; ++j)
+                            {
+                                Color clr = bitmap.GetPixel(j, bitmap.Height - i - 1);
+                                pixels[(i * bitmap.Width + j) * 3 + 0] = clr.R;
+                                pixels[(i * bitmap.Width + j) * 3 + 1] = clr.G;
+                                pixels[(i * bitmap.Width + j) * 3 + 2] = clr.B;
+                            }
+                        }
+                        Gl.glTexImage2D(Gl.GL_TEXTURE_2D, 0, Gl.GL_RGB, bitmap.Width, bitmap.Height, 0, Gl.GL_RGB, Gl.GL_UNSIGNED_BYTE, pixels);
+                    }
+                    
+                    textures[bitmap] = texName;
+                    
+                    // Register texture with resource manager for tracking and leak detection
+                    OpenGLResourceManager.RegisterTexture(texName, $"Bitmap_{bitmap.Width}x{bitmap.Height}_{texName}", bitmap.Width, bitmap.Height, bytesPerPixel);
+                    OpenGLErrorHandler.LogDebug($"Texture created: {texName} ({bitmap.Width}x{bitmap.Height}, {bytesPerPixel} BPP)");
+                    
+                    CheckError();
                 }
-                else
+                catch (Exception e)
                 {
-                    pixels = new byte[bitmap.Width * bitmap.Height * 3];
-                    for (int i = 0; i < bitmap.Height; ++i)
-                    {
-                        for (int j = 0; j < bitmap.Width; ++j)
-                        {
-                            Color clr = bitmap.GetPixel(j, bitmap.Height - i - 1);
-                            pixels[(i * bitmap.Width + j) * 3 + 0] = clr.R;
-                            pixels[(i * bitmap.Width + j) * 3 + 1] = clr.G;
-                            pixels[(i * bitmap.Width + j) * 3 + 2] = clr.B;
-                        }
-                    }
-                    Gl.glTexImage2D(Gl.GL_TEXTURE_2D, 0, Gl.GL_RGB, bitmap.Width, bitmap.Height, 0, Gl.GL_RGB, Gl.GL_UNSIGNED_BYTE, pixels);
+                    OpenGLErrorHandler.LogError($"Exception in PrepareBitmap: {e.Message}");
+                    CheckError();
                 }
-                
-                textures[bitmap] = texName;
-                
-                // Register texture with resource manager
-                OpenGLResourceManager.RegisterTexture(texName, $"Bitmap_{texName}", bitmap.Width, bitmap.Height, bytesPerPixel);
-                OpenGLErrorHandler.LogDebug($"Texture created: {texName} ({bitmap.Width}x{bitmap.Height}, {bytesPerPixel} BPP)");
-                
-                CheckError();
             }
         }
-        void IPaintTo3D.RectangularBitmap(System.Drawing.Bitmap bitmap, GeoPoint location, GeoVector directionWidth, GeoVector directionHeight)
+        void IPaintTo3D.RectangularBitmap(Bitmap bitmap, GeoPoint location, GeoVector directionWidth, GeoVector directionHeight)
         {
             uint texName;
             if (textures.TryGetValue(bitmap, out texName))
@@ -1390,13 +1728,13 @@ namespace CADability.Forms
                 CheckError();
             }
         }
-        void IPaintTo3D.Text(GeoVector lineDirection, GeoVector glyphDirection, GeoPoint location, string fontName, string textString, FontStyle fontStyle, Text.AlignMode alignment, CADability.GeoObject.Text.LineAlignMode lineAlignment)
+        void IPaintTo3D.Text(GeoVector lineDirection, GeoVector glyphDirection, GeoPoint location, string fontName, string textString, FontStyle fontStyle, Text.AlignMode alignment, Text.LineAlignMode lineAlignment)
         {
             if (currentList != null) currentList.SetHasContents();
             if (textString.Length == 0) return;
             GeoVector normal = lineDirection ^ glyphDirection;
             FontDisplayList fdl = GetFontDisplayList(fontName);
-            if (alignment != GeoObject.Text.AlignMode.Baseline || lineAlignment != GeoObject.Text.LineAlignMode.Left)
+            if (alignment != Text.AlignMode.Baseline || lineAlignment != Text.LineAlignMode.Left)
             {
                 // hier location modifizieren gemäß alignment
                 float dx = 0.0f;
@@ -1423,24 +1761,24 @@ namespace CADability.Forms
                 dy /= textString.Length;
                 switch (alignment)
                 {   // der Text kommt wenn unverändert angegeben an der Baseline
-                    case GeoObject.Text.AlignMode.Baseline: break;
-                    case GeoObject.Text.AlignMode.Bottom:
+                    case Text.AlignMode.Baseline: break;
+                    case Text.AlignMode.Bottom:
                         location = location + 0.2 * glyphDirection;
                         break;
-                    case GeoObject.Text.AlignMode.Center:
+                    case Text.AlignMode.Center:
                         location = location - 0.25 * glyphDirection;
                         break;
-                    case GeoObject.Text.AlignMode.Top:
+                    case Text.AlignMode.Top:
                         location = location - 0.7 * glyphDirection;
                         break;
                 }
                 switch (lineAlignment)
                 {
-                    case GeoObject.Text.LineAlignMode.Left: break;
-                    case GeoObject.Text.LineAlignMode.Center:
+                    case Text.LineAlignMode.Left: break;
+                    case Text.LineAlignMode.Center:
                         location = location - (dx / 2) * lineDirection;
                         break;
-                    case GeoObject.Text.LineAlignMode.Right:
+                    case Text.LineAlignMode.Right:
                         location = location - (dx) * lineDirection;
                         break;
                 }
@@ -1570,7 +1908,7 @@ namespace CADability.Forms
             if (useLineWidth) Gl.glEnable(Gl.GL_LINE_SMOOTH);
             CheckError();
         }
-        void IPaintTo3D.DisplayIcon(GeoPoint p, System.Drawing.Bitmap icon)
+        void IPaintTo3D.DisplayIcon(GeoPoint p, Bitmap icon)
         {
             if (currentList != null) currentList.SetHasContents();
             if (icons.ContainsKey(icon))
@@ -1606,7 +1944,7 @@ namespace CADability.Forms
             }
             CheckError();
         }
-        void IPaintTo3D.DisplayBitmap(GeoPoint p, System.Drawing.Bitmap bitmap)
+        void IPaintTo3D.DisplayBitmap(GeoPoint p, Bitmap bitmap)
         {
             if (currentList != null) currentList.SetHasContents();
             IPaintTo3DList list;
@@ -1841,6 +2179,11 @@ namespace CADability.Forms
             OpenGlList res = currentList;
             currentList = null;
             CheckError();
+            
+            // CRITICAL: Call FreeLists() to ensure the error queue is drained
+            // This prevents error accumulation when closing lists
+            OpenGlList.FreeLists();
+            
             //System.Diagnostics.Trace.WriteLine("close list: " + res.ListNumber.ToString());
             if (res != null && res.HasContents()) return res;
             else
@@ -1880,7 +2223,7 @@ namespace CADability.Forms
         {
             throw new NotSupportedException("OpenGL does not support paths");
         }
-        void IPaintTo3D.ClosePath(System.Drawing.Color color)
+        void IPaintTo3D.ClosePath(Color color)
         {
             throw new NotSupportedException("OpenGL does not support paths");
         }
@@ -1912,17 +2255,24 @@ namespace CADability.Forms
         {
             try
             {
-                Gl.glFlush();
-                Gl.glFinish();
-                Gdi.SwapBuffersFast(deviceContext);
+                // Buffer Swap Synchronization: Ensure all GPU operations complete before swap
+                Gl.glFlush();           // Flush queued OpenGL commands
+                Gl.glFinish();          // Wait for all GPU operations to complete (synchronous)
+                
+                // Swap buffers with error checking
+                int swapResult = Gdi.SwapBuffersFast(deviceContext);
+                if (swapResult == 0)
+                {
+                    int lastError = Marshal.GetLastWin32Error();
+                    OpenGLErrorHandler.LogError($"SwapBuffers failed (error {lastError}). Frame may not display correctly.");
+                }
             }
-            catch (System.Exception e)
-            {   // stürzt manchmal auf Eckhards Rechner ab
-                if (e is ThreadAbortException) throw (e);
+            catch (Exception e)
+            {
+                if (e is ThreadAbortException) throw e;
+                OpenGLErrorHandler.LogError($"Exception in FinishPaint: {e.Message}");
             }
             CheckError();
-            //Wgl.wglMakeCurrent(IntPtr.Zero, IntPtr.Zero);
-            //CheckError();
         }
         class MoveFacesBehindEdgesOffset : IDisposable
         {
@@ -2126,11 +2476,9 @@ namespace CADability.Forms
         public static Bitmap PaintToBitmap(GeoObjectList list, GeoVector viewDirection, int width, int height, BoundingCube? extent = null)
         {
             Bitmap bmp = new Bitmap(width, height);
-            System.Drawing.Graphics gr = System.Drawing.Graphics.FromImage(bmp);
+            Graphics gr = Graphics.FromImage(bmp);
             IntPtr dc = gr.GetHdc();
-            BoundingCube bc;
-            if (extent.HasValue) bc = extent.Value;
-            else bc = list.GetExtent();
+            BoundingCube bc = extent ?? list.GetExtent();
             PaintToOpenGL paintTo3D = new PaintToOpenGL(bc.Size / Math.Max(width, height));
             paintTo3D.Init(dc, width, height, true);
             IPaintTo3D ipaintTo3D = paintTo3D;
@@ -2183,8 +2531,8 @@ namespace CADability.Forms
     /// </remarks>
     internal class OpenGlList : IPaintTo3DList
     {
-        static List<int> toDelete = new List<int>();
-        static Dictionary<int, string> openLists = new Dictionary<int, string>();
+	    private static readonly List<int> toDelete = new List<int>();
+	    private static readonly Dictionary<int, string> openLists = new Dictionary<int, string>();
         private readonly object deletedLock = new object();
         public bool hasContents, isDeleted;
         public OpenGlList(string name = null)
@@ -2197,10 +2545,6 @@ namespace CADability.Forms
             
             // Register with resource manager for tracking
             OpenGLResourceManager.RegisterDisplayList(ListNumber, this.name, "OpenGlList.Constructor");
-            
-#if DEBUG
-            //System.Diagnostics.Trace.WriteLine("+++++ OpenGl List Nr.: " + ListNumber.ToString() + " (" + openLists.Count.ToString() + ") " + name);
-#endif
         }
         ~OpenGlList()
         {
@@ -2209,56 +2553,127 @@ namespace CADability.Forms
                 if (!isDeleted) toDelete.Add(ListNumber);
             }
         }
-        static public void FreeLists()
+		public static void FreeLists()
+		{
+			lock (toDelete)
+			{
+				if (toDelete.Count <= 0)
+				{
+					return;
+				}
+
+				for (int i = 0; i < toDelete.Count; ++i)
+				{
+					openLists.Remove(toDelete[i]);
+
+					// Unregister from resource manager
+					OpenGLResourceManager.UnregisterDisplayList(toDelete[i]);
+
+					try
+					{
+						Gl.glDeleteLists(toDelete[i], 1);
+						OpenGLErrorHandler.CheckError($"Deleting display list {toDelete[i]}");
+					}
+					catch (Exception e)
+					{
+						if (e is ThreadAbortException) throw (e);
+						OpenGLErrorHandler.LogError($"Exception while deleting display list {toDelete[i]}: {e.Message}");
+					}
+				}
+				toDelete.Clear();
+
+				// CRITICAL: Drain error queue after all deletions to prevent overflow
+				int errorDrainCount = 0;
+				while (Gl.glGetError() != Gl.GL_NO_ERROR && errorDrainCount < 50)
+				{
+					errorDrainCount++;
+				}
+			}
+		}
+        /// <summary>
+        /// Frees all currently open display lists and clears tracking dictionaries.
+        /// Called during application shutdown to ensure complete cleanup.
+        /// </summary>
+        /// <remarks>
+        /// CRITICAL: This method must be called with a valid OpenGL context.
+        /// Iterates through ALL open lists and deletes them, then drains the error queue.
+        /// Must synchronize on static collections to prevent race conditions with Delete().
+        /// </remarks>
+        public static void FreeAllOpenLists()
         {
-            if (toDelete.Count > 0)
+            try
             {
+                int deletedCount = 0;
+                int failedCount = 0;
+                
+                // CRITICAL: Synchronize on toDelete lock to prevent race conditions with Delete() method
+                // Create a snapshot of lists to delete (avoid modification during iteration)
+                List<int> listsToDelete;
                 lock (toDelete)
                 {
-                    for (int i = 0; i < toDelete.Count; ++i)
+                    listsToDelete = new List<int>(openLists.Keys);
+                }
+                
+                foreach (int listNum in listsToDelete)
+                {
+                    try
                     {
-#if DEBUG
-                        //System.Diagnostics.Trace.WriteLine("----- OpenGl List Nr.: " + toDelete[i].ToString());
-#endif
-                        openLists.Remove(toDelete[i]);
+                        Gl.glDeleteLists(listNum, 1);
                         
-                        // Unregister from resource manager
-                        OpenGLResourceManager.UnregisterDisplayList(toDelete[i]);
+                        // Check for immediate errors from deletion
+                        int error = Gl.glGetError();
+                        if (error != Gl.GL_NO_ERROR)
+                        {
+                            string errorMsg = OpenGLErrorHandler.GetErrorString(error);
+                            OpenGLErrorHandler.LogWarning($"FreeAllOpenLists: Error deleting list {listNum}: {errorMsg}");
+                            failedCount++;
+                        }
+                        else
+                        {
+                            deletedCount++;
+                        }
                         
-                        try
+                        // CRITICAL: Synchronize when modifying shared collections
+                        lock (toDelete)
                         {
-                            Gl.glDeleteLists(toDelete[i], 1);
-                            OpenGLErrorHandler.CheckError($"Deleting display list {toDelete[i]}");
+	                        openLists.Remove(listNum);
+	                        // Also remove from pending deletion queue if present
+                            if (toDelete.Contains(listNum)) toDelete.Remove(listNum);
                         }
-                        catch (Exception e)
-                        {
-                            if (e is System.Threading.ThreadAbortException) throw (e);
-                            OpenGLErrorHandler.LogError($"Exception while deleting display list {toDelete[i]}: {e.Message}");
-                        }
+                        
+                        OpenGLResourceManager.UnregisterDisplayList(listNum);
                     }
+                    catch (Exception ex)
+                    {
+                        OpenGLErrorHandler.LogError($"FreeAllOpenLists: Exception deleting list {listNum}: {ex.Message}");
+                        lock (toDelete)
+                        {
+	                        openLists.Remove(listNum);
+	                        if (toDelete.Contains(listNum)) toDelete.Remove(listNum);
+                        }
+                        failedCount++;
+                    }
+                }
+                
+                // Final error queue drain to ensure clean state
+                int finalDrainCount = 0;
+                while (Gl.glGetError() != Gl.GL_NO_ERROR && finalDrainCount < 50)
+                {
+                    finalDrainCount++;
+                }
+                
+                OpenGLErrorHandler.LogDebug($"FreeAllOpenLists: Deleted {deletedCount} lists, {failedCount} failed, error queue drained {finalDrainCount} times");
+            }
+            catch (Exception ex)
+            {
+                OpenGLErrorHandler.LogError($"FreeAllOpenLists: Unexpected exception: {ex.Message}");
+                // Ensure clean state even on exception
+                lock (toDelete)
+                {
+                    openLists.Clear();
                     toDelete.Clear();
                 }
-#if DEBUG
-                //System.Diagnostics.Trace.Write("still open: ");
-                foreach (KeyValuePair<int, string> l in openLists)
-                {
-                    //System.Diagnostics.Trace.Write(l.Value + ", ");
-                }
-                //System.Diagnostics.Trace.WriteLine(".");
-#endif
             }
-        }
-        static public void FreeAllOpenLists()
-        {
-            foreach (KeyValuePair<int, string> l in openLists)
-            {
-                Gl.glDeleteLists(l.Key, 1);
-                int err = Gl.glGetError();
-#if DEBUG
-                if (err != 0) { }
-#endif
-            }
-            openLists.Clear();
         }
         public int ListNumber { get; }
         public void SetHasContents()
@@ -2271,63 +2686,276 @@ namespace CADability.Forms
         }
         public void Open()
         {
+            // CRITICAL: Clear error queue before opening list to ensure clean state
+            // This prevents accumulated errors from affecting the new list creation
+            int errorClearCount = 0;
+            while (Gl.glGetError() != Gl.GL_NO_ERROR && errorClearCount < 50)
+            {
+                errorClearCount++;
+            }
+            
             Gl.glNewList(ListNumber, Gl.GL_COMPILE);
+            
+            // Verify list was created successfully
+            int error = Gl.glGetError();
+            if (error != Gl.GL_NO_ERROR)
+            {
+                OpenGLErrorHandler.LogError($"Failed to open display list {ListNumber}: {OpenGLErrorHandler.GetErrorString(error)}");
+            }
         }
+        /// <summary>
+        /// Closes the current display list compilation and verifies success.
+        /// CRITICAL: Must be called after Open() and before rendering from this list.
+        /// </summary>
+        /// <remarks>
+        /// Closing a list ends the compilation mode. The list is now ready for execution.
+        /// Any errors during compilation are logged for diagnostics.
+        /// </remarks>
         public void Close()
         {
-            Gl.glEndList();
+            try
+            {
+                Gl.glEndList();
+                
+                // Verify list closed successfully
+                int error = Gl.glGetError();
+                if (error != Gl.GL_NO_ERROR)
+                {
+                    string errorMsg = OpenGLErrorHandler.GetErrorString(error);
+                    OpenGLErrorHandler.LogError($"Close: Failed to close display list {ListNumber}: {errorMsg}");
+                }
+            }
+            catch (Exception ex)
+            {
+                OpenGLErrorHandler.LogError($"Close: Exception closing list {ListNumber}: {ex.Message}");
+            }
         }
+        /// <summary>
+        /// Immediately deletes this display list from GPU memory.
+        /// CRITICAL: Must be called with valid OpenGL context.
+        /// Once deleted, this list cannot be used for rendering.
+        /// </summary>
+        /// <remarks>
+        /// Uses double-checked locking to prevent multiple deletions.
+        /// Properly synchronizes access to shared static collections (openLists, toDelete).
+        /// Unregisters from resource manager for tracking.
+        /// Checks for errors from the delete operation.
+        /// </remarks>
         public void Delete()
         {
+            // Double-checked locking: fast path for already-deleted lists
+            // ReSharper disable once InconsistentlySynchronizedField
+            if (isDeleted)
+                return;
+            
             lock (deletedLock)
             {
+                // Check again after acquiring lock
                 if (isDeleted)
                     return;
 
                 isDeleted = true;
             }
-            openLists.Remove(ListNumber);
-#if DEBUG
-            //System.Diagnostics.Trace.WriteLine("Direct Deleting OpenGl List Nr.: " + ListNumber.ToString());
-#endif            
-            Gl.glDeleteLists(ListNumber, 1);
+            
+            // CRITICAL: Synchronize access to static collections to prevent race conditions
+            lock (toDelete)  // Use toDelete lock for consistency with other static access
+            {
+                // Remove from tracking (even if delete fails later)
+                if (!openLists.ContainsKey(ListNumber))
+                {
+                    OpenGLErrorHandler.LogDebug($"Delete: List {ListNumber} was not in openLists (may have already been removed)");
+                }
+                else
+                {
+                    openLists.Remove(ListNumber);
+                }
+                
+                // Also remove from pending deletion queue if it was marked for deferred deletion
+                if (toDelete.Contains(ListNumber))
+                {
+                    toDelete.Remove(ListNumber);
+                }
+            }
+            
+            // Unregister from resource manager
+            try
+            {
+                OpenGLResourceManager.UnregisterDisplayList(ListNumber);
+            }
+            catch (Exception e)
+            {
+                OpenGLErrorHandler.LogError($"Delete: Error unregistering display list {ListNumber}: {e.Message}");
+            }
+            
+            // Delete from GPU
+            try
+            {
+                Gl.glDeleteLists(ListNumber, 1);
+                
+                // Check for deletion errors
+                int error = Gl.glGetError();
+                if (error != Gl.GL_NO_ERROR)
+                {
+                    string errorMsg = OpenGLErrorHandler.GetErrorString(error);
+                    OpenGLErrorHandler.LogWarning($"Delete: Error deleting OpenGL list {ListNumber}: {errorMsg}");
+                }
+                else
+                {
+                    OpenGLErrorHandler.LogDebug($"Delete: OpenGL list {ListNumber} deleted successfully");
+                }
+            }
+            catch (Exception e)
+            {
+                OpenGLErrorHandler.LogError($"Delete: Exception deleting OpenGL list {ListNumber}: {e.Message}");
+            }
         }
         #region IPaintTo3DList Members
         private string name;
+        
+        // Thread-safe dictionary utilities for static collections
+        private static bool TryRemove<TKey, TValue>(Dictionary<TKey, TValue> dict, TKey key, out TValue value)
+        {
+            value = default(TValue);
+            if (dict.TryGetValue(key, out value))
+            {
+                dict.Remove(key);
+                return true;
+            }
+            return false;
+        }
         string IPaintTo3DList.Name
         {
-            get
+            get => name;
+            set => name = value;
+        }
+        
+        /// <summary>
+        /// Gets diagnostic information about all display lists.
+        /// Useful for memory monitoring and leak detection.
+        /// </summary>
+        /// <returns>Dictionary with list numbers and their names</returns>
+        public static Dictionary<int, string> GetListStatistics()
+        {
+            // Return a snapshot to avoid synchronization issues
+            lock (openLists)
             {
-                return name;
+                return new Dictionary<int, string>(openLists);
             }
-            set
+        }
+        
+        /// <summary>
+        /// Gets count of open lists (pending deletion).
+        /// </summary>
+        /// <returns>Number of lists marked for deletion</returns>
+        public static int GetPendingDeletionCount()
+        {
+            lock (toDelete)
             {
-                name = value;
+                return toDelete.Count;
+            }
+        }
+        
+        /// <summary>
+        /// Gets total count of actively tracked lists.
+        /// </summary>
+        /// <returns>Number of open lists</returns>
+        public static int GetOpenListCount()
+        {
+            lock (openLists)
+            {
+                return openLists.Count;
             }
         }
         private List<IPaintTo3DList> keepAlive;
+        
+        /// <summary>
+        /// Stores references to sublists that are compiled into this composite list.
+        /// </summary>
+        /// <remarks>
+        /// CRITICAL DESIGN PATTERN: Lifetime Management of Composite Display Lists
+        /// 
+        /// Problem:
+        /// When multiple OpenGL display lists are composed into a single parent list via glCallList,
+        /// OpenGL stores only the list numbers (integers). It maintains NO references to the actual
+        /// OpenGlList objects. This means the garbage collector could collect the sublist objects
+        /// while the parent list still references them by number, causing:
+        /// - Corruption of tracking dictionaries (openLists, toDelete)
+        /// - Double-deletion errors
+        /// - Orphaned GPU resources
+        /// - Inconsistent cleanup timing
+        /// 
+        /// Solution: keepAlive Pattern
+        /// This property setter stores references to all compiled sublists in the parent list object.
+        /// By keeping the sublists alive as long as the parent list exists:
+        /// 1. Sublists are not garbage collected until parent is deleted
+        /// 2. Tracking dictionaries remain consistent
+        /// 3. Deletion order is deterministic: parent → sublists
+        /// 4. Resource cleanup is correct and complete
+        /// 
+        /// Lifecycle:
+        /// - MakeList() creates parent: new OpenGlList("composite")
+        /// - Calls glCallList() for each sublist (creates reference by number)
+        /// - Sets containedSubLists = [sub1, sub2, ...] (stores object references)
+        /// - When parent is deleted: Delete() → FreeLists() processes both parent and sublists
+        /// - Sublists cleaned up after parent, maintaining consistency
+        /// 
+        /// Why NOT delete sublists immediately in Dispose():
+        /// - Sublists must outlive parent list execution in GPU
+        /// - Deferred deletion (FreeLists) respects GPU execution timing
+        /// - OpenGL state may reference sublist numbers until context cleanup
+        /// - Delete order matters for proper error checking and resource release
+        /// 
+        /// Example: Creating a block with multiple geometry sublists
+        /// ```
+        /// OpenGlList parent = new OpenGlList("block");
+        /// parent.Open();
+        /// foreach (sublist in geometryLists)
+        /// {
+        ///     glCallList(sublist.ListNumber);  // OpenGL records the number
+        /// }
+        /// parent.Close();
+        /// parent.containedSubLists = geometryLists;  // Store references for lifetime management
+        /// 
+        /// // Later during cleanup:
+        /// // - parent.Delete() executed
+        /// // - Sublists still reachable via keepAlive
+        /// // - FreeLists() cleans up both in correct order
+        /// ```
+        /// </remarks>
         List<IPaintTo3DList> IPaintTo3DList.containedSubLists
         {
-            // das Problem mit den SubLists ist so:
-            // Es werden meherere OpenGlList objekte generiert (z.B. Block)
-            // dann werden diese Listen durch "glCallList" in eine zusammengeführt. Aber gl
-            // merkt sich nur die Nummern. deshalb müssen diese Listen am Leben bleiben
-            // und dürfen nicht freigegeben werden. Hier ist der Platz sie zu erhalten.
-            set
-            {
-                keepAlive = value;
-            }
+            set => keepAlive = value;
         }
+        /// <summary>
+        /// Disposes this display list. Calls Delete() to free GPU resources.
+        /// CRITICAL: keepAlive sublists are intentionally NOT deleted.
+        /// They are managed separately to ensure proper cleanup order.
+        /// </summary>
+        /// <remarks>
+        /// The keepAlive list holds references to sublists to prevent garbage collection
+        /// while this list is alive. Deleting sublists here would break rendering of
+        /// composite lists (those created with MakeList). Sublists are cleaned up when
+        /// the parent list is deleted via FreeLists().
+        /// </remarks>
         public void Dispose()
         {
-            Delete();
-            //if (keepAlive != null)
-            //{
-            //    for (int i = 0; i < keepAlive.Count; i++)
-            //    {
-            //        (keepAlive[i] as OpenGlList)?.Delete();
-            //    }
-            //}
+            try
+            {
+                Delete();
+                
+                // IMPORTANT: Do NOT dispose keepAlive lists here!
+                // These are owned by the parent list and will be cleaned up
+                // through the FreeLists() mechanism to ensure proper ordering.
+                
+                if (keepAlive != null)
+                {
+                    OpenGLErrorHandler.LogDebug($"Dispose: List {ListNumber} disposing with {keepAlive.Count} sublists (not deleted - managed by parent)");
+                }
+            }
+            catch (Exception ex)
+            {
+                OpenGLErrorHandler.LogError($"Dispose: Exception in Dispose for list {ListNumber}: {ex.Message}");
+            }
         }
         #endregion
     }

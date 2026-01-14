@@ -48,6 +48,12 @@ namespace CADability.Forms
         public static Thread MainThread = null;
         public static List<IntPtr> ContextsToDelete = new List<IntPtr>();
         public static List<IntPtr> activeRenderContexts = new List<IntPtr>();
+        
+        // Modern OpenGL integration
+        private ModernOpenGLIntegration modernOpenGL;
+        private ModernRenderingPath modernRenderingPath;
+        private bool useModernRendering = false;
+        
         bool paintSurfaces;
         bool paintEdges;
         bool paintSurfaceEdges;
@@ -77,9 +83,7 @@ namespace CADability.Forms
         Color backgroundColor; // Die Hintergrundfarbe um sicherzustellen, dass nicht mit dieser farbe
                                // gezeichnet wird
         Color selectColor;
-        Color lastColor; // if twice the same color was selected with alpha==0, then this is color override state
         bool colorOverride = false;
-        Color overrideColor;
 
         // Glu.GLUnurbs nurbsRenderer;
         OpenGlList currentList;
@@ -306,6 +310,23 @@ namespace CADability.Forms
             this.deviceContext = deviceContext;
             isBitmap = toBitmap;
 
+            // ============================================================================
+            // CRITICAL CONTEXT INITIALIZATION SEQUENCE
+            // ============================================================================
+            // The OpenGL context lifecycle is:
+            // 1. Device context already created (passed as parameter)
+            // 2. Pixel format will be set below
+            // 3. Rendering context will be created below
+            // 4. Context will be made current below (wglMakeCurrent)
+            // 5. Modern OpenGL capabilities detection happens AFTER step 4
+            //
+            // ERROR PREVENTION:
+            // - glGetString() and other GL functions require an active context
+            // - DetectCapabilities() MUST be called after wglMakeCurrent()
+            // - Calling it before will return false/null and all modern features disabled
+            // - This is moved to occur after (this as IPaintTo3D).MakeCurrent() below
+            // ============================================================================
+
             //Setup pixel format
             Gdi.PIXELFORMATDESCRIPTOR pixelFormat = new Gdi.PIXELFORMATDESCRIPTOR();
             //int numpf = Gdi.DescribePixelFormat(deviceContext, 1, (uint)0, IntPtr.Zero);
@@ -379,9 +400,7 @@ namespace CADability.Forms
 
             //Create rendering context
             renderContext = Wgl.wglCreateContext(deviceContext);
-#if DEBUG
-            //System.Diagnostics.Trace.WriteLine("RenderContext created: " + renderContext.ToString());
-#endif
+
             activeRenderContexts.Add(renderContext);
             // CheckError(); kein OpenGL
             // wir wollen nur einen Satz von Listen verwenden, sonst ist das mit dem Löschen der Listen
@@ -421,6 +440,19 @@ namespace CADability.Forms
             //Make this the current context
             (this as IPaintTo3D).MakeCurrent();
 
+            // CRITICAL: Detect modern OpenGL capabilities AFTER context is made current
+            // This ensures glGetString() and other GL queries have a valid context to work with
+            if (modernOpenGL == null)
+            {
+                modernOpenGL = new ModernOpenGLIntegration(this);
+                OpenGLErrorHandler.LogDebug("Init: Making context current and detecting modern OpenGL capabilities...");
+                ModernOpenGLIntegration.DetectCapabilities();
+                useModernRendering = Settings.GlobalSettings.GetBoolValue("UseModernOpenGL", true) && 
+                                    ModernOpenGLIntegration.SupportsShaders;
+                string renderingStatus = useModernRendering ? "enabled" : "disabled";
+                OpenGLErrorHandler.LogDebug($"Init: Modern OpenGL rendering {renderingStatus}");
+            }
+
             int dbgscentil;
             Gl.glGetIntegerv(Gl.GL_STENCIL_BITS, out dbgscentil);
             Gl.glGetIntegerv(Gl.GL_RED_BITS, out dbgscentil);
@@ -432,6 +464,21 @@ namespace CADability.Forms
             //Glu.gluNurbsProperty(nurbsRenderer, Glu.GLU_SAMPLING_TOLERANCE, (float)precision);
             Gl.glShadeModel(Gl.GL_SMOOTH);
             CheckError();
+            
+            // Initialize modern rendering path if available
+            if (useModernRendering && modernRenderingPath == null)
+            {
+                try
+                {
+                    modernRenderingPath = new ModernRenderingPath(modernOpenGL);
+                    OpenGLErrorHandler.LogDebug("Modern OpenGL rendering path initialized");
+                }
+                catch (Exception ex)
+                {
+                    OpenGLErrorHandler.LogError($"Failed to initialize modern rendering path: {ex.Message}");
+                    useModernRendering = false;
+                }
+            }
 
             if (toBitmap)
             {
@@ -883,6 +930,7 @@ namespace CADability.Forms
             resourceInfo.AppendLine($"  Created: {stats.TotalTexturesCreated}, Deleted: {stats.TotalTexturesDeleted}");
             resourceInfo.AppendLine($"Est. Memory: {stats.EstimatedMemoryUsageBytes / (1024 * 1024)} MB");
             resourceInfo.AppendLine($"Cached Bitmaps: {GetCachedTextureCount()}");
+            resourceInfo.AppendLine($"Modern OpenGL: {(ModernOpenGLIntegration.SupportsShaders ? "Enabled" : "Disabled")}");
             
             return resourceInfo.ToString();
         }
@@ -1013,6 +1061,17 @@ namespace CADability.Forms
         }
         void IPaintTo3D.Dispose()
         {
+            // Clean up modern OpenGL resources first
+            try
+            {
+                modernRenderingPath?.Cleanup();
+                modernOpenGL?.Cleanup();
+            }
+            catch (Exception ex)
+            {
+                OpenGLErrorHandler.LogError($"Error cleaning up modern OpenGL resources: {ex.Message}");
+            }
+            
             if (graphics != null)
             {
                 graphics.ReleaseHdc(deviceContext);
@@ -1413,6 +1472,18 @@ namespace CADability.Forms
         {
             debugNumTriangles += indextriples.Length / 3;
             if (currentList != null) currentList.SetHasContents();
+            
+            // Try modern rendering path first if available
+            if (useModernRendering && modernRenderingPath != null)
+            {
+                if (modernRenderingPath.TryRenderTriangleMesh(vertex, normals, indextriples))
+                {
+                    CheckError();
+                    return; // Successfully rendered with modern path
+                }
+            }
+            
+            // Fall back to legacy rendering
             Gl.glEnable(Gl.GL_LIGHTING);
             float[] mat_ambient = { 0.5f, 0.5f, 0.5f, 1.0f };
             float[] mat_specular = { 1.0f, 1.0f, 1.0f, 1.0f };

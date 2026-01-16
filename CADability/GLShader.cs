@@ -12,6 +12,10 @@ namespace CADability
 	/// This class handles shader program creation, compilation, and linking.
 	/// Supports both vertex and fragment shaders with error reporting.
 	/// Uses dynamically loaded OpenGL function pointers for runtime flexibility.
+	/// 
+	/// NOTE: This class MUST be disposed explicitly using Dispose() or a using statement
+	/// BEFORE the OpenGL context is destroyed. GPU resources cannot be safely cleaned up
+	/// during garbage collection finalizers because the OpenGL context may no longer be active.
 	/// </remarks>
 	[CLSCompliant(false)]
 	public class GLShader : IDisposable
@@ -286,7 +290,8 @@ namespace CADability
 		}
 
 		/// <summary>
-		/// Disposes this shader program and frees GPU resources
+		/// Disposes this shader program and frees GPU resources.
+		/// IMPORTANT: Call this BEFORE the OpenGL context is destroyed!
 		/// </summary>
 		public void Dispose()
 		{
@@ -308,18 +313,8 @@ namespace CADability
 			}
 
 			uniformLocations.Clear();
-		}
-
-		/// <summary>
-		/// Finalizer to ensure cleanup
-		/// </summary>
-		~GLShader()
-		{
-			try
-			{
-				Dispose();
-			}
-			catch { }
+			GC.SuppressFinalize(this);
 		}
 	}
 }
+

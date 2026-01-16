@@ -375,7 +375,12 @@ namespace CADability
         /// Renders a triangle mesh using modern VBO/shader approach if available.
         /// Falls back to immediate mode if not supported.
         /// </summary>
-        public bool TryRenderTriangleMesh(GeoPoint[] vertices, GeoVector[] normals, int[] indices)
+        /// <param name="vertices">Array of vertex positions</param>
+        /// <param name="normals">Array of vertex normals (can be null)</param>
+        /// <param name="indices">Triangle indices</param>
+        /// <param name="color">Color to render the geometry with (System.Drawing.Color)</param>
+        /// <returns>True if modern rendering was used, false if fallback should be used</returns>
+        public bool TryRenderTriangleMesh(GeoPoint[] vertices, GeoVector[] normals, int[] indices, System.Drawing.Color color)
         {
             if (!ModernOpenGLIntegration.SupportsVBO || lightingShader == null)
                 return false; // Fall back to legacy rendering
@@ -420,8 +425,13 @@ namespace CADability
                     indexData[i] = (uint)indices[i];
                 }
 
-                // Set shader uniforms for lighting
-                lightingShader.SetUniform("objectColor", 0.5f, 0.5f, 0.5f);
+                // Convert System.Drawing.Color to normalized RGB components (0.0 to 1.0)
+                float colorR = color.R / 255.0f;
+                float colorG = color.G / 255.0f;
+                float colorB = color.B / 255.0f;
+
+                // Set shader uniforms for lighting with the actual object color
+                lightingShader.SetUniform("objectColor", colorR, colorG, colorB);
                 lightingShader.SetUniform("lightPosition", 1.0f, 1.0f, 1.0f);
                 lightingShader.SetUniform("viewPosition", 0.0f, 0.0f, 1.0f);
                 lightingShader.SetUniform("ambientStrength", 0.1f);
@@ -522,11 +532,17 @@ namespace CADability
                     GLFunctionLoader.DeleteVertexArrays(1, vaoHandle);
                 }
 
+                // CRITICAL: Restore fixed-function pipeline state
+                // Must disable the shader program after rendering to restore legacy state
+                GLFunctionLoader.UseProgram(0);
+                
                 return true; // Modern rendering path was successfully used
             }
             catch (Exception ex)
             {
                 OpenGLErrorHandler.LogError($"Error in modern rendering path: {ex.Message}");
+                // CRITICAL: Restore fixed-function pipeline state on error
+                GLFunctionLoader.UseProgram(0);
                 return false;
             }
         }

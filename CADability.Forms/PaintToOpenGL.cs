@@ -1476,7 +1476,17 @@ namespace CADability.Forms
             // Try modern rendering path first if available
             if (useModernRendering && modernRenderingPath != null)
             {
-                if (modernRenderingPath.TryRenderTriangleMesh(vertex, normals, indextriples))
+                // Get the current OpenGL color from state
+                float[] currentColor = new float[4];
+                Gl.glGetFloatv(Gl.GL_CURRENT_COLOR, currentColor);
+                Color glColor = Color.FromArgb(
+                    (byte)(currentColor[3] * 255),
+                    (byte)(currentColor[0] * 255),
+                    (byte)(currentColor[1] * 255),
+                    (byte)(currentColor[2] * 255)
+                );
+                
+                if (modernRenderingPath.TryRenderTriangleMesh(vertex, normals, indextriples, glColor))
                 {
                     CheckError();
                     return; // Successfully rendered with modern path

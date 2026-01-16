@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using CADability;
 
-namespace CADability.Forms
+namespace CADability
 {
     /// <summary>
     /// Manages integration of modern OpenGL features (shaders, VBOs) with PaintToOpenGL.
@@ -19,7 +19,7 @@ namespace CADability.Forms
     /// It allows PaintToOpenGL to gradually adopt modern OpenGL techniques
     /// while maintaining backward compatibility with legacy rendering paths.
     /// </remarks>
-    internal class ModernOpenGLIntegration
+    public class ModernOpenGLIntegration
     {
         private static bool capabilitiesDetected = false;
         private static bool supportsShaders = false;
@@ -31,9 +31,9 @@ namespace CADability.Forms
         private Dictionary<string, GLVertexBuffer> vboCache = new Dictionary<string, GLVertexBuffer>();
 
         // Reference to parent PaintToOpenGL for context access
-        private PaintToOpenGL parentPainter;
+        private object parentPainter;
 
-        public ModernOpenGLIntegration(PaintToOpenGL painter)
+        public ModernOpenGLIntegration(object painter)
         {
             parentPainter = painter ?? throw new ArgumentNullException(nameof(painter));
         }
@@ -354,7 +354,7 @@ namespace CADability.Forms
     /// 
     /// All methods gracefully degrade to legacy rendering if modern features unavailable.
     /// </remarks>
-    internal class ModernRenderingPath
+    public class ModernRenderingPath
     {
         private ModernOpenGLIntegration integration;
         private GLShader basicColorShader;

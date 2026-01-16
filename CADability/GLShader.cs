@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Text;
 
 namespace CADability
 {
@@ -10,6 +11,7 @@ namespace CADability
 	/// <remarks>
 	/// This class handles shader program creation, compilation, and linking.
 	/// Supports both vertex and fragment shaders with error reporting.
+	/// Uses dynamically loaded OpenGL function pointers for runtime flexibility.
 	/// </remarks>
 	[CLSCompliant(false)]
 	public class GLShader : IDisposable
@@ -30,7 +32,7 @@ namespace CADability
 		{
 			get
 			{
-				Gl.glGetIntegerv(Gl.GL_CURRENT_PROGRAM, out int current);
+				GLFunctionLoader.GetIntegerv(GLGetParameter.CurrentProgram, out int current);
 				return current == (int)programId;
 			}
 		}
@@ -43,30 +45,52 @@ namespace CADability
 		/// <exception cref="InvalidOperationException">Thrown if shader compilation or linking fails</exception>
 		public GLShader(string vertexSource, string fragmentSource)
 		{
+			if (string.IsNullOrWhiteSpace(vertexSource))
+			{
+				throw new ArgumentNullException(nameof(vertexSource), "Vertex shader source cannot be null or empty");
+			}
+
+			if (string.IsNullOrWhiteSpace(fragmentSource))
+			{
+				throw new ArgumentNullException(nameof(fragmentSource), "Fragment shader source cannot be null or empty");
+			}
+
+			// Ensure OpenGL functions are loaded
+			if (GLFunctionLoader.CreateProgram == null)
+			{
+				try
+				{
+					GLFunctionLoader.Initialize();
+				}
+				catch (Exception ex)
+				{
+					throw new InvalidOperationException("Failed to initialize OpenGL shader functions. Ensure your GPU supports GLSL and OpenGL 2.1+", ex);
+				}
+			}
+
 			try
 			{
-				uint vertexShader = CompileShader(Gl.GL_VERTEX_SHADER, vertexSource, "Vertex");
-				uint fragmentShader = CompileShader(Gl.GL_FRAGMENT_SHADER, fragmentSource, "Fragment");
+				uint vertexShader = CompileShader(GLFunctionLoader.CreateShader((uint)GLShaderType.VertexShader), vertexSource, "Vertex");
+				uint fragmentShader = CompileShader(GLFunctionLoader.CreateShader((uint)GLShaderType.FragmentShader), fragmentSource, "Fragment");
 
-				programId = Gl.glCreateProgram();
+				programId = GLFunctionLoader.CreateProgram();
 				if (programId == 0)
 				{
-					throw new InvalidOperationException("Failed to create OpenGL shader program");
+					throw new InvalidOperationException("Failed to create OpenGL shader program. GPU may not support shaders.");
 				}
 
-				Gl.glAttachShader(programId, vertexShader);
-				Gl.glAttachShader(programId, fragmentShader);
+				GLFunctionLoader.AttachShader(programId, vertexShader);
+				GLFunctionLoader.AttachShader(programId, fragmentShader);
 
 				// Set attribute locations before linking
-				Gl.glBindAttribLocation(programId, 0, "position");
-				Gl.glBindAttribLocation(programId, 1, "normal");
-				Gl.glBindAttribLocation(programId, 2, "color");
-				Gl.glBindAttribLocation(programId, 3, "texCoord");
+				GLFunctionLoader.BindAttribLocation(programId, 0, "position");
+				GLFunctionLoader.BindAttribLocation(programId, 1, "normal");
+				GLFunctionLoader.BindAttribLocation(programId, 2, "color");
+				GLFunctionLoader.BindAttribLocation(programId, 3, "texCoord");
 
-				Gl.glLinkProgram(programId);
+				GLFunctionLoader.LinkProgram(programId);
 
-				int linkStatus;
-				Gl.glGetProgramiv(programId, Gl.GL_LINK_STATUS, out linkStatus);
+				GLFunctionLoader.GetProgramiv(programId, GLProgramParameter.LinkStatus, out int linkStatus);
 				if (linkStatus == 0)
 				{
 					string infoLog = GetProgramInfoLog(programId);
@@ -74,8 +98,8 @@ namespace CADability
 				}
 
 				// Clean up individual shaders (they're now linked into the program)
-				Gl.glDeleteShader(vertexShader);
-				Gl.glDeleteShader(fragmentShader);
+				GLFunctionLoader.DeleteShader(vertexShader);
+				GLFunctionLoader.DeleteShader(fragmentShader);
 
 				OpenGLErrorHandler.LogDebug($"Shader program {programId} created and linked successfully");
 			}
@@ -89,28 +113,26 @@ namespace CADability
 		/// <summary>
 		/// Compiles an individual shader (vertex or fragment)
 		/// </summary>
-		private uint CompileShader(int shaderType, string source, string shaderName)
+		private uint CompileShader(uint shader, string source, string shaderName)
 		{
 			if (string.IsNullOrEmpty(source))
 			{
 				throw new ArgumentException($"{shaderName} shader source is null or empty", nameof(source));
 			}
 
-			uint shader = Gl.glCreateShader((uint)shaderType);
 			if (shader == 0)
 			{
 				throw new InvalidOperationException($"Failed to create {shaderName} shader");
 			}
 
-			Gl.glShaderSource(shader, 1, new string[] { source }, null);
-			Gl.glCompileShader(shader);
+			GLFunctionLoader.ShaderSource(shader, 1, new string[] { source }, null);
+			GLFunctionLoader.CompileShader(shader);
 
-			int compileStatus;
-			Gl.glGetShaderiv(shader, Gl.GL_COMPILE_STATUS, out compileStatus);
+			GLFunctionLoader.GetShaderiv(shader, GLShaderParameter.CompileStatus, out int compileStatus);
 			if (compileStatus == 0)
 			{
 				string infoLog = GetShaderInfoLog(shader);
-				Gl.glDeleteShader(shader);
+				GLFunctionLoader.DeleteShader(shader);
 				throw new InvalidOperationException($"{shaderName} shader compilation failed:\n{infoLog}");
 			}
 
@@ -123,13 +145,11 @@ namespace CADability
 		/// </summary>
 		private string GetShaderInfoLog(uint shader)
 		{
-			int logLength;
-			Gl.glGetShaderiv(shader, Gl.GL_INFO_LOG_LENGTH, out logLength);
+			GLFunctionLoader.GetShaderiv(shader, GLShaderParameter.InfoLogLength, out int logLength);
 			if (logLength <= 1) return "";
 
-			System.Text.StringBuilder sb = new System.Text.StringBuilder(logLength);
-			int charsWritten;
-			Gl.glGetShaderInfoLog(shader, logLength, out charsWritten, sb);
+			StringBuilder sb = new StringBuilder(logLength);
+			GLFunctionLoader.GetShaderInfoLog(shader, logLength, out int charsWritten, sb);
 			return sb.ToString();
 		}
 
@@ -138,13 +158,11 @@ namespace CADability
 		/// </summary>
 		private string GetProgramInfoLog(uint program)
 		{
-			int logLength;
-			Gl.glGetProgramiv(program, Gl.GL_INFO_LOG_LENGTH, out logLength);
+			GLFunctionLoader.GetProgramiv(program, GLProgramParameter.InfoLogLength, out int logLength);
 			if (logLength <= 1) return "";
 
-			System.Text.StringBuilder sb = new System.Text.StringBuilder(logLength);
-			int charsWritten;
-			Gl.glGetProgramInfoLog(program, logLength, out charsWritten, sb);
+			StringBuilder sb = new StringBuilder(logLength);
+			GLFunctionLoader.GetProgramInfoLog(program, logLength, out int charsWritten, sb);
 			return sb.ToString();
 		}
 
@@ -158,7 +176,7 @@ namespace CADability
 				throw new ObjectDisposedException("GLShader");
 			}
 
-			Gl.glUseProgram(programId);
+			GLFunctionLoader.UseProgram(programId);
 			OpenGLErrorHandler.CheckError("glUseProgram");
 		}
 
@@ -174,7 +192,7 @@ namespace CADability
 				return location;
 			}
 
-			location = Gl.glGetUniformLocation(programId, uniformName);
+			location = GLFunctionLoader.GetUniformLocation(programId, uniformName);
 			uniformLocations[uniformName] = location;
 
 			if (location == -1)
@@ -193,7 +211,7 @@ namespace CADability
 			int location = GetUniformLocation(uniformName);
 			if (location >= 0)
 			{
-				Gl.glUniform1f(location, value);
+				GLFunctionLoader.Uniform1f(location, value);
 			}
 		}
 
@@ -205,7 +223,7 @@ namespace CADability
 			int location = GetUniformLocation(uniformName);
 			if (location >= 0)
 			{
-				Gl.glUniform1i(location, value);
+				GLFunctionLoader.Uniform1i(location, value);
 			}
 		}
 
@@ -217,7 +235,7 @@ namespace CADability
 			int location = GetUniformLocation(uniformName);
 			if (location >= 0)
 			{
-				Gl.glUniform2f(location, x, y);
+				GLFunctionLoader.Uniform2f(location, x, y);
 			}
 		}
 
@@ -229,7 +247,7 @@ namespace CADability
 			int location = GetUniformLocation(uniformName);
 			if (location >= 0)
 			{
-				Gl.glUniform3f(location, x, y, z);
+				GLFunctionLoader.Uniform3f(location, x, y, z);
 			}
 		}
 
@@ -241,7 +259,7 @@ namespace CADability
 			int location = GetUniformLocation(uniformName);
 			if (location >= 0)
 			{
-				Gl.glUniform4f(location, x, y, z, w);
+				GLFunctionLoader.Uniform4f(location, x, y, z, w);
 			}
 		}
 
@@ -263,7 +281,7 @@ namespace CADability
 				{
 					floatMatrix[i] = (float)matrix4x4[i];
 				}
-				Gl.glUniformMatrix4fv(location, 1, false, floatMatrix);
+				GLFunctionLoader.UniformMatrix4fv(location, 1, false, floatMatrix);
 			}
 		}
 
@@ -279,7 +297,7 @@ namespace CADability
 			{
 				try
 				{
-					Gl.glDeleteProgram(programId);
+					GLFunctionLoader.DeleteProgram(programId);
 					OpenGLErrorHandler.LogDebug($"Shader program {programId} deleted");
 				}
 				catch (Exception ex)

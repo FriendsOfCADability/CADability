@@ -8926,5 +8926,7 @@ namespace CADability
         public static extern IntPtr wglGetCurrentContext();
         [DllImport(WGL_NATIVE_LIBRARY, SetLastError = true), SuppressUnmanagedCodeSecurity]
         public static extern bool wglShareLists(IntPtr source, IntPtr destination);
+        [DllImport(WGL_NATIVE_LIBRARY, CharSet = CharSet.Ansi, SetLastError = true), SuppressUnmanagedCodeSecurity]
+        public static extern IntPtr wglGetProcAddress(string functionName);
     }
 }

@@ -380,12 +380,149 @@ namespace CADability.Forms
             if (!ModernOpenGLIntegration.SupportsVBO || lightingShader == null)
                 return false; // Fall back to legacy rendering
 
+            if (vertices == null || vertices.Length == 0 || indices == null || indices.Length == 0)
+                return false; // Invalid input
+
             try
             {
-                // Would use GLVertexBuffer here to create and render VBO
-                // This is a placeholder for the actual implementation
-                OpenGLErrorHandler.LogDebug("Modern triangle rendering path (not yet fully implemented)");
-                return false; // For now, still fall back
+                // Use the lighting shader for rendering
+                lightingShader.Use();
+
+                // Prepare vertex data as interleaved arrays (position followed by normal)
+                float[] vertexData = new float[vertices.Length * 6]; // 3 for position + 3 for normal
+                for (int i = 0; i < vertices.Length; i++)
+                {
+                    // Position
+                    vertexData[i * 6 + 0] = (float)vertices[i].x;
+                    vertexData[i * 6 + 1] = (float)vertices[i].y;
+                    vertexData[i * 6 + 2] = (float)vertices[i].z;
+
+                    // Normal (use provided normal or calculate from geometry if missing)
+                    if (normals != null && i < normals.Length)
+                    {
+                        vertexData[i * 6 + 3] = (float)normals[i].x;
+                        vertexData[i * 6 + 4] = (float)normals[i].y;
+                        vertexData[i * 6 + 5] = (float)normals[i].z;
+                    }
+                    else
+                    {
+                        // Default normal pointing upward if not provided
+                        vertexData[i * 6 + 3] = 0.0f;
+                        vertexData[i * 6 + 4] = 0.0f;
+                        vertexData[i * 6 + 5] = 1.0f;
+                    }
+                }
+
+                // Convert indices to unsigned int array
+                uint[] indexData = new uint[indices.Length];
+                for (int i = 0; i < indices.Length; i++)
+                {
+                    indexData[i] = (uint)indices[i];
+                }
+
+                // Set shader uniforms for lighting
+                lightingShader.SetUniform("objectColor", 0.5f, 0.5f, 0.5f);
+                lightingShader.SetUniform("lightPosition", 1.0f, 1.0f, 1.0f);
+                lightingShader.SetUniform("viewPosition", 0.0f, 0.0f, 1.0f);
+                lightingShader.SetUniform("ambientStrength", 0.1f);
+                lightingShader.SetUniform("diffuseStrength", 0.7f);
+                lightingShader.SetUniform("specularStrength", 0.5f);
+                lightingShader.SetUniform("shininess", 32.0f);
+
+                // Create Vertex Array Object (VAO)
+                uint[] vaoHandle = new uint[1];
+                GLFunctionLoader.GenVertexArrays(1, vaoHandle);
+                GLFunctionLoader.BindVertexArray(vaoHandle[0]);
+
+                try
+                {
+                    // Create Vertex Buffer Object (VBO) for vertex data
+                    uint[] vboHandle = new uint[1];
+                    GLFunctionLoader.GenBuffers(1, vboHandle);
+                    GLFunctionLoader.BindBuffer(GLBufferTarget.ArrayBuffer, vboHandle[0]);
+
+                    // Upload vertex data to GPU
+                    GCHandle vertexHandle = GCHandle.Alloc(vertexData, GCHandleType.Pinned);
+                    try
+                    {
+                        IntPtr vertexPtr = vertexHandle.AddrOfPinnedObject();
+                        IntPtr vertexSize = new IntPtr(vertexData.Length * sizeof(float));
+                        GLFunctionLoader.BufferData(
+                            GLBufferTarget.ArrayBuffer,
+                            vertexSize,
+                            vertexPtr,
+                            GLBufferUsage.StaticDraw);
+                    }
+                    finally
+                    {
+                        vertexHandle.Free();
+                    }
+
+                    // Configure vertex attributes
+                    // Vertex position (location 0)
+                    GLFunctionLoader.VertexAttribPointer(
+                        0, // position attribute location
+                        3, // 3 components (x, y, z)
+                        GLDataType.Float,
+                        false, // not normalized
+                        24, // stride: 6 floats * 4 bytes = 24 bytes
+                        IntPtr.Zero); // offset: position starts at 0
+                    GLFunctionLoader.EnableVertexAttribArray(0);
+
+                    // Vertex normal (location 1)
+                    GLFunctionLoader.VertexAttribPointer(
+                        1, // normal attribute location
+                        3, // 3 components (nx, ny, nz)
+                        GLDataType.Float,
+                        false, // not normalized
+                        24, // stride: 6 floats * 4 bytes = 24 bytes
+                        new IntPtr(12)); // offset: normal starts at 12 bytes (3 floats)
+                    GLFunctionLoader.EnableVertexAttribArray(1);
+
+                    // Create Element Buffer Object (EBO/IBO) for indices
+                    uint[] eboHandle = new uint[1];
+                    GLFunctionLoader.GenBuffers(1, eboHandle);
+                    GLFunctionLoader.BindBuffer(GLBufferTarget.ElementArrayBuffer, eboHandle[0]);
+
+                    // Upload index data to GPU
+                    GCHandle indexHandle = GCHandle.Alloc(indexData, GCHandleType.Pinned);
+                    try
+                    {
+                        IntPtr indexPtr = indexHandle.AddrOfPinnedObject();
+                        IntPtr indexSize = new IntPtr(indexData.Length * sizeof(uint));
+                        GLFunctionLoader.BufferData(
+                            GLBufferTarget.ElementArrayBuffer,
+                            indexSize,
+                            indexPtr,
+                            GLBufferUsage.StaticDraw);
+                    }
+                    finally
+                    {
+                        indexHandle.Free();
+                    }
+
+                    // Render the triangles
+                    GLFunctionLoader.DrawElements(
+                        GLPrimitiveType.Triangles,
+                        indices.Length, // number of indices to render
+                        GLDataType.UnsignedInt,
+                        IntPtr.Zero); // offset in the EBO
+
+                    OpenGLErrorHandler.LogDebug(
+                        $"Modern triangle rendering: {vertices.Length} vertices, {indices.Length / 3} triangles rendered");
+
+                    // Clean up GPU resources
+                    GLFunctionLoader.DeleteBuffers(1, vboHandle);
+                    GLFunctionLoader.DeleteBuffers(1, eboHandle);
+                }
+                finally
+                {
+                    // Unbind and delete VAO
+                    GLFunctionLoader.BindVertexArray(0);
+                    GLFunctionLoader.DeleteVertexArrays(1, vaoHandle);
+                }
+
+                return true; // Modern rendering path was successfully used
             }
             catch (Exception ex)
             {

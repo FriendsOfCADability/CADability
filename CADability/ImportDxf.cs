@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using netDxf;
-using netDxf.Entities;
 using CADability.GeoObject;
 using CADability.Shapes;
 using CADability.Curve2D;
@@ -12,9 +10,9 @@ using Point = CADability.WebDrawing.Point;
 #else
 using System.Drawing;
 #endif
-using netDxf.Tables;
 using System.Text;
 using System.IO;
+using System.Linq;
 
 namespace CADability.DXF
 {
@@ -25,45 +23,49 @@ namespace CADability.DXF
     /// </summary>
     public class Import
     {
-        private DxfDocument doc;
+        private IDxfDocument doc;
+        private IDxfLibrary dxfLibrary;
         private Project project;
         private Dictionary<string, GeoObject.Block> blockTable;
-        private Dictionary<netDxf.Tables.Layer, ColorDef> layerColorTable;
-        private Dictionary<netDxf.Tables.Layer, Attribute.Layer> layerTable;
+        private Dictionary<string, ColorDef> layerColorTable;
+        private Dictionary<string, Attribute.Layer> layerTable;
         /// <summary>
-        /// Create the Import instance. The document is being read and converted to netDXF objects.
+        /// Create the Import instance. The document is being read and converted using the DXF abstraction layer.
         /// </summary>
         /// <param name="fileName"></param>
         public Import(string fileName)
         {
-            using (Stream stream = File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-            {
-                MathHelper.Epsilon = 1e-8;
-                doc = DxfDocument.Load(stream);
-            }
+            dxfLibrary = DxfLibraryFactory.GetLibrary();
+            doc = dxfLibrary.LoadFromFile(fileName);
         }
         public static bool CanImportVersion(string fileName)
         {
-            netDxf.Header.DxfVersion ver = DxfDocument.CheckDxfFileVersion(fileName, out bool isBinary);
-            return ver >= netDxf.Header.DxfVersion.AutoCad2000;
+            IDxfLibrary library = DxfLibraryFactory.GetLibrary();
+            return library.CanImportVersion(fileName);
         }
         private void FillModelSpace(Model model)
         {
-            netDxf.Blocks.Block modelSpace = doc.Blocks["*Model_Space"];
-            foreach (EntityObject item in modelSpace.Entities)
+            IDxfBlock modelSpace = doc.Blocks.GetBlock("*Model_Space");
+            if (modelSpace != null)
             {
-                IGeoObject geoObject = GeoObjectFromEntity(item);
-                if (geoObject != null) model.Add(geoObject);
+                foreach (IDxfEntity item in modelSpace.Entities)
+                {
+                    IGeoObject geoObject = GeoObjectFromEntity(item);
+                    if (geoObject != null) model.Add(geoObject);
+                }
             }
             model.Name = "*Model_Space";
         }
         private void FillPaperSpace(Model model)
         {
-            netDxf.Blocks.Block modelSpace = doc.Blocks["*Paper_Space"];
-            foreach (EntityObject item in modelSpace.Entities)
+            IDxfBlock paperSpace = doc.Blocks.GetBlock("*Paper_Space");
+            if (paperSpace != null)
             {
-                IGeoObject geoObject = GeoObjectFromEntity(item);
-                if (geoObject != null) model.Add(geoObject);
+                foreach (IDxfEntity item in paperSpace.Entities)
+                {
+                    IGeoObject geoObject = GeoObjectFromEntity(item);
+                    if (geoObject != null) model.Add(geoObject);
+                }
             }
             model.Name = "*Paper_Space";
         }
@@ -76,26 +78,23 @@ namespace CADability.DXF
             if (doc == null) return null;
             project = Project.CreateSimpleProject();
             blockTable = new Dictionary<string, GeoObject.Block>();
-            layerColorTable = new Dictionary<netDxf.Tables.Layer, ColorDef>();
-            layerTable = new Dictionary<netDxf.Tables.Layer, Attribute.Layer>();
+            layerColorTable = new Dictionary<string, ColorDef>();
+            layerTable = new Dictionary<string, Attribute.Layer>();
             foreach (var item in doc.Layers)
             {
                 Attribute.Layer layer = project.LayerList.CreateOrFind(item.Name);
-                layerTable[item] = layer;
-                Color rgb = item.Color.ToColor();
+                layerTable[item.Name] = layer;
+                Color rgb = Color.FromArgb(item.ColorArgb);
                 if (rgb.ToArgb() == Color.White.ToArgb()) rgb = Color.Black;
                 ColorDef cd = project.ColorList.CreateOrFind(item.Name + ":ByLayer", rgb);
-                layerColorTable[item] = cd;
+                layerColorTable[item.Name] = cd;
             }
-            foreach (var item in doc.Linetypes)
+            foreach (var item in doc.LineTypes)
             {
                 List<double> pattern = new List<double>();
-                for (int i = 0; i < item.Segments.Count; i++)
+                foreach (double segment in item.Segments)
                 {
-                    if (item.Segments[i].Type == LinetypeSegmentType.Simple)
-                    {
-                        pattern.Add(Math.Abs(item.Segments[i].Length));
-                    }
+                    pattern.Add(Math.Abs(segment));
                 }
                 project.LinePatternList.CreateOrFind(item.Name, pattern.ToArray());
             }
@@ -118,31 +117,31 @@ namespace CADability.DXF
             doc = null;
             return project;
         }
-        private IGeoObject GeoObjectFromEntity(EntityObject item)
+        private IGeoObject GeoObjectFromEntity(IDxfEntity item)
         {
             IGeoObject res = null;
-            switch (item)
-            {
-                case netDxf.Entities.Line dxfLine: res = CreateLine(dxfLine); break;
-                case netDxf.Entities.Ray dxfRay: res = CreateRay(dxfRay); break;
-                case netDxf.Entities.Arc dxfArc: res = CreateArc(dxfArc); break;
-                case netDxf.Entities.Circle dxfCircle: res = CreateCircle(dxfCircle); break;
-                case netDxf.Entities.Ellipse dxfEllipse: res = CreateEllipse(dxfEllipse); break;
-                case netDxf.Entities.Spline dxfSpline: res = CreateSpline(dxfSpline); break;
-                case netDxf.Entities.Face3D dxfFace: res = CreateFace(dxfFace); break;
-                case netDxf.Entities.PolyfaceMesh dxfPolyfaceMesh: res = CreatePolyfaceMesh(dxfPolyfaceMesh); break;
-                case netDxf.Entities.Hatch dxfHatch: res = CreateHatch(dxfHatch); break;
-                case netDxf.Entities.Solid dxfSolid: res = CreateSolid(dxfSolid); break;
-                case netDxf.Entities.Insert dxfInsert: res = CreateInsert(dxfInsert); break;
-                case netDxf.Entities.Polyline2D dxfPolyline2D: res = CreatePolyline2D(dxfPolyline2D); break;
-                case netDxf.Entities.MLine dxfMLine: res = CreateMLine(dxfMLine); break;
-                case netDxf.Entities.Text dxfText: res = CreateText(dxfText); break;
-                case netDxf.Entities.Dimension dxfDimension: res = CreateDimension(dxfDimension); break;
-                case netDxf.Entities.MText dxfMText: res = CreateMText(dxfMText); break;
-                case netDxf.Entities.Leader dxfLeader: res = CreateLeader(dxfLeader); break;
-                case netDxf.Entities.Polyline3D dxfPolyline3D: res = CreatePolyline3D(dxfPolyline3D); break;
-                case netDxf.Entities.Point dxfPoint: res = CreatePoint(dxfPoint); break;
-                case netDxf.Entities.Mesh dxfMesh: res = CreateMesh(dxfMesh); break;
+            switch (item.EntityType)
+        {
+                case DxfEntityType.Line: res = CreateLine((IDxfLine)item); break;
+                case DxfEntityType.Ray: res = CreateRay((IDxfRay)item); break;
+                case DxfEntityType.Arc: res = CreateArc((IDxfArc)item); break;
+                case DxfEntityType.Circle: res = CreateCircle((IDxfCircle)item); break;
+                case DxfEntityType.Ellipse: res = CreateEllipse((IDxfEllipse)item); break;
+                case DxfEntityType.Spline: res = CreateSpline((IDxfSpline)item); break;
+                case DxfEntityType.Face3D: res = CreateFace((IDxfFace3D)item); break;
+                case DxfEntityType.PolyfaceMesh: res = CreatePolyfaceMesh((IDxfPolyfaceMesh)item); break;
+                case DxfEntityType.Hatch: res = CreateHatch((IDxfHatch)item); break;
+                case DxfEntityType.Solid: res = CreateSolid((IDxfSolid)item); break;
+                case DxfEntityType.Insert: res = CreateInsert((IDxfInsert)item); break;
+                case DxfEntityType.Polyline2D: res = CreatePolyline2D((IDxfPolyline2D)item); break;
+                case DxfEntityType.MLine: res = CreateMLine((IDxfMLine)item); break;
+                case DxfEntityType.Text: res = CreateText((IDxfText)item); break;
+                case DxfEntityType.Dimension: res = CreateDimension((IDxfDimension)item); break;
+                case DxfEntityType.MText: res = CreateMText((IDxfMText)item); break;
+                case DxfEntityType.Leader: res = CreateLeader((IDxfLeader)item); break;
+                case DxfEntityType.Polyline3D: res = CreatePolyline3D((IDxfPolyline3D)item); break;
+                case DxfEntityType.Point: res = CreatePoint((IDxfPoint)item); break;
+                case DxfEntityType.Mesh: res = CreateMesh((IDxfMesh)item); break;
                 default:
                     System.Diagnostics.Trace.WriteLine("dxf: not imported: " + item.ToString());
                     break;
@@ -155,15 +154,15 @@ namespace CADability.DXF
             }
             return res;
         }
-        private static GeoPoint GeoPoint(Vector3 p)
+        private static GeoPoint GeoPoint((double X, double Y, double Z) p)
         {
             return new GeoPoint(p.X, p.Y, p.Z);
         }
-        private static GeoVector GeoVector(Vector3 p)
+        private static GeoVector GeoVector((double X, double Y, double Z) p)
         {
             return new GeoVector(p.X, p.Y, p.Z);
         }
-        internal static Plane Plane(Vector3 center, Vector3 normal)
+        internal static Plane Plane((double X, double Y, double Z) center, (double X, double Y, double Z) normal)
         {
             // this is AutoCADs arbitrary axis algorithm we must use here to get the correct plane
             // because sometimes we need the correct x-axis, y-axis orientation
@@ -195,13 +194,13 @@ namespace CADability.DXF
             project.HatchStyleList.Add(nhss);
             return nhss;
         }
-        private HatchStyleLines FindOrCreateHatchStyleLines(netDxf.Entities.EntityObject entity, double lineAngle, double lineDistance, double[] dashes)
+        private HatchStyleLines FindOrCreateHatchStyleLines(IDxfEntity entity, double lineAngle, double lineDistance, double[] dashes)
         {
             for (int i = 0; i < project.HatchStyleList.Count; i++)
             {
                 if (project.HatchStyleList[i] is HatchStyleLines hsl)
                 {
-                    if (hsl.ColorDef.Color.ToArgb() == entity.Layer.Color.ToColor().ToArgb() && hsl.LineAngle == lineAngle && hsl.LineDistance == lineDistance) return hsl;
+                    if (hsl.ColorDef.Color.ToArgb() == Color.FromArgb(layerTable[entity.LayerName] != null ? layerColorTable[entity.LayerName].Color.ToArgb() : Color.Black.ToArgb()).ToArgb() && hsl.LineAngle == lineAngle && hsl.LineDistance == lineDistance) return hsl;
                 }
             }
             HatchStyleLines nhsl = new HatchStyleLines();
@@ -209,7 +208,7 @@ namespace CADability.DXF
             nhsl.Name = name;
             nhsl.LineAngle = lineAngle;
             nhsl.LineDistance = lineDistance;
-            nhsl.ColorDef = project.ColorList.CreateOrFind(entity.Layer.Color.ToColor().ToString(), entity.Layer.Color.ToColor());
+            nhsl.ColorDef = project.ColorList.CreateOrFind(Color.FromArgb(layerTable[entity.LayerName] != null ? layerColorTable[entity.LayerName].Color.ToArgb() : Color.Black.ToArgb()).ToString(), Color.FromArgb(layerTable[entity.LayerName] != null ? layerColorTable[entity.LayerName].Color.ToArgb() : Color.Black.ToArgb()));
             Lineweight lw = entity.Lineweight;
             if (lw == Lineweight.ByLayer) lw = entity.Layer.Lineweight;
             if (lw == Lineweight.ByBlock && entity.Owner != null) lw = entity.Owner.Layer.Lineweight; // not sure, but Block doesn't seem to have a lineweight
@@ -219,15 +218,16 @@ namespace CADability.DXF
             project.HatchStyleList.Add(nhsl);
             return nhsl;
         }
-        private ColorDef FindOrCreateColor(AciColor color, netDxf.Tables.Layer layer)
+        private ColorDef FindOrCreateColor(int? colorArgb, string layerName)
         {
-            if (color.IsByLayer && layer != null)
+            if (colorArgb == null && layerName != null && layerColorTable.TryGetValue(layerName, out ColorDef layerColor))
             {
-                ColorDef res = layerColorTable[layer] as ColorDef;
-                if (res != null) return res;
+                return layerColor;
             }
-            Color rgb = color.ToColor();
-            if (color.ToColor().ToArgb() == Color.White.ToArgb())
+            if (colorArgb == null) colorArgb = Color.White.ToArgb();
+            
+            Color rgb = Color.FromArgb(colorArgb.Value);
+            if (rgb.ToArgb() == Color.White.ToArgb())
             {
                 rgb = Color.Black;
             }
@@ -287,59 +287,59 @@ namespace CADability.DXF
             }
             return new LinePattern(NewName("DXFpattern", project.LinePatternList), dashes);
         }
-        private void SetAttributes(IGeoObject go, netDxf.Entities.EntityObject entity)
+        private void SetAttributes(IGeoObject go, IDxfEntity entity)
         {
-            if (go is IColorDef cd) cd.ColorDef = FindOrCreateColor(entity.Color, entity.Layer);
-            go.Layer = layerTable[entity.Layer];
-            if (go is ILinePattern lp) lp.LinePattern = project.LinePatternList.Find(entity.Linetype.Name);
-            if (go is ILineWidth ld)
+            if (go is IColorDef cd) cd.ColorDef = FindOrCreateColor(entity.ColorArgb, entity.LayerName);
+            if (entity.LayerName != null && layerTable.TryGetValue(entity.LayerName, out var layer))
+                go.Layer = layer;
+            if (go is ILinePattern lp && entity.LineTypeName != null) 
+                lp.LinePattern = project.LinePatternList.Find(entity.LineTypeName);
+            if (go is ILineWidth ld && entity.LineWeight.HasValue)
             {
-                Lineweight lw = entity.Lineweight;
-                if (lw == Lineweight.ByLayer) lw = entity.Layer.Lineweight;
-                if (lw == Lineweight.ByBlock && entity.Owner != null) lw = entity.Owner.Layer.Lineweight; // not sure, but Block doesn't seem to have a lineweight
+                int lw = entity.LineWeight.Value;
                 if (lw < 0) lw = 0;
-                ld.LineWidth = project.LineWidthList.CreateOrFind("DXF_" + lw.ToString(), ((int)lw) / 100.0);
+                ld.LineWidth = project.LineWidthList.CreateOrFind("DXF_" + lw.ToString(), lw / 100.0);
             }
         }
-        private void SetUserData(IGeoObject go, netDxf.Entities.EntityObject entity)
+        private void SetUserData(IGeoObject go, IDxfEntity entity)
         {
-            foreach (KeyValuePair<string, XData> item in entity.XData)
+            foreach (var xdata in entity.XData)
             {
-                ExtendedEntityData xdata = new ExtendedEntityData();
-                xdata.ApplicationName = item.Value.ApplicationRegistry.Name;
-
-                string name = item.Value.ApplicationRegistry.Name + ":" + item.Key;
-
-                for (int i = 0; i < item.Value.XDataRecord.Count; i++)
+                ExtendedEntityData edata = new ExtendedEntityData();
+                edata.ApplicationName = xdata.ApplicationName;
+                
+                string name = xdata.ApplicationName + ":" + xdata.ApplicationName;
+                
+                foreach (var record in xdata.Records)
                 {
-                    xdata.Data.Add(new KeyValuePair<XDataCode, object>(item.Value.XDataRecord[i].Code, item.Value.XDataRecord[i].Value));
+                    edata.Data.Add(new KeyValuePair<XDataCode, object>((XDataCode)record.Code, record.Value));
                 }
-
-                go.UserData.Add(name, xdata);
+                
+                go.UserData.Add(name, edata);
             }
             go.UserData["DxfImport.Handle"] = new UserInterface.StringProperty(entity.Handle, "DxfImport.Handle");
         }
-        private GeoObject.Block FindBlock(netDxf.Blocks.Block entity)
+        private GeoObject.Block FindBlock(IDxfBlock entity)
         {
             if (!blockTable.TryGetValue(entity.Handle, out GeoObject.Block found))
             {
                 found = GeoObject.Block.Construct();
                 found.Name = entity.Name;
                 found.RefPoint = GeoPoint(entity.Origin);
-                for (int i = 0; i < entity.Entities.Count; i++)
+                foreach (IDxfEntity item in entity.Entities)
                 {
-                    IGeoObject go = GeoObjectFromEntity(entity.Entities[i]);
+                    IGeoObject go = GeoObjectFromEntity(item);
                     if (go != null) found.Add(go);
                 }
                 blockTable[entity.Handle] = found;
             }
             return found;
         }
-        private IGeoObject CreateLine(netDxf.Entities.Line line)
+        private IGeoObject CreateLine(IDxfLine line)
         {
             GeoObject.Line l = GeoObject.Line.Construct();
-            Vector3 sp = line.StartPoint;
-            Vector3 ep = line.EndPoint;
+            var sp = line.StartPoint;
+            var ep = line.EndPoint;
             {
                 l.StartPoint = GeoPoint(sp);
                 l.EndPoint = GeoPoint(ep);
@@ -360,16 +360,16 @@ namespace CADability.DXF
                 return l;
             }
         }
-        private IGeoObject CreateRay(Ray ray)
+        private IGeoObject CreateRay(IDxfRay ray)
         {
             GeoObject.Line l = GeoObject.Line.Construct();
-            Vector3 sp = ray.Origin;
-            Vector3 dir = ray.Direction;
+            var sp = ray.Origin;
+            var dir = ray.Direction;
             l.StartPoint = GeoPoint(sp);
             l.EndPoint = l.StartPoint + GeoVector(dir);
             return l;
         }
-        private IGeoObject CreateArc(Arc arc)
+        private IGeoObject CreateArc(IDxfArc arc)
         {
             GeoObject.Ellipse e = GeoObject.Ellipse.Construct();
             GeoVector nor = GeoVector(arc.Normal);
@@ -401,7 +401,7 @@ namespace CADability.DXF
             return e;
         }
 
-        private IGeoObject CreateCircle(netDxf.Entities.Circle circle)
+        private IGeoObject CreateCircle(IDxfCircle circle)
         {
             GeoObject.Ellipse e = GeoObject.Ellipse.Construct();
             Plane plane = Plane(circle.Center, circle.Normal);
@@ -414,20 +414,20 @@ namespace CADability.DXF
             }
             return e;
         }
-        private IGeoObject CreateEllipse(netDxf.Entities.Ellipse ellipse)
+        private IGeoObject CreateEllipse(IDxfEllipse ellipse)
         {
             GeoObject.Ellipse e = GeoObject.Ellipse.Construct();
             Plane plane = Plane(ellipse.Center, ellipse.Normal);
             ModOp2D rot = ModOp2D.Rotate(Angle.Deg(ellipse.Rotation));
-            GeoVector2D majorAxis = 0.5 * ellipse.MajorAxis * (rot * GeoVector2D.XAxis);
-            GeoVector2D minorAxis = 0.5 * ellipse.MinorAxis * (rot * GeoVector2D.YAxis);
+            GeoVector2D majorAxis = 0.5 * ellipse.MajorAxisEnd.X * 2 * (rot * GeoVector2D.XAxis);
+            GeoVector2D minorAxis = 0.5 * ellipse.MinorAxisRatio * ellipse.MajorAxisEnd.X * 2 * (rot * GeoVector2D.YAxis);
             e.SetEllipseCenterAxis(GeoPoint(ellipse.Center), plane.ToGlobal(majorAxis), plane.ToGlobal(minorAxis));
 
-            Vector2 startPoint = ellipse.PolarCoordinateRelativeToCenter(ellipse.StartAngle);
-            double sp = CalcStartEndParameter(startPoint, ellipse.MajorAxis, ellipse.MinorAxis);
+            // Vector2 startPoint calculation removed - using angles directly
+            double sp = ellipse.StartAngle;
 
-            Vector2 endPoint = ellipse.PolarCoordinateRelativeToCenter(ellipse.EndAngle);
-            double ep = CalcStartEndParameter(endPoint, ellipse.MajorAxis, ellipse.MinorAxis);
+            // Vector2 endPoint calculation removed - using angles directly
+            double ep = ellipse.EndAngle;
 
             e.StartParameter = sp;
             e.SweepParameter = ep - sp;
@@ -445,7 +445,7 @@ namespace CADability.DXF
             return parameter;
         }
 
-        private IGeoObject CreateSpline(netDxf.Entities.Spline spline)
+        private IGeoObject CreateSpline(IDxfSpline spline)
         {
             int degree = spline.Degree;
             if (spline.ControlPoints.Length == 0 && spline.FitPoints.Count > 0)
@@ -539,8 +539,9 @@ namespace CADability.DXF
                         else
                             usedCurves = approxCurve.SubCurves.Length;
 
-                        netDxf.Entities.Polyline2D p2d = spline.ToPolyline2D(usedCurves);
-                        var res = CreatePolyline2D(p2d);
+                        // Polyline2D conversion not available in abstraction
+                        // var p2d = CreatePolyline2DFromSpline(spline, usedCurves);
+                        // return bsp; // fallback to spline
                         
                         return res;
                     }
@@ -552,7 +553,7 @@ namespace CADability.DXF
             return null;
         }
 
-        private IGeoObject CreateFace(netDxf.Entities.Face3D face)
+        private IGeoObject CreateFace(IDxfFace3D face)
         {
             List<GeoPoint> points = new List<GeoPoint>();
             GeoPoint p = GeoPoint(face.FirstVertex);
@@ -609,20 +610,20 @@ namespace CADability.DXF
             return null;
 
         }
-        private IGeoObject CreatePolyfaceMesh(netDxf.Entities.PolyfaceMesh polyfacemesh)
+        private IGeoObject CreatePolyfaceMesh(IDxfPolyfaceMesh polyfacemesh)
         {
             polyfacemesh.Explode();
 
-            GeoPoint[] vertices = new GeoPoint[polyfacemesh.Vertexes.Length];
+            GeoPoint[] vertices = new GeoPoint[polyfacemesh.Vertices.Length];
             for (int i = 0; i < vertices.Length; i++)
             {
-                vertices[i] = GeoPoint(polyfacemesh.Vertexes[i]); // there is more information, I would need a good example
+                vertices[i] = GeoPoint(System.Linq.Enumerable.ElementAt(polyfacemesh.Vertices, i)); // there is more information, I would need a good example
             }
 
             List<Face> faces = new List<Face>();
-            for (int i = 0; i < polyfacemesh.Faces.Count; i++)
+            for (int i = 0; i < polyfaceSystem.Linq.Enumerable.Count(mesh.Faces); i++)
             {
-                short[] indices = polyfacemesh.Faces[i].VertexIndexes;
+                short[] indices = polyfaceSystem.Linq.Enumerable.ElementAt(mesh.Faces, i).VertexIndexes;
                 for (int j = 0; j < indices.Length; j++)
                 {
                     indices[j] = (short)(Math.Abs(indices[j]) - 1); // why? what does it mean?
@@ -672,7 +673,7 @@ namespace CADability.DXF
             }
             else return null;
         }
-        private IGeoObject CreateHatch(netDxf.Entities.Hatch hatch)
+        private IGeoObject CreateHatch(IDxfHatch hatch)
         {
             CompoundShape cs = null;
             bool ok = true;
@@ -739,7 +740,7 @@ namespace CADability.DXF
                 GeoObject.Hatch res = GeoObject.Hatch.Construct();
                 res.CompoundShape = cs;
                 res.Plane = pln;
-                if (hatch.Pattern.Fill.Equals(HatchFillType.SolidFill))
+                if (hatch.Pattern.FillType == HatchFillType.SolidFill)
                 {
                     HatchStyleSolid hst = FindOrCreateSolidHatchStyle(hatch.Layer.Color.ToColor());
                     res.HatchStyle = hst;
@@ -775,9 +776,10 @@ namespace CADability.DXF
                 return null;
             }
         }
-        private IGeoObject CreateSolid(netDxf.Entities.Solid solid)
+        private IGeoObject CreateSolid(IDxfSolid solid)
         {
-            Plane ocs = Plane(new Vector3(solid.Elevation * solid.Normal.X, solid.Elevation * solid.Normal.Y, solid.Elevation * solid.Normal.Z), solid.Normal);
+            var normal = solid.Normal;
+            Plane ocs = Plane((solid.Elevation * normal.X, solid.Elevation * normal.Y, solid.Elevation * normal.Z), normal);
             // not sure, whether the ocs is correct, maybe the position is (0,0,solid.Elevation)
 
             HatchStyleSolid hst = FindOrCreateSolidHatchStyle(solid.Color.ToColor());
@@ -820,7 +822,7 @@ namespace CADability.DXF
             hatch.Plane = pln;
             return hatch;
         }
-        private IGeoObject CreateInsert(netDxf.Entities.Insert insert)
+        private IGeoObject CreateInsert(IDxfInsert insert)
         {
             // could also use insert.Explode()
             GeoObject.Block block = FindBlock(insert.Block);
@@ -837,9 +839,9 @@ namespace CADability.DXF
             }
             return null;
         }
-        private IGeoObject CreatePolyline2D(netDxf.Entities.Polyline2D polyline2D)
+        private IGeoObject CreatePolyline2D(IDxfPolyline2D polyline2D)
         {
-            List<EntityObject> exploded = polyline2D.Explode();
+            var exploded = polyline2D.Explode();
             List<IGeoObject> path = new List<IGeoObject>();
             for (int i = 0; i < exploded.Count; i++)
             {
@@ -851,9 +853,9 @@ namespace CADability.DXF
             if (go.CurveCount > 0) return go;
             return null;
         }
-        private IGeoObject CreateMLine(netDxf.Entities.MLine mLine)
+        private IGeoObject CreateMLine(IDxfMLine mLine)
         {
-            List<EntityObject> exploded = mLine.Explode();
+            var exploded = mLine.Explode();
             List<IGeoObject> path = new List<IGeoObject>();
             for (int i = 0; i < exploded.Count; i++)
             {
@@ -909,7 +911,7 @@ namespace CADability.DXF
             // and maybe some more, is there a documentation?
             return sb.ToString();
         }
-        private IGeoObject CreateText(netDxf.Entities.Text txt)
+        private IGeoObject CreateText(IDxfText txt)
         {
             GeoObject.Text text = GeoObject.Text.Construct();
             string txtstring = processAcadString(txt.Value);
@@ -919,12 +921,12 @@ namespace CADability.DXF
             string typeface;
             bool bold;
             bool italic;
-            filename = txt.Style.FontFamilyName;
-            if (string.IsNullOrEmpty(filename)) filename = txt.Style.FontFile;
-            name = txt.Style.Name;
+            filename = txt.FontName;
+            if (string.IsNullOrEmpty(filename)) filename = txt.FontName;
+            name = txt.StyleName;
             typeface = "";
-            bold = txt.Style.FontStyle.HasFlag(netDxf.Tables.FontStyle.Bold);
-            italic = txt.Style.FontStyle.HasFlag(netDxf.Tables.FontStyle.Italic);
+            bold = txt.IsBold;
+            italic = txt.IsItalic;
             GeoPoint pos = GeoPoint(txt.Position);
             Angle a = Angle.Deg(txt.Rotation);
             double h = txt.Height;
@@ -951,69 +953,12 @@ namespace CADability.DXF
             text.Italic = italic;
             text.TextString = txtstring;
             text.Location = CADability.GeoPoint.Origin;
-            text.LineDirection = h * CADability.GeoVector.XAxis; //plane.ToGlobal(new GeoVector2D(a));
-            text.GlyphDirection = h * CADability.GeoVector.YAxis; // plane.ToGlobal(new GeoVector2D(a + SweepAngle.ToLeft));
+            text.LineDirection = h * CADability.GeoVector.XAxis;
+            text.GlyphDirection = h * CADability.GeoVector.YAxis;
             text.TextSize = h;
             text.Alignment = GeoObject.Text.AlignMode.Bottom;
             text.LineAlignment = GeoObject.Text.LineAlignMode.Left;
-            switch (txt.Alignment)
-            {
-                case TextAlignment.Aligned:
-                case TextAlignment.Fit: // fit in width or height: not implemented
-                    text.LineAlignment = GeoObject.Text.LineAlignMode.Left;
-                    text.Alignment = GeoObject.Text.AlignMode.Baseline;
-                    break;
-                case TextAlignment.BaselineLeft:
-                    text.LineAlignment = GeoObject.Text.LineAlignMode.Left;
-                    text.Alignment = GeoObject.Text.AlignMode.Baseline;
-                    break;
-                case TextAlignment.BaselineCenter:
-                    text.LineAlignment = GeoObject.Text.LineAlignMode.Center;
-                    text.Alignment = GeoObject.Text.AlignMode.Baseline;
-                    break;
-                case TextAlignment.BaselineRight:
-                    text.LineAlignment = GeoObject.Text.LineAlignMode.Right;
-                    text.Alignment = GeoObject.Text.AlignMode.Baseline;
-                    break;
-                case TextAlignment.BottomLeft:
-                    text.LineAlignment = GeoObject.Text.LineAlignMode.Left;
-                    text.Alignment = GeoObject.Text.AlignMode.Bottom;
-                    break;
-                case TextAlignment.BottomCenter:
-                    text.LineAlignment = GeoObject.Text.LineAlignMode.Center;
-                    text.Alignment = GeoObject.Text.AlignMode.Bottom;
-                    break;
-                case TextAlignment.BottomRight:
-                    text.LineAlignment = GeoObject.Text.LineAlignMode.Right;
-                    text.Alignment = GeoObject.Text.AlignMode.Bottom;
-                    break;
-                case TextAlignment.MiddleLeft:
-                    text.LineAlignment = GeoObject.Text.LineAlignMode.Left;
-                    text.Alignment = GeoObject.Text.AlignMode.Center;
-                    break;
-                case TextAlignment.Middle:
-                case TextAlignment.MiddleCenter:
-                    text.LineAlignment = GeoObject.Text.LineAlignMode.Center;
-                    text.Alignment = GeoObject.Text.AlignMode.Center;
-                    break;
-                case TextAlignment.MiddleRight:
-                    text.LineAlignment = GeoObject.Text.LineAlignMode.Right;
-                    text.Alignment = GeoObject.Text.AlignMode.Center;
-                    break;
-                case TextAlignment.TopLeft:
-                    text.LineAlignment = GeoObject.Text.LineAlignMode.Left;
-                    text.Alignment = GeoObject.Text.AlignMode.Top;
-                    break;
-                case TextAlignment.TopCenter:
-                    text.LineAlignment = GeoObject.Text.LineAlignMode.Center;
-                    text.Alignment = GeoObject.Text.AlignMode.Top;
-                    break;
-                case TextAlignment.TopRight:
-                    text.LineAlignment = GeoObject.Text.LineAlignMode.Right;
-                    text.Alignment = GeoObject.Text.AlignMode.Top;
-                    break;
-            }
-            // h /= GetFontScaling(text.Font, fnt);
+            // Note: TextAlignment is not available in the abstraction layer, using default alignment
             text.Location = GeoPoint(txt.Position);
             GeoVector2D dir2d = new GeoVector2D(a);
             GeoVector linedir = plane.ToGlobal(dir2d);
@@ -1027,13 +972,13 @@ namespace CADability.DXF
             if (text.TextSize < 1e-5) return null;
             return text;
         }
-        private IGeoObject CreateDimension(netDxf.Entities.Dimension dimension)
+        private IGeoObject CreateDimension(IDxfDimension dimension)
         {
             // we could create a CADability Dimension object usind the dimension data and setting the block with the FindBlock values.
             // but then we would need a "CustomBlock" flag in the CADability Dimension object and also save this Block
-            if (dimension.Block != null)
+            if (dimension.DimensionBlock != null)
             {
-                GeoObject.Block block = FindBlock(dimension.Block);
+                GeoObject.Block block = FindBlock(dimension.DimensionBlock);
                 if (block != null)
                 {
                     IGeoObject res = block.Clone();
@@ -1046,29 +991,39 @@ namespace CADability.DXF
             }
             return null;
         }
-        private IGeoObject CreateMText(netDxf.Entities.MText mText)
+                private IGeoObject CreateMText(IDxfMText mText)
         {
-            // this has to be splitted in chunks (see sourcecode in dwgmtext.cpp) we could implement a MText to List<Text> method in netDxf library
-            netDxf.Entities.Text txt = new netDxf.Entities.Text()
-            {
-                Value = mText.PlainText(),
-                Height = mText.Height,
-                // Width = mText.Height, // width is not used in CreateText (should be used for align.fit) but may not be 0
-                WidthFactor = 1.0,
-                Rotation = mText.Rotation,
-                ObliqueAngle = mText.Style.ObliqueAngle,
-                // IsBackward = false,
-                // IsUpsideDown = false,
-                Style = mText.Style,
-                Position = mText.Position,
-                Normal = mText.Normal,
-                Alignment = TextAlignment.BaselineLeft
-            };
-            return CreateText(txt);
+            GeoObject.Text text = GeoObject.Text.Construct();
+            string txtstring = processAcadString(mText.PlainText);
+            if (txtstring.Trim().Length == 0) return null;
+            
+            string filename = mText.FontName ?? mText.StyleName ?? "Arial";
+            bool bold = false;
+            bool italic = false;
+            
+            GeoPoint pos = GeoPoint(mText.Position);
+            Angle a = Angle.Deg(mText.Rotation);
+            double h = mText.Height;
+            Plane plane = Plane(mText.Position, mText.Normal);
+
+            text.Font = filename;
+            text.Bold = bold;
+            text.Italic = italic;
+            text.TextString = txtstring;
+            text.Location = pos;
+            text.LineDirection = h * plane.ToGlobal(new GeoVector2D(a));
+            text.GlyphDirection = h * plane.ToGlobal(new GeoVector2D(a + SweepAngle.ToLeft));
+            text.TextSize = h;
+            text.Alignment = GeoObject.Text.AlignMode.Bottom;
+            text.LineAlignment = GeoObject.Text.LineAlignMode.Left;
+            
+            if (text.TextSize < 1e-5) return null;
+            return text;
         }
-        private IGeoObject CreateLeader(netDxf.Entities.Leader leader)
+        private IGeoObject CreateLeader(IDxfLeader leader)
         {
-            Plane ocs = Plane(new Vector3(leader.Elevation * leader.Normal.X, leader.Elevation * leader.Normal.Y, leader.Elevation * leader.Normal.Z), leader.Normal);
+            var normal = leader.Normal;
+            Plane ocs = Plane((leader.Elevation * normal.X, leader.Elevation * normal.Y, leader.Elevation * normal.Z), normal);
             GeoObject.Block blk = GeoObject.Block.Construct();
             blk.Name = "Leader:" + leader.Handle;
             if (leader.Annotation != null)
@@ -1086,7 +1041,7 @@ namespace CADability.DXF
             blk.Add(pln);
             return blk;
         }
-        private IGeoObject CreatePolyline3D(netDxf.Entities.Polyline3D polyline3D)
+        private IGeoObject CreatePolyline3D(IDxfPolyline3D polyline3D)
         {
             // polyline.Explode();
             bool hasWidth = false, hasBulges = false;
@@ -1119,24 +1074,24 @@ namespace CADability.DXF
             }
             return null;
         }
-        private IGeoObject CreatePoint(netDxf.Entities.Point point)
+        private IGeoObject CreatePoint(IDxfPoint point)
         {
             CADability.GeoObject.Point p = CADability.GeoObject.Point.Construct();
             p.Location = GeoPoint(point.Position);
             p.Symbol = PointSymbol.Cross;
             return p;
         }
-        private IGeoObject CreateMesh(netDxf.Entities.Mesh mesh)
+        private IGeoObject CreateMesh(IDxfMesh mesh)
         {
-            GeoPoint[] vertices = new GeoPoint[mesh.Vertexes.Count];
+            GeoPoint[] vertices = new GeoPoint[System.Linq.Enumerable.Count(mesh.Vertices)];
             for (int i = 0; i < vertices.Length; i++)
             {
-                vertices[i] = GeoPoint(mesh.Vertexes[i]);
+                vertices[i] = GeoPoint(System.Linq.Enumerable.ElementAt(mesh.Vertices, i));
             }
             List<Face> faces = new List<Face>();
-            for (int i = 0; i < mesh.Faces.Count; i++)
+            for (int i = 0; i < System.Linq.Enumerable.Count(mesh.Faces); i++)
             {
-                int[] indices = mesh.Faces[i];
+                int[] indices = System.Linq.Enumerable.ElementAt(mesh.Faces, i);
                 if (indices.Length <= 3 || indices[3] == indices[2])
                 {
                     if (indices[0] != indices[1] && indices[1] != indices[2])

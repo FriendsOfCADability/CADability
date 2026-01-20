@@ -739,7 +739,7 @@ namespace CADability.DXF
                 GeoObject.Hatch res = GeoObject.Hatch.Construct();
                 res.CompoundShape = cs;
                 res.Plane = pln;
-                if (hatch.Pattern.Fill == HatchFillType.SolidFill)
+                if (hatch.Pattern.Fill.Equals(HatchFillType.SolidFill))
                 {
                     HatchStyleSolid hst = FindOrCreateSolidHatchStyle(hatch.Layer.Color.ToColor());
                     res.HatchStyle = hst;

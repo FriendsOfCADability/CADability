@@ -52,6 +52,12 @@
 
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="" />
+    <None Include="DXF\ACADSHARP_IMPLEMENTATION.md" />
+    <None Include="DXF\ACADSHARP_INTEGRATION_SUMMARY.md" />
+    <None Include="DXF\COMPLETION_STATUS.md" />
+    <None Include="DXF\IMPLEMENTATION_SUMMARY.md" />
+    <None Include="DXF\README.md" />
+    <None Include="DXF\REFACTORING_GUIDE.md" />
   </ItemGroup>
 
   <ItemGroup>
@@ -79,15 +85,24 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="DXF\Adapters\ACadSharpLibraryAdapter.cs" />
+    <Compile Include="DXF\Adapters\NetDxfLibraryAdapter.cs" />
+    <Compile Include="DXF\DxfLibraryFactory.cs" />
+    <Compile Include="DXF\DxfSettings.cs" />
+    <Compile Include="DXF\IDxfLibrary.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="MenuResource.xml" />
     <EmbeddedResource Include="StringTableDeutsch.xml" />
     <EmbeddedResource Include="StringTableEnglish.xml" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="ACadSharp" Version="3.3.23" />
     <PackageReference Include="MathNet.Numerics.Signed" Version="5.0.0" />
     <PackageReference Include="System.Drawing.Common" Version="6.0.0" />
-    <PackageReference Include="System.Text.Encoding.CodePages" Version="6.0.0" />
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="9.0.6" />
     <Reference Include="Microsoft.VisualStudio.DebuggerVisualizers">
       <HintPath>$(VsInstallRoot)\Common7\IDE\PublicAssemblies\Microsoft.VisualStudio.DebuggerVisualizers.dll</HintPath>
     </Reference>

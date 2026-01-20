@@ -414,36 +414,33 @@ namespace CADability.DXF
             }
             return e;
         }
-        private IGeoObject CreateEllipse(IDxfEllipse ellipse)
+                private IGeoObject CreateEllipse(IDxfEllipse ellipse)
         {
             GeoObject.Ellipse e = GeoObject.Ellipse.Construct();
             Plane plane = Plane(ellipse.Center, ellipse.Normal);
-            ModOp2D rot = ModOp2D.Rotate(Angle.Deg(ellipse.Rotation));
-            GeoVector2D majorAxis = 0.5 * ellipse.MajorAxisEnd.X * 2 * (rot * GeoVector2D.XAxis);
-            GeoVector2D minorAxis = 0.5 * ellipse.MinorAxisRatio * ellipse.MajorAxisEnd.X * 2 * (rot * GeoVector2D.YAxis);
-            e.SetEllipseCenterAxis(GeoPoint(ellipse.Center), plane.ToGlobal(majorAxis), plane.ToGlobal(minorAxis));
+            
+            // Calculate major and minor axis from the abstraction properties
+            GeoVector majorAxisVec = GeoVector(ellipse.MajorAxisEnd);
+            double majorAxisLength = majorAxisVec.Length;
+            double minorAxisLength = majorAxisLength * ellipse.MinorAxisRatio;
+            
+            GeoVector2D majorAxis2D = plane.Project(majorAxisVec).ToVector();
+            if (majorAxis2D.IsNullVector()) majorAxis2D = GeoVector2D.XAxis * (majorAxisLength / 2);
+            else majorAxis2D.Length = majorAxisLength / 2;
+            
+            GeoVector2D minorAxis2D = majorAxis2D.ToLeft();
+            minorAxis2D.Length = minorAxisLength / 2;
+            
+            e.SetEllipseCenterAxis(GeoPoint(ellipse.Center), plane.ToGlobal(majorAxis2D), plane.ToGlobal(minorAxis2D));
 
-            // Vector2 startPoint calculation removed - using angles directly
-            double sp = ellipse.StartAngle;
-
-            // Vector2 endPoint calculation removed - using angles directly
-            double ep = ellipse.EndAngle;
-
-            e.StartParameter = sp;
-            e.SweepParameter = ep - sp;
+            e.StartParameter = ellipse.StartAngle;
+            e.SweepParameter = ellipse.EndAngle - ellipse.StartAngle;
             if (e.SweepParameter == 0.0) e.SweepParameter = Math.PI * 2.0;
-            if (e.SweepParameter < 0.0) e.SweepParameter += Math.PI * 2.0; // seems it is always counterclockwise
-            // it looks like clockwise 2d ellipses are defined with normal vector (0, 0, -1)
+            if (e.SweepParameter < 0.0) e.SweepParameter += Math.PI * 2.0;
             return e;
         }
 
-        private double CalcStartEndParameter(Vector2 startEndPoint, double majorAxis, double minorAxis)
-        {
-            double a = 1 / (0.5 * majorAxis);
-            double b = 1 / (0.5 * minorAxis);
-            double parameter = Math.Atan2(startEndPoint.Y * b, startEndPoint.X * a);
-            return parameter;
-        }
+        
 
         private IGeoObject CreateSpline(IDxfSpline spline)
         {
@@ -539,9 +536,9 @@ namespace CADability.DXF
                         else
                             usedCurves = approxCurve.SubCurves.Length;
 
-                        // Polyline2D conversion not available in abstraction
-                        // var p2d = CreatePolyline2DFromSpline(spline, usedCurves);
-                        // return bsp; // fallback to spline
+                                            // Polyline2D conversion not available in abstraction layer
+                        // Fallback to returning the BSpline
+                        return bsp;
                         
                         return res;
                     }
@@ -610,23 +607,23 @@ namespace CADability.DXF
             return null;
 
         }
-        private IGeoObject CreatePolyfaceMesh(IDxfPolyfaceMesh polyfacemesh)
+                private IGeoObject CreatePolyfaceMesh(IDxfPolyfaceMesh polyfacemesh)
         {
             polyfacemesh.Explode();
 
-            GeoPoint[] vertices = new GeoPoint[polyfacemesh.Vertices.Length];
+            var vertexArray = polyfacemesh.Vertices;
+            GeoPoint[] vertices = new GeoPoint[vertexArray.Length];
             for (int i = 0; i < vertices.Length; i++)
             {
-                vertices[i] = GeoPoint(System.Linq.Enumerable.ElementAt(polyfacemesh.Vertices, i)); // there is more information, I would need a good example
+                vertices[i] = GeoPoint(vertexArray[i]);
             }
 
             List<Face> faces = new List<Face>();
-            for (int i = 0; i < polyfaceSystem.Linq.Enumerable.Count(mesh.Faces); i++)
+            foreach (short[] indices in polyfacemesh.Faces)
             {
-                short[] indices = polyfaceSystem.Linq.Enumerable.ElementAt(mesh.Faces, i).VertexIndexes;
                 for (int j = 0; j < indices.Length; j++)
                 {
-                    indices[j] = (short)(Math.Abs(indices[j]) - 1); // why? what does it mean?
+                    indices[j] = (short)(Math.Abs(indices[j]) - 1);
                 }
                 if (indices.Length <= 3 || indices[3] == indices[2])
                 {
@@ -776,20 +773,20 @@ namespace CADability.DXF
                 return null;
             }
         }
-        private IGeoObject CreateSolid(IDxfSolid solid)
+                private IGeoObject CreateSolid(IDxfSolid solid)
         {
             var normal = solid.Normal;
             Plane ocs = Plane((solid.Elevation * normal.X, solid.Elevation * normal.Y, solid.Elevation * normal.Z), normal);
-            // not sure, whether the ocs is correct, maybe the position is (0,0,solid.Elevation)
 
-            HatchStyleSolid hst = FindOrCreateSolidHatchStyle(solid.Color.ToColor());
+            Color clr = Color.Black; // Default color
+            HatchStyleSolid hst = FindOrCreateSolidHatchStyle(clr);
             List<GeoPoint> points = new List<GeoPoint>();
             points.Add(ocs.ToGlobal(new GeoPoint2D(solid.FirstVertex.X, solid.FirstVertex.Y)));
             points.Add(ocs.ToGlobal(new GeoPoint2D(solid.SecondVertex.X, solid.SecondVertex.Y)));
             points.Add(ocs.ToGlobal(new GeoPoint2D(solid.ThirdVertex.X, solid.ThirdVertex.Y)));
             points.Add(ocs.ToGlobal(new GeoPoint2D(solid.FourthVertex.X, solid.FourthVertex.Y)));
             for (int i = 3; i > 0; --i)
-            {   // gleiche Punkte wegmachen
+            {
                 for (int j = 0; j < i; ++j)
                 {
                     if (Precision.IsEqual(points[j], points[i]))
@@ -841,11 +838,10 @@ namespace CADability.DXF
         }
         private IGeoObject CreatePolyline2D(IDxfPolyline2D polyline2D)
         {
-            var exploded = polyline2D.Explode();
             List<IGeoObject> path = new List<IGeoObject>();
-            for (int i = 0; i < exploded.Count; i++)
+            foreach (var item in polyline2D.Explode())
             {
-                IGeoObject ent = GeoObjectFromEntity(exploded[i]);
+                IGeoObject ent = GeoObjectFromEntity(item);
                 if (ent != null) path.Add(ent);
             }
             GeoObject.Path go = GeoObject.Path.Construct();
@@ -855,11 +851,10 @@ namespace CADability.DXF
         }
         private IGeoObject CreateMLine(IDxfMLine mLine)
         {
-            var exploded = mLine.Explode();
             List<IGeoObject> path = new List<IGeoObject>();
-            for (int i = 0; i < exploded.Count; i++)
+            foreach (var item in mLine.Explode())
             {
-                IGeoObject ent = GeoObjectFromEntity(exploded[i]);
+                IGeoObject ent = GeoObjectFromEntity(item);
                 if (ent != null) path.Add(ent);
             }
             GeoObjectList list = new GeoObjectList(path);
@@ -1020,7 +1015,7 @@ namespace CADability.DXF
             if (text.TextSize < 1e-5) return null;
             return text;
         }
-        private IGeoObject CreateLeader(IDxfLeader leader)
+                private IGeoObject CreateLeader(IDxfLeader leader)
         {
             var normal = leader.Normal;
             Plane ocs = Plane((leader.Elevation * normal.X, leader.Elevation * normal.Y, leader.Elevation * normal.Z), normal);
@@ -1031,48 +1026,27 @@ namespace CADability.DXF
                 IGeoObject annotation = GeoObjectFromEntity(leader.Annotation);
                 if (annotation != null) blk.Add(annotation);
             }
-            GeoPoint[] vtx = new GeoPoint[leader.Vertexes.Count];
+            var vertices = leader.Vertices.ToArray();
+            GeoPoint[] vtx = new GeoPoint[vertices.Length];
             for (int i = 0; i < vtx.Length; i++)
             {
-                vtx[i] = ocs.ToGlobal(new GeoPoint2D(leader.Vertexes[i].X, leader.Vertexes[i].Y));
+                vtx[i] = ocs.ToGlobal(new GeoPoint2D(vertices[i].X, vertices[i].Y));
             }
             GeoObject.Polyline pln = GeoObject.Polyline.Construct();
             pln.SetPoints(vtx, false);
             blk.Add(pln);
             return blk;
         }
-        private IGeoObject CreatePolyline3D(IDxfPolyline3D polyline3D)
+                private IGeoObject CreatePolyline3D(IDxfPolyline3D polyline3D)
         {
-            // polyline.Explode();
-            bool hasWidth = false, hasBulges = false;
-            for (int i = 0; i < polyline3D.Vertexes.Count; i++)
+            GeoObject.Polyline res = GeoObject.Polyline.Construct();
+            foreach (var vertex in polyline3D.Vertices)
             {
-                //hasBulges |= polyline.Vertexes[i].Bulge != 0.0;
-                //hasWidth |= (polyline.Vertexes[i].StartWidth != 0.0) || (polyline.Vertexes[i].EndWidth != 0.0);
+                res.AddPoint(GeoPoint(vertex));
             }
-            if (hasWidth && !hasBulges)
-            {
-
-            }
-            else
-            {
-                if (hasBulges)
-                {   // must be in a single plane
-
-                }
-                else
-                {
-                    GeoObject.Polyline res = GeoObject.Polyline.Construct();
-                    for (int i = 0; i < polyline3D.Vertexes.Count; ++i)
-                    {
-                        res.AddPoint(GeoPoint(polyline3D.Vertexes[i]));
-                    }
-                    res.IsClosed = polyline3D.IsClosed;
-                    if (res.GetExtent(0.0).Size < 1e-6) return null; // only identical points
-                    return res;
-                }
-            }
-            return null;
+            res.IsClosed = polyline3D.IsClosed;
+            if (res.GetExtent(0.0).Size < 1e-6) return null;
+            return res;
         }
         private IGeoObject CreatePoint(IDxfPoint point)
         {
@@ -1081,17 +1055,17 @@ namespace CADability.DXF
             p.Symbol = PointSymbol.Cross;
             return p;
         }
-        private IGeoObject CreateMesh(IDxfMesh mesh)
+                private IGeoObject CreateMesh(IDxfMesh mesh)
         {
-            GeoPoint[] vertices = new GeoPoint[System.Linq.Enumerable.Count(mesh.Vertices)];
+            var vertexList = mesh.Vertices.ToArray();
+            GeoPoint[] vertices = new GeoPoint[vertexList.Length];
             for (int i = 0; i < vertices.Length; i++)
             {
-                vertices[i] = GeoPoint(System.Linq.Enumerable.ElementAt(mesh.Vertices, i));
+                vertices[i] = GeoPoint(vertexList[i]);
             }
             List<Face> faces = new List<Face>();
-            for (int i = 0; i < System.Linq.Enumerable.Count(mesh.Faces); i++)
+            foreach (int[] indices in mesh.Faces)
             {
-                int[] indices = System.Linq.Enumerable.ElementAt(mesh.Faces, i);
                 if (indices.Length <= 3 || indices[3] == indices[2])
                 {
                     if (indices[0] != indices[1] && indices[1] != indices[2])

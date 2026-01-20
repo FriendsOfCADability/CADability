@@ -33,6 +33,11 @@ namespace CADability.DXF
         /// Creates a new DXF document for export.
         /// </summary>
         IDxfDocument CreateDocument();
+
+        /// <summary>
+        /// Gets the entity factory for creating new DXF entities.
+        /// </summary>
+        IDxfEntityFactory EntityFactory { get; }
     }
 
     /// <summary>
@@ -450,5 +455,71 @@ namespace CADability.DXF
         SolidFill,
         PatternFill,
         GradientFill
+    }
+
+    /// <summary>
+    /// Factory for creating DXF entities for export.
+    /// </summary>
+    public interface IDxfEntityFactory
+    {
+        /// <summary>
+        /// Creates a new line entity.
+        /// </summary>
+        IDxfEntity CreateLine((double X, double Y, double Z) start, (double X, double Y, double Z) end);
+
+        /// <summary>
+        /// Creates a new arc entity.
+        /// </summary>
+        IDxfEntity CreateArc((double X, double Y, double Z) center, double radius, double startAngle, double endAngle, (double X, double Y, double Z) normal);
+
+        /// <summary>
+        /// Creates a new circle entity.
+        /// </summary>
+        IDxfEntity CreateCircle((double X, double Y, double Z) center, double radius, (double X, double Y, double Z) normal);
+
+        /// <summary>
+        /// Creates a new ellipse entity.
+        /// </summary>
+        IDxfEntity CreateEllipse((double X, double Y, double Z) center, double majorAxis, double minorAxis, double rotation, (double X, double Y, double Z) normal);
+
+        /// <summary>
+        /// Creates a new point entity.
+        /// </summary>
+        IDxfEntity CreatePoint((double X, double Y, double Z) location);
+
+        /// <summary>
+        /// Creates a new text entity.
+        /// </summary>
+        IDxfEntity CreateText(string value, (double X, double Y, double Z) position, double height);
+
+        /// <summary>
+        /// Creates a new spline entity.
+        /// </summary>
+        IDxfEntity CreateSpline((double X, double Y, double Z)[] controlPoints, double[] weights, double[] knots, int degree, bool isClosed);
+
+        /// <summary>
+        /// Creates a new 3D polyline entity.
+        /// </summary>
+        IDxfEntity CreatePolyline3D((double X, double Y, double Z)[] vertices, bool isClosed);
+
+        /// <summary>
+        /// Creates a new polyface mesh entity.
+        /// </summary>
+        IDxfEntity CreatePolyfaceMesh((double X, double Y, double Z)[] vertices, short[][] faces);
+
+        /// <summary>
+        /// Creates a new mesh entity.
+        /// </summary>
+        IDxfEntity CreateMesh((double X, double Y, double Z)[] vertices, int[][] faces);
+
+        /// <summary>
+        /// Creates a new block.
+        /// </summary>
+        IDxfBlock CreateBlock(string name, IDxfEntity[] entities);
+
+        /// <summary>
+        /// Creates a new insert (block reference) entity.
+        /// </summary>
+        IDxfEntity CreateInsert(IDxfBlock block, (double X, double Y, double Z) position);
     }
 }

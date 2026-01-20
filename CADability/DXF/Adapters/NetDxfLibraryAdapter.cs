@@ -15,7 +15,16 @@ namespace CADability.DXF.Adapters
     /// </summary>
     public class NetDxfLibraryAdapter : IDxfLibrary
     {
+        private readonly NetDxfEntityFactory entityFactory;
+
+        public NetDxfLibraryAdapter()
+        {
+            entityFactory = new NetDxfEntityFactory();
+        }
+
         public string LibraryName => "netDxf";
+
+        public IDxfEntityFactory EntityFactory => entityFactory;
 
         public bool CanImportVersion(string fileName)
         {
@@ -821,6 +830,125 @@ namespace CADability.DXF.Adapters
                 return new NetDxfTextAdapter(text);
             else
                 return new NetDxfEntityAdapter(e);
+        }
+    }
+
+    /// <summary>
+    /// netDxf implementation of entity factory for creating DXF entities.
+    /// </summary>
+    internal class NetDxfEntityFactory : IDxfEntityFactory
+    {
+        public IDxfEntity CreateLine((double X, double Y, double Z) start, (double X, double Y, double Z) end)
+        {
+            var line = new netDxf.Entities.Line(
+                new Vector3(start.X, start.Y, start.Z),
+                new Vector3(end.X, end.Y, end.Z));
+            return new NetDxfLineAdapter(line);
+        }
+
+        public IDxfEntity CreateArc((double X, double Y, double Z) center, double radius, double startAngle, double endAngle, (double X, double Y, double Z) normal)
+        {
+            var arc = new netDxf.Entities.Arc(
+                new Vector3(center.X, center.Y, center.Z),
+                radius,
+                startAngle,
+                endAngle)
+            {
+                Normal = new Vector3(normal.X, normal.Y, normal.Z)
+            };
+            return new NetDxfArcAdapter(arc);
+        }
+
+        public IDxfEntity CreateCircle((double X, double Y, double Z) center, double radius, (double X, double Y, double Z) normal)
+        {
+            var circle = new netDxf.Entities.Circle(
+                new Vector3(center.X, center.Y, center.Z),
+                radius)
+            {
+                Normal = new Vector3(normal.X, normal.Y, normal.Z)
+            };
+            return new NetDxfCircleAdapter(circle);
+        }
+
+        public IDxfEntity CreateEllipse((double X, double Y, double Z) center, double majorAxis, double minorAxis, double rotation, (double X, double Y, double Z) normal)
+        {
+            var ellipse = new netDxf.Entities.Ellipse(
+                new Vector3(center.X, center.Y, center.Z),
+                majorAxis,
+                minorAxis)
+            {
+                Rotation = rotation,
+                Normal = new Vector3(normal.X, normal.Y, normal.Z)
+            };
+            return new NetDxfEllipseAdapter(ellipse);
+        }
+
+        public IDxfEntity CreatePoint((double X, double Y, double Z) location)
+        {
+            var point = new netDxf.Entities.Point(
+                new Vector3(location.X, location.Y, location.Z));
+            return new NetDxfPointAdapter(point);
+        }
+
+        public IDxfEntity CreateText(string value, (double X, double Y, double Z) position, double height)
+        {
+            var text = new netDxf.Entities.Text(
+                value,
+                new Vector2(position.X, position.Y),
+                height);
+            return new NetDxfTextAdapter(text);
+        }
+
+        public IDxfEntity CreateSpline((double X, double Y, double Z)[] controlPoints, double[] weights, double[] knots, int degree, bool isClosed)
+        {
+            var poles = controlPoints.Select(p => new Vector3(p.X, p.Y, p.Z)).ToList();
+            var spline = new netDxf.Entities.Spline(poles, weights?.ToList(), knots?.ToList(), (short)degree, isClosed);
+            return new NetDxfSplineAdapter(spline);
+        }
+
+        public IDxfEntity CreatePolyline3D((double X, double Y, double Z)[] vertices, bool isClosed)
+        {
+            var verts = vertices.Select(v => new Vector3(v.X, v.Y, v.Z)).ToList();
+            var polyline = new netDxf.Entities.Polyline3D(verts, isClosed);
+            return new NetDxfPolyline3DAdapter(polyline);
+        }
+
+        public IDxfEntity CreatePolyfaceMesh((double X, double Y, double Z)[] vertices, short[][] faces)
+        {
+            var verts = vertices.Select(v => new Vector3(v.X, v.Y, v.Z)).ToList();
+            var mesh = new netDxf.Entities.PolyfaceMesh(verts, faces.ToList());
+            return new NetDxfPolyfaceMeshAdapter(mesh);
+        }
+
+        public IDxfEntity CreateMesh((double X, double Y, double Z)[] vertices, int[][] faces)
+        {
+            var verts = vertices.Select(v => new Vector3(v.X, v.Y, v.Z)).ToArray();
+            var mesh = new netDxf.Entities.Mesh(verts, faces);
+            return new NetDxfMeshAdapter(mesh);
+        }
+
+        public IDxfBlock CreateBlock(string name, IDxfEntity[] entities)
+        {
+            var entityObjects = new List<EntityObject>();
+            foreach (var entity in entities)
+            {
+                if (entity is NetDxfEntityAdapter adapter)
+                {
+                    entityObjects.Add(adapter.WrappedEntity);
+                }
+            }
+            var block = new Block(name, entityObjects);
+            return new NetDxfBlockAdapter(block);
+        }
+
+        public IDxfEntity CreateInsert(IDxfBlock block, (double X, double Y, double Z) position)
+        {
+            if (block is NetDxfBlockAdapter blockAdapter)
+            {
+                var insert = new Insert(blockAdapter.WrappedBlock, new Vector3(position.X, position.Y, position.Z));
+                return new NetDxfInsertAdapter(insert, null);
+            }
+            throw new ArgumentException("Block must be a NetDxfBlockAdapter", nameof(block));
         }
     }
 }

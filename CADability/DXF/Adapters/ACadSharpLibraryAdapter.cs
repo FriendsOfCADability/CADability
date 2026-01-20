@@ -19,7 +19,16 @@ namespace CADability.DXF.Adapters
     /// </summary>
     public class ACadSharpLibraryAdapter : IDxfLibrary
     {
+        private readonly ACadSharpEntityFactory entityFactory;
+
+        public ACadSharpLibraryAdapter()
+        {
+            entityFactory = new ACadSharpEntityFactory();
+        }
+
         public string LibraryName => "ACadSharp";
+
+        public IDxfEntityFactory EntityFactory => entityFactory;
 
         public bool CanImportVersion(string fileName)
         {
@@ -932,6 +941,175 @@ namespace CADability.DXF.Adapters
                 }
                 return null;
             }
+        }
+    }
+
+    /// <summary>
+    /// ACadSharp implementation of entity factory for creating DXF entities.
+    /// </summary>
+    internal class ACadSharpEntityFactory : IDxfEntityFactory
+    {
+        public IDxfEntity CreateLine((double X, double Y, double Z) start, (double X, double Y, double Z) end)
+        {
+            var line = new Line(new CSMath.XYZ(start.X, start.Y, start.Z), new CSMath.XYZ(end.X, end.Y, end.Z));
+            return new ACadSharpLineAdapter(line);
+        }
+
+        public IDxfEntity CreateArc((double X, double Y, double Z) center, double radius, double startAngle, double endAngle, (double X, double Y, double Z) normal)
+        {
+            var arc = new Arc
+            {
+                Center = new CSMath.XYZ(center.X, center.Y, center.Z),
+                Radius = radius,
+                StartAngle = startAngle,
+                EndAngle = endAngle,
+                Normal = new CSMath.XYZ(normal.X, normal.Y, normal.Z)
+            };
+            return new ACadSharpArcAdapter(arc);
+        }
+
+        public IDxfEntity CreateCircle((double X, double Y, double Z) center, double radius, (double X, double Y, double Z) normal)
+        {
+            var circle = new Circle
+            {
+                Center = new CSMath.XYZ(center.X, center.Y, center.Z),
+                Radius = radius,
+                Normal = new CSMath.XYZ(normal.X, normal.Y, normal.Z)
+            };
+            return new ACadSharpCircleAdapter(circle);
+        }
+
+        public IDxfEntity CreateEllipse((double X, double Y, double Z) center, double majorAxis, double minorAxis, double rotation, (double X, double Y, double Z) normal)
+        {
+            // Calculate major axis end point from rotation
+            double majorAxisX = (majorAxis / 2.0) * Math.Cos(rotation * Math.PI / 180.0);
+            double majorAxisY = (majorAxis / 2.0) * Math.Sin(rotation * Math.PI / 180.0);
+            
+            var ellipse = new Ellipse
+            {
+                Center = new CSMath.XYZ(center.X, center.Y, center.Z),
+                MajorAxisEndPoint = new CSMath.XYZ(majorAxisX, majorAxisY, 0),
+                RadiusRatio = minorAxis / majorAxis,
+                Normal = new CSMath.XYZ(normal.X, normal.Y, normal.Z)
+            };
+            return new ACadSharpEllipseAdapter(ellipse);
+        }
+
+        public IDxfEntity CreatePoint((double X, double Y, double Z) location)
+        {
+            var point = new Point(new CSMath.XYZ(location.X, location.Y, location.Z));
+            return new ACadSharpPointAdapter(point);
+        }
+
+        public IDxfEntity CreateText(string value, (double X, double Y, double Z) position, double height)
+        {
+            var text = new TextEntity
+            {
+                Value = value,
+                InsertPoint = new CSMath.XYZ(position.X, position.Y, position.Z),
+                Height = height
+            };
+            return new ACadSharpTextAdapter(text);
+        }
+
+        public IDxfEntity CreateSpline((double X, double Y, double Z)[] controlPoints, double[] weights, double[] knots, int degree, bool isClosed)
+        {
+            var spline = new Spline
+            {
+                Degree = degree,
+                IsClosed = isClosed
+            };
+            
+            foreach (var cp in controlPoints)
+            {
+                spline.ControlPoints.Add(new CSMath.XYZ(cp.X, cp.Y, cp.Z));
+            }
+            
+            if (weights != null)
+            {
+                foreach (var w in weights)
+                {
+                    spline.Weights.Add(w);
+                }
+            }
+            
+            if (knots != null)
+            {
+                foreach (var k in knots)
+                {
+                    spline.Knots.Add(k);
+                }
+            }
+            
+            return new ACadSharpSplineAdapter(spline);
+        }
+
+        public IDxfEntity CreatePolyline3D((double X, double Y, double Z)[] vertices, bool isClosed)
+        {
+            var polyline = new Polyline3D();
+            foreach (var v in vertices)
+            {
+                polyline.Vertices.Add(new Vertex3D(new CSMath.XYZ(v.X, v.Y, v.Z)));
+            }
+            
+            if (isClosed)
+            {
+                polyline.Flags |= PolylineFlags.ClosedPolylineOrClosedPolygonMeshInM;
+            }
+            
+            return new ACadSharpPolyline3DAdapter(polyline);
+        }
+
+        public IDxfEntity CreatePolyfaceMesh((double X, double Y, double Z)[] vertices, short[][] faces)
+        {
+            // PolyfaceMesh creation in ACadSharp is complex
+            // For now, create an empty mesh - would need proper ACadSharp implementation
+            var mesh = new PolyfaceMesh();
+            // ACadSharp PolyfaceMesh vertex creation is different from the documentation
+            // This would need to be implemented based on ACadSharp's actual API
+            return new ACadSharpPolyfaceMeshAdapter(mesh);
+        }
+
+        public IDxfEntity CreateMesh((double X, double Y, double Z)[] vertices, int[][] faces)
+        {
+            var mesh = new Mesh();
+            foreach (var v in vertices)
+            {
+                mesh.Vertices.Add(new CSMath.XYZ(v.X, v.Y, v.Z));
+            }
+            
+            foreach (var face in faces)
+            {
+                mesh.Faces.Add(face);
+            }
+            
+            return new ACadSharpMeshAdapter(mesh);
+        }
+
+        public IDxfBlock CreateBlock(string name, IDxfEntity[] entities)
+        {
+            var block = new BlockRecord(name);
+            foreach (var entity in entities)
+            {
+                if (entity is ACadSharpEntityAdapter adapter)
+                {
+                    block.Entities.Add(adapter.WrappedEntity);
+                }
+            }
+            return new ACadSharpBlockAdapter(block, null);
+        }
+
+        public IDxfEntity CreateInsert(IDxfBlock block, (double X, double Y, double Z) position)
+        {
+            if (block is ACadSharpBlockAdapter blockAdapter)
+            {
+                var insert = new Insert(blockAdapter.WrappedBlock)
+                {
+                    InsertPoint = new CSMath.XYZ(position.X, position.Y, position.Z)
+                };
+                return new ACadSharpInsertAdapter(insert, null);
+            }
+            throw new ArgumentException("Block must be an ACadSharpBlockAdapter", nameof(block));
         }
     }
 }

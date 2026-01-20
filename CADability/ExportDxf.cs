@@ -425,8 +425,11 @@ namespace CADability.DXF
             if (elli.IsArc)
             {
                 Plane dxfPlane;
-                if (elli.CounterClockWise) dxfPlane = Import.Plane(Vector3(elli.Center), Vector3(elli.Plane.Normal));
-                else dxfPlane = Import.Plane(Vector3(elli.Center), Vector3(-elli.Plane.Normal));
+                var centerTuple = (Vector3(elli.Center).X, Vector3(elli.Center).Y, Vector3(elli.Center).Z);
+                var normalTuple = (Vector3(elli.Plane.Normal).X, Vector3(elli.Plane.Normal).Y, Vector3(elli.Plane.Normal).Z);
+                var negNormalTuple = (Vector3(-elli.Plane.Normal).X, Vector3(-elli.Plane.Normal).Y, Vector3(-elli.Plane.Normal).Z);
+                if (elli.CounterClockWise) dxfPlane = Plane(centerTuple, normalTuple);
+                else dxfPlane = Plane(centerTuple, negNormalTuple);
                 if (elli.IsCircle)
                 {
                     GeoObject.Ellipse aligned = GeoObject.Ellipse.Construct();
@@ -480,7 +483,7 @@ namespace CADability.DXF
                     netDxf.Entities.Ellipse expelli = new netDxf.Entities.Ellipse(Vector3(elli.Center), 2 * elli.MajorRadius, 2 * elli.MinorRadius);
                     entity = expelli;
                     entity.Normal = Vector3(elli.Plane.Normal);
-                    Plane dxfplane = Import.Plane(expelli.Center, expelli.Normal); // this plane is not correct, it has to be rotated
+                    Plane dxfplane = Plane((expelli.Center.X, expelli.Center.Y, expelli.Center.Z), (expelli.Normal.X, expelli.Normal.Y, expelli.Normal.Z)); // this plane is not correct, it has to be rotated
                     Plane cdbplane = elli.Plane;
                     GeoVector2D dir = dxfplane.Project(cdbplane.DirectionX);
                     SweepAngle rot = new SweepAngle(GeoVector2D.XAxis, dir);
@@ -629,6 +632,13 @@ namespace CADability.DXF
         {
             return new Vector3(p.x, p.y, p.z);
         }
+        
+        // Helper method to create a Plane from tuples
+        private static Plane Plane((double X, double Y, double Z) center, (double X, double Y, double Z) normal)
+        {
+            return new Plane(new GeoPoint(center.X, center.Y, center.Z), new GeoVector(normal.X, normal.Y, normal.Z));
+        }
+        
         private Vector3 Vector3(GeoVector v)
         {
             return new Vector3(v.x, v.y, v.z);

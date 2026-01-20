@@ -204,16 +204,26 @@ namespace CADability.DXF
                 }
             }
             HatchStyleLines nhsl = new HatchStyleLines();
-            string name = NewName(entity.Layer.Name, project.HatchStyleList);
+            string name = NewName(entity.LayerName ?? "Hatch", project.HatchStyleList);
             nhsl.Name = name;
             nhsl.LineAngle = lineAngle;
             nhsl.LineDistance = lineDistance;
             nhsl.ColorDef = project.ColorList.CreateOrFind(Color.FromArgb(layerTable[entity.LayerName] != null ? layerColorTable[entity.LayerName].Color.ToArgb() : Color.Black.ToArgb()).ToString(), Color.FromArgb(layerTable[entity.LayerName] != null ? layerColorTable[entity.LayerName].Color.ToArgb() : Color.Black.ToArgb()));
-            Lineweight lw = entity.Lineweight;
-            if (lw == Lineweight.ByLayer) lw = entity.Layer.Lineweight;
-            if (lw == Lineweight.ByBlock && entity.Owner != null) lw = entity.Owner.Layer.Lineweight; // not sure, but Block doesn't seem to have a lineweight
-            if (lw < 0) lw = 0;
-            nhsl.LineWidth = project.LineWidthList.CreateOrFind("DXF_" + lw.ToString(), ((int)lw) / 100.0);
+            int? lw = entity.LineWeight;
+            if (!lw.HasValue || lw.Value < 0)
+            {
+                // Try to get lineweight from layer
+                if (entity.LayerName != null && layerTable.TryGetValue(entity.LayerName, out var layer))
+                {
+                    // Use default lineweight if layer doesn't specify
+                    lw = 0;
+                }
+                else
+                {
+                    lw = 0;
+                }
+            }
+            nhsl.LineWidth = project.LineWidthList.CreateOrFind("DXF_" + lw.ToString(), lw.Value / 100.0);
             nhsl.LinePattern = FindOrcreateLinePattern(dashes);
             project.HatchStyleList.Add(nhsl);
             return nhsl;
@@ -312,7 +322,7 @@ namespace CADability.DXF
                 
                 foreach (var record in xdata.Records)
                 {
-                    edata.Data.Add(new KeyValuePair<XDataCode, object>((XDataCode)record.Code, record.Value));
+                    edata.Data.Add(new KeyValuePair<netDxf.XDataCode, object>((netDxf.XDataCode)record.Code, record.Value));
                 }
                 
                 go.UserData.Add(name, edata);
@@ -424,12 +434,12 @@ namespace CADability.DXF
             double majorAxisLength = majorAxisVec.Length;
             double minorAxisLength = majorAxisLength * ellipse.MinorAxisRatio;
             
-            GeoVector2D majorAxis2D = plane.Project(majorAxisVec).ToVector();
-            if (majorAxis2D.IsNullVector()) majorAxis2D = GeoVector2D.XAxis * (majorAxisLength / 2);
-            else majorAxis2D.Length = majorAxisLength / 2;
+            GeoVector2D majorAxis2D = plane.Project(majorAxisVec);
+            if (majorAxis2D.IsNullVector()) majorAxis2D = new GeoVector2D(majorAxisLength / 2, 0);
+            else majorAxis2D = (majorAxisLength / 2) * majorAxis2D.Normalized;
             
             GeoVector2D minorAxis2D = majorAxis2D.ToLeft();
-            minorAxis2D.Length = minorAxisLength / 2;
+            minorAxis2D = (minorAxisLength / 2) * minorAxis2D.Normalized;
             
             e.SetEllipseCenterAxis(GeoPoint(ellipse.Center), plane.ToGlobal(majorAxis2D), plane.ToGlobal(minorAxis2D));
 
@@ -445,13 +455,14 @@ namespace CADability.DXF
         private IGeoObject CreateSpline(IDxfSpline spline)
         {
             int degree = spline.Degree;
-            if (spline.ControlPoints.Length == 0 && spline.FitPoints.Count > 0)
+            var fitPointsArray = spline.FitPoints.ToArray();
+            if (spline.ControlPoints.Length == 0 && fitPointsArray.Length > 0)
             {
                 BSpline bsp = BSpline.Construct();
-                GeoPoint[] fp = new GeoPoint[spline.FitPoints.Count];
+                GeoPoint[] fp = new GeoPoint[fitPointsArray.Length];
                 for (int i = 0; i < fp.Length; i++)
                 {
-                    fp[i] = GeoPoint(spline.FitPoints[i]);
+                    fp[i] = GeoPoint(fitPointsArray[i]);
                 }
                 bsp.ThroughPoints(fp, spline.Degree, spline.IsClosed);
                 return bsp;
@@ -536,11 +547,9 @@ namespace CADability.DXF
                         else
                             usedCurves = approxCurve.SubCurves.Length;
 
-                                            // Polyline2D conversion not available in abstraction layer
+                        // Polyline2D conversion not available in abstraction layer
                         // Fallback to returning the BSpline
                         return bsp;
-                        
-                        return res;
                     }
 
                     return bsp;
@@ -676,16 +685,17 @@ namespace CADability.DXF
             bool ok = true;
             List<ICurve2D> allCurves = new List<ICurve2D>();
             Plane pln = CADability.Plane.XYPlane;
-            for (int i = 0; i < hatch.BoundaryPaths.Count; i++)
+            var boundaryPathsArray = hatch.BoundaryPaths.ToArray();
+            for (int i = 0; i < boundaryPathsArray.Length; i++)
             {
 
                 // System.Diagnostics.Trace.WriteLine("Loop: " + i.ToString());
                 //OdDbHatch.HatchLoopType.kExternal
                 // hatch.BoundaryPaths[i].PathType
                 List<ICurve> boundaryEntities = new List<ICurve>();
-                for (int j = 0; j < hatch.BoundaryPaths[i].Edges.Count; j++)
+                foreach (var edge in boundaryPathsArray[i].Edges)
                 {
-                    IGeoObject ent = GeoObjectFromEntity(hatch.BoundaryPaths[i].Edges[j].ConvertTo());
+                    IGeoObject ent = GeoObjectFromEntity(edge);
                     if (ent is ICurve crv) boundaryEntities.Add(crv);
                 }
                 //for (int j = 0; j < hatch.BoundaryPaths[i].Entities.Count; j++)
@@ -705,7 +715,7 @@ namespace CADability.DXF
                 try
                 {
                     Border border = Border.FromUnorientedList(bdr, true);
-                    HatchBoundaryPathTypeFlags flag = hatch.BoundaryPaths[i].PathType;
+                    // Remove HatchBoundaryPathTypeFlags reference as it's not available
                     allCurves.AddRange(bdr);
                     if (border != null)
                     {
@@ -739,22 +749,32 @@ namespace CADability.DXF
                 res.Plane = pln;
                 if (hatch.Pattern.FillType == HatchFillType.SolidFill)
                 {
-                    HatchStyleSolid hst = FindOrCreateSolidHatchStyle(hatch.Layer.Color.ToColor());
+                    Color clr = Color.Black; // default color
+                    if (hatch.ColorArgb.HasValue)
+                    {
+                        clr = Color.FromArgb(hatch.ColorArgb.Value);
+                    }
+                    else if (hatch.LayerName != null && layerColorTable.TryGetValue(hatch.LayerName, out ColorDef layerColor))
+                    {
+                        clr = layerColor.Color;
+                    }
+                    HatchStyleSolid hst = FindOrCreateSolidHatchStyle(clr);
                     res.HatchStyle = hst;
                     return res;
                 }
                 else
                 {
                     GeoObjectList list = new GeoObjectList();
-                    for (int i = 0; i < hatch.Pattern.LineDefinitions.Count; i++)
+                    var lineDefinitionsArray = hatch.Pattern.LineDefinitions.ToArray();
+                    for (int i = 0; i < lineDefinitionsArray.Length; i++)
                     {
                         if (i > 0) res = res.Clone() as GeoObject.Hatch;
-                        double lineAngle = Angle.Deg(hatch.Pattern.LineDefinitions[i].Angle);
-                        double baseX = hatch.Pattern.LineDefinitions[i].Origin.X;
-                        double baseY = hatch.Pattern.LineDefinitions[i].Origin.Y;
-                        double offsetX = hatch.Pattern.LineDefinitions[i].Delta.X;
-                        double offsetY = hatch.Pattern.LineDefinitions[i].Delta.Y;
-                        double[] dashes = hatch.Pattern.LineDefinitions[i].DashPattern.ToArray();
+                        double lineAngle = Angle.Deg(lineDefinitionsArray[i].Angle);
+                        double baseX = lineDefinitionsArray[i].Origin.X;
+                        double baseY = lineDefinitionsArray[i].Origin.Y;
+                        double offsetX = lineDefinitionsArray[i].Delta.X;
+                        double offsetY = lineDefinitionsArray[i].Delta.Y;
+                        double[] dashes = lineDefinitionsArray[i].DashPattern;
                         HatchStyleLines hsl = FindOrCreateHatchStyleLines(hatch, lineAngle, Math.Sqrt(offsetX * offsetX + offsetY * offsetY), dashes);
                         res.HatchStyle = hsl;
                         list.Add(res);
@@ -992,7 +1012,7 @@ namespace CADability.DXF
             string txtstring = processAcadString(mText.PlainText);
             if (txtstring.Trim().Length == 0) return null;
             
-            string filename = mText.FontName ?? mText.StyleName ?? "Arial";
+            string filename = mText.StyleName ?? "Arial";
             bool bold = false;
             bool italic = false;
             

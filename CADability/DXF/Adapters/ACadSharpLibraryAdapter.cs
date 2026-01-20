@@ -40,9 +40,6 @@ namespace CADability.DXF.Adapters
 
         public IDxfDocument LoadFromStream(Stream stream)
         {
-            // Try to detect format - ACadSharp auto-detects DXF binary format
-            bool isDxfBinary = DxfReader.IsBinary(stream, resetPos: true);
-            
             CadDocument doc;
             using (var reader = new DxfReader(stream))
             {
@@ -89,7 +86,7 @@ namespace CADability.DXF.Adapters
             this.doc = doc;
         }
 
-        public IDxfBlockCollection Blocks => new ACadSharpBlockCollectionAdapter(doc.BlockRecords);
+        public IDxfBlockCollection Blocks => new ACadSharpBlockCollectionAdapter(doc.BlockRecords, this);
 
         public IEnumerable<IDxfLayer> Layers => doc.Layers.Select(l => new ACadSharpLayerAdapter(l));
 
@@ -97,7 +94,7 @@ namespace CADability.DXF.Adapters
 
         public string Name
         {
-            get { return ""; } // ACadSharp CadHeader doesn't have a DrawingName property
+            get { return null; } // ACadSharp CadHeader doesn't have a DrawingName property
             set { /* No equivalent in ACadSharp */ }
         }
 
@@ -163,7 +160,7 @@ namespace CADability.DXF.Adapters
             }
         }
 
-        private IDxfEntity WrapEntity(Entity entity)
+        internal IDxfEntity WrapEntity(Entity entity)
         {
             if (entity is Line line)
                 return new ACadSharpLineAdapter(line);
@@ -216,17 +213,19 @@ namespace CADability.DXF.Adapters
     internal class ACadSharpBlockCollectionAdapter : IDxfBlockCollection
     {
         private readonly BlockRecordsTable blocks;
+        private readonly ACadSharpDocumentAdapter document;
 
-        public ACadSharpBlockCollectionAdapter(BlockRecordsTable blocks)
+        public ACadSharpBlockCollectionAdapter(BlockRecordsTable blocks, ACadSharpDocumentAdapter document)
         {
             this.blocks = blocks;
+            this.document = document;
         }
 
         public IDxfBlock GetBlock(string name)
         {
             if (blocks.TryGetValue(name, out BlockRecord block))
             {
-                return new ACadSharpBlockAdapter(block);
+                return new ACadSharpBlockAdapter(block, document);
             }
             return null;
         }
@@ -235,7 +234,7 @@ namespace CADability.DXF.Adapters
         {
             if (blocks.TryGetValue(blockName, out BlockRecord block))
             {
-                return block.Entities.OfType<Entity>().Select(e => ConvertEntity(e));
+                return block.Entities.OfType<Entity>().Select(e => document.WrapEntity(e));
             }
             return Enumerable.Empty<IDxfEntity>();
         }
@@ -247,22 +246,6 @@ namespace CADability.DXF.Adapters
                 blocks.Add(adapter.WrappedBlock);
             }
         }
-
-        private IDxfEntity ConvertEntity(Entity entity)
-        {
-            if (entity is Line line)
-                return new ACadSharpLineAdapter(line);
-            else if (entity is Arc arc)
-                return new ACadSharpArcAdapter(arc);
-            else if (entity is Circle circle)
-                return new ACadSharpCircleAdapter(circle);
-            else if (entity is Ellipse ellipse)
-                return new ACadSharpEllipseAdapter(ellipse);
-            else if (entity is Spline spline)
-                return new ACadSharpSplineAdapter(spline);
-            else
-                return new ACadSharpEntityAdapter(entity);
-        }
     }
 
     /// <summary>
@@ -271,10 +254,12 @@ namespace CADability.DXF.Adapters
     internal class ACadSharpBlockAdapter : IDxfBlock
     {
         private readonly BlockRecord block;
+        private readonly ACadSharpDocumentAdapter document;
 
-        public ACadSharpBlockAdapter(BlockRecord block)
+        public ACadSharpBlockAdapter(BlockRecord block, ACadSharpDocumentAdapter document)
         {
             this.block = block;
+            this.document = document;
         }
 
         public BlockRecord WrappedBlock => block;
@@ -294,21 +279,9 @@ namespace CADability.DXF.Adapters
             }
         }
         
-        public IEnumerable<IDxfEntity> Entities => block.Entities.OfType<Entity>().Select(e => ConvertEntity(e));
+        public IEnumerable<IDxfEntity> Entities => block.Entities.OfType<Entity>().Select(e => document.WrapEntity(e));
         
         public string Handle => block.Handle.ToString();
-
-        private IDxfEntity ConvertEntity(Entity entity)
-        {
-            if (entity is Line line)
-                return new ACadSharpLineAdapter(line);
-            else if (entity is Arc arc)
-                return new ACadSharpArcAdapter(arc);
-            else if (entity is Circle circle)
-                return new ACadSharpCircleAdapter(circle);
-            else
-                return new ACadSharpEntityAdapter(entity);
-        }
     }
 
     /// <summary>
@@ -382,7 +355,7 @@ namespace CADability.DXF.Adapters
             {
                 // ACadSharp LineType has Segments property with pattern data
                 // For now, return empty array - would need to extract from PatternLength
-                return new double[0];
+                return Array.Empty<double>();
             }
         }
     }
@@ -768,7 +741,7 @@ namespace CADability.DXF.Adapters
         public (double X, double Y, double Z) Position => (insert.InsertPoint.X, insert.InsertPoint.Y, insert.InsertPoint.Z);
         public double Rotation => insert.Rotation;
         public (double X, double Y, double Z) Scale => (insert.XScale, insert.YScale, insert.ZScale);
-        public IDxfBlock Block => insert.Block != null ? new ACadSharpBlockAdapter(insert.Block) : null;
+        public IDxfBlock Block => insert.Block != null ? new ACadSharpBlockAdapter(insert.Block, document) : null;
     }
 
     internal class ACadSharpFace3DAdapter : ACadSharpEntityAdapter, IDxfFace3D
@@ -921,7 +894,7 @@ namespace CADability.DXF.Adapters
                 // ACadSharp Dimension has Block property
                 if (dimension.Block != null)
                 {
-                    return new ACadSharpBlockAdapter(dimension.Block);
+                    return new ACadSharpBlockAdapter(dimension.Block, document);
                 }
                 return null;
             }
@@ -955,20 +928,10 @@ namespace CADability.DXF.Adapters
             {
                 if (leader.AssociatedAnnotation != null)
                 {
-                    return ConvertEntity(leader.AssociatedAnnotation);
+                    return document.WrapEntity(leader.AssociatedAnnotation);
                 }
                 return null;
             }
-        }
-
-        private IDxfEntity ConvertEntity(Entity e)
-        {
-            if (e is TextEntity text)
-                return new ACadSharpTextAdapter(text);
-            else if (e is MText mtext)
-                return new ACadSharpMTextAdapter(mtext);
-            else
-                return new ACadSharpEntityAdapter(e);
         }
     }
 }

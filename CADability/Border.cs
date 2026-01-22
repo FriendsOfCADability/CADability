@@ -4255,9 +4255,10 @@ namespace CADability.Shapes
 						if (part != null) segments.Insert(i + 1, part);
 						lastPos = infl[j];
 					}
+					// Trim the first part (from 0 to first inflection point)
 					ICurve2D firstPart = segments[i].Trim(0, infl[0]);
 					if (firstPart != null) segments[i] = firstPart;
-					else segments.RemoveAt(i);
+					else segments.RemoveAt(i); // Safe to remove while iterating backwards
 				}
 			}
 			bool found = false;

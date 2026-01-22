@@ -2050,14 +2050,14 @@ namespace CADability.Shapes
 				{   // nur ein Segment wird benötigt
 					ICurve2D TheOnlyCurve = segment[StartIndex].Clone();
 					TheOnlyCurve = TheOnlyCurve.Trim(lastPos - StartIndex, nextPos - StartIndex);
-					if (TheOnlyCurve.Length > Precision.eps) res.Add(new Border(new ICurve2D[] { TheOnlyCurve }));
+					if (TheOnlyCurve != null && TheOnlyCurve.Length > Precision.eps) res.Add(new Border(new ICurve2D[] { TheOnlyCurve }));
 				}
 				else
 				{
 					ArrayList curves = new ArrayList(EndIndex - StartIndex + 1);
 					ICurve2D FirstCurve = segment[StartIndex].Clone();
 					FirstCurve = FirstCurve.Trim(lastPos - StartIndex, 1.0);
-					if (FirstCurve.Length > Precision.eps) curves.Add(FirstCurve);
+					if (FirstCurve != null && FirstCurve.Length > Precision.eps) curves.Add(FirstCurve);
 					for (int j = StartIndex + 1; j < EndIndex; ++j)
 					{
 						ICurve2D InnerCurve = segment[j].Clone();
@@ -2065,7 +2065,7 @@ namespace CADability.Shapes
 					}
 					ICurve2D LastCurve = segment[EndIndex].Clone();
 					LastCurve = LastCurve.Trim(0.0, nextPos - EndIndex);
-					if (LastCurve.Length > Precision.eps) curves.Add(LastCurve);
+					if (LastCurve != null && LastCurve.Length > Precision.eps) curves.Add(LastCurve);
 					if (curves.Count > 0)
 					{
 						res.Add(new Border((ICurve2D[])(curves.ToArray(typeof(ICurve2D)))));
@@ -2186,9 +2186,12 @@ namespace CADability.Shapes
 					ArrayList curves = new ArrayList(endIndex - startIndex + 1);
 					ICurve2D firstCurve = segment[startIndex].Clone();
 					firstCurve = firstCurve.Trim(lastPos - startIndex, 1.0);
-					firstCurve.UserData.CloneFrom(segment[startIndex].UserData);
-					if (i > 0) firstCurve.StartPoint = points[i - 1];
-					if (firstCurve.Length > Precision.eps) curves.Add(firstCurve);
+					if (firstCurve != null)
+					{
+						firstCurve.UserData.CloneFrom(segment[startIndex].UserData);
+						if (i > 0) firstCurve.StartPoint = points[i - 1];
+						if (firstCurve.Length > Precision.eps) curves.Add(firstCurve);
+					}
 					for (int j = startIndex + 1; j < endIndex; ++j)
 					{
 						ICurve2D innerCurve = segment[j].Clone();
@@ -2197,9 +2200,12 @@ namespace CADability.Shapes
 					}
 					ICurve2D lastCurve = segment[endIndex].Clone();
 					lastCurve = lastCurve.Trim(0.0, nextPos - endIndex);
-					lastCurve.UserData.CloneFrom(segment[endIndex].UserData);
-					if (i < parameter.Length) lastCurve.EndPoint = points[i];
-					if (lastCurve.Length > Precision.eps) curves.Add(lastCurve);
+					if (lastCurve != null)
+					{
+						lastCurve.UserData.CloneFrom(segment[endIndex].UserData);
+						if (i < parameter.Length) lastCurve.EndPoint = points[i];
+						if (lastCurve.Length > Precision.eps) curves.Add(lastCurve);
+					}
 					if (curves.Count > 0)
 					{
 						Border toAdd = new Border((ICurve2D[])(curves.ToArray(typeof(ICurve2D))));
@@ -4249,7 +4255,9 @@ namespace CADability.Shapes
 						if (part != null) segments.Insert(i + 1, part);
 						lastPos = infl[j];
 					}
-					segments[i] = segments[i].Trim(0, infl[0]);
+					ICurve2D firstPart = segments[i].Trim(0, infl[0]);
+					if (firstPart != null) segments[i] = firstPart;
+					else segments.RemoveAt(i);
 				}
 			}
 			bool found = false;

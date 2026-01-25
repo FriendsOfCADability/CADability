@@ -87,7 +87,7 @@ namespace CADability.GeoObject
         {
             lock (lockApproximationRecalc)
             {
-                if (approximation == null || approxPrecision == 0 || (precision > 0 && approxPrecision > precision))
+                if (approximation == null || approxPrecision <= 0 || (precision > 0 && approxPrecision > precision))
                 {
                     approxPrecision = precision;
                     ICurve cv = (this as ICurve).Approximate(true, precision);
@@ -516,6 +516,7 @@ namespace CADability.GeoObject
                 interdir = null;
                 interparam = null;
                 approximation = null;
+                approxPrecision = 0;
                 extent = BoundingCube.EmptyBoundingCube;
                 tetraederHull = null;
                 extrema = null;

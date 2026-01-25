@@ -9,7 +9,7 @@ namespace CADability.Tests
 		[TestMethod]
 		public void GetParallel_OffsetCausesArcToDisappear_DoesNotThrowException()
 		{
-			// This test reproduces the issue from https://github.com/FriendsOfCADability/CADability/issues/XXX
+			// This test reproduces the issue from https://github.com/FriendsOfCADability/CADability/issues/264
 			// When an arc of the border disappears for the computed offset, it should not throw an exception
 			
 			BorderBuilder bb = new BorderBuilder();

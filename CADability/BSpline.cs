@@ -87,7 +87,7 @@ namespace CADability.GeoObject
         {
             lock (lockApproximationRecalc)
             {
-                if (((precision > 0) && (approxPrecision > precision)) || approximation == null)
+                if (approximation == null || approxPrecision == 0 || (precision > 0 && approxPrecision > precision))
                 {
                     approxPrecision = precision;
                     ICurve cv = (this as ICurve).Approximate(true, precision);

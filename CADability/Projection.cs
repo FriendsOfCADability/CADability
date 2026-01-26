@@ -200,6 +200,7 @@ namespace CADability
 
         private Matrix4 openGlMatrix; // bildet alles auf den Würfel [-1,1][-1,1][0,1] ab
         private Matrix4 inverseOpenGLMatrix;
+        private GeoPoint coordinateOffset; // Offset to improve floating-point precision in OpenGL
         private Rectangle clientRect; // das Fenster
         private BoundingCube extent; // Größe des Modells
 
@@ -237,6 +238,17 @@ namespace CADability
             }
         }
         /// <summary>
+        /// Gets the coordinate offset used to improve floating-point precision in OpenGL rendering.
+        /// Coordinates should be adjusted by this offset before being sent to OpenGL.
+        /// </summary>
+        public GeoPoint CoordinateOffset
+        {
+            get
+            {
+                return coordinateOffset;
+            }
+        }
+        /// <summary>
         /// Delegate definition for the <see cref="ProjectionChangedEvent"/>
         /// </summary>
         /// <param name="sender">Object issuing the event</param>
@@ -256,6 +268,7 @@ namespace CADability
             showHiddenLines = false;
             showFaces = true;
             LayoutFactor = 1.0;
+            coordinateOffset = GeoPoint.Origin; // Initialize to origin
             grid = new Grid();
             LineWidthFactor = 10.0;
             UseLineWidth = Settings.GlobalSettings.GetBoolValue("View.UseLineWidth", true);
@@ -1051,6 +1064,22 @@ namespace CADability
                 // extend.Expand(1.0); 
                 BoundingCube extentex = extent;
                 extentex.Expand(Math.Max(1.0, extent.Size / 100.0)); // um zu vermeiden, dass die Box in einer Richtung die Dicke 0 hat (selbst 0.5 ist zu wenig)
+                
+                // Calculate coordinate offset to improve floating-point precision in OpenGL
+                // By translating the model center to the origin, we minimize coordinate magnitudes
+                // which reduces precision loss when converting from double to float in OpenGL
+                coordinateOffset = extentex.GetCenter();
+                
+                // Apply the offset to transform all coordinates relative to the center
+                GeoVector offset = coordinateOffset - GeoPoint.Origin;
+                leftbottom = leftbottom - offset;
+                rightbottom = rightbottom - offset;
+                lefttop = lefttop - offset;
+                extentex = new BoundingCube(
+                    extentex.Xmin - coordinateOffset.x, extentex.Ymin - coordinateOffset.y, extentex.Zmin - coordinateOffset.z,
+                    extentex.Xmax - coordinateOffset.x, extentex.Ymax - coordinateOffset.y, extentex.Zmax - coordinateOffset.z
+                );
+                
                 // bei zweidimensionalen Zeichnungen, die sehr groß sind, muss das Z im Verhältnis stehen, sonst sieht man die Markierung nicht
                 if (projdir.x > 0)
                 {

@@ -59,7 +59,7 @@ namespace CADability.Forms
         Stack<state> stateStack;
         GeoVector projectionDirection;
         bool isPerspective;
-        Projection currentProjection; // Store current projection for coordinate offset
+        GeoVector coordinateOffset; // Offset to improve floating-point precision in OpenGL
         Color backgroundColor; // Die Hintergrundfarbe um sicherzustellen, dass nicht mit dieser farbe
                                // gezeichnet wird
         Color selectColor;
@@ -778,7 +778,21 @@ namespace CADability.Forms
         {
             // System.Diagnostics.Trace.WriteLine("SetProjection: " + boundingCube.ToString());
             if (Wgl.wglGetCurrentContext() != renderContext) (this as IPaintTo3D).MakeCurrent();
-            currentProjection = projection; // Store for coordinate offset access
+            
+            // Calculate coordinate offset to improve floating-point precision in OpenGL
+            // By translating large coordinates to be centered near the origin, we minimize
+            // precision loss when OpenGL converts doubles to floats internally
+            if (boundingCube != null && !boundingCube.IsEmpty)
+            {
+                coordinateOffset = new GeoVector(boundingCube.GetCenter().x, 
+                                                boundingCube.GetCenter().y, 
+                                                boundingCube.GetCenter().z);
+            }
+            else
+            {
+                coordinateOffset = GeoVector.NullVector;
+            }
+            
             Gl.glViewport(0, 0, clientwidth, clientheight);
             Gl.glMatrixMode(Gl.GL_MODELVIEW);
             Gl.glLoadIdentity();
@@ -982,17 +996,11 @@ namespace CADability.Forms
         
         /// <summary>
         /// Gets the coordinate offset to apply for improved floating-point precision in OpenGL.
-        /// Returns NullVector if no projection is set.
+        /// The offset centers geometry near the origin to minimize precision loss from double to float conversion.
         /// </summary>
         private GeoVector GetCoordinateOffset()
         {
-            if (currentProjection != null)
-            {
-                return new GeoVector(currentProjection.CoordinateOffset.x, 
-                                   currentProjection.CoordinateOffset.y, 
-                                   currentProjection.CoordinateOffset.z);
-            }
-            return GeoVector.NullVector;
+            return coordinateOffset;
         }
         
         void IPaintTo3D.Polyline(GeoPoint[] points)

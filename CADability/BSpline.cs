@@ -3251,9 +3251,9 @@ namespace CADability.GeoObject
                     {
                         pos.Clear();
                         int minSamples = Math.Max(5, knots.Length);
-                        for (int i = 0; i <= minSamples; ++i)
+                        for (int i = 0; i < minSamples; ++i)
                         {
-                            pos.Add((double)i / (double)minSamples);
+                            pos.Add((double)i / (double)(minSamples - 1));
                         }
                     }
                     return Curves.ApproximateLinear(this, pos.ToArray(), maxError);

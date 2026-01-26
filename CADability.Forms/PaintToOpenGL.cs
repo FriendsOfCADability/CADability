@@ -59,7 +59,6 @@ namespace CADability.Forms
         Stack<state> stateStack;
         GeoVector projectionDirection;
         bool isPerspective;
-        GeoVector coordinateOffset; // Offset to improve floating-point precision in OpenGL
         Color backgroundColor; // Die Hintergrundfarbe um sicherzustellen, dass nicht mit dieser farbe
                                // gezeichnet wird
         Color selectColor;
@@ -778,19 +777,6 @@ namespace CADability.Forms
         {
             // System.Diagnostics.Trace.WriteLine("SetProjection: " + boundingCube.ToString());
             if (Wgl.wglGetCurrentContext() != renderContext) (this as IPaintTo3D).MakeCurrent();
-            
-            // Calculate coordinate offset to improve floating-point precision in OpenGL
-            // By translating large coordinates to be centered near the origin, we minimize
-            // precision loss when OpenGL converts doubles to floats internally
-            if (boundingCube != null && !boundingCube.IsEmpty)
-            {
-                coordinateOffset = new GeoVector(GeoPoint.Origin, boundingCube.GetCenter());
-            }
-            else
-            {
-                coordinateOffset = GeoVector.NullVector;
-            }
-            
             Gl.glViewport(0, 0, clientwidth, clientheight);
             Gl.glMatrixMode(Gl.GL_MODELVIEW);
             Gl.glLoadIdentity();
@@ -846,6 +832,16 @@ namespace CADability.Forms
 
             Gl.glMatrixMode(Gl.GL_MODELVIEW);
             Gl.glLoadIdentity();
+            
+            // Apply translation to improve floating-point precision for large coordinates
+            // By centering the model near the origin in the modelview transform, we reduce
+            // precision loss when OpenGL converts doubles to floats
+            if (!boundingCube.IsEmpty)
+            {
+                GeoPoint center = boundingCube.GetCenter();
+                Gl.glTranslated(-center.x, -center.y, -center.z);
+            }
+            
             Gl.glEnable(Gl.GL_AUTO_NORMAL);
             Gl.glEnable(Gl.GL_NORMALIZE);
             Gl.glBlendFunc(Gl.GL_ONE, Gl.GL_ZERO);
@@ -991,16 +987,6 @@ namespace CADability.Forms
             }
             CheckError();
         }
-        
-        /// <summary>
-        /// Gets the coordinate offset to apply for improved floating-point precision in OpenGL.
-        /// The offset centers geometry near the origin to minimize precision loss from double to float conversion.
-        /// </summary>
-        private GeoVector GetCoordinateOffset()
-        {
-            return coordinateOffset;
-        }
-        
         void IPaintTo3D.Polyline(GeoPoint[] points)
         {
 #if DEBUG
@@ -1012,13 +998,9 @@ namespace CADability.Forms
             if (currentList != null) currentList.SetHasContents();
             Gl.glDisable(Gl.GL_LIGHTING);
             Gl.glBegin(Gl.GL_LINE_STRIP);
-            
-            // Apply coordinate offset to improve floating-point precision
-            GeoVector offset = GetCoordinateOffset();
-            
             for (int i = 0; i < points.Length; ++i)
             {
-                Gl.glVertex3d(points[i].x - offset.x, points[i].y - offset.y, points[i].z - offset.z);
+                Gl.glVertex3d(points[i].x, points[i].y, points[i].z);
             }
             Gl.glEnd();
             CheckError();
@@ -1028,13 +1010,9 @@ namespace CADability.Forms
             if (currentList != null) currentList.SetHasContents();
             Gl.glEnable(Gl.GL_LIGHTING);
             Gl.glBegin(Gl.GL_POLYGON);
-            
-            // Apply coordinate offset to improve floating-point precision
-            GeoVector offset = GetCoordinateOffset();
-            
             for (int i = 0; i < points.Length; ++i)
             {
-                Gl.glVertex3d(points[i].x - offset.x, points[i].y - offset.y, points[i].z - offset.z);
+                Gl.glVertex3d(points[i].x, points[i].y, points[i].z);
             }
             Gl.glEnd();
             CheckError();
@@ -1046,13 +1024,9 @@ namespace CADability.Forms
                 if (currentList != null) currentList.SetHasContents();
                 Gl.glDisable(Gl.GL_LIGHTING);
                 Gl.glBegin(Gl.GL_POINTS);
-                
-                // Apply coordinate offset to improve floating-point precision
-                GeoVector offset = GetCoordinateOffset();
-                
                 for (int i = 0; i < points.Length; ++i)
                 {
-                    Gl.glVertex3d(points[i].x - offset.x, points[i].y - offset.y, points[i].z - offset.z);
+                    Gl.glVertex3d(points[i].x, points[i].y, points[i].z);
                 }
                 Gl.glEnd();
             }
@@ -1135,9 +1109,6 @@ namespace CADability.Forms
             //Gl.glEnable(Gl.GL_BLEND);
             //Gl.glBlendFunc(Gl.GL_SRC_ALPHA, Gl.GL_ONE_MINUS_SRC_ALPHA);
 
-            // Apply coordinate offset to improve floating-point precision
-            GeoVector offset = GetCoordinateOffset();
-
             Gl.glBegin(Gl.GL_TRIANGLES);
             for (int i = 0; i < indextriples.Length; i += 3)
             {
@@ -1153,20 +1124,20 @@ namespace CADability.Forms
                 if (n0 * n1 < 0)
                 {
                     Gl.glNormal3d(n1.x, n1.y, n1.z);
-                    Gl.glVertex3d(v1.x - offset.x, v1.y - offset.y, v1.z - offset.z);
+                    Gl.glVertex3d(v1.x, v1.y, v1.z);
                     Gl.glNormal3d(n3.x, n3.y, n3.z);
-                    Gl.glVertex3d(v3.x - offset.x, v3.y - offset.y, v3.z - offset.z);
+                    Gl.glVertex3d(v3.x, v3.y, v3.z);
                     Gl.glNormal3d(n2.x, n2.y, n2.z);
-                    Gl.glVertex3d(v2.x - offset.x, v2.y - offset.y, v2.z - offset.z);
+                    Gl.glVertex3d(v2.x, v2.y, v2.z);
                 }
                 else
                 {
                     Gl.glNormal3d(n1.x, n1.y, n1.z);
-                    Gl.glVertex3d(v1.x - offset.x, v1.y - offset.y, v1.z - offset.z);
+                    Gl.glVertex3d(v1.x, v1.y, v1.z);
                     Gl.glNormal3d(n2.x, n2.y, n2.z);
-                    Gl.glVertex3d(v2.x - offset.x, v2.y - offset.y, v2.z - offset.z);
+                    Gl.glVertex3d(v2.x, v2.y, v2.z);
                     Gl.glNormal3d(n3.x, n3.y, n3.z);
-                    Gl.glVertex3d(v3.x - offset.x, v3.y - offset.y, v3.z - offset.z);
+                    Gl.glVertex3d(v3.x, v3.y, v3.z);
                 }
             }
             Gl.glEnd();
@@ -1406,15 +1377,11 @@ namespace CADability.Forms
                 GeoPoint p1 = location + directionWidth;
                 GeoPoint p2 = location + directionWidth + directionHeight;
                 GeoPoint p3 = location + directionHeight;
-                
-                // Apply coordinate offset to improve floating-point precision
-                GeoVector offset = GetCoordinateOffset();
-                
                 Gl.glBegin(Gl.GL_QUADS);
-                Gl.glTexCoord2d(0.0, 0.0); Gl.glVertex3d(p0.x - offset.x, p0.y - offset.y, p0.z - offset.z);
-                Gl.glTexCoord2d(0.0, 1.0); Gl.glVertex3d(p3.x - offset.x, p3.y - offset.y, p3.z - offset.z);
-                Gl.glTexCoord2d(1.0, 1.0); Gl.glVertex3d(p2.x - offset.x, p2.y - offset.y, p2.z - offset.z);
-                Gl.glTexCoord2d(1.0, 0.0); Gl.glVertex3d(p1.x - offset.x, p1.y - offset.y, p1.z - offset.z);
+                Gl.glTexCoord2d(0.0, 0.0); Gl.glVertex3d(p0.x, p0.y, p0.z);
+                Gl.glTexCoord2d(0.0, 1.0); Gl.glVertex3d(p3.x, p3.y, p3.z);
+                Gl.glTexCoord2d(1.0, 1.0); Gl.glVertex3d(p2.x, p2.y, p2.z);
+                Gl.glTexCoord2d(1.0, 0.0); Gl.glVertex3d(p1.x, p1.y, p1.z);
                 Gl.glEnd();
                 Gl.glDisable(Gl.GL_TEXTURE_2D);
                 Gl.glDisable(Gl.GL_ALPHA_TEST); // eingeführt wg. Hintergrund in PFOCad
@@ -1480,11 +1447,6 @@ namespace CADability.Forms
             Gl.glMatrixMode(Gl.GL_MODELVIEW); // ModelView Matrix ist und bleibt immer Identität
             Gl.glPushMatrix();
             // ACHTUNG: Matrix ist vertauscht!!!
-            
-            // Apply coordinate offset to improve floating-point precision
-            GeoVector offset = GetCoordinateOffset();
-            GeoPoint offsetLocation = new GeoPoint(location.x - offset.x, location.y - offset.y, location.z - offset.z);
-            
             double[] pmat = new double[16];
             pmat[0] = lineDirection.x;
             pmat[1] = lineDirection.y;
@@ -1498,9 +1460,9 @@ namespace CADability.Forms
             pmat[9] = normal.y;
             pmat[10] = normal.z;
             pmat[11] = 0;
-            pmat[12] = offsetLocation.x;
-            pmat[13] = offsetLocation.y;
-            pmat[14] = offsetLocation.z;
+            pmat[12] = location.x;
+            pmat[13] = location.y;
+            pmat[14] = location.z;
             pmat[15] = 1;
             Gl.glLoadMatrixd(pmat);
             for (int i = 0; i < textString.Length; ++i)
@@ -1615,11 +1577,6 @@ namespace CADability.Forms
                 Gl.glMatrixMode(Gl.GL_MODELVIEW); // ModelView Matrix ist und bleibt immer Identität (nein! bei BlockRef nicht!)
                 Gl.glPushMatrix();
                 // ACHTUNG: Matrix ist vertauscht!!!
-                
-                // Apply coordinate offset to improve floating-point precision
-                GeoVector offset = GetCoordinateOffset();
-                GeoPoint offsetP = new GeoPoint(p.x - offset.x, p.y - offset.y, p.z - offset.z);
-                
                 double[] pmat = new double[16];
                 pmat[0] = 1.0;
                 pmat[1] = 0.0;
@@ -1633,9 +1590,9 @@ namespace CADability.Forms
                 pmat[9] = 0.0;
                 pmat[10] = 1.0;
                 pmat[11] = 0;
-                pmat[12] = offsetP.x;
-                pmat[13] = offsetP.y;
-                pmat[14] = offsetP.z;
+                pmat[12] = p.x;
+                pmat[13] = p.y;
+                pmat[14] = p.z;
                 pmat[15] = 1;
                 // Gl.glDisable(Gl.GL_LINE_SMOOTH);
                 Gl.glDisable(Gl.GL_LIGHTING);
@@ -1657,11 +1614,6 @@ namespace CADability.Forms
                 Gl.glMatrixMode(Gl.GL_MODELVIEW); // ModelView Matrix ist und bleibt immer Identität
                 Gl.glPushMatrix();
                 // ACHTUNG: Matrix ist vertauscht!!!
-                
-                // Apply coordinate offset to improve floating-point precision
-                GeoVector offset = GetCoordinateOffset();
-                GeoPoint offsetP = new GeoPoint(p.x - offset.x, p.y - offset.y, p.z - offset.z);
-                
                 double[] pmat = new double[16];
                 pmat[0] = 1.0;
                 pmat[1] = 0.0;
@@ -1675,9 +1627,9 @@ namespace CADability.Forms
                 pmat[9] = 0.0;
                 pmat[10] = 1.0;
                 pmat[11] = 0;
-                pmat[12] = offsetP.x;
-                pmat[13] = offsetP.y;
-                pmat[14] = offsetP.z;
+                pmat[12] = p.x;
+                pmat[13] = p.y;
+                pmat[14] = p.z;
                 pmat[15] = 1;
                 // Gl.glDisable(Gl.GL_LINE_SMOOTH);
                 Gl.glDisable(Gl.GL_LIGHTING);

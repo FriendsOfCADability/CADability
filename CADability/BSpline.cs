@@ -3045,6 +3045,36 @@ namespace CADability.GeoObject
             }
             else
             {
+                // When poles become identical after projection, we need to filter them out
+                // and create a BSpline2D with the unique poles
+                List<GeoPoint2D> uniquePoles = new List<GeoPoint2D>();
+                List<double> uniqueWeights = new List<double>();
+                uniquePoles.Add(poles2d[0]);
+                uniqueWeights.Add(weights[0]);
+                for (int i = 1; i < poles2d.Length; i++)
+                {
+                    if (!Precision.IsEqual(poles2d[i], uniquePoles[uniquePoles.Count - 1]))
+                    {
+                        uniquePoles.Add(poles2d[i]);
+                        uniqueWeights.Add(weights[i]);
+                    }
+                }
+                
+                // If we have enough unique poles, try to create a BSpline2D
+                if (uniquePoles.Count >= degree + 1)
+                {
+                    try
+                    {
+                        BSpline2D bsp2d = new BSpline2D(uniquePoles.ToArray(), degree, this.periodic);
+                        return bsp2d;
+                    }
+                    catch
+                    {
+                        // Fall through to throughPoints approach
+                    }
+                }
+                
+                // Fallback: create through points
                 List<GeoPoint2D> throughPoints2d = new List<GeoPoint2D>();
                 if (ThroughPoints3dExist)
                 {

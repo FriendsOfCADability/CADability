@@ -3245,6 +3245,17 @@ namespace CADability.GeoObject
                         }
                     }
                     pos.Add(1.0);
+                    // Ensure we have enough sample points even if the curve appears linear
+                    // This prevents circular/curved splines from being simplified to lines
+                    if (pos.Count < 5)
+                    {
+                        pos.Clear();
+                        int minSamples = Math.Max(5, knots.Length);
+                        for (int i = 0; i <= minSamples; ++i)
+                        {
+                            pos.Add((double)i / (double)minSamples);
+                        }
+                    }
                     return Curves.ApproximateLinear(this, pos.ToArray(), maxError);
                 }
                 else

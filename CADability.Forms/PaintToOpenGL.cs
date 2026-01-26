@@ -979,6 +979,22 @@ namespace CADability.Forms
             }
             CheckError();
         }
+        
+        /// <summary>
+        /// Gets the coordinate offset to apply for improved floating-point precision in OpenGL.
+        /// Returns NullVector if no projection is set.
+        /// </summary>
+        private GeoVector GetCoordinateOffset()
+        {
+            if (currentProjection != null)
+            {
+                return new GeoVector(currentProjection.CoordinateOffset.x, 
+                                   currentProjection.CoordinateOffset.y, 
+                                   currentProjection.CoordinateOffset.z);
+            }
+            return GeoVector.NullVector;
+        }
+        
         void IPaintTo3D.Polyline(GeoPoint[] points)
         {
 #if DEBUG
@@ -992,11 +1008,7 @@ namespace CADability.Forms
             Gl.glBegin(Gl.GL_LINE_STRIP);
             
             // Apply coordinate offset to improve floating-point precision
-            GeoVector offset = GeoVector.NullVector;
-            if (currentProjection != null)
-            {
-                offset = (GeoVector)currentProjection.CoordinateOffset;
-            }
+            GeoVector offset = GetCoordinateOffset();
             
             for (int i = 0; i < points.Length; ++i)
             {
@@ -1012,11 +1024,7 @@ namespace CADability.Forms
             Gl.glBegin(Gl.GL_POLYGON);
             
             // Apply coordinate offset to improve floating-point precision
-            GeoVector offset = GeoVector.NullVector;
-            if (currentProjection != null)
-            {
-                offset = (GeoVector)currentProjection.CoordinateOffset;
-            }
+            GeoVector offset = GetCoordinateOffset();
             
             for (int i = 0; i < points.Length; ++i)
             {
@@ -1034,11 +1042,7 @@ namespace CADability.Forms
                 Gl.glBegin(Gl.GL_POINTS);
                 
                 // Apply coordinate offset to improve floating-point precision
-                GeoVector offset = GeoVector.NullVector;
-                if (currentProjection != null)
-                {
-                    offset = (GeoVector)currentProjection.CoordinateOffset;
-                }
+                GeoVector offset = GetCoordinateOffset();
                 
                 for (int i = 0; i < points.Length; ++i)
                 {
@@ -1126,11 +1130,7 @@ namespace CADability.Forms
             //Gl.glBlendFunc(Gl.GL_SRC_ALPHA, Gl.GL_ONE_MINUS_SRC_ALPHA);
 
             // Apply coordinate offset to improve floating-point precision
-            GeoVector offset = GeoVector.NullVector;
-            if (currentProjection != null)
-            {
-                offset = (GeoVector)currentProjection.CoordinateOffset;
-            }
+            GeoVector offset = GetCoordinateOffset();
 
             Gl.glBegin(Gl.GL_TRIANGLES);
             for (int i = 0; i < indextriples.Length; i += 3)
@@ -1402,11 +1402,7 @@ namespace CADability.Forms
                 GeoPoint p3 = location + directionHeight;
                 
                 // Apply coordinate offset to improve floating-point precision
-                GeoVector offset = GeoVector.NullVector;
-                if (currentProjection != null)
-                {
-                    offset = (GeoVector)currentProjection.CoordinateOffset;
-                }
+                GeoVector offset = GetCoordinateOffset();
                 
                 Gl.glBegin(Gl.GL_QUADS);
                 Gl.glTexCoord2d(0.0, 0.0); Gl.glVertex3d(p0.x - offset.x, p0.y - offset.y, p0.z - offset.z);
@@ -1480,12 +1476,8 @@ namespace CADability.Forms
             // ACHTUNG: Matrix ist vertauscht!!!
             
             // Apply coordinate offset to improve floating-point precision
-            GeoPoint offsetLocation = location;
-            if (currentProjection != null)
-            {
-                GeoVector offset = (GeoVector)currentProjection.CoordinateOffset;
-                offsetLocation = new GeoPoint(location.x - offset.x, location.y - offset.y, location.z - offset.z);
-            }
+            GeoVector offset = GetCoordinateOffset();
+            GeoPoint offsetLocation = new GeoPoint(location.x - offset.x, location.y - offset.y, location.z - offset.z);
             
             double[] pmat = new double[16];
             pmat[0] = lineDirection.x;
@@ -1619,12 +1611,8 @@ namespace CADability.Forms
                 // ACHTUNG: Matrix ist vertauscht!!!
                 
                 // Apply coordinate offset to improve floating-point precision
-                GeoPoint offsetP = p;
-                if (currentProjection != null)
-                {
-                    GeoVector offset = (GeoVector)currentProjection.CoordinateOffset;
-                    offsetP = new GeoPoint(p.x - offset.x, p.y - offset.y, p.z - offset.z);
-                }
+                GeoVector offset = GetCoordinateOffset();
+                GeoPoint offsetP = new GeoPoint(p.x - offset.x, p.y - offset.y, p.z - offset.z);
                 
                 double[] pmat = new double[16];
                 pmat[0] = 1.0;
@@ -1665,12 +1653,8 @@ namespace CADability.Forms
                 // ACHTUNG: Matrix ist vertauscht!!!
                 
                 // Apply coordinate offset to improve floating-point precision
-                GeoPoint offsetP = p;
-                if (currentProjection != null)
-                {
-                    GeoVector offset = (GeoVector)currentProjection.CoordinateOffset;
-                    offsetP = new GeoPoint(p.x - offset.x, p.y - offset.y, p.z - offset.z);
-                }
+                GeoVector offset = GetCoordinateOffset();
+                GeoPoint offsetP = new GeoPoint(p.x - offset.x, p.y - offset.y, p.z - offset.z);
                 
                 double[] pmat = new double[16];
                 pmat[0] = 1.0;

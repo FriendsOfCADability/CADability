@@ -1071,13 +1071,14 @@ namespace CADability
                 coordinateOffset = extentex.GetCenter();
                 
                 // Apply the offset to transform all coordinates relative to the center
-                GeoVector offset = coordinateOffset - GeoPoint.Origin;
+                // Note: Subtracting Origin from a point gives us the point's position vector
+                GeoVector offset = new GeoVector(coordinateOffset.x, coordinateOffset.y, coordinateOffset.z);
                 leftbottom = leftbottom - offset;
                 rightbottom = rightbottom - offset;
                 lefttop = lefttop - offset;
                 extentex = new BoundingCube(
-                    extentex.Xmin - coordinateOffset.x, extentex.Ymin - coordinateOffset.y, extentex.Zmin - coordinateOffset.z,
-                    extentex.Xmax - coordinateOffset.x, extentex.Ymax - coordinateOffset.y, extentex.Zmax - coordinateOffset.z
+                    extentex.Xmin - offset.x, extentex.Ymin - offset.y, extentex.Zmin - offset.z,
+                    extentex.Xmax - offset.x, extentex.Ymax - offset.y, extentex.Zmax - offset.z
                 );
                 
                 // bei zweidimensionalen Zeichnungen, die sehr groß sind, muss das Z im Verhältnis stehen, sonst sieht man die Markierung nicht

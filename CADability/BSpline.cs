@@ -91,6 +91,36 @@ namespace CADability.GeoObject
                 {
                     approxPrecision = precision;
                     ICurve cv = (this as ICurve).Approximate(true, precision);
+                    
+#if DEBUG
+                    // Debug output to help diagnose approximation issues
+                    System.Diagnostics.Debug.WriteLine("=== BSpline Approximation Debug ===");
+                    System.Diagnostics.Debug.WriteLine($"Precision: {precision}");
+                    System.Diagnostics.Debug.WriteLine($"Poles count: {poles?.Length ?? 0}");
+                    System.Diagnostics.Debug.WriteLine($"Knots count: {knots?.Length ?? 0}");
+                    System.Diagnostics.Debug.WriteLine($"Degree: {degree}");
+                    System.Diagnostics.Debug.WriteLine($"Periodic: {periodic}");
+                    System.Diagnostics.Debug.WriteLine($"StartParam: {startParam}, EndParam: {endParam}");
+                    System.Diagnostics.Debug.WriteLine($"PlanarState: {(this as ICurve).GetPlanarState()}");
+                    System.Diagnostics.Debug.WriteLine($"Approximation result type: {cv?.GetType().Name ?? "null"}");
+                    if (cv is Line line)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"  Line: Start={line.StartPoint}, End={line.EndPoint}");
+                        System.Diagnostics.Debug.WriteLine($"  Line Length: {line.Length}");
+                    }
+                    else if (cv is Polyline polyline)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"  Polyline: {polyline.PointCount} points, Length={polyline.Length}");
+                    }
+                    else if (cv is Path path)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"  Path: {path.CurveCount} curves, Length={path.Length}");
+                    }
+                    System.Diagnostics.Debug.WriteLine($"Original BSpline: Start={StartPoint}, End={EndPoint}");
+                    System.Diagnostics.Debug.WriteLine($"Original BSpline Length: {(this as ICurve).Length}");
+                    System.Diagnostics.Debug.WriteLine("=====================================");
+#endif
+                    
                     if (cv is Path)
                     {
                         Path path = (cv as Path);

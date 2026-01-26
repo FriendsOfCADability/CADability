@@ -784,9 +784,7 @@ namespace CADability.Forms
             // precision loss when OpenGL converts doubles to floats internally
             if (boundingCube != null && !boundingCube.IsEmpty)
             {
-                coordinateOffset = new GeoVector(boundingCube.GetCenter().x, 
-                                                boundingCube.GetCenter().y, 
-                                                boundingCube.GetCenter().z);
+                coordinateOffset = new GeoVector(GeoPoint.Origin, boundingCube.GetCenter());
             }
             else
             {

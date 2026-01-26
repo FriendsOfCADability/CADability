@@ -3162,7 +3162,7 @@ namespace CADability.GeoObject
             {
                 Plane pl = (this as ICurve).GetPlane();
                 ICurve2D c2d = (this as ICurve).GetProjectedCurve(pl);
-                if (c2d == null || c2d.Length < maxError)
+                if (c2d == null)
                 {   // zu kurze machen u.U. Probleme
                     Line line = Line.Construct();
                     line.SetTwoPoints((this as ICurve).StartPoint, (this as ICurve).EndPoint);

@@ -59,6 +59,7 @@ namespace CADability.Forms
         Stack<state> stateStack;
         GeoVector projectionDirection;
         bool isPerspective;
+        GeoPoint modelCenterOffset = GeoPoint.Invalid; // Persistent offset for precision improvement
         Color backgroundColor; // Die Hintergrundfarbe um sicherzustellen, dass nicht mit dieser farbe
                                // gezeichnet wird
         Color selectColor;
@@ -834,12 +835,16 @@ namespace CADability.Forms
             Gl.glLoadIdentity();
             
             // Apply translation to improve floating-point precision for large coordinates
-            // By centering the model near the origin in the modelview transform, we reduce
-            // precision loss when OpenGL converts doubles to floats
+            // Calculate offset once and reuse it to keep zoom behavior consistent
             if (!boundingCube.IsEmpty)
             {
-                GeoPoint center = boundingCube.GetCenter();
-                Gl.glTranslated(-center.x, -center.y, -center.z);
+                // Only set the offset if it hasn't been set yet (first call or after reset)
+                if (!modelCenterOffset.IsValid)
+                {
+                    modelCenterOffset = boundingCube.GetCenter();
+                }
+                // Always use the same offset for consistency during zoom/pan
+                Gl.glTranslated(-modelCenterOffset.x, -modelCenterOffset.y, -modelCenterOffset.z);
             }
             
             Gl.glEnable(Gl.GL_AUTO_NORMAL);

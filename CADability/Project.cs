@@ -1210,11 +1210,11 @@ namespace CADability
                 case "html":
                     return true;
                 case "dxf":
-                    CADability.DXF.Export export = new DXF.Export(netDxf.Header.DxfVersion.AutoCad2000);
-                    export.WriteToFile(this, fileName);
-                    return true;
+                    // TODO: Implement DXF export using ACADSharp
+                    throw new NotImplementedException("DXF export is not yet implemented with ACADSharp. Export functionality will be added in a future update.");
                 case "dwg":
-                    return true;
+                    // TODO: Implement DWG export using ACADSharp
+                    throw new NotImplementedException("DWG export is not yet implemented with ACADSharp. Export functionality will be added in a future update.");
                 case "dxb":
                     return true;
                 case "igs":
@@ -1695,148 +1695,17 @@ namespace CADability
         /// if this program is installed on the computer and the global setting "DwgDxfConverter" contains the path and filename to this program, it will be automatically executed
         /// and the dwg file will be converted to a dxf file, which can then be imported.
         /// </summary>
-        private class ConvertToDxfAutoCad2000 : IDisposable
-        {
-            private string folderOrg, folderConverted;
-            public string DxfFileName;
-            public ConvertToDxfAutoCad2000(string fileName, string format)
-            {
-                // ACADSharp now handles most versions natively, so we only need conversion for very old files or if ACADSharp fails
-                if ((format.Equals("dxf", StringComparison.OrdinalIgnoreCase) && !DXF.ImportAcadSharp.CanImportVersion(fileName) && !DXF.Import.CanImportVersion(fileName)) || 
-                    (format.Equals("dwg", StringComparison.OrdinalIgnoreCase) && !DXF.ImportAcadSharp.CanImportVersion(fileName)))
-                {
-                    string converter = Settings.GlobalSettings.GetStringValue("DwgDxfConverter", null);
-                    bool isInSetting = true;
-                    if (String.IsNullOrEmpty(converter))
-                    {
-                        isInSetting = false;
-
-                        string programFilesPath = string.Empty;
-
-                        if (Environment.Is64BitOperatingSystem && !Environment.Is64BitProcess)
-                        {
-                            programFilesPath = Environment.GetEnvironmentVariable("ProgramW6432");
-                        }
-                        else
-                        {
-                            programFilesPath = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-                        }
-
-                        //converter = @"C:\Program Files\ODA\ODAFileConverter_title 21.3.0\ODAFileConverter.exe";                        
-                        string odaFolder = System.IO.Path.Combine(programFilesPath, "ODA");
-                        if (Directory.Exists(odaFolder))
-                        {
-                            string[] oda = Directory.GetFiles(odaFolder, "odafileconverter.exe", SearchOption.AllDirectories);
-
-                            for (int i = 0; i < oda.Length; i++)
-                            {
-                                string fn = System.IO.Path.GetDirectoryName(oda[i]);
-                                if (!string.IsNullOrEmpty(converter))
-                                {
-                                    string fnc = System.IO.Path.GetDirectoryName(converter);
-                                    if (string.Compare(fnc, fn, true) < 0) converter = oda[i];
-                                }
-                                else
-                                {
-                                    converter = oda[i];
-                                }
-                            }
-                        }
-                    }
-                    if (!String.IsNullOrEmpty(converter))
-                    {
-                        folderOrg = GetTemporaryDirectory();
-                        folderConverted = GetTemporaryDirectory();
-                        Directory.CreateDirectory(folderOrg);
-                        Directory.CreateDirectory(folderConverted);
-                        File.Copy(fileName, System.IO.Path.Combine(folderOrg, System.IO.Path.GetFileName(fileName)));
-                        DxfFileName = System.IO.Path.Combine(folderConverted, System.IO.Path.GetFileNameWithoutExtension(fileName) + ".dxf");
-                        System.Diagnostics.Process process = new System.Diagnostics.Process();
-                        // Configure the process using the StartInfo properties.
-                        process.StartInfo.FileName = converter;
-                        process.StartInfo.Arguments = "\"" + folderOrg + "\" " + "\"" + folderConverted + "\" " + "ACAD2000 DXF 0 0";
-                        process.Start();
-                        process.WaitForExit();// Waits here for the process to exit.                    
-                        if (!isInSetting && process.ExitCode == 0) Settings.GlobalSettings.SetValue("DwgDxfConverter", converter);
-                    }
-                }
-                else
-                {
-                    DxfFileName = fileName;
-                }
-            }
-            private string GetTemporaryDirectory()
-            {
-                string tempDirectory = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.IO.Path.GetRandomFileName());
-                Directory.CreateDirectory(tempDirectory);
-                return tempDirectory;
-            }
-            void IDisposable.Dispose()
-            {
-                if (folderOrg != null)
-                {
-                    try
-                    {
-                        if (Directory.Exists(folderOrg))
-                            Directory.Delete(folderOrg, true);
-                        if (Directory.Exists(folderConverted))
-                            Directory.Delete(folderConverted, true);
-                    }
-                    catch (Exception ex)
-                    {
-                        if (ex is DirectoryNotFoundException || ex is IOException || ex is UnauthorizedAccessException)
-                        {
-                            //Best effort, if the folders could not be deleted there is nothing we can do.
-                        }
-                        else
-                        {
-                            throw;
-                        }
-                    }
-                }
-            }
-        }
         private static Project ImportDXF(string filename)
         {
-            // Try ACADSharp first (supports more versions natively)
-            try
-            {
-                CADability.DXF.ImportAcadSharp import = new DXF.ImportAcadSharp(filename);
-                return import.Project;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Trace.WriteLine($"ACADSharp import failed: {ex.Message}");
-                
-                // Fallback to old netDXF importer with conversion if needed
-                using (ConvertToDxfAutoCad2000 converted = new ConvertToDxfAutoCad2000(filename, "dxf"))
-                {
-                    string fn = converted.DxfFileName;
-                    if (string.IsNullOrEmpty(fn)) fn = filename;
-                    CADability.DXF.Import import = new DXF.Import(fn);
-                    return import.Project;
-                }
-            }
+            // Use ACADSharp for DXF import (supports AC1009/R12 and later)
+            CADability.DXF.ImportAcadSharp import = new DXF.ImportAcadSharp(filename);
+            return import.Project;
         }
         private static Project ImportDWG(string filename)
         {
-            // ACADSharp supports DWG directly - no conversion needed
-            try
-            {
-                CADability.DXF.ImportAcadSharp import = new DXF.ImportAcadSharp(filename);
-                return import.Project;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Trace.WriteLine($"ACADSharp DWG import failed: {ex.Message}");
-                
-                // Fallback to old netDXF importer with conversion
-                using (ConvertToDxfAutoCad2000 converted = new ConvertToDxfAutoCad2000(filename, "dxf"))
-                {
-                    CADability.DXF.Import import = new DXF.Import(converted.DxfFileName);
-                    return import.Project;
-                }
-            }
+            // Use ACADSharp for DWG import (supports AC1014/R14 and later)
+            CADability.DXF.ImportAcadSharp import = new DXF.ImportAcadSharp(filename);
+            return import.Project;
         }
         public static Project ReadFromFile(string FileName, string Format, bool useProgress, bool makeCompounds = true)
         {

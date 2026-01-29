@@ -58,6 +58,10 @@
     <!-- exclusions -->
     <RemoveFiles Include="CADability.DXF\**" />
     <RemoveFiles Include="DXF\**" />
+    <RemoveFiles Include="netDxf\**" />
+    <RemoveFiles Include="ImportDxf.cs.old" />
+    <RemoveFiles Include="ExportDxf.cs.old" />
+    <RemoveFiles Include="ExtendedEntityData.cs.old" />
     <RemoveFiles Include="_site\**" />
     <RemoveFiles Include="OpenGlList.cs" />
     <RemoveFiles Include="Scripting.cs" />

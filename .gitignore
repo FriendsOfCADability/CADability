@@ -350,3 +350,9 @@ CADability.Forms/log.txt
 /CADability.Forms/UnfoldOptions.cs
 /CADability.Forms/ImportSVG.cs
 /CADability.BlenderInterface/CADability.BlenderInterface.csproj
+
+# Old netDXF files (replaced by ACADSharp)
+CADability/ImportDxf.cs.old
+CADability/ExportDxf.cs.old
+CADability/ExtendedEntityData.cs.old
+CADability/netDxf/

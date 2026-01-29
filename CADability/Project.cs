@@ -1701,7 +1701,9 @@ namespace CADability
             public string DxfFileName;
             public ConvertToDxfAutoCad2000(string fileName, string format)
             {
-                if ((format.Equals("dxf", StringComparison.OrdinalIgnoreCase) && !DXF.Import.CanImportVersion(fileName)) || format.Equals("dwg", StringComparison.OrdinalIgnoreCase))
+                // ACADSharp now handles most versions natively, so we only need conversion for very old files or if ACADSharp fails
+                if ((format.Equals("dxf", StringComparison.OrdinalIgnoreCase) && !DXF.ImportAcadSharp.CanImportVersion(fileName) && !DXF.Import.CanImportVersion(fileName)) || 
+                    (format.Equals("dwg", StringComparison.OrdinalIgnoreCase) && !DXF.ImportAcadSharp.CanImportVersion(fileName)))
                 {
                     string converter = Settings.GlobalSettings.GetStringValue("DwgDxfConverter", null);
                     bool isInSetting = true;
@@ -1796,20 +1798,44 @@ namespace CADability
         }
         private static Project ImportDXF(string filename)
         {
-            using (ConvertToDxfAutoCad2000 converted = new ConvertToDxfAutoCad2000(filename, "dxf"))
+            // Try ACADSharp first (supports more versions natively)
+            try
             {
-                string fn = converted.DxfFileName;
-                if (string.IsNullOrEmpty(fn)) fn = filename;
-                CADability.DXF.Import import = new DXF.Import(fn); // DEBUGGING! change to fn again
+                CADability.DXF.ImportAcadSharp import = new DXF.ImportAcadSharp(filename);
                 return import.Project;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine($"ACADSharp import failed: {ex.Message}");
+                
+                // Fallback to old netDXF importer with conversion if needed
+                using (ConvertToDxfAutoCad2000 converted = new ConvertToDxfAutoCad2000(filename, "dxf"))
+                {
+                    string fn = converted.DxfFileName;
+                    if (string.IsNullOrEmpty(fn)) fn = filename;
+                    CADability.DXF.Import import = new DXF.Import(fn);
+                    return import.Project;
+                }
             }
         }
         private static Project ImportDWG(string filename)
         {
-            using (ConvertToDxfAutoCad2000 converted = new ConvertToDxfAutoCad2000(filename, "dxf"))
+            // ACADSharp supports DWG directly - no conversion needed
+            try
             {
-                CADability.DXF.Import import = new DXF.Import(converted.DxfFileName);
+                CADability.DXF.ImportAcadSharp import = new DXF.ImportAcadSharp(filename);
                 return import.Project;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine($"ACADSharp DWG import failed: {ex.Message}");
+                
+                // Fallback to old netDXF importer with conversion
+                using (ConvertToDxfAutoCad2000 converted = new ConvertToDxfAutoCad2000(filename, "dxf"))
+                {
+                    CADability.DXF.Import import = new DXF.Import(converted.DxfFileName);
+                    return import.Project;
+                }
             }
         }
         public static Project ReadFromFile(string FileName, string Format, bool useProgress, bool makeCompounds = true)

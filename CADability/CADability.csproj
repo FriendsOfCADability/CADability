@@ -85,9 +85,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="ACadSharp" Version="3.0.8" />
     <PackageReference Include="MathNet.Numerics.Signed" Version="5.0.0" />
     <PackageReference Include="System.Drawing.Common" Version="6.0.0" />
-    <PackageReference Include="System.Text.Encoding.CodePages" Version="6.0.0" />
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="9.0.6" />
     <Reference Include="Microsoft.VisualStudio.DebuggerVisualizers">
       <HintPath>$(VsInstallRoot)\Common7\IDE\PublicAssemblies\Microsoft.VisualStudio.DebuggerVisualizers.dll</HintPath>
     </Reference>

@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
     <PackageId>CADability</PackageId>
     <Version>1.0.22</Version>
     <!-- Update this for each publish -->
@@ -20,6 +21,10 @@
     <AssemblyName>CADability</AssemblyName>
     <Platforms>AnyCPU;x64</Platforms>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    
+    <!-- Suppress CS8002 warning about unsigned ACadSharp assembly -->
+    <!-- This is acceptable as CADability runs in full trust environments -->
+    <NoWarn>$(NoWarn);CS8002</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)'=='Debug'">

@@ -210,9 +210,51 @@ namespace CADability.DXF
 
         private void FillModel(Model model, BlockRecord blockRecord)
         {
+            // Collect all entities and handle special cases like Polyline3D with separate vertices
+            List<Entity> processedEntities = new List<Entity>();
+            Dictionary<ulong, List<ACadSharp.Entities.Vertex3D>> polyline3DVertices = new Dictionary<ulong, List<ACadSharp.Entities.Vertex3D>>();
+            ACadSharp.Entities.Polyline3D currentPolyline3D = null;
+            
+            // First pass: group Vertex3D entities with their parent Polyline3D
             foreach (var entity in blockRecord.Entities)
             {
-                IGeoObject geoObject = GeoObjectFromEntity(entity);
+                if (entity is ACadSharp.Entities.Polyline3D p3d)
+                {
+                    currentPolyline3D = p3d;
+                    polyline3DVertices[p3d.Handle] = new List<ACadSharp.Entities.Vertex3D>();
+                    processedEntities.Add(entity);
+                }
+                else if (entity is ACadSharp.Entities.Vertex3D v3d && currentPolyline3D != null)
+                {
+                    polyline3DVertices[currentPolyline3D.Handle].Add(v3d);
+                    // Don't add Vertex3D to processedEntities - they're part of the polyline
+                }
+                else if (entity is ACadSharp.Entities.Seqend)
+                {
+                    currentPolyline3D = null; // End of polyline sequence
+                    // Don't add Seqend to processedEntities
+                }
+                else
+                {
+                    processedEntities.Add(entity);
+                }
+            }
+            
+            // Second pass: convert entities to GeoObjects
+            foreach (var entity in processedEntities)
+            {
+                IGeoObject geoObject = null;
+                
+                if (entity is ACadSharp.Entities.Polyline3D p3d && polyline3DVertices.ContainsKey(p3d.Handle))
+                {
+                    // Convert Polyline3D with collected vertices
+                    geoObject = CreatePolyline3DFromVertices(p3d, polyline3DVertices[p3d.Handle]);
+                }
+                else
+                {
+                    geoObject = GeoObjectFromEntity(entity);
+                }
+                
                 if (geoObject != null)
                 {
                     model.Add(geoObject);
@@ -249,6 +291,9 @@ namespace CADability.DXF
                         break;
                     case ACadSharp.Entities.LwPolyline lwPolyline:
                         res = CreateLwPolyline(lwPolyline);
+                        break;
+                    case ACadSharp.Entities.Polyline3D polyline3D:
+                        res = CreatePolyline3D(polyline3D);
                         break;
                     case ACadSharp.Entities.Polyline polyline:
                         res = CreatePolyline(polyline);
@@ -654,6 +699,60 @@ namespace CADability.DXF
             catch (Exception ex)
             {
                 System.Diagnostics.Trace.WriteLine($"Error creating Polyline: {ex.Message}");
+                return null;
+            }
+        }
+
+        private IGeoObject CreatePolyline3D(ACadSharp.Entities.Polyline3D polyline3D)
+        {
+            if (polyline3D.Vertices.Count < 2)
+                return null;
+
+            try
+            {
+                // Polyline3D vertices are Vertex3D objects with Location property
+                GeoPoint[] points = new GeoPoint[polyline3D.Vertices.Count];
+                int i = 0;
+                foreach (var vertex in polyline3D.Vertices)
+                {
+                    points[i++] = ToGeoPoint(vertex.Location);
+                }
+                
+                return CreatePolylineFromPoints(points, polyline3D.IsClosed);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine($"Error creating Polyline3D: {ex.Message}");
+                return null;
+            }
+        }
+
+        private IGeoObject CreatePolyline3DFromVertices(ACadSharp.Entities.Polyline3D polyline3D, List<ACadSharp.Entities.Vertex3D> vertices)
+        {
+            if (vertices.Count < 2)
+                return null;
+
+            try
+            {
+                GeoPoint[] points = new GeoPoint[vertices.Count];
+                for (int i = 0; i < vertices.Count; i++)
+                {
+                    points[i] = ToGeoPoint(vertices[i].Location);
+                }
+                
+                // Check if it's closed by comparing first and last points
+                bool isClosed = polyline3D.IsClosed;
+                if (!isClosed && vertices.Count > 2)
+                {
+                    // If first and last points are the same, it's closed
+                    isClosed = Precision.IsEqual(points[0], points[vertices.Count - 1]);
+                }
+                
+                return CreatePolylineFromPoints(points, isClosed);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine($"Error creating Polyline3D from vertices: {ex.Message}");
                 return null;
             }
         }

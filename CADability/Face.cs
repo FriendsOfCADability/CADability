@@ -6070,7 +6070,7 @@ namespace CADability.GeoObject
             }
             //Make list of 2D edges.
             //Handle seam edges and different period.
-            double tol = 0.00006; //For file SZ6061196J07_P029_ASS_Test_Automation.stp    //0.0008 For file 06_PN_4648_S_1185_1_I15_A13_AS_P100-1.stp  //0.000005; //Not Precision.eps for file 83855_elp11b.stp
+            double tol = 0.0005; //For file 1_MATFT84_ALL_OM.stp    //For file SZ6061196J07_P029_ASS_Test_Automation.stp    //0.0008 For file 06_PN_4648_S_1185_1_I15_A13_AS_P100-1.stp  //0.000005; //Not Precision.eps for file 83855_elp11b.stp
             int remainingEdges = edges.Length;
             int currEdgeIndex = nonSeamEdgeIndex;
             if (nonSeamEdgeIndex >= edges.Length)

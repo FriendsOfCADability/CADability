@@ -284,7 +284,7 @@ namespace CADability.UserInterface
 		<label>???</label>
 		<info>???</info>
 	</data>";
-                    File.AppendAllText(@"C:\Temp\MissingString.txt", txt);
+                    //File.AppendAllText(@"C:\Temp\MissingString.txt", txt);
                 }
 #endif
                 return "missing string: " + Name;

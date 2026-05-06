@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
 
   <PropertyGroup>
-    <TargetFramework>net8.0-windows7.0</TargetFramework>
+    <TargetFramework>net10.0-windows7.0</TargetFramework>
+    <NoWarn>$(NoWarn);WFO1000</NoWarn>
     <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>CADability.Forms</RootNamespace>
     <AssemblyName>UICADability.W</AssemblyName>

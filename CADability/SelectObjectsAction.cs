@@ -2302,37 +2302,32 @@ namespace CADability.Actions
 
 					if (selectedObjects.Count == 0) return false;
 					Frame.UIService.SetClipboardData(selectedObjects, true);
-					//Clipboard.SetDataObject(selectedObjects, true);
 					return true;
 				case "MenuId.Edit.Paste":
-					object data = Frame.UIService.GetClipboardData(typeof(GeoObjectList));
-					if (data is GeoObjectList l) // System.Windows.Forms.DataFormats.Serializable))
-					{
-						// GeoObjectList l = data.GetData(typeof(GeoObjectList)) as GeoObjectList; // System.Windows.Forms.DataFormats.Serializable) as GeoObjectList;
-						if (l != null && l.Count > 0)
-							if (Settings.GlobalSettings.GetBoolValue("Select.KeepPasteActive", false))
+					GeoObjectList l = Frame.UIService.GetClipboardData();
+					if (l != null && l.Count > 0)
+						if (Settings.GlobalSettings.GetBoolValue("Select.KeepPasteActive", false))
+						{
+							PlaceObjects mo = new PlaceObjects(l, l.GetExtent().GetCenter());
+							Frame.SetAction(mo);
+						}
+						else
+						{
+							using (Frame.Project.Undo.UndoFrame)
 							{
-								PlaceObjects mo = new PlaceObjects(l, l.GetExtent().GetCenter());
-								Frame.SetAction(mo);
-							}
-							else
-							{
-								using (Frame.Project.Undo.UndoFrame)
+								foreach (IGeoObject go in l)
 								{
-									foreach (IGeoObject go in l)
+									if (go.Style != null && go.Style.Name == "CADability.EdgeStyle")
 									{
-										if (go.Style != null && go.Style.Name == "CADability.EdgeStyle")
-										{
-											go.Style = Frame.Project.StyleList.Current;
-										}
-										AttributeListContainer.UpdateObjectAttrinutes(Frame.Project, go);
-										go.UpdateAttributes(Frame.Project);
-										Frame.ActiveView.Model.Add(go);
+										go.Style = Frame.Project.StyleList.Current;
 									}
+									AttributeListContainer.UpdateObjectAttrinutes(Frame.Project, go);
+									go.UpdateAttributes(Frame.Project);
+									Frame.ActiveView.Model.Add(go);
 								}
 							}
-						if (l != null) SetSelectedObjects(l);
-					}
+						}
+					if (l != null) SetSelectedObjects(l);
 					return true;
 				//case "MenuId.SelectedObjects.PreferEdges":
 				//    pickEdges = !pickEdges;
@@ -2518,7 +2513,7 @@ namespace CADability.Actions
 				case "MenuId.Edit.Paste":
 					if (!Settings.GlobalSettings.GetBoolValue("DontCheckClipboardContent", false))
 					{
-						CommandState.Enabled = Frame.UIService.HasClipboardData(typeof(GeoObjectList));
+						CommandState.Enabled = Frame.UIService.HasClipboardData();
 					}
 					return true;
 				case "MenuId.SelectedObjects.Mode.All":

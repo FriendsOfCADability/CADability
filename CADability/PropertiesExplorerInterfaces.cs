@@ -337,8 +337,8 @@ namespace CADability.UserInterface
         DialogResult ShowPageSetupDlg(ref PrintDocument printDocument1, PageSettings pageSettings, out int width, out int height, out bool landscape);
         DialogResult ShowPrintDlg(ref PrintDocument printDocument);
         void SetClipboardData(GeoObjectList objects, bool copy);
-        object GetClipboardData(Type typeOfData);
-        bool HasClipboardData(Type typeOfData);
+        GeoObjectList GetClipboardData();
+        bool HasClipboardData();
         /// <summary>
         /// Shows or hides a progress bar. 
         /// </summary>

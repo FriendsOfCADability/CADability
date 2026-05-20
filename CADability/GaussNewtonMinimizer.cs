@@ -492,7 +492,6 @@ namespace CADability
                 double a = parameters[0];
                 double b = parameters[1];
                 double c = parameters[2];
-                double d = -1;
                 for (int i = 0; i < points.Length; i++)
                 {
                     double px = points[i].x + dx;

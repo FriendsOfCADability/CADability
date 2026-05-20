@@ -85,7 +85,8 @@ namespace CADability.UserInterface
             AddString("deutsch", "MenuId.ToggleDebugFlag", Category.label, "Debug Flag");
             AddString("english", "MenuId.ToggleDebugFlag", Category.label, "Debug Flag");
 #if DEBUG
-            File.Delete(@"C:\Temp\MissingString.txt");
+            if (File.Exists(@"C:\Temp\MissingString.txt"))
+                File.Delete(@"C:\Temp\MissingString.txt");
 #endif
         }
 

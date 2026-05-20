@@ -137,6 +137,12 @@ namespace CADability
                 }
             }
 
+            private bool EqualsAt(string value, StringComparison cmp = StringComparison.Ordinal)
+            {
+                if ((uint)actind > (uint)currentline.Length) return false;
+                if (currentline.Length - actind < value.Length) return false;
+                return currentline.AsSpan(actind, value.Length).Equals(value.AsSpan(), cmp);
+            }
             public etoken NextToken(out string line, out int start, out int length)
             {
                 line = null;
@@ -203,8 +209,17 @@ namespace CADability
                     case '7':
                     case '8':
                     case '9':
+                    case 'I':
                         {   // return a number
                             start = actind;
+                            if (EqualsAt("Infinity") || EqualsAt("+Infinity") || EqualsAt("-Infinity"))
+                            {
+                                actind += "Infinity".Length;
+                                if (currentline[start] == '+' || currentline[start] == '-') actind += 1;
+                                length = actind - start;
+                                line = currentline;
+                                return etoken.number;
+                            }
                             ++actind;
                             while (actind < currentline.Length && (char.IsDigit(currentline[actind]) || currentline[actind] == 'E' || currentline[actind] == 'e'
                                 || currentline[actind] == '+' || currentline[actind] == '-' || currentline[actind] == '.')) ++actind;
@@ -405,7 +420,8 @@ namespace CADability
                     for (int i = 0; i < kve.Count; i++)
                     {
 
-                        try { ar.Add(kve[i]); } catch { }; // could fail when kve[i] is a JsonUnknownType
+                        try { ar.Add(kve[i]); } catch { }
+                        ; // could fail when kve[i] is a JsonUnknownType
                     }
                     return ar;
                 }
@@ -494,6 +510,7 @@ namespace CADability
         Dictionary<int, int> typeIndexToVersion;
         Queue<Tuple<IJsonSerialize, JsonDict>> deferred;
         private bool verbose;
+        private string fileVersion;
 
         public JsonSerialize()
         {
@@ -678,7 +695,7 @@ namespace CADability
                 JsonDict cdb = allObjects["CADability"] as JsonDict;
                 if (cdb != null)
                 {
-                    string versionstring = cdb["Version"] as string;
+                    fileVersion = cdb["Version"] as string;
                 }
                 if (!allObjects.ContainsKey("Entities")) return null;
                 List<object> entities = allObjects["Entities"] as List<object>;
@@ -724,6 +741,7 @@ namespace CADability
         {
             get { return outStream!=null; }   
         }
+        public Version FileVersion { get { return new Version(fileVersion); } }
         private SerializationInfo SerializationInfoFromJsonData(JsonDict data, Type tp, List<object> entities, HashSet<ulong> underConstruction)
         {
             SerializationInfo si = new SerializationInfo(tp, new FormatterConverter());
@@ -1113,6 +1131,7 @@ namespace CADability
             objectCount = 0;
             WriteProperty("Entities");
             BeginArray();
+            objectToIndex[toSerialize] = 0;
             while (queue.Count > 0)
             {
                 if (objectCount > 0)
@@ -1192,19 +1211,24 @@ namespace CADability
         {
             BeginObject();
 
-            if (verbose) (this as IJsonWriteData).AddProperty("$Index(Debug)", objectCount);
+            if (verbose)
+                (this as IJsonWriteData).AddProperty("$Index(Debug)", objectCount);
+
+            Type valType = val.GetType();
+
             if (val is IDictionary ht && !(val is IJsonSerialize))
-            {   // a hashtable or some other kind of dictionary is serialized as 
-                val = new JSonDictionary(ht, val.GetType());
+            {
+                // a hashtable or some other kind of dictionary is serialized as 
+                val = new JSonDictionary(ht, valType);
             }
             if (val is System.Drawing.Color || val is System.Drawing.Printing.PageSettings || val is System.Drawing.Printing.Margins || val is System.Drawing.Printing.PaperSize ||
                 val is System.Drawing.Printing.PaperSource || val is System.Drawing.Printing.PrinterResolution || val is System.Drawing.Printing.PrinterSettings)
             {
                 val = new JSonSubstitute(val);
             }
-            if (val is IList lst && !(val is IJsonSerialize))
+            else if (valType.IsValueType && valType.Namespace == "System" && valType.Name.StartsWith("ValueTuple"))
             {
-
+                val = new JSonSubstitute(val);
             }
 
             int typeIndex;
@@ -1217,8 +1241,8 @@ namespace CADability
                 {   // if it is an unknown type, we use the typename that was given on deserialisation
 
                     // the following is not correct: if the order of objects has been changed, there is no original typename in the JsonProxyType
-                    // we would need a more global dictionare of proxy types
-                    // but this is only an issue, when saving files, where an object could not be deserialised on read
+                    // we would need a more global dictionary of proxy types
+                    // but this is only an issue, when saving files, where an object could not be deserialized on read
                     (this as IJsonWriteData).AddProperty("$Type", junk.OriginalTypeName);
                     typeIndex = junk.OriginalTypeVersion;
                     string assemblyName = junk.OriginalTypeAssembly;
@@ -1275,12 +1299,16 @@ namespace CADability
                             object[] nsa = pi[i].GetCustomAttributes(typeof(NonSerializedAttribute), true);
                             if ((nsa == null || nsa.Length == 0) && pi[i].CanRead && pi[i].CanWrite)
                             {
+                                try
+                                {
                                 object pval = pi[i].GetValue(val, new object[0]);
                                 (this as IJsonWriteData).AddProperty(pi[i].Name, pval);
                                 serialized = true; // at least one property can be read and written
                             }
+                                catch (TargetInvocationException) { }
                         }
                     }
+                }
                 }
                 if (serialized)
                 {
@@ -1533,7 +1561,8 @@ namespace CADability
             }
             else
             {
-                throw new ApplicationException("Cannot serialize value" + value.ToString());
+                WriteNull(); // no exception here, because this can happen with some properties, e.g. from System.Drawing.Common
+                // throw new ApplicationException("Cannot serialize value" + value.ToString());
             }
         }
 #if DEBUG
@@ -1607,6 +1636,12 @@ namespace CADability
         void IJsonWriteData.RegisterForSerializationDoneCallback(CADability.IJsonSerializeDone toCall)
         {
             SerializationDoneCallback.Add(toCall);
+        }
+
+        public int GetTypeVersion(Type type)
+        {
+            if (typeVersions.TryGetValue(type.FullName, out int v)) return v;
+            return -1;
         }
         #endregion
     }
@@ -1719,7 +1754,7 @@ namespace CADability
             return res;
         }
     }
-    internal class JsonProxyType : Hashtable, IJsonSerialize
+    internal class JsonProxyType : Hashtable, IJsonSerialize, ISerializable
     {
         Dictionary<string, object> dict;
         protected JsonProxyType()
@@ -1750,10 +1785,19 @@ namespace CADability
             }
         }
         public int OriginalTypeVersion => (int)dict["$TypeVersion"];
+        public override void GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            base.GetObjectData(info, context);
+    }
+        protected JsonProxyType(SerializationInfo info, StreamingContext context) : base(info, context)
+        {
+        }
+
     }
     internal class JSonSubstitute : IJsonSerialize, IJsonConvert
     {
         object toSerialize;
+        string typeName;
         public JSonSubstitute(object toSerialize)
         {
             this.toSerialize = toSerialize;
@@ -1767,130 +1811,261 @@ namespace CADability
         {
 
         }
-        public void GetObjectData(IJsonWriteData data)
-        {
-            data.AddProperty("$OriginalType", toSerialize.GetType().FullName);
-            if (toSerialize is System.Drawing.Color color)
-            {
-                data.AddProperty("Argb", color.ToArgb());
-            }
-            else if (toSerialize is System.Drawing.Printing.PageSettings pageSettings)
-            {
-                data.AddProperty("Color", pageSettings.Color);
-                data.AddProperty("Landscape", pageSettings.Landscape);
-                data.AddProperty("Margins", pageSettings.Margins);
-                data.AddProperty("PaperSize", pageSettings.PaperSize);
-                data.AddProperty("PaperSource", pageSettings.PaperSource);
-                data.AddProperty("PrinterResolution", pageSettings.PrinterResolution);
-                data.AddProperty("PrinterSettings", pageSettings.PrinterSettings);
-            }
-            else if (toSerialize is System.Drawing.Printing.Margins margins)
-            {
-                data.AddProperty("Left", margins.Left);
-                data.AddProperty("Right", margins.Right);
-                data.AddProperty("Top", margins.Top);
-                data.AddProperty("Bottom", margins.Bottom);
-            }
-            else if (toSerialize is System.Drawing.Printing.PaperSize paperSize)
-            {
-                data.AddProperty("Height", paperSize.Height);
-                data.AddProperty("PaperName", paperSize.PaperName);
-                data.AddProperty("RawKind", paperSize.RawKind);
-                data.AddProperty("Width", paperSize.Width);
-            }
-            else if (toSerialize is System.Drawing.Printing.PaperSource paperSource)
-            {
-                data.AddProperty("RawKind", paperSource.RawKind);
-                data.AddProperty("SourceName", paperSource.SourceName);
-            }
-            else if (toSerialize is System.Drawing.Printing.PrinterResolution printerResolution)
-            {
-                data.AddProperty("Kind", printerResolution.Kind);
-                data.AddProperty("X", printerResolution.X);
-                data.AddProperty("Y", printerResolution.Y);
-            }
-            else if (toSerialize is System.Drawing.Printing.PrinterSettings printerSettings)
-            {
-                data.AddProperty("Collate", printerSettings.Collate);
-                data.AddProperty("Copies", printerSettings.Copies);
-                data.AddProperty("Duplex", printerSettings.Duplex);
-                data.AddProperty("FromPage", printerSettings.FromPage);
-                data.AddProperty("MaximumPage", printerSettings.MaximumPage);
-                data.AddProperty("MinimumPage", printerSettings.MinimumPage);
-                data.AddProperty("PrinterName", printerSettings.PrinterName);
-                data.AddProperty("PrintFileName", printerSettings.PrintFileName);
-                data.AddProperty("PrintRange", printerSettings.PrintRange);
-                data.AddProperty("PrintToFile", printerSettings.PrintToFile);
-                data.AddProperty("ToPage", printerSettings.ToPage);
-            }
-        }
+		public void GetObjectData(IJsonWriteData data)
+		{
+			typeName = toSerialize.GetType().FullName;
+
+			if (string.IsNullOrEmpty(typeName))
+				return;
+
+			data.AddProperty("$OriginalType", typeName);
+			if (typeName == "System.Drawing.Color")
+			{
+				data.AddProperty("Argb", ((System.Drawing.Color)toSerialize).ToArgb());
+			}
+			else if (typeName.StartsWith("System.ValueTuple`"))
+			{
+				SerializeValueTuple(data);
+			}
+			else if (typeName == "System.Drawing.Printing.PageSettings")
+			{
+				System.Drawing.Printing.PageSettings pageSettings = toSerialize as System.Drawing.Printing.PageSettings;
+				data.AddProperty("Color", pageSettings.Color);
+				data.AddProperty("Landscape", pageSettings.Landscape);
+				data.AddProperty("Margins", pageSettings.Margins);
+				data.AddProperty("PaperSize", pageSettings.PaperSize);
+				data.AddProperty("PaperSource", pageSettings.PaperSource);
+				data.AddProperty("PrinterResolution", pageSettings.PrinterResolution);
+				data.AddProperty("PrinterSettings", pageSettings.PrinterSettings);
+			}
+			else if (typeName == "System.Drawing.Printing.Margins")
+			{
+				System.Drawing.Printing.Margins margins = toSerialize as System.Drawing.Printing.Margins;
+				data.AddProperty("Left", margins.Left);
+				data.AddProperty("Right", margins.Right);
+				data.AddProperty("Top", margins.Top);
+				data.AddProperty("Bottom", margins.Bottom);
+			}
+			else if (typeName == "System.Drawing.Printing.PaperSize")
+			{
+				System.Drawing.Printing.PaperSize paperSize = toSerialize as System.Drawing.Printing.PaperSize;
+				data.AddProperty("Height", paperSize.Height);
+				data.AddProperty("PaperName", paperSize.PaperName);
+				data.AddProperty("RawKind", paperSize.RawKind);
+				data.AddProperty("Width", paperSize.Width);
+			}
+			else if (typeName == "System.Drawing.Printing.PaperSource")
+			{
+				System.Drawing.Printing.PaperSource paperSource = toSerialize as System.Drawing.Printing.PaperSource;
+				data.AddProperty("RawKind", paperSource.RawKind);
+				data.AddProperty("SourceName", paperSource.SourceName);
+			}
+			else if (typeName == "System.Drawing.Printing.PrinterResolution")
+			{
+				System.Drawing.Printing.PrinterResolution printerResolution = toSerialize as System.Drawing.Printing.PrinterResolution;
+				data.AddProperty("Kind", printerResolution.Kind);
+				data.AddProperty("X", printerResolution.X);
+				data.AddProperty("Y", printerResolution.Y);
+			}
+			else if (typeName == "System.Drawing.Printing.PrinterSettings")
+			{
+				System.Drawing.Printing.PrinterSettings printerSettings = toSerialize as System.Drawing.Printing.PrinterSettings;
+				data.AddProperty("Collate", printerSettings.Collate);
+				data.AddProperty("Copies", printerSettings.Copies);
+				data.AddProperty("Duplex", printerSettings.Duplex);
+				data.AddProperty("FromPage", printerSettings.FromPage);
+				data.AddProperty("MaximumPage", printerSettings.MaximumPage);
+				data.AddProperty("MinimumPage", printerSettings.MinimumPage);
+				data.AddProperty("PrinterName", printerSettings.PrinterName);
+				data.AddProperty("PrintFileName", printerSettings.PrintFileName);
+				data.AddProperty("PrintRange", printerSettings.PrintRange);
+				data.AddProperty("PrintToFile", printerSettings.PrintToFile);
+				data.AddProperty("ToPage", printerSettings.ToPage);
+			}
+		}
 
         public void SetObjectData(IJsonReadData data)
         {
-            string typeName = data.GetProperty<string>("$OriginalType");
-            switch (typeName)
+            typeName = data.GetProperty<string>("$OriginalType");
+
+            if (typeName == "System.Drawing.Color")
             {
-                case "System.Drawing.Color":
-                    toSerialize = System.Drawing.Color.FromArgb(data.GetProperty<int>("Argb"));
-                    break;
-                case "System.Drawing.Printing.PageSettings":
-                    System.Drawing.Printing.PageSettings pageSettings = new System.Drawing.Printing.PageSettings();
-                    toSerialize = pageSettings;
-                    pageSettings.Color = data.GetProperty<bool>("Color");
-                    pageSettings.Landscape = data.GetProperty<bool>("Landscape");
-                    pageSettings.Margins = data.GetProperty<System.Drawing.Printing.Margins>("Margins");
-                    pageSettings.PaperSize = data.GetProperty<System.Drawing.Printing.PaperSize>("PaperSize");
-                    pageSettings.PaperSource = data.GetProperty<System.Drawing.Printing.PaperSource>("PaperSource");
-                    pageSettings.PrinterResolution = data.GetProperty<System.Drawing.Printing.PrinterResolution>("PrinterResolution");
-                    pageSettings.PrinterSettings = data.GetProperty<System.Drawing.Printing.PrinterSettings>("PrinterSettings");
-                    break;
-                case "System.Drawing.Printing.Margins":
-                    System.Drawing.Printing.Margins margins = new System.Drawing.Printing.Margins();
-                    toSerialize = margins;
-                    margins.Left = data.GetProperty<int>("Left");
-                    margins.Right = data.GetProperty<int>("Right");
-                    margins.Top = data.GetProperty<int>("Top");
-                    margins.Bottom = data.GetProperty<int>("Bottom");
-                    break;
-                case "System.Drawing.Printing.PaperSize":
-                    System.Drawing.Printing.PaperSize paperSize = new System.Drawing.Printing.PaperSize();
-                    toSerialize = paperSize;
-                    paperSize.Height = data.GetProperty<int>("Height");
-                    paperSize.PaperName = data.GetProperty<string>("PaperName");
-                    paperSize.RawKind = data.GetProperty<int>("RawKind");
-                    paperSize.Width = data.GetProperty<int>("Width");
-                    break;
-                case "System.Drawing.Printing.PaperSource":
-                    System.Drawing.Printing.PaperSource paperSource = new System.Drawing.Printing.PaperSource();
-                    toSerialize = paperSource;
-                    paperSource.RawKind = data.GetProperty<int>("RawKind");
-                    paperSource.SourceName = data.GetProperty<string>("SourceName");
-                    break;
-                case "System.Drawing.Printing.PrinterResolution":
-                    System.Drawing.Printing.PrinterResolution printerResolution = new System.Drawing.Printing.PrinterResolution();
-                    toSerialize = printerResolution;
-                    printerResolution.Kind = data.GetProperty<System.Drawing.Printing.PrinterResolutionKind>("Kind");
-                    printerResolution.X = data.GetProperty<int>("X");
-                    printerResolution.Y = data.GetProperty<int>("Y");
-                    break;
-                case "System.Drawing.Printing.PrinterSettings":
-                    System.Drawing.Printing.PrinterSettings printerSettings = new System.Drawing.Printing.PrinterSettings();
-                    toSerialize = printerSettings;
-                    printerSettings.Collate = data.GetProperty<bool>("Collate");
-                    printerSettings.Copies = data.GetProperty<short>("Copies");
-                    printerSettings.Duplex = data.GetProperty<System.Drawing.Printing.Duplex>("Duplex");
-                    printerSettings.FromPage = data.GetProperty<int>("FromPage");
-                    printerSettings.MaximumPage = data.GetProperty<int>("MaximumPage");
-                    printerSettings.MinimumPage = data.GetProperty<int>("MinimumPage");
-                    printerSettings.PrinterName = data.GetProperty<string>("PrinterName");
-                    string pfn = data.GetProperty<string>("PrintFileName");
-                    if (!String.IsNullOrEmpty(pfn))
-                        printerSettings.PrintFileName = pfn;
-                    printerSettings.PrintRange = data.GetProperty<System.Drawing.Printing.PrintRange>("PrintRange");
-                    printerSettings.PrintToFile = data.GetProperty<bool>("PrintToFile");
-                    printerSettings.ToPage = data.GetProperty<int>("ToPage");
-                    break;
+                toSerialize = System.Drawing.Color.FromArgb(data.GetProperty<int>("Argb"));
             }
+            else if (typeName.StartsWith("System.ValueTuple`"))
+            {
+                DeserializeValueTuple(data);
+            }
+            else if (typeName == "System.Drawing.Printing.PageSettings")
+            {
+                System.Drawing.Printing.PageSettings pageSettings = new System.Drawing.Printing.PageSettings();
+                toSerialize = pageSettings;
+                pageSettings.Color = data.GetProperty<bool>("Color");
+                pageSettings.Landscape = data.GetProperty<bool>("Landscape");
+                pageSettings.Margins = data.GetProperty<System.Drawing.Printing.Margins>("Margins");
+                pageSettings.PaperSize = data.GetProperty<System.Drawing.Printing.PaperSize>("PaperSize");
+                pageSettings.PaperSource = data.GetProperty<System.Drawing.Printing.PaperSource>("PaperSource");
+                pageSettings.PrinterResolution = data.GetProperty<System.Drawing.Printing.PrinterResolution>("PrinterResolution");
+                pageSettings.PrinterSettings = data.GetProperty<System.Drawing.Printing.PrinterSettings>("PrinterSettings");
+            }
+            else if (typeName == "System.Drawing.Printing.Margins")
+            {
+                System.Drawing.Printing.Margins margins = new System.Drawing.Printing.Margins();
+                toSerialize = margins;
+                margins.Left = data.GetProperty<int>("Left");
+                margins.Right = data.GetProperty<int>("Right");
+                margins.Top = data.GetProperty<int>("Top");
+                margins.Bottom = data.GetProperty<int>("Bottom");
+            }
+            else if (typeName == "System.Drawing.Printing.PaperSize")
+            {
+                System.Drawing.Printing.PaperSize paperSize = new System.Drawing.Printing.PaperSize();
+                toSerialize = paperSize;
+                paperSize.Height = data.GetProperty<int>("Height");
+                paperSize.PaperName = data.GetProperty<string>("PaperName");
+                paperSize.RawKind = data.GetProperty<int>("RawKind");
+                paperSize.Width = data.GetProperty<int>("Width");
+            }
+            else if (typeName == "System.Drawing.Printing.PaperSource")
+            {
+                System.Drawing.Printing.PaperSource paperSource = new System.Drawing.Printing.PaperSource();
+                toSerialize = paperSource;
+                paperSource.RawKind = data.GetProperty<int>("RawKind");
+                paperSource.SourceName = data.GetProperty<string>("SourceName");
+            }
+            else if (typeName == "System.Drawing.Printing.PrinterResolution")
+            {
+                System.Drawing.Printing.PrinterResolution printerResolution = new System.Drawing.Printing.PrinterResolution();
+                toSerialize = printerResolution;
+                printerResolution.Kind = data.GetProperty<System.Drawing.Printing.PrinterResolutionKind>("Kind");
+                printerResolution.X = data.GetProperty<int>("X");
+                printerResolution.Y = data.GetProperty<int>("Y");
+            }
+            else if (typeName == "System.Drawing.Printing.PrinterSettings")
+            {
+                System.Drawing.Printing.PrinterSettings printerSettings = new System.Drawing.Printing.PrinterSettings();
+                toSerialize = printerSettings;
+                printerSettings.Collate = data.GetProperty<bool>("Collate");
+                printerSettings.Copies = data.GetProperty<short>("Copies");
+                printerSettings.Duplex = data.GetProperty<System.Drawing.Printing.Duplex>("Duplex");
+                printerSettings.FromPage = data.GetProperty<int>("FromPage");
+                printerSettings.MaximumPage = data.GetProperty<int>("MaximumPage");
+                printerSettings.MinimumPage = data.GetProperty<int>("MinimumPage");
+                printerSettings.PrinterName = data.GetProperty<string>("PrinterName");
+                string pfn = data.GetProperty<string>("PrintFileName");
+                if (!String.IsNullOrEmpty(pfn))
+                    printerSettings.PrintFileName = pfn;
+                printerSettings.PrintRange = data.GetProperty<System.Drawing.Printing.PrintRange>("PrintRange");
+                printerSettings.PrintToFile = data.GetProperty<bool>("PrintToFile");
+                printerSettings.ToPage = data.GetProperty<int>("ToPage");
+            }
+        }
+
+        private void SerializeValueTuple(IJsonWriteData data)
+        {
+            Type type = toSerialize.GetType();
+            // Get all Item fields (Item1, Item2, etc.)
+            FieldInfo[] fields = type.GetFields(BindingFlags.Instance | BindingFlags.Public);
+
+            // Store the generic type arguments for reconstruction
+            Type[] genericArgs = type.GetGenericArguments();
+            string[] typeNames = new string[genericArgs.Length];
+            for (int i = 0; i < genericArgs.Length; i++)
+            {
+                typeNames[i] = genericArgs[i].FullName;
+    }
+            data.AddProperty("$GenericTypes", typeNames);
+
+            // Store each field value
+            object[] values = new object[fields.Length];
+            for (int i = 0; i < fields.Length; i++)
+            {
+                values[i] = fields[i].GetValue(toSerialize);
+            }
+            data.AddProperty("Values", values);
+        }
+
+        private void DeserializeValueTuple(IJsonReadData data)
+        {
+            // Get the generic type arguments
+            string[] typeNames = data.GetProperty<string[]>("$GenericTypes");
+            Type[] genericArgs = new Type[typeNames.Length];
+            for (int i = 0; i < typeNames.Length; i++)
+            {
+                genericArgs[i] = Type.GetType(typeNames[i]);
+
+                if (genericArgs[i] != null) 
+                    continue;
+
+                // Try to find in loaded assemblies
+                foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    genericArgs[i] = assembly.GetType(typeNames[i]);
+                    if (genericArgs[i] != null) break;
+                }
+            }
+
+            // Construct the ValueTuple type
+            Type tupleType = Type.GetType(typeName);
+            if (tupleType == null)
+            {
+                // Build the generic type manually
+                string baseTypeName = typeName.Substring(0, typeName.IndexOf('`'));
+                Type genericTypeDef = Type.GetType(baseTypeName + "`" + genericArgs.Length);
+
+                if (genericTypeDef is null)
+                    return;
+
+                tupleType = genericTypeDef.MakeGenericType(genericArgs);
+            }
+
+            // Get the values
+            object[] values = data.GetProperty<object[]>("Values");
+
+            // Convert values to match constructor parameter types
+            for (int i = 0; i < values.Length && i < genericArgs.Length; i++)
+            {
+                if (values[i] == null || genericArgs[i].IsAssignableFrom(values[i].GetType()))
+                    continue;
+
+                // Handle array types - JSON deserializes arrays as List<object>
+                if (genericArgs[i].IsArray && values[i] is List<object> list)
+                {
+                    Type elementType = genericArgs[i].GetElementType();
+
+                    if (elementType == null)
+                        continue;
+
+                    Array array = Array.CreateInstance(elementType, list.Count);
+                    for (int j = 0; j < list.Count; j++)
+                    {
+                        object listItem = list[j];
+                        if (listItem != null && (elementType.IsPrimitive || elementType.IsEnum))
+                        {
+                            array.SetValue(Convert.ChangeType(listItem, elementType), j);
+                        }
+                        else if (listItem != null)
+                        {
+                            array.SetValue(listItem, j);
+                        }
+                    }
+                    values[i] = array;
+                }
+                // Handle primitive type conversions
+                else if (genericArgs[i].IsPrimitive || genericArgs[i].IsEnum)
+                {
+                    values[i] = Convert.ChangeType(values[i], genericArgs[i]);
+                }
+            }
+
+            // Find constructor with matching parameter types
+            ConstructorInfo constructor = tupleType.GetConstructor(genericArgs);
+
+            if (constructor is null)
+                return;
+
+            // Create the tuple instance
+            toSerialize = constructor.Invoke(values);
         }
     }
     //internal class JSonList: List<object>, IJsonSerialize, IJsonConvert

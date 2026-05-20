@@ -1072,10 +1072,10 @@ namespace CADability
                         involvedFaces.Add(edge.PrimaryFace);
                         involvedFaces.Add(edge.SecondaryFace);
                     }
-                    else
-                    {
-                        // return false; // edge could not be recalculated, the modification is not possible
-                    }
+                    //else
+                    //{
+                    // return false; // edge could not be recalculated, the modification is not possible
+                    //}
                 }
                 foreach (Face face in involvedFaces)
                 {
@@ -1099,7 +1099,6 @@ namespace CADability
                     clonedShell.RecalcVertices(); // not sure, why this is necessary, but sometimes it is 
                     return clonedShell.CheckConsistency();
                 }
-                return true;
             }
             finally
             {   // clear all sets to allow multiple usage of the parametrics

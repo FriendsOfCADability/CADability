@@ -466,7 +466,6 @@ namespace CADability.Actions
             validResult = false;
             distance = length;
             return Refresh();
-            return false;
         }
 
         private double DistanceInput_GetLengthEvent()

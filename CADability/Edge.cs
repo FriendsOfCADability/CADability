@@ -1919,7 +1919,7 @@ namespace CADability
                     curve3d = dsc.ToBSpline(Precision.eps);
                     if (curveOnPrimaryFace is InterpolatedDualSurfaceCurve.ProjectedCurve)
                     {
-                        curveOnPrimaryFace = (curveOnPrimaryFace as InterpolatedDualSurfaceCurve.ProjectedCurve).ToBSpline(Precision.eps);
+                        curveOnPrimaryFace = (curveOnPrimaryFace as InterpolatedDualSurfaceCurve.ProjectedCurve).ToBspline(Precision.eps);
                     }
                 }
             }

@@ -1179,7 +1179,7 @@ namespace CADability
                 }
             }
         }
-        internal void SetClientRect(Rectangle clr)
+        public void SetClientRect(Rectangle clr)
         {
             this.clientRect = clr;
         }

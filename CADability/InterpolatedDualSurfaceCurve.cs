@@ -127,7 +127,7 @@ namespace CADability
                 this.onSurface1 = onSurface1;
                 this.reversed = reversed;
             }
-            public BSpline2D ToBSpline(double precision)
+            public new BSpline2D ToBspline(double precision)
             {
                 BSpline2D res = base.ToBspline(0.0);
                 return res;

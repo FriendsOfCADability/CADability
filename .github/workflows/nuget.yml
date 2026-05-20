@@ -1,38 +1,28 @@
 name: Publish NuGet Package
-
 on:
   push:
     tags:
       - 'v*' # Trigger on version tags like v1.0.0
-
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
-
+        uses: actions/checkout@v4
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.x'
-
       - name: Restore dependencies
         run: dotnet restore CADability/CADability.csproj
-
       - name: Build
         run: dotnet build CADability/CADability.csproj -c Release --no-restore
-
       - name: List build output
         run: dir CADability\bin\Release\netstandard2.0
-
       - name: Pack
         run: dotnet pack CADability/CADability.csproj -c Release --no-build -o ./nupkgs
-
       - name: List nupkg
         run: dir .\nupkgs
-
       - name: Push NuGet package
         run: |
           $version = "${{ github.ref_name }}" -replace '^v', ''

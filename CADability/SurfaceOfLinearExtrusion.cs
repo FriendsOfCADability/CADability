@@ -96,7 +96,7 @@ namespace CADability.GeoObject
                         ICurve2D c2dp = c2d.Parallel(offset, false, Precision.eps, Math.PI);
                         if (c2dp != null) return new SurfaceOfLinearExtrusion(c2dp.MakeGeoObject(pln) as ICurve, direction, curveStartParameter, curveEndParameter);
                     }
-                    catch (Exception ex) { } // some curves don't implement Parallel (e.g. EllipseArc2D)
+                    catch (Exception) { } // some curves don't implement Parallel (e.g. EllipseArc2D)
                 }
             }
             return new OffsetSurface(this, offset);

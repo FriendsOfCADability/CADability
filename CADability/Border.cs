@@ -1156,28 +1156,32 @@ namespace CADability.Shapes
 			Recalc(out dumy);
 			return true;
 		}
-		internal void SplitSingleCurve()
-		{   // avoid borders with single outline, like circles or closed bsplines
-			// they make problems in BorderOperation since the position of the start/endpoint 0.0 ad 1.0 is ambiguous
-			if (segment.Length == 1)
-			{
-				ICurve2D orgSegment = segment[0].Clone();
-				Segments = segment[0].Split(0.5);
+        internal void SplitSingleCurve()
+        {
+            if (segment.Length != 1) 
+                return;
 
-				//Save the userdata to the splitted
-				foreach (ICurve2D item in Segments)
-					item.UserData.Add(orgSegment.UserData);
+            ICurve2D orgSegment = segment[0].Clone();
+            ICurve2D[] splitResult = segment[0].Split(0.5);
 
-				Recalc(out _);
-				UnsplittedOutline = orgSegment;
-			}
-		}
+            // Only proceed if Split returned valid (non-null) segments
+            if (splitResult == null || splitResult.All(s => s == null))
+                return;
 
-		/// <summary>
-		/// In case of a border with a single outline like circles or closed bsplines
-		/// this property will contain a cloned unsplitted outline. While GetClonedSegments() will return the splitted one.
-		/// </summary>
-		public ICurve2D UnsplittedOutline { get; private set; }
+            Segments = splitResult;
+
+            foreach (ICurve2D item in Segments)
+                item?.UserData.Add(orgSegment.UserData);
+
+            Recalc(out _);
+            UnsplittedOutline = orgSegment;
+        }
+
+        /// <summary>
+        /// In case of a border with a single outline like circles or closed bsplines
+        /// this property will contain a cloned unsplitted outline. While GetClonedSegments() will return the splitted one.
+        /// </summary>
+        public ICurve2D UnsplittedOutline { get; private set; }
 
 		//public void RemoveSegmentsSmaller(double prec)
 		//{

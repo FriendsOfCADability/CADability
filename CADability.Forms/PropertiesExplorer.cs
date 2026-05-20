@@ -174,7 +174,6 @@ namespace CADability.Forms
 
         #region textBox
         TextBox textBox; // there is only one TextBox for editing labels or values. It is normally hidden and moved, filled and activated when needed
-        bool endEidtCalled;
         private ErrorProvider errorProvider = new ErrorProvider();
         public void ShowTextBox(Rectangle screenLocation, string initialText, IPropertyEntry sender, Point screenClickPos)
         {

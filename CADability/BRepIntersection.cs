@@ -9472,7 +9472,7 @@ namespace CADability
                             (tr as IGeoObject).UserData.Add("DebugIntersectionBy2", item.Key.face2.GetHashCode());
                             if (con2 is InterpolatedDualSurfaceCurve.ProjectedCurve)
                             {
-                                BSpline2D dbgbsp2d = (con2 as InterpolatedDualSurfaceCurve.ProjectedCurve).ToBSpline(0.0);
+                                BSpline2D dbgbsp2d = (con2 as InterpolatedDualSurfaceCurve.ProjectedCurve).ToBspline(0.0);
                             }
 #endif
                             if (dirs1) // the trimming of BSplines is sometimes not very exact

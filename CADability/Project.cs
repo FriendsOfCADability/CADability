@@ -1064,70 +1064,42 @@ namespace CADability
         {
             get { return undoRedoSystem; }
         }
+        
         /// <summary>
-        /// Write the project to an XML file using a soap formatter with System.Runtime.Serialization. Use <see cref="ReadFromXML"/> to read the file into a projact.
-        /// </summary>
-        /// <param name="FileName">Name of the file to write to.</param>
-        public void WriteToXML(string FileName)
-        {
-            throw new NotImplementedException("Writing to XML no longer supported, write to JSON instead");
-            //// BinaryFormatter formatter = new BinaryFormatter();
-            //Stream stream = File.Open(FileName, FileMode.Create);
-            //SoapFormatter soapformatter = new SoapFormatter(); // funktioniert, aber sehr geschwätzig
-            //soapformatter.AssemblyFormat = System.Runtime.Serialization.Formatters.FormatterAssemblyStyle.Simple;
-            //soapformatter.TypeFormat = System.Runtime.Serialization.Formatters.FormatterTypeStyle.TypesWhenNeeded;
-            //soapformatter.Serialize(stream, this);
-            //stream.Close();
-        }
-        /// <summary>
-        /// Read the provided file with a sop formatter into a new Project. The file must have been written with <see cref="WriteToXML"/>.
-        /// </summary>
-        /// <param name="FileName"></param>
-        /// <returns></returns>
-        public static Project ReadFromXML(string FileName)
-        {
-            throw new NotImplementedException("Reading from XML no longer supported, use JSON instead");
-            //// BinaryFormatter formatter = new BinaryFormatter();
-            //Stream stream = File.Open(FileName, FileMode.Open);
-            //SoapFormatter soapformatter = new SoapFormatter(); // funktioniert, aber sehr geschwätzig
-            //soapformatter.Binder = new CondorSerializationBinder(); // nur zum Test
-            //soapformatter.AssemblyFormat = System.Runtime.Serialization.Formatters.FormatterAssemblyStyle.Simple;
-            //soapformatter.TypeFormat = System.Runtime.Serialization.Formatters.FormatterTypeStyle.TypesWhenNeeded;
-            //Project res = soapformatter.Deserialize(stream) as Project;
-            //stream.Close();
-            //return res;
-        }
-        /// <summary>
-        /// Writes the project data to the given stream. Resets the IsModified flag
+        /// Writes the project data to the given stream using binary serialization. Resets the IsModified flag.
+        /// This method is obsolete. Use <see cref="WriteToJson"/> instead for new code.
         /// </summary>
         /// <param name="stream">Stream where to write the data</param>
+        [Obsolete("Use WriteToJson instead. Binary serialization is deprecated in favor of JSON format.")]
         public void WriteToStream(Stream stream)
         {
-            // BinaryFormatter formatter = new BinaryFormatter();
-            // System.Xml.Serialization.XmlSerializer xml = new System.Xml.Serialization.XmlSerializer(typeof(Project));
-            // xml.Serialize(stream, this); // geht nicht, macht vermutlich keinen Object-Graph
-
-            // SOAPFORMATTER: liefert sehr geschwätzigen output. Am einfachsten dürfte es sein, diesen output
-            // in ein XML Dokument umzuwandeln und darauf einige Operationen auszuführen, die die NameSpaces
-            // entfernen. Die dazu inversen Operationen müssen natürlich auch vorhanden sein, um das Zeug wieder
-            // einlesen zu können.
-            //SoapFormatter soapformatter = new SoapFormatter(); // funktioniert, aber sehr geschwätzig
-            //soapformatter.AssemblyFormat = System.Runtime.Serialization.Formatters.FormatterAssemblyStyle.Simple;
-            //soapformatter.TypeFormat = System.Runtime.Serialization.Formatters.FormatterTypeStyle.TypesWhenNeeded;
             BinaryFormatter formatter = new BinaryFormatter(null, new StreamingContext(StreamingContextStates.File, null));
             formatter.AssemblyFormat = System.Runtime.Serialization.Formatters.FormatterAssemblyStyle.Simple;
-            // formatter.TypeFormat = System.Runtime.Serialization.Formatters.FormatterTypeStyle.XsdString; // XsdString macht das wechseln von .NET Frameworks schwierig
             formatter.Serialize(stream, this);
-            // soapformatter.Serialize(stream, this);
             isModified = false;
         }
+
+        /// <summary>
+        /// Writes the Project to a JSON formatted stream. Resets the IsModified flag.
+        /// </summary>
+        /// <param name="stream">The Stream to write the JSON serialized project data to</param>
+        public void WriteToJson(Stream stream)
+        {
+            // Create a new JsonSerialize instance to handle serialization
+            JsonSerialize js = new JsonSerialize();
+
+            // Serialize this project instance to the stream in JSON format
+            js.ToStream(stream, this);
+            isModified = false;
+        }
+
         /// <summary>
         /// Saves the project in a file with the given FileName.
         /// If FileName is null, a SaveFileDialog is presented. Uses WriteToStream.
         /// </summary>
         /// <param name="FileName">The file name</param>
         /// <returns>true, if successful, false if the user pressed escape in the SaveFileDialog</returns>
-        virtual public bool WriteToFile(string FileName)
+        public virtual bool WriteToFile(string FileName)
         {
             // Für die ThumbNail Ansicht braucht man IExtractImage
             bool writeAsJson = openedAsJson;
@@ -1428,15 +1400,20 @@ namespace CADability
          * Aber man kann ja kein leeres Objekt erzeugen
          */
         /// <summary>
-        /// Creates a new project reading the data from the given stream.
+        /// Creates a new project reading the data from the given stream using binary deserialization.
+        /// This method is obsolete but kept for backward compatibility to read legacy binary format files.
+        /// Use <see cref="ReadFromJson"/> for new code.
         /// </summary>
         /// <param name="stream">Stream to read from</param>
-        /// <returns></returns>
+        /// <returns>The deserialized Project or null if deserialization fails</returns>
+        [Obsolete("Use ReadFromJson for new code. This method is kept only for reading legacy binary format files.")]
         public static Project ReadFromStream(Stream stream)
         {
             // BinaryFormatter formatter = new BinaryFormatter();
             FinishDeserialization finishDeserialization = new FinishDeserialization();
-            BinaryFormatter formatter = new BinaryFormatter(); //(null,new StreamingContext(StreamingContextStates.File,finishDeserialization));
+            BinaryFormatter formatter = new BinaryFormatter(); 
+            
+            //(null,new StreamingContext(StreamingContextStates.File,finishDeserialization));
             // so kann man ggf. die ganze Serialisierung auf JSON umstellen:
             // SerializationInfo si = new SerializationInfo(typeof(Project), new FormatterConverter());
             // damit kann man GetData aufrufen und dann si wiederum nach zugefügten Einträgen iterieren
@@ -1505,8 +1482,6 @@ namespace CADability
                 {
                     if (ex is ThreadAbortException) throw (ex);
                     if (ex is OutOfMemoryException) throw (ex);
-#if FW2
-#else
                     if (ex.Message.Contains("CompareInfo")) throw new ProjectOldVersionException("probably old version cdb file, must be converted", ex);
                     if (ex is ArgumentNullException) throw new ProjectOldVersionException("probably old version cdb file, must be converted", ex);
                     if (ex is ArgumentOutOfRangeException) throw new ProjectOldVersionException("probably old version cdb file, must be converted", ex);
@@ -1514,8 +1489,6 @@ namespace CADability
                     if (ex is SerializationException) throw new ProjectOldVersionException("probably old version cdb file, must be converted", ex);
                     if (ex is OutOfMemoryException) throw new ProjectOldVersionException("probably old version cdb file, must be converted", ex);
                     if (ex is System.IO.FileLoadException) throw new ProjectOldVersionException("probably old version cdb file, must be converted", ex);
-
-#endif
 
                     // System.Diagnostics.Debug.WriteLine(ex.StackTrace);
                     return null;
@@ -1656,14 +1629,29 @@ namespace CADability
                 return res;
             }
         }
-        private static Project ReadFromJson(FileStream stream)
+
+        /// <summary>
+        /// Reads a Project from a JSON formatted stream.
+        /// </summary>
+        /// <param name="stream">The Stream containing JSON serialized project data</param>
+        /// <returns>The deserialized Project or null if deserialization fails</returns>
+        public static Project ReadFromJson(Stream stream)
         {
+            // Create a new JsonSerialize instance to handle deserialization
             JsonSerialize js = new JsonSerialize();
-            Project res = js.FromStream(stream) as Project;
+
+            // Attempt to deserialize the stream into a Project object
+            if (!(js.FromStream(stream) is Project res))
+                return null;
+
+            // Update all attribute lists to ensure they are synchronized with the project's attributes
             AttributeListContainer.UpdateLists(res, true);
+
+            // Reset the modified flag since we just loaded the project from file
             res.isModified = false;
             return res;
         }
+
         private static Project ReadConvertedFile(string FileName, bool useProgress)
         {
             Project res = null;

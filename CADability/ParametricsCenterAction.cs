@@ -18,7 +18,6 @@ namespace CADability.Actions
 
         private BRepObjectInput centerOnObjects;
         private GeoObjectInput facesToCenter;
-        private BRepObjectInput definingCenterPosition; // what is to be centered? a vertex, an axis or the extent of the faces?
         private DoubleInput ratioInput; // normally 0.5, bot may be between 0 and 1
         private StringInput nameInput; // Name for the Parametrics when added to the shell
         private BooleanInput preserveInput; // preserve this value, when other parametrics are applied

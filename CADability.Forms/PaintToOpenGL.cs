@@ -62,9 +62,7 @@ namespace CADability.Forms
         Color backgroundColor; // Die Hintergrundfarbe um sicherzustellen, dass nicht mit dieser farbe
                                // gezeichnet wird
         Color selectColor;
-        Color lastColor; // if twice the same color was selected with alpha==0, then this is color override state
         bool colorOverride = false;
-        Color overrideColor;
 
         // Glu.GLUnurbs nurbsRenderer;
         OpenGlList currentList;

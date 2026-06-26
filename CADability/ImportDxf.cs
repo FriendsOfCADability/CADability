@@ -38,9 +38,64 @@ namespace CADability.DXF
         {
             using (Stream stream = File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
-                var reader = new DxfReader(stream);
-                doc = reader.Read();
+                try
+                {
+                    doc = new DxfReader(stream).Read();
+                }
+                catch (ACadSharp.Exceptions.DxfException)
+                {
+                    // Some DXF files have non-standard OBJECTS sections (last section in the file)
+                    // that ACadSharp cannot parse. Strip the OBJECTS section and retry — the
+                    // graphical data (ENTITIES, BLOCKS) comes before OBJECTS and is still usable.
+                    stream.Seek(0, SeekOrigin.Begin);
+                    using (var sanitized = StripObjectsSection(stream))
+                        doc = new DxfReader(sanitized).Read();
+                }
             }
+        }
+
+        private static MemoryStream StripObjectsSection(Stream input)
+        {
+            // Read the whole file as raw bytes, find the OBJECTS section start and truncate.
+            // DXF OBJECTS section is not needed for graphical import and is the most likely
+            // location for non-standard data that breaks strict parsers.
+            byte[] data;
+            using (var ms = new MemoryStream())
+            {
+                input.CopyTo(ms);
+                data = ms.ToArray();
+            }
+            // The OBJECTS section is preceded by "  0\r\nOBJECTS\r\n" or "  0\nOBJECTS\n"
+            // Search for both CRLF and LF variants in ASCII bytes.
+            byte[] markerCrlf = Encoding.ASCII.GetBytes("\r\n  0\r\nOBJECTS\r\n");
+            byte[] markerLf   = Encoding.ASCII.GetBytes("\n  0\nOBJECTS\n");
+            byte[] eofCrlf    = Encoding.ASCII.GetBytes("\r\n  0\r\nEOF\r\n");
+            byte[] eofLf      = Encoding.ASCII.GetBytes("\n  0\nEOF\n");
+            int pos = IndexOf(data, markerCrlf);
+            bool isCrlf = pos >= 0;
+            if (pos < 0) pos = IndexOf(data, markerLf);
+            if (pos >= 0)
+            {
+                // Include the leading newline so that content before OBJECTS closes properly
+                var trimmed = new byte[pos + 1 + (isCrlf ? eofCrlf.Length : eofLf.Length)];
+                Array.Copy(data, 0, trimmed, 0, pos + 1);
+                byte[] eof = isCrlf ? eofCrlf : eofLf;
+                Array.Copy(eof, 0, trimmed, pos + 1, eof.Length);
+                data = trimmed;
+            }
+            return new MemoryStream(data);
+        }
+
+        private static int IndexOf(byte[] data, byte[] pattern)
+        {
+            for (int i = 0; i <= data.Length - pattern.Length; i++)
+            {
+                bool match = true;
+                for (int j = 0; j < pattern.Length; j++)
+                    if (data[i + j] != pattern[j]) { match = false; break; }
+                if (match) return i;
+            }
+            return -1;
         }
 
         internal Import(CadDocument document)
@@ -151,6 +206,7 @@ namespace CADability.DXF
                 case ACadSharp.Entities.Point dxfPoint: res = CreatePoint(dxfPoint); break;
                 case ACadSharp.Entities.Mesh dxfMesh: res = CreateMesh(dxfMesh); break;
                 case ACadSharp.Entities.Wipeout dxfWipeout: res = CreateWipeout(dxfWipeout); break;
+                case ACadSharp.Entities.Tolerance dxfTolerance: res = CreateTolerance(dxfTolerance); break;
                 default:
                     System.Diagnostics.Trace.WriteLine("dxf: not imported: " + item.ToString());
                     break;
@@ -1150,6 +1206,96 @@ namespace CADability.DXF
                     txt.VerticalAlignment = TextVerticalAlignmentType.Bottom; break;
             }
             return CreateText(txt);
+        }
+
+        private IGeoObject CreateTolerance(ACadSharp.Entities.Tolerance tolerance)
+        {
+            // DXF TOLERANCE (AcDbFcf) is a Feature Control Frame annotation.
+            // The text uses GDT-font characters and %%v cell separators. Convert to a
+            // readable plain-text string and import as a Text object at the insertion point.
+            string raw = tolerance.Text ?? "";
+            string plain = ExtractFcfText(raw);
+            plain = plain.Trim('|', ' ');
+            if (string.IsNullOrWhiteSpace(plain)) return null;
+
+            double height = (tolerance.Style?.TextHeight ?? 0) > 0 ? tolerance.Style.TextHeight : 2.5;
+            GeoVector dir = GeoVector(tolerance.Direction);
+            double rotation = dir.IsNullVector() ? 0.0 : Math.Atan2(dir.y, dir.x);
+
+            var txt = new ACadSharp.Entities.TextEntity
+            {
+                Value = plain,
+                Height = height,
+                InsertPoint = tolerance.InsertionPoint,
+                Normal = tolerance.Normal,
+                Rotation = rotation,
+                Style = tolerance.Style?.Style,   // DimensionStyle.Style is the TextStyle
+            };
+            return CreateText(txt);
+        }
+
+        private static string ExtractFcfText(string text)
+        {
+            // Convert FCF (Feature Control Frame) encoding to plain text:
+            //   {\Fgdt;X}  → X  (GDT font character — keep the letter as-is)
+            //   %%v        → |  (cell separator)
+            //   %%d / %%D  → °
+            //   %%p / %%P  → ±
+            //   %%c / %%C  → ⌀
+            //   ^J         → \n (DXF FCF line break)
+            //   \P / \p    → \n
+            if (string.IsNullOrEmpty(text)) return text;
+            var sb = new StringBuilder(text.Length);
+            int i = 0;
+            while (i < text.Length)
+            {
+                char c = text[i];
+                if (c == '{')
+                {
+                    int depth = 1, j = i + 1;
+                    while (j < text.Length && depth > 0)
+                    {
+                        if (text[j] == '{') depth++;
+                        else if (text[j] == '}') depth--;
+                        j++;
+                    }
+                    string inner = text.Substring(i + 1, j - i - 2);
+                    // Strip leading format codes of the form \X...;
+                    int k = 0;
+                    while (k < inner.Length && inner[k] == '\\')
+                    {
+                        int semi = inner.IndexOf(';', k + 1);
+                        if (semi < 0) { k = inner.Length; break; }
+                        k = semi + 1;
+                    }
+                    sb.Append(ExtractFcfText(inner.Substring(k)));
+                    i = j;
+                }
+                else if (c == '%' && i + 2 < text.Length && text[i + 1] == '%')
+                {
+                    char code = char.ToLower(text[i + 2]);
+                    if (code == 'v') { sb.Append('|'); i += 3; }
+                    else if (code == 'd') { sb.Append('°'); i += 3; }
+                    else if (code == 'p') { sb.Append('±'); i += 3; }
+                    else if (code == 'c') { sb.Append('⌀'); i += 3; }
+                    else { sb.Append(c); i++; }
+                }
+                else if (c == '^' && i + 1 < text.Length && text[i + 1] == 'J')
+                {
+                    sb.Append('\n'); i += 2;
+                }
+                else if (c == '\\' && i + 1 < text.Length)
+                {
+                    char next = char.ToLower(text[i + 1]);
+                    if (next == 'p') { sb.Append('\n'); i += 2; }
+                    else { i += 2; }
+                }
+                else
+                {
+                    sb.Append(c); i++;
+                }
+            }
+            return sb.ToString();
         }
 
         private IGeoObject CreateLeader(ACadSharp.Entities.Leader leader)

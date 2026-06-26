@@ -761,7 +761,7 @@ namespace CADability.DXF
             }
         }
 
-        private IGeoObject ConvertPolylineBoundary(Hatch.BoundaryPath.Polyline pl, XYZ normal, Plane plane)
+        private IGeoObject ConvertPolylineBoundary(ACadSharp.Entities.Hatch.BoundaryPath.Polyline pl, XYZ normal, Plane plane)
         {
             // Polyline boundary vertices: X,Y are coords, Z is bulge per ACadSharp docs
             // But separate Bulges array is also available

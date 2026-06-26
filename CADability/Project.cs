@@ -21,6 +21,7 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using ACadSharp;
 using ACadSharp.IO;
+using Color = System.Drawing.Color;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading;
 // using System.Runtime.Serialization.Formatters.Soap; Müsste man mal einführen, referenz muss verwendet werden

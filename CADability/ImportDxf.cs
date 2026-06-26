@@ -42,13 +42,13 @@ namespace CADability.DXF
                 {
                     doc = new DxfReader(stream).Read();
                 }
-                catch (ACadSharp.Exceptions.DxfException)
+                catch (Exception)
                 {
                     // The OBJECTS section is the last DXF section and contains non-geometric
                     // data (dictionaries, layouts, xrecords). Geometry lives in HEADERS,
                     // TABLES, BLOCKS, and ENTITIES — all read before OBJECTS.
-                    // When OBJECTS is malformed we fall back to a read that stops there,
-                    // so that valid geometry is still imported.
+                    // When OBJECTS is malformed (DxfException, NullReferenceException, etc.)
+                    // we fall back to a read that stops before it, so geometry still imports.
                     doc = ReadWithoutObjectsSection(fileName);
                     if (doc == null) throw; // OBJECTS was not the problem — re-throw
                 }

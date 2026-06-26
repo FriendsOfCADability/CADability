@@ -176,8 +176,10 @@ namespace CADability.Forms
                         if (connect != null) mainMenu = connect.Invoke(null, new object[] { cadFrame, mainMenu }) as MenuWithHandler[];
                     }
                     #endregion DebuggerPlayground
-                    parentForm.Menu = MenuManager.MakeMainMenu(mainMenu);
-                    cadFrame.FormMenu = parentForm.Menu;
+                    var menuStrip = MenuManager.MakeMainMenu(mainMenu);
+                    parentForm.Controls.Add(menuStrip);
+                    parentForm.MainMenuStrip = menuStrip;
+                    cadFrame.FormMenu = menuStrip;
                 }
                 parentForm.KeyPreview = true; // used to filter the escape key (and maybe some more?)                
                 parentForm.FormClosed += ParentForm_FormClosed;

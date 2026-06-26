@@ -196,6 +196,162 @@ namespace CADability.Tests
         }
 
         [TestMethod]
+        public void import_dxf_arc_quarter_sweep_is_correct()
+        {
+            // Regression: Arc.StartAngle / EndAngle from ACadSharp are in RADIANS.
+            // The old code called Angle.Deg() on them, which treats radians as degrees
+            // and divides by 180/π — shrinking every arc by factor ~57.
+            // A 90° arc (DXF: start=0°, end=90°) must import with SweepParameter = π/2,
+            // not the bugged value of π/2 × π/180 ≈ 0.027 (a near-invisible sliver).
+            const string dxf = @"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1009
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+ARC
+  8
+0
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 40
+100.0
+ 50
+0.0
+ 51
+90.0
+  0
+ENDSEC
+  0
+EOF
+";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var model = Project.ReadFromFile(file, "dxf").GetActiveModel();
+            var arc = Assert.That.IsInstanceOfType<GeoObject.Ellipse>(model.AllObjects[0]);
+            Assert.AreEqual(100.0, arc.MajorRadius, 1e-6, "Radius");
+            Assert.AreEqual(Math.PI / 2, arc.SweepParameter, 1e-4,
+                "90° arc sweep must be π/2 rad; bug caused ≈0.027 rad");
+        }
+
+        [TestMethod]
+        public void import_dxf_arc_crossing_zero_sweep_is_correct()
+        {
+            // An arc from 315° to 45° crosses 0° and sweeps 90° CCW.
+            // With the angle-unit bug, ACadSharp's radian values are further shrunk so the
+            // crossing-zero logic (sweep += 2π) doesn't trigger correctly either.
+            const string dxf = @"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1009
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+ARC
+  8
+0
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 40
+50.0
+ 50
+315.0
+ 51
+45.0
+  0
+ENDSEC
+  0
+EOF
+";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var model = Project.ReadFromFile(file, "dxf").GetActiveModel();
+            var arc = Assert.That.IsInstanceOfType<GeoObject.Ellipse>(model.AllObjects[0]);
+            Assert.AreEqual(50.0, arc.MajorRadius, 1e-6, "Radius");
+            // 315°→45° CCW: sweep = 45 - 315 = -270, +360 = 90° = π/2 rad
+            Assert.AreEqual(Math.PI / 2, arc.SweepParameter, 1e-4,
+                "315°→45° arc sweep must be π/2 rad");
+        }
+
+        [TestMethod]
+        public void import_dxf_text_rotation_correct()
+        {
+            // Regression: TextEntity.Rotation from ACadSharp is in RADIANS.
+            // Old code called Angle.Deg() on it, making 90° text appear at ~1.57° (nearly horizontal).
+            // A text at DXF rotation=90° must import with LineDirection ≈ (0, 1, 0).
+            const string dxf = @"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1009
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+TEXT
+  8
+0
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 40
+10.0
+  1
+Test
+ 41
+1.0
+ 50
+90.0
+  0
+ENDSEC
+  0
+EOF
+";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var model = Project.ReadFromFile(file, "dxf").GetActiveModel();
+            var text = Assert.That.IsInstanceOfType<GeoObject.Text>(model.AllObjects[0]);
+            var dir = text.LineDirection.Normalized;
+            // 90° rotation: text flows upward → LineDirection ≈ (0, 1, 0)
+            Assert.AreEqual(0.0, dir.x, 1e-3, "90° rotated text: LineDirection.x must be ≈ 0");
+            Assert.AreEqual(1.0, dir.y, 1e-3, "90° rotated text: LineDirection.y must be ≈ 1");
+        }
+
+        [TestMethod]
         [DeploymentItem(@"Files/Step/issue153.stp", nameof(import_step_issue153_succeeds))]
         public void import_step_issue153_succeeds()
         {

@@ -38,8 +38,70 @@ namespace CADability.DXF
         {
             using (Stream stream = File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
-                doc = new DxfReader(stream).Read();
+                try
+                {
+                    doc = new DxfReader(stream).Read();
+                }
+                catch (ACadSharp.Exceptions.DxfException)
+                {
+                    // The OBJECTS section is the last DXF section and contains non-geometric
+                    // data (dictionaries, layouts, xrecords). Geometry lives in HEADERS,
+                    // TABLES, BLOCKS, and ENTITIES — all read before OBJECTS.
+                    // When OBJECTS is malformed we fall back to a read that stops there,
+                    // so that valid geometry is still imported.
+                    doc = ReadWithoutObjectsSection(fileName);
+                    if (doc == null) throw; // OBJECTS was not the problem — re-throw
+                }
             }
+        }
+
+        // Retries reading by presenting the file content only up to (but not including)
+        // the OBJECTS section.  Returns null if the OBJECTS section boundary cannot be
+        // located (meaning something earlier in the file caused the original error).
+        private static CadDocument ReadWithoutObjectsSection(string fileName)
+        {
+            byte[] raw = File.ReadAllBytes(fileName);
+
+            // The section header is a group-0 entity followed by SECTION / group-2 / OBJECTS.
+            // Match both CRLF and LF line endings.
+            byte[][] markers = new byte[][]
+            {
+                Encoding.ASCII.GetBytes("  0\r\nSECTION\r\n  2\r\nOBJECTS\r\n"),
+                Encoding.ASCII.GetBytes("  0\nSECTION\n  2\nOBJECTS\n"),
+            };
+
+            int cutAt = -1;
+            foreach (byte[] marker in markers)
+            {
+                int pos = IndexOf(raw, marker);
+                if (pos >= 0) { cutAt = pos; break; }
+            }
+
+            if (cutAt < 0) return null; // OBJECTS boundary not found — original error is elsewhere
+
+            // Build a valid minimal DXF ending: EOF group.
+            byte[] eof = Encoding.ASCII.GetBytes("  0\r\nEOF\r\n");
+            byte[] truncated = new byte[cutAt + eof.Length];
+            Array.Copy(raw, truncated, cutAt);
+            Array.Copy(eof, 0, truncated, cutAt, eof.Length);
+
+            using (MemoryStream ms = new MemoryStream(truncated))
+                return new DxfReader(ms).Read();
+        }
+
+        private static int IndexOf(byte[] haystack, byte[] needle)
+        {
+            int limit = haystack.Length - needle.Length;
+            for (int i = 0; i <= limit; i++)
+            {
+                bool match = true;
+                for (int j = 0; j < needle.Length; j++)
+                {
+                    if (haystack[i + j] != needle[j]) { match = false; break; }
+                }
+                if (match) return i;
+            }
+            return -1;
         }
 
         internal Import(CadDocument document)

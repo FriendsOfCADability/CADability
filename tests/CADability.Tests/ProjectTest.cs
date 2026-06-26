@@ -741,6 +741,124 @@ EOF
         }
 
         [TestMethod]
+        public void import_dxf_malformed_objects_section_falls_back_to_geometry()
+        {
+            // Regression: DxfException "Invalid dxf code with value 0" in the OBJECTS section
+            // crashed the import even though all geometry (in BLOCKS/ENTITIES) was already
+            // parsed. The import now retries without the OBJECTS section so geometry survives.
+            // The OBJECTS section is intentionally truncated / broken here.
+            const string dxf = @"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1015
+  0
+ENDSEC
+  0
+SECTION
+  2
+TABLES
+  0
+TABLE
+  2
+LAYER
+ 70
+1
+  0
+LAYER
+  2
+0
+ 70
+0
+ 62
+7
+  6
+Continuous
+  0
+ENDTAB
+  0
+ENDSEC
+  0
+SECTION
+  2
+BLOCKS
+  0
+BLOCK
+  8
+0
+  2
+*Model_Space
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  3
+*Model_Space
+  4
+
+  0
+LINE
+  8
+0
+ 10
+10.0
+ 20
+20.0
+ 30
+0.0
+ 11
+30.0
+ 21
+40.0
+ 31
+0.0
+  0
+ENDBLK
+  8
+0
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+ENDSEC
+  0
+SECTION
+  2
+OBJECTS
+  0
+DICTIONARY
+  5
+C
+330
+0
+281
+1
+  3
+ACAD_GROUP
+350
+D
+  0
+"; // intentionally truncated (no ENDSEC/EOF) — simulates a malformed OBJECTS section
+
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var project = Project.ReadFromFile(file, "dxf");
+            Assert.IsNotNull(project, "Import must fall back gracefully when OBJECTS section is malformed");
+            var model = project.GetActiveModel();
+            Assert.IsNotNull(model);
+            Assert.IsTrue(model.AllObjects.Count > 0,
+                "Geometry from BLOCKS section must survive a malformed OBJECTS section");
+        }
+
+        [TestMethod]
         public void import_dxf_empty_block_insert_not_placed_at_origin()
         {
             // Regression: empty blocks (e.g. dimension arrowheads with no geometry) were

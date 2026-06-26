@@ -1005,6 +1005,45 @@ EOF
         }
 
         [TestMethod]
+        [DeploymentItem(@"Files/Dxf/BlockXTestFile.dxf", nameof(import_dxf_block_with_insert_succeeds))]
+        public void import_dxf_block_with_insert_succeeds()
+        {
+            // BlockXTestFile.dxf contains a LINE entity plus an INSERT of block "AnonymousBlock1"
+            // which itself contains 2 LINE entities forming an X shape.
+            // After import the model must have 2 top-level objects: 1 Line and 1 Block (with 2 child Lines).
+            var file = Path.Combine(this.TestContext.DeploymentDirectory, this.TestContext.TestName, "BlockXTestFile.dxf");
+            Assert.IsTrue(File.Exists(file));
+            var project = Project.ReadFromFile(file, "dxf");
+            Assert.IsNotNull(project);
+            var model = project.GetActiveModel();
+            Assert.IsNotNull(model);
+            Assert.AreEqual(2, model.AllObjects.Count,
+                $"Expected 1 Line + 1 Block (from INSERT), got {model.AllObjects.Count} objects");
+            var block = model.AllObjects.OfType<GeoObject.Block>().FirstOrDefault();
+            Assert.IsNotNull(block, "INSERT must be imported as a GeoObject.Block");
+            Assert.AreEqual(2, block.Count,
+                $"Block from INSERT must contain 2 child Lines; got {block.Count}");
+        }
+
+        [TestMethod]
+        [DeploymentItem(@"Files/Dxf/BlockRefXTestFile.dxf", nameof(import_dxf_simple_line_file_succeeds))]
+        public void import_dxf_simple_line_file_succeeds()
+        {
+            // BlockRefXTestFile.dxf contains a single LINE entity and a paper-space VIEWPORT.
+            // The VIEWPORT is not a geometry entity and must be skipped; only 1 Line must be imported.
+            var file = Path.Combine(this.TestContext.DeploymentDirectory, this.TestContext.TestName, "BlockRefXTestFile.dxf");
+            Assert.IsTrue(File.Exists(file));
+            var project = Project.ReadFromFile(file, "dxf");
+            Assert.IsNotNull(project);
+            var model = project.GetActiveModel();
+            Assert.IsNotNull(model);
+            Assert.AreEqual(1, model.AllObjects.Count,
+                $"Expected 1 Line; got {model.AllObjects.Count} objects");
+            Assert.IsInstanceOfType(model.AllObjects[0], typeof(GeoObject.Line),
+                "The single imported object must be a Line");
+        }
+
+        [TestMethod]
         [DeploymentItem(@"Files/Step/issue153.stp", nameof(import_step_issue153_succeeds))]
         public void import_step_issue153_succeeds()
         {

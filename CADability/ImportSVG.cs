@@ -7,7 +7,6 @@ using CADability;
 using CADability.GeoObject;
 using System.Linq;
 using CADability.Curve2D;
-using netDxf;
 using System.Runtime.InteropServices.ComTypes;
 using CADability.Attribute;
 using MathNet.Numerics.LinearAlgebra.Factorization;

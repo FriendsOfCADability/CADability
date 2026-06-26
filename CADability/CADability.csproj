@@ -70,6 +70,7 @@
     <EmbeddedFiles Remove="@(RemoveFiles)" />
     <Resource Remove="@(RemoveFiles)" />
     <Compile Remove="@(RemoveFiles)" />
+    <Compile Remove="netDxf\**" />
     <Compile Remove="ParametricsExtrudeAction.cs" />
     <Compile Remove="ParametricsOffsetAction.cs" />
     <Compile Remove="ParametricsRadiusAction.cs" />
@@ -85,6 +86,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="ACadSharp" Version="3.6.35" />
     <PackageReference Include="MathNet.Numerics.Signed" Version="5.0.0" />
     <PackageReference Include="System.Drawing.Common" Version="6.0.0" />
     <PackageReference Include="System.Text.Encoding.CodePages" Version="6.0.0" />

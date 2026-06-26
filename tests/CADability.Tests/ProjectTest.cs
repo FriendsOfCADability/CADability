@@ -741,6 +741,128 @@ EOF
         }
 
         [TestMethod]
+        public void import_dxf_empty_block_insert_not_placed_at_origin()
+        {
+            // Regression: empty blocks (e.g. dimension arrowheads with no geometry) were
+            // inserted as GeoObject.Block at (0,0,0), appearing far outside the main drawing.
+            // CreateInsert must return null when the referenced block has no children.
+            const string dxf = @"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1015
+  0
+ENDSEC
+  0
+SECTION
+  2
+BLOCKS
+  0
+BLOCK
+  8
+0
+  2
+EmptyArrow
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  3
+EmptyArrow
+  4
+
+  0
+ENDBLK
+  8
+0
+  0
+BLOCK
+  8
+0
+  2
+Geometry
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  3
+Geometry
+  4
+
+  0
+LINE
+  8
+0
+ 10
+100.0
+ 20
+100.0
+ 30
+0.0
+ 11
+200.0
+ 21
+200.0
+ 31
+0.0
+  0
+ENDBLK
+  8
+0
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+INSERT
+  8
+0
+  2
+EmptyArrow
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  0
+INSERT
+  8
+0
+  2
+Geometry
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  0
+ENDSEC
+  0
+EOF
+";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var project = Project.ReadFromFile(file, "dxf");
+            Assert.IsNotNull(project, "Import must not crash");
+            var model = project.GetActiveModel();
+            Assert.IsNotNull(model);
+            // Only the block with geometry should be added; the empty block insert must be skipped
+            Assert.IsTrue(model.AllObjects.Count == 1,
+                $"Empty block insert must be skipped; expected 1 object, got {model.AllObjects.Count}");
+        }
+
+        [TestMethod]
         [DeploymentItem(@"Files/Step/issue153.stp", nameof(import_step_issue153_succeeds))]
         public void import_step_issue153_succeeds()
         {

@@ -868,7 +868,7 @@ namespace CADability.DXF
         private IGeoObject CreateInsert(ACadSharp.Entities.Insert insert)
         {
             GeoObject.Block block = FindBlock(insert.Block);
-            if (block != null)
+            if (block != null && block.Count > 0)
             {
                 IGeoObject res = block.Clone();
                 ModOp transform = ModOp.Translate(GeoVector(insert.InsertPoint)) *

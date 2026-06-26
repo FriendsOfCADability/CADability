@@ -796,29 +796,27 @@ namespace CADability.DXF
 
         private ICurve BulgeToArc(GeoPoint startPt, GeoPoint endPt, double bulge, Plane plane)
         {
-            // DXF bulge formula: bulge = tan(includedAngle/4)
+            // DXF bulge = tan(includedAngle/4); positive = CCW, negative = CW.
             double angle = 4.0 * Math.Atan(Math.Abs(bulge));
             double chordLen = (endPt - startPt).Length;
             if (chordLen < Precision.eps) return null;
 
             double radius = chordLen / (2.0 * Math.Sin(angle / 2.0));
             GeoPoint midChord = new GeoPoint(0.5 * (startPt.x + endPt.x), 0.5 * (startPt.y + endPt.y), 0.5 * (startPt.z + endPt.z));
-            GeoVector chordDir = (endPt - startPt).Normalized;
-            GeoVector perpDir = plane.Normal ^ chordDir;
-            perpDir = perpDir.Normalized;
-            double sagitta = radius - Math.Sqrt(radius * radius - (chordLen / 2.0) * (chordLen / 2.0));
-
-            // bulge positive = counterclockwise, negative = clockwise
-            GeoPoint center;
-            if (bulge > 0)
-                center = midChord + (radius - sagitta) * perpDir;
-            else
-                center = midChord - (radius - sagitta) * perpDir;
+            GeoVector perpDir = (plane.Normal ^ (endPt - startPt).Normalized).Normalized;
+            // d = distance from chord midpoint to arc center
+            double d = Math.Sqrt(Math.Max(0, radius * radius - (chordLen / 2.0) * (chordLen / 2.0)));
+            // CCW (bulge > 0): center is to the left of the chord (Normal × chordDir)
+            // CW  (bulge < 0): center is to the right
+            GeoPoint center = bulge > 0
+                ? midChord + d * perpDir
+                : midChord - d * perpDir;
 
             GeoObject.Ellipse arc = GeoObject.Ellipse.Construct();
-            bool ccw = bulge > 0;
-            Plane arcPlane = ccw ? plane : Import.Plane(new XYZ(center.x, center.y, center.z), new XYZ(-plane.Normal.x, -plane.Normal.y, -plane.Normal.z));
-            arc.SetArcPlaneCenterStartEndPoint(arcPlane, arcPlane.Project(center), arcPlane.Project(startPt), arcPlane.Project(endPt), arcPlane, ccw);
+            // Use the OCS plane directly for both CCW and CW arcs.
+            // Flipping the plane for CW arcs was wrong: it caused SetArcPlaneCenterStartEndPoint
+            // to produce a 270° sweep instead of the correct 90° (the arc went the long way round).
+            arc.SetArcPlaneCenterStartEndPoint(plane, plane.Project(center), plane.Project(startPt), plane.Project(endPt), plane, bulge > 0);
             return arc;
         }
 

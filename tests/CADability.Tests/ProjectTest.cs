@@ -352,6 +352,120 @@ EOF
         }
 
         [TestMethod]
+        public void import_dxf_lwpolyline_cw_bulge_correct()
+        {
+            // Regression: BulgeToArc for CW arcs (bulge < 0) was flipping the plane normal
+            // and passing ccw=false, which caused SetArcPlaneCenterStartEndPoint to produce
+            // a -270° sweep (the long way round) instead of -90°.
+            // An LWPOLYLINE with vertices (0,0)→(10,0) and bulge=-1 (CW semicircle) must
+            // produce an arc with SweepParameter ≈ -π (180° CW).
+            // bulge = tan(angle/4) = 1 → angle = 4*atan(1) = π → semicircle
+            const string dxf = @"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1015
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+LWPOLYLINE
+  8
+0
+ 90
+2
+ 70
+0
+ 10
+0.0
+ 20
+0.0
+ 42
+-1.0
+ 10
+10.0
+ 20
+0.0
+  0
+ENDSEC
+  0
+EOF
+";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var model = Project.ReadFromFile(file, "dxf").GetActiveModel();
+            Assert.AreEqual(1, model.AllObjects.Count);
+            var arc = Assert.That.IsInstanceOfType<GeoObject.Ellipse>(model.AllObjects[0]);
+            // bulge=-1 → included angle = π → radius = chord/2 / sin(π/2) = 5
+            Assert.AreEqual(5.0, arc.MajorRadius, 1e-4, "Radius of CW semicircle");
+            // SweepParameter must be negative (CW) and ≈ -π (180°), not -3π/2 (270°)
+            Assert.IsTrue(arc.SweepParameter < 0, "CW arc must have negative SweepParameter");
+            Assert.AreEqual(-Math.PI, arc.SweepParameter, 1e-4,
+                "CW semicircle sweep must be -π; bug caused -3π/2 (270° the wrong way)");
+        }
+
+        [TestMethod]
+        public void import_dxf_lwpolyline_cw_quarter_arc_correct()
+        {
+            // A CW quarter-circle: vertices (0,0)→(1,0) with bulge=-tan(π/8) ≈ -0.4142.
+            // This produces a 90° CW arc (SweepParameter ≈ -π/2).
+            // The bug caused a 270° CW arc (-3π/2) because the plane flip reversed start/end
+            // angle ordering before the sweep direction forced the long way round.
+            double bulge = -Math.Tan(Math.PI / 8); // -tan(22.5°) for a 90° arc
+            string dxf = $@"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1015
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+LWPOLYLINE
+  8
+0
+ 90
+2
+ 70
+0
+ 10
+0.0
+ 20
+0.0
+ 42
+{bulge:F6}
+ 10
+2.0
+ 20
+0.0
+  0
+ENDSEC
+  0
+EOF
+";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var model = Project.ReadFromFile(file, "dxf").GetActiveModel();
+            Assert.AreEqual(1, model.AllObjects.Count);
+            var arc = Assert.That.IsInstanceOfType<GeoObject.Ellipse>(model.AllObjects[0]);
+            Assert.IsTrue(arc.SweepParameter < 0, "CW arc must have negative SweepParameter");
+            Assert.AreEqual(-Math.PI / 2, arc.SweepParameter, 1e-3,
+                "CW quarter-arc sweep must be -π/2; bug caused -3π/2");
+        }
+
+        [TestMethod]
         [DeploymentItem(@"Files/Step/issue153.stp", nameof(import_step_issue153_succeeds))]
         public void import_step_issue153_succeeds()
         {

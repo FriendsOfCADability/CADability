@@ -204,6 +204,7 @@ namespace CADability.Forms
                 foreach (var sub in definition.SubMenus)
                     DropDownItems.Add(new MenuItemWithHandler(sub));
             }
+            DropDownOpening += HandleDropDownOpening;
         }
 
         protected override void OnClick(EventArgs e)
@@ -213,7 +214,7 @@ namespace CADability.Forms
             if (definition?.Target != null) definition.Target.OnCommand(definition.ID);
         }
 
-        protected override void OnDropDownOpening(EventArgs e)
+        private void HandleDropDownOpening(object sender, EventArgs e)
         {
             HideToolTip();
             foreach (ToolStripItem mi in DropDownItems)
@@ -229,7 +230,6 @@ namespace CADability.Forms
                     }
                 }
             }
-            base.OnDropDownOpening(e);
         }
     }
 

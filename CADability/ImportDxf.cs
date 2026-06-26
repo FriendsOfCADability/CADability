@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using ACadSharp;
 using ACadSharp.Entities;
@@ -319,21 +320,13 @@ namespace CADability.DXF
                 string entryName = kvp.Key.Name;
                 foreach (var record in kvp.Value.Records)
                 {
-                    XDataCode code = XDataCodeFromGroupCode(record.Code);
+                    XDataCode code = (XDataCode)(int)record.Code;
                     object value = record.RawValue;
                     xdata.Data.Add(new KeyValuePair<XDataCode, object>(code, value));
                 }
                 go.UserData.Add(entryName, xdata);
             }
             go.UserData["DxfImport.Handle"] = new UserInterface.StringProperty(entity.Handle.ToString("X"), "DxfImport.Handle");
-        }
-
-        private static XDataCode XDataCodeFromGroupCode(GroupCodeValueType codeType)
-        {
-            // GroupCodeValueType is not the same as DXF group code integer.
-            // For XData, ACadSharp uses specific ExtendedDataRecord subtypes.
-            // Fall back to string for unknown types.
-            return XDataCode.String;
         }
 
         private GeoObject.Block FindBlock(BlockRecord blockRec)
@@ -766,7 +759,7 @@ namespace CADability.DXF
             // Polyline boundary vertices: X,Y are coords, Z is bulge per ACadSharp docs
             // But separate Bulges array is also available
             var verts = pl.Vertices;
-            var bulges = pl.Bulges;
+            double[] bulgesArr = pl.Bulges?.ToArray();
             int n = verts.Count;
             if (n < 2) return null;
 
@@ -781,7 +774,7 @@ namespace CADability.DXF
                 GeoPoint p0 = plane.ToGlobal(new GeoPoint2D(v0.X, v0.Y));
                 GeoPoint p1 = plane.ToGlobal(new GeoPoint2D(v1.X, v1.Y));
 
-                double bulge = (bulges != null && i < bulges.Count) ? bulges[i] : v0.Z;
+                double bulge = (bulgesArr != null && i < bulgesArr.Length) ? bulgesArr[i] : v0.Z;
 
                 if (Math.Abs(bulge) < 1e-10)
                 {
@@ -1014,11 +1007,11 @@ namespace CADability.DXF
             string txtstring = processAcadString(txt.Value ?? "");
             if (txtstring.Trim().Length == 0) return null;
 
-            string filename = txt.Style?.FontFamilyName ?? "";
-            if (string.IsNullOrEmpty(filename)) filename = txt.Style?.Filename ?? "";
+            string filename = txt.Style?.Filename ?? "";
             string name = txt.Style?.Name ?? "";
-            bool bold = txt.Style?.Bold ?? false;
-            bool italic = txt.Style?.Italic ?? false;
+            long trueType = txt.Style?.TrueType ?? 0L;
+            bool bold = (trueType & 2L) != 0;
+            bool italic = (trueType & 1L) != 0;
 
             if (filename.EndsWith(".shx", StringComparison.OrdinalIgnoreCase)) filename = filename.Substring(0, filename.Length - 4);
             if (filename.EndsWith(".ttf", StringComparison.OrdinalIgnoreCase))

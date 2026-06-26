@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using Color = System.Drawing.Color;
 
 namespace CADability.DXF
 {
@@ -363,8 +364,10 @@ namespace CADability.DXF
             double height = text.TextSize;
             try
             {
-                using var font = new System.Drawing.Font(text.Font, 1000.0f, fs);
-                height = text.TextSize * 1000.0 / font.Height;
+                using (var font = new System.Drawing.Font(text.Font, 1000.0f, fs))
+                {
+                    height = text.TextSize * 1000.0 / font.Height;
+                }
             }
             catch { /* use text.TextSize as-is in headless environments */ }
 
@@ -553,7 +556,7 @@ namespace CADability.DXF
                     endParam = elli.IsArc ? elli.StartParameter + elli.SweepParameter : 2.0 * Math.PI;
                 }
 
-                GeoVector majorAxisEnd = majorDir.Normalized * elli.MajorRadius;
+                GeoVector majorAxisEnd = elli.MajorRadius * majorDir.Normalized;
                 return new ACadSharp.Entities.Ellipse
                 {
                     Center = ToXYZ(elli.Center),

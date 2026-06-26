@@ -17,6 +17,7 @@ using CADability.WebDrawing;
 using Point = CADability.WebDrawing.Point;
 #else
 using System.Drawing;
+using Color = System.Drawing.Color;
 #endif
 
 namespace CADability.DXF
@@ -96,12 +97,10 @@ namespace CADability.DXF
             foreach (var item in doc.LineTypes)
             {
                 List<double> pattern = new List<double>();
-                for (int i = 0; i < item.Segments.Count; i++)
+                foreach (var seg in item.Segments)
                 {
-                    if (!item.Segments[i].IsShape && !item.Segments[i].IsText)
-                    {
-                        pattern.Add(Math.Abs(item.Segments[i].Length));
-                    }
+                    if (!seg.IsShape && !seg.IsText)
+                        pattern.Add(Math.Abs(seg.Length));
                 }
                 project.LinePatternList.CreateOrFind(item.Name, pattern.ToArray());
             }
@@ -141,7 +140,6 @@ namespace CADability.DXF
                 case ACadSharp.Entities.PolyfaceMesh dxfPolyfaceMesh: res = CreatePolyfaceMesh(dxfPolyfaceMesh); break;
                 case ACadSharp.Entities.Hatch dxfHatch: res = CreateHatch(dxfHatch); break;
                 case ACadSharp.Entities.Solid dxfSolid: res = CreateSolid(dxfSolid); break;
-                case ACadSharp.Entities.Trace dxfTrace: res = CreateTrace(dxfTrace); break;
                 case ACadSharp.Entities.Insert dxfInsert: res = CreateInsert(dxfInsert); break;
                 case ACadSharp.Entities.LwPolyline dxfLwPolyline: res = CreateLwPolyline(dxfLwPolyline); break;
                 case ACadSharp.Entities.Polyline2D dxfPolyline2D: res = CreatePolyline2D(dxfPolyline2D); break;
@@ -162,7 +160,7 @@ namespace CADability.DXF
             {
                 SetAttributes(res, item);
                 SetUserData(res, item);
-                res.IsVisible = item.IsVisible;
+                res.IsVisible = !item.IsInvisible;
             }
             return res;
         }
@@ -528,8 +526,8 @@ namespace CADability.DXF
             {
                 double t0 = (double)i / segments;
                 double t1 = (double)(i + 1) / segments;
-                GeoPoint p0 = bsp.PointAt(t0);
-                GeoPoint p1 = bsp.PointAt(t1);
+                GeoPoint p0 = ((ICurve)bsp).PointAt(t0);
+                GeoPoint p1 = ((ICurve)bsp).PointAt(t1);
                 GeoObject.Line l = GeoObject.Line.Construct();
                 l.StartPoint = p0;
                 l.EndPoint = p1;
@@ -674,7 +672,7 @@ namespace CADability.DXF
                 List<ICurve> boundaryEntities = new List<ICurve>();
 
                 if (boundaryPath.IsPolyline && boundaryPath.Edges.Count > 0 &&
-                    boundaryPath.Edges[0] is Hatch.BoundaryPath.Polyline pl)
+                    boundaryPath.Edges[0] is ACadSharp.Entities.Hatch.BoundaryPath.Polyline pl)
                 {
                     // Polyline boundary: convert bulge segments to arcs/lines
                     IGeoObject ent = ConvertPolylineBoundary(pl, hatch.Normal, pln);
@@ -835,8 +833,10 @@ namespace CADability.DXF
 
         private IGeoObject CreateSolid(ACadSharp.Entities.Solid solid)
         {
-            XYZ elevVec = solid.Normal * solid.Elevation;
-            Plane ocs = Plane(new XYZ(elevVec.X, elevVec.Y, elevVec.Z), solid.Normal);
+            // ACadSharp Solid corners are XYZ; elevation is encoded in the Z of the corners
+            double elevation = solid.FirstCorner.Z;
+            XYZ origin = new XYZ(solid.Normal.X * elevation, solid.Normal.Y * elevation, solid.Normal.Z * elevation);
+            Plane ocs = Plane(origin, solid.Normal);
             return BuildSolidHatch(ocs,
                 new XY(solid.FirstCorner.X, solid.FirstCorner.Y),
                 new XY(solid.SecondCorner.X, solid.SecondCorner.Y),
@@ -845,18 +845,6 @@ namespace CADability.DXF
                 AcadColorToDrawing(solid.Color));
         }
 
-        private IGeoObject CreateTrace(ACadSharp.Entities.Trace trace)
-        {
-            // Trace has same structure as Solid
-            XYZ elevVec = trace.Normal * trace.Elevation;
-            Plane ocs = Plane(new XYZ(elevVec.X, elevVec.Y, elevVec.Z), trace.Normal);
-            return BuildSolidHatch(ocs,
-                new XY(trace.FirstCorner.X, trace.FirstCorner.Y),
-                new XY(trace.SecondCorner.X, trace.SecondCorner.Y),
-                new XY(trace.ThirdCorner.X, trace.ThirdCorner.Y),
-                new XY(trace.FourthCorner.X, trace.FourthCorner.Y),
-                AcadColorToDrawing(trace.Color));
-        }
 
         private IGeoObject BuildSolidHatch(Plane ocs, XY c1, XY c2, XY c3, XY c4, Color color)
         {
@@ -1150,7 +1138,7 @@ namespace CADability.DXF
 
         private IGeoObject CreateLeader(ACadSharp.Entities.Leader leader)
         {
-            Plane ocs = Plane(new XYZ(leader.Elevation * leader.Normal.X, leader.Elevation * leader.Normal.Y, leader.Elevation * leader.Normal.Z), leader.Normal);
+            Plane ocs = Plane(XYZ.Zero, leader.Normal);
             GeoObject.Block blk = GeoObject.Block.Construct();
             blk.Name = "Leader:" + leader.Handle.ToString("X");
             if (leader.AssociatedAnnotation != null)

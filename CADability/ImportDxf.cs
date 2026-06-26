@@ -1009,7 +1009,7 @@ namespace CADability.DXF
 
             string filename = txt.Style?.Filename ?? "";
             string name = txt.Style?.Name ?? "";
-            long trueType = txt.Style?.TrueType ?? 0L;
+            long trueType = (long)(txt.Style?.TrueType ?? 0);
             bool bold = (trueType & 2L) != 0;
             bool italic = (trueType & 1L) != 0;
 

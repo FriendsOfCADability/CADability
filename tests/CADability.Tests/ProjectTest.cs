@@ -466,6 +466,130 @@ EOF
         }
 
         [TestMethod]
+        [DeploymentItem(@"Files/Dxf/0583667_008.dxf", nameof(import_dxf_0583667_succeeds))]
+        public void import_dxf_0583667_succeeds()
+        {
+            // AC1027 DXF with ACAD_TABLE entities (*T1/*T2/*T3 blocks) containing MTEXT
+            // with non-default attachment points. Verifies the file imports without exceptions
+            // and that the model space contains the expected inserted block objects.
+            var file = Path.Combine(this.TestContext.DeploymentDirectory, this.TestContext.TestName, "0583667_008.dxf");
+            Assert.IsTrue(File.Exists(file));
+
+            var project = Project.ReadFromFile(file, "dxf");
+            Assert.IsNotNull(project);
+            var model = project.GetActiveModel();
+            Assert.IsNotNull(model);
+            // Model space contains: 5 INSERTs + 3 ACAD_TABLEs + 3 DIMENSIONs + 5 LINEs + 12 SPLINEs + 5 ARCs
+            Assert.IsTrue(model.AllObjects.Count > 0, "Model must contain imported entities");
+        }
+
+        [TestMethod]
+        public void import_dxf_mtext_topcenter_placement_correct()
+        {
+            // Regression: CreateMText ignored AttachmentPoint so all MTEXT rendered as
+            // Left/Baseline. For table cells with attachment TopCenter (71=2) the text
+            // appears shifted right and down of where it should be.
+            // An MTEXT at (50,30) with attachment TopCenter must import with
+            // LineAlignment=Center and Alignment=Top so the text is centered on x=50 and
+            // its top edge is at y=30.
+            const string dxf = @"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1015
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+MTEXT
+  8
+0
+ 10
+50.0
+ 20
+30.0
+ 30
+0.0
+ 40
+5.0
+ 71
+2
+  1
+Hello
+  0
+ENDSEC
+  0
+EOF
+";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var model = Project.ReadFromFile(file, "dxf").GetActiveModel();
+            var text = Assert.That.IsInstanceOfType<GeoObject.Text>(model.AllObjects[0]);
+            // Anchor is at (50, 30): location must stay at that point
+            Assert.AreEqual(50.0, text.Location.x, 1e-4, "MTEXT TopCenter: Location.x must be anchor x");
+            Assert.AreEqual(30.0, text.Location.y, 1e-4, "MTEXT TopCenter: Location.y must be anchor y");
+            Assert.AreEqual(GeoObject.Text.LineAlignMode.Center, text.LineAlignment,
+                "MTEXT attach=2 (TopCenter) must import as LineAlignment=Center");
+            Assert.AreEqual(GeoObject.Text.AlignMode.Top, text.Alignment,
+                "MTEXT attach=2 (TopCenter) must import as Alignment=Top");
+        }
+
+        [TestMethod]
+        public void import_dxf_mtext_bottomright_placement_correct()
+        {
+            // MTEXT with attachment BottomRight (71=9) must have Right+Bottom alignment.
+            const string dxf = @"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1015
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+MTEXT
+  8
+0
+ 10
+100.0
+ 20
+10.0
+ 30
+0.0
+ 40
+3.5
+ 71
+9
+  1
+Test
+  0
+ENDSEC
+  0
+EOF
+";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var model = Project.ReadFromFile(file, "dxf").GetActiveModel();
+            var text = Assert.That.IsInstanceOfType<GeoObject.Text>(model.AllObjects[0]);
+            Assert.AreEqual(GeoObject.Text.LineAlignMode.Right, text.LineAlignment,
+                "MTEXT attach=9 (BottomRight) must import as LineAlignment=Right");
+            Assert.AreEqual(GeoObject.Text.AlignMode.Bottom, text.Alignment,
+                "MTEXT attach=9 (BottomRight) must import as Alignment=Bottom");
+        }
+
+        [TestMethod]
         [DeploymentItem(@"Files/Step/issue153.stp", nameof(import_step_issue153_succeeds))]
         public void import_step_issue153_succeeds()
         {

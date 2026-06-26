@@ -1111,7 +1111,6 @@ namespace CADability.DXF
         private IGeoObject CreateMText(ACadSharp.Entities.MText mText)
         {
             string plainText = StripMTextFormatCodes(mText.Value ?? "");
-            // Create a temporary TextEntity-like structure
             var txt = new ACadSharp.Entities.TextEntity
             {
                 Value = plainText,
@@ -1122,6 +1121,34 @@ namespace CADability.DXF
                 InsertPoint = mText.InsertPoint,
                 Normal = mText.Normal,
             };
+            // Map MTEXT attachment point (group 71) to horizontal/vertical alignment.
+            // The InsertPoint is the anchor for the specified attachment mode.
+            switch (mText.AttachmentPoint)
+            {
+                case AttachmentPointType.TopCenter:
+                case AttachmentPointType.MiddleCenter:
+                case AttachmentPointType.BottomCenter:
+                    txt.HorizontalAlignment = TextHorizontalAlignment.Center; break;
+                case AttachmentPointType.TopRight:
+                case AttachmentPointType.MiddleRight:
+                case AttachmentPointType.BottomRight:
+                    txt.HorizontalAlignment = TextHorizontalAlignment.Right; break;
+                default:
+                    txt.HorizontalAlignment = TextHorizontalAlignment.Left; break;
+            }
+            switch (mText.AttachmentPoint)
+            {
+                case AttachmentPointType.TopLeft:
+                case AttachmentPointType.TopCenter:
+                case AttachmentPointType.TopRight:
+                    txt.VerticalAlignment = TextVerticalAlignmentType.Top; break;
+                case AttachmentPointType.MiddleLeft:
+                case AttachmentPointType.MiddleCenter:
+                case AttachmentPointType.MiddleRight:
+                    txt.VerticalAlignment = TextVerticalAlignmentType.Middle; break;
+                default:
+                    txt.VerticalAlignment = TextVerticalAlignmentType.Bottom; break;
+            }
             return CreateText(txt);
         }
 

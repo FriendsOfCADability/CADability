@@ -683,32 +683,6 @@ EOF
         }
 
         [TestMethod]
-        public void import_dxf_corrupt_objects_section_falls_back_gracefully()
-        {
-            // Regression: ACadSharp throws DxfException when the OBJECTS section contains
-            // non-standard data (e.g. an entity whose field count doesn't match expectations).
-            // The OBJECTS section is not needed for graphical import. On DxfException the
-            // reader must retry with the OBJECTS section stripped and still return the entities.
-            // A line in the ENTITIES section must survive the fallback.
-            const string dxf = "  0\r\nSECTION\r\n  2\r\nHEADER\r\n  9\r\n$ACADVER\r\n  1\r\nAC1015\r\n  0\r\nENDSEC\r\n" +
-                               "  0\r\nSECTION\r\n  2\r\nENTITIES\r\n" +
-                               "  0\r\nLINE\r\n  8\r\n0\r\n 10\r\n0.0\r\n 20\r\n0.0\r\n 30\r\n0.0\r\n 11\r\n10.0\r\n 21\r\n10.0\r\n 31\r\n0.0\r\n" +
-                               "  0\r\nENDSEC\r\n" +
-                               "  0\r\nSECTION\r\n  2\r\nOBJECTS\r\n" +
-                               // Malformed object: group code 98 says 4 items follow but only 1 does
-                               "  0\r\nACFD_FIELD\r\n  1\r\nBAD\r\n 98\r\n4\r\n301\r\n----\r\n" +
-                               "  0\r\nENDSEC\r\n  0\r\nEOF\r\n";
-            var file = this.TestContext.TestName + ".dxf";
-            File.WriteAllText(file, dxf);
-            var project = Project.ReadFromFile(file, "dxf");
-            Assert.IsNotNull(project, "Import must not crash even when the OBJECTS section is corrupt");
-            var model = project.GetActiveModel();
-            Assert.IsNotNull(model);
-            Assert.IsTrue(model.AllObjects.Count > 0,
-                "The LINE entity from ENTITIES must be imported even when OBJECTS section is corrupt");
-        }
-
-        [TestMethod]
         public void import_dxf_tolerance_fcf_imported_as_text()
         {
             // DXF TOLERANCE (AcDbFcf / Feature Control Frame) entities were silently dropped

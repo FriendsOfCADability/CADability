@@ -38,64 +38,8 @@ namespace CADability.DXF
         {
             using (Stream stream = File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
-                try
-                {
-                    doc = new DxfReader(stream).Read();
-                }
-                catch (ACadSharp.Exceptions.DxfException)
-                {
-                    // Some DXF files have non-standard OBJECTS sections (last section in the file)
-                    // that ACadSharp cannot parse. Strip the OBJECTS section and retry — the
-                    // graphical data (ENTITIES, BLOCKS) comes before OBJECTS and is still usable.
-                    stream.Seek(0, SeekOrigin.Begin);
-                    using (var sanitized = StripObjectsSection(stream))
-                        doc = new DxfReader(sanitized).Read();
-                }
+                doc = new DxfReader(stream).Read();
             }
-        }
-
-        private static MemoryStream StripObjectsSection(Stream input)
-        {
-            // Read the whole file as raw bytes, find the OBJECTS section start and truncate.
-            // DXF OBJECTS section is not needed for graphical import and is the most likely
-            // location for non-standard data that breaks strict parsers.
-            byte[] data;
-            using (var ms = new MemoryStream())
-            {
-                input.CopyTo(ms);
-                data = ms.ToArray();
-            }
-            // The OBJECTS section is preceded by "  0\r\nOBJECTS\r\n" or "  0\nOBJECTS\n"
-            // Search for both CRLF and LF variants in ASCII bytes.
-            byte[] markerCrlf = Encoding.ASCII.GetBytes("\r\n  0\r\nOBJECTS\r\n");
-            byte[] markerLf   = Encoding.ASCII.GetBytes("\n  0\nOBJECTS\n");
-            byte[] eofCrlf    = Encoding.ASCII.GetBytes("\r\n  0\r\nEOF\r\n");
-            byte[] eofLf      = Encoding.ASCII.GetBytes("\n  0\nEOF\n");
-            int pos = IndexOf(data, markerCrlf);
-            bool isCrlf = pos >= 0;
-            if (pos < 0) pos = IndexOf(data, markerLf);
-            if (pos >= 0)
-            {
-                // Include the leading newline so that content before OBJECTS closes properly
-                var trimmed = new byte[pos + 1 + (isCrlf ? eofCrlf.Length : eofLf.Length)];
-                Array.Copy(data, 0, trimmed, 0, pos + 1);
-                byte[] eof = isCrlf ? eofCrlf : eofLf;
-                Array.Copy(eof, 0, trimmed, pos + 1, eof.Length);
-                data = trimmed;
-            }
-            return new MemoryStream(data);
-        }
-
-        private static int IndexOf(byte[] data, byte[] pattern)
-        {
-            for (int i = 0; i <= data.Length - pattern.Length; i++)
-            {
-                bool match = true;
-                for (int j = 0; j < pattern.Length; j++)
-                    if (data[i + j] != pattern[j]) { match = false; break; }
-                if (match) return i;
-            }
-            return -1;
         }
 
         internal Import(CadDocument document)

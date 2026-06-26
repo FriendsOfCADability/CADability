@@ -1,7 +1,9 @@
-<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net6.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
     <RootNamespace>CADability.App</RootNamespace>
     <AssemblyName>CADability.App</AssemblyName>
     <UseWindowsForms>true</UseWindowsForms>
@@ -26,7 +28,7 @@
     <UseApplicationTrust>false</UseApplicationTrust>
     <PublishWizardCompleted>true</PublishWizardCompleted>
     <BootstrapperEnabled>true</BootstrapperEnabled>
-    <GenerateManifests>true</GenerateManifests>
+    <GenerateManifests Condition="'$(OS)' == 'Windows_NT'">true</GenerateManifests>
     <SignManifests>false</SignManifests>
     <SignAssembly>false</SignAssembly>
     <ManifestCertificateThumbprint>BAEB7160A322344105B8E042B48C557AA0564154</ManifestCertificateThumbprint>

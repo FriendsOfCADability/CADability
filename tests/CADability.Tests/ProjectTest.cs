@@ -590,6 +590,99 @@ EOF
         }
 
         [TestMethod]
+        public void import_dxf_spline_degenerate_does_not_crash()
+        {
+            // Regression: CreateSplineAsPolyline used `lines as ICollection<IGeoObject>` where
+            // `lines` is `List<GeoObject.Line>`. C# generic interfaces are invariant, so the cast
+            // returns null. Passing null to GeoObjectList(ICollection<IGeoObject>) throws
+            // NullReferenceException at list.Count (GeoObjectList.cs:50).
+            // A cubic SPLINE whose consecutive control points 1 and 2 are identical (distance 0 <
+            // Precision.eps = 1e-6) triggers forcePolyline2D=true which calls CreateSplineAsPolyline.
+            // The import must complete without throwing.
+            const string dxf = @"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1015
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+SPLINE
+  8
+0
+ 70
+8
+ 71
+3
+ 72
+8
+ 73
+4
+ 74
+0
+ 40
+0.0
+ 40
+0.0
+ 40
+0.0
+ 40
+0.0
+ 40
+1.0
+ 40
+1.0
+ 40
+1.0
+ 40
+1.0
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 10
+5.0
+ 20
+5.0
+ 30
+0.0
+ 10
+5.0
+ 20
+5.0
+ 30
+0.0
+ 10
+10.0
+ 20
+0.0
+ 30
+0.0
+  0
+ENDSEC
+  0
+EOF
+";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var project = Project.ReadFromFile(file, "dxf");
+            Assert.IsNotNull(project, "Import must not crash and must return a project");
+            var model = project.GetActiveModel();
+            Assert.IsNotNull(model);
+            Assert.IsTrue(model.AllObjects.Count > 0,
+                "Degenerate spline (duplicate consecutive control points) must import as a path");
+        }
+
+        [TestMethod]
         [DeploymentItem(@"Files/Step/issue153.stp", nameof(import_step_issue153_succeeds))]
         public void import_step_issue153_succeeds()
         {

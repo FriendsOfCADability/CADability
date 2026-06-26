@@ -525,7 +525,7 @@ namespace CADability.DXF
                 lines.Add(l);
             }
             GeoObject.Path path = GeoObject.Path.Construct();
-            path.Set(new GeoObjectList(lines as ICollection<IGeoObject>), false, 1e-6);
+            path.Set(new GeoObjectList(lines.Cast<IGeoObject>().ToList()), false, 1e-6);
             return path.CurveCount > 0 ? (IGeoObject)path : null;
         }
 
@@ -790,7 +790,7 @@ namespace CADability.DXF
             if (curves.Count == 0) return null;
             if (curves.Count == 1) return curves[0] as IGeoObject;
             GeoObject.Path path = GeoObject.Path.Construct();
-            path.Set(new GeoObjectList(curves as ICollection<IGeoObject>), false, 1e-6);
+            path.Set(new GeoObjectList(curves), false, 1e-6);
             return path.CurveCount > 0 ? (IGeoObject)path : null;
         }
 

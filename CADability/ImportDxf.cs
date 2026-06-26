@@ -386,8 +386,8 @@ namespace CADability.DXF
             GeoObject.Ellipse e = GeoObject.Ellipse.Construct();
             GeoVector nor = GeoVector(arc.Normal);
             Plane plane = Plane(arc.Center, arc.Normal);
-            double start = Angle.Deg(arc.StartAngle);
-            double end = Angle.Deg(arc.EndAngle);
+            double start = arc.StartAngle;
+            double end = arc.EndAngle;
             double sweep = end - start;
             if (sweep < 0.0) sweep += Math.PI * 2.0;
             if (start == end) sweep = 0.0;
@@ -732,7 +732,7 @@ namespace CADability.DXF
                     foreach (var lineDef in hatch.Pattern.Lines)
                     {
                         if (list.Count > 0) res = res.Clone() as GeoObject.Hatch;
-                        double lineAngle = Angle.Deg(lineDef.Angle);
+                        double lineAngle = lineDef.Angle;
                         double offX = lineDef.Offset.X;
                         double offY = lineDef.Offset.Y;
                         double[] dashes = lineDef.DashLengths != null ? lineDef.DashLengths.ToArray() : new double[0];
@@ -874,7 +874,7 @@ namespace CADability.DXF
             {
                 IGeoObject res = block.Clone();
                 ModOp transform = ModOp.Translate(GeoVector(insert.InsertPoint)) *
-                    ModOp.Rotate(CADability.GeoVector.ZAxis, SweepAngle.Deg(insert.Rotation)) *
+                    ModOp.Rotate(CADability.GeoVector.ZAxis, new SweepAngle(insert.Rotation)) *
                     ModOp.Scale(insert.XScale, insert.YScale, insert.ZScale) *
                     ModOp.Translate(CADability.GeoPoint.Origin - block.RefPoint);
                 res.Modify(transform);
@@ -1024,7 +1024,7 @@ namespace CADability.DXF
 
             double h = txt.Height;
             Plane plane = Plane(txt.InsertPoint, txt.Normal);
-            Angle a = Angle.Deg(txt.Rotation);
+            Angle a = new Angle(txt.Rotation);
             GeoVector2D dir2d = new GeoVector2D(a);
             GeoVector linedir = plane.ToGlobal(dir2d);
             GeoVector glyphdir = plane.ToGlobal(dir2d.ToLeft());

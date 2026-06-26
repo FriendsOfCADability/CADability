@@ -169,6 +169,33 @@ namespace CADability.Tests
         }
 
         [TestMethod]
+        [DeploymentItem(@"Files/Dxf/BVH_Bona.dxf", nameof(import_dxf_BVH_Bona_succeeds))]
+        public void import_dxf_BVH_Bona_succeeds()
+        {
+            // AC1024 DXF with 508 arcs, 34 LwPolylines, 41 lines, 11 splines, 3 MTexts.
+            // Arc.StartAngle/EndAngle from ACadSharp are in radians; using Angle.Deg() on them
+            // shrinks all angles by π/180 making arcs nearly invisible ("totally obscured").
+            var file = Path.Combine(this.TestContext.DeploymentDirectory, this.TestContext.TestName, "BVH_Bona.dxf");
+            Assert.IsTrue(File.Exists(file));
+
+            var project = Project.ReadFromFile(file, "dxf");
+            Assert.IsNotNull(project);
+            var model = project.GetActiveModel();
+            Assert.IsNotNull(model);
+
+            // Verify the 508 arcs are imported as arcs (Ellipse with IsCircle==false)
+            var arcs = model.AllObjects.Cast<GeoObject.IGeoObject>()
+                .OfType<GeoObject.Ellipse>()
+                .Where(e => !e.IsCircle)
+                .ToList();
+            Assert.AreEqual(508, arcs.Count);
+
+            // Verify that arcs have sensible sweep angles (not near-zero due to radian/degree confusion)
+            foreach (var arc in arcs)
+                Assert.IsTrue(arc.SweepParameter > 0.001, $"Arc sweep {arc.SweepParameter} is near zero — angle unit bug?");
+        }
+
+        [TestMethod]
         [DeploymentItem(@"Files/Step/issue153.stp", nameof(import_step_issue153_succeeds))]
         public void import_step_issue153_succeeds()
         {

@@ -229,6 +229,22 @@ namespace CADability.DXF
         private static GeoPoint GeoPoint(XYZ p) => new GeoPoint(p.X, p.Y, p.Z);
         private static GeoVector GeoVector(XYZ p) => new GeoVector(p.X, p.Y, p.Z);
 
+        // Convert a 2D entity's position from OCS (Object Coordinate System) to WCS.
+        // DXF stores ARC/CIRCLE centers, TEXT insert points, etc. in OCS when Normal ≠ (0,0,1).
+        // The OCS axes are derived via the AutoCAD Arbitrary Axis Algorithm.
+        private static GeoPoint OcsToWcs(XYZ ocsPoint, XYZ normal)
+        {
+            GeoVector n = GeoVector(normal);
+            GeoVector ax = (Math.Abs(normal.X) < 1.0 / 64 && Math.Abs(normal.Y) < 1.0 / 64)
+                ? CADability.GeoVector.YAxis ^ n
+                : CADability.GeoVector.ZAxis ^ n;
+            GeoVector ay = n ^ ax;
+            return new GeoPoint(
+                ocsPoint.X * ax.x + ocsPoint.Y * ay.x + ocsPoint.Z * n.x,
+                ocsPoint.X * ax.y + ocsPoint.Y * ay.y + ocsPoint.Z * n.y,
+                ocsPoint.X * ax.z + ocsPoint.Y * ay.z + ocsPoint.Z * n.z);
+        }
+
         internal static Plane Plane(XYZ center, XYZ normal)
         {
             // AutoCAD Arbitrary Axis Algorithm — must use this for correct plane orientation
@@ -448,17 +464,18 @@ namespace CADability.DXF
             GeoObject.Ellipse e = GeoObject.Ellipse.Construct();
             GeoVector nor = GeoVector(arc.Normal);
             Plane plane = Plane(arc.Center, arc.Normal);
+            GeoPoint wcsCenter = OcsToWcs(arc.Center, arc.Normal);
             double start = arc.StartAngle;
             double end = arc.EndAngle;
             double sweep = end - start;
             if (sweep < 0.0) sweep += Math.PI * 2.0;
             if (start == end) sweep = 0.0;
             if (start == Math.PI * 2.0 && end == 0.0) sweep = 0.0;
-            e.SetArcPlaneCenterRadiusAngles(plane, GeoPoint(arc.Center), arc.Radius, start, sweep);
+            e.SetArcPlaneCenterRadiusAngles(plane, wcsCenter, arc.Radius, start, sweep);
             if (e.IsCircle && sweep == 0.0 && Precision.IsEqual(e.StartPoint, e.EndPoint))
             {
                 GeoObject.Ellipse circle = GeoObject.Ellipse.Construct();
-                circle.SetCirclePlaneCenterRadius(plane, GeoPoint(arc.Center), arc.Radius);
+                circle.SetCirclePlaneCenterRadius(plane, wcsCenter, arc.Radius);
                 e = circle;
             }
             double th = arc.Thickness;
@@ -471,7 +488,8 @@ namespace CADability.DXF
         {
             GeoObject.Ellipse e = GeoObject.Ellipse.Construct();
             Plane plane = Plane(circle.Center, circle.Normal);
-            e.SetCirclePlaneCenterRadius(plane, GeoPoint(circle.Center), circle.Radius);
+            GeoPoint wcsCenter = OcsToWcs(circle.Center, circle.Normal);
+            e.SetCirclePlaneCenterRadius(plane, wcsCenter, circle.Radius);
             double th = circle.Thickness;
             GeoVector no = GeoVector(circle.Normal);
             if (th != 0.0 && !no.IsNullVector())

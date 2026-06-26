@@ -981,6 +981,30 @@ EOF
         }
 
         [TestMethod]
+        public void import_dxf_arc_with_reversed_normal_uses_wcs_center()
+        {
+            // Regression: ARC/CIRCLE entities with Normal=(0,0,-1) store their center in OCS.
+            // OCS→WCS via Arbitrary Axis Algorithm flips the X component for Normal=(0,0,-1).
+            // OCS (-1000,-500,0) with Normal=(0,0,-1) → WCS (1000,-500,0).
+            // Without the fix the center was imported at the raw OCS coordinate (-1000,-500).
+            const string dxf = "  0\r\nSECTION\r\n  2\r\nHEADER\r\n  9\r\n$ACADVER\r\n  1\r\nAC1015\r\n  0\r\nENDSEC\r\n  0\r\nSECTION\r\n  2\r\nBLOCKS\r\n  0\r\nBLOCK\r\n  8\r\n0\r\n  2\r\n*Model_Space\r\n 10\r\n0.0\r\n 20\r\n0.0\r\n 30\r\n0.0\r\n  3\r\n*Model_Space\r\n  4\r\n\r\n  0\r\nARC\r\n  8\r\n0\r\n 10\r\n-1000.0\r\n 20\r\n-500.0\r\n 30\r\n0.0\r\n 40\r\n100.0\r\n 50\r\n0.0\r\n 51\r\n90.0\r\n210\r\n0.0\r\n220\r\n0.0\r\n230\r\n-1.0\r\n  0\r\nENDBLK\r\n  8\r\n0\r\n  0\r\nENDSEC\r\n  0\r\nSECTION\r\n  2\r\nENTITIES\r\n  0\r\nENDSEC\r\n  0\r\nEOF\r\n";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var project = Project.ReadFromFile(file, "dxf");
+            Assert.IsNotNull(project);
+            var model = project.GetActiveModel();
+            Assert.IsNotNull(model);
+            Assert.IsTrue(model.AllObjects.Count > 0, "ARC entity must be imported");
+            var arc = model.AllObjects[0] as GeoObject.Ellipse;
+            Assert.IsNotNull(arc, "Imported object must be an Ellipse/Arc");
+            // WCS center must be (1000,-500,0), not the raw OCS value (-1000,-500,0)
+            Assert.IsTrue(Math.Abs(arc.Center.x - 1000.0) < 1e-6,
+                $"Arc WCS X must be 1000, got {arc.Center.x}");
+            Assert.IsTrue(Math.Abs(arc.Center.y - (-500.0)) < 1e-6,
+                $"Arc WCS Y must be -500, got {arc.Center.y}");
+        }
+
+        [TestMethod]
         [DeploymentItem(@"Files/Step/issue153.stp", nameof(import_step_issue153_succeeds))]
         public void import_step_issue153_succeeds()
         {

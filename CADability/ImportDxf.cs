@@ -55,8 +55,7 @@ namespace CADability.DXF
 
         private void FillModelSpace(Model model)
         {
-            BlockRecord modelSpace = doc.BlockRecords["*Model_Space"];
-            if (modelSpace == null) return;
+            if (!doc.BlockRecords.TryGetValue("*Model_Space", out BlockRecord modelSpace)) return;
             foreach (Entity item in modelSpace.Entities)
             {
                 IGeoObject geoObject = GeoObjectFromEntity(item);
@@ -67,8 +66,7 @@ namespace CADability.DXF
 
         private void FillPaperSpace(Model model)
         {
-            BlockRecord paperSpace = doc.BlockRecords["*Paper_Space"];
-            if (paperSpace == null) return;
+            if (!doc.BlockRecords.TryGetValue("*Paper_Space", out BlockRecord paperSpace)) return;
             foreach (Entity item in paperSpace.Entities)
             {
                 IGeoObject geoObject = GeoObjectFromEntity(item);

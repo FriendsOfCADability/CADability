@@ -152,6 +152,23 @@ namespace CADability.Tests
         }
 
         [TestMethod]
+        [DeploymentItem(@"Files/Dxf/Z273.dxf", nameof(import_dxf_Z273_succeeds))]
+        public void import_dxf_Z273_succeeds()
+        {
+            // AC1009 (R12) DXF with no *Paper_Space block — importing this used to throw
+            // KeyNotFoundException when FillPaperSpace accessed the missing block record.
+            var file = Path.Combine(this.TestContext.DeploymentDirectory, this.TestContext.TestName, "Z273.dxf");
+            Assert.IsTrue(File.Exists(file));
+
+            var project = Project.ReadFromFile(file, "dxf");
+            Assert.IsNotNull(project);
+            var model = project.GetActiveModel();
+            Assert.IsNotNull(model);
+            // 3 TEXT + 23 LINE + 7 CIRCLE = 33 entities
+            Assert.AreEqual(33, model.AllObjects.Count);
+        }
+
+        [TestMethod]
         [DeploymentItem(@"Files/Step/issue153.stp", nameof(import_step_issue153_succeeds))]
         public void import_step_issue153_succeeds()
         {

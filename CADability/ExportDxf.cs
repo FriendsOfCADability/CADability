@@ -473,6 +473,10 @@ namespace CADability.DXF
             bool defaultAlign = hAlign == TextHorizontalAlignment.Left
                              && vAlign == TextVerticalAlignmentType.Baseline;
 
+            // Group 10 (InsertPoint) always holds the text anchor so viewers that ignore
+            // group 11 still render text at the correct position.
+            // For non-default alignment, group 11 (AlignmentPoint) is also set to the
+            // same anchor — that is the convention real DXF writers use.
             var res = new ACadSharp.Entities.TextEntity
             {
                 Value = textString,
@@ -480,10 +484,7 @@ namespace CADability.DXF
                 Style = textStyle,
                 HorizontalAlignment = hAlign,
                 VerticalAlignment = vAlign,
-                // For default (left/baseline): InsertPoint is the actual anchor.
-                // For other alignments: InsertPoint (group 10) is a dummy (0,0,0);
-                // AlignmentPoint (group 11) carries the true anchor so viewers position correctly.
-                InsertPoint = defaultAlign ? ToXYZ(text.Location) : XYZ.Zero,
+                InsertPoint = ToXYZ(text.Location),
             };
             if (!defaultAlign)
                 res.AlignmentPoint = ToXYZ(text.Location);

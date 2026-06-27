@@ -541,8 +541,8 @@ namespace CADability.DXF
                         {
                             Center = ToXYZ(aligned.Center),
                             Radius = aligned.Radius,
-                            StartAngle = aligned.StartParameter * (180.0 / Math.PI),
-                            EndAngle = (aligned.StartParameter + aligned.SweepParameter) * (180.0 / Math.PI),
+                            StartAngle = aligned.StartParameter,
+                            EndAngle = aligned.StartParameter + aligned.SweepParameter,
                             Normal = ToXYZ(normal)
                         };
                     }

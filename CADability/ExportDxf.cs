@@ -456,13 +456,37 @@ namespace CADability.DXF
                 createdTextStyles[fontName] = textStyle;
             }
 
+            // Map CADability alignment to DXF group 72/73
+            TextHorizontalAlignment hAlign = TextHorizontalAlignment.Left;
+            TextVerticalAlignmentType vAlign = TextVerticalAlignmentType.Baseline;
+            switch (text.LineAlignment)
+            {
+                case GeoObject.Text.LineAlignMode.Center: hAlign = TextHorizontalAlignment.Center; break;
+                case GeoObject.Text.LineAlignMode.Right:  hAlign = TextHorizontalAlignment.Right; break;
+            }
+            switch (text.Alignment)
+            {
+                case GeoObject.Text.AlignMode.Bottom:   vAlign = TextVerticalAlignmentType.Bottom; break;
+                case GeoObject.Text.AlignMode.Center:   vAlign = TextVerticalAlignmentType.Middle; break;
+                case GeoObject.Text.AlignMode.Top:      vAlign = TextVerticalAlignmentType.Top; break;
+            }
+            bool defaultAlign = hAlign == TextHorizontalAlignment.Left
+                             && vAlign == TextVerticalAlignmentType.Baseline;
+
             var res = new ACadSharp.Entities.TextEntity
             {
                 Value = textString,
                 Height = height,
                 Style = textStyle,
-                InsertPoint = ToXYZ(text.Location),
+                HorizontalAlignment = hAlign,
+                VerticalAlignment = vAlign,
+                // For default (left/baseline): InsertPoint is the actual anchor.
+                // For other alignments: InsertPoint (group 10) is a dummy (0,0,0);
+                // AlignmentPoint (group 11) carries the true anchor so viewers position correctly.
+                InsertPoint = defaultAlign ? ToXYZ(text.Location) : XYZ.Zero,
             };
+            if (!defaultAlign)
+                res.AlignmentPoint = ToXYZ(text.Location);
 
             GeoVector lineDir = text.LineDirection.Normalized;
             GeoVector glyphDir = text.GlyphDirection.Normalized;

@@ -539,11 +539,24 @@ namespace CADability.DXF
             {
                 if (elli.IsArc)
                 {
-                    GeoVector normal = elli.CounterClockWise ? elli.Plane.Normal : -elli.Plane.Normal;
+                    // Always keep the arc's own normal (never flip for CW arcs).
+                    // CW arcs are represented as CCW by swapping start/end endpoints,
+                    // so all exported arcs use Normal=(0,0,1) and work in viewers that
+                    // don't implement the OCS transformation.
+                    GeoVector normal = elli.Plane.Normal;
                     Plane dxfPlane = Import.Plane(ToXYZ(elli.Center), ToXYZ(normal));
                     GeoObject.Ellipse aligned = GeoObject.Ellipse.Construct();
-                    aligned.SetArcPlaneCenterStartEndPoint(dxfPlane, dxfPlane.Project(elli.Center),
-                        dxfPlane.Project(elli.StartPoint), dxfPlane.Project(elli.EndPoint), dxfPlane, true);
+                    if (elli.CounterClockWise)
+                    {
+                        aligned.SetArcPlaneCenterStartEndPoint(dxfPlane, dxfPlane.Project(elli.Center),
+                            dxfPlane.Project(elli.StartPoint), dxfPlane.Project(elli.EndPoint), dxfPlane, true);
+                    }
+                    else
+                    {
+                        // Swap start/end to get the equivalent CCW arc covering the same geometric portion
+                        aligned.SetArcPlaneCenterStartEndPoint(dxfPlane, dxfPlane.Project(elli.Center),
+                            dxfPlane.Project(elli.EndPoint), dxfPlane.Project(elli.StartPoint), dxfPlane, true);
+                    }
                     if (Math.Abs(elli.SweepParameter) > Math.PI && Precision.IsEqual(elli.StartPoint, elli.EndPoint))
                     {
                         return new ACadSharp.Entities.Circle

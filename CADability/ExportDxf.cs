@@ -1,5 +1,7 @@
 using CADability.Attribute;
+using CADability.Curve2D;
 using CADability.GeoObject;
+using CADability.Shapes;
 using ACadSharp;
 using ACadSharp.Entities;
 using ACadSharp.IO;
@@ -10,6 +12,7 @@ using CSMath;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.IO;
 using Color = System.Drawing.Color;
 
@@ -121,6 +124,7 @@ namespace CADability.DXF
                         entities = ExportPathWithoutBlock(path);
                     break;
                 case GeoObject.Text text: entity = ExportText(text); break;
+                case GeoObject.Hatch hatch: entity = ExportHatch(hatch); break;
                 case GeoObject.Block block: entity = ExportBlock(block); break;
                 case GeoObject.Face face: entity = ExportFace(face); break;
                 case GeoObject.Shell shell: entities = ExportShell(shell); break;
@@ -399,6 +403,35 @@ namespace CADability.DXF
             foreach (var pt in pts) mc.Item1.Add(ToXYZ(pt));
         }
 
+        private Entity ExportHatch(GeoObject.Hatch hatch)
+        {
+            if (hatch.CompoundShape == null || hatch.CompoundShape.SimpleShapes.Length == 0)
+                return null;
+            // Export simple solid-fill triangles/quads (from DXF SOLID import) back as SOLID.
+            if (hatch.HatchStyle is HatchStyleSolid)
+            {
+                SimpleShape ss = hatch.CompoundShape.SimpleShapes[0];
+                ICurve2D[] segs = ss.Outline.Segments;
+                if (segs.Length >= 3 && segs.Length <= 4 && segs.All(s => s is CADability.Curve2D.Line2D))
+                {
+                    GeoPoint[] pts = new GeoPoint[4];
+                    for (int i = 0; i < segs.Length; i++)
+                        pts[i] = hatch.Plane.ToGlobal(segs[i].StartPoint);
+                    // DXF SOLID requires 4 corners; duplicate last for triangles
+                    if (segs.Length == 3) pts[3] = pts[2];
+                    return new ACadSharp.Entities.Solid
+                    {
+                        FirstCorner  = ToXYZ(pts[0]),
+                        SecondCorner = ToXYZ(pts[1]),
+                        ThirdCorner  = ToXYZ(pts[2]),
+                        FourthCorner = ToXYZ(pts[3]),
+                        Normal = ToXYZ(hatch.Plane.Normal)
+                    };
+                }
+            }
+            return null;
+        }
+
         private Entity ExportText(GeoObject.Text text)
         {
             var textString = text.TextString.Replace("\r\n", " ");
@@ -406,15 +439,9 @@ namespace CADability.DXF
             if (text.Bold) fs |= System.Drawing.FontStyle.Bold;
             if (text.Italic) fs |= System.Drawing.FontStyle.Italic;
 
+            // TextSize is the raw DXF cap-height (group 40) stored unchanged during import.
+            // Do not apply any font-metric scaling here — it would corrupt the value.
             double height = text.TextSize;
-            try
-            {
-                using (var font = new System.Drawing.Font(text.Font, 1000.0f, fs))
-                {
-                    height = text.TextSize * 1000.0 / font.Height;
-                }
-            }
-            catch { /* use text.TextSize as-is in headless environments */ }
 
             string fontName = text.Font ?? "Standard";
             if (!createdTextStyles.TryGetValue(fontName, out ACadSharp.Tables.TextStyle textStyle))

@@ -2,6 +2,7 @@ using CADability;
 using Silk.NET.OpenGL;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Numerics;
 
 namespace CADability.Forms
@@ -23,8 +24,21 @@ namespace CADability.Forms
         // 2D overlay lines (screen-space)
         internal List<(int sx, int sy, int ex, int ey)> Lines2D = new();
 
-        // sub-lists to replay
+        // sub-lists to replay (from MakeList / containedSubLists)
         internal List<IPaintTo3DList> SubLists;
+
+        // sub-list calls recorded during OpenList/CloseList (e.g. text characters)
+        internal struct SubListCall
+        {
+            internal PaintToSilkGLList List;
+            internal float[] ModelView;
+            internal Color Color;
+        }
+        internal List<SubListCall> SubListCalls;
+
+        // per-entity color batches: each entry means "from startVertex, use this color"
+        internal List<(int startVertex, Color color)> SurfaceBatches = new();
+        internal List<(int startVertex, Color color)> EdgeBatches = new();
 
         internal bool IsGpuUploaded;
         internal GL Gl;

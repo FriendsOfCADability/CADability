@@ -11,7 +11,8 @@ out vec4 FragColor;
 void main()
 {
     vec3 norm = normalize(vNormal);
-    vec3 lightDir = normalize(u_light_pos - vFragPos);
+    // u_light_pos is a direction vector in world space (directional light, like w=0 in old glLightfv)
+    vec3 lightDir = normalize(u_light_pos);
 
     // two-sided lighting
     float diff = abs(dot(norm, lightDir));

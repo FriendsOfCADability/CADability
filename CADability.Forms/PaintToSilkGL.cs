@@ -244,6 +244,12 @@ namespace CADability.Forms
             return r;
         }
 
+        private static void AddColorBatch(List<(int startVertex, Color color)> batches, int vertexCount, Color color)
+        {
+            if (batches.Count > 0 && batches[batches.Count - 1].color == color) return;
+            batches.Add((vertexCount, color));
+        }
+
         private static float[] Ortho2D(float w, float h)
         {
             // left=0, right=w, bottom=h, top=0, near=-1, far=1  (WinForms y-down)
@@ -351,6 +357,11 @@ namespace CADability.Forms
                 color = Color.FromArgb(color.A, (color.R + 20) % 256,
                     (color.G + 20) % 256, (color.B + 20) % 256);
             currentColor = color;
+            if (inList)
+            {
+                AddColorBatch(currentList.SurfaceBatches, currentList.SurfaceVertexCount, color);
+                AddColorBatch(currentList.EdgeBatches,    currentList.EdgeVertexCount,    color);
+            }
         }
 
         public void AvoidColor(Color color) { avoidColor = color; }
@@ -468,31 +479,101 @@ namespace CADability.Forms
             // TriangulateText == true: caller sends triangulated geometry via Triangle()
         }
 
+        private void DrawListSurface(PaintToSilkGLList list)
+        {
+            if (list.SurfaceVao == 0 || list.SurfaceVertexCount == 0) return;
+            gl.BindVertexArray(list.SurfaceVao);
+            gl.UseProgram(surfaceProgram);
+            var batches = list.SurfaceBatches;
+            if (batches == null || batches.Count == 0)
+            {
+                UploadSurfaceUniforms(projectionMatrix, modelviewMatrix);
+                gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)list.SurfaceVertexCount);
+            }
+            else
+            {
+                Color savedColor = currentColor;
+                for (int i = 0; i < batches.Count; i++)
+                {
+                    int first = batches[i].startVertex;
+                    int end   = (i + 1 < batches.Count) ? batches[i + 1].startVertex : list.SurfaceVertexCount;
+                    if (end <= first) continue;
+                    currentColor = batches[i].color;
+                    UploadSurfaceUniforms(projectionMatrix, modelviewMatrix);
+                    gl.DrawArrays(PrimitiveType.Triangles, first, (uint)(end - first));
+                }
+                currentColor = savedColor;
+            }
+            gl.BindVertexArray(0);
+        }
+
+        private void DrawListEdge(PaintToSilkGLList list)
+        {
+            if (list.EdgeVao == 0 || list.EdgeVertexCount == 0) return;
+            gl.BindVertexArray(list.EdgeVao);
+            gl.UseProgram(edgeProgram);
+            var batches = list.EdgeBatches;
+            if (batches == null || batches.Count == 0)
+            {
+                UploadEdgeUniforms(projectionMatrix, modelviewMatrix);
+                gl.DrawArrays(PrimitiveType.Lines, 0, (uint)list.EdgeVertexCount);
+            }
+            else
+            {
+                Color savedColor = currentColor;
+                for (int i = 0; i < batches.Count; i++)
+                {
+                    int first = batches[i].startVertex;
+                    int end   = (i + 1 < batches.Count) ? batches[i + 1].startVertex : list.EdgeVertexCount;
+                    if (end <= first) continue;
+                    currentColor = batches[i].color;
+                    UploadEdgeUniforms(projectionMatrix, modelviewMatrix);
+                    gl.DrawArrays(PrimitiveType.Lines, first, (uint)(end - first));
+                }
+                currentColor = savedColor;
+            }
+            gl.BindVertexArray(0);
+        }
+
         public void List(IPaintTo3DList paintThisList)
         {
             if (paintThisList is not PaintToSilkGLList list) return;
+
+            // Recording mode: capture as a sub-list call with the current modelview and color
+            if (inList)
+            {
+                (currentList.SubListCalls ??= new()).Add(new PaintToSilkGLList.SubListCall
+                {
+                    List      = list,
+                    ModelView = (float[])modelviewMatrix.Clone(),
+                    Color     = currentColor,
+                });
+                return;
+            }
+
             if (!list.IsGpuUploaded) list.UploadToGpu(gl);
 
-            if (list.SurfaceVao != 0 && paintSurfaces)
-            {
-                gl.BindVertexArray(list.SurfaceVao);
-                gl.UseProgram(surfaceProgram);
-                UploadSurfaceUniforms(projectionMatrix, modelviewMatrix);
-                gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)list.SurfaceVertexCount);
-                gl.BindVertexArray(0);
-            }
+            if (paintSurfaces) DrawListSurface(list);
+            if (paintEdges)    DrawListEdge(list);
 
-            if (list.EdgeVao != 0 && paintEdges)
-            {
-                gl.BindVertexArray(list.EdgeVao);
-                gl.UseProgram(edgeProgram);
-                UploadEdgeUniforms(projectionMatrix, modelviewMatrix);
-                gl.DrawArrays(PrimitiveType.Lines, 0, (uint)list.EdgeVertexCount);
-                gl.BindVertexArray(0);
-            }
-
+            // Replay static composite sub-lists (from MakeList)
             if (list.SubLists != null)
                 foreach (var sub in list.SubLists) List(sub);
+
+            // Replay dynamic sub-list calls recorded during OpenList (e.g. text characters)
+            if (list.SubListCalls != null)
+            {
+                float[] savedMV    = modelviewMatrix;
+                Color   savedColor = currentColor;
+                foreach (var call in list.SubListCalls)
+                {
+                    modelviewMatrix = call.ModelView;
+                    currentColor    = call.Color;
+                    List(call.List);
+                }
+                modelviewMatrix = savedMV;
+                currentColor    = savedColor;
+            }
         }
 
         public void SelectedList(IPaintTo3DList paintThisList, int wobbleRadius)

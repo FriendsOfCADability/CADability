@@ -120,7 +120,7 @@ namespace CADability.Forms
         }
         void ICanvas.ShowView(IView toShow)
         {
-            if (paintTo3D is PaintToOpenGL openGL)
+            if (paintTo3D is PaintToSilkGL openGL)
             {
                 openGL.Disconnect(this);
             }
@@ -140,9 +140,9 @@ namespace CADability.Forms
                         this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.Opaque | ControlStyles.ResizeRedraw | ControlStyles.UserPaint, true);
                         this.SetStyle(ControlStyles.OptimizedDoubleBuffer, false);
                         this.DoubleBuffered = false;
-                        PaintToOpenGL paintToOpenGL = new PaintToOpenGL(1e-6);
-                        paintToOpenGL.Init(this);
-                        paintTo3D = paintToOpenGL;
+                        PaintToSilkGL paintToSilkGL = new PaintToSilkGL(1e-6);
+                        paintToSilkGL.Init(this);
+                        paintTo3D = paintToSilkGL;
                     }
                     break;
             }
@@ -225,7 +225,7 @@ namespace CADability.Forms
         }
         protected override void Dispose(bool disposing)
         {
-            if (view != null && paintTo3D != null) (paintTo3D as PaintToOpenGL)?.Disconnect(this);
+            if (view != null && paintTo3D != null) (paintTo3D as PaintToSilkGL)?.Disconnect(this);
             view?.Disconnect(this);
             base.Dispose(disposing);
         }

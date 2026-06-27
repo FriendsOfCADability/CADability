@@ -197,7 +197,7 @@ namespace CADability.DXF
             if (createdLayers.TryGetValue(cadLayer, out ACadSharp.Tables.Layer layer))
                 return layer;
             foreach (ACadSharp.Tables.Layer existing in doc.Layers)
-                if (existing.Name == cadLayer.Name) { createdLayers[cadLayer] = existing; return existing; }
+                if (string.Equals(existing.Name, cadLayer.Name, StringComparison.OrdinalIgnoreCase)) { createdLayers[cadLayer] = existing; return existing; }
             layer = new ACadSharp.Tables.Layer(cadLayer.Name);
             doc.Layers.Add(layer);
             createdLayers[cadLayer] = layer;
@@ -209,7 +209,7 @@ namespace CADability.DXF
             if (createdLinePatterns.TryGetValue(lp, out ACadSharp.Tables.LineType lt))
                 return lt;
             foreach (ACadSharp.Tables.LineType existing in doc.LineTypes)
-                if (existing.Name == lp.Name) { createdLinePatterns[lp] = existing; return existing; }
+                if (string.Equals(existing.Name, lp.Name, StringComparison.OrdinalIgnoreCase)) { createdLinePatterns[lp] = existing; return existing; }
             lt = new ACadSharp.Tables.LineType(lp.Name);
             if (lp.Pattern != null)
                 for (int i = 0; i < lp.Pattern.Length; i++)

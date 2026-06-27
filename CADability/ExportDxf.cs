@@ -116,13 +116,7 @@ namespace CADability.DXF
                 for (int i = 0; i < entities.Length; i++)
                 {
                     if (geoObject.Layer == null) continue;
-                    if (!createdLayers.TryGetValue(geoObject.Layer, out ACadSharp.Tables.Layer layer))
-                    {
-                        layer = new ACadSharp.Tables.Layer(geoObject.Layer.Name);
-                        doc.Layers.Add(layer);
-                        createdLayers[geoObject.Layer] = layer;
-                    }
-                    entities[i].Layer = layer;
+                    entities[i].Layer = GetOrCreateLayer(geoObject.Layer);
                 }
                 return entities;
             }
@@ -175,6 +169,36 @@ namespace CADability.DXF
                     catch { /* skip */ }
                 }
             }
+        }
+
+        private ACadSharp.Tables.Layer GetOrCreateLayer(CADability.Attribute.Layer cadLayer)
+        {
+            if (createdLayers.TryGetValue(cadLayer, out ACadSharp.Tables.Layer layer))
+                return layer;
+            foreach (ACadSharp.Tables.Layer existing in doc.Layers)
+                if (existing.Name == cadLayer.Name) { createdLayers[cadLayer] = existing; return existing; }
+            layer = new ACadSharp.Tables.Layer(cadLayer.Name);
+            doc.Layers.Add(layer);
+            createdLayers[cadLayer] = layer;
+            return layer;
+        }
+
+        private ACadSharp.Tables.LineType GetOrCreateLineType(CADability.Attribute.LinePattern lp)
+        {
+            if (createdLinePatterns.TryGetValue(lp, out ACadSharp.Tables.LineType lt))
+                return lt;
+            foreach (ACadSharp.Tables.LineType existing in doc.LineTypes)
+                if (existing.Name == lp.Name) { createdLinePatterns[lp] = existing; return existing; }
+            lt = new ACadSharp.Tables.LineType(lp.Name);
+            if (lp.Pattern != null)
+                for (int i = 0; i < lp.Pattern.Length; i++)
+                {
+                    double len = (i & 1) == 0 ? lp.Pattern[i] : -lp.Pattern[i];
+                    lt.AddSegment(new ACadSharp.Tables.LineType.Segment { Length = len });
+                }
+            doc.LineTypes.Add(lt);
+            createdLinePatterns[lp] = lt;
+            return lt;
         }
 
         private AppId GetOrCreateAppId(string name)
@@ -590,33 +614,9 @@ namespace CADability.DXF
                     entity.Color = new ACadSharp.Color(clr.R, clr.G, clr.B);
             }
             if (go.Layer != null)
-            {
-                if (!createdLayers.TryGetValue(go.Layer, out ACadSharp.Tables.Layer layer))
-                {
-                    layer = new ACadSharp.Tables.Layer(go.Layer.Name);
-                    doc.Layers.Add(layer);
-                    createdLayers[go.Layer] = layer;
-                }
-                entity.Layer = layer;
-            }
+                entity.Layer = GetOrCreateLayer(go.Layer);
             if (go is ILinePattern ilp && ilp.LinePattern != null)
-            {
-                if (!createdLinePatterns.TryGetValue(ilp.LinePattern, out ACadSharp.Tables.LineType lineType))
-                {
-                    lineType = new ACadSharp.Tables.LineType(ilp.LinePattern.Name);
-                    if (ilp.LinePattern.Pattern != null)
-                    {
-                        for (int i = 0; i < ilp.LinePattern.Pattern.Length; i++)
-                        {
-                            double len = (i & 1) == 0 ? ilp.LinePattern.Pattern[i] : -ilp.LinePattern.Pattern[i];
-                            lineType.AddSegment(new ACadSharp.Tables.LineType.Segment { Length = len });
-                        }
-                    }
-                    doc.LineTypes.Add(lineType);
-                    createdLinePatterns[ilp.LinePattern] = lineType;
-                }
-                entity.LineType = lineType;
-            }
+                entity.LineType = GetOrCreateLineType(ilp.LinePattern);
             if (go is ILineWidth lw && lw.LineWidth != null)
             {
                 LineWeightType found = LineWeightType.Default;

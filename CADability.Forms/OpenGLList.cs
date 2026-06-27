@@ -36,7 +36,7 @@ namespace CADability.Forms
             set => SubLists = value;
         }
 
-        internal void UploadToGpu(GL gl)
+        internal unsafe void UploadToGpu(GL gl)
         {
             Gl = gl;
 
@@ -47,9 +47,9 @@ namespace CADability.Forms
                 gl.BindVertexArray(SurfaceVao);
                 gl.BindBuffer(BufferTargetARB.ArrayBuffer, SurfaceVbo);
                 gl.BufferData<float>(BufferTargetARB.ArrayBuffer, (ReadOnlySpan<float>)SurfaceVertices.AsSpan(0, SurfaceVertexCount * 6), BufferUsageARB.StaticDraw);
-                gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 0);
+                gl.VertexAttribPointer(0, 3, GLEnum.Float, false, (uint)(6 * sizeof(float)), (void*)0);
                 gl.EnableVertexAttribArray(0);
-                gl.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 3 * sizeof(float));
+                gl.VertexAttribPointer(1, 3, GLEnum.Float, false, (uint)(6 * sizeof(float)), (void*)(3 * sizeof(float)));
                 gl.EnableVertexAttribArray(1);
                 gl.BindVertexArray(0);
             }
@@ -61,7 +61,7 @@ namespace CADability.Forms
                 gl.BindVertexArray(EdgeVao);
                 gl.BindBuffer(BufferTargetARB.ArrayBuffer, EdgeVbo);
                 gl.BufferData<float>(BufferTargetARB.ArrayBuffer, (ReadOnlySpan<float>)EdgeVertices.AsSpan(0, EdgeVertexCount * 3), BufferUsageARB.StaticDraw);
-                gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3 * sizeof(float), 0);
+                gl.VertexAttribPointer(0, 3, GLEnum.Float, false, (uint)(3 * sizeof(float)), (void*)0);
                 gl.EnableVertexAttribArray(0);
                 gl.BindVertexArray(0);
             }

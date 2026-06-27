@@ -261,16 +261,16 @@ namespace CADability.Forms
         // Internal draw helpers
         // -------------------------------------------------------------------------
 
-        private void DrawSurface(float[] verts, int vertCount)
+        private unsafe void DrawSurface(float[] verts, int vertCount)
         {
             if (vertCount == 0) return;
             gl.BindVertexArray(streamVao);
             gl.BindBuffer(BufferTargetARB.ArrayBuffer, streamVbo);
             gl.BufferData<float>(BufferTargetARB.ArrayBuffer,
                 (ReadOnlySpan<float>)verts.AsSpan(0, vertCount * 6), BufferUsageARB.StreamDraw);
-            gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 0);
+            gl.VertexAttribPointer(0, 3, GLEnum.Float, false, (uint)(6 * sizeof(float)), (void*)0);
             gl.EnableVertexAttribArray(0);
-            gl.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), (uint)(3 * sizeof(float)));
+            gl.VertexAttribPointer(1, 3, GLEnum.Float, false, (uint)(6 * sizeof(float)), (void*)(3 * sizeof(float)));
             gl.EnableVertexAttribArray(1);
             gl.UseProgram(surfaceProgram);
             UploadSurfaceUniforms(projectionMatrix, modelviewMatrix);
@@ -278,7 +278,7 @@ namespace CADability.Forms
             gl.BindVertexArray(0);
         }
 
-        private void DrawEdge(float[] verts, int vertCount, PrimitiveType mode,
+        private unsafe void DrawEdge(float[] verts, int vertCount, PrimitiveType mode,
             float[] proj = null, float[] mv = null)
         {
             if (vertCount == 0) return;
@@ -288,7 +288,7 @@ namespace CADability.Forms
             gl.BindBuffer(BufferTargetARB.ArrayBuffer, streamVbo);
             gl.BufferData<float>(BufferTargetARB.ArrayBuffer,
                 (ReadOnlySpan<float>)verts.AsSpan(0, vertCount * 3), BufferUsageARB.StreamDraw);
-            gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3 * sizeof(float), 0);
+            gl.VertexAttribPointer(0, 3, GLEnum.Float, false, (uint)(3 * sizeof(float)), (void*)0);
             gl.EnableVertexAttribArray(0);
             gl.DisableVertexAttribArray(1);
             gl.UseProgram(edgeProgram);
@@ -709,7 +709,7 @@ namespace CADability.Forms
                 gl?.Enable(EnableCap.ScissorTest);
                 // WinForms y=0 is at top; OpenGL scissor y=0 is at bottom
                 gl?.Scissor(clipRectangle.X, viewHeight - clipRectangle.Bottom,
-                    clipRectangle.Width, clipRectangle.Height);
+                    (uint)clipRectangle.Width, (uint)clipRectangle.Height);
             }
         }
 

@@ -545,6 +545,8 @@ namespace CADability.Forms
             // Recording mode: capture as a sub-list call with the current modelview and color
             if (inList)
             {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[SilkGL] RECORD SubListCall '{list.Name}' tx={modelviewMatrix[12]:F4} ty={modelviewMatrix[13]:F4} tz={modelviewMatrix[14]:F4}");
                 (currentList.SubListCalls ??= new()).Add(new PaintToSilkGLList.SubListCall
                 {
                     List      = list,
@@ -568,10 +570,14 @@ namespace CADability.Forms
             {
                 float[] savedMV    = modelviewMatrix;
                 Color   savedColor = currentColor;
+                System.Diagnostics.Debug.WriteLine(
+                    $"[SilkGL] REPLAY '{list.Name}' has {list.SubListCalls.Count} SubListCalls");
                 foreach (var call in list.SubListCalls)
                 {
                     modelviewMatrix = call.ModelView;
                     currentColor    = call.Color;
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[SilkGL]   → draw '{call.List.Name}' tx={modelviewMatrix[12]:F4} ty={modelviewMatrix[13]:F4} tz={modelviewMatrix[14]:F4}");
                     List(call.List);
                 }
                 modelviewMatrix = savedMV;
@@ -788,6 +794,9 @@ namespace CADability.Forms
             modopStack.Push(modelviewMatrix);
             // new modelview = current * ModOp  (matches glMultMatrix semantics)
             modelviewMatrix = Mul4(modelviewMatrix, ModOpToGL(mm));
+            if (inList)
+                System.Diagnostics.Debug.WriteLine(
+                    $"[SilkGL] PushMultModOp (inList) → tx={modelviewMatrix[12]:F4} ty={modelviewMatrix[13]:F4} tz={modelviewMatrix[14]:F4}");
         }
 
         public void PopModOp()

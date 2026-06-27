@@ -9,6 +9,13 @@ namespace CADability.Forms
         ICommandHandler commandHandler;
         public string menuID;
 
+        internal static ToolStripItem CreateItem(MenuWithHandler def)
+        {
+            if (def.ID == "SEPARATOR" || def.Text == "-")
+                return new ToolStripSeparator();
+            return new MenuItemWithHandler(def);
+        }
+
         public ContextMenuWithHandler(ToolStripMenuItem[] menuItems, ICommandHandler handler, string menuID) : base()
         {
             commandHandler = handler;
@@ -21,7 +28,7 @@ namespace CADability.Forms
             menuID = null;
             commandHandler = null;
             foreach (var def in definition)
-                Items.Add(new MenuItemWithHandler(def));
+                Items.Add(CreateItem(def));
             Closed += (s, e) => MenuItemWithHandler.HideToolTip();
         }
 
@@ -202,7 +209,7 @@ namespace CADability.Forms
             if (definition.SubMenus != null)
             {
                 foreach (var sub in definition.SubMenus)
-                    DropDownItems.Add(new MenuItemWithHandler(sub));
+                    DropDownItems.Add(ContextMenuWithHandler.CreateItem(sub));
             }
             DropDownOpening += HandleDropDownOpening;
         }
@@ -244,7 +251,7 @@ namespace CADability.Forms
         {
             MenuStrip res = new MenuStrip();
             foreach (var def in definition)
-                res.Items.Add(new MenuItemWithHandler(def));
+                res.Items.Add(ContextMenuWithHandler.CreateItem(def));
             res.MenuDeactivate += (s, e) => MenuItemWithHandler.HideToolTip();
             return res;
         }

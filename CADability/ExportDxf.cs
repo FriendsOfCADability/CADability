@@ -51,6 +51,7 @@ namespace CADability.DXF
                     foreach (var e in entities)
                         msBlock.Entities.Add(e);
             }
+            SetExtents(modelSpace);
             var ms = new MemoryStream();
             using (var writer = new DxfWriter(ms, doc, false))
                 writer.Write();
@@ -81,8 +82,25 @@ namespace CADability.DXF
                     foreach (var e in entities)
                         msBlock.Entities.Add(e);
             }
+            SetExtents(modelSpace);
             using (var writer = new DxfWriter(filename, doc, false))
                 writer.Write();
+        }
+
+        private void SetExtents(Model model)
+        {
+            try
+            {
+                BoundingCube ext = model.Extent;
+                if (!ext.IsEmpty)
+                {
+                    doc.Header.ModelSpaceExtMin = new XYZ(ext.Xmin, ext.Ymin, ext.Zmin);
+                    doc.Header.ModelSpaceExtMax = new XYZ(ext.Xmax, ext.Ymax, ext.Zmax);
+                    doc.Header.ModelSpaceLimitsMin = new CSMath.XY(ext.Xmin, ext.Ymin);
+                    doc.Header.ModelSpaceLimitsMax = new CSMath.XY(ext.Xmax, ext.Ymax);
+                }
+            }
+            catch { }
         }
 
         private Entity[] GeoObjectToEntity(IGeoObject geoObject)

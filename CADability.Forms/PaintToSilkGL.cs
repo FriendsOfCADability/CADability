@@ -333,7 +333,7 @@ namespace CADability.Forms
             {
                 _gl = gl;
                 _gl.Enable(EnableCap.PolygonOffsetFill);
-                _gl.PolygonOffset(1f, 1f);
+                _gl.PolygonOffset(1f, 4f);
             }
             public void Dispose()
             {
@@ -761,7 +761,7 @@ namespace CADability.Forms
             if (mode == PaintTo3D.PaintMode.FacesOnly)
             {
                 gl?.Enable(EnableCap.PolygonOffsetFill);
-                gl?.PolygonOffset(1f, 1f);
+                gl?.PolygonOffset(1f, 4f);
             }
             else
             {

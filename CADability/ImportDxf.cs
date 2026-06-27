@@ -1209,7 +1209,7 @@ namespace CADability.DXF
                 numLines--;
             if (numLines == 0) return null;
 
-            // Map attachment point to horizontal alignment (applied to every line)
+            // Map attachment point to horizontal/vertical alignment (applied to every line)
             TextHorizontalAlignment hAlign;
             switch (mText.AttachmentPoint)
             {
@@ -1223,6 +1223,20 @@ namespace CADability.DXF
                     hAlign = TextHorizontalAlignment.Right; break;
                 default:
                     hAlign = TextHorizontalAlignment.Left; break;
+            }
+            TextVerticalAlignmentType vAlign;
+            switch (mText.AttachmentPoint)
+            {
+                case AttachmentPointType.TopLeft:
+                case AttachmentPointType.TopCenter:
+                case AttachmentPointType.TopRight:
+                    vAlign = TextVerticalAlignmentType.Top; break;
+                case AttachmentPointType.MiddleLeft:
+                case AttachmentPointType.MiddleCenter:
+                case AttachmentPointType.MiddleRight:
+                    vAlign = TextVerticalAlignmentType.Middle; break;
+                default: // Bottom
+                    vAlign = TextVerticalAlignmentType.Bottom; break;
             }
 
             // "Up" direction in WCS (perpendicular to text baseline, pointing away from ground).
@@ -1268,7 +1282,7 @@ namespace CADability.DXF
                     InsertPoint = new XYZ(pos.x, pos.y, pos.z),
                     Normal = mText.Normal,
                     HorizontalAlignment = hAlign,
-                    VerticalAlignment = TextVerticalAlignmentType.Baseline,
+                    VerticalAlignment = vAlign,
                 };
                 return CreateText(txt);
             }

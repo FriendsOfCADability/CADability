@@ -1146,7 +1146,6 @@ namespace CADability.DXF
         private string StripMTextFormatCodes(string value)
         {
             if (string.IsNullOrEmpty(value)) return value;
-            // Remove MTEXT formatting codes: \P (paragraph), \~, {\fFontName|...}, {\H...;}, etc.
             var sb = new StringBuilder();
             int i = 0;
             while (i < value.Length)
@@ -1157,11 +1156,22 @@ namespace CADability.DXF
                     if (next == 'P' || next == 'p') { sb.Append('\n'); i += 2; }
                     else if (next == '~') { sb.Append(' '); i += 2; }
                     else if (next == 'n' || next == 'N') { sb.Append('\n'); i += 2; }
-                    else { i += 2; } // skip other escape sequences
+                    else if (next == '\\') { sb.Append('\\'); i += 2; }
+                    else if (next == '{') { sb.Append('{'); i += 2; }
+                    else if (next == '}') { sb.Append('}'); i += 2; }
+                    else
+                    {
+                        // Parameterized codes (\H, \W, \A, \C, \T, \Q, \S, \f, \p, etc.)
+                        // end with a semicolon. Toggle codes (\L, \l, \O, \o, \K, \k) have no
+                        // parameters. Skip up to and including the terminating semicolon when
+                        // present; otherwise skip just the two-char sequence.
+                        int semi = value.IndexOf(';', i + 2);
+                        i = semi >= 0 && semi - (i + 2) <= 64 ? semi + 1 : i + 2;
+                    }
                 }
                 else if (value[i] == '{')
                 {
-                    // Find matching closing brace - skip format group
+                    // Find matching closing brace
                     int depth = 1;
                     int j = i + 1;
                     while (j < value.Length && depth > 0)
@@ -1170,14 +1180,14 @@ namespace CADability.DXF
                         else if (value[j] == '}') depth--;
                         j++;
                     }
-                    // If it starts with a format code, skip the whole group
-                    if (i + 1 < value.Length && value[i + 1] == '\\')
-                        i = j;
-                    else if (i + 1 < value.Length && value[i + 1] == '}')
+                    if (i + 1 < value.Length && value[i + 1] == '}')
+                    {
                         i = j; // empty group
+                    }
                     else
                     {
-                        // Recurse into the group content
+                        // Always recurse — the format codes inside (e.g. \fArial|b0;, \H2.0;)
+                        // will be stripped, preserving any actual text content.
                         sb.Append(StripMTextFormatCodes(value.Substring(i + 1, j - i - 2)));
                         i = j;
                     }

@@ -419,8 +419,13 @@ namespace CADability.DXF
             string fontName = text.Font ?? "Standard";
             if (!createdTextStyles.TryGetValue(fontName, out ACadSharp.Tables.TextStyle textStyle))
             {
-                textStyle = new ACadSharp.Tables.TextStyle(fontName) { Filename = fontName + ".ttf" };
-                doc.TextStyles.Add(textStyle);
+                foreach (ACadSharp.Tables.TextStyle existing in doc.TextStyles)
+                    if (string.Equals(existing.Name, fontName, StringComparison.OrdinalIgnoreCase)) { textStyle = existing; break; }
+                if (textStyle == null)
+                {
+                    textStyle = new ACadSharp.Tables.TextStyle(fontName) { Filename = fontName + ".ttf" };
+                    doc.TextStyles.Add(textStyle);
+                }
                 createdTextStyles[fontName] = textStyle;
             }
 

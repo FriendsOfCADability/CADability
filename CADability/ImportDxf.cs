@@ -36,7 +36,18 @@ namespace CADability.DXF
 
         public Import(string fileName)
         {
-            using (Stream stream = File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            byte[] raw;
+            using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                raw = new byte[fs.Length];
+                fs.Read(raw, 0, raw.Length);
+            }
+            // Some non-standard R12 files place TABLE sections directly after the HEADER
+            // ENDSEC without the required SECTION/TABLES wrapper. ACadSharp cannot parse
+            // this and silently returns an empty document. Normalize the structure first.
+            byte[] toRead = NormalizeOrphanedTables(raw) ?? raw;
+
+            using (var stream = new MemoryStream(toRead))
             {
                 try
                 {
@@ -49,19 +60,52 @@ namespace CADability.DXF
                     // TABLES, BLOCKS, and ENTITIES — all read before OBJECTS.
                     // When OBJECTS is malformed (DxfException, NullReferenceException, etc.)
                     // we fall back to a read that stops before it, so geometry still imports.
-                    doc = ReadWithoutObjectsSection(fileName);
+                    doc = ReadWithoutObjectsSection(toRead);
                     if (doc == null) throw; // OBJECTS was not the problem — re-throw
                 }
             }
         }
 
+        // Detects non-standard R12 DXF files where TABLE sections appear directly after the
+        // HEADER ENDSEC without a SECTION/TABLES wrapper. Inserts the wrapper and returns the
+        // normalized bytes, or null if no normalization was needed.
+        private static byte[] NormalizeOrphanedTables(byte[] raw)
+        {
+            bool hasCrLf = IndexOf(raw, new byte[] { 0x0D, 0x0A }) >= 0;
+            string text = Encoding.ASCII.GetString(raw).Replace("\r\n", "\n").Replace('\r', '\n');
+
+            // Detect: ENDSEC immediately followed by TABLE instead of SECTION.
+            const string marker = "  0\nENDSEC\n  0\nTABLE\n";
+            int pos = text.IndexOf(marker, StringComparison.Ordinal);
+            if (pos < 0) return null; // Standard structure — no normalization needed
+
+            // Split: keep everything up to and including the ENDSEC line,
+            // collect the orphaned tables, then the rest (starting at SECTION ENTITIES).
+            int splitAt = pos + "  0\nENDSEC\n".Length;
+            string header  = text.Substring(0, splitAt);
+            string rest    = text.Substring(splitAt);
+
+            int sectionStart = rest.IndexOf("  0\nSECTION\n", StringComparison.Ordinal);
+            if (sectionStart < 0) return null; // Cannot locate ENTITIES section — give up
+
+            string tables   = rest.Substring(0, sectionStart);
+            string entities = rest.Substring(sectionStart);
+
+            string normalized = header
+                + "  0\nSECTION\n  2\nTABLES\n"
+                + tables
+                + "  0\nENDSEC\n"
+                + entities;
+
+            if (hasCrLf) normalized = normalized.Replace("\n", "\r\n");
+            return Encoding.ASCII.GetBytes(normalized);
+        }
+
         // Retries reading by presenting the file content only up to (but not including)
         // the OBJECTS section.  Returns null if the OBJECTS section boundary cannot be
         // located (meaning something earlier in the file caused the original error).
-        private static CadDocument ReadWithoutObjectsSection(string fileName)
+        private static CadDocument ReadWithoutObjectsSection(byte[] raw)
         {
-            byte[] raw = File.ReadAllBytes(fileName);
-
             // The section header is a group-0 entity followed by SECTION / group-2 / OBJECTS.
             // Match both CRLF and LF line endings.
             byte[][] markers = new byte[][]
@@ -116,11 +160,29 @@ namespace CADability.DXF
 
         private void FillModelSpace(Model model)
         {
-            if (!doc.BlockRecords.TryGetValue("*Model_Space", out BlockRecord modelSpace)) return;
-            foreach (Entity item in modelSpace.Entities)
+            if (doc.BlockRecords.TryGetValue("*Model_Space", out BlockRecord modelSpace)
+                && modelSpace.Entities.Count > 0)
             {
-                IGeoObject geoObject = GeoObjectFromEntity(item);
-                if (geoObject != null) model.Add(geoObject);
+                foreach (Entity item in modelSpace.Entities)
+                {
+                    IGeoObject geoObject = GeoObjectFromEntity(item);
+                    if (geoObject != null) model.Add(geoObject);
+                }
+            }
+            else
+            {
+                // Fallback for non-standard R12 files: *Model_Space absent or empty.
+                // doc.Entities is ACadSharp's flat view of all drawing entities; take only
+                // those whose owner is a space block (or unowned, which is model-space in R12).
+                foreach (var obj in doc.Entities)
+                {
+                    if (!(obj is Entity item)) continue;
+                    string ownerName = (item.Owner as BlockRecord)?.Name;
+                    if (ownerName != null && !ownerName.StartsWith("*"))
+                        continue;
+                    IGeoObject geoObject = GeoObjectFromEntity(item);
+                    if (geoObject != null) model.Add(geoObject);
+                }
             }
             model.Name = "*Model_Space";
         }

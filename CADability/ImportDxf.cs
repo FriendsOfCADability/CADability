@@ -918,30 +918,31 @@ namespace CADability.DXF
         private IGeoObject BuildSolidHatch(Plane ocs, XY c1, XY c2, XY c3, XY c4, Color color)
         {
             HatchStyleSolid hst = FindOrCreateSolidHatchStyle(color.ToArgb() == Color.White.ToArgb() ? Color.Black : color);
+            // Convert OCS corners to WCS, then remove duplicates.
             List<GeoPoint> points = new List<GeoPoint>();
             points.Add(ocs.ToGlobal(new GeoPoint2D(c1.X, c1.Y)));
             points.Add(ocs.ToGlobal(new GeoPoint2D(c2.X, c2.Y)));
             points.Add(ocs.ToGlobal(new GeoPoint2D(c3.X, c3.Y)));
             points.Add(ocs.ToGlobal(new GeoPoint2D(c4.X, c4.Y)));
             for (int i = 3; i > 0; --i)
-            {
                 for (int j = 0; j < i; ++j)
-                {
                     if (Precision.IsEqual(points[j], points[i])) { points.RemoveAt(i); break; }
-                }
-            }
             if (points.Count < 3) return null;
-            Plane pln;
-            try { pln = new Plane(points[0], points[1], points[2]); }
+            // Check non-collinear (throws PlaneException if degenerate)
+            try { var _ = new Plane(points[0], points[1], points[2]); }
             catch (PlaneException) { return null; }
+            // Project back to ocs 2D so the hatch plane keeps ocs.Normal (the SOLID's own OCS
+            // normal). Using a plane derived from the cross-product of WCS points would give the
+            // wrong normal direction (e.g. (0,0,-1) for CW points), causing DXF viewers to apply
+            // the Arbitrary Axis Algorithm with a flipped X-axis and mirror every vertex.
             GeoPoint2D[] vertex = new GeoPoint2D[points.Count + 1];
-            for (int i = 0; i < points.Count; ++i) vertex[i] = pln.Project(points[i]);
+            for (int i = 0; i < points.Count; ++i) vertex[i] = ocs.Project(points[i]);
             vertex[points.Count] = vertex[0];
             Border bdr = new Border(new Curve2D.Polyline2D(vertex));
             GeoObject.Hatch h = GeoObject.Hatch.Construct();
             h.CompoundShape = new CompoundShape(new SimpleShape(bdr));
             h.HatchStyle = hst;
-            h.Plane = pln;
+            h.Plane = ocs;
             return h;
         }
 

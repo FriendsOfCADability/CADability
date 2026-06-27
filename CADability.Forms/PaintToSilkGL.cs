@@ -50,6 +50,7 @@ namespace CADability.Forms
         private List<float> listSurfBuf;
         private List<float> listEdgeBuf;
         private bool inList;
+        private Stack<(PaintToSilkGLList list, List<float> surf, List<float> edge, float[] mv)> listNestStack = new();
 
         // Transient streaming VAO/VBO for immediate draw
         private uint streamVao;
@@ -82,6 +83,8 @@ namespace CADability.Forms
             (hdc, hglrc) = WglContext.Create(hwnd);
             WglContext.MakeCurrent(hdc, hglrc);
             gl = WglContext.CreateSilkGL();
+            viewWidth  = Math.Max(1, ctrl.ClientSize.Width);
+            viewHeight = Math.Max(1, ctrl.ClientSize.Height);
 
             CompileShaders();
             InitStreamBuffer();
@@ -668,6 +671,12 @@ namespace CADability.Forms
 
         public void OpenList(string name = null)
         {
+            if (inList)
+            {
+                // Nested call (e.g. FontCache building a glyph inside an entity list):
+                // save outer state so CloseList can restore it.
+                listNestStack.Push((currentList, listSurfBuf, listEdgeBuf, modelviewMatrix));
+            }
             currentList = new PaintToSilkGLList { Name = name };
             listSurfBuf = new List<float>();
             listEdgeBuf = new List<float>();
@@ -678,17 +687,24 @@ namespace CADability.Forms
 
         public IPaintTo3DList CloseList()
         {
-            inList = false;
             var list = currentList;
-
             if (listSurfBuf.Count > 0) list.SurfaceVertices = listSurfBuf.ToArray();
             if (listEdgeBuf.Count > 0) list.EdgeVertices    = listEdgeBuf.ToArray();
-
             list.UploadToGpu(gl);
 
-            listSurfBuf = null;
-            listEdgeBuf = null;
-            currentList = null;
+            if (listNestStack.Count > 0)
+            {
+                // Restore outer list that was interrupted by this nested OpenList call.
+                (currentList, listSurfBuf, listEdgeBuf, modelviewMatrix) = listNestStack.Pop();
+                inList = true;
+            }
+            else
+            {
+                inList      = false;
+                listSurfBuf = null;
+                listEdgeBuf = null;
+                currentList = null;
+            }
             return list;
         }
 

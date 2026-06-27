@@ -4,6 +4,7 @@ using ACadSharp;
 using ACadSharp.Entities;
 using ACadSharp.IO;
 using ACadSharp.Tables;
+using ACadSharp.Types.Units;
 using ACadSharp.XData;
 using CSMath;
 using System;
@@ -27,6 +28,8 @@ namespace CADability.DXF
         public Export(ACadVersion version = ACadVersion.AC1015)
         {
             doc = new CadDocument(version);
+            doc.Header.AngularDirection = AngularDirection.CounterClockWise;
+            doc.Header.InsUnits = UnitsType.Millimeters;
             createdLayers = new Dictionary<CADability.Attribute.Layer, ACadSharp.Tables.Layer>();
             createdLinePatterns = new Dictionary<CADability.Attribute.LinePattern, ACadSharp.Tables.LineType>();
             createdTextStyles = new Dictionary<string, ACadSharp.Tables.TextStyle>();
@@ -597,7 +600,7 @@ namespace CADability.DXF
         {
             System.Drawing.Color clr = System.Drawing.Color.FromArgb(argb);
             if (argb == System.Drawing.Color.White.ToArgb() || argb == System.Drawing.Color.Black.ToArgb())
-                entity.Color = ACadSharp.Color.Default;
+                entity.Color = ACadSharp.Color.ByLayer;
             else
                 entity.Color = new ACadSharp.Color(clr.R, clr.G, clr.B);
         }
@@ -609,7 +612,7 @@ namespace CADability.DXF
                 System.Drawing.Color clr = cd.ColorDef.Color;
                 if (clr.ToArgb() == System.Drawing.Color.White.ToArgb() ||
                     clr.ToArgb() == System.Drawing.Color.Black.ToArgb())
-                    entity.Color = ACadSharp.Color.Default;
+                    entity.Color = ACadSharp.Color.ByLayer;
                 else
                     entity.Color = new ACadSharp.Color(clr.R, clr.G, clr.B);
             }

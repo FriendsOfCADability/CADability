@@ -1201,45 +1201,98 @@ namespace CADability.DXF
         private IGeoObject CreateMText(ACadSharp.Entities.MText mText)
         {
             string plainText = StripMTextFormatCodes(mText.Value ?? "");
-            var txt = new ACadSharp.Entities.TextEntity
-            {
-                Value = plainText,
-                Height = mText.Height,
-                WidthFactor = 1.0,
-                Rotation = mText.Rotation,
-                Style = mText.Style,
-                InsertPoint = mText.InsertPoint,
-                Normal = mText.Normal,
-            };
-            // Map MTEXT attachment point (group 71) to horizontal/vertical alignment.
-            // The InsertPoint is the anchor for the specified attachment mode.
+            // Split on \P paragraph breaks (converted to \n by StripMTextFormatCodes)
+            string[] lines = plainText.Split('\n');
+            // Trim trailing empty lines (common when content ends with \P)
+            int numLines = lines.Length;
+            while (numLines > 0 && string.IsNullOrEmpty(lines[numLines - 1]))
+                numLines--;
+            if (numLines == 0) return null;
+
+            // Map attachment point to horizontal alignment (applied to every line)
+            TextHorizontalAlignment hAlign;
             switch (mText.AttachmentPoint)
             {
                 case AttachmentPointType.TopCenter:
                 case AttachmentPointType.MiddleCenter:
                 case AttachmentPointType.BottomCenter:
-                    txt.HorizontalAlignment = TextHorizontalAlignment.Center; break;
+                    hAlign = TextHorizontalAlignment.Center; break;
                 case AttachmentPointType.TopRight:
                 case AttachmentPointType.MiddleRight:
                 case AttachmentPointType.BottomRight:
-                    txt.HorizontalAlignment = TextHorizontalAlignment.Right; break;
+                    hAlign = TextHorizontalAlignment.Right; break;
                 default:
-                    txt.HorizontalAlignment = TextHorizontalAlignment.Left; break;
+                    hAlign = TextHorizontalAlignment.Left; break;
             }
+
+            // "Up" direction in WCS (perpendicular to text baseline, pointing away from ground).
+            // Used to offset subsequent lines downward (negative upDir).
+            Plane ocsPlane = Plane(mText.InsertPoint, mText.Normal);
+            GeoVector2D dir2d = new GeoVector2D(new Angle(mText.Rotation));
+            GeoVector upDir = ocsPlane.ToGlobal(dir2d.ToLeft());
+            if (upDir.IsNullVector()) upDir = CADability.GeoVector.YAxis;
+            upDir = upDir.Normalized;
+
+            // Baseline-to-baseline line spacing: DXF default is ~5/3 of cap height
+            double lineStep = mText.Height > 0 ? mText.Height * 5.0 / 3.0 : 1.0;
+
+            // Compute the WCS position of the first line's baseline
+            GeoPoint anchor = GeoPoint(mText.InsertPoint);
+            GeoPoint firstLine;
             switch (mText.AttachmentPoint)
             {
-                case AttachmentPointType.TopLeft:
-                case AttachmentPointType.TopCenter:
-                case AttachmentPointType.TopRight:
-                    txt.VerticalAlignment = TextVerticalAlignmentType.Top; break;
                 case AttachmentPointType.MiddleLeft:
                 case AttachmentPointType.MiddleCenter:
                 case AttachmentPointType.MiddleRight:
-                    txt.VerticalAlignment = TextVerticalAlignmentType.Middle; break;
-                default:
-                    txt.VerticalAlignment = TextVerticalAlignmentType.Bottom; break;
+                    firstLine = anchor + ((numLines - 1) / 2.0) * lineStep * upDir;
+                    break;
+                case AttachmentPointType.BottomLeft:
+                case AttachmentPointType.BottomCenter:
+                case AttachmentPointType.BottomRight:
+                    firstLine = anchor + (numLines - 1) * lineStep * upDir;
+                    break;
+                default: // Top
+                    firstLine = anchor;
+                    break;
             }
-            return CreateText(txt);
+
+            IGeoObject MakeLine(string text, GeoPoint pos)
+            {
+                var txt = new ACadSharp.Entities.TextEntity
+                {
+                    Value = text,
+                    Height = mText.Height,
+                    WidthFactor = 1.0,
+                    Rotation = mText.Rotation,
+                    Style = mText.Style,
+                    InsertPoint = new XYZ(pos.x, pos.y, pos.z),
+                    Normal = mText.Normal,
+                    HorizontalAlignment = hAlign,
+                    VerticalAlignment = TextVerticalAlignmentType.Baseline,
+                };
+                return CreateText(txt);
+            }
+
+            if (numLines == 1)
+                return MakeLine(lines[0], firstLine);
+
+            // Multiple lines: create a block containing one Text per line.
+            // Blank lines between content still advance the position.
+            var geoLines = new GeoObjectList();
+            for (int i = 0; i < numLines; i++)
+            {
+                GeoPoint pos = firstLine - i * lineStep * upDir;
+                if (!string.IsNullOrEmpty(lines[i]))
+                {
+                    var geo = MakeLine(lines[i], pos);
+                    if (geo != null) geoLines.Add(geo);
+                }
+            }
+            if (geoLines.Count == 0) return null;
+            if (geoLines.Count == 1) return geoLines[0];
+            var block = GeoObject.Block.Construct();
+            block.Set(geoLines);
+            return block;
         }
 
         private IGeoObject CreateTolerance(ACadSharp.Entities.Tolerance tolerance)

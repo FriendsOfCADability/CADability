@@ -901,6 +901,7 @@ namespace CADability.GeoObject
                 }
                 double extwidth = ext.Width;
                 // if (width < extwidth * 0.9) width = extwidth * 1.1; warum diese Zeile? Stört bei Commercial Script
+                if (width == 0.0 && extwidth > 0.0) width = extwidth; // fallback when GetCharABCWidths fails (e.g. non-TrueType/SHX fonts)
                 found.width = width; // hier könnte man mit TextRenderer.MeasureText arbeiten, wenns so nicht passt
                 if (useLists)
                 {

@@ -51,10 +51,11 @@ namespace CADability.DXF
                     foreach (var e in entities)
                         msBlock.Entities.Add(e);
             }
+            SetExtents(modelSpace);
             var ms = new MemoryStream();
             using (var writer = new DxfWriter(ms, doc, false))
                 writer.Write();
-            return InjectExtents(ms.ToArray(), modelSpace.Extent);
+            return ms.ToArray();
         }
 
         public void WriteToFile(Project toExport, string filename)
@@ -81,29 +82,25 @@ namespace CADability.DXF
                     foreach (var e in entities)
                         msBlock.Entities.Add(e);
             }
-            var ms = new MemoryStream();
-            using (var writer = new DxfWriter(ms, doc, false))
+            SetExtents(modelSpace);
+            using (var writer = new DxfWriter(filename, doc, false))
                 writer.Write();
-            File.WriteAllBytes(filename, InjectExtents(ms.ToArray(), modelSpace.Extent));
         }
 
-        // ACadSharp sets header extent properties but never serializes them to DXF.
-        // We inject the variables by post-processing the raw DXF text before returning.
-        private static byte[] InjectExtents(byte[] dxfBytes, BoundingCube ext)
+        private void SetExtents(Model model)
         {
-            if (ext.IsEmpty) return dxfBytes;
-            string content = System.Text.Encoding.UTF8.GetString(dxfBytes);
-            // Find the end of the HEADER section — always the first "  0\nENDSEC".
-            int insertPos = content.IndexOf("  0\nENDSEC");
-            if (insertPos < 0) return dxfBytes;
-            string nl = "\n";
-            string inject =
-                $"  9{nl}$EXTMIN{nl} 10{nl}{ext.Xmin:R}{nl} 20{nl}{ext.Ymin:R}{nl} 30{nl}{ext.Zmin:R}{nl}" +
-                $"  9{nl}$EXTMAX{nl} 10{nl}{ext.Xmax:R}{nl} 20{nl}{ext.Ymax:R}{nl} 30{nl}{ext.Zmax:R}{nl}" +
-                $"  9{nl}$LIMMIN{nl} 10{nl}{ext.Xmin:R}{nl} 20{nl}{ext.Ymin:R}{nl}" +
-                $"  9{nl}$LIMMAX{nl} 10{nl}{ext.Xmax:R}{nl} 20{nl}{ext.Ymax:R}{nl}";
-            content = content.Insert(insertPos, inject);
-            return System.Text.Encoding.UTF8.GetBytes(content);
+            try
+            {
+                BoundingCube ext = model.Extent;
+                if (!ext.IsEmpty)
+                {
+                    doc.Header.ModelSpaceExtMin = new XYZ(ext.Xmin, ext.Ymin, ext.Zmin);
+                    doc.Header.ModelSpaceExtMax = new XYZ(ext.Xmax, ext.Ymax, ext.Zmax);
+                    doc.Header.ModelSpaceLimitsMin = new CSMath.XY(ext.Xmin, ext.Ymin);
+                    doc.Header.ModelSpaceLimitsMax = new CSMath.XY(ext.Xmax, ext.Ymax);
+                }
+            }
+            catch { }
         }
 
         private Entity[] GeoObjectToEntity(IGeoObject geoObject)

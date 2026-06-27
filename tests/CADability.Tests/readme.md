@@ -1,13 +1,10 @@
-﻿# CADability.Tests
+# CADability.Tests
 
-Run test from commandline:
+Run tests from the command line (requires .NET 8 SDK):
 
 ```bash
-SET VsInstallRoot=C:\Program Files\Microsoft Visual Studio\2022\Community
 dotnet test CADability.sln
 ```
-
-> ! Setting VsInstallRoot is required because CADability.csproj references Microsoft.VisualStudio.DebuggerVisualizers with this path.
 
 # Coverage in Visual Studio
 
@@ -20,10 +17,8 @@ This will show coverage markers directly in Visual Studio and a Coverage Report 
 
 # Generating Test Artifacts
 
-Recommended for generating cobertura.xml and junit.xml (i.e. for GitLab)
+Generate cobertura.xml and junit.xml (e.g., for CI pipelines):
 
 ```bash
-dotnet test CADability.sln  --collect:"XPlat Code Coverage" --logger:"junit;LogFilePath=test-results.xml;MethodFormat=Class;FailureBodyFormat=Verbose" --settings coverlet.runsettings
+dotnet test CADability.sln --collect:"XPlat Code Coverage" --logger:"junit;LogFilePath=test-results.xml;MethodFormat=Class;FailureBodyFormat=Verbose" --settings coverlet.runsettings
 ```
-
-> ! Does currently not work and test run hangs

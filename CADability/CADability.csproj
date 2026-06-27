@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableUnsafeBinaryFormatterSerialization>true</EnableUnsafeBinaryFormatterSerialization>
     <PackageId>CADability</PackageId>
     <Version>1.0.33</Version>
     <!-- Update this for each publish -->
@@ -10,7 +11,7 @@
     <RepositoryUrl>https://github.com/FriendsOfCADability/CADability</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>cad drawing winforms geometry netstandard net48</PackageTags>
+    <PackageTags>cad drawing winforms geometry net8</PackageTags>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 
     <BuildDocFx Condition=" '$(Configuration)'!='RelWithDoc' ">false</BuildDocFx>
@@ -88,7 +89,7 @@
   <ItemGroup>
     <PackageReference Include="ACadSharp" Version="3.6.35" />
     <PackageReference Include="MathNet.Numerics.Signed" Version="5.0.0" />
-    <PackageReference Include="System.Drawing.Common" Version="6.0.0" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
     <PackageReference Include="System.Text.Encoding.CodePages" Version="9.0.6" />
   </ItemGroup>
 

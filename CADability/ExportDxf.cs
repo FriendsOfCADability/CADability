@@ -97,7 +97,7 @@ namespace CADability.DXF
                 case GeoObject.Polyline polyline: entity = ExportPolyline(polyline); break;
                 case GeoObject.BSpline bspline: entity = ExportBSpline(bspline); break;
                 case GeoObject.Path path:
-                    if (Settings.GlobalSettings.GetBoolValue("DxfExport.ExportPathsAsBlocks", true))
+                    if (Settings.GlobalSettings.GetBoolValue("DxfExport.ExportPathsAsBlocks", false))
                         entity = ExportPath(path);
                     else
                         entities = ExportPathWithoutBlock(path);

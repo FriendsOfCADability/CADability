@@ -335,5 +335,33 @@ EOF
             Assert.IsTrue(model.AllObjects.Count > 0,
                 "LINE entity from R12 ENTITIES section must be imported when TABLE is orphaned");
         }
+
+        [TestMethod]
+        public void import_dxf_r12_tab_prefixed_values_and_named_layer_succeeds()
+        {
+            // Regression: real R12 files produced by some CAD tools use a TAB character
+            // before integer values (e.g. " 70\r\n\t256\r\n") and put entities on a named
+            // layer "1" rather than the default "0". ACadSharp silently falls back to the
+            // default layer for such entries, but entities must still be imported.
+            // The orphaned-table normalizer must not break when the count field is malformed.
+            const string dxf = "  0\r\nSECTION\r\n  2\r\nHEADER\r\n  9\r\n$ACADVER\r\n  1\r\nAC1003\r\n  0\r\nENDSEC\r\n" +
+                               "  0\r\nTABLE\r\n  2\r\nLAYER\r\n 70\r\n\t2\r\n" +
+                               "  0\r\nLAYER\r\n  2\r\n0\r\n 70\r\n0\r\n 62\r\n7\r\n  6\r\nContinuous\r\n" +
+                               "  0\r\nLAYER\r\n  2\r\n1\r\n 70\r\n0\r\n 62\r\n4\r\n  6\r\nContinuous\r\n" +
+                               "  0\r\nENDTAB\r\n" +
+                               "  0\r\nSECTION\r\n  2\r\nENTITIES\r\n" +
+                               "  0\r\nLINE\r\n  8\r\n1\r\n 10\r\n0.0\r\n 20\r\n0.0\r\n 30\r\n0.0\r\n 11\r\n10.0\r\n 21\r\n10.0\r\n 31\r\n0.0\r\n" +
+                               "  0\r\nARC\r\n  8\r\n1\r\n 10\r\n5.0\r\n 20\r\n5.0\r\n 30\r\n0.0\r\n 40\r\n3.0\r\n 50\r\n0.0\r\n 51\r\n180.0\r\n" +
+                               "  0\r\nENDSEC\r\n  0\r\nEOF\r\n";
+
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var project = Project.ReadFromFile(file, "dxf");
+            Assert.IsNotNull(project);
+            var model = project.GetActiveModel();
+            Assert.IsNotNull(model);
+            Assert.AreEqual(2, model.AllObjects.Count,
+                $"LINE and ARC on layer '1' must both be imported; got {model.AllObjects.Count}");
+        }
     }
 }

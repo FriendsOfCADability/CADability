@@ -606,10 +606,14 @@ namespace CADability.Forms
             paintEdges    = prevEdges;
             selectMode    = false;
 
-            // Draw at center with original colors — sits on top of the yellow halo.
+            // Draw at center with original colors. Use GL_LEQUAL so this pass overwrites
+            // yellow pixels at the same depth (the shifted halo passes wrote the same Z
+            // values; GL_LESS would reject equal-depth fragments, leaving all yellow).
+            gl.DepthFunc(DepthFunction.Lequal);
             projectionMatrix = (float[])savedProj.Clone();
             List(paintThisList);
             projectionMatrix = savedProj;
+            gl.DepthFunc(DepthFunction.Less);
 
             selectMode = prevSelect;
         }

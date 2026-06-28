@@ -583,11 +583,15 @@ namespace CADability.Forms
         {
             float[] savedProj = projectionMatrix;
 
-            // Draw edges in select color at every shifted position — this creates a yellow halo.
-            // Skip center (0,0) so the original-color draw below is not overwritten.
+            // Draw all geometry in select color at every shifted position — yellow halo.
+            // Surfaces must be included here because text glyphs are surface-only geometry
+            // (TriangulateText=true); edge-only halo produces nothing visible for text.
+            // The center draw (original colors) is rendered on top via the depth test.
             bool prevSurfaces = paintSurfaces;
+            bool prevEdges    = paintEdges;
             bool prevSelect   = selectMode;
-            paintSurfaces = false;
+            paintSurfaces = true;
+            paintEdges    = true;
             selectMode    = true;
             for (int dx = -wobbleRadius; dx <= wobbleRadius; dx++)
             for (int dy = -wobbleRadius; dy <= wobbleRadius; dy++)
@@ -598,10 +602,8 @@ namespace CADability.Forms
                 projectionMatrix[13] += dy * 2f / viewHeight;
                 List(paintThisList);
             }
-            // Restore surfaces; force selectMode OFF so center draw uses original colors
-            // regardless of what the caller had set (callers typically set SelectMode=true
-            // before calling SelectedList, so prevSelect is true — we must not restore it yet).
             paintSurfaces = prevSurfaces;
+            paintEdges    = prevEdges;
             selectMode    = false;
 
             // Draw at center with original colors — sits on top of the yellow halo.

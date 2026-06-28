@@ -1,5 +1,7 @@
 using CADability.Attribute;
+using CADability.Curve2D;
 using CADability.GeoObject;
+using CADability.Shapes;
 using ACadSharp;
 using ACadSharp.Entities;
 using ACadSharp.IO;
@@ -10,6 +12,7 @@ using CSMath;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.IO;
 using Color = System.Drawing.Color;
 
@@ -51,10 +54,11 @@ namespace CADability.DXF
                     foreach (var e in entities)
                         msBlock.Entities.Add(e);
             }
+            SetExtents(modelSpace);
             var ms = new MemoryStream();
             using (var writer = new DxfWriter(ms, doc, false))
                 writer.Write();
-            return InjectExtents(ms.ToArray(), modelSpace.Extent);
+            return ms.ToArray();
         }
 
         public void WriteToFile(Project toExport, string filename)
@@ -81,29 +85,25 @@ namespace CADability.DXF
                     foreach (var e in entities)
                         msBlock.Entities.Add(e);
             }
-            var ms = new MemoryStream();
-            using (var writer = new DxfWriter(ms, doc, false))
+            SetExtents(modelSpace);
+            using (var writer = new DxfWriter(filename, doc, false))
                 writer.Write();
-            File.WriteAllBytes(filename, InjectExtents(ms.ToArray(), modelSpace.Extent));
         }
 
-        // ACadSharp sets header extent properties but never serializes them to DXF.
-        // We inject the variables by post-processing the raw DXF text before returning.
-        private static byte[] InjectExtents(byte[] dxfBytes, BoundingCube ext)
+        private void SetExtents(Model model)
         {
-            if (ext.IsEmpty) return dxfBytes;
-            string content = System.Text.Encoding.UTF8.GetString(dxfBytes);
-            // Find the end of the HEADER section — always the first "  0\nENDSEC".
-            int insertPos = content.IndexOf("  0\nENDSEC");
-            if (insertPos < 0) return dxfBytes;
-            string nl = "\n";
-            string inject =
-                $"  9{nl}$EXTMIN{nl} 10{nl}{ext.Xmin:R}{nl} 20{nl}{ext.Ymin:R}{nl} 30{nl}{ext.Zmin:R}{nl}" +
-                $"  9{nl}$EXTMAX{nl} 10{nl}{ext.Xmax:R}{nl} 20{nl}{ext.Ymax:R}{nl} 30{nl}{ext.Zmax:R}{nl}" +
-                $"  9{nl}$LIMMIN{nl} 10{nl}{ext.Xmin:R}{nl} 20{nl}{ext.Ymin:R}{nl}" +
-                $"  9{nl}$LIMMAX{nl} 10{nl}{ext.Xmax:R}{nl} 20{nl}{ext.Ymax:R}{nl}";
-            content = content.Insert(insertPos, inject);
-            return System.Text.Encoding.UTF8.GetBytes(content);
+            try
+            {
+                BoundingCube ext = model.Extent;
+                if (!ext.IsEmpty)
+                {
+                    doc.Header.ModelSpaceExtMin = new XYZ(ext.Xmin, ext.Ymin, ext.Zmin);
+                    doc.Header.ModelSpaceExtMax = new XYZ(ext.Xmax, ext.Ymax, ext.Zmax);
+                    doc.Header.ModelSpaceLimitsMin = new CSMath.XY(ext.Xmin, ext.Ymin);
+                    doc.Header.ModelSpaceLimitsMax = new CSMath.XY(ext.Xmax, ext.Ymax);
+                }
+            }
+            catch { }
         }
 
         private Entity[] GeoObjectToEntity(IGeoObject geoObject)
@@ -124,6 +124,7 @@ namespace CADability.DXF
                         entities = ExportPathWithoutBlock(path);
                     break;
                 case GeoObject.Text text: entity = ExportText(text); break;
+                case GeoObject.Hatch hatch: entity = ExportHatch(hatch); break;
                 case GeoObject.Block block: entity = ExportBlock(block); break;
                 case GeoObject.Face face: entity = ExportFace(face); break;
                 case GeoObject.Shell shell: entities = ExportShell(shell); break;
@@ -200,7 +201,7 @@ namespace CADability.DXF
             if (createdLayers.TryGetValue(cadLayer, out ACadSharp.Tables.Layer layer))
                 return layer;
             foreach (ACadSharp.Tables.Layer existing in doc.Layers)
-                if (existing.Name == cadLayer.Name) { createdLayers[cadLayer] = existing; return existing; }
+                if (string.Equals(existing.Name, cadLayer.Name, StringComparison.OrdinalIgnoreCase)) { createdLayers[cadLayer] = existing; return existing; }
             layer = new ACadSharp.Tables.Layer(cadLayer.Name);
             doc.Layers.Add(layer);
             createdLayers[cadLayer] = layer;
@@ -212,7 +213,7 @@ namespace CADability.DXF
             if (createdLinePatterns.TryGetValue(lp, out ACadSharp.Tables.LineType lt))
                 return lt;
             foreach (ACadSharp.Tables.LineType existing in doc.LineTypes)
-                if (existing.Name == lp.Name) { createdLinePatterns[lp] = existing; return existing; }
+                if (string.Equals(existing.Name, lp.Name, StringComparison.OrdinalIgnoreCase)) { createdLinePatterns[lp] = existing; return existing; }
             lt = new ACadSharp.Tables.LineType(lp.Name);
             if (lp.Pattern != null)
                 for (int i = 0; i < lp.Pattern.Length; i++)
@@ -402,6 +403,35 @@ namespace CADability.DXF
             foreach (var pt in pts) mc.Item1.Add(ToXYZ(pt));
         }
 
+        private Entity ExportHatch(GeoObject.Hatch hatch)
+        {
+            if (hatch.CompoundShape == null || hatch.CompoundShape.SimpleShapes.Length == 0)
+                return null;
+            // Export simple solid-fill triangles/quads (from DXF SOLID import) back as SOLID.
+            if (hatch.HatchStyle is HatchStyleSolid)
+            {
+                SimpleShape ss = hatch.CompoundShape.SimpleShapes[0];
+                ICurve2D[] segs = ss.Outline.Segments;
+                if (segs.Length >= 3 && segs.Length <= 4 && segs.All(s => s is CADability.Curve2D.Line2D))
+                {
+                    GeoPoint[] pts = new GeoPoint[4];
+                    for (int i = 0; i < segs.Length; i++)
+                        pts[i] = hatch.Plane.ToGlobal(segs[i].StartPoint);
+                    // DXF SOLID requires 4 corners; duplicate last for triangles
+                    if (segs.Length == 3) pts[3] = pts[2];
+                    return new ACadSharp.Entities.Solid
+                    {
+                        FirstCorner  = ToXYZ(pts[0]),
+                        SecondCorner = ToXYZ(pts[1]),
+                        ThirdCorner  = ToXYZ(pts[2]),
+                        FourthCorner = ToXYZ(pts[3]),
+                        Normal = ToXYZ(hatch.Plane.Normal)
+                    };
+                }
+            }
+            return null;
+        }
+
         private Entity ExportText(GeoObject.Text text)
         {
             var textString = text.TextString.Replace("\r\n", " ");
@@ -409,31 +439,55 @@ namespace CADability.DXF
             if (text.Bold) fs |= System.Drawing.FontStyle.Bold;
             if (text.Italic) fs |= System.Drawing.FontStyle.Italic;
 
+            // TextSize is the raw DXF cap-height (group 40) stored unchanged during import.
+            // Do not apply any font-metric scaling here — it would corrupt the value.
             double height = text.TextSize;
-            try
-            {
-                using (var font = new System.Drawing.Font(text.Font, 1000.0f, fs))
-                {
-                    height = text.TextSize * 1000.0 / font.Height;
-                }
-            }
-            catch { /* use text.TextSize as-is in headless environments */ }
 
             string fontName = text.Font ?? "Standard";
             if (!createdTextStyles.TryGetValue(fontName, out ACadSharp.Tables.TextStyle textStyle))
             {
-                textStyle = new ACadSharp.Tables.TextStyle(fontName) { Filename = fontName + ".ttf" };
-                doc.TextStyles.Add(textStyle);
+                foreach (ACadSharp.Tables.TextStyle existing in doc.TextStyles)
+                    if (string.Equals(existing.Name, fontName, StringComparison.OrdinalIgnoreCase)) { textStyle = existing; break; }
+                if (textStyle == null)
+                {
+                    textStyle = new ACadSharp.Tables.TextStyle(fontName) { Filename = fontName + ".ttf" };
+                    doc.TextStyles.Add(textStyle);
+                }
                 createdTextStyles[fontName] = textStyle;
             }
 
+            // Map CADability alignment to DXF group 72/73
+            TextHorizontalAlignment hAlign = TextHorizontalAlignment.Left;
+            TextVerticalAlignmentType vAlign = TextVerticalAlignmentType.Baseline;
+            switch (text.LineAlignment)
+            {
+                case GeoObject.Text.LineAlignMode.Center: hAlign = TextHorizontalAlignment.Center; break;
+                case GeoObject.Text.LineAlignMode.Right:  hAlign = TextHorizontalAlignment.Right; break;
+            }
+            switch (text.Alignment)
+            {
+                case GeoObject.Text.AlignMode.Bottom:   vAlign = TextVerticalAlignmentType.Bottom; break;
+                case GeoObject.Text.AlignMode.Center:   vAlign = TextVerticalAlignmentType.Middle; break;
+                case GeoObject.Text.AlignMode.Top:      vAlign = TextVerticalAlignmentType.Top; break;
+            }
+            bool defaultAlign = hAlign == TextHorizontalAlignment.Left
+                             && vAlign == TextVerticalAlignmentType.Baseline;
+
+            // Group 10 (InsertPoint) always holds the text anchor so viewers that ignore
+            // group 11 still render text at the correct position.
+            // For non-default alignment, group 11 (AlignmentPoint) is also set to the
+            // same anchor — that is the convention real DXF writers use.
             var res = new ACadSharp.Entities.TextEntity
             {
                 Value = textString,
                 Height = height,
                 Style = textStyle,
+                HorizontalAlignment = hAlign,
+                VerticalAlignment = vAlign,
                 InsertPoint = ToXYZ(text.Location),
             };
+            if (!defaultAlign)
+                res.AlignmentPoint = ToXYZ(text.Location);
 
             GeoVector lineDir = text.LineDirection.Normalized;
             GeoVector glyphDir = text.GlyphDirection.Normalized;
@@ -542,11 +596,24 @@ namespace CADability.DXF
             {
                 if (elli.IsArc)
                 {
-                    GeoVector normal = elli.CounterClockWise ? elli.Plane.Normal : -elli.Plane.Normal;
+                    // Always keep the arc's own normal (never flip for CW arcs).
+                    // CW arcs are represented as CCW by swapping start/end endpoints,
+                    // so all exported arcs use Normal=(0,0,1) and work in viewers that
+                    // don't implement the OCS transformation.
+                    GeoVector normal = elli.Plane.Normal;
                     Plane dxfPlane = Import.Plane(ToXYZ(elli.Center), ToXYZ(normal));
                     GeoObject.Ellipse aligned = GeoObject.Ellipse.Construct();
-                    aligned.SetArcPlaneCenterStartEndPoint(dxfPlane, dxfPlane.Project(elli.Center),
-                        dxfPlane.Project(elli.StartPoint), dxfPlane.Project(elli.EndPoint), dxfPlane, true);
+                    if (elli.CounterClockWise)
+                    {
+                        aligned.SetArcPlaneCenterStartEndPoint(dxfPlane, dxfPlane.Project(elli.Center),
+                            dxfPlane.Project(elli.StartPoint), dxfPlane.Project(elli.EndPoint), dxfPlane, true);
+                    }
+                    else
+                    {
+                        // Swap start/end to get the equivalent CCW arc covering the same geometric portion
+                        aligned.SetArcPlaneCenterStartEndPoint(dxfPlane, dxfPlane.Project(elli.Center),
+                            dxfPlane.Project(elli.EndPoint), dxfPlane.Project(elli.StartPoint), dxfPlane, true);
+                    }
                     if (Math.Abs(elli.SweepParameter) > Math.PI && Precision.IsEqual(elli.StartPoint, elli.EndPoint))
                     {
                         return new ACadSharp.Entities.Circle

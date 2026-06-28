@@ -36,7 +36,50 @@ namespace CADability.DXF
 
         public Import(string fileName)
         {
-            using (Stream stream = File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            byte[] raw;
+            using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                raw = new byte[fs.Length];
+                fs.Read(raw, 0, raw.Length);
+            }
+            // WORKAROUND — non-standard R12 DXF: orphaned TABLE sections
+            //
+            // Some AutoCAD R12 (AC1003) files produced by third-party CAD tools place
+            // the LAYER (and other) TABLE records directly after the HEADER ENDSEC without
+            // the required outer SECTION / TABLES / ENDSEC envelope:
+            //
+            //   Standard:             Non-standard (seen in the wild):
+            //   SECTION               SECTION
+            //     HEADER                HEADER
+            //   ENDSEC                ENDSEC
+            //   SECTION               TABLE          ← bare TABLE, no SECTION wrapper
+            //     TABLES                LAYER
+            //       TABLE               ...
+            //         LAYER           ENDTAB
+            //         ...             SECTION        ← ENTITIES starts here directly
+            //       ENDTAB              ENTITIES
+            //     ENDSEC              ENDSEC
+            //   SECTION               EOF
+            //     ENTITIES
+            //   ENDSEC
+            //   EOF
+            //
+            // ACadSharp's DxfReader state machine requires the SECTION/TABLES/ENDSEC
+            // envelope.  When it sees a bare TABLE group code after an ENDSEC it enters
+            // an undefined parser state and silently produces a CadDocument whose
+            // *Model_Space block record contains zero entities, even though the ENTITIES
+            // section that follows is perfectly valid.  No exception is thrown.
+            //
+            // Fix applied here: pre-scan the raw bytes; if the pattern is detected,
+            // synthetically inject the missing SECTION / TABLES / ENDSEC wrapper before
+            // handing the bytes to ACadSharp (see NormalizeOrphanedTables below).
+            //
+            // TODO upstream: report to ACadSharp (https://github.com/DomCR/ACadSharp)
+            // so that DxfReader handles orphaned TABLE sections gracefully without a
+            // client-side workaround.
+            byte[] toRead = NormalizeOrphanedTables(raw) ?? raw;
+
+            using (var stream = new MemoryStream(toRead))
             {
                 try
                 {
@@ -49,19 +92,70 @@ namespace CADability.DXF
                     // TABLES, BLOCKS, and ENTITIES — all read before OBJECTS.
                     // When OBJECTS is malformed (DxfException, NullReferenceException, etc.)
                     // we fall back to a read that stops before it, so geometry still imports.
-                    doc = ReadWithoutObjectsSection(fileName);
+                    doc = ReadWithoutObjectsSection(toRead);
                     if (doc == null) throw; // OBJECTS was not the problem — re-throw
                 }
             }
         }
 
+        // NormalizeOrphanedTables — client-side workaround for a bug in ACadSharp.
+        //
+        // Root cause: ACadSharp's DxfReader (≤ 3.6.35) requires that TABLE records appear
+        // inside a SECTION / TABLES / ENDSEC envelope.  Some R12 files produced by older
+        // or non-conformant CAD tools omit this envelope and place TABLE records directly
+        // after the HEADER ENDSEC.  ACadSharp silently produces an empty *Model_Space in
+        // that case instead of raising an error or falling back gracefully.
+        //
+        // Additional quirk: the affected files sometimes prefix integer group values with a
+        // TAB character (e.g. " 70\r\n\t256\r\n").  ACadSharp silently ignores malformed
+        // integer tokens, so layer entries with such values may not be registered in
+        // doc.Layers, though entities are still created (on the default "0" layer).
+        //
+        // This method detects the non-standard structure, injects the missing
+        // SECTION / TABLES / ENDSEC wrapper, and returns the corrected bytes.
+        // Returns null when the file is already standard-conformant.
+        //
+        // When/if ACadSharp gains native support for orphaned TABLE sections this method
+        // can simply be removed and the call site reverted to passing 'raw' directly.
+        // Track: https://github.com/DomCR/ACadSharp/issues (file a new issue).
+        private static byte[] NormalizeOrphanedTables(byte[] raw)
+        {
+            bool hasCrLf = IndexOf(raw, new byte[] { 0x0D, 0x0A }) >= 0;
+            string text = Encoding.ASCII.GetString(raw).Replace("\r\n", "\n").Replace('\r', '\n');
+
+            // Detect: an ENDSEC followed immediately by a bare TABLE (not SECTION).
+            const string marker = "  0\nENDSEC\n  0\nTABLE\n";
+            int pos = text.IndexOf(marker, StringComparison.Ordinal);
+            if (pos < 0) return null; // Standard structure — no normalization needed
+
+            // Split at the ENDSEC boundary: everything before is kept as-is (includes HEADER),
+            // everything after up to the next SECTION keyword is the orphaned tables region.
+            int splitAt = pos + "  0\nENDSEC\n".Length;
+            string header  = text.Substring(0, splitAt);
+            string rest    = text.Substring(splitAt);
+
+            int sectionStart = rest.IndexOf("  0\nSECTION\n", StringComparison.Ordinal);
+            if (sectionStart < 0) return null; // Cannot locate the next SECTION — give up
+
+            string tables   = rest.Substring(0, sectionStart);   // orphaned TABLE...ENDTAB block(s)
+            string entities = rest.Substring(sectionStart);        // SECTION ENTITIES ... EOF
+
+            // Re-assemble with the required SECTION / TABLES / ENDSEC envelope.
+            string normalized = header
+                + "  0\nSECTION\n  2\nTABLES\n"
+                + tables
+                + "  0\nENDSEC\n"
+                + entities;
+
+            if (hasCrLf) normalized = normalized.Replace("\n", "\r\n");
+            return Encoding.ASCII.GetBytes(normalized);
+        }
+
         // Retries reading by presenting the file content only up to (but not including)
         // the OBJECTS section.  Returns null if the OBJECTS section boundary cannot be
         // located (meaning something earlier in the file caused the original error).
-        private static CadDocument ReadWithoutObjectsSection(string fileName)
+        private static CadDocument ReadWithoutObjectsSection(byte[] raw)
         {
-            byte[] raw = File.ReadAllBytes(fileName);
-
             // The section header is a group-0 entity followed by SECTION / group-2 / OBJECTS.
             // Match both CRLF and LF line endings.
             byte[][] markers = new byte[][]
@@ -116,11 +210,29 @@ namespace CADability.DXF
 
         private void FillModelSpace(Model model)
         {
-            if (!doc.BlockRecords.TryGetValue("*Model_Space", out BlockRecord modelSpace)) return;
-            foreach (Entity item in modelSpace.Entities)
+            if (doc.BlockRecords.TryGetValue("*Model_Space", out BlockRecord modelSpace)
+                && modelSpace.Entities.Count > 0)
             {
-                IGeoObject geoObject = GeoObjectFromEntity(item);
-                if (geoObject != null) model.Add(geoObject);
+                foreach (Entity item in modelSpace.Entities)
+                {
+                    IGeoObject geoObject = GeoObjectFromEntity(item);
+                    if (geoObject != null) model.Add(geoObject);
+                }
+            }
+            else
+            {
+                // Fallback for non-standard R12 files: *Model_Space absent or empty.
+                // doc.Entities is ACadSharp's flat view of all drawing entities; take only
+                // those whose owner is a space block (or unowned, which is model-space in R12).
+                foreach (var obj in doc.Entities)
+                {
+                    if (!(obj is Entity item)) continue;
+                    string ownerName = (item.Owner as BlockRecord)?.Name;
+                    if (ownerName != null && !ownerName.StartsWith("*"))
+                        continue;
+                    IGeoObject geoObject = GeoObjectFromEntity(item);
+                    if (geoObject != null) model.Add(geoObject);
+                }
             }
             model.Name = "*Model_Space";
         }
@@ -918,30 +1030,31 @@ namespace CADability.DXF
         private IGeoObject BuildSolidHatch(Plane ocs, XY c1, XY c2, XY c3, XY c4, Color color)
         {
             HatchStyleSolid hst = FindOrCreateSolidHatchStyle(color.ToArgb() == Color.White.ToArgb() ? Color.Black : color);
+            // Convert OCS corners to WCS, then remove duplicates.
             List<GeoPoint> points = new List<GeoPoint>();
             points.Add(ocs.ToGlobal(new GeoPoint2D(c1.X, c1.Y)));
             points.Add(ocs.ToGlobal(new GeoPoint2D(c2.X, c2.Y)));
             points.Add(ocs.ToGlobal(new GeoPoint2D(c3.X, c3.Y)));
             points.Add(ocs.ToGlobal(new GeoPoint2D(c4.X, c4.Y)));
             for (int i = 3; i > 0; --i)
-            {
                 for (int j = 0; j < i; ++j)
-                {
                     if (Precision.IsEqual(points[j], points[i])) { points.RemoveAt(i); break; }
-                }
-            }
             if (points.Count < 3) return null;
-            Plane pln;
-            try { pln = new Plane(points[0], points[1], points[2]); }
+            // Check non-collinear (throws PlaneException if degenerate)
+            try { var _ = new Plane(points[0], points[1], points[2]); }
             catch (PlaneException) { return null; }
+            // Project back to ocs 2D so the hatch plane keeps ocs.Normal (the SOLID's own OCS
+            // normal). Using a plane derived from the cross-product of WCS points would give the
+            // wrong normal direction (e.g. (0,0,-1) for CW points), causing DXF viewers to apply
+            // the Arbitrary Axis Algorithm with a flipped X-axis and mirror every vertex.
             GeoPoint2D[] vertex = new GeoPoint2D[points.Count + 1];
-            for (int i = 0; i < points.Count; ++i) vertex[i] = pln.Project(points[i]);
+            for (int i = 0; i < points.Count; ++i) vertex[i] = ocs.Project(points[i]);
             vertex[points.Count] = vertex[0];
             Border bdr = new Border(new Curve2D.Polyline2D(vertex));
             GeoObject.Hatch h = GeoObject.Hatch.Construct();
             h.CompoundShape = new CompoundShape(new SimpleShape(bdr));
             h.HatchStyle = hst;
-            h.Plane = pln;
+            h.Plane = ocs;
             return h;
         }
 
@@ -1146,7 +1259,6 @@ namespace CADability.DXF
         private string StripMTextFormatCodes(string value)
         {
             if (string.IsNullOrEmpty(value)) return value;
-            // Remove MTEXT formatting codes: \P (paragraph), \~, {\fFontName|...}, {\H...;}, etc.
             var sb = new StringBuilder();
             int i = 0;
             while (i < value.Length)
@@ -1157,11 +1269,22 @@ namespace CADability.DXF
                     if (next == 'P' || next == 'p') { sb.Append('\n'); i += 2; }
                     else if (next == '~') { sb.Append(' '); i += 2; }
                     else if (next == 'n' || next == 'N') { sb.Append('\n'); i += 2; }
-                    else { i += 2; } // skip other escape sequences
+                    else if (next == '\\') { sb.Append('\\'); i += 2; }
+                    else if (next == '{') { sb.Append('{'); i += 2; }
+                    else if (next == '}') { sb.Append('}'); i += 2; }
+                    else
+                    {
+                        // Parameterized codes (\H, \W, \A, \C, \T, \Q, \S, \f, \p, etc.)
+                        // end with a semicolon. Toggle codes (\L, \l, \O, \o, \K, \k) have no
+                        // parameters. Skip up to and including the terminating semicolon when
+                        // present; otherwise skip just the two-char sequence.
+                        int semi = value.IndexOf(';', i + 2);
+                        i = semi >= 0 && semi - (i + 2) <= 64 ? semi + 1 : i + 2;
+                    }
                 }
                 else if (value[i] == '{')
                 {
-                    // Find matching closing brace - skip format group
+                    // Find matching closing brace
                     int depth = 1;
                     int j = i + 1;
                     while (j < value.Length && depth > 0)
@@ -1170,14 +1293,14 @@ namespace CADability.DXF
                         else if (value[j] == '}') depth--;
                         j++;
                     }
-                    // If it starts with a format code, skip the whole group
-                    if (i + 1 < value.Length && value[i + 1] == '\\')
-                        i = j;
-                    else if (i + 1 < value.Length && value[i + 1] == '}')
+                    if (i + 1 < value.Length && value[i + 1] == '}')
+                    {
                         i = j; // empty group
+                    }
                     else
                     {
-                        // Recurse into the group content
+                        // Always recurse — the format codes inside (e.g. \fArial|b0;, \H2.0;)
+                        // will be stripped, preserving any actual text content.
                         sb.Append(StripMTextFormatCodes(value.Substring(i + 1, j - i - 2)));
                         i = j;
                     }
@@ -1191,45 +1314,112 @@ namespace CADability.DXF
         private IGeoObject CreateMText(ACadSharp.Entities.MText mText)
         {
             string plainText = StripMTextFormatCodes(mText.Value ?? "");
-            var txt = new ACadSharp.Entities.TextEntity
-            {
-                Value = plainText,
-                Height = mText.Height,
-                WidthFactor = 1.0,
-                Rotation = mText.Rotation,
-                Style = mText.Style,
-                InsertPoint = mText.InsertPoint,
-                Normal = mText.Normal,
-            };
-            // Map MTEXT attachment point (group 71) to horizontal/vertical alignment.
-            // The InsertPoint is the anchor for the specified attachment mode.
+            // Split on \P paragraph breaks (converted to \n by StripMTextFormatCodes)
+            string[] lines = plainText.Split('\n');
+            // Trim trailing empty lines (common when content ends with \P)
+            int numLines = lines.Length;
+            while (numLines > 0 && string.IsNullOrEmpty(lines[numLines - 1]))
+                numLines--;
+            if (numLines == 0) return null;
+
+            // Map attachment point to horizontal/vertical alignment (applied to every line)
+            TextHorizontalAlignment hAlign;
             switch (mText.AttachmentPoint)
             {
                 case AttachmentPointType.TopCenter:
                 case AttachmentPointType.MiddleCenter:
                 case AttachmentPointType.BottomCenter:
-                    txt.HorizontalAlignment = TextHorizontalAlignment.Center; break;
+                    hAlign = TextHorizontalAlignment.Center; break;
                 case AttachmentPointType.TopRight:
                 case AttachmentPointType.MiddleRight:
                 case AttachmentPointType.BottomRight:
-                    txt.HorizontalAlignment = TextHorizontalAlignment.Right; break;
+                    hAlign = TextHorizontalAlignment.Right; break;
                 default:
-                    txt.HorizontalAlignment = TextHorizontalAlignment.Left; break;
+                    hAlign = TextHorizontalAlignment.Left; break;
             }
+            TextVerticalAlignmentType vAlign;
             switch (mText.AttachmentPoint)
             {
                 case AttachmentPointType.TopLeft:
                 case AttachmentPointType.TopCenter:
                 case AttachmentPointType.TopRight:
-                    txt.VerticalAlignment = TextVerticalAlignmentType.Top; break;
+                    vAlign = TextVerticalAlignmentType.Top; break;
                 case AttachmentPointType.MiddleLeft:
                 case AttachmentPointType.MiddleCenter:
                 case AttachmentPointType.MiddleRight:
-                    txt.VerticalAlignment = TextVerticalAlignmentType.Middle; break;
-                default:
-                    txt.VerticalAlignment = TextVerticalAlignmentType.Bottom; break;
+                    vAlign = TextVerticalAlignmentType.Middle; break;
+                default: // Bottom
+                    vAlign = TextVerticalAlignmentType.Bottom; break;
             }
-            return CreateText(txt);
+
+            // "Up" direction in WCS (perpendicular to text baseline, pointing away from ground).
+            // Used to offset subsequent lines downward (negative upDir).
+            Plane ocsPlane = Plane(mText.InsertPoint, mText.Normal);
+            GeoVector2D dir2d = new GeoVector2D(new Angle(mText.Rotation));
+            GeoVector upDir = ocsPlane.ToGlobal(dir2d.ToLeft());
+            if (upDir.IsNullVector()) upDir = CADability.GeoVector.YAxis;
+            upDir = upDir.Normalized;
+
+            // Baseline-to-baseline line spacing: DXF default is ~5/3 of cap height
+            double lineStep = mText.Height > 0 ? mText.Height * 5.0 / 3.0 : 1.0;
+
+            // Compute the WCS position of the first line's baseline
+            GeoPoint anchor = GeoPoint(mText.InsertPoint);
+            GeoPoint firstLine;
+            switch (mText.AttachmentPoint)
+            {
+                case AttachmentPointType.MiddleLeft:
+                case AttachmentPointType.MiddleCenter:
+                case AttachmentPointType.MiddleRight:
+                    firstLine = anchor + ((numLines - 1) / 2.0) * lineStep * upDir;
+                    break;
+                case AttachmentPointType.BottomLeft:
+                case AttachmentPointType.BottomCenter:
+                case AttachmentPointType.BottomRight:
+                    firstLine = anchor + (numLines - 1) * lineStep * upDir;
+                    break;
+                default: // Top
+                    firstLine = anchor;
+                    break;
+            }
+
+            IGeoObject MakeLine(string text, GeoPoint pos)
+            {
+                var txt = new ACadSharp.Entities.TextEntity
+                {
+                    Value = text,
+                    Height = mText.Height,
+                    WidthFactor = 1.0,
+                    Rotation = mText.Rotation,
+                    Style = mText.Style,
+                    InsertPoint = new XYZ(pos.x, pos.y, pos.z),
+                    Normal = mText.Normal,
+                    HorizontalAlignment = hAlign,
+                    VerticalAlignment = vAlign,
+                };
+                return CreateText(txt);
+            }
+
+            if (numLines == 1)
+                return MakeLine(lines[0], firstLine);
+
+            // Multiple lines: create a block containing one Text per line.
+            // Blank lines between content still advance the position.
+            var geoLines = new GeoObjectList();
+            for (int i = 0; i < numLines; i++)
+            {
+                GeoPoint pos = firstLine - i * lineStep * upDir;
+                if (!string.IsNullOrEmpty(lines[i]))
+                {
+                    var geo = MakeLine(lines[i], pos);
+                    if (geo != null) geoLines.Add(geo);
+                }
+            }
+            if (geoLines.Count == 0) return null;
+            if (geoLines.Count == 1) return geoLines[0];
+            var block = GeoObject.Block.Construct();
+            block.Set(geoLines);
+            return block;
         }
 
         private IGeoObject CreateTolerance(ACadSharp.Entities.Tolerance tolerance)

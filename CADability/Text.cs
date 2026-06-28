@@ -593,9 +593,21 @@ namespace CADability.GeoObject
             IntPtr hfont = font.ToHfont();
             IntPtr oldfont = Gdi.SelectObject(hDC, hfont);
             Gdi.ABC[] abc = new Gdi.ABC[1];
-            Gdi.GetCharABCWidths(hDC, (uint)c, (uint)c, abc);
-            //int[] widths = new int[1]; // liefert das selbe wie GetCharABCWidths, nur die Summe halt.
-            //Gdi.GetCharWidth32(hDC, (uint)c, (uint)c, widths);
+            bool abcOk = Gdi.GetCharABCWidths(hDC, (uint)c, (uint)c, abc);
+            int charWidth32 = 0;
+            if (!abcOk)
+            {
+                // GetCharABCWidths failed (non-TrueType or hDC issue).
+                // Try GetCharWidth32 as fallback — returns total advance width (abcA+abcB+abcC).
+                int[] widthBuf = new int[1];
+                if (Gdi.GetCharWidth32(hDC, (uint)c, (uint)c, widthBuf))
+                    charWidth32 = widthBuf[0];
+                System.Diagnostics.Debug.WriteLine($"[FontCache] GetCharABCWidths FAILED for '{c}' (U+{(int)c:X4}) font='{fontName}' style={fs} em={em}; GetCharWidth32={charWidth32}");
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"[FontCache] '{c}' font='{fontName}' style={fs}: abcA={abc[0].abcA} abcB={abc[0].abcB} abcC={abc[0].abcC} em={em} advance={(abc[0].abcA + abc[0].abcB + abc[0].abcC) / (double)em:F4}");
+            }
             if (!kerning.ContainsKey(new KerningKey(fontName, fontStyle)))
             {
                 KerningKey kk = new KerningKey(fontName, fontStyle);
@@ -615,7 +627,12 @@ namespace CADability.GeoObject
             Gdi.SelectObject(hDC, oldfont);
             Gdi.DeleteObject(hfont);
 
-            width = (abc[0].abcA + abc[0].abcB + abc[0].abcC) / (double)em;
+            if (abcOk)
+                width = (abc[0].abcA + abc[0].abcB + abc[0].abcC) / (double)em;
+            else if (charWidth32 > 0)
+                width = charWidth32 / (double)em; // GetCharWidth32 fallback: total advance
+            else
+                width = 0.0; // will fall back to path-extent width in FontCache.Get
 
             path.AddString(c.ToString(), ff, fs, 1.0f, new PointF(0.0f, 0.0f), sf);
             List<Path2D> res = new List<Path2D>();
@@ -900,6 +917,7 @@ namespace CADability.GeoObject
                     ext.MinMax(paths[i].GetExtent());
                 }
                 double extwidth = ext.Width;
+                System.Diagnostics.Debug.WriteLine($"[FontCache] '{c}' font='{font}' style={fontStyle}: pathExtentW={extwidth:F4} abcWidth={width:F4} extLeft={ext.Left:F4} extRight={ext.Right:F4}");
                 // if (width < extwidth * 0.9) width = extwidth * 1.1; warum diese Zeile? Stört bei Commercial Script
                 if (width == 0.0 && extwidth > 0.0) width = extwidth; // fallback when GetCharABCWidths fails (e.g. non-TrueType/SHX fonts)
                 found.width = width; // hier könnte man mit TextRenderer.MeasureText arbeiten, wenns so nicht passt

@@ -29,6 +29,9 @@ namespace CADability
         [DllImport("gdi32.dll", EntryPoint = "GetCharABCWidthsW")]
         public static extern bool GetCharABCWidths(IntPtr hdc, uint uFirstChar, uint uLastChar, ABC[] lpabc);
 
+        [DllImport("gdi32.dll", EntryPoint = "GetCharWidth32W")]
+        public static extern bool GetCharWidth32(IntPtr hdc, uint uFirstChar, uint uLastChar, int[] lpBuffer);
+
         [DllImport("gdi32.dll", EntryPoint = "GetKerningPairsW")]
         public static extern int GetKerningPairs(IntPtr hdc, int nPairs, KERNINGPAIR[] lpkrnpair);
     }

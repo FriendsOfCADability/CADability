@@ -892,14 +892,6 @@ namespace CADability.GeoObject
                             paintTo3D.Precision = oldprecision;
                             paintTo3D.PaintSurfaceEdges = oldpse;
                         }
-                        // Add glyph outline paths as edge geometry so that selection rendering
-                        // (which draws edges in yellow) shows yellow character outlines while
-                        // the surface fill keeps its original color.
-                        for (int i = 0; i < paths.Length; ++i)
-                        {
-                            IGeoObject outlineGo = paths[i].MakeGeoObject(Plane.XYPlane);
-                            outlineGo.PaintTo3D(paintTo3D);
-                        }
                     }
                     if (useLists)
                     {

@@ -598,13 +598,18 @@ namespace CADability.Forms
                 projectionMatrix[13] += dy * 2f / viewHeight;
                 List(paintThisList);
             }
+            // Restore surfaces; force selectMode OFF so center draw uses original colors
+            // regardless of what the caller had set (callers typically set SelectMode=true
+            // before calling SelectedList, so prevSelect is true — we must not restore it yet).
             paintSurfaces = prevSurfaces;
-            selectMode    = prevSelect;
+            selectMode    = false;
 
             // Draw at center with original colors — sits on top of the yellow halo.
             projectionMatrix = (float[])savedProj.Clone();
             List(paintThisList);
             projectionMatrix = savedProj;
+
+            selectMode = prevSelect;
         }
 
         public void Nurbs(GeoPoint[] poles, double[] weights, double[] knots, int degree) { }

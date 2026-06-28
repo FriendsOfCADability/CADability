@@ -42,9 +42,41 @@ namespace CADability.DXF
                 raw = new byte[fs.Length];
                 fs.Read(raw, 0, raw.Length);
             }
-            // Some non-standard R12 files place TABLE sections directly after the HEADER
-            // ENDSEC without the required SECTION/TABLES wrapper. ACadSharp cannot parse
-            // this and silently returns an empty document. Normalize the structure first.
+            // WORKAROUND — non-standard R12 DXF: orphaned TABLE sections
+            //
+            // Some AutoCAD R12 (AC1003) files produced by third-party CAD tools place
+            // the LAYER (and other) TABLE records directly after the HEADER ENDSEC without
+            // the required outer SECTION / TABLES / ENDSEC envelope:
+            //
+            //   Standard:             Non-standard (seen in the wild):
+            //   SECTION               SECTION
+            //     HEADER                HEADER
+            //   ENDSEC                ENDSEC
+            //   SECTION               TABLE          ← bare TABLE, no SECTION wrapper
+            //     TABLES                LAYER
+            //       TABLE               ...
+            //         LAYER           ENDTAB
+            //         ...             SECTION        ← ENTITIES starts here directly
+            //       ENDTAB              ENTITIES
+            //     ENDSEC              ENDSEC
+            //   SECTION               EOF
+            //     ENTITIES
+            //   ENDSEC
+            //   EOF
+            //
+            // ACadSharp's DxfReader state machine requires the SECTION/TABLES/ENDSEC
+            // envelope.  When it sees a bare TABLE group code after an ENDSEC it enters
+            // an undefined parser state and silently produces a CadDocument whose
+            // *Model_Space block record contains zero entities, even though the ENTITIES
+            // section that follows is perfectly valid.  No exception is thrown.
+            //
+            // Fix applied here: pre-scan the raw bytes; if the pattern is detected,
+            // synthetically inject the missing SECTION / TABLES / ENDSEC wrapper before
+            // handing the bytes to ACadSharp (see NormalizeOrphanedTables below).
+            //
+            // TODO upstream: report to ACadSharp (https://github.com/DomCR/ACadSharp)
+            // so that DxfReader handles orphaned TABLE sections gracefully without a
+            // client-side workaround.
             byte[] toRead = NormalizeOrphanedTables(raw) ?? raw;
 
             using (var stream = new MemoryStream(toRead))
@@ -66,31 +98,49 @@ namespace CADability.DXF
             }
         }
 
-        // Detects non-standard R12 DXF files where TABLE sections appear directly after the
-        // HEADER ENDSEC without a SECTION/TABLES wrapper. Inserts the wrapper and returns the
-        // normalized bytes, or null if no normalization was needed.
+        // NormalizeOrphanedTables — client-side workaround for a bug in ACadSharp.
+        //
+        // Root cause: ACadSharp's DxfReader (≤ 3.6.35) requires that TABLE records appear
+        // inside a SECTION / TABLES / ENDSEC envelope.  Some R12 files produced by older
+        // or non-conformant CAD tools omit this envelope and place TABLE records directly
+        // after the HEADER ENDSEC.  ACadSharp silently produces an empty *Model_Space in
+        // that case instead of raising an error or falling back gracefully.
+        //
+        // Additional quirk: the affected files sometimes prefix integer group values with a
+        // TAB character (e.g. " 70\r\n\t256\r\n").  ACadSharp silently ignores malformed
+        // integer tokens, so layer entries with such values may not be registered in
+        // doc.Layers, though entities are still created (on the default "0" layer).
+        //
+        // This method detects the non-standard structure, injects the missing
+        // SECTION / TABLES / ENDSEC wrapper, and returns the corrected bytes.
+        // Returns null when the file is already standard-conformant.
+        //
+        // When/if ACadSharp gains native support for orphaned TABLE sections this method
+        // can simply be removed and the call site reverted to passing 'raw' directly.
+        // Track: https://github.com/DomCR/ACadSharp/issues (file a new issue).
         private static byte[] NormalizeOrphanedTables(byte[] raw)
         {
             bool hasCrLf = IndexOf(raw, new byte[] { 0x0D, 0x0A }) >= 0;
             string text = Encoding.ASCII.GetString(raw).Replace("\r\n", "\n").Replace('\r', '\n');
 
-            // Detect: ENDSEC immediately followed by TABLE instead of SECTION.
+            // Detect: an ENDSEC followed immediately by a bare TABLE (not SECTION).
             const string marker = "  0\nENDSEC\n  0\nTABLE\n";
             int pos = text.IndexOf(marker, StringComparison.Ordinal);
             if (pos < 0) return null; // Standard structure — no normalization needed
 
-            // Split: keep everything up to and including the ENDSEC line,
-            // collect the orphaned tables, then the rest (starting at SECTION ENTITIES).
+            // Split at the ENDSEC boundary: everything before is kept as-is (includes HEADER),
+            // everything after up to the next SECTION keyword is the orphaned tables region.
             int splitAt = pos + "  0\nENDSEC\n".Length;
             string header  = text.Substring(0, splitAt);
             string rest    = text.Substring(splitAt);
 
             int sectionStart = rest.IndexOf("  0\nSECTION\n", StringComparison.Ordinal);
-            if (sectionStart < 0) return null; // Cannot locate ENTITIES section — give up
+            if (sectionStart < 0) return null; // Cannot locate the next SECTION — give up
 
-            string tables   = rest.Substring(0, sectionStart);
-            string entities = rest.Substring(sectionStart);
+            string tables   = rest.Substring(0, sectionStart);   // orphaned TABLE...ENDTAB block(s)
+            string entities = rest.Substring(sectionStart);        // SECTION ENTITIES ... EOF
 
+            // Re-assemble with the required SECTION / TABLES / ENDSEC envelope.
             string normalized = header
                 + "  0\nSECTION\n  2\nTABLES\n"
                 + tables

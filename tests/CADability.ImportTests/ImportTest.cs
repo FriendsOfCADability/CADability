@@ -316,11 +316,26 @@ EOF
         [TestMethod]
         public void import_dxf_r12_orphaned_table_succeeds()
         {
-            // Regression: non-standard R12 (AC1003) DXF files where the LAYER TABLE appears
-            // directly after the HEADER ENDSEC without a SECTION/TABLES wrapper confuse
-            // ACadSharp's parser, leaving *Model_Space with zero entities. The normalizer
-            // must insert the missing wrapper so entities are imported correctly.
+            // Regression guard for a client-side workaround of an ACadSharp bug.
+            //
+            // BUG IN ACADSHARP (≤ 3.6.35):
+            //   DxfReader requires TABLE records to be wrapped in a SECTION / TABLES / ENDSEC
+            //   envelope.  Some R12 (AC1003) files produced by third-party CAD tools place the
+            //   LAYER (and other) TABLE records directly after the HEADER ENDSEC with no outer
+            //   SECTION wrapper.  ACadSharp silently returns a CadDocument whose *Model_Space
+            //   block record contains zero entities — no exception is thrown — even though the
+            //   ENTITIES section that follows the orphaned TABLE block is perfectly valid.
+            //
+            // FIX APPLIED IN ImportDxf.cs (NormalizeOrphanedTables):
+            //   Before passing bytes to DxfReader the raw file is scanned for the pattern
+            //   "ENDSEC immediately followed by TABLE".  When detected, the missing
+            //   SECTION / TABLES / ENDSEC envelope is injected synthetically and the
+            //   corrected bytes are handed to ACadSharp.
+            //
+            // TODO: report upstream to ACadSharp so DxfReader handles this natively.
+            //   https://github.com/DomCR/ACadSharp/issues
             const string dxf = "  0\r\nSECTION\r\n  2\r\nHEADER\r\n  9\r\n$ACADVER\r\n  1\r\nAC1003\r\n  0\r\nENDSEC\r\n" +
+                               // ↓ bare TABLE — no surrounding SECTION/TABLES/ENDSEC (the bug trigger)
                                "  0\r\nTABLE\r\n  2\r\nLAYER\r\n 70\r\n1\r\n  0\r\nLAYER\r\n  2\r\n0\r\n 70\r\n0\r\n 62\r\n7\r\n  6\r\nContinuous\r\n  0\r\nENDTAB\r\n" +
                                "  0\r\nSECTION\r\n  2\r\nENTITIES\r\n" +
                                "  0\r\nLINE\r\n  8\r\n0\r\n 10\r\n0.0\r\n 20\r\n0.0\r\n 30\r\n0.0\r\n 11\r\n10.0\r\n 21\r\n10.0\r\n 31\r\n0.0\r\n" +
@@ -339,19 +354,31 @@ EOF
         [TestMethod]
         public void import_dxf_r12_tab_prefixed_values_and_named_layer_succeeds()
         {
-            // Regression: real R12 files produced by some CAD tools use a TAB character
-            // before integer values (e.g. " 70\r\n\t256\r\n") and put entities on a named
-            // layer "1" rather than the default "0". ACadSharp silently falls back to the
-            // default layer for such entries, but entities must still be imported.
-            // The orphaned-table normalizer must not break when the count field is malformed.
+            // Regression guard — extends import_dxf_r12_orphaned_table_succeeds with two
+            // additional quirks observed in real-world R12 files from certain CAD tools:
+            //
+            //  1. TAB-prefixed integer group values (e.g. " 70\r\n\t2\r\n").
+            //     The DXF spec requires right-justified decimal integers with no leading TAB.
+            //     ACadSharp silently ignores the malformed token; as a result the LAYER TABLE
+            //     capacity is not read, so named layers may not be registered in doc.Layers.
+            //     Entities that reference such layers fall back to the default "0" layer.
+            //
+            //  2. Entities on a named layer ("1") rather than the default ("0").
+            //     Because layer "1" is not in doc.Layers (due to quirk 1), SetAttributes
+            //     cannot set the layer attribute — but the entity must still be created and
+            //     added to the model regardless.
+            //
+            // The orphaned-TABLE normalizer (NormalizeOrphanedTables in ImportDxf.cs) wraps
+            // the file before ACadSharp sees it, so both LINE and ARC are imported despite
+            // the malformed layer count and the missing SECTION/TABLES envelope.
             const string dxf = "  0\r\nSECTION\r\n  2\r\nHEADER\r\n  9\r\n$ACADVER\r\n  1\r\nAC1003\r\n  0\r\nENDSEC\r\n" +
-                               "  0\r\nTABLE\r\n  2\r\nLAYER\r\n 70\r\n\t2\r\n" +
+                               "  0\r\nTABLE\r\n  2\r\nLAYER\r\n 70\r\n\t2\r\n" + // ← TAB before "2"
                                "  0\r\nLAYER\r\n  2\r\n0\r\n 70\r\n0\r\n 62\r\n7\r\n  6\r\nContinuous\r\n" +
                                "  0\r\nLAYER\r\n  2\r\n1\r\n 70\r\n0\r\n 62\r\n4\r\n  6\r\nContinuous\r\n" +
                                "  0\r\nENDTAB\r\n" +
                                "  0\r\nSECTION\r\n  2\r\nENTITIES\r\n" +
-                               "  0\r\nLINE\r\n  8\r\n1\r\n 10\r\n0.0\r\n 20\r\n0.0\r\n 30\r\n0.0\r\n 11\r\n10.0\r\n 21\r\n10.0\r\n 31\r\n0.0\r\n" +
-                               "  0\r\nARC\r\n  8\r\n1\r\n 10\r\n5.0\r\n 20\r\n5.0\r\n 30\r\n0.0\r\n 40\r\n3.0\r\n 50\r\n0.0\r\n 51\r\n180.0\r\n" +
+                               "  0\r\nLINE\r\n  8\r\n1\r\n 10\r\n0.0\r\n 20\r\n0.0\r\n 30\r\n0.0\r\n 11\r\n10.0\r\n 21\r\n10.0\r\n 31\r\n0.0\r\n" + // layer 1
+                               "  0\r\nARC\r\n  8\r\n1\r\n 10\r\n5.0\r\n 20\r\n5.0\r\n 30\r\n0.0\r\n 40\r\n3.0\r\n 50\r\n0.0\r\n 51\r\n180.0\r\n" + // layer 1
                                "  0\r\nENDSEC\r\n  0\r\nEOF\r\n";
 
             var file = this.TestContext.TestName + ".dxf";

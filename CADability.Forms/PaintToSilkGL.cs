@@ -50,7 +50,7 @@ namespace CADability.Forms
         private List<float> listSurfBuf;
         private List<float> listEdgeBuf;
         private bool inList;
-        private Stack<(PaintToSilkGLList list, List<float> surf, List<float> edge, float[] mv)> listNestStack = new();
+        private Stack<(PaintToSilkGLList list, List<float> surf, List<float> edge, float[] mv, bool selectMode)> listNestStack = new();
 
         // Transient streaming VAO/VBO for immediate draw
         private uint streamVao;
@@ -686,12 +686,10 @@ namespace CADability.Forms
 
         public void OpenList(string name = null)
         {
-            if (inList)
-            {
-                // Nested call (e.g. FontCache building a glyph inside an entity list):
-                // save outer state so CloseList can restore it.
-                listNestStack.Push((currentList, listSurfBuf, listEdgeBuf, modelviewMatrix));
-            }
+            // Always record with selectMode=false so SubListCall colors capture the object's
+            // own color, not the caller's selection color. selectMode only applies at replay time.
+            listNestStack.Push((currentList, listSurfBuf, listEdgeBuf, modelviewMatrix, selectMode));
+            selectMode  = false;
             currentList = new PaintToSilkGLList { Name = name };
             listSurfBuf = new List<float>();
             listEdgeBuf = new List<float>();
@@ -709,9 +707,8 @@ namespace CADability.Forms
 
             if (listNestStack.Count > 0)
             {
-                // Restore outer list that was interrupted by this nested OpenList call.
-                (currentList, listSurfBuf, listEdgeBuf, modelviewMatrix) = listNestStack.Pop();
-                inList = true;
+                (currentList, listSurfBuf, listEdgeBuf, modelviewMatrix, selectMode) = listNestStack.Pop();
+                inList = listNestStack.Count > 0 || currentList != null;
             }
             else
             {

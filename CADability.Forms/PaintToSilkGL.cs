@@ -36,8 +36,6 @@ namespace CADability.Forms
         private float[] modelviewMatrix  = Identity4();
         private Stack<float[]> modopStack = new();
 
-        private int _dbgFrameCount = 0;
-
         private float lightX, lightY, lightZ;
 
         private Color currentColor = Color.White;
@@ -165,8 +163,6 @@ namespace CADability.Forms
             edgeLoc_projection = gl.GetUniformLocation(edgeProgram, "u_projection");
             edgeLoc_modelview  = gl.GetUniformLocation(edgeProgram, "u_modelview");
             edgeLoc_color      = gl.GetUniformLocation(edgeProgram, "u_color");
-            System.Diagnostics.Debug.WriteLine($"[DBG] Shader locs: edge proj={edgeLoc_projection} mv={edgeLoc_modelview} color={edgeLoc_color}");
-            System.Diagnostics.Debug.WriteLine($"[DBG] Shader locs: surf proj={surfLoc_projection} mv={surfLoc_modelview} norm={surfLoc_normal_matrix} color={surfLoc_color} light={surfLoc_light_pos}");
         }
 
         // -------------------------------------------------------------------------
@@ -517,13 +513,6 @@ namespace CADability.Forms
         private void DrawListEdge(PaintToSilkGLList list)
         {
             if (list.EdgeVao == 0 || list.EdgeVertexCount == 0) return;
-            if (_dbgFrameCount <= 3)
-            {
-                System.Diagnostics.Debug.WriteLine($"[DBG] Frame {_dbgFrameCount} DrawListEdge '{list.Name}': EdgeVao={list.EdgeVao} verts={list.EdgeVertexCount} batches={list.EdgeBatches?.Count ?? 0} currentColor={currentColor}");
-                if (list.EdgeBatches != null)
-                    for (int b = 0; b < Math.Min(list.EdgeBatches.Count, 5); b++)
-                        System.Diagnostics.Debug.WriteLine($"  batch[{b}] start={list.EdgeBatches[b].startVertex} color={list.EdgeBatches[b].color}");
-            }
             gl.BindVertexArray(list.EdgeVao);
             gl.UseProgram(edgeProgram);
             var batches = list.EdgeBatches;
@@ -592,20 +581,28 @@ namespace CADability.Forms
 
         public void SelectedList(IPaintTo3DList paintThisList, int wobbleRadius)
         {
-            bool prevSelect = selectMode;
-            selectMode = true;
             float[] savedProj = projectionMatrix;
             for (int dx = -wobbleRadius; dx <= wobbleRadius; dx++)
             for (int dy = -wobbleRadius; dy <= wobbleRadius; dy++)
             {
                 projectionMatrix = (float[])savedProj.Clone();
-                // shift translation column (col 3) in screen pixels
                 projectionMatrix[12] += dx * 2f / viewWidth;
                 projectionMatrix[13] += dy * 2f / viewHeight;
+
+                // Pass 1: draw with original colors so fills (e.g. text) remain readable.
                 List(paintThisList);
+
+                // Pass 2: draw only edges in select color (yellow) — outlines the geometry
+                // without overwriting surface fills.
+                bool prevSurfaces = paintSurfaces;
+                bool prevSelect   = selectMode;
+                paintSurfaces = false;
+                selectMode    = true;
+                List(paintThisList);
+                paintSurfaces = prevSurfaces;
+                selectMode    = prevSelect;
             }
             projectionMatrix = savedProj;
-            selectMode = prevSelect;
         }
 
         public void Nurbs(GeoPoint[] poles, double[] weights, double[] knots, int degree) { }
@@ -665,13 +662,10 @@ namespace CADability.Forms
             useLineWidth = projection.UseLineWidth;
             if (useLineWidth) gl.Enable(EnableCap.LineSmooth);
             else              gl.Disable(EnableCap.LineSmooth);
-            if (_dbgFrameCount <= 3)
-                System.Diagnostics.Debug.WriteLine($"[DBG] Frame {_dbgFrameCount} SetProjection diag=[{projectionMatrix[0]:F4},{projectionMatrix[5]:F4},{projectionMatrix[10]:F4},{projectionMatrix[15]:F4}] vp={viewWidth}x{viewHeight}");
         }
 
         public void Clear(Color background)
         {
-            _dbgFrameCount++;
             gl.ClearColor(background.R/255f, background.G/255f, background.B/255f, 1f);
             gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
         }

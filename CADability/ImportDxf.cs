@@ -1199,12 +1199,9 @@ namespace CADability.DXF
             string filename = txt.Style?.Filename ?? "";
             string name = txt.Style?.Name ?? "";
             long trueType = (long)(txt.Style?.TrueType ?? 0);
-            // DXF XDATA 1071 encoding (AutoCAD): bit 0 (0x01) = bold, bit 2 (0x04) = italic.
-            // Bits 1 and 4 are TrueType/charset metadata, not style flags.
-            // Example: "Standard"/Arial-Regular has trueType=18 (0x12 = TrueType|charset) → bold=false, italic=false.
+            // DXF XDATA 1071: bit 0 (0x01) = bold, bit 2 (0x04) = italic; bits 1 and 4 are TrueType/charset metadata.
             bool bold = (trueType & 1L) != 0;
             bool italic = (trueType & 4L) != 0;
-            System.Diagnostics.Debug.WriteLine($"[ImportDxf] Text '{txt.Value}' style='{txt.Style?.Name}' TrueType=0x{trueType:X} bold={bold} italic={italic}");
 
             if (filename.EndsWith(".shx", StringComparison.OrdinalIgnoreCase)) filename = filename.Substring(0, filename.Length - 4);
             if (filename.EndsWith(".ttf", StringComparison.OrdinalIgnoreCase))

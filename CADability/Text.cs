@@ -591,7 +591,7 @@ namespace CADability.GeoObject
             if (em == 0) em = 1000;
             Font font = new Font(ff, em, (FontStyle)fs, GraphicsUnit.Pixel);
 
-            // Keep GDI P/Invoke only for kerning pairs; GetCharABCWidths returns zero on .NET 8 memory DCs.
+            // GDI P/Invoke is used only for kerning pairs.
             IntPtr hfont = font.ToHfont();
             IntPtr oldfont = Gdi.SelectObject(hDC, hfont);
             if (!kerning.ContainsKey(new KerningKey(fontName, fontStyle)))

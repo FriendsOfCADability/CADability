@@ -582,26 +582,28 @@ namespace CADability.Forms
         public void SelectedList(IPaintTo3DList paintThisList, int wobbleRadius)
         {
             float[] savedProj = projectionMatrix;
+
+            // Draw edges in select color at every shifted position — this creates a yellow halo.
+            // Skip center (0,0) so the original-color draw below is not overwritten.
+            bool prevSurfaces = paintSurfaces;
+            bool prevSelect   = selectMode;
+            paintSurfaces = false;
+            selectMode    = true;
             for (int dx = -wobbleRadius; dx <= wobbleRadius; dx++)
             for (int dy = -wobbleRadius; dy <= wobbleRadius; dy++)
             {
+                if (dx == 0 && dy == 0) continue;
                 projectionMatrix = (float[])savedProj.Clone();
                 projectionMatrix[12] += dx * 2f / viewWidth;
                 projectionMatrix[13] += dy * 2f / viewHeight;
-
-                // Pass 1: draw with original colors so fills (e.g. text) remain readable.
                 List(paintThisList);
-
-                // Pass 2: draw only edges in select color (yellow) — outlines the geometry
-                // without overwriting surface fills.
-                bool prevSurfaces = paintSurfaces;
-                bool prevSelect   = selectMode;
-                paintSurfaces = false;
-                selectMode    = true;
-                List(paintThisList);
-                paintSurfaces = prevSurfaces;
-                selectMode    = prevSelect;
             }
+            paintSurfaces = prevSurfaces;
+            selectMode    = prevSelect;
+
+            // Draw at center with original colors — sits on top of the yellow halo.
+            projectionMatrix = (float[])savedProj.Clone();
+            List(paintThisList);
             projectionMatrix = savedProj;
         }
 

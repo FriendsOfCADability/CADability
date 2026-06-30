@@ -516,7 +516,7 @@ namespace CADability.GeoObject
 		/// <returns></returns>
 		public override ISurface Clone()
 		{
-			return new SphericalSurface(toSphere);
+			return new SphericalSurface(toSphere, usedArea);
 		}
 		/// <summary>
 		/// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Modify (ModOp)"/>

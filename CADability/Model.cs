@@ -150,19 +150,23 @@ namespace CADability
 					{
 						// hier wird die eigentliche Arbeit gemacht
 						go.PrepareDisplayList(data.Precision);
-						lock (runningThreads)
-						{
-							runningThreads.Remove(data.RecalcID); // wirft keine Exception wenn nicht drin
-																  // recalcDone hat einen Wert, wenn DoBackgroundRecalcDisplayList alle Objekte in die
-																  // Queue gesteckt hat und auf das Ende wartet
-							if (recalcDone != null && runningThreads.Count == 0)
-							{   // wenn der letzte thread fertig ist, nachdem alle in der Liste stehen
-								// wird recalcDone "signalisiert", d.h. alle Objekte sind jetzt berechnet
-								// und eine neue Displayliste kann schnell hergestellt werden
-								recalcDone.Set();
-							}
-						}
 					}
+				}
+			}
+			// Always remove from runningThreads regardless of cancellation. If a worker exits
+			// early due to cancellation without removing itself, DoBackgroundRecalcDisplayList
+			// can block forever on recalcDone.WaitOne() when AbortBackgroundRecalc ran before
+			// recalcDone was created and therefore could not signal it.
+			lock (runningThreads)
+			{
+				runningThreads.Remove(data.RecalcID); // wirft keine Exception wenn nicht drin
+													  // recalcDone hat einen Wert, wenn DoBackgroundRecalcDisplayList alle Objekte in die
+													  // Queue gesteckt hat und auf das Ende wartet
+				if (recalcDone != null && runningThreads.Count == 0)
+				{   // wenn der letzte thread fertig ist, nachdem alle in der Liste stehen
+					// wird recalcDone "signalisiert", d.h. alle Objekte sind jetzt berechnet
+					// und eine neue Displayliste kann schnell hergestellt werden
+					recalcDone.Set();
 				}
 			}
 		}

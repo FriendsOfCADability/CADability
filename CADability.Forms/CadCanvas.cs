@@ -156,16 +156,16 @@ namespace CADability.Forms
         void ICanvas.ShowContextMenu(MenuWithHandler[] contextMenu, System.Drawing.Point viewPosition, Action<int> collapsed)
         {
             ContextMenuWithHandler cm = MenuManager.MakeContextMenu(contextMenu);
-            ContextMenu = cm; // need to set this in order to get the Collapse event
+            ContextMenuStrip = cm;
             callbackCollapsed = collapsed;
-            cm.Collapse += Cm_Collapse;
+            cm.Closed += (s, e) => Cm_Collapse(s, e);
             cm.UpdateCommand();
             cm.Show(this, viewPosition);
         }
 
         private void Cm_Collapse(object sender, EventArgs e)
         {
-            ContextMenu = null;
+            ContextMenuStrip = null;
             callbackCollapsed?.Invoke(0);
             callbackCollapsed = null;
         }

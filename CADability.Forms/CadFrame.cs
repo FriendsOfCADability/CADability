@@ -31,7 +31,7 @@ namespace CADability.Forms
         /// <summary>
         /// The parent form menu
         /// </summary>
-        public MainMenu FormMenu { set; private get; }
+        public MenuStrip FormMenu { set; private get; }
 
         /// <summary>
         /// Action that delegate the progress.
@@ -79,49 +79,41 @@ namespace CADability.Forms
 
         public override void UpdateMRUMenu(string[] mruFiles)
         {
-            if (this.FormMenu != null)
+            if (FormMenu != null)
             {
-                foreach (MenuItem mi in this.FormMenu.MenuItems)
-                {
+                foreach (ToolStripItem mi in FormMenu.Items)
                     UpdateMRUMenu(mi, mruFiles);
-                }
             }
         }
 
-        private void UpdateMRUMenu(MenuItem mi, string[] mruFiles)
+        private void UpdateMRUMenu(ToolStripItem mi, string[] mruFiles)
         {
-            if (mi.IsParent)
+            if (mi is ToolStripMenuItem tsmi && tsmi.HasDropDownItems)
             {
-                foreach (MenuItem mmi in mi.MenuItems)
-                {
+                foreach (ToolStripItem mmi in tsmi.DropDownItems)
                     UpdateMRUMenu(mmi, mruFiles);
-                }
             }
-            else
+            else if (mi is MenuItemWithHandler mid)
             {
-                MenuItemWithHandler mid = mi as MenuItemWithHandler;
-                if (mid != null)
+                MenuWithHandler mwh = mid.Tag as MenuWithHandler;
+                if (mwh != null)
                 {
-                    MenuWithHandler mwh = mid.Tag as MenuWithHandler;
-                    if (mwh != null)
+                    string MenuId = mwh.ID;
+                    if (MenuId.StartsWith("MenuId.File.Mru.File"))
                     {
-                        string MenuId = mwh.ID;
-                        if (MenuId.StartsWith("MenuId.File.Mru.File"))
+                        string filenr = MenuId.Substring("MenuId.File.Mru.File".Length);
+                        try
                         {
-                            string filenr = MenuId.Substring("MenuId.File.Mru.File".Length);
-                            try
+                            int n = int.Parse(filenr);
+                            if (n <= mruFiles.Length && n > 0)
                             {
-                                int n = int.Parse(filenr);
-                                if (n <= mruFiles.Length && n > 0)
-                                {
-                                    string[] parts = mruFiles[mruFiles.Length - n].Split(';');
-                                    if (parts.Length > 1)
-                                        mid.Text = parts[0];
-                                }
+                                string[] parts = mruFiles[mruFiles.Length - n].Split(';');
+                                if (parts.Length > 1)
+                                    mid.Text = parts[0];
                             }
-                            catch (FormatException) { }
-                            catch (OverflowException) { }
                         }
+                        catch (FormatException) { }
+                        catch (OverflowException) { }
                     }
                 }
             }

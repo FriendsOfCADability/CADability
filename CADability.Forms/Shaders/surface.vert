@@ -14,6 +14,11 @@ void main()
 {
     vec4 worldPos = u_modelview * vec4(aPosition, 1.0);
     vFragPos = worldPos.xyz;
-    vNormal = normalize(u_normal_matrix * aNormal);
+    // a zero normal marks unlit geometry (text glyphs, see IPaintTo3DFlatText);
+    // it must be passed through as zero, normalize() of a zero vector is undefined
+    if (dot(aNormal, aNormal) < 1e-12)
+        vNormal = vec3(0.0);
+    else
+        vNormal = normalize(u_normal_matrix * aNormal);
     gl_Position = u_projection * worldPos;
 }

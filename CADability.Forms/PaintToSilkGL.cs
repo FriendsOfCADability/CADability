@@ -11,12 +11,21 @@ using System.Windows.Forms;
 
 namespace CADability.Forms
 {
-    public class PaintToSilkGL : IPaintTo3D
+    public class PaintToSilkGL : IPaintTo3D, IPaintTo3DFlatText
     {
         private GL gl;
         private IntPtr hwnd;
         private IntPtr hdc;
         private IntPtr hglrc;
+
+        // text glyph triangles are recorded with zero normals; the surface shader renders
+        // zero-normal geometry unlit, so text appears exactly in its plain color
+        private bool flatTextMode;
+        public bool FlatTextMode
+        {
+            get { return flatTextMode; }
+            set { flatTextMode = value; }
+        }
 
         private uint surfaceProgram;
         private uint edgeProgram;
@@ -435,7 +444,11 @@ namespace CADability.Forms
                     listSurfBuf.Add((float)vertex[idx].x);
                     listSurfBuf.Add((float)vertex[idx].y);
                     listSurfBuf.Add((float)vertex[idx].z);
-                    if (normals != null && idx < normals.Length)
+                    if (flatTextMode)
+                    {   // zero normal marks unlit geometry (text glyphs) for the surface shader
+                        listSurfBuf.Add(0); listSurfBuf.Add(0); listSurfBuf.Add(0);
+                    }
+                    else if (normals != null && idx < normals.Length)
                     {
                         listSurfBuf.Add((float)normals[idx].x);
                         listSurfBuf.Add((float)normals[idx].y);
@@ -454,7 +467,11 @@ namespace CADability.Forms
                 v[i*6+0] = (float)vertex[idx].x;
                 v[i*6+1] = (float)vertex[idx].y;
                 v[i*6+2] = (float)vertex[idx].z;
-                if (normals != null && idx < normals.Length)
+                if (flatTextMode)
+                {   // zero normal marks unlit geometry (text glyphs) for the surface shader
+                    v[i*6+3]=0; v[i*6+4]=0; v[i*6+5]=0;
+                }
+                else if (normals != null && idx < normals.Length)
                 {
                     v[i*6+3] = (float)normals[idx].x;
                     v[i*6+4] = (float)normals[idx].y;

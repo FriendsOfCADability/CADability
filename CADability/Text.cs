@@ -888,7 +888,18 @@ namespace CADability.GeoObject
                             }
                             bool oldpse = paintTo3D.PaintSurfaceEdges;
                             paintTo3D.PaintSurfaceEdges = false;
-                            fc.PaintTo3D(paintTo3D); // will be triangulated according to paintTo3D.Precision
+                            // glyphs are rendered flat (unlit): text must appear exactly in its
+                            // ColorDef color and not be modified by the scene lighting
+                            IPaintTo3DFlatText flatText = paintTo3D as IPaintTo3DFlatText;
+                            if (flatText != null) flatText.FlatTextMode = true;
+                            try
+                            {
+                                fc.PaintTo3D(paintTo3D); // will be triangulated according to paintTo3D.Precision
+                            }
+                            finally
+                            {
+                                if (flatText != null) flatText.FlatTextMode = false;
+                            }
                             paintTo3D.Precision = oldprecision;
                             paintTo3D.PaintSurfaceEdges = oldpse;
                         }

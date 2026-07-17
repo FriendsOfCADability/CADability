@@ -1,4 +1,4 @@
-﻿using CADability.Curve2D;
+using CADability.Curve2D;
 using System;
 #if WEBASSEMBLY
 using CADability.WebDrawing;
@@ -34,7 +34,7 @@ namespace CADability.GeoObject
         /// <returns>A Line or Line derived class</returns>
         public delegate Line ConstructionDelegate();
         /// <summary>
-        /// Provide a delegate here if you want you Line derived class to be 
+        /// Provide a delegate here if you want you Line derived class to be
         /// created each time CADability creates a line.
         /// </summary>
         public static ConstructionDelegate Constructor;
@@ -71,13 +71,10 @@ namespace CADability.GeoObject
         /// </summary>
         public virtual GeoPoint StartPoint
         {
-            get
-            {
-                return startPoint;
-            }
+            get => startPoint;
             set
             {
-                using (new Changing(this, "StartPoint"))
+                using (Changing.Create(this, startPoint))
                 {
                     startPoint = value;
                 }
@@ -89,13 +86,10 @@ namespace CADability.GeoObject
         /// </summary>
         public virtual GeoPoint EndPoint
         {
-            get
-            {
-                return endPoint;
-            }
+            get => endPoint;
             set
             {
-                using (new Changing(this, "EndPoint"))
+                using (Changing.Create(this, endPoint))
                 {
                     endPoint = value;
                 }
@@ -122,13 +116,10 @@ namespace CADability.GeoObject
         /// </summary>
         public double Length
         {
-            get
-            {
-                return Geometry.Dist(startPoint, endPoint);
-            }
+            get => Geometry.Dist(startPoint, endPoint);
             set
             {
-                using (new Changing(this, "Length"))
+                using (Changing.Create(this, Length))
                 {
                     GeoVector v = endPoint - startPoint;
                     if (!v.IsNullVector()) v.Norm();
@@ -154,7 +145,7 @@ namespace CADability.GeoObject
         /// <param name="m">the operator for the modification</param>
         public override void Modify(ModOp m)
         {
-            using (new Changing(this, "ModifyInverse", m))
+            using (new Changing(this, nameof(ModifyInverse), m))
             {
                 startPoint = m * startPoint;
                 endPoint = m * endPoint;
@@ -447,13 +438,10 @@ namespace CADability.GeoObject
         private ColorDef colorDef;
         public ColorDef ColorDef
         {
-            get
-            {
-                return colorDef;
-            }
+            get => colorDef;
             set
             {
-                using (new ChangingAttribute(this, "ColorDef", colorDef))
+                using (ChangingAttribute.Create(this, colorDef))
                 {
                     colorDef = value;
                 }
@@ -754,13 +742,10 @@ namespace CADability.GeoObject
         #region ILineWidth Members
         public LineWidth LineWidth
         {
-            get
-            {
-                return lineWidth;
-            }
+            get => lineWidth;
             set
             {
-                using (new ChangingAttribute(this, "LineWidth", lineWidth))
+                using (ChangingAttribute.Create(this, lineWidth))
                 {
                     lineWidth = value;
                 }
@@ -772,13 +757,10 @@ namespace CADability.GeoObject
 
         public LinePattern LinePattern
         {
-            get
-            {
-                return linePattern;
-            }
+            get => linePattern;
             set
             {
-                using (new ChangingAttribute(this, "LinePattern", linePattern))
+                using (ChangingAttribute.Create(this, linePattern))
                 {
                     linePattern = value;
                 }
@@ -853,7 +835,7 @@ namespace CADability.GeoObject
                 int sp = (startPoint as IExportStep).Export(export, false);
                 int ep = (endPoint as IExportStep).Export(export, false);
                 int tc = export.WriteDefinition("TRIMMED_CURVE('',#" + ln.ToString() + ",(#" + sp.ToString() + ",PARAMETER_VALUE(0.0)),(#" + ep.ToString() + ",PARAMETER_VALUE("+export.ToString(Length)+")),.T.,.CARTESIAN.)");
-                int gcs = export.WriteDefinition("GEOMETRIC_CURVE_SET('',(#" + tc.ToString() + "))"); // is a Representation_Item 
+                int gcs = export.WriteDefinition("GEOMETRIC_CURVE_SET('',(#" + tc.ToString() + "))"); // is a Representation_Item
                 ColorDef cd = ColorDef;
                 if (cd == null) cd = new ColorDef("Black", Color.Black);
                 cd.MakeStepStyle(gcs, export);

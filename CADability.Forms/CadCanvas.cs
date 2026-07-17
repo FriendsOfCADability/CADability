@@ -120,7 +120,7 @@ namespace CADability.Forms
         }
         void ICanvas.ShowView(IView toShow)
         {
-            if (paintTo3D is PaintToSilkGL openGL)
+            if (paintTo3D is PaintToOpenGL openGL)
             {
                 openGL.Disconnect(this);
             }
@@ -140,9 +140,9 @@ namespace CADability.Forms
                         this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.Opaque | ControlStyles.ResizeRedraw | ControlStyles.UserPaint, true);
                         this.SetStyle(ControlStyles.OptimizedDoubleBuffer, false);
                         this.DoubleBuffered = false;
-                        PaintToSilkGL paintToSilkGL = new PaintToSilkGL(1e-6);
-                        paintToSilkGL.Init(this);
-                        paintTo3D = paintToSilkGL;
+                        PaintToOpenGL paintToOpenGL = new PaintToOpenGL(1e-6);
+                        paintToOpenGL.Init(this);
+                        paintTo3D = paintToOpenGL;
                     }
                     break;
             }
@@ -156,16 +156,14 @@ namespace CADability.Forms
         void ICanvas.ShowContextMenu(MenuWithHandler[] contextMenu, System.Drawing.Point viewPosition, Action<int> collapsed)
         {
             ContextMenuWithHandler cm = MenuManager.MakeContextMenu(contextMenu);
-            ContextMenuStrip = cm;
             callbackCollapsed = collapsed;
-            cm.Closed += (s, e) => Cm_Collapse(s, e);
+            cm.Closed += Cm_Collapse;
             cm.UpdateCommand();
             cm.Show(this, viewPosition);
         }
 
-        private void Cm_Collapse(object sender, EventArgs e)
+        private void Cm_Collapse(object sender, ToolStripDropDownClosedEventArgs e)
         {
-            ContextMenuStrip = null;
             callbackCollapsed?.Invoke(0);
             callbackCollapsed = null;
         }
@@ -225,7 +223,7 @@ namespace CADability.Forms
         }
         protected override void Dispose(bool disposing)
         {
-            if (view != null && paintTo3D != null) (paintTo3D as PaintToSilkGL)?.Disconnect(this);
+            if (view != null && paintTo3D != null) (paintTo3D as PaintToOpenGL)?.Disconnect(this);
             view?.Disconnect(this);
             base.Dispose(disposing);
         }

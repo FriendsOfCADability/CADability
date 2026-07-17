@@ -79,41 +79,49 @@ namespace CADability.Forms
 
         public override void UpdateMRUMenu(string[] mruFiles)
         {
-            if (FormMenu != null)
+            if (this.FormMenu != null)
             {
-                foreach (ToolStripItem mi in FormMenu.Items)
-                    UpdateMRUMenu(mi, mruFiles);
+                foreach (ToolStripItem item in this.FormMenu.Items)
+                {
+                    if (item is ToolStripMenuItem mi) UpdateMRUMenu(mi, mruFiles);
+                }
             }
         }
 
-        private void UpdateMRUMenu(ToolStripItem mi, string[] mruFiles)
+        private void UpdateMRUMenu(ToolStripMenuItem mi, string[] mruFiles)
         {
-            if (mi is ToolStripMenuItem tsmi && tsmi.HasDropDownItems)
+            if (mi.HasDropDownItems)
             {
-                foreach (ToolStripItem mmi in tsmi.DropDownItems)
-                    UpdateMRUMenu(mmi, mruFiles);
-            }
-            else if (mi is MenuItemWithHandler mid)
-            {
-                MenuWithHandler mwh = mid.Tag as MenuWithHandler;
-                if (mwh != null)
+                foreach (ToolStripItem item in mi.DropDownItems)
                 {
-                    string MenuId = mwh.ID;
-                    if (MenuId.StartsWith("MenuId.File.Mru.File"))
+                    if (item is ToolStripMenuItem mmi) UpdateMRUMenu(mmi, mruFiles);
+                }
+            }
+            else
+            {
+                MenuItemWithHandler mid = mi as MenuItemWithHandler;
+                if (mid != null)
+                {
+                    MenuWithHandler mwh = mid.Tag as MenuWithHandler;
+                    if (mwh != null)
                     {
-                        string filenr = MenuId.Substring("MenuId.File.Mru.File".Length);
-                        try
+                        string MenuId = mwh.ID;
+                        if (MenuId.StartsWith("MenuId.File.Mru.File"))
                         {
-                            int n = int.Parse(filenr);
-                            if (n <= mruFiles.Length && n > 0)
+                            string filenr = MenuId.Substring("MenuId.File.Mru.File".Length);
+                            try
                             {
-                                string[] parts = mruFiles[mruFiles.Length - n].Split(';');
-                                if (parts.Length > 1)
-                                    mid.Text = parts[0];
+                                int n = int.Parse(filenr);
+                                if (n <= mruFiles.Length && n > 0)
+                                {
+                                    string[] parts = mruFiles[mruFiles.Length - n].Split(';');
+                                    if (parts.Length > 1)
+                                        mid.Text = parts[0];
+                                }
                             }
+                            catch (FormatException) { }
+                            catch (OverflowException) { }
                         }
-                        catch (FormatException) { }
-                        catch (OverflowException) { }
                     }
                 }
             }
@@ -240,7 +248,9 @@ namespace CADability.Forms
         }
         IPaintTo3D IUIService.CreatePaintInterface(Bitmap paintToBitmap, double precision)
         {
-            throw new NotImplementedException("Off-screen bitmap rendering not yet implemented in PaintToSilkGL");
+            PaintToOpenGL paintTo3D = new PaintToOpenGL(precision);
+            paintTo3D.Init(paintToBitmap);
+            return paintTo3D;
         }
         Substitutes.DialogResult IUIService.ShowPageSetupDlg(ref PrintDocument printDocument, PageSettings pageSettings, out int width, out int height, out bool landscape)
         {

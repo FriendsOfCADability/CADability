@@ -1,4 +1,4 @@
-﻿using CADability.Attribute;
+using CADability.Attribute;
 using CADability.Curve2D;
 using CADability.UserInterface;
 using System;
@@ -182,7 +182,7 @@ namespace CADability.GeoObject
             #endregion
 
         }
-        private ColorDef colorDef; // die Farbe. 
+        private ColorDef colorDef; // die Farbe.
         #region polymorph construction
         public delegate GeneralCurve ConstructionDelegate();
         public static ConstructionDelegate Constructor;
@@ -869,13 +869,10 @@ namespace CADability.GeoObject
         private LineWidth lineWidth;
         public LineWidth LineWidth
         {
-            get
-            {
-                return lineWidth;
-            }
+            get => lineWidth;
             set
             {
-                using (new ChangingAttribute(this, "LineWidth", lineWidth))
+                using (ChangingAttribute.Create(this, lineWidth))
                 {
                     lineWidth = value;
                 }
@@ -887,13 +884,10 @@ namespace CADability.GeoObject
         private LinePattern linePattern;
         public LinePattern LinePattern
         {
-            get
-            {
-                return linePattern;
-            }
+            get => linePattern;
             set
             {
-                using (new ChangingAttribute(this, "LinePattern", linePattern))
+                using (ChangingAttribute.Create(this, linePattern))
                 {
                     linePattern = value;
                 }
@@ -1096,7 +1090,7 @@ namespace CADability.GeoObject
                             GeoPoint p4 = pl4.Intersect(ip, id);
                             double d12 = (p1 | p2);
                             // if ((p3 | p4) > d12 || (p1 | p3) > d12 || (p1 | p4) > d12 || (p2 | p3) > d12 || (p2 | p4) > d12)
-                            
+
                             //Unreachable code
                             /*
                             if (false)
@@ -2458,7 +2452,7 @@ namespace CADability.GeoObject
 
         internal double Position(GeoPoint fromHere, GeoVector direction, double precision)
         {   // gesucht die Z-Höhe für das Picken, um verschiedene Objekte nach vorne und hinten unterscheiden zu können
-            // ein Octtree um die passenden Tetraeder zu finden, 
+            // ein Octtree um die passenden Tetraeder zu finden,
             // hier erstmal grobe Annäherung
             double mindist = double.MaxValue;
             double res = double.MaxValue;
@@ -2678,7 +2672,7 @@ namespace CADability.GeoObject
                 {   // the surface does not intersect the linear connection of tetraederBase[i] and tetraederBase[i+1] or
                     // it intersects an even number of times (a torus might intersect a circle 4 times)
                     // here we look, whether the surface has a minimum distaance to the line in this segment, and if so
-                    // we try to find multiple intersection points 
+                    // we try to find multiple intersection points
                     GeoPoint startPoint = tetraederBase[i];
                     GeoVector direction = tetraederBase[i + 1] - tetraederBase[i];
                     Polynom toSolve = implicitSurface.Substitute(new Polynom(direction.x, "u", startPoint.x, ""), new Polynom(direction.y, "u", startPoint.y, ""), new Polynom(direction.z, "u", startPoint.z, "")).Derivate(1);

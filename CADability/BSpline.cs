@@ -1,4 +1,4 @@
-﻿using CADability.Attribute;
+using CADability.Attribute;
 using CADability.Curve2D;
 using CADability.UserInterface;
 using System;
@@ -61,7 +61,7 @@ namespace CADability.GeoObject
         private Plane? plane; // liegt in dieser Ebene, wenn spezifiziert
 #if NET_45
         private WeakReference<ExplicitPCurve3D> explicitPCurve3D;
-#else 
+#else
         private WeakReference explicitPCurve3D;
 #endif
         // NurbsHelper Daten
@@ -197,7 +197,7 @@ namespace CADability.GeoObject
                 {
                     double dknot = knots[knots.Length - 1] - knots[0];
                     // letztlich ist es komisch, dass zwei knoten vornedran müssen
-                    //for (int i = 0; i < 1; ++i) // 
+                    //for (int i = 0; i < 1; ++i) //
                     //{
                     //    knotslist.Insert(0, knotslist[knotslist.Count - degree - i] - dknot);
                     //}
@@ -205,12 +205,12 @@ namespace CADability.GeoObject
                     //{
                     //    knotslist.Add(knotslist[2 * (degree - 1) + i] + dknot);
                     //}
-                    // neue Idee: 
+                    // neue Idee:
                     // 1. es werden immer "degree" poles hinten angehängt
                     // 2. der 1. Knoten muss immer degree+1 mal vorkommen ( siehe STEP/piece0: dort sind alle Knoten 4-fach
                     //    bei degree=5 und FindSpan muss immer eine Stelle finden, an der es gerade wechselt
                     // 3. es werden soviele Knoten hinten angehängt, dass "knotslist.Length-degree-1 ==  poles.length" gilt
-                    //for (int i = 0; i < 1; ++i) // 
+                    //for (int i = 0; i < 1; ++i) //
                     //{
                     //    knotslist.Insert(0, knotslist[knotslist.Count - degree - i] - dknot);
                     //}
@@ -458,7 +458,7 @@ namespace CADability.GeoObject
                 //bool ok = false;
                 //if (sa >= 0 && sm >= 0) ok = sm <= sa;
                 //if (sa < 0 && sm < 0) ok = sm >= sa;
-                // Die Frage ist, wie groß ist der Fehler. Man kann nicht einfach in der Mitte testen, 
+                // Die Frage ist, wie groß ist der Fehler. Man kann nicht einfach in der Mitte testen,
                 // da der Verlauf der Kurve nicht bekannt ist, insbesondere ein Wendepunkt kann zu Fehlern
                 // führen. So testen wir hier jeweils noch die 1/4 und 3/4 Punkte um einigerm´ßen sicher
                 // zu gehen
@@ -708,7 +708,7 @@ namespace CADability.GeoObject
         //				SetOcasBuddy(edg.GetGeneralEdge());
         //				FireDidChange(ce);
         //				return true;
-        //			} 
+        //			}
         //			catch (OpenCascade.Exception)
         //			{
         //				return false;
@@ -921,7 +921,7 @@ namespace CADability.GeoObject
             //-	the Poles and Weights arrays have the same dimension and this dimension is greater than or equal to 2,
             //-	the Knots and Multiplicities arrays have the same dimension and this dimension is greater than or equal to 2,
             //-	the knots sequence is in ascending order, i.e. Knots(i) is less than Knots(i+1),
-            //-	the multiplicity coefficients are in the range 1 to Degree.  However, on a non-periodic curve, the first and last multiplicities 
+            //-	the multiplicity coefficients are in the range 1 to Degree.  However, on a non-periodic curve, the first and last multiplicities
             //  may be Degree + 1 (this is recommended if you want the curve to start and finish on the first and last poles),
             //-	on a periodic curve the first and last multiplicities must be the same,
             //-	on a non-periodic curve, the number of poles is equal to the sum of the multiplicity coefficients, minus Degree, minus 1,
@@ -1089,7 +1089,7 @@ namespace CADability.GeoObject
             //					throughPoints3d[Index] = NewValue;
             //					RecalcFromEdge(edg);
             //				}
-            //			} 
+            //			}
             //			catch (OpenCascade.Exception)
             //			{
             //			}
@@ -1235,17 +1235,17 @@ namespace CADability.GeoObject
                         if (!done)
                         {
                             if (multiplicities.Length > 1)
-                            {	// ob das so ganz allgemein gilt, muss noch überprüft werden, 
+                            {	// ob das so ganz allgemein gilt, muss noch überprüft werden,
                                 // die Bedinungen sind so:
-                                // 1.	the multiplicity coefficients are in the range 1 to Degree.  
-                                // However, on a non-periodic curve, the first and last multiplicities may be 
-                                // Degree + 1 (this is recommended if you want the curve to start 
+                                // 1.	the multiplicity coefficients are in the range 1 to Degree.
+                                // However, on a non-periodic curve, the first and last multiplicities may be
+                                // Degree + 1 (this is recommended if you want the curve to start
                                 // and finish on the first and last poles),
                                 // 2.	on a periodic curve the first and last multiplicities must be the same,
-                                // 3.	on a non-periodic curve, the number of poles is equal to the sum of the 
+                                // 3.	on a non-periodic curve, the number of poles is equal to the sum of the
                                 // multiplicity coefficients, minus Degree, minus 1,
-                                // 4.	on a periodic curve, the number of poles is equal to the sum of knot 
-                                // multiplicities, excluding the last knot.							
+                                // 4.	on a periodic curve, the number of poles is equal to the sum of knot
+                                // multiplicities, excluding the last knot.
                                 if (value)
                                 {	// es wird geschlossen
                                     // 1. Bedingung
@@ -1294,7 +1294,7 @@ namespace CADability.GeoObject
                                     // die 3. Bedingung muss erfüllt werden
                                     int sum = 0;
                                     for (int i = 0; i < multiplicities.Length; ++i) sum += multiplicities[i];
-                                    // 3.	on a non-periodic curve, the number of poles is equal to the sum of the 
+                                    // 3.	on a non-periodic curve, the number of poles is equal to the sum of the
                                     // multiplicity coefficients, minus Degree, minus 1,
                                     int dif = poles.Length - (sum - degree - 1);
                                     int j = 0; // zuerst die beiden äußeren erhöhen
@@ -3549,13 +3549,10 @@ namespace CADability.GeoObject
         private ColorDef colorDef;
         public ColorDef ColorDef
         {
-            get
-            {
-                return colorDef;
-            }
+            get => colorDef;
             set
             {
-                using (new ChangingAttribute(this, "ColorDef", colorDef))
+                using (ChangingAttribute.Create(this, colorDef))
                 {
                     colorDef = value;
                 }
@@ -3574,13 +3571,10 @@ namespace CADability.GeoObject
         private LineWidth lineWidth;
         public LineWidth LineWidth
         {
-            get
-            {
-                return lineWidth;
-            }
+            get => lineWidth;
             set
             {
-                using (new ChangingAttribute(this, "LineWidth", lineWidth))
+                using (ChangingAttribute.Create(this, lineWidth))
                 {
                     lineWidth = value;
                 }
@@ -3591,13 +3585,10 @@ namespace CADability.GeoObject
         private LinePattern linePattern;
         public LinePattern LinePattern
         {
-            get
-            {
-                return linePattern;
-            }
+            get => linePattern;
             set
             {
-                using (new ChangingAttribute(this, "LinePattern", linePattern))
+                using (ChangingAttribute.Create(this, linePattern))
                 {
                     linePattern = value;
                 }

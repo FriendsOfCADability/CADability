@@ -15,9 +15,6 @@ using System.Collections.Generic;
 // Make internals of this library available to the unit test framework.
 //[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("UnitTests")]
 
-// Everything should be CLS compliant.
-[assembly: CLSCompliant(true)]
-
 
 namespace Wintellect.PowerCollections
 {

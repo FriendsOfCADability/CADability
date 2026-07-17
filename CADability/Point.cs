@@ -1,15 +1,14 @@
-﻿using CADability.Attribute;
-using CADability.UserInterface;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
+using CADability.Attribute;
+using CADability.UserInterface;
 
 namespace CADability.GeoObject
 {
     /// <summary>
     /// Flags definig the symbol for the presentation of a <see cref="Point"/> object.
-    /// The flag may contain one of the values Empty=0x0,Dot=0x1,Plus=0x2,Cross=0x3,Line=0x4 
+    /// The flag may contain one of the values Empty=0x0,Dot=0x1,Plus=0x2,Cross=0x3,Line=0x4
     /// combined with Square=0x8 or Circle=0x10.
     /// </summary>
     [Flags]
@@ -49,7 +48,7 @@ namespace CADability.GeoObject
         Select = 0x40
     }
     /// <summary>
-    /// Implements a point as a <see cref="IGeoObject"/>. 
+    /// Implements a point as a <see cref="IGeoObject"/>.
     /// </summary>
     [Serializable()]
     public class Point : IGeoObjectImpl, IColorDef, ISerializable, IJsonSerialize
@@ -77,10 +76,10 @@ namespace CADability.GeoObject
         }
         public GeoPoint Location
         {
-            get { return location; }
+            get => location;
             set
             {
-                using (new Changing(this, "Location", location))
+                using (Changing.Create(this, location))
                 {
                     location = value;
                 }
@@ -88,10 +87,10 @@ namespace CADability.GeoObject
         }
         public PointSymbol Symbol
         {
-            get { return symbol; }
+            get => symbol;
             set
             {
-                using (new Changing(this, "Symbol", symbol))
+                using (Changing.Create(this, symbol))
                 {
                     symbol = value;
                 }
@@ -99,10 +98,10 @@ namespace CADability.GeoObject
         }
         public double Size
         {
-            get { return size; }
+            get => size;
             set
             {
-                using (new Changing(this, "Size", size))
+                using (Changing.Create(this, size))
                 {
                     size = value;
                 }

@@ -1,4 +1,4 @@
-﻿using CADability.Actions;
+using CADability.Actions;
 using CADability.Attribute;
 using CADability.Curve2D;
 using MathNet.Numerics.LinearAlgebra.Double;
@@ -218,7 +218,7 @@ namespace CADability.GeoObject
             return res;
         }
         /// <summary>
-        /// Returns all the edges of this Shell. Each egde is unique in the array 
+        /// Returns all the edges of this Shell. Each egde is unique in the array
         /// but may belong to two different faces.
         /// </summary>
         public Edge[] Edges
@@ -299,7 +299,7 @@ namespace CADability.GeoObject
                 //}
                 for (int i = 0; i < triangleIndex.Length; i += 3)
                 {
-                    // use the signed volume of the tetrahedron from the origin to the triangle 
+                    // use the signed volume of the tetrahedron from the origin to the triangle
                     sum += trianglePoint[triangleIndex[i]].x * trianglePoint[triangleIndex[i + 1]].y * trianglePoint[triangleIndex[i + 2]].z -
                            trianglePoint[triangleIndex[i]].x * trianglePoint[triangleIndex[i + 1]].z * trianglePoint[triangleIndex[i + 2]].y -
                            trianglePoint[triangleIndex[i]].y * trianglePoint[triangleIndex[i + 1]].x * trianglePoint[triangleIndex[i + 2]].z +
@@ -307,7 +307,7 @@ namespace CADability.GeoObject
                            trianglePoint[triangleIndex[i]].z * trianglePoint[triangleIndex[i + 1]].x * trianglePoint[triangleIndex[i + 2]].y -
                            trianglePoint[triangleIndex[i]].z * trianglePoint[triangleIndex[i + 1]].y * trianglePoint[triangleIndex[i + 2]].x;
                     // if the triangle is not planar (a point in the middle has some distance to the triangle) then we use a correction value
-                    // which was experimentally set to 3/4 of the "thick triangle". The calculation can certainly be made easier 
+                    // which was experimentally set to 3/4 of the "thick triangle". The calculation can certainly be made easier
                     try
                     {
                         Plane pln = new Plane(trianglePoint[triangleIndex[i]], trianglePoint[triangleIndex[i + 1]] - trianglePoint[triangleIndex[i]], trianglePoint[triangleIndex[i + 2]] - trianglePoint[triangleIndex[i]]);
@@ -807,7 +807,7 @@ namespace CADability.GeoObject
             return thickness;
         }
         /// <summary>
-        /// The name of the shell. 
+        /// The name of the shell.
         /// </summary>
         public string Name
         {
@@ -1684,7 +1684,7 @@ namespace CADability.GeoObject
             // We test for PlanarSurface, CylindricalSurface, ConicalSurface, SphereicalSurface and ToriodalSurface
             Dictionary<Edge, Edge> newEdges = new Dictionary<Edge, Edge>();
             List<Face> res = new List<Face>();
-            OctTree<VectorInOctTree> normals = new OctTree<VectorInOctTree>(new BoundingCube(new GeoPoint(1e-5, 1e-5, 1e-5), 1.1), 1e-6); // octtree around the unit cube, 
+            OctTree<VectorInOctTree> normals = new OctTree<VectorInOctTree>(new BoundingCube(new GeoPoint(1e-5, 1e-5, 1e-5), 1.1), 1e-6); // octtree around the unit cube,
                                                                                                                                           // to collect the normals of all faces. This help to classify the faces
                                                                                                                                           // a little bit excentric to collect vetors close to the unit (axis, e.g.: (0,0,1)) in a single OctTree box.
             List<GeoPoint> ndirs = new List<GeoPoint>(); // all normals (on the unit sphere) to check, whether there is a cylinder or cone
@@ -1871,7 +1871,7 @@ namespace CADability.GeoObject
             if (subsetForTest.Count > 4)
             {   // the inner parts of sphere/torus stl triangulation usually include the longitude/latitude curves.
                 // This is not the case at the border and of course all triangles could be at the border
-                // Here we try to find longitude/latitude curves. 
+                // Here we try to find longitude/latitude curves.
 
                 // First filter all edges at close to 90° triangles
                 Set<Edge> rectangularEdges = new Set<Edge>();
@@ -2754,13 +2754,10 @@ namespace CADability.GeoObject
         private ColorDef colorDef;
         public ColorDef ColorDef
         {
-            get
-            {
-                return colorDef;
-            }
+            get => colorDef;
             set
             {
-                using (new ChangingAttribute(this, "ColorDef", colorDef))
+                using (ChangingAttribute.Create(this, colorDef))
                 {
                     colorDef = value;
                     if (faces != null)
@@ -3038,7 +3035,7 @@ namespace CADability.GeoObject
                 else { canRemove = false; }
             }
             if (!canRemove) return false;
-            // 
+            //
             int[] holeIndices = new int[loops.Count];
             int holesFound = 0;
             for (int i = 0; i < loops.Count; i++)
@@ -3606,7 +3603,7 @@ namespace CADability.GeoObject
                         allFaces.Add(new Tripel<int, int, int>(triangleIndex[i] + baseIndex, triangleIndex[i + 1] + baseIndex, triangleIndex[i + 2] + baseIndex));
                     }
                     Set<int> openVertices = new Set<int>();
-                    // die vertices muss man dann noch unterscheiden zwischen denen, wo zwei fremde dreiecke aneinanderstoßen, die also mit einer Pipe gefüllt werden müssen, und denen, 
+                    // die vertices muss man dann noch unterscheiden zwischen denen, wo zwei fremde dreiecke aneinanderstoßen, die also mit einer Pipe gefüllt werden müssen, und denen,
                     // die echte vertices der Shell sind, wo also eine kuge eingefüllt wertden muss. Und dann noch die selbstüberschneidungen
                 }
             }
@@ -3782,7 +3779,7 @@ namespace CADability.GeoObject
                         {
                             testPoint = edg.Curve3D.PointAt(0.5) + dd * (edg.Curve3D.DirectionAt(0.5).Normalized ^ pfn);
                         }
-                        // wir schneiden jetzt die beiden Faces an der Linie aus dem Testpunkt (der etwas innerhalb liegt) und der Normalen 
+                        // wir schneiden jetzt die beiden Faces an der Linie aus dem Testpunkt (der etwas innerhalb liegt) und der Normalen
                         // (die ja bei beiden nur gegensätzliche Richtungen haben)
                         GeoPoint2D[] intpf = edg.PrimaryFace.Surface.GetLineIntersection(testPoint, pfn);
                         GeoPoint2D[] intsf = edg.SecondaryFace.Surface.GetLineIntersection(testPoint, pfn);
@@ -3891,7 +3888,7 @@ namespace CADability.GeoObject
                         // der SelfIntersection ohnehin weg, und erzeugen dort nur zusätzlichen Aufwand, indem sie unnötige Schnittkanten berechnen lassen.
                         // Die Bedingung ist: Die Normalenvektoren and den 4 Ecken müssen in die gleiche Richtung zeigen, nicht in Gegenrichtung.
                         // Anschaulich bedeutet das, dass die Kante "konvex" ist
-                        // Es sind (bei unregelmäßigen Nurbsflächen) Situationen denkbar, wo die Kanten am Ende konvex ist, in der Mitte aber konkav. 
+                        // Es sind (bei unregelmäßigen Nurbsflächen) Situationen denkbar, wo die Kanten am Ende konvex ist, in der Mitte aber konkav.
                         // Diese werden hier unterschlagen.
                         double or1 = edg.PrimaryFace.Surface.GetNormal(startHere.GetPositionOnFace(edg.PrimaryFace)).Normalized * gsc.GetNormal(gsc.PositionOf(v1.Position)).Normalized;
                         double or2 = edg.PrimaryFace.Surface.GetNormal(endHere.GetPositionOnFace(edg.PrimaryFace)).Normalized * gsc.GetNormal(gsc.PositionOf(v2.Position)).Normalized;
@@ -4156,7 +4153,7 @@ namespace CADability.GeoObject
                             }
                         }
                         Plane polePln = new Plane(v.Position, vl[i0].Position - vl[j0].Position);
-                        // in dieser Ebene liegen die beiden Pole der Kugel. 
+                        // in dieser Ebene liegen die beiden Pole der Kugel.
                         // Gesucht ist jetzt die Achse der Kugel. Da es maximal nur eine Halbkugel werden kann (Nadelspitze, bei der alle Faces sich tangential in der Spitze treffen)
                         // suchen wir jetzt eine Linie durch den Mittelpunkt, so dass alle vls und auch die Zwischenpunkte der Bögen auf der selben Seite liegen.
                         List<GeoPoint2D> projPnts = new List<GeoPoint2D>();
@@ -4296,7 +4293,7 @@ namespace CADability.GeoObject
 
             Shell res = MakeShell(fcs.ToArray());
             // res.AssertOutwardOrientation(); die Orientierung ist genau so wie das Original, kann bei offenen Shells ambiguous sein
-            // Edge[] oe = res.OpenEdges; 
+            // Edge[] oe = res.OpenEdges;
             res.RecalcEdges(); // wichtig, da egde und verex Koordinatenmäßig ungenau sein kann. Evtl an besser geeigneter Stelle sicherstellen, oder?
             return res;
         }
@@ -4890,7 +4887,7 @@ namespace CADability.GeoObject
 #if DEBUG
             foreach (Vertex vtx in splitVertices)
             {
-                // 
+                //
                 DebuggerContainer dcsv = new CADability.DebuggerContainer();
                 Edge[] edgs = vtx.Edges;
                 for (int i = 0; i < edgs.Length; i++)
@@ -5242,7 +5239,7 @@ namespace CADability.GeoObject
                             if (Edge.IsGeometricallyEqual(duplicatEdges[i], duplicatEdges[j], true, false, precision))
                             {   // zwei Kanten sind identisch:
                                 // sie haben ein gemeinsames face und zwei andere. Das gemeinsame Face wird
-                                // eliminiert 
+                                // eliminiert
                                 Face common, first, second;
                                 if (duplicatEdges[i].PrimaryFace == duplicatEdges[j].PrimaryFace)
                                 {
@@ -5601,7 +5598,7 @@ namespace CADability.GeoObject
                 if (needsFixing)
                 {
                     if (involvedFaces.Count > 2)
-                    {   // in most cases, there are 3 Faces involved. 
+                    {   // in most cases, there are 3 Faces involved.
                         Face[] fa = involvedFaces.ToArray();
                         GeoPoint ip = vtx.Position;
                         if (Surfaces.NewtonIntersect(fa[0].Surface, fa[0].Domain, fa[1].Surface, fa[1].Domain, fa[2].Surface, fa[2].Domain, ref ip, out GeoPoint2D uv0, out GeoPoint2D uv1, out GeoPoint2D uv2))
@@ -5612,7 +5609,7 @@ namespace CADability.GeoObject
                             vtx.AddPositionOnFace(fa[2], uv2);
                         }
                         if (fa.Length > 3)
-                        {   // more than 3 faces involved (like in the tip of a four sided pyramid): 
+                        {   // more than 3 faces involved (like in the tip of a four sided pyramid):
                             // here we would need a more sophisticated approach to find the best solution. Maybe even to modify a surface
                         }
                     }
@@ -5681,7 +5678,7 @@ namespace CADability.GeoObject
             }
         }
         internal void RecalcEdges()
-        {   // hier sollten alle Edges neu justiert werden. 
+        {   // hier sollten alle Edges neu justiert werden.
             // Erstmal nur einen Fehler beheben
             foreach (Edge edg in Edges)
             {
@@ -6528,7 +6525,7 @@ namespace CADability.GeoObject
             return null;
         }
         /// <summary>
-        /// From a set of <paramref name="edges"/> build loops of sorted edges. Each loop contains ordered edges which 
+        /// From a set of <paramref name="edges"/> build loops of sorted edges. Each loop contains ordered edges which
         /// </summary>
         /// <param name="edges"></param>
         /// <param name="extendIfNecessary"></param>
@@ -6562,7 +6559,7 @@ namespace CADability.GeoObject
                         break;
                     }
                 }
-                if (currentVertex == stopVertex) res.Add(loop.ToArray()); // only when  is closed 
+                if (currentVertex == stopVertex) res.Add(loop.ToArray()); // only when  is closed
             }
             return res;
         }
@@ -6600,7 +6597,7 @@ namespace CADability.GeoObject
             return res;
         }
         /// <summary>
-        /// Collect all faces which are connected to the provided <paramref name="faces"/> and are part of the same surface geometry 
+        /// Collect all faces which are connected to the provided <paramref name="faces"/> and are part of the same surface geometry
         /// (like two halves of a cylinder, which are connected by a "seam" edge)
         /// </summary>
         /// <param name="faces"></param>
@@ -6662,7 +6659,7 @@ namespace CADability.GeoObject
 
         /// <summary>
         /// Tries to find a "feature" which is disconnected from the remaining shell by the provided edges in <paramref name="loopEdges"/>.
-        /// 
+        ///
         /// </summary>
         /// <param name="loopEdges">unsorted edges, which seperate the feature from the shell</param>
         /// <param name="featureFaces">faces (of this shell), which belong to the feature</param>
@@ -6935,7 +6932,7 @@ namespace CADability.GeoObject
             return face;
         }
         /// <summary>
-        /// Returns "features" of the shell. A feature is a subset of the faces of the shell, which is seperated by the provided <paramref name="loops"/>. 
+        /// Returns "features" of the shell. A feature is a subset of the faces of the shell, which is seperated by the provided <paramref name="loops"/>.
         /// Since such a feature has open edges, there is also a face or multiple faces, which close the feature to make it to a solid.
         /// </summary>
         /// <param name="bounds"></param>
@@ -7305,7 +7302,7 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
-        /// Returns a dictionary from the <paramref name="other"/> shell to this shell of corresponding faces. If a face had been split, only a single face is in the 
+        /// Returns a dictionary from the <paramref name="other"/> shell to this shell of corresponding faces. If a face had been split, only a single face is in the
         /// value part of the dictionary entry
         /// </summary>
         /// <param name="other"></param>
@@ -7342,7 +7339,7 @@ namespace CADability.GeoObject
             foreach (Face face in Faces)
             {
                 FaceReference fr = face.UserData.GetData("CADability.RememberFace") as FaceReference;
-                if (fr != null) 
+                if (fr != null)
                 {
                     if (!result.TryGetValue(fr.Face, out List<Face> list)) result[fr.Face] = list = new List<Face>();
                     list.Add(face);

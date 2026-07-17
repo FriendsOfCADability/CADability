@@ -2,8 +2,6 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
-    <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
     <RootNamespace>CADability.App</RootNamespace>
     <AssemblyName>CADability.App</AssemblyName>
     <UseWindowsForms>true</UseWindowsForms>
@@ -11,28 +9,11 @@
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <GenerateResourceMSBuildArchitecture>CurrentArchitecture</GenerateResourceMSBuildArchitecture>
     <GenerateResourceMSBuildRuntime>CurrentRuntime</GenerateResourceMSBuildRuntime>
-    <IsWebBootstrapper>false</IsWebBootstrapper>
-    <PublishUrl>C:\Temp\publish\</PublishUrl>
-    <Install>true</Install>
-    <InstallFrom>Disk</InstallFrom>
-    <UpdateEnabled>false</UpdateEnabled>
-    <UpdateMode>Foreground</UpdateMode>
-    <UpdateInterval>7</UpdateInterval>
-    <UpdateIntervalUnits>Days</UpdateIntervalUnits>
-    <UpdatePeriodically>false</UpdatePeriodically>
-    <UpdateRequired>false</UpdateRequired>
-    <MapFileExtensions>true</MapFileExtensions>
-    <WebPage>publish.htm</WebPage>
-    <ApplicationRevision>4</ApplicationRevision>
-    <ApplicationVersion>1.0.0.*</ApplicationVersion>
-    <UseApplicationTrust>false</UseApplicationTrust>
-    <PublishWizardCompleted>true</PublishWizardCompleted>
-    <BootstrapperEnabled>true</BootstrapperEnabled>
-    <GenerateManifests Condition="'$(OS)' == 'Windows_NT'">true</GenerateManifests>
-    <SignManifests>false</SignManifests>
     <SignAssembly>false</SignAssembly>
-    <ManifestCertificateThumbprint>BAEB7160A322344105B8E042B48C557AA0564154</ManifestCertificateThumbprint>
-    <ManifestKeyFile>CADability.App_TemporaryKey.pfx</ManifestKeyFile>
+    <LangVersion>11.0</LangVersion>
+    <!-- Required for legacy BinaryFormatter-based persistence/compatibility. BinaryFormatter is insecure; only deserialize trusted data and migrate away when possible. -->
+    <EnableUnsafeBinaryFormatterSerialization>true</EnableUnsafeBinaryFormatterSerialization>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 
   <!-- Configurations -->
@@ -88,7 +69,7 @@
 
   <!-- NuGet Packages -->
   <ItemGroup>
-    <PackageReference Include="System.Drawing.Common" Version="6.0.0" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
   </ItemGroup>
 
   <!-- Project References -->
@@ -99,8 +80,6 @@
 
   <!-- Additional files -->
   <ItemGroup>
-    <None Include="CADability.App_TemporaryKey.pfx" />
-    <None Include="App.config" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>

@@ -6,6 +6,8 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      id-token: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -17,14 +19,14 @@ jobs:
         run: dotnet restore CADability/CADability.csproj
       - name: Build
         run: dotnet build CADability/CADability.csproj -c Release --no-restore
-      - name: List build output
-        run: dir CADability\bin\Release\netstandard2.0
       - name: Pack
         run: dotnet pack CADability/CADability.csproj -c Release --no-build -o ./nupkgs
-      - name: List nupkg
-        run: dir .\nupkgs
+      - name: Login to NuGet
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: dsn27
       - name: Push NuGet package
         run: |
-          $version = "${{ github.ref_name }}" -replace '^v', ''
-          $pkg = Get-ChildItem -Path ./nupkgs -Filter "*$version.nupkg" | Select-Object -First 1
-          dotnet nuget push $pkg.FullName --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+          $pkg = Get-ChildItem -Path ./nupkgs -Filter "*.nupkg" | Select-Object -First 1
+          dotnet nuget push "$($pkg.FullName)" --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate

@@ -1,4 +1,4 @@
-﻿using CADability.Actions;
+using CADability.Actions;
 using CADability.Attribute;
 using CADability.Substitutes;
 using CADability.UserInterface;
@@ -177,7 +177,7 @@ namespace CADability.GeoObject
         internal Flags flags;
         private Edge[] edges; // secondary data, not serialized
         /// <summary>
-        /// Returns all the edges of this Shell. Each egde is unique in the array 
+        /// Returns all the edges of this Shell. Each egde is unique in the array
         /// but may belong to two different faces.
         /// </summary>
         public Edge[] Edges
@@ -311,7 +311,7 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
-        /// The name of the solid. 
+        /// The name of the solid.
         /// </summary>
         public string Name
         {
@@ -723,7 +723,7 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
-        /// Returns the intersection of two solids, i.e. those parts that are common to both solids. If the 
+        /// Returns the intersection of two solids, i.e. those parts that are common to both solids. If the
         /// solids are disjunct, an empty array is returned. There may be more than one solid body as a restult.
         /// </summary>
         /// <param name="solid1">first solid</param>
@@ -926,13 +926,10 @@ namespace CADability.GeoObject
         private ColorDef colorDef;
         public ColorDef ColorDef
         {
-            get
-            {
-                return colorDef;
-            }
+            get => colorDef;
             set
             {
-                using (new ChangingAttribute(this, "ColorDef", colorDef))
+                using (ChangingAttribute.Create(this, colorDef))
                 {
                     colorDef = value;
                     if (shells != null)
@@ -1099,7 +1096,7 @@ namespace CADability.GeoObject
                     if (fromBox[i] is Solid sld && sld != this) otherSolids.Add(sld);
                 }
                 if (otherSolids.Count > 0)
-                {   // there are other solids close to this solid, it is not guaranteed that these other solids interfere with this solid 
+                {   // there are other solids close to this solid, it is not guaranteed that these other solids interfere with this solid
                     MenuWithHandler mhSubtractFrom = new MenuWithHandler();
                     mhSubtractFrom.ID = "MenuId.Solid.RemoveFrom";
                     mhSubtractFrom.Text = StringTable.GetString("MenuId.Solid.RemoveFrom", StringTable.Category.label);

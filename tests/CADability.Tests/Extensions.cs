@@ -5,6 +5,7 @@
 //   Microsoft.VisualStudio.TestPlatform.MSTest.TestAdapter
 // do not show in the test window but the calling method,
 // which is what we want to achive.
+using System.Drawing;
 using System.Runtime.CompilerServices;
 
 namespace Microsoft.VisualStudio.TestTools.UnitTesting

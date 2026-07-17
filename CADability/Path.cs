@@ -25,7 +25,7 @@ namespace CADability.GeoObject
 
 	/// <summary>
 	/// A geoobject, that derives from Block and represents a ordered collection of
-	/// geoobjects which all support the ICurve intrface. The contained curves are connected, 
+	/// geoobjects which all support the ICurve intrface. The contained curves are connected,
 	/// i.e. Child(i).EndPoint is equal or close to Child(i+1).StartPoint.
 	/// The Path is not necessary planar, closed and may be self intersecting.
 	/// </summary>
@@ -182,14 +182,14 @@ namespace CADability.GeoObject
 		//		{
 		//			if (inPlane!=null) return; // schon berechnet
 		//			GeoPoint [] pts = new GeoPoint[subCurves.Length];
-		//			for (int i=0; i<subCurves.Length; ++i) 
+		//			for (int i=0; i<subCurves.Length; ++i)
 		//			{
 		//				pts[i] = subCurves[i].StartPoint;
 		//			}
 		//			double maxDist;
 		//			Plane pln = Plane.FromPoints(pts,out maxDist);
 		//			if (maxDist>Precision.eps) return;
-		//			for (int i=0; i<subCurves.Length; ++i) 
+		//			for (int i=0; i<subCurves.Length; ++i)
 		//			{
 		//				if (subCurves[i].GetPlanarState()==Condor.PlanarState.NonPlanar) return;
 		//				if (!subCurves[i].IsInPlane(pln)) return;
@@ -261,7 +261,7 @@ namespace CADability.GeoObject
 		/// Returns a Path containing the curve BeginWith and other curves from the projectedModel.
 		/// The curve BeginWith is checked at both ends to find connected objects. The search is stopped
 		/// if there are nore more connected objects. The curves are clones and are tagged with <see cref="UserData"/> objects
-		/// with the name key "CADability.Path.Original" and the original object as the value. 
+		/// with the name key "CADability.Path.Original" and the original object as the value.
 		/// If flatten is true, UserData will be lost.
 		/// </summary>
 		/// <param name="BeginWith">Curve to begin with</param>
@@ -382,7 +382,7 @@ namespace CADability.GeoObject
 		/// Returns a Path containing the curve BeginWith and other curves from the Model.
 		/// The curve BeginWith is checked at both ends to find connected objects. The search is stopped
 		/// when there are nore more connected objects. The curves are clones and are tagged with <see cref="UserData"/> objects
-		/// with the name key "CADability.Path.Original" and the original object as the value. 
+		/// with the name key "CADability.Path.Original" and the original object as the value.
 		/// If flatten is true, UserData will be lost.
 		/// </summary>
 		/// <param name="BeginWith">Curve to begin with</param>
@@ -891,7 +891,7 @@ namespace CADability.GeoObject
 
 		/// <summary>
 		/// Assumes both this and toThis are closed Paths with the same number of segments. Changes this Path
-		/// to start with the segment where the distance of corresponding vertices is minimal. The geometry of 
+		/// to start with the segment where the distance of corresponding vertices is minimal. The geometry of
 		/// this curve will not be changed
 		/// </summary>
 		/// <param name="toThis">adapt to this path</param>
@@ -1054,7 +1054,7 @@ namespace CADability.GeoObject
 			}
 		}
 		/// <summary>
-		/// Splits the curve of this path that contains the provided position. If position is exactely 
+		/// Splits the curve of this path that contains the provided position. If position is exactely
 		/// on the connection of two subcurves, the path remains unchanged. Otherwise the curve containing the
 		/// position is split and both curves are added to the path
 		/// </summary>
@@ -1361,34 +1361,31 @@ namespace CADability.GeoObject
 			return res;
 		}
 		public override Layer Layer
-		{
-			get
-			{
-				return base.Layer;
-			}
-			set
-			{
-				using (new ChangingAttribute(this, "Layer", base.Layer))
-				{
-					base.Layer = value;
-					if (subCurves != null)
-					{
-						for (int i = 0; i < subCurves.Length; ++i)
-						{
-							(subCurves[i] as IGeoObject).Layer = value;
-						}
-					}
-				}
-			}
-		}
-		#endregion
-		#region IOctTreeInsertable members
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (double)"/>
-		/// </summary>
-		/// <param name="precision"></param>
-		/// <returns></returns>
-		public override BoundingCube GetExtent(double precision)
+        {
+            get => base.Layer;
+            set
+            {
+                using (ChangingAttribute.Create(this, base.Layer))
+                {
+                    base.Layer = value;
+                    if (subCurves != null)
+                    {
+                        for (int i = 0; i < subCurves.Length; ++i)
+                        {
+                            (subCurves[i] as IGeoObject).Layer = value;
+                        }
+                    }
+                }
+            }
+        }
+        #endregion
+        #region IOctTreeInsertable members
+        /// <summary>
+        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (double)"/>
+        /// </summary>
+        /// <param name="precision"></param>
+        /// <returns></returns>
+        public override BoundingCube GetExtent(double precision)
 		{
 			return GetBoundingCube();
 		}
@@ -1560,7 +1557,7 @@ namespace CADability.GeoObject
 			//			if (ind<0) return StartPoint;
 			//			else if (ind>=subCurves.Length) return EndPoint;
 			//			else return Curve(ind).PointAt(pos-ind);
-			// gefordert ist, dass auch Punkte vor oder nach der Kurve geliefert werden 
+			// gefordert ist, dass auch Punkte vor oder nach der Kurve geliefert werden
 			// (z.B. wg. Verlängern). Deshalb nicht einfach Start- bzw. Endpunkt liefern
 			return Curve(ind).PointAt(pos - ind);
 		}
@@ -2310,24 +2307,21 @@ namespace CADability.GeoObject
 		#region IColorDef Members
 		private ColorDef colorDef;
 		public ColorDef ColorDef
-		{
-			get
-			{
-				return colorDef;
-			}
-			set
-			{
-				using (new ChangingAttribute(this, "ColorDef", colorDef))
-				{
-					colorDef = value;
-					if (subCurves != null) for (int i = 0; i < subCurves.Length; ++i)
-						{
-							(subCurves[i] as IColorDef).ColorDef = value;
-						}
-				}
-			}
-		}
-		void IColorDef.SetTopLevel(ColorDef newValue)
+        {
+            get => colorDef;
+            set
+            {
+                using (ChangingAttribute.Create(this, colorDef))
+                {
+                    colorDef = value;
+                    if (subCurves != null) for (int i = 0; i < subCurves.Length; ++i)
+                    {
+                        (subCurves[i] as IColorDef).ColorDef = value;
+                    }
+                }
+            }
+        }
+        void IColorDef.SetTopLevel(ColorDef newValue)
 		{
 			colorDef = newValue;
 		}
@@ -2352,47 +2346,41 @@ namespace CADability.GeoObject
 		#region ILinePattern Members
 		private LinePattern linePattern;
 		public LinePattern LinePattern
-		{
-			get
-			{
-				return linePattern;
-			}
-			set
-			{
-				using (new ChangingAttribute(this, "LinePattern", linePattern))
-				{
-					linePattern = value;
-					if (subCurves != null) for (int i = 0; i < subCurves.Length; ++i)
-						{
-							(subCurves[i] as ILinePattern).LinePattern = value;
-						}
-				}
-			}
-		}
-		#endregion
-		#region ILineWidth Members
-		private LineWidth lineWidth;
+        {
+            get => linePattern;
+            set
+            {
+                using (ChangingAttribute.Create(this, linePattern))
+                {
+                    linePattern = value;
+                    if (subCurves != null) for (int i = 0; i < subCurves.Length; ++i)
+                    {
+                        (subCurves[i] as ILinePattern).LinePattern = value;
+                    }
+                }
+            }
+        }
+        #endregion
+        #region ILineWidth Members
+        private LineWidth lineWidth;
 		public LineWidth LineWidth
-		{
-			get
-			{
-				return lineWidth;
-			}
-			set
-			{
-				using (new ChangingAttribute(this, "LineWidth", lineWidth))
-				{
-					lineWidth = value;
-					if (subCurves != null) for (int i = 0; i < subCurves.Length; ++i)
-						{
-							(subCurves[i] as ILineWidth).LineWidth = value;
-						}
-				}
-			}
-		}
-		#endregion
-		#region IGeoObjectOwner
-		void IGeoObjectOwner.Remove(IGeoObject toRemove)
+        {
+            get => lineWidth;
+            set
+            {
+                using (ChangingAttribute.Create(this, lineWidth))
+                {
+                    lineWidth = value;
+                    if (subCurves != null) for (int i = 0; i < subCurves.Length; ++i)
+                    {
+                        (subCurves[i] as ILineWidth).LineWidth = value;
+                    }
+                }
+            }
+        }
+        #endregion
+        #region IGeoObjectOwner
+        void IGeoObjectOwner.Remove(IGeoObject toRemove)
 		{   // ein Teilobjekt eines Pfades wird anderweitig verwendet
 			// was kann man da tun? Es einfach zu entfernen geht nicht, da dieser
 			// Pfad durch ein späteres Undo wieder verwendet werden könnte.

@@ -1,8 +1,8 @@
-﻿using CADability.UserInterface;
 using System;
 using System.Collections;
 using System.Reflection;
 using System.Runtime.Serialization;
+using CADability.UserInterface;
 
 
 /// <summary>
@@ -10,71 +10,11 @@ using System.Runtime.Serialization;
 /// </summary>
 namespace CADability.GeoObject
 {
-    using CADability.Actions;
-    using CADability.Attribute;
     using System.Collections.Generic;
     using System.Globalization;
-    using System.Threading;
-
-    /// <summary>
-    /// This class is used as a parameter in the <see cref="ChangeDelegate"/> event of IGeoObject 
-    /// (see <see cref="IGeoObject.WillChangeEvent"/>).
-    /// </summary>
-
-    public class GeoObjectChange : ReversibleChange
-    {
-        /// <summary>
-        /// Notifies that only an attribute was changed in contrast to a change of the geometry.
-        /// </summary>
-        public bool OnlyAttributeChanged;
-        /// <summary>
-        /// Notifies that this change doesn't require an undo operation
-        /// </summary>
-        public bool NoUndoNecessary;
-        /// <summary>
-        /// Creates a new GeoObjectChange object. See the appropriate constructor of <see cref="ReversibleChange"/> for details.
-        /// </summary>
-        /// <param name="objectToChange">The object which will be or was changed</param>
-        /// <param name="interfaceForMethod">the interface on which contains the method or property</param>
-        /// <param name="methodOrPropertyName">the case sensitive name of the method or property</param>
-        /// <param name="parameters">The parameters neede to call this method or property</param>
-        public GeoObjectChange(IGeoObject objectToChange, Type interfaceForMethod, string methodOrPropertyName, params object[] parameters)
-            : base(objectToChange, interfaceForMethod, methodOrPropertyName, parameters)
-        {
-            OnlyAttributeChanged = false;
-            NoUndoNecessary = false;
-        }
-        /// <summary>
-        /// Creates a new GeoObjectChange object. See the appropriate constructor of <see cref="ReversibleChange"/> for details.
-        /// </summary>
-        /// <param name="objectToChange">The object which will be or was changed</param>
-        /// <param name="methodOrPropertyName">the case sensitive name of the method or property</param>
-        /// <param name="parameters">The parameters neede to call this method or property</param>
-        public GeoObjectChange(IGeoObject objectToChange, string methodOrPropertyName, params object[] parameters)
-            : base(objectToChange, methodOrPropertyName, parameters)
-        {
-            OnlyAttributeChanged = false;
-            NoUndoNecessary = false;
-        }
-        /// <summary>
-        /// Creates a new GeoObjectChange object that reflects a modification by the <see cref="ModOp"/> m.
-        /// </summary>
-        /// <param name="objectToChange">The object which will be or was changed</param>
-        /// <param name="m">the ModOp that changes or changed the object</param>
-        public GeoObjectChange(IGeoObject objectToChange, ModOp m)
-            : base(objectToChange, "ModifyInverse", m)
-        {
-            OnlyAttributeChanged = false;
-            NoUndoNecessary = false;
-        }
-        // Wenn das gebraucht wird, dann mit anderen Parametern versehen sonst droht verwechslung mit obiger Methode (methodOrPropertyName)
-        //public GeoObjectChange(IGeoObject objectToChange, string key, object oldValue)
-        //    : base(objectToChange.UserData, "Add", key, oldValue)
-        //{
-        //    OnlyAttributeChanged = true;
-        //    NoUndoNecessary = false;
-        //}
-    }
+    using System.Runtime.CompilerServices;
+    using CADability.Actions;
+    using CADability.Attribute;
 
     /// <summary>
     /// Delegate method that is invoked when a GeoObject is about to change or did change.
@@ -98,7 +38,7 @@ namespace CADability.GeoObject
             this.geoObject = geoObject;
         }
     }
-    internal class LayerToDisplayListDictionary: Dictionary<Layer, IPaintTo3DList>
+    internal class LayerToDisplayListDictionary : Dictionary<Layer, IPaintTo3DList>
     {
         public new void Clear()
         {
@@ -255,14 +195,14 @@ namespace CADability.GeoObject
     }
 
     /// <summary>
-    /// IGeoObject is the interface that all geometric entities must support 
-    /// (see <a href="c90ccd0b-e1de-4859-8d4d-20e516a766cd.htm">GeoObject</a>). 
+    /// IGeoObject is the interface that all geometric entities must support
+    /// (see <a href="c90ccd0b-e1de-4859-8d4d-20e516a766cd.htm">GeoObject</a>).
     /// </summary>
 
     public interface IGeoObject : ILayer, IStyle, IOctTreeInsertable, IComparable
     {
         /// <summary>
-        /// Modifies this GeoObject with the given <see cref="ModOp">modification operation</see> 
+        /// Modifies this GeoObject with the given <see cref="ModOp">modification operation</see>
         /// (includes moving, rotating, reflecting, scaling etc.).
         /// </summary>
         /// <param name="m">Operation to be applied</param>
@@ -279,7 +219,7 @@ namespace CADability.GeoObject
         /// <returns></returns>
         bool HasChildren();
         /// <summary>
-        /// Returns the number of children the GeoObject has. Simple GeoObjects (like <see cref="Line"/>) 
+        /// Returns the number of children the GeoObject has. Simple GeoObjects (like <see cref="Line"/>)
         /// dont have children.
         /// </summary>
         int NumChildren { get; }
@@ -290,7 +230,7 @@ namespace CADability.GeoObject
         /// <returns>this child</returns>
         IGeoObject Child(int Index);
         /// <summary>
-        /// Returns the owner of this GeoObject. Each GeoObject has only one owner. 
+        /// Returns the owner of this GeoObject. Each GeoObject has only one owner.
         /// This might be a <see cref="Model"/> or a GeoObject derived from <see cref="Block"/>.
         /// </summary>
         IGeoObjectOwner Owner { get; set; }
@@ -317,7 +257,7 @@ namespace CADability.GeoObject
         event ChangeDelegate DidChangeEvent;
         /// <summary>
         /// Gets a <see cref="IShowProperty"/> object that represents the properties of
-        /// this geoobject. The result will be used to display the properties in the 
+        /// this geoobject. The result will be used to display the properties in the
         /// control center.
         /// </summary>
         /// <param name="Frame">IFrame reference used to check settings</param>
@@ -332,7 +272,7 @@ namespace CADability.GeoObject
         /// <returns>list of properties</returns>
         IPropertyEntry[] GetAttributeProperties(IFrame Frame);
         /// <summary>
-        /// Returns a bounding cube of the object. The object must fir into this cube. 
+        /// Returns a bounding cube of the object. The object must fir into this cube.
         /// There may be a smaller cube that contains the object if it is to expensive to
         /// calculate the exact cube.
         /// </summary>
@@ -364,7 +304,7 @@ namespace CADability.GeoObject
         /// <returns>true if used by this GeoObject</returns>
         bool IsAttributeUsed(object Attribute);
         /// <summary>
-        /// Sets an attribut to the GeoObject. There are the following types (keys) of attributes 
+        /// Sets an attribut to the GeoObject. There are the following types (keys) of attributes
         /// predefined in CADability, which can be set with this method:
         /// <list type="">
         /// <item> "Layer": sets a <see cref="Layer"/></item>
@@ -381,7 +321,7 @@ namespace CADability.GeoObject
         /// <param name="toSet">attribute</param>
         void SetNamedAttribute(string key, INamedAttribute toSet);
         /// <summary>
-        /// Gets an attribut from the GeoObject. There are the following types (keys) of attributes 
+        /// Gets an attribut from the GeoObject. There are the following types (keys) of attributes
         /// predefined in CADability, which can be set with this method:
         /// <list type="">
         /// <item> "Layer": sets a <see cref="Layer"/></item>
@@ -406,7 +346,7 @@ namespace CADability.GeoObject
         /// </summary>
         string[] CustomAttributeKeys { get; }
         /// <summary>
-        /// This method is called to notify the object of an attribute that changed some of 
+        /// This method is called to notify the object of an attribute that changed some of
         /// its properties. The objects returns true, if it needs to be repainted.
         /// </summary>
         /// <param name="attribute"></param>
@@ -420,14 +360,14 @@ namespace CADability.GeoObject
         /// <returns></returns>
         bool ModifyWithMouse(object sender, string propertyName, bool startModify);
         /// <summary>
-        /// Asks the object to enumerate all its possible snap points according to the 
+        /// Asks the object to enumerate all its possible snap points according to the
         /// required modes defined by the parameter.
         /// </summary>
         /// <param name="spf">definition and collection of snap points</param>
         void FindSnapPoint(SnapPointFinder spf);
         /// <summary>
         /// Determins whether the GeoObject has valid data (e.g. to be added to a model).
-        /// E.g. a line where the startpoint is identical to the endpoint or a circle with 
+        /// E.g. a line where the startpoint is identical to the endpoint or a circle with
         /// radius &lt;=0.0 is considered invalid.
         /// </summary>
         /// <returns>true, if valid, false otherwise</returns>
@@ -452,7 +392,7 @@ namespace CADability.GeoObject
         /// <summary>
         /// This method will be called from a background thread when a higher precision
         /// displaylist is needed. The object should do all the necessary calculation
-        /// to produce a display list with the required precision. The display list 
+        /// to produce a display list with the required precision. The display list
         /// will later be acquired by a call to PaintTo3DList (or PaintTo3D) from the main thred
         /// because the display dirvers are not multithread enabled.
         /// </summary>
@@ -604,6 +544,9 @@ namespace CADability.GeoObject
         /// </summary>
         protected class ChangingAttribute : Changing
         {
+            new public static Changing<T> Create<T>(IGeoObjectImpl geoObject, T oldValue, [CallerMemberName] string propertyName = null) where T : INamedAttribute
+                => new Changing<T>(geoObject, oldValue, true, propertyName);
+
             /// <summary>
             /// Creates a ChangingAttribute
             /// </summary>
@@ -620,6 +563,43 @@ namespace CADability.GeoObject
         {
             return new Changing(geoObject, propertyName);
         }
+
+        /// <summary>
+        /// A performance optimized version of <see cref="Changing"/>, without reflection and minimal allocations.
+        /// </summary>
+        /// <typeparam name="T">The type of the value being changed.</typeparam>
+        protected readonly struct Changing<T> : IDisposable
+        {
+            private readonly IGeoObjectImpl _geoObject;
+            private readonly T _oldValue;
+            private readonly bool _isAttribute;
+            private readonly string _propertyName;
+            private readonly GeoObjectChange _change;
+
+            public Changing(IGeoObjectImpl geoObject, T oldValue, bool isAttribute, [CallerMemberName] string propertyName = null)
+            {
+                _geoObject = geoObject;
+                _oldValue = oldValue;
+                _isAttribute = isAttribute;
+                _propertyName = propertyName;
+                _change = null;
+                if (_geoObject.isChanging++ == 0 && _geoObject.WillChangeEvent != null)
+                {
+                    // only allocate and fire the event if this is the outermost change and there are subscribers
+                    _change = new GeoObjectChange(_geoObject, propertyName, _oldValue) { OnlyAttributeChanged = isAttribute };
+                    _geoObject.FireWillChange(_change);
+                }
+            }
+
+            public void Dispose()
+            {
+                if (--_geoObject.isChanging == 0 && (_geoObject.DidChangeEvent != null || _geoObject.FeedBackChangedEvent != null))
+                {
+                    _geoObject.FireDidChange(_change ?? new GeoObjectChange(_geoObject, _propertyName, _oldValue) { OnlyAttributeChanged = _isAttribute });
+                }
+            }
+        }
+
         /// <summary>
         /// Helper class to wrap any changing of this GeoObject. Usually used in this way:
         /// <code>
@@ -634,6 +614,9 @@ namespace CADability.GeoObject
         /// </summary>
         protected class Changing : IDisposable
         {
+            public static Changing<T> Create<T>(IGeoObjectImpl geoObject, T oldValue, [CallerMemberName] string propertyName = null)
+                => new Changing<T>(geoObject, oldValue, false, propertyName);
+
             private IGeoObjectImpl geoObject; // Rückverweis
             private GeoObjectChange Change;
             private PropertyInfo FindProperty(object o, string propname)
@@ -657,7 +640,7 @@ namespace CADability.GeoObject
             }
             /// <summary>
             /// Sets <see cref="GeoObjectChange.NoUndoNecessary"/> to true for the
-            /// parameter of the call to <see cref="FireWillChange"/> 
+            /// parameter of the call to <see cref="FireWillChange"/>
             /// and <see cref="FireDidChange"/>.
             /// </summary>
             public void NoUndoNecessary()
@@ -708,7 +691,7 @@ namespace CADability.GeoObject
                 }
             }
             /// <summary>
-            /// Changing geometrical aspects of an GeoObject. A <see cref="Clone"/> of this GeoObject is 
+            /// Changing geometrical aspects of an GeoObject. A <see cref="Clone"/> of this GeoObject is
             /// made and saved and <see cref="CopyGeometry"/> might be called with that clone later
             /// when there is an undo.
             /// </summary>
@@ -724,7 +707,7 @@ namespace CADability.GeoObject
                 }
             }
             /// <summary>
-            /// Changing geometrical aspects of an GeoObject. A <see cref="Clone"/> of this GeoObject is 
+            /// Changing geometrical aspects of an GeoObject. A <see cref="Clone"/> of this GeoObject is
             /// made and saved and <see cref="CopyGeometry"/> might be called with that clone later
             /// when there is an undo.
             /// </summary>
@@ -742,7 +725,7 @@ namespace CADability.GeoObject
                 }
             }
             /// <summary>
-            /// Changing geometrical aspects of an GeoObject. A <see cref="Clone"/> of this GeoObject is 
+            /// Changing geometrical aspects of an GeoObject. A <see cref="Clone"/> of this GeoObject is
             /// made and saved and <see cref="CopyGeometry"/> might be called with that clone later
             /// when there is an undo.
             /// </summary>
@@ -940,11 +923,11 @@ namespace CADability.GeoObject
 #endif
         public int UniqueId { get { return uniqueId; } }
         /// <summary>
-        /// Event that is raised when the GeoObject is about to change. 
+        /// Event that is raised when the GeoObject is about to change.
         /// </summary>
         public event ChangeDelegate WillChangeEvent;
         /// <summary>
-        /// Event that is raised when the GeoObject did change. 
+        /// Event that is raised when the GeoObject did change.
         /// </summary>
         public event ChangeDelegate DidChangeEvent;
         public event FeedBackChangedDelegate FeedBackChangedEvent;
@@ -1066,7 +1049,7 @@ namespace CADability.GeoObject
         /// <param name="attribute"></param>
         /// <returns></returns>
         public virtual bool AttributeChanged(INamedAttribute attribute)
-        {	// wird aufgerufen, wenn die Eigenschaft eine Attributes geändert wurde (also z.B.
+        {   // wird aufgerufen, wenn die Eigenschaft eine Attributes geändert wurde (also z.B.
             // der RGB Wert von ColorDef oder die Sichtbarkeit eines Layers, nicht wenn
             // z.B. die Eigenschaft "Layer" dieses Objektes geändert wurde.
             if (attribute == layer) // Layer haben alle ist ja hier in IGeoObjectimpl definiert
@@ -1414,7 +1397,7 @@ namespace CADability.GeoObject
         }
         /// <summary>
         /// Implements <see cref="IGeoObject.GetBoundingCube"/> abstract.
-        /// Must be overridden. 
+        /// Must be overridden.
         /// </summary>
         /// <returns>the bounding cube</returns>
         public abstract BoundingCube GetBoundingCube();
@@ -1517,10 +1500,10 @@ namespace CADability.GeoObject
                 }
             }
             if (this is BlockRef)
-            {	// das muss aufgerufen werden, wenn z.B. ein Modell zum Projekt hinzugefügt
+            {   // das muss aufgerufen werden, wenn z.B. ein Modell zum Projekt hinzugefügt
                 // wird und dieses Modell enthält BlockRef Objekte.
                 // Leider wird es dabei zu oft aufgerufen, wenn es nämlich mehrere Instanzen
-                // des selben Blockrefs enthält. 
+                // des selben Blockrefs enthält.
                 // Alternativ dazu könnte man in solchen Fällen zuerst eine Liste aller verwendeten
                 // BlockRefs erzeugen und dann diesen mechanismus für jeden Blockref genau einmal
                 // aufrufen (und natürlich diese Implementierung hier abklemmen)
@@ -1569,7 +1552,7 @@ namespace CADability.GeoObject
         /// <param name="startModify"></param>
         /// <returns></returns>
         public virtual bool ModifyWithMouse(object sender, string propertyName, bool startModify)
-        {	// mit WillChange zeigt das Objekt an, dass es mit der Maus verändert werden wird
+        {   // mit WillChange zeigt das Objekt an, dass es mit der Maus verändert werden wird
             // mit DidChange, dass die Mausänderung zuende ist.
             // Leider kommen jetzt danach mehrere Paare FireWillChange/FireDidChange, so dass also
             // FireWillChange zweimal hintereinander kommt.
@@ -1612,7 +1595,7 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
-        /// Patin the object to th <see cref="IPaintTo3D"/> interface. 
+        /// Patin the object to th <see cref="IPaintTo3D"/> interface.
         /// </summary>
         /// <param name="paintTo3D">Target for the paint operation</param>
         public abstract void PaintTo3D(IPaintTo3D paintTo3D);
@@ -1850,13 +1833,10 @@ namespace CADability.GeoObject
         /// </summary>
         public virtual Layer Layer
         {
-            get
-            {
-                return layer;
-            }
+            get => layer;
             set
             {
-                using (new ChangingAttribute(this, "Layer", layer))
+                using (ChangingAttribute.Create(this, layer))
                 {
                     layer = value;
                 }
@@ -1868,17 +1848,14 @@ namespace CADability.GeoObject
         /// </summary>
         public virtual Style Style
         {
+            get => style;
             set
             {
-                using (new ChangingAttribute(this, "Style", style))
+                using (ChangingAttribute.Create(this, style))
                 {
                     style = value;
                     if (style != null) style.Apply(this); // diese senden eingeschachtelte Changings
                 }
-            }
-            get
-            {
-                return style;
             }
         }
         /// <summary>

@@ -570,7 +570,7 @@ namespace CADability.Attribute
             }
             set
             {
-                object[] param = new object[] { colorDef };
+                var param = colorDef;
                 colorDef = value;
                 if (parent != null)
                     (parent as IAttributeList).AttributeChanged(this, new ReversibleChange(this, "ColorDef", param));
@@ -594,7 +594,7 @@ namespace CADability.Attribute
             }
             set
             {
-                object[] param = new object[] { layer };
+                var param = layer;
                 layer = value;
                 if (parent != null)
                     (parent as IAttributeList).AttributeChanged(this, new ReversibleChange(this, "Layer", param));
@@ -609,7 +609,7 @@ namespace CADability.Attribute
             }
             set
             {
-                object[] param = new object[] { lineWidth };
+                var param = lineWidth;
                 lineWidth = value;
                 if (parent != null)
                     (parent as IAttributeList).AttributeChanged(this, new ReversibleChange(this, "LineWidth", param));
@@ -625,7 +625,7 @@ namespace CADability.Attribute
             }
             set
             {
-                object[] param = new object[] { linePattern };
+                var param = linePattern;
                 linePattern = value;
                 if (parent != null)
                     (parent as IAttributeList).AttributeChanged(this, new ReversibleChange(this, "LinePattern", param));
@@ -640,7 +640,7 @@ namespace CADability.Attribute
             }
             set
             {
-                object[] param = new object[] { hatchStyle };
+                var param = hatchStyle;
                 hatchStyle = value;
                 if (parent != null)
                     (parent as IAttributeList).AttributeChanged(this, new ReversibleChange(this, "HatchStyle", param));
@@ -651,7 +651,7 @@ namespace CADability.Attribute
             get { return dimStyle; }
             set
             {
-                object[] param = new object[] { dimStyle };
+                var param = dimStyle;
                 dimStyle = value;
                 if (parent != null)
                     (parent as IAttributeList).AttributeChanged(this, new ReversibleChange(this, "DimensionStyle", param));

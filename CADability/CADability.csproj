@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackageId>CADability</PackageId>
-    <Version>1.0.33</Version>
+    <Version>1.0.38</Version>
     <!-- Update this for each publish -->
     <Authors>FriendsOfCADability</Authors>
     <Description>CAD functionality for .NET</Description>
@@ -20,6 +20,7 @@
     <AssemblyName>CADability</AssemblyName>
     <Platforms>AnyCPU;x64</Platforms>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <LangVersion>11.0</LangVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)'=='Debug'">

@@ -984,7 +984,7 @@ namespace CADability
 					}
 				}
 			}
-			Undo.AddUndoStep(new ReversibleChange(this, "Remove", new object[] { ListToAdd.Clone() }));
+            Undo.AddUndoStep(new ReversibleChange(this, "Remove", ListToAdd.Clone()));
 			if (AddingGeoObjectsEvent != null) AddingGeoObjectsEvent(ListToAdd);
 			if (octTree != null && octTree.IsEmpty && extent != null) octTree = new OctTree<IGeoObject>(extent.Value, displayListPrecision);
 			for (int i = 0; i < ListToAdd.Count; ++i)
@@ -1069,7 +1069,7 @@ namespace CADability
 			// den Aufruf von RemovingGeoObjectsEvent an den Anfang gesetzt, damit man darin einen UndoFrame machen kann
 			// den man bei GeoObjectsRemovedEvent wieder zu macht. Ob das stört?
 			if (RemovingGeoObjectsEvent != null) RemovingGeoObjectsEvent(ToRemove);
-			Undo.AddUndoStep(new ReversibleChange(this, "Add", new object[] { ToRemove.Clone() }));
+            Undo.AddUndoStep(new ReversibleChange(this, "Add", ToRemove.Clone()));
 			// kein Undoframe, denn Remove wird selbst von Undo aufgerufen
 			for (int i = ToRemove.Count - 1; i >= 0; i--)
 			{

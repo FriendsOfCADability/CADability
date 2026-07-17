@@ -176,7 +176,7 @@ namespace CADability.Forms
                         if (connect != null) mainMenu = connect.Invoke(null, new object[] { cadFrame, mainMenu }) as MenuWithHandler[];
                     }
                     #endregion DebuggerPlayground
-                    var menuStrip = MenuManager.MakeMainMenu(mainMenu);
+                    MenuStrip menuStrip = MenuManager.MakeMainMenu(mainMenu);
                     parentForm.Controls.Add(menuStrip);
                     parentForm.MainMenuStrip = menuStrip;
                     cadFrame.FormMenu = menuStrip;

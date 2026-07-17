@@ -1,4 +1,4 @@
-﻿using CADability.Actions;
+using CADability.Actions;
 using CADability.Attribute;
 using CADability.UserInterface;
 using System;
@@ -176,7 +176,7 @@ namespace CADability.GeoObject
         #endregion
     }
     /// <summary>
-    /// 
+    ///
     /// </summary>
     [Serializable()]
     public class BlockRef : IGeoObjectImpl, IColorDef, IGeoObjectOwner
@@ -609,13 +609,10 @@ namespace CADability.GeoObject
         private ColorDef colorDef;
         public ColorDef ColorDef
         {
-            get
-            {
-                return colorDef;
-            }
+            get => colorDef;
             set
             {
-                using (new ChangingAttribute(this, "ColorDef", colorDef))
+                using (ChangingAttribute.Create(this, colorDef))
                 {
                     colorDef = value;
                 }

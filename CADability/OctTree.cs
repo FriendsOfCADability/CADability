@@ -456,7 +456,7 @@ namespace CADability
             {
                 if (ppp == null)
                 {
-                    list.Remove(objectToRemove);
+                    list?.Remove(objectToRemove);
                 }
                 else
                 {
@@ -494,7 +494,7 @@ namespace CADability
                     }
                 }
             }
-            internal void GetObjectsFromRect(Projection projection, BoundingRect rect, bool onlyInside, Set<TT> addToList)
+            internal void GetObjectsFromRect(Projection projection, BoundingRect rect, bool onlyInside, Set<TT> addToList, HashSet<TT> alreadyTested)
             {
                 if (cube.Interferes(projection, rect))
                 {
@@ -502,7 +502,7 @@ namespace CADability
                     {
                         foreach (TT item in list)
                         {
-                            if (!addToList.Contains(item) && item.HitTest(projection, rect, onlyInside))
+                            if (alreadyTested.Add(item) && item.HitTest(projection, rect, onlyInside))
                             {
                                 addToList.Add(item);
                             }
@@ -510,18 +510,18 @@ namespace CADability
                     }
                     else if (ppp != null)
                     {
-                        ppp.GetObjectsFromRect(projection, rect, onlyInside, addToList);
-                        mpp.GetObjectsFromRect(projection, rect, onlyInside, addToList);
-                        pmp.GetObjectsFromRect(projection, rect, onlyInside, addToList);
-                        mmp.GetObjectsFromRect(projection, rect, onlyInside, addToList);
-                        ppm.GetObjectsFromRect(projection, rect, onlyInside, addToList);
-                        mpm.GetObjectsFromRect(projection, rect, onlyInside, addToList);
-                        pmm.GetObjectsFromRect(projection, rect, onlyInside, addToList);
-                        mmm.GetObjectsFromRect(projection, rect, onlyInside, addToList);
+                        ppp.GetObjectsFromRect(projection, rect, onlyInside, addToList, alreadyTested);
+                        mpp.GetObjectsFromRect(projection, rect, onlyInside, addToList, alreadyTested);
+                        pmp.GetObjectsFromRect(projection, rect, onlyInside, addToList, alreadyTested);
+                        mmp.GetObjectsFromRect(projection, rect, onlyInside, addToList, alreadyTested);
+                        ppm.GetObjectsFromRect(projection, rect, onlyInside, addToList, alreadyTested);
+                        mpm.GetObjectsFromRect(projection, rect, onlyInside, addToList, alreadyTested);
+                        pmm.GetObjectsFromRect(projection, rect, onlyInside, addToList, alreadyTested);
+                        mmm.GetObjectsFromRect(projection, rect, onlyInside, addToList, alreadyTested);
                     }
                 }
             }
-            internal void GetObjectsFromRect(Projection.PickArea area, bool onlyInside, Set<TT> addToList)
+            internal void GetObjectsFromRect(Projection.PickArea area, bool onlyInside, Set<TT> addToList, HashSet<TT> alreadyTested)
             {
                 if (area == null) return;
                 if (cube.Interferes(area))
@@ -530,7 +530,7 @@ namespace CADability
                     {
                         foreach (TT item in list)
                         {
-                            if (!addToList.Contains(item) && item.HitTest(area, onlyInside))
+                            if (alreadyTested.Add(item) && item.HitTest(area, onlyInside))
                             {
                                 addToList.Add(item);
                             }
@@ -538,14 +538,14 @@ namespace CADability
                     }
                     else if (ppp != null)
                     {
-                        ppp.GetObjectsFromRect(area, onlyInside, addToList);
-                        mpp.GetObjectsFromRect(area, onlyInside, addToList);
-                        pmp.GetObjectsFromRect(area, onlyInside, addToList);
-                        mmp.GetObjectsFromRect(area, onlyInside, addToList);
-                        ppm.GetObjectsFromRect(area, onlyInside, addToList);
-                        mpm.GetObjectsFromRect(area, onlyInside, addToList);
-                        pmm.GetObjectsFromRect(area, onlyInside, addToList);
-                        mmm.GetObjectsFromRect(area, onlyInside, addToList);
+                        ppp.GetObjectsFromRect(area, onlyInside, addToList, alreadyTested);
+                        mpp.GetObjectsFromRect(area, onlyInside, addToList, alreadyTested);
+                        pmp.GetObjectsFromRect(area, onlyInside, addToList, alreadyTested);
+                        mmp.GetObjectsFromRect(area, onlyInside, addToList, alreadyTested);
+                        ppm.GetObjectsFromRect(area, onlyInside, addToList, alreadyTested);
+                        mpm.GetObjectsFromRect(area, onlyInside, addToList, alreadyTested);
+                        pmm.GetObjectsFromRect(area, onlyInside, addToList, alreadyTested);
+                        mmm.GetObjectsFromRect(area, onlyInside, addToList, alreadyTested);
                     }
                 }
             }
@@ -1205,7 +1205,7 @@ namespace CADability
         {
             //GeoObjectList dbg = DebugCheck(delegate(IOctTreeInsertable[] theList, BoundingCube bc) { return bc.Interferes(projection, rect); });
             Set<T> addToList = new Set<T>();
-            node.GetObjectsFromRect(projection, rect, onlyInside, addToList);
+            node.GetObjectsFromRect(projection, rect, onlyInside, addToList, new HashSet<T>());
             return addToList.ToArray();
         }
         /// <summary>
@@ -1220,7 +1220,7 @@ namespace CADability
         {
             //GeoObjectList dbg = DebugCheck(delegate(IOctTreeInsertable[] theList, BoundingCube bc) { return bc.Interferes(projection, rect); });
             Set<T> addToList = new Set<T>();
-            node.GetObjectsFromRect(area, onlyInside, addToList);
+            node.GetObjectsFromRect(area, onlyInside, addToList, new HashSet<T>());
             return addToList.ToArray();
         }
         /// <summary>

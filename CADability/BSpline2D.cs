@@ -1121,7 +1121,7 @@ namespace CADability.Curve2D
                 if (zMax < p.z) zMax = p.z;
             }
         }
-        protected override void GetTriangulationBasis(out GeoPoint2D[] points, out GeoVector2D[] directions, out double[] parameters)
+        private double[] GetTriangulationKnots()
         {
             double[] tknots = knots;
             if (knots.Length == 2)
@@ -1131,6 +1131,37 @@ namespace CADability.Curve2D
                 tknots[1] = (knots[0] + knots[1]) / 2.0;
                 tknots[2] = knots[1];
             }
+            // The triangulation based HitTest relies on each span's control triangle enclosing the
+            // curve, which only holds while a span turns less than ~180°. Free-form splines with few
+            // knots have spans that turn too much, so the coarse triangle test rejects them and only
+            // the knot points (notably the curve start/end) register as hits. Subdivide such spans by
+            // turning angle so the resulting triangles stay tight enough to bound the curve.
+            const double maxSpanAngle = Math.PI / 4.0; // 45° per sub-span
+            List<double> res = new List<double>(tknots.Length);
+            GeoVector2D d0 = DirectionAtParam(tknots[0]);
+            for (int i = 0; i < tknots.Length - 1; i++)
+            {
+                res.Add(tknots[i]);
+                GeoVector2D d1 = DirectionAtParam(tknots[i + 1]);
+                if (!d0.IsNullVector() && !d1.IsNullVector())
+                {
+                    double dot = d0.x * d1.x + d0.y * d1.y;
+                    double cross = d0.x * d1.y - d0.y * d1.x;
+                    double angle = Math.Atan2(Math.Abs(cross), dot); // [0, pi], directions are normalized
+                    int sub = (int)Math.Ceiling(angle / maxSpanAngle);
+                    for (int j = 1; j < sub; j++)
+                    {
+                        res.Add(tknots[i] + (tknots[i + 1] - tknots[i]) * j / sub);
+                    }
+                }
+                d0 = d1;
+            }
+            res.Add(tknots[tknots.Length - 1]);
+            return res.ToArray();
+        }
+        protected override void GetTriangulationBasis(out GeoPoint2D[] points, out GeoVector2D[] directions, out double[] parameters)
+        {
+            double[] tknots = GetTriangulationKnots();
             points = new GeoPoint2D[tknots.Length];
             directions = new GeoVector2D[tknots.Length];
             parameters = new double[tknots.Length];
@@ -1142,14 +1173,7 @@ namespace CADability.Curve2D
         }
         internal override void GetTriangulationPoints(out GeoPoint2D[] points, out double[] parameters)
         {
-            double[] tknots = knots;
-            if (knots.Length == 2)
-            {   // there are splines with only two knots and degree 14 which represent a full circle. We invent an additional knot
-                tknots = new double[3];
-                tknots[0] = knots[0];
-                tknots[1] = (knots[0] + knots[1]) / 2.0;
-                tknots[2] = knots[1];
-            }
+            double[] tknots = GetTriangulationKnots();
             points = new GeoPoint2D[tknots.Length];
             parameters = new double[tknots.Length];
             for (int i = 0; i < tknots.Length; i++)

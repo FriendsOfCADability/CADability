@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.Reflection;
 using System.Threading;
@@ -14,8 +14,9 @@ namespace CADability
 
     public class ReversibleChange
     {
-        private object objectToChange;
-        private string methodOrPropertyName;
+        private readonly object objectToChange;
+        private readonly string methodOrPropertyName;
+        private readonly object parameter; // for the case of a single parameter, this is used to find the property or method
         private object[] parameters;
         private Type interfaceForMethod;
         private Func<bool> undo; // this is the modern way to do it, all data is captured
@@ -35,7 +36,8 @@ namespace CADability
         {
             this.objectToChange = objectToChange;
             this.methodOrPropertyName = methodOrPropertyName;
-            this.parameters = (object[])parameters.Clone();
+            this.parameter = null;
+            this.parameters = parameters;
             this.interfaceForMethod = interfaceForMethod;
         }
         /// <summary>
@@ -53,7 +55,17 @@ namespace CADability
         {
             this.objectToChange = objectToChange;
             this.methodOrPropertyName = methodOrPropertyName;
-            this.parameters = (object[])parameters.Clone();
+            this.parameter = null;
+            this.parameters = parameters;
+            this.interfaceForMethod = null;
+        }
+
+        public ReversibleChange(object objectToChange, string methodOrPropertyName, object parameter)
+        {
+            this.objectToChange = objectToChange;
+            this.methodOrPropertyName = methodOrPropertyName;
+            this.parameter = parameter;
+            this.parameters = null;
             this.interfaceForMethod = null;
         }
         /// <summary>
@@ -122,6 +134,10 @@ namespace CADability
         public bool Undo()
         {
             if (undo != null) return undo(); // this is the modern way
+
+            // lazy initialization of parameters, because the parameter is only used for the case of a single parameter
+            if (parameters == null)
+                parameters = new object[] { parameter };
             if (parameters.Length == 1)
             {
                 try

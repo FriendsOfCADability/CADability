@@ -1,5 +1,8 @@
 using CADability.UserInterface;
 using System;
+using System.ComponentModel;
+using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 namespace CADability.Forms
@@ -9,184 +12,175 @@ namespace CADability.Forms
         ICommandHandler commandHandler;
         public string menuID;
 
-        internal static ToolStripItem CreateItem(MenuWithHandler def)
+        public ContextMenuWithHandler(ToolStripItem[] items, ICommandHandler Handler, string menuID)
         {
-            if (def.ID == "SEPARATOR" || def.Text == "-")
-                return new ToolStripSeparator();
-            return new MenuItemWithHandler(def);
-        }
-
-        public ContextMenuWithHandler(ToolStripMenuItem[] menuItems, ICommandHandler handler, string menuID) : base()
-        {
-            commandHandler = handler;
+            Items.AddRange(items);
+            commandHandler = Handler;
             this.menuID = menuID;
-            Items.AddRange(menuItems);
         }
 
-        public ContextMenuWithHandler(MenuWithHandler[] definition) : base()
+        public ContextMenuWithHandler(MenuWithHandler[] definition)
         {
-            menuID = null;
+            this.menuID = null;
             commandHandler = null;
-            foreach (var def in definition)
-                Items.Add(CreateItem(def));
-            Closed += (s, e) => MenuItemWithHandler.HideToolTip();
+            for (int i = 0; i < definition.Length; i++)
+            {
+                Items.Add(MenuItemWithHandler.CreateItem(definition[i]));
+            }
+            this.Closed += (s, e) =>
+            {
+                MenuItemWithHandler.HideToolTip();
+                BeginInvoke(new Action(() => { if (!IsDisposed) Dispose(); }));
+            };
         }
 
         private void RecurseCommandState(MenuItemWithHandler miid)
         {
-            foreach (ToolStripItem mi in miid.DropDownItems)
+            foreach (ToolStripItem item in miid.DropDownItems)
             {
-                if (mi is MenuItemWithHandler submiid)
+                MenuItemWithHandler submiid = item as MenuItemWithHandler;
+                if (submiid != null)
                 {
                     if (commandHandler != null)
                     {
-                        CommandState cs = new CommandState();
-                        commandHandler.OnUpdateCommand((submiid.Tag as MenuWithHandler).ID, cs);
-                        submiid.Enabled = cs.Enabled;
-                        submiid.Checked = cs.Checked;
+                        CommandState commandState = new CommandState();
+                        commandHandler.OnUpdateCommand((submiid.Tag as MenuWithHandler).ID, commandState);
+                        submiid.Enabled = commandState.Enabled;
+                        submiid.Checked = commandState.Checked;
                     }
                     if (submiid.HasDropDownItems) RecurseCommandState(submiid);
                 }
             }
         }
-
         public void UpdateCommand()
         {
-            foreach (ToolStripItem mi in Items)
+            foreach (ToolStripItem item in Items)
             {
-                if (mi is MenuItemWithHandler miid && mi.Tag is MenuWithHandler mwh && mwh.Target != null)
+                MenuItemWithHandler miid = item as MenuItemWithHandler;
+                if (miid != null && miid.Tag is MenuWithHandler menuWithHandler)
                 {
-                    CommandState cs = new CommandState();
-                    mwh.Target.OnUpdateCommand(mwh.ID, cs);
-                    miid.Enabled = cs.Enabled;
-                    miid.Checked = cs.Checked;
-                    if (miid.HasDropDownItems) RecurseCommandState(miid);
+                    if (menuWithHandler.Target != null)
+                    {
+                        CommandState commandState = new CommandState();
+                        menuWithHandler.Target.OnUpdateCommand(menuWithHandler.ID, commandState);
+                        miid.Enabled = commandState.Enabled;
+                        miid.Checked = commandState.Checked;
+                        if (miid.HasDropDownItems) RecurseCommandState(miid);
+                    }
                 }
             }
         }
-
-        protected override void OnOpening(System.ComponentModel.CancelEventArgs e)
+        protected override void OnOpening(CancelEventArgs e)
         {
             UpdateCommand();
             base.OnOpening(e);
         }
-
-        protected override void OnClosed(ToolStripDropDownClosedEventArgs e)
+        protected override void Dispose(bool disposing)
         {
-            base.OnClosed(e);
+            base.Dispose(disposing);
         }
-
         public void SetCommandHandler(ICommandHandler hc)
         {
-            foreach (ToolStripItem mi in Items)
+            foreach (ToolStripItem item in Items)
             {
-                if (mi is MenuItemWithHandler submiid)
+                MenuItemWithHandler submiid = item as MenuItemWithHandler;
+                if (submiid != null)
                 {
                     (submiid.Tag as MenuWithHandler).Target = hc;
                     if (submiid.HasDropDownItems) SetCommandHandler(submiid, hc);
                 }
             }
-            commandHandler = hc;
+            this.commandHandler = hc;
         }
-
         private void SetCommandHandler(MenuItemWithHandler miid, ICommandHandler hc)
         {
-            foreach (ToolStripItem mi in miid.DropDownItems)
+            foreach (ToolStripItem item in miid.DropDownItems)
             {
-                if (mi is MenuItemWithHandler submiid)
+                MenuItemWithHandler submiid = item as MenuItemWithHandler;
+                if (submiid != null)
                 {
                     (submiid.Tag as MenuWithHandler).Target = hc;
                     if (submiid.HasDropDownItems) SetCommandHandler(submiid, hc);
                 }
             }
         }
-
         public delegate void MenuItemSelectedDelegate(string menuId);
         public event MenuItemSelectedDelegate MenuItemSelectedEvent;
-        public void FireMenuItemSelected(string menuId) => MenuItemSelectedEvent?.Invoke(menuId);
-
+        public void FireMenuItemSelected(string menuId)
+        {
+            if (MenuItemSelectedEvent != null) MenuItemSelectedEvent(menuId);
+        }
         private bool ProcessShortCut(Keys keys, ToolStripMenuItem mi)
         {
             if (mi.HasDropDownItems)
             {
-                foreach (ToolStripItem mii in mi.DropDownItems)
-                    if (mii is ToolStripMenuItem tsmi && ProcessShortCut(keys, tsmi))
+                foreach (ToolStripItem item in mi.DropDownItems)
+                {
+                    if (item is ToolStripMenuItem mii && ProcessShortCut(keys, mii))
                         return true;
+                }
             }
-            else if (mi.ShortcutKeys == keys && mi is MenuItemWithHandler miid)
+            else if (mi.ShortcutKeys == keys)
             {
-                CommandState cs = new CommandState();
-                commandHandler.OnUpdateCommand((miid.Tag as MenuWithHandler).ID, cs);
-                if (cs.Enabled) commandHandler.OnCommand((miid.Tag as MenuWithHandler).ID);
+                MenuItemWithHandler miid = mi as MenuItemWithHandler;
+                if (miid != null && commandHandler != null)
+                {
+                    CommandState commandState = new CommandState();
+                    commandHandler.OnUpdateCommand((miid.Tag as MenuWithHandler).ID, commandState);
+                    if (commandState.Enabled)
+                        commandHandler.OnCommand((miid.Tag as MenuWithHandler).ID);
+                }
                 return true;
             }
             return false;
         }
-
         internal bool ProcessShortCut(Keys keys)
         {
-            foreach (ToolStripItem mi in Items)
-                if (mi is ToolStripMenuItem tsmi && ProcessShortCut(keys, tsmi))
+            foreach (ToolStripItem item in Items)
+            {
+                if (item is ToolStripMenuItem mi && ProcessShortCut(keys, mi))
                     return true;
+            }
             return false;
         }
     }
 
     class MenuItemWithHandler : ToolStripMenuItem
     {
-        private static ToolTip toolTip = new ToolTip
-        {
-            AutoPopDelay = 10000,
-            InitialDelay = 0,
-            ReshowDelay = 0,
-            ShowAlways = true
-        };
+        private static Timer hoverTimer;
+        public static ToolTip toolTip;
+        private static Timer autoHideTimer;
+        private static MenuItemWithHandler currentItem;
+        private static string currentToolTipText;
 
-        internal static void HideToolTip()
-        {
-            if (Form.ActiveForm != null) toolTip.Hide(Form.ActiveForm);
-        }
-
-        private static Keys ShortcutKeysFromString(string p)
+        private static Keys ShortcutFromString(string p)
         {
             if (string.IsNullOrEmpty(p) || p == "None") return Keys.None;
-            Keys mods = Keys.None;
-            string key = p;
-            if (key.StartsWith("CtrlShift")) { mods = Keys.Control | Keys.Shift; key = key.Substring(9); }
-            else if (key.StartsWith("Ctrl")) { mods = Keys.Control; key = key.Substring(4); }
-            else if (key.StartsWith("Alt")) { mods = Keys.Alt; key = key.Substring(3); }
-            else if (key.StartsWith("Shift")) { mods = Keys.Shift; key = key.Substring(5); }
+            if (Enum.TryParse<Shortcut>(p, out Shortcut s)) return (Keys)(int)s;
+            return Keys.None;
+        }
 
-            switch (key)
-            {
-                case "Del": return mods | Keys.Delete;
-                case "Ins": return mods | Keys.Insert;
-                case "BkSp": case "Bksp": return mods | Keys.Back;
-                case "DownArrow": return mods | Keys.Down;
-                case "UpArrow": return mods | Keys.Up;
-                case "LeftArrow": return mods | Keys.Left;
-                case "RightArrow": return mods | Keys.Right;
-                case "F1": return mods | Keys.F1;
-                case "F2": return mods | Keys.F2;
-                case "F3": return mods | Keys.F3;
-                case "F4": return mods | Keys.F4;
-                case "F5": return mods | Keys.F5;
-                case "F6": return mods | Keys.F6;
-                case "F7": return mods | Keys.F7;
-                case "F8": return mods | Keys.F8;
-                case "F9": return mods | Keys.F9;
-                case "F10": return mods | Keys.F10;
-                case "F11": return mods | Keys.F11;
-                case "F12": return mods | Keys.F12;
-                default:
-                    if (key.Length == 1)
-                    {
-                        char c = key[0];
-                        if (c >= 'A' && c <= 'Z') return mods | (Keys)c;
-                        if (c >= '0' && c <= '9') return mods | (Keys)(Keys.D0 + (c - '0'));
-                    }
-                    return Keys.None;
-            }
+        static MenuItemWithHandler()
+        {
+            hoverTimer = new Timer();
+            hoverTimer.Interval = 500;
+            hoverTimer.Tick += HoverTimer_Tick;
+
+            toolTip = new ToolTip();
+            toolTip.AutoPopDelay = 10000;
+            toolTip.InitialDelay = 0;
+            toolTip.ReshowDelay = 0;
+            toolTip.ShowAlways = true;
+
+            autoHideTimer = new Timer();
+            autoHideTimer.Interval = 5000;
+            autoHideTimer.Tick += AutoHideTimer_Tick;
+        }
+
+        internal static ToolStripItem CreateItem(MenuWithHandler definition)
+        {
+            if (definition.Text == "-") return new ToolStripSeparator();
+            return new MenuItemWithHandler(definition);
         }
 
         public MenuItemWithHandler(MenuWithHandler definition) : base()
@@ -195,48 +189,143 @@ namespace CADability.Forms
             Tag = definition;
             if (!string.IsNullOrEmpty(definition.Shortcut))
             {
-                ShortcutKeys = ShortcutKeysFromString(definition.Shortcut);
+                ShortcutKeys = ShortcutFromString(definition.Shortcut);
                 ShowShortcutKeys = definition.ShowShortcut;
             }
+
+            if (definition.ImageIndex >= 0)
+            {
+                int ind = definition.ImageIndex;
+                if (ind >= 10000) ind = ind - 10000 + ButtonImages.OffsetUserImages;
+                if (ind < ButtonImages.ButtonImageList.Images.Count)
+                    Image = ButtonImages.ButtonImageList.Images[ind];
+            }
+
+            if (definition.SubMenus != null)
+            {
+                for (int i = 0; i < definition.SubMenus.Length; i++)
+                {
+                    DropDownItems.Add(CreateItem(definition.SubMenus[i]));
+                }
+            }
+
+            MouseEnter += OnMenuItemMouseEnter;
+            MouseLeave += (s, e) =>
+            {
+                hoverTimer.Stop();
+                HideToolTip();
+                if (ReferenceEquals(currentItem, this))
+                {
+                    currentItem = null;
+                    currentToolTipText = "";
+                }
+            };
+        }
+
+        private void OnMenuItemMouseEnter(object sender, EventArgs e)
+        {
+            MenuWithHandler definition = Tag as MenuWithHandler;
+            if (definition?.Target != null) definition.Target.OnSelected(definition, true);
+
+            currentItem = this;
+            currentToolTipText = "";
             if (StringTable.IsStringDefined(definition.ID))
             {
                 string tt = StringTable.GetString(definition.ID, StringTable.Category.info);
-                if (string.IsNullOrEmpty(tt) || tt.StartsWith("missing string:"))
-                    tt = StringTable.GetString(definition.ID, StringTable.Category.label);
-                if (!string.IsNullOrEmpty(tt) && !tt.StartsWith("missing string:"))
-                    ToolTipText = tt;
+                if (string.IsNullOrEmpty(tt) || tt.StartsWith("missing string:")) tt = StringTable.GetString(definition.ID, StringTable.Category.label);
+                if (!string.IsNullOrEmpty(tt) && !tt.StartsWith("missing string:")) currentToolTipText = tt;
             }
-            if (definition.SubMenus != null)
-            {
-                foreach (var sub in definition.SubMenus)
-                    DropDownItems.Add(ContextMenuWithHandler.CreateItem(sub));
-            }
-            DropDownOpening += HandleDropDownOpening;
+
+            hoverTimer.Stop();
+            if (!string.IsNullOrEmpty(currentToolTipText))
+                hoverTimer.Start();
+
+            HideToolTip();
         }
 
         protected override void OnClick(EventArgs e)
         {
             HideToolTip();
-            MenuWithHandler definition = Tag as MenuWithHandler;
-            if (definition?.Target != null) definition.Target.OnCommand(definition.ID);
+            hoverTimer.Stop();
+            MenuWithHandler definition = (Tag as MenuWithHandler);
+            if (definition.Target != null) definition.Target.OnCommand(definition.ID);
+
+            // find and dispose the root ContextMenuWithHandler to avoid blank menu text accumulation
+            // defer disposal so WinForms can finish its closing sequence before the object is released
+            ToolStrip ts = this.Owner;
+            while (ts != null && !(ts is ContextMenuWithHandler))
+            {
+                if (ts is ToolStripDropDownMenu ddm && ddm.OwnerItem != null)
+                    ts = ddm.OwnerItem.Owner;
+                else break;
+            }
+            if (ts is ContextMenuWithHandler rootMenu && !rootMenu.IsDisposed)
+            {
+                rootMenu.BeginInvoke((Action)(() =>
+                {
+                    if (!rootMenu.IsDisposed)
+                        rootMenu.Dispose();
+                }));
+            }
         }
 
-        private void HandleDropDownOpening(object sender, EventArgs e)
+        protected override void OnDropDownShow(EventArgs e)
         {
             HideToolTip();
-            foreach (ToolStripItem mi in DropDownItems)
+
+            foreach (ToolStripItem item in DropDownItems)
             {
-                MenuWithHandler definition = mi.Tag as MenuWithHandler;
-                if (definition?.Target != null)
+                MenuItemWithHandler submiid = item as MenuItemWithHandler;
+                if (submiid != null)
                 {
-                    CommandState cs = new CommandState();
-                    if (definition.Target.OnUpdateCommand(definition.ID, cs))
+                    MenuWithHandler definition = submiid.Tag as MenuWithHandler;
+                    if (definition?.Target != null)
                     {
-                        mi.Enabled = cs.Enabled;
-                        if (mi is MenuItemWithHandler miw) miw.Checked = cs.Checked;
+                        CommandState commandState = new CommandState();
+                        if (definition.Target.OnUpdateCommand(definition.ID, commandState))
+                        {
+                            submiid.Enabled = commandState.Enabled;
+                            submiid.Checked = commandState.Checked;
+                        }
                     }
                 }
             }
+            base.OnDropDownShow(e);
+        }
+
+        private static void HoverTimer_Tick(object sender, EventArgs e)
+        {
+            hoverTimer.Stop();
+            if (currentItem != null && !string.IsNullOrEmpty(currentToolTipText))
+            {
+                Point mousePos = Cursor.Position;
+                Form ownerForm = Form.ActiveForm;
+                if (ownerForm != null)
+                {
+                    Point formPos = ownerForm.PointToClient(mousePos);
+                    toolTip.Show(currentToolTipText, ownerForm, formPos.X + 10, formPos.Y + 10);
+                    autoHideTimer.Stop();
+                    autoHideTimer.Start();
+                }
+            }
+        }
+
+        private static void AutoHideTimer_Tick(object sender, EventArgs e)
+        {
+            HideToolTip();
+        }
+
+        internal static void HideToolTip()
+        {
+            Form ownerForm = currentItem?.GetOwnerForm();
+            if (ownerForm != null)
+                toolTip.Hide(ownerForm);
+            autoHideTimer.Stop();
+        }
+
+        private Form GetOwnerForm()
+        {
+            return Form.ActiveForm;
         }
     }
 
@@ -250,8 +339,10 @@ namespace CADability.Forms
         static internal MenuStrip MakeMainMenu(MenuWithHandler[] definition)
         {
             MenuStrip res = new MenuStrip();
-            foreach (var def in definition)
-                res.Items.Add(ContextMenuWithHandler.CreateItem(def));
+            for (int i = 0; i < definition.Length; i++)
+            {
+                res.Items.Add(MenuItemWithHandler.CreateItem(definition[i]));
+            }
             res.MenuDeactivate += (s, e) => MenuItemWithHandler.HideToolTip();
             return res;
         }

@@ -1,4 +1,4 @@
-﻿using CADability.Attribute;
+using CADability.Attribute;
 using CADability.Curve2D;
 using CADability.UserInterface;
 using System;
@@ -22,13 +22,13 @@ namespace CADability.GeoObject
     }
 
     /// <summary>
-    /// 
+    ///
     /// </summary>
     [Serializable()]
     public class Polyline : IGeoObjectImpl, IColorDef, ILineWidth, ILinePattern, ICurve,
             ISerializable, IExtentedableCurve, IJsonSerialize, IExportStep
     {
-        private ColorDef colorDef; // die Farbe. 
+        private ColorDef colorDef; // die Farbe.
         private GeoPoint[] vertex; // die Eckpunkte
         private bool closed; // geschlossen oder nicht
         private PlanarState planarState;
@@ -520,7 +520,7 @@ namespace CADability.GeoObject
                 endPoint = vertex[i];
                 if (i == 0) startPoint = vertex[vertex.Length - 1];
                 bool isLine = i > 0 || closed;
-                // man müsste hier abchecken, auf welcher Linie der Cursor gerade steht, und 
+                // man müsste hier abchecken, auf welcher Linie der Cursor gerade steht, und
                 // nur diese Linie als Fußpunkt, Mittelpunkt u.s.w. zulassen
                 if (spf.SnapToObjectCenter && isLine)
                 {
@@ -804,7 +804,7 @@ namespace CADability.GeoObject
 			for (int i = 0; i < vertex.Length - 1; ++i)
 			{
 				Geometry.DistLL(vertex[i], vertex[i + 1] - vertex[i], fromHere, direction, out double pos1, out double pos2);
-				if (pos1 >= 0.0 && pos1 <= 1.0 && pos2 < res) 
+				if (pos1 >= 0.0 && pos1 <= 1.0 && pos2 < res)
 					res = pos2;
 			}
 
@@ -812,7 +812,7 @@ namespace CADability.GeoObject
 			if (closed)
 			{
 				Geometry.DistLL(vertex[vertex.Length - 1], vertex[0] - vertex[vertex.Length - 1], fromHere, direction, out double pos1, out double pos2);
-				if (pos1 >= 0.0 && pos1 <= 1.0 && pos2 < res) 
+				if (pos1 >= 0.0 && pos1 <= 1.0 && pos2 < res)
 					res = pos2;
 			}
 
@@ -1638,13 +1638,10 @@ namespace CADability.GeoObject
         private LineWidth lineWidth;
         public LineWidth LineWidth
         {
-            get
-            {
-                return lineWidth;
-            }
+            get => lineWidth;
             set
             {
-                using (new ChangingAttribute(this, "LineWidth", lineWidth))
+                using (ChangingAttribute.Create(this, lineWidth))
                 {
                     // planarState = PlanarState.Unknown; Ebene bleibt erhalten
                     lineWidth = value;
@@ -1656,13 +1653,10 @@ namespace CADability.GeoObject
         private LinePattern linePattern;
         public LinePattern LinePattern
         {
-            get
-            {
-                return linePattern;
-            }
+            get => linePattern;
             set
             {
-                using (new ChangingAttribute(this, "LinePattern", linePattern))
+                using (ChangingAttribute.Create(this, linePattern))
                 {
                     // planarState = PlanarState.Unknown; Ebene bleibt erhalten
                     linePattern = value;

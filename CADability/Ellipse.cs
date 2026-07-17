@@ -1,4 +1,4 @@
-﻿using CADability.Attribute;
+using CADability.Attribute;
 using CADability.Curve2D;
 using CADability.UserInterface;
 using System;
@@ -109,7 +109,7 @@ namespace CADability.GeoObject
 	}
 
 	/// <summary>
-	/// 
+	///
 	/// </summary>
 	[Serializable]
 	public class Ellipse : IGeoObjectImpl, IColorDef, ILineWidth, ILinePattern, ICurve, ISerializable,
@@ -188,7 +188,7 @@ namespace CADability.GeoObject
 			// implementieren
 			//EllipseData2D res = (EllipseData2D)projectionData[pr];
 			//if (res==null)
-			//{ 
+			//{
 			//    res = CalculateProjectionData(pr.ProjectionPlane);
 			//    projectionData[pr] = res;
 			//}
@@ -306,7 +306,7 @@ namespace CADability.GeoObject
 					res.sweepAng = (double)new SweepAngle(StartDir.Angle, EndDir.Angle, ccw);
 					if (Math.Abs(res.sweepAng) < 1e-6 && Math.Abs(this.sweepParameter) > Math.PI)
 					{
-						// Sonderfall: ein fast Vollkreis wird nicht als solcher erkannt und liefert 
+						// Sonderfall: ein fast Vollkreis wird nicht als solcher erkannt und liefert
 						// allerdings exakt 0.0 für sweepAng
 						if (ccw) res.sweepAng = Math.Abs(this.sweepParameter);
 						else res.sweepAng = -Math.Abs(this.sweepParameter);
@@ -358,7 +358,7 @@ namespace CADability.GeoObject
 					res.sweepParameter = sw.Radian;
 					if (Math.Abs(res.sweepParameter) < 1e-6 && Math.Abs(res.sweepAng) > Math.PI)
 					{
-						// Sonderfall: ein fast Vollkreis wird nicht als solcher erkannt und liefert 
+						// Sonderfall: ein fast Vollkreis wird nicht als solcher erkannt und liefert
 						// allerdings exakt 0.0 für sweepAng
 						if (ccw) res.sweepParameter = Math.Abs(res.sweepAng);
 						else res.sweepParameter = -Math.Abs(res.sweepAng);
@@ -932,7 +932,7 @@ namespace CADability.GeoObject
 							if (Geometry.Dist(p.ToGlobal(pl[0].p), locationP) <
 							    Geometry.Dist(p.ToGlobal(pl[1].p), locationP))
 							{
-								if (distLoc > dist12) // ausserhalb 
+								if (distLoc > dist12) // ausserhalb
 									centerIndex = 0;
 								else centerIndex = 1;
 							}
@@ -943,7 +943,7 @@ namespace CADability.GeoObject
 								else centerIndex = 0;
 							}
 
-							// falls eine abweichende Lösong gewünscht ist (es gibt vier), 
+							// falls eine abweichende Lösong gewünscht ist (es gibt vier),
 							// hier für die selSol-Fälle 1 und drei umkehrung des Mittelpunktes
 							// if ((selSol % 2) != 0)
 							if ((selSol & 0x1) != 0)
@@ -961,7 +961,7 @@ namespace CADability.GeoObject
 
 					this.startParameter = new Angle(this.plane.Project(arcPoint1), this.plane.Project(this.Center));
 					bool dir = (distLoc1 < 0.0);
-					// falls eine abweichende Lösung gewünscht ist (es gibt vier), 
+					// falls eine abweichende Lösung gewünscht ist (es gibt vier),
 					// hier für die selSol-Fälle zwei und drei umkehrung der Richtung
 					// if (((selSol % 4) == 2)||((selSol % 4) == 3))  dir = !dir;
 					if ((selSol & 0x2) != 0) dir = !dir;
@@ -1151,7 +1151,7 @@ namespace CADability.GeoObject
 			// dir ist jetzt im Einheitskreis, aber nicht unbedingt Länge 1, ist aber
 			// für Atan2 nicht wichtig
 			// der Atan2 liefert zu einer Senkrechten zu dir den Winkel, also
-			// den Parameter im Sinne der Ellipse. Der 2. Tangentenpunkt hat den 
+			// den Parameter im Sinne der Ellipse. Der 2. Tangentenpunkt hat den
 			// Parameter u+pi (bei Atan2 sind die Parameter vertauscht Atan2(y,x))
 			return Math.Atan2(dir.x, -dir.y);
 		}
@@ -1963,18 +1963,18 @@ namespace CADability.GeoObject
 		private ColorDef colorDef;
 
 		public ColorDef ColorDef
-		{
-			get { return colorDef; }
-			set
-			{
-				using (new ChangingAttribute(this, "ColorDef", colorDef))
-				{
-					colorDef = value;
-				}
-			}
-		}
+        {
+            get => colorDef;
+            set
+            {
+                using (ChangingAttribute.Create(this, colorDef))
+                {
+                    colorDef = value;
+                }
+            }
+        }
 
-		void IColorDef.SetTopLevel(ColorDef newValue)
+        void IColorDef.SetTopLevel(ColorDef newValue)
 		{
 			colorDef = newValue;
 		}
@@ -1992,10 +1992,10 @@ namespace CADability.GeoObject
 
 		public LineWidth LineWidth
 		{
-			get { return lineWidth; }
+			get => lineWidth;
 			set
 			{
-				using (new ChangingAttribute(this, "LineWidth", lineWidth))
+				using (ChangingAttribute.Create(this, lineWidth))
 				{
 					lineWidth = value;
 				}
@@ -2010,10 +2010,10 @@ namespace CADability.GeoObject
 
 		public LinePattern LinePattern
 		{
-			get { return linePattern; }
+			get => linePattern;
 			set
 			{
-				using (new ChangingAttribute(this, "LinePattern", linePattern))
+				using (ChangingAttribute.Create(this, linePattern))
 				{
 					linePattern = value;
 				}
@@ -2044,7 +2044,7 @@ namespace CADability.GeoObject
 		/// <summary>
 		/// Gets or sets the sweep amount of this arc. A full circle or ellipse must have a sweepparameter of
 		/// either 2.0*Math.PI or -2.0*Math.PI, The sweep parameter of circular or elliptical arcs are
-		/// in the range of -2.0*Math.PI &lt; SweepParameter &lt; 2.0*Math.PI. SweepParameter is often used 
+		/// in the range of -2.0*Math.PI &lt; SweepParameter &lt; 2.0*Math.PI. SweepParameter is often used
 		/// in connection with startParameter
 		/// </summary>
 		public double SweepParameter
@@ -2317,7 +2317,7 @@ namespace CADability.GeoObject
 					Plane pln = plane;
 					if (!Precision.IsPointOnPlane(value, this.plane))
 					{
-						// die Ebene bleibt nicht erhalten. neue Ebene gegeben durch 
+						// die Ebene bleibt nicht erhalten. neue Ebene gegeben durch
 						// Startpunkt, Endpunkt und Richtung senkrecht zum jetzigen Normalenvektor
 						GeoVector diry = (EndPoint - value) ^ plane.Normal;
 						if (Precision.IsNullVector(diry)) diry = plane.DirectionY;
@@ -2376,7 +2376,7 @@ namespace CADability.GeoObject
 						Plane pln = plane;
 						if (!Precision.IsPointOnPlane(value, this.plane))
 						{
-							// die Ebene bleibt nicht erhalten. neue Ebene gegeben durch 
+							// die Ebene bleibt nicht erhalten. neue Ebene gegeben durch
 							// Startpunkt, Endpunkt und Richtung senkrecht zum jetzigen Normalenvektor
 							GeoVector diry = (StartPoint - value) ^ plane.Normal;
 							if (Precision.IsNullVector(diry)) diry = plane.DirectionY;
@@ -2423,7 +2423,7 @@ namespace CADability.GeoObject
 		}
 
 		/// <summary>
-		/// Returns the Parameter of the given point projected into the plane of this ellipse (pp). 
+		/// Returns the Parameter of the given point projected into the plane of this ellipse (pp).
 		/// For a circle or arc this is the
 		/// radian of the angle of the point. For an ellipse this is the value (a), where
 		/// e.x = center.x+majorradius*cos(a), e.y = center.y+minorradius*cos(a) yields a point (e)

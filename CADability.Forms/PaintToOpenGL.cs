@@ -26,7 +26,7 @@ namespace CADability.Forms
     /// <summary>
     /// Implementation of <see cref="IPaintTo3D"/> via OpenGL
     /// </summary>
-    public class PaintToOpenGL : IPaintTo3D
+    public class PaintToOpenGL : IPaintTo3D, IPaintTo3DFlatText
     {
         #region IPaintTo3D data
         public static int debugNumTriangles = 0;
@@ -38,6 +38,7 @@ namespace CADability.Forms
         bool paintSurfaceEdges;
         bool triangulateText = true;
         bool selectMode;
+        bool flatTextMode; // text glyph triangles are drawn unlit in the plain current color
         bool delayText;
         bool delayAll;
         bool dontRecalcTriangulation;
@@ -1081,10 +1082,33 @@ namespace CADability.Forms
             }
             CheckError();
         }
+        bool IPaintTo3DFlatText.FlatTextMode
+        {
+            get { return flatTextMode; }
+            set { flatTextMode = value; }
+        }
         void IPaintTo3D.Triangle(GeoPoint[] vertex, GeoVector[] normals, int[] indextriples)
         {
             debugNumTriangles += indextriples.Length / 3;
             if (currentList != null) currentList.SetHasContents();
+            if (flatTextMode)
+            {   // text glyphs: draw unlit so the text appears exactly in the current color
+                // (like curves do) instead of being brightened by the scene lighting
+                Gl.glDisable(Gl.GL_LIGHTING);
+                Gl.glBegin(Gl.GL_TRIANGLES);
+                for (int i = 0; i < indextriples.Length; i += 3)
+                {
+                    GeoPoint v1 = vertex[indextriples[i]];
+                    GeoPoint v2 = vertex[indextriples[i + 1]];
+                    GeoPoint v3 = vertex[indextriples[i + 2]];
+                    Gl.glVertex3d(v1.x, v1.y, v1.z);
+                    Gl.glVertex3d(v2.x, v2.y, v2.z);
+                    Gl.glVertex3d(v3.x, v3.y, v3.z);
+                }
+                Gl.glEnd();
+                CheckError();
+                return;
+            }
             Gl.glEnable(Gl.GL_LIGHTING);
             float[] mat_ambient = { 0.5f, 0.5f, 0.5f, 1.0f };
             float[] mat_specular = { 1.0f, 1.0f, 1.0f, 1.0f };

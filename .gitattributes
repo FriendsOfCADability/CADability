@@ -3,6 +3,11 @@
 ###############################################################################
 * text=auto
 
+# DXF files must keep their original line endings (CRLF or LF) because the
+# ACadSharp parser is sensitive to them and our bug-reproduction test files
+# intentionally use CRLF to match real R12 output from third-party CAD tools.
+*.dxf -text
+
 ###############################################################################
 # Set default behavior for command prompt diff.
 #

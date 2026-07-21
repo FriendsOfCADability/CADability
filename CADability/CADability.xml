@@ -31698,14 +31698,6 @@
             <param name="FileName">The name of the file</param>
             <returns>The newly created project or null if failed to create a project</returns>
         </member>
-        <member name="T:CADability.Project.ConvertToDxfAutoCad2000">
-            <summary>
-            If necessary, a dxf or dwg file is converted to ACAD2000 dxf version and the temporary filename is returned. Upon Dispose, the temporary files are deleted.
-            There is a free converter program from open design https://www.opendesign.com/guestfiles/oda_file_converter (odafileconverter.exe).
-            if this program is installed on the computer and the global setting "DwgDxfConverter" contains the path and filename to this program, it will be automatically executed
-            and the dwg file will be converted to a dxf file, which can then be imported.
-            </summary>
-        </member>
         <member name="P:CADability.Project.EntryType">
             <summary>
             Overrides <see cref="P:CADability.UserInterface.IShowPropertyImpl.EntryType"/>, 

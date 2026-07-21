@@ -92,6 +92,7 @@ namespace CADability.GeoObject
         private readonly GeoVectorHotSpot lineDirHotspot; // Hotspot für Richtung
         private readonly LengthProperty sizeProp;
         private readonly LengthHotSpot sizeHotspot;
+        private readonly LengthProperty columnWidthProperty;
         public ShowPropertyText(Text t, IFrame frame) : base(frame)
         {
             text = t;
@@ -122,6 +123,7 @@ namespace CADability.GeoObject
             stringProperty = new StringProperty(text.TextString, "Text.TextString");
             stringProperty.OnGetValue = () => text.TextString;
             stringProperty.OnSetValue = (string val) => text.TextString = val;
+            columnWidthProperty = new LengthProperty(text, "ColumnWidth", "Text.ColumnWidth", frame, false);
         }
 
         internal string[] GetChoicesFromResource(string resId)
@@ -171,6 +173,8 @@ namespace CADability.GeoObject
             sizeProp.LengthChanged();
             res.Add(sizeProp);
             res.Add(glyphAngleProp);
+            columnWidthProperty.LengthChanged();
+            res.Add(columnWidthProperty);
             res.Add(new ShowPropertyFont(text));
             return res.ToArray();
         }
@@ -223,6 +227,8 @@ namespace CADability.GeoObject
                     sizeProp.LengthChanged();
                     list.Add(sizeProp);
                     list.Add(glyphAngleProp);
+                    columnWidthProperty.LengthChanged();
+                    list.Add(columnWidthProperty);
                     list.Add(new ShowPropertyFont(text));
                     list.AddRange(text.GetAttributeProperties(Frame));
 
@@ -305,6 +311,7 @@ namespace CADability.GeoObject
             sizeHotspot.Position = new GeoPoint(gp, vs.x, vs.y, vs.z);
             glyphAngleProp.AngleChanged();
             sizeProp.LengthChanged();
+            columnWidthProperty.LengthChanged();
             locationProperty.Refresh();
             glyphDirectionProperty.Refresh();
             stringProperty.Refresh();
@@ -883,7 +890,18 @@ namespace CADability.GeoObject
                             }
                             bool oldpse = paintTo3D.PaintSurfaceEdges;
                             paintTo3D.PaintSurfaceEdges = false;
-                            fc.PaintTo3D(paintTo3D); // will be triangulated according to paintTo3D.Precision 
+                            // glyphs are rendered flat (unlit): text must appear exactly in its
+                            // ColorDef color and not be modified by the scene lighting
+                            IPaintTo3DFlatText flatText = paintTo3D as IPaintTo3DFlatText;
+                            if (flatText != null) flatText.FlatTextMode = true;
+                            try
+                            {
+                                fc.PaintTo3D(paintTo3D); // will be triangulated according to paintTo3D.Precision
+                            }
+                            finally
+                            {
+                                if (flatText != null) flatText.FlatTextMode = false;
+                            }
                             paintTo3D.Precision = oldprecision;
                             paintTo3D.PaintSurfaceEdges = oldpse;
                         }
@@ -1108,6 +1126,9 @@ namespace CADability.GeoObject
         private GeoPoint location;
         private string fontName;
         private string textString;
+        private double columnWidth; // 0.0: no automatic word wrap, otherwise the text is wrapped to this width (world units)
+        private double lineSpacing; // 0.0: natural line spacing of the font, otherwise baseline distance as factor of the text size
+        private string displayString; // cache: textString with the automatic line breaks applied (see GetDisplayString)
         private FontStyle fontStyle;
         private SizeF sizeExtent;
         private double emSizeFactor;
@@ -1331,6 +1352,74 @@ namespace CADability.GeoObject
             }
             points.RemoveRange(0, points.Count - 1); // den letzten als ersten drinlassen
         }
+        // Returns the string to display: textString, with additional line breaks inserted at word
+        // boundaries when ColumnWidth demands wrapping. Character widths are measured with the same
+        // FontCache the layout loops use, so the wrapped lines fit the column exactly.
+        private string GetDisplayString(int fs)
+        {
+            if (textString == null) return "";
+            if (columnWidth <= 0.0) return textString;
+            if (displayString != null) return displayString;
+            double scale = lineDirection.Length;
+            if (scale < Precision.eps) return textString;
+            double normalizedWidth = columnWidth / scale; // FontCache widths are normalized to em size 1
+            string res;
+            try
+            {
+                System.Text.StringBuilder wrapped = new System.Text.StringBuilder();
+                string[] paragraphs = textString.Replace("\r", "").Split('\n');
+                for (int p = 0; p < paragraphs.Length; p++)
+                {
+                    if (p > 0) wrapped.Append('\n');
+                    AppendWrappedParagraph(wrapped, paragraphs[p], normalizedWidth, fs);
+                }
+                res = wrapped.ToString();
+            }
+            catch
+            {
+                res = textString; // if measuring fails, show the text without wrapping
+            }
+            displayString = res;
+            return res;
+        }
+        private void AppendWrappedParagraph(System.Text.StringBuilder result, string paragraph, double normalizedWidth, int fs)
+        {
+            double MeasureWord(string w)
+            {
+                double total = 0.0;
+                for (int i = 0; i < w.Length; i++)
+                {
+                    FontCache.GlobalFontCache.Get(fontName, fs, w[i], out double cw, null);
+                    total += cw;
+                    if (i > 0) total += FontCache.GlobalFontCache.GetKerning(fontName, fs, w[i - 1], w[i]);
+                }
+                return total;
+            }
+            FontCache.GlobalFontCache.Get(fontName, fs, ' ', out double spaceWidth, null);
+            string[] words = paragraph.Split(' ');
+            double lineWidth = 0.0;
+            bool firstOnLine = true;
+            foreach (string word in words)
+            {
+                double wordWidth = MeasureWord(word);
+                if (firstOnLine)
+                {
+                    result.Append(word);
+                    lineWidth = wordWidth;
+                    firstOnLine = false;
+                }
+                else if (lineWidth + spaceWidth + wordWidth <= normalizedWidth)
+                {
+                    result.Append(' ').Append(word);
+                    lineWidth += spaceWidth + wordWidth;
+                }
+                else
+                {
+                    result.Append('\n').Append(word);
+                    lineWidth = wordWidth;
+                }
+            }
+        }
         /// <summary>
         /// Returns a list of objects that define the outline (and holes) of this text. The global setting "Font.Precision"
         /// defines the precision of the outline, if the precision is 3 (fine) then splines can occur in the outline.
@@ -1363,35 +1452,37 @@ namespace CADability.GeoObject
                 else if (ff.IsStyleAvailable(FontStyle.Strikeout)) fs = (int)FontStyle.Strikeout;
                 else if (ff.IsStyleAvailable(FontStyle.Underline)) fs = (int)FontStyle.Underline; // irgend einen muss es ja wohl geben, oder?
             }
+            string txt = GetDisplayString(fs);
             int em = ff.GetEmHeight((FontStyle)fs);
             int ls = ff.GetLineSpacing((FontStyle)fs);
             int dc = ff.GetCellDescent((FontStyle)fs);
             int ac = ff.GetCellAscent((FontStyle)fs);
             double lsp = ls / em;
+            if (lineSpacing > 0.0) lsp = lineSpacing; // explicit baseline distance as factor of the text size
             double dx = 0.0;
             double dy = 0.0;
             double totwidth = 0.0;
             double totwidthMax = 0.0;
             List<double> totwidthArray = new List<double>(); // Liste der Zeilenlängen bei mehrzeiligen Texten
-            for (int i = 0; i < textString.Length; ++i)
+            for (int i = 0; i < txt.Length; ++i)
             {
                 double width;
-                if (textString[i] == '\r') // linefeed ignorieren
+                if (txt[i] == '\r') // linefeed ignorieren
                 {
                     continue;
                 }
-                if (textString[i] == '\n') // carriage return
+                if (txt[i] == '\n') // carriage return
                 {
                     totwidthArray.Add(totwidth); // Länge in die Liste
                     if (totwidth > totwidthMax) { totwidthMax = totwidth; } // Maximum merken für Extents
                     totwidth = 0.0;
                     continue;
                 }
-                FontCache.GlobalFontCache.Get(fontName, fs, textString[i], out width, null);
+                FontCache.GlobalFontCache.Get(fontName, fs, txt[i], out width, null);
                 totwidth += width;
                 if (i > 0)
                 {
-                    double krn = FontCache.GlobalFontCache.GetKerning(fontName, fs, textString[i - 1], textString[i]);
+                    double krn = FontCache.GlobalFontCache.GetKerning(fontName, fs, txt[i - 1], txt[i]);
                     totwidth += krn; // das ist negativ
                 }
             }
@@ -1412,6 +1503,15 @@ namespace CADability.GeoObject
                 case AlignMode.Center: dy = (ac / 2 + dc / 2 - em) / (double)em; break;
                 case AlignMode.Top: dy = -1.0; break;
             }
+            if (totwidthArray.Count > 1)
+            {   // multi-line text: the vertical alignment refers to the whole text block, not only to the first line
+                switch (alignment)
+                {
+                    case AlignMode.Bottom:
+                    case AlignMode.Baseline: dy += (totwidthArray.Count - 1) * lsp; break;
+                    case AlignMode.Center: dy += (totwidthArray.Count - 1) * lsp * 0.5; break;
+                }
+            }
             lowerLeft = pls.PointAt(new GeoPoint2D(dx, dy - (totwidthArray.Count - 1) * lsp));
             lowerRight = pls.PointAt(new GeoPoint2D(dx + totwidthMax, dy - (totwidthArray.Count - 1) * lsp));
             upperLeft = pls.PointAt(new GeoPoint2D(dx, dy + 1.0));
@@ -1429,14 +1529,14 @@ namespace CADability.GeoObject
                     case LineAlignMode.Right: dx = -totwidthArray[0]; break;
                 }
             }
-            for (int i = 0; i < textString.Length; ++i)
+            for (int i = 0; i < txt.Length; ++i)
             {
                 double width;
-                if (textString[i] == '\r') // linefeed ignorieren
+                if (txt[i] == '\r') // linefeed ignorieren
                 {
                     continue;
                 }
-                if (textString[i] == '\n') // carriage return, neue Zeile
+                if (txt[i] == '\n') // carriage return, neue Zeile
                 {
                     dy = dy - lsp; // eins runter im normierten Text
                     // den nächsten x-Wert setzen:
@@ -1452,10 +1552,10 @@ namespace CADability.GeoObject
                     }
                     continue;
                 }
-                Path2D[] path2d = FontCache.GlobalFontCache.GetOutline2D(fontName, fs, textString[i], out width);
+                Path2D[] path2d = FontCache.GlobalFontCache.GetOutline2D(fontName, fs, txt[i], out width);
                 if (i > 0)
                 {
-                    double krn = FontCache.GlobalFontCache.GetKerning(fontName, fs, textString[i - 1], textString[i]);
+                    double krn = FontCache.GlobalFontCache.GetKerning(fontName, fs, txt[i - 1], txt[i]);
                     dx += krn; // das ist negativ
                 }
                 if (path2d != null)
@@ -1515,35 +1615,37 @@ namespace CADability.GeoObject
                 else if (ff.IsStyleAvailable(FontStyle.Strikeout)) fs = (int)FontStyle.Strikeout;
                 else if (ff.IsStyleAvailable(FontStyle.Underline)) fs = (int)FontStyle.Underline; // irgend einen muss es ja wohl geben, oder?
             }
+            string txt = GetDisplayString(fs);
             int em = ff.GetEmHeight((FontStyle)fs);
             int ls = ff.GetLineSpacing((FontStyle)fs);
             int dc = ff.GetCellDescent((FontStyle)fs);
             int ac = ff.GetCellAscent((FontStyle)fs);
             double lsp = ls / em;
+            if (lineSpacing > 0.0) lsp = lineSpacing; // explicit baseline distance as factor of the text size
             double dx = 0.0;
             double dy = 0.0;
             double totwidth = 0.0;
             double totwidthMax = 0.0;
             List<double> totwidthArray = new List<double>(); // Liste der Zeilenlängen bei mehrzeiligen Texten
-            for (int i = 0; i < textString.Length; ++i)
+            for (int i = 0; i < txt.Length; ++i)
             {
                 double width;
-                if (textString[i] == '\r') // linefeed ignorieren
+                if (txt[i] == '\r') // linefeed ignorieren
                 {
                     continue;
                 }
-                if (textString[i] == '\n') // carriage return
+                if (txt[i] == '\n') // carriage return
                 {
                     totwidthArray.Add(totwidth); // Länge in die Liste
                     if (totwidth > totwidthMax) { totwidthMax = totwidth; } // Maximum merken für Extents
                     totwidth = 0.0;
                     continue;
                 }
-                FontCache.GlobalFontCache.Get(fontName, fs, textString[i], out width, null);
+                FontCache.GlobalFontCache.Get(fontName, fs, txt[i], out width, null);
                 totwidth += width;
                 if (i > 0)
                 {
-                    double krn = FontCache.GlobalFontCache.GetKerning(fontName, fs, textString[i - 1], textString[i]);
+                    double krn = FontCache.GlobalFontCache.GetKerning(fontName, fs, txt[i - 1], txt[i]);
                     totwidth += krn; // das ist negativ
                 }
             }
@@ -1564,6 +1666,15 @@ namespace CADability.GeoObject
                 case AlignMode.Center: dy = (ac / 2 + dc / 2 - em) / (double)em; break;
                 case AlignMode.Top: dy = -1.0; break;
             }
+            if (totwidthArray.Count > 1)
+            {   // multi-line text: the vertical alignment refers to the whole text block, not only to the first line
+                switch (alignment)
+                {
+                    case AlignMode.Bottom:
+                    case AlignMode.Baseline: dy += (totwidthArray.Count - 1) * lsp; break;
+                    case AlignMode.Center: dy += (totwidthArray.Count - 1) * lsp * 0.5; break;
+                }
+            }
             lowerLeft = pls.PointAt(new GeoPoint2D(dx, dy - (totwidthArray.Count - 1) * lsp));
             lowerRight = pls.PointAt(new GeoPoint2D(dx + totwidthMax, dy - (totwidthArray.Count - 1) * lsp));
             upperLeft = pls.PointAt(new GeoPoint2D(dx, dy + 1.0));
@@ -1581,14 +1692,14 @@ namespace CADability.GeoObject
                     case LineAlignMode.Right: dx = -totwidthArray[0]; break;
                 }
             }
-            for (int i = 0; i < textString.Length; ++i)
+            for (int i = 0; i < txt.Length; ++i)
             {
                 double width;
-                if (textString[i] == '\r') // linefeed ignorieren
+                if (txt[i] == '\r') // linefeed ignorieren
                 {
                     continue;
                 }
-                if (textString[i] == '\n') // carriage return, neue Zeile
+                if (txt[i] == '\n') // carriage return, neue Zeile
                 {
                     dy = dy - lsp; // eins runter im normierten Text
                     // den nächsten x-Wert setzen:
@@ -1604,11 +1715,11 @@ namespace CADability.GeoObject
                     }
                     continue;
                 }
-                CompoundShape cs = FontCache.GlobalFontCache.Get(fontName, fs, textString[i], out width);
+                CompoundShape cs = FontCache.GlobalFontCache.Get(fontName, fs, txt[i], out width);
                 res.Add(cs.GetModified(ModOp2D.Translate(dx, dy)));
                 if (i > 0)
                 {
-                    double krn = FontCache.GlobalFontCache.GetKerning(fontName, fs, textString[i - 1], textString[i]);
+                    double krn = FontCache.GlobalFontCache.GetKerning(fontName, fs, txt[i - 1], txt[i]);
                     dx += krn; // das ist negativ
                 }
                 dx += width;
@@ -1645,35 +1756,37 @@ namespace CADability.GeoObject
                 else if (ff.IsStyleAvailable(FontStyle.Strikeout)) fs = (int)FontStyle.Strikeout;
                 else if (ff.IsStyleAvailable(FontStyle.Underline)) fs = (int)FontStyle.Underline; // irgend einen muss es ja wohl geben, oder?
             }
+            string txt = GetDisplayString(fs);
             int em = ff.GetEmHeight((FontStyle)fs);
             int ls = ff.GetLineSpacing((FontStyle)fs);
             int dc = ff.GetCellDescent((FontStyle)fs);
             int ac = ff.GetCellAscent((FontStyle)fs);
             double lsp = ls / em;
+            if (lineSpacing > 0.0) lsp = lineSpacing; // explicit baseline distance as factor of the text size
             double dx = 0.0;
             double dy = 0.0;
             double totwidth = 0.0;
             double totwidthMax = 0.0;
             List<double> totwidthArray = new List<double>(); // Liste der Zeilenlängen bei mehrzeiligen Texten
-            for (int i = 0; i < textString.Length; ++i)
+            for (int i = 0; i < txt.Length; ++i)
             {
                 double width;
-                if (textString[i] == '\r') // linefeed ignorieren
+                if (txt[i] == '\r') // linefeed ignorieren
                 {
                     continue;
                 }
-                if (textString[i] == '\n') // carriage return
+                if (txt[i] == '\n') // carriage return
                 {
                     totwidthArray.Add(totwidth); // Länge in die Liste
                     if (totwidth > totwidthMax) { totwidthMax = totwidth; } // Maximum merken für Extents
                     totwidth = 0.0;
                     continue;
                 }
-                FontCache.GlobalFontCache.GetCenterLines(fontName, fs, textString[i], out width);
+                FontCache.GlobalFontCache.GetCenterLines(fontName, fs, txt[i], out width);
                 totwidth += width;
                 if (i > 0)
                 {
-                    double krn = FontCache.GlobalFontCache.GetKerning(fontName, fs, textString[i - 1], textString[i]);
+                    double krn = FontCache.GlobalFontCache.GetKerning(fontName, fs, txt[i - 1], txt[i]);
                     totwidth += krn; // das ist negativ
                 }
             }
@@ -1694,6 +1807,15 @@ namespace CADability.GeoObject
                 case AlignMode.Center: dy = (ac / 2 + dc / 2 - em) / (double)em; break;
                 case AlignMode.Top: dy = -1.0; break;
             }
+            if (totwidthArray.Count > 1)
+            {   // multi-line text: the vertical alignment refers to the whole text block, not only to the first line
+                switch (alignment)
+                {
+                    case AlignMode.Bottom:
+                    case AlignMode.Baseline: dy += (totwidthArray.Count - 1) * lsp; break;
+                    case AlignMode.Center: dy += (totwidthArray.Count - 1) * lsp * 0.5; break;
+                }
+            }
             lowerLeft = pls.PointAt(new GeoPoint2D(dx, dy - (totwidthArray.Count - 1) * lsp));
             lowerRight = pls.PointAt(new GeoPoint2D(dx + totwidthMax, dy - (totwidthArray.Count - 1) * lsp));
             upperLeft = pls.PointAt(new GeoPoint2D(dx, dy + 1.0));
@@ -1711,14 +1833,14 @@ namespace CADability.GeoObject
                     case LineAlignMode.Right: dx = -totwidthArray[0]; break;
                 }
             }
-            for (int i = 0; i < textString.Length; ++i)
+            for (int i = 0; i < txt.Length; ++i)
             {
                 double width;
-                if (textString[i] == '\r') // linefeed ignorieren
+                if (txt[i] == '\r') // linefeed ignorieren
                 {
                     continue;
                 }
-                if (textString[i] == '\n') // carriage return, neue Zeile
+                if (txt[i] == '\n') // carriage return, neue Zeile
                 {
                     dy = dy - lsp; // eins runter im normierten Text
                     // den nächsten x-Wert setzen:
@@ -1734,10 +1856,10 @@ namespace CADability.GeoObject
                     }
                     continue;
                 }
-                GeoObjectList charlist = FontCache.GlobalFontCache.GetCenterLines(fontName, fs, textString[i], out width);
+                GeoObjectList charlist = FontCache.GlobalFontCache.GetCenterLines(fontName, fs, txt[i], out width);
                 if (i > 0)
                 {
-                    double krn = FontCache.GlobalFontCache.GetKerning(fontName, fs, textString[i - 1], textString[i]);
+                    double krn = FontCache.GlobalFontCache.GetKerning(fontName, fs, txt[i - 1], txt[i]);
                     dx += krn; // das ist negativ
                 }
                 if (charlist != null)
@@ -2044,6 +2166,7 @@ namespace CADability.GeoObject
                     else if (ff.IsStyleAvailable(FontStyle.Strikeout)) fs = (int)FontStyle.Strikeout;
                     else if (ff.IsStyleAvailable(FontStyle.Underline)) fs = (int)FontStyle.Underline; // irgend einen muss es ja wohl geben, oder?
                 }
+                string txt = GetDisplayString(fs);
                 int em = ff.GetEmHeight((FontStyle)fs);
                 int ls = ff.GetLineSpacing((FontStyle)fs);
                 int dc = ff.GetCellDescent((FontStyle)fs);
@@ -2051,31 +2174,32 @@ namespace CADability.GeoObject
                 double lsp;
                 if (em > 0) lsp = (double)ls / em;
                 else lsp = 1.0;
+                if (lineSpacing > 0.0) lsp = lineSpacing; // explicit baseline distance as factor of the text size
                 double dx = 0.0;
                 double dy = 0.0;
                 double totwidth = 0.0;
                 double totwidthMax = 0.0;
                 List<double> totwidthArray = new List<double>(); // Liste der Zeilenlängen bei mehrzeiligen Texten
                 if (textString == null) textString = "";
-                for (int i = 0; i < textString.Length; ++i)
+                for (int i = 0; i < txt.Length; ++i)
                 {
                     double width;
-                    if (textString[i] == '\r') // linefeed ignorieren
+                    if (txt[i] == '\r') // linefeed ignorieren
                     {
                         continue;
                     }
-                    if (textString[i] == '\n') // carriage return
+                    if (txt[i] == '\n') // carriage return
                     {
                         totwidthArray.Add(totwidth); // Länge in die Liste
                         if (totwidth > totwidthMax) { totwidthMax = totwidth; } // Maximum merken für Extents
                         totwidth = 0.0;
                         continue;
                     }
-                    FontCache.GlobalFontCache.Get(fontName, fs, textString[i], out width, null);
+                    FontCache.GlobalFontCache.Get(fontName, fs, txt[i], out width, null);
                     totwidth += width;
                     if (i > 0)
                     {
-                        double krn = FontCache.GlobalFontCache.GetKerning(fontName, fs, textString[i - 1], textString[i]);
+                        double krn = FontCache.GlobalFontCache.GetKerning(fontName, fs, txt[i - 1], txt[i]);
                         totwidth += krn; // das ist negativ
                     }
                 }
@@ -2099,6 +2223,15 @@ namespace CADability.GeoObject
                         //case AlignMode.Baseline: dy = -ac / (double)(ac+dc); break;
                         //case AlignMode.Center: dy = -0.5; break;
                         //case AlignMode.Top: dy = -1.0; break;
+                }
+                if (totwidthArray.Count > 1)
+                {   // multi-line text: the vertical alignment refers to the whole text block, not only to the first line
+                    switch (alignment)
+                    {
+                        case AlignMode.Bottom:
+                        case AlignMode.Baseline: dy += (totwidthArray.Count - 1) * lsp; break;
+                        case AlignMode.Center: dy += (totwidthArray.Count - 1) * lsp * 0.5; break;
+                    }
                 }
                 lowerLeft = pls.PointAt(new GeoPoint2D(dx, dy - (totwidthArray.Count - 1) * lsp));
                 lowerRight = pls.PointAt(new GeoPoint2D(dx + totwidthMax, dy - (totwidthArray.Count - 1) * lsp));
@@ -2426,6 +2559,46 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
+        /// Width of the text column for automatic word wrapping (in world units, e.g. from a DXF MTEXT).
+        /// The displayed text is broken into additional lines at word boundaries so that no line gets
+        /// wider than this value. 0.0 (the default) means no automatic wrapping, only explicit line
+        /// breaks ("\n") are used.
+        /// </summary>
+        public double ColumnWidth
+        {
+            get { return columnWidth; }
+            set
+            {
+                if (value != columnWidth)
+                {
+                    using (new Changing(this, "ColumnWidth"))
+                    {
+                        columnWidth = value;
+                        isValidExtent = false;
+                    }
+                }
+            }
+        }
+        /// <summary>
+        /// Distance between two baselines of a multi-line text as a factor of the text size.
+        /// 0.0 (the default) means the natural line spacing of the font is used.
+        /// </summary>
+        public double LineSpacing
+        {
+            get { return lineSpacing; }
+            set
+            {
+                if (value != lineSpacing)
+                {
+                    using (new Changing(this, "LineSpacing"))
+                    {
+                        lineSpacing = value;
+                        isValidExtent = false;
+                    }
+                }
+            }
+        }
+        /// <summary>
         /// Gets or sets the angle of the characters vertical direction in respect to the horizontal direction.
         /// The default value is 90°, different angles create different italic fonts.
         /// </summary>
@@ -2509,6 +2682,8 @@ namespace CADability.GeoObject
             res.glyphDirection = glyphDirection;
             res.fontName = fontName;
             res.textString = textString;
+            res.columnWidth = columnWidth;
+            res.lineSpacing = lineSpacing;
             res.fontStyle = fontStyle;
             res.alignment = alignment;
             res.lineAlignment = lineAlignment;
@@ -2532,6 +2707,8 @@ namespace CADability.GeoObject
                 glyphDirection = txt.glyphDirection;
                 fontName = txt.fontName;
                 textString = txt.textString;
+                columnWidth = txt.columnWidth;
+                lineSpacing = txt.lineSpacing;
                 fontStyle = txt.fontStyle;
                 alignment = txt.alignment;
                 lineAlignment = txt.lineAlignment;
@@ -2716,35 +2893,38 @@ namespace CADability.GeoObject
                     else if (ff.IsStyleAvailable(FontStyle.Strikeout)) fs = (int)FontStyle.Strikeout;
                     else if (ff.IsStyleAvailable(FontStyle.Underline)) fs = (int)FontStyle.Underline; // irgend einen muss es ja wohl geben, oder?
                 }
+                string txt = GetDisplayString(fs);
                 int em = ff.GetEmHeight((FontStyle)fs);
                 int ls = ff.GetLineSpacing((FontStyle)fs);
                 int dc = ff.GetCellDescent((FontStyle)fs);
                 int ac = ff.GetCellAscent((FontStyle)fs);
                 double lsp = ls / em;
+                if (lineSpacing > 0.0) lsp = lineSpacing; // explicit baseline distance as factor of the text size
+            if (lineSpacing > 0.0) lsp = lineSpacing; // explicit baseline distance as factor of the text size
                 double dx = 0.0;
                 double dy = 0.0;
                 double totwidth = 0.0;
                 double totwidthMax = 0.0;
                 List<double> totwidthArray = new List<double>(); // Liste der Zeilenlängen bei mehrzeiligen Texten
-                for (int i = 0; i < textString.Length; ++i)
+                for (int i = 0; i < txt.Length; ++i)
                 {
                     double width;
-                    if (textString[i] == '\r') // linefeed ignorieren
+                    if (txt[i] == '\r') // linefeed ignorieren
                     {
                         continue;
                     }
-                    if (textString[i] == '\n') // carriage return
+                    if (txt[i] == '\n') // carriage return
                     {
                         totwidthArray.Add(totwidth); // Länge in die Liste
                         if (totwidth > totwidthMax) { totwidthMax = totwidth; } // Maximum merken für Extents
                         totwidth = 0.0;
                         continue;
                     }
-                    FontCache.GlobalFontCache.Get(fontName, fs, textString[i], out width, null);
+                    FontCache.GlobalFontCache.Get(fontName, fs, txt[i], out width, null);
                     totwidth += width;
                     if (i > 0)
                     {
-                        double krn = FontCache.GlobalFontCache.GetKerning(fontName, fs, textString[i - 1], textString[i]);
+                        double krn = FontCache.GlobalFontCache.GetKerning(fontName, fs, txt[i - 1], txt[i]);
                         totwidth += krn; // das ist negativ
                     }
                 }
@@ -2764,6 +2944,15 @@ namespace CADability.GeoObject
                     case AlignMode.Baseline: dy = -(em - ac) / (double)em; break;
                     case AlignMode.Center: dy = (ac / 2 + dc / 2 - em) / (double)em; break;
                     case AlignMode.Top: dy = -1.0; break;
+                }
+                if (totwidthArray.Count > 1)
+                {   // multi-line text: the vertical alignment refers to the whole text block, not only to the first line
+                    switch (alignment)
+                    {
+                        case AlignMode.Bottom:
+                        case AlignMode.Baseline: dy += (totwidthArray.Count - 1) * lsp; break;
+                        case AlignMode.Center: dy += (totwidthArray.Count - 1) * lsp * 0.5; break;
+                    }
                 }
                 lowerLeft = pls.PointAt(new GeoPoint2D(dx, dy - (totwidthArray.Count - 1) * lsp));
                 lowerRight = pls.PointAt(new GeoPoint2D(dx + totwidthMax, dy - (totwidthArray.Count - 1) * lsp));
@@ -2785,14 +2974,14 @@ namespace CADability.GeoObject
                         case LineAlignMode.Right: dx = -totwidthArray[0]; break;
                     }
                 }
-                for (int i = 0; i < textString.Length; ++i)
+                for (int i = 0; i < txt.Length; ++i)
                 {
                     double width;
-                    if (textString[i] == '\r') // linefeed ignorieren
+                    if (txt[i] == '\r') // linefeed ignorieren
                     {
                         continue;
                     }
-                    if (textString[i] == '\n') // carriage return, neue Zeile
+                    if (txt[i] == '\n') // carriage return, neue Zeile
                     {
                         dy = dy - lsp; // eins runter im normierten Text
                         // den nächsten x-Wert setzen:
@@ -2808,10 +2997,10 @@ namespace CADability.GeoObject
                         }
                         continue;
                     }
-                    IPaintTo3DList paintlist = FontCache.GlobalFontCache.Get(fontName, fs, textString[i], out width, null);
+                    IPaintTo3DList paintlist = FontCache.GlobalFontCache.Get(fontName, fs, txt[i], out width, null);
                     if (i > 0)
                     {
-                        double krn = FontCache.GlobalFontCache.GetKerning(fontName, fs, textString[i - 1], textString[i]);
+                        double krn = FontCache.GlobalFontCache.GetKerning(fontName, fs, txt[i - 1], txt[i]);
                         dx += krn; // das ist negativ
                     }
                     if (paintlist != null && useLists)
@@ -2825,7 +3014,7 @@ namespace CADability.GeoObject
                         if (!useLists)
                         {
                             paintTo3D.PushMultModOp(toWorld * ModOp.Translate(dx, dy, 0));
-                            FontCache.GlobalFontCache.Get(fontName, fs, textString[i], out width, paintTo3D); // hierbei wird auf paintTo3D ausgegeben
+                            FontCache.GlobalFontCache.Get(fontName, fs, txt[i], out width, paintTo3D); // hierbei wird auf paintTo3D ausgegeben
                             paintTo3D.PopModOp();
                         }
                     }
@@ -2835,10 +3024,11 @@ namespace CADability.GeoObject
             }
             else
             {
+                string wrapped = GetDisplayString((int)fontStyle); // apply automatic line wrapping here as well
 #if WEBASSEMBLY
-                paintTo3D.Text(lineDirection, glyphDirection, location, fontName, textString, CADability.WebDrawing.FontStyle.Regular, alignment, lineAlignment);
+                paintTo3D.Text(lineDirection, glyphDirection, location, fontName, wrapped, CADability.WebDrawing.FontStyle.Regular, alignment, lineAlignment);
 #else
-                paintTo3D.Text(lineDirection, glyphDirection, location, fontName, textString, fontStyle, alignment, lineAlignment);
+                paintTo3D.Text(lineDirection, glyphDirection, location, fontName, wrapped, fontStyle, alignment, lineAlignment);
 #endif
             }
         }
@@ -3019,6 +3209,16 @@ namespace CADability.GeoObject
                     isReflected = false;
                 }
             }
+            try
+            {
+                columnWidth = info.GetDouble("ColumnWidth");
+                lineSpacing = info.GetDouble("LineSpacing");
+            }
+            catch (SerializationException)
+            {   // older files without these entries
+                columnWidth = 0.0;
+                lineSpacing = 0.0;
+            }
         }
 
         /// <summary>
@@ -3040,6 +3240,8 @@ namespace CADability.GeoObject
             info.AddValue("Alignment", alignment);
             info.AddValue("LineAlignment", lineAlignment);
             info.AddValue("IsReflected", isReflected);
+            info.AddValue("ColumnWidth", columnWidth);
+            info.AddValue("LineSpacing", lineSpacing);
 
         }
 
@@ -3056,6 +3258,8 @@ namespace CADability.GeoObject
             data.AddProperty("Alignment", alignment);
             data.AddProperty("LineAlignment", lineAlignment);
             data.AddProperty("IsReflected", isReflected);
+            data.AddProperty("ColumnWidth", columnWidth);
+            data.AddProperty("LineSpacing", lineSpacing);
         }
 
         public override void SetObjectData(IJsonReadData data)
@@ -3071,11 +3275,14 @@ namespace CADability.GeoObject
             alignment = data.GetProperty<AlignMode>("Alignment");
             lineAlignment = data.GetProperty<LineAlignMode>("LineAlignment");
             isReflected = data.GetProperty<bool>("IsReflected");
+            columnWidth = data.GetPropertyOrDefault<double>("ColumnWidth");
+            lineSpacing = data.GetPropertyOrDefault<double>("LineSpacing");
         }
         #endregion
         internal void InvalidateSecondaryData()
         {
             isValidExtent = false;
+            displayString = null;
         }
     }
 

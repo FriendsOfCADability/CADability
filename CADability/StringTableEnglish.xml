@@ -5,6 +5,14 @@
 		<label>Line</label>
 		<info>The properties of the line</info>
 	</data>
+	<data name="Ray.Object">
+		<label>Ray</label>
+		<info>The properties of the ray (a construction line extending infinitely in one direction)</info>
+	</data>
+	<data name="XLine.Object">
+		<label>Construction line</label>
+		<info>The properties of the construction line (extending infinitely in both directions)</info>
+	</data>
 	<data name="Line.StartPoint">
 		<label>Starting point</label>
 		<info>Edit field for the starting point, separate x, y an z components by spaces.</info>
@@ -2108,6 +2116,10 @@
 	<data name="Text.TextSize">
 		<label>Character size</label>
 		<info>Character size</info>
+	</data>
+	<data name="Text.ColumnWidth">
+		<label>Column width</label>
+		<info>Width for automatic word wrapping: the text is broken into additional lines at word boundaries so that no line gets wider than this value. 0 means no automatic wrapping, the text only breaks at explicit line breaks.</info>
 	</data>
 	<data name="Text.Font">
 		<label>Text font</label>

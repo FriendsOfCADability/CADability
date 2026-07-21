@@ -153,6 +153,898 @@ namespace CADability.Tests
         }
 
         [TestMethod]
+        [DeploymentItem(@"Files/Dxf/Z273.dxf", nameof(import_dxf_Z273_succeeds))]
+        public void import_dxf_Z273_succeeds()
+        {
+            // AC1009 (R12) DXF with no *Paper_Space block — importing this used to throw
+            // KeyNotFoundException when FillPaperSpace accessed the missing block record.
+            var file = Path.Combine(this.TestContext.DeploymentDirectory, this.TestContext.TestName, "Z273.dxf");
+            Assert.IsTrue(File.Exists(file));
+
+            var project = Project.ReadFromFile(file, "dxf");
+            Assert.IsNotNull(project);
+            var model = project.GetActiveModel();
+            Assert.IsNotNull(model);
+            // 3 TEXT + 23 LINE + 7 CIRCLE = 33 entities
+            Assert.AreEqual(33, model.AllObjects.Count);
+        }
+
+        [TestMethod]
+        [DeploymentItem(@"Files/Dxf/BVH_Bona.dxf", nameof(import_dxf_BVH_Bona_succeeds))]
+        public void import_dxf_BVH_Bona_succeeds()
+        {
+            // AC1024 DXF with 508 arcs, 34 LwPolylines, 41 lines, 11 splines, 3 MTexts.
+            // Arc.StartAngle/EndAngle from ACadSharp are in radians; using Angle.Deg() on them
+            // shrinks all angles by π/180 making arcs nearly invisible ("totally obscured").
+            var file = Path.Combine(this.TestContext.DeploymentDirectory, this.TestContext.TestName, "BVH_Bona.dxf");
+            Assert.IsTrue(File.Exists(file));
+
+            var project = Project.ReadFromFile(file, "dxf");
+            Assert.IsNotNull(project);
+            var model = project.GetActiveModel();
+            Assert.IsNotNull(model);
+
+            // Verify the 508 arcs are imported as arcs (Ellipse with IsCircle==false)
+            var arcs = model.AllObjects.Cast<GeoObject.IGeoObject>()
+                .OfType<GeoObject.Ellipse>()
+                .Where(e => !e.IsCircle)
+                .ToList();
+            Assert.AreEqual(508, arcs.Count);
+
+            // Verify that arcs have sensible sweep angles (not near-zero due to radian/degree confusion)
+            foreach (var arc in arcs)
+                Assert.IsTrue(arc.SweepParameter > 0.001, $"Arc sweep {arc.SweepParameter} is near zero — angle unit bug?");
+        }
+
+        [TestMethod]
+        public void import_dxf_arc_quarter_sweep_is_correct()
+        {
+            // Regression: Arc.StartAngle / EndAngle from ACadSharp are in RADIANS.
+            // The old code called Angle.Deg() on them, which treats radians as degrees
+            // and divides by 180/π — shrinking every arc by factor ~57.
+            // A 90° arc (DXF: start=0°, end=90°) must import with SweepParameter = π/2,
+            // not the bugged value of π/2 × π/180 ≈ 0.027 (a near-invisible sliver).
+            const string dxf = @"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1009
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+ARC
+  8
+0
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 40
+100.0
+ 50
+0.0
+ 51
+90.0
+  0
+ENDSEC
+  0
+EOF
+";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var model = Project.ReadFromFile(file, "dxf").GetActiveModel();
+            var arc = Assert.That.IsInstanceOfType<GeoObject.Ellipse>(model.AllObjects[0]);
+            Assert.AreEqual(100.0, arc.MajorRadius, 1e-6, "Radius");
+            Assert.AreEqual(Math.PI / 2, arc.SweepParameter, 1e-4,
+                "90° arc sweep must be π/2 rad; bug caused ≈0.027 rad");
+        }
+
+        [TestMethod]
+        public void import_dxf_arc_crossing_zero_sweep_is_correct()
+        {
+            // An arc from 315° to 45° crosses 0° and sweeps 90° CCW.
+            // With the angle-unit bug, ACadSharp's radian values are further shrunk so the
+            // crossing-zero logic (sweep += 2π) doesn't trigger correctly either.
+            const string dxf = @"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1009
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+ARC
+  8
+0
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 40
+50.0
+ 50
+315.0
+ 51
+45.0
+  0
+ENDSEC
+  0
+EOF
+";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var model = Project.ReadFromFile(file, "dxf").GetActiveModel();
+            var arc = Assert.That.IsInstanceOfType<GeoObject.Ellipse>(model.AllObjects[0]);
+            Assert.AreEqual(50.0, arc.MajorRadius, 1e-6, "Radius");
+            // 315°→45° CCW: sweep = 45 - 315 = -270, +360 = 90° = π/2 rad
+            Assert.AreEqual(Math.PI / 2, arc.SweepParameter, 1e-4,
+                "315°→45° arc sweep must be π/2 rad");
+        }
+
+        [TestMethod]
+        public void import_dxf_text_rotation_correct()
+        {
+            // Regression: TextEntity.Rotation from ACadSharp is in RADIANS.
+            // Old code called Angle.Deg() on it, making 90° text appear at ~1.57° (nearly horizontal).
+            // A text at DXF rotation=90° must import with LineDirection ≈ (0, 1, 0).
+            const string dxf = @"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1009
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+TEXT
+  8
+0
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 40
+10.0
+  1
+Test
+ 41
+1.0
+ 50
+90.0
+  0
+ENDSEC
+  0
+EOF
+";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var model = Project.ReadFromFile(file, "dxf").GetActiveModel();
+            var text = Assert.That.IsInstanceOfType<GeoObject.Text>(model.AllObjects[0]);
+            var dir = text.LineDirection.Normalized;
+            // 90° rotation: text flows upward → LineDirection ≈ (0, 1, 0)
+            Assert.AreEqual(0.0, dir.x, 1e-3, "90° rotated text: LineDirection.x must be ≈ 0");
+            Assert.AreEqual(1.0, dir.y, 1e-3, "90° rotated text: LineDirection.y must be ≈ 1");
+        }
+
+        [TestMethod]
+        public void import_dxf_lwpolyline_cw_bulge_correct()
+        {
+            // Regression: BulgeToArc for CW arcs (bulge < 0) was flipping the plane normal
+            // and passing ccw=false, which caused SetArcPlaneCenterStartEndPoint to produce
+            // a -270° sweep (the long way round) instead of -90°.
+            // An LWPOLYLINE with vertices (0,0)→(10,0) and bulge=-1 (CW semicircle) must
+            // produce an arc with SweepParameter ≈ -π (180° CW).
+            // bulge = tan(angle/4) = 1 → angle = 4*atan(1) = π → semicircle
+            const string dxf = @"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1015
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+LWPOLYLINE
+  8
+0
+ 90
+2
+ 70
+0
+ 10
+0.0
+ 20
+0.0
+ 42
+-1.0
+ 10
+10.0
+ 20
+0.0
+  0
+ENDSEC
+  0
+EOF
+";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var model = Project.ReadFromFile(file, "dxf").GetActiveModel();
+            Assert.AreEqual(1, model.AllObjects.Count);
+            var arc = Assert.That.IsInstanceOfType<GeoObject.Ellipse>(model.AllObjects[0]);
+            // bulge=-1 → included angle = π → radius = chord/2 / sin(π/2) = 5
+            Assert.AreEqual(5.0, arc.MajorRadius, 1e-4, "Radius of CW semicircle");
+            // SweepParameter must be negative (CW) and ≈ -π (180°), not -3π/2 (270°)
+            Assert.IsTrue(arc.SweepParameter < 0, "CW arc must have negative SweepParameter");
+            Assert.AreEqual(-Math.PI, arc.SweepParameter, 1e-4,
+                "CW semicircle sweep must be -π; bug caused -3π/2 (270° the wrong way)");
+        }
+
+        [TestMethod]
+        public void import_dxf_lwpolyline_cw_quarter_arc_correct()
+        {
+            // A CW quarter-circle: vertices (0,0)→(1,0) with bulge=-tan(π/8) ≈ -0.4142.
+            // This produces a 90° CW arc (SweepParameter ≈ -π/2).
+            // The bug caused a 270° CW arc (-3π/2) because the plane flip reversed start/end
+            // angle ordering before the sweep direction forced the long way round.
+            double bulge = -Math.Tan(Math.PI / 8); // -tan(22.5°) for a 90° arc
+            string dxf = $@"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1015
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+LWPOLYLINE
+  8
+0
+ 90
+2
+ 70
+0
+ 10
+0.0
+ 20
+0.0
+ 42
+{bulge:F6}
+ 10
+2.0
+ 20
+0.0
+  0
+ENDSEC
+  0
+EOF
+";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var model = Project.ReadFromFile(file, "dxf").GetActiveModel();
+            Assert.AreEqual(1, model.AllObjects.Count);
+            var arc = Assert.That.IsInstanceOfType<GeoObject.Ellipse>(model.AllObjects[0]);
+            Assert.IsTrue(arc.SweepParameter < 0, "CW arc must have negative SweepParameter");
+            Assert.AreEqual(-Math.PI / 2, arc.SweepParameter, 1e-3,
+                "CW quarter-arc sweep must be -π/2; bug caused -3π/2");
+        }
+
+        [TestMethod]
+        [DeploymentItem(@"Files/Dxf/0583667_008.dxf", nameof(import_dxf_0583667_succeeds))]
+        public void import_dxf_0583667_succeeds()
+        {
+            // AC1027 DXF with ACAD_TABLE entities (*T1/*T2/*T3 blocks) containing MTEXT
+            // with non-default attachment points. Verifies the file imports without exceptions
+            // and that the model space contains the expected inserted block objects.
+            var file = Path.Combine(this.TestContext.DeploymentDirectory, this.TestContext.TestName, "0583667_008.dxf");
+            Assert.IsTrue(File.Exists(file));
+
+            var project = Project.ReadFromFile(file, "dxf");
+            Assert.IsNotNull(project);
+            var model = project.GetActiveModel();
+            Assert.IsNotNull(model);
+            // Model space contains: 5 INSERTs + 3 ACAD_TABLEs + 3 DIMENSIONs + 5 LINEs + 12 SPLINEs + 5 ARCs
+            Assert.IsTrue(model.AllObjects.Count > 0, "Model must contain imported entities");
+        }
+
+        [TestMethod]
+        public void import_dxf_mtext_topcenter_placement_correct()
+        {
+            // Regression: CreateMText ignored AttachmentPoint so all MTEXT rendered as
+            // Left/Baseline. For table cells with attachment TopCenter (71=2) the text
+            // appears shifted right and down of where it should be.
+            // An MTEXT at (50,30) with attachment TopCenter must import with
+            // LineAlignment=Center and Alignment=Top so the text is centered on x=50 and
+            // its top edge is at y=30.
+            const string dxf = @"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1015
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+MTEXT
+  8
+0
+ 10
+50.0
+ 20
+30.0
+ 30
+0.0
+ 40
+5.0
+ 71
+2
+  1
+Hello
+  0
+ENDSEC
+  0
+EOF
+";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var model = Project.ReadFromFile(file, "dxf").GetActiveModel();
+            var text = Assert.That.IsInstanceOfType<GeoObject.Text>(model.AllObjects[0]);
+            // Anchor is at (50, 30): location must stay at that point
+            Assert.AreEqual(50.0, text.Location.x, 1e-4, "MTEXT TopCenter: Location.x must be anchor x");
+            Assert.AreEqual(30.0, text.Location.y, 1e-4, "MTEXT TopCenter: Location.y must be anchor y");
+            Assert.AreEqual(GeoObject.Text.LineAlignMode.Center, text.LineAlignment,
+                "MTEXT attach=2 (TopCenter) must import as LineAlignment=Center");
+            Assert.AreEqual(GeoObject.Text.AlignMode.Top, text.Alignment,
+                "MTEXT attach=2 (TopCenter) must import as Alignment=Top");
+        }
+
+        [TestMethod]
+        public void import_dxf_mtext_bottomright_placement_correct()
+        {
+            // MTEXT with attachment BottomRight (71=9) must have Right+Bottom alignment.
+            const string dxf = @"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1015
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+MTEXT
+  8
+0
+ 10
+100.0
+ 20
+10.0
+ 30
+0.0
+ 40
+3.5
+ 71
+9
+  1
+Test
+  0
+ENDSEC
+  0
+EOF
+";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var model = Project.ReadFromFile(file, "dxf").GetActiveModel();
+            var text = Assert.That.IsInstanceOfType<GeoObject.Text>(model.AllObjects[0]);
+            Assert.AreEqual(GeoObject.Text.LineAlignMode.Right, text.LineAlignment,
+                "MTEXT attach=9 (BottomRight) must import as LineAlignment=Right");
+            Assert.AreEqual(GeoObject.Text.AlignMode.Bottom, text.Alignment,
+                "MTEXT attach=9 (BottomRight) must import as Alignment=Bottom");
+        }
+
+        [TestMethod]
+        public void import_dxf_spline_degenerate_does_not_crash()
+        {
+            // Regression: CreateSplineAsPolyline used `lines as ICollection<IGeoObject>` where
+            // `lines` is `List<GeoObject.Line>`. C# generic interfaces are invariant, so the cast
+            // returns null. Passing null to GeoObjectList(ICollection<IGeoObject>) throws
+            // NullReferenceException at list.Count (GeoObjectList.cs:50).
+            // A cubic SPLINE whose consecutive control points 1 and 2 are identical (distance 0 <
+            // Precision.eps = 1e-6) triggers forcePolyline2D=true which calls CreateSplineAsPolyline.
+            // The import must complete without throwing.
+            const string dxf = @"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1015
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+SPLINE
+  8
+0
+ 70
+8
+ 71
+3
+ 72
+8
+ 73
+4
+ 74
+0
+ 40
+0.0
+ 40
+0.0
+ 40
+0.0
+ 40
+0.0
+ 40
+1.0
+ 40
+1.0
+ 40
+1.0
+ 40
+1.0
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 10
+5.0
+ 20
+5.0
+ 30
+0.0
+ 10
+5.0
+ 20
+5.0
+ 30
+0.0
+ 10
+10.0
+ 20
+0.0
+ 30
+0.0
+  0
+ENDSEC
+  0
+EOF
+";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var project = Project.ReadFromFile(file, "dxf");
+            Assert.IsNotNull(project, "Import must not crash and must return a project");
+            var model = project.GetActiveModel();
+            Assert.IsNotNull(model);
+            Assert.IsTrue(model.AllObjects.Count > 0,
+                "Degenerate spline (duplicate consecutive control points) must import as a path");
+        }
+
+        [TestMethod]
+        public void import_dxf_tolerance_fcf_imported_as_text()
+        {
+            // DXF TOLERANCE (AcDbFcf / Feature Control Frame) entities were silently dropped
+            // because there was no case for ACadSharp.Entities.Tolerance in GeoObjectFromEntity.
+            // They must now be imported as Text objects at the insertion point.
+            // The FCF content "{\Fgdt;f}%%v2 CZ%%v%%vA%%v%%v%%v^J" should produce something like
+            // "f|2 CZ||A|||" (GDT symbol letter, pipes as cell separators).
+            const string dxf = @"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1015
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+TOLERANCE
+  8
+0
+100
+AcDbEntity
+  8
+0
+100
+AcDbFcf
+  3
+Standard
+ 10
+50.0
+ 20
+30.0
+ 30
+0.0
+  1
+{\Fgdt;f}%%v0.1%%v%%vA%%v%%v%%v
+  0
+ENDSEC
+  0
+EOF
+";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var project = Project.ReadFromFile(file, "dxf");
+            Assert.IsNotNull(project, "Import must not crash");
+            var model = project.GetActiveModel();
+            Assert.IsNotNull(model);
+            Assert.IsTrue(model.AllObjects.Count > 0, "TOLERANCE entity must be imported as a text object");
+            var text = Assert.That.IsInstanceOfType<GeoObject.Text>(model.AllObjects[0]);
+            Assert.IsTrue(text.TextString.Contains("|"), "FCF text must use | as cell separator (%%v → |)");
+        }
+
+        [TestMethod]
+        public void import_dxf_malformed_objects_section_falls_back_to_geometry()
+        {
+            // Regression: DxfException "Invalid dxf code with value 0" in the OBJECTS section
+            // crashed the import even though all geometry (in BLOCKS/ENTITIES) was already
+            // parsed. The import now retries without the OBJECTS section so geometry survives.
+            // The OBJECTS section is intentionally truncated / broken here.
+            const string dxf = @"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1015
+  0
+ENDSEC
+  0
+SECTION
+  2
+TABLES
+  0
+TABLE
+  2
+LAYER
+ 70
+1
+  0
+LAYER
+  2
+0
+ 70
+0
+ 62
+7
+  6
+Continuous
+  0
+ENDTAB
+  0
+ENDSEC
+  0
+SECTION
+  2
+BLOCKS
+  0
+BLOCK
+  8
+0
+  2
+*Model_Space
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  3
+*Model_Space
+  4
+
+  0
+LINE
+  8
+0
+ 10
+10.0
+ 20
+20.0
+ 30
+0.0
+ 11
+30.0
+ 21
+40.0
+ 31
+0.0
+  0
+ENDBLK
+  8
+0
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+ENDSEC
+  0
+SECTION
+  2
+OBJECTS
+  0
+DICTIONARY
+  5
+C
+330
+0
+281
+1
+  3
+ACAD_GROUP
+350
+D
+  0
+"; // intentionally truncated (no ENDSEC/EOF) — simulates a malformed OBJECTS section
+
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var project = Project.ReadFromFile(file, "dxf");
+            Assert.IsNotNull(project, "Import must fall back gracefully when OBJECTS section is malformed");
+            var model = project.GetActiveModel();
+            Assert.IsNotNull(model);
+            Assert.IsTrue(model.AllObjects.Count > 0,
+                "Geometry from BLOCKS section must survive a malformed OBJECTS section");
+        }
+
+        [TestMethod]
+        public void import_dxf_empty_block_insert_not_placed_at_origin()
+        {
+            // Regression: empty blocks (e.g. dimension arrowheads with no geometry) were
+            // inserted as GeoObject.Block at (0,0,0), appearing far outside the main drawing.
+            // CreateInsert must return null when the referenced block has no children.
+            const string dxf = @"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1015
+  0
+ENDSEC
+  0
+SECTION
+  2
+BLOCKS
+  0
+BLOCK
+  8
+0
+  2
+EmptyArrow
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  3
+EmptyArrow
+  4
+
+  0
+ENDBLK
+  8
+0
+  0
+BLOCK
+  8
+0
+  2
+Geometry
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  3
+Geometry
+  4
+
+  0
+LINE
+  8
+0
+ 10
+100.0
+ 20
+100.0
+ 30
+0.0
+ 11
+200.0
+ 21
+200.0
+ 31
+0.0
+  0
+ENDBLK
+  8
+0
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+INSERT
+  8
+0
+  2
+EmptyArrow
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  0
+INSERT
+  8
+0
+  2
+Geometry
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  0
+ENDSEC
+  0
+EOF
+";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var project = Project.ReadFromFile(file, "dxf");
+            Assert.IsNotNull(project, "Import must not crash");
+            var model = project.GetActiveModel();
+            Assert.IsNotNull(model);
+            // Only the block with geometry should be added; the empty block insert must be skipped
+            Assert.IsTrue(model.AllObjects.Count == 1,
+                $"Empty block insert must be skipped; expected 1 object, got {model.AllObjects.Count}");
+        }
+
+        [TestMethod]
+        public void import_dxf_arc_with_reversed_normal_uses_wcs_center()
+        {
+            // Regression: ARC/CIRCLE entities with Normal=(0,0,-1) store their center in OCS.
+            // OCS→WCS via Arbitrary Axis Algorithm flips the X component for Normal=(0,0,-1).
+            // OCS (-1000,-500,0) with Normal=(0,0,-1) → WCS (1000,-500,0).
+            // Without the fix the center was imported at the raw OCS coordinate (-1000,-500).
+            const string dxf = "  0\r\nSECTION\r\n  2\r\nHEADER\r\n  9\r\n$ACADVER\r\n  1\r\nAC1015\r\n  0\r\nENDSEC\r\n  0\r\nSECTION\r\n  2\r\nBLOCKS\r\n  0\r\nBLOCK\r\n  8\r\n0\r\n  2\r\n*Model_Space\r\n 10\r\n0.0\r\n 20\r\n0.0\r\n 30\r\n0.0\r\n  3\r\n*Model_Space\r\n  4\r\n\r\n  0\r\nARC\r\n  8\r\n0\r\n 10\r\n-1000.0\r\n 20\r\n-500.0\r\n 30\r\n0.0\r\n 40\r\n100.0\r\n 50\r\n0.0\r\n 51\r\n90.0\r\n210\r\n0.0\r\n220\r\n0.0\r\n230\r\n-1.0\r\n  0\r\nENDBLK\r\n  8\r\n0\r\n  0\r\nENDSEC\r\n  0\r\nSECTION\r\n  2\r\nENTITIES\r\n  0\r\nENDSEC\r\n  0\r\nEOF\r\n";
+            var file = this.TestContext.TestName + ".dxf";
+            File.WriteAllText(file, dxf);
+            var project = Project.ReadFromFile(file, "dxf");
+            Assert.IsNotNull(project);
+            var model = project.GetActiveModel();
+            Assert.IsNotNull(model);
+            Assert.IsTrue(model.AllObjects.Count > 0, "ARC entity must be imported");
+            var arc = model.AllObjects[0] as GeoObject.Ellipse;
+            Assert.IsNotNull(arc, "Imported object must be an Ellipse/Arc");
+            // WCS center must be (1000,-500,0), not the raw OCS value (-1000,-500,0)
+            Assert.IsTrue(Math.Abs(arc.Center.x - 1000.0) < 1e-6,
+                $"Arc WCS X must be 1000, got {arc.Center.x}");
+            Assert.IsTrue(Math.Abs(arc.Center.y - (-500.0)) < 1e-6,
+                $"Arc WCS Y must be -500, got {arc.Center.y}");
+        }
+
+        [TestMethod]
+        [DeploymentItem(@"Files/Dxf/BlockXTestFile.dxf", nameof(import_dxf_block_with_insert_succeeds))]
+        public void import_dxf_block_with_insert_succeeds()
+        {
+            // BlockXTestFile.dxf contains a LINE entity plus an INSERT of block "AnonymousBlock1"
+            // which itself contains 2 LINE entities forming an X shape.
+            // After import the model must have 2 top-level objects: 1 Line and 1 Block (with 2 child Lines).
+            var file = Path.Combine(this.TestContext.DeploymentDirectory, this.TestContext.TestName, "BlockXTestFile.dxf");
+            Assert.IsTrue(File.Exists(file));
+            var project = Project.ReadFromFile(file, "dxf");
+            Assert.IsNotNull(project);
+            var model = project.GetActiveModel();
+            Assert.IsNotNull(model);
+            Assert.AreEqual(2, model.AllObjects.Count,
+                $"Expected 1 Line + 1 Block (from INSERT), got {model.AllObjects.Count} objects");
+            var block = model.AllObjects.OfType<GeoObject.Block>().FirstOrDefault();
+            Assert.IsNotNull(block, "INSERT must be imported as a GeoObject.Block");
+            Assert.AreEqual(2, block.Count,
+                $"Block from INSERT must contain 2 child Lines; got {block.Count}");
+        }
+
+        [TestMethod]
+        [DeploymentItem(@"Files/Dxf/BlockRefXTestFile.dxf", nameof(import_dxf_simple_line_file_succeeds))]
+        public void import_dxf_simple_line_file_succeeds()
+        {
+            // BlockRefXTestFile.dxf contains a single LINE entity and a paper-space VIEWPORT.
+            // The VIEWPORT is not a geometry entity and must be skipped; only 1 Line must be imported.
+            var file = Path.Combine(this.TestContext.DeploymentDirectory, this.TestContext.TestName, "BlockRefXTestFile.dxf");
+            Assert.IsTrue(File.Exists(file));
+            var project = Project.ReadFromFile(file, "dxf");
+            Assert.IsNotNull(project);
+            var model = project.GetActiveModel();
+            Assert.IsNotNull(model);
+            Assert.AreEqual(1, model.AllObjects.Count,
+                $"Expected 1 Line; got {model.AllObjects.Count} objects");
+            Assert.IsInstanceOfType(model.AllObjects[0], typeof(GeoObject.Line),
+                "The single imported object must be a Line");
+        }
+
+        [TestMethod]
         [DeploymentItem(@"Files/Step/issue153.stp", nameof(import_step_issue153_succeeds))]
         public void import_step_issue153_succeeds()
         {

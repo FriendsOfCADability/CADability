@@ -71,7 +71,10 @@ namespace CADability.UserInterface
                 attributeProperties[i] = sp[i] as IPropertyEntry;
             }
 
-            base.resourceIdInternal = "Line.Object";
+            if (line is ConstructionLine constructionLine)
+                base.resourceIdInternal = constructionLine.IsRay ? "Ray.Object" : "XLine.Object";
+            else
+                base.resourceIdInternal = "Line.Object";
         }
         private void OnGeoObjectDidChange(IGeoObject sender, GeoObjectChange change)
         {

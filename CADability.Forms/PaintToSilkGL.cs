@@ -18,6 +18,15 @@ namespace CADability.Forms
         private IntPtr hdc;
         private IntPtr hglrc;
 
+        // Off-screen rendering (see Init(Bitmap)): a hidden window hosts the GL context,
+        // rendering goes into a framebuffer object which is copied into targetBitmap
+        private NativeWindow hiddenWindow;
+        private Bitmap targetBitmap;
+        private bool isBitmap;
+        private uint fbo;
+        private uint fboColorRb;
+        private uint fboDepthRb;
+
         // text glyph triangles are recorded with zero normals; the surface shader renders
         // zero-normal geometry unlit, so text appears exactly in its plain color
         private bool flatTextMode;
@@ -101,6 +110,99 @@ namespace CADability.Forms
             gl.Enable(EnableCap.DepthTest);
             gl.Enable(EnableCap.Blend);
             gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+        }
+
+        /// <summary>
+        /// Initializes for off-screen rendering into <paramref name="target"/>. Modern GL
+        /// contexts cannot render into a GDI bitmap DC (the old PFD_DRAW_TO_BITMAP path only
+        /// worked with the software OpenGL 1.1 renderer), so a hidden window provides the WGL
+        /// context and the scene is rendered into a framebuffer object of the bitmap's size.
+        /// The FBO content is copied into the bitmap by <see cref="FinishPaint"/> and as a
+        /// fallback by <see cref="Dispose"/>, because some callers (printing in LayoutView)
+        /// dispose without calling FinishPaint.
+        /// </summary>
+        internal void Init(Bitmap target)
+        {
+            targetBitmap = target;
+            isBitmap  = true;
+            viewWidth  = Math.Max(1, target.Width);
+            viewHeight = Math.Max(1, target.Height);
+            try
+            {
+                hiddenWindow = new NativeWindow();
+                hiddenWindow.CreateHandle(new CreateParams { Width = 1, Height = 1 }); // no WS_VISIBLE: never shown
+                hwnd = hiddenWindow.Handle;
+                (hdc, hglrc) = WglContext.Create(hwnd);
+                WglContext.MakeCurrent(hdc, hglrc);
+                gl = WglContext.CreateSilkGL();
+
+                CompileShaders();
+                InitStreamBuffer();
+                CreateFramebuffer();
+
+                gl.Enable(EnableCap.DepthTest);
+                gl.Enable(EnableCap.Blend);
+                gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+                gl.Viewport(0, 0, (uint)viewWidth, (uint)viewHeight);
+            }
+            catch
+            {
+                Dispose(); // don't leak the hidden window or a half-initialized context
+                throw;
+            }
+        }
+
+        private void CreateFramebuffer()
+        {
+            fbo = gl.GenFramebuffer();
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
+
+            fboColorRb = gl.GenRenderbuffer();
+            gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, fboColorRb);
+            gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, InternalFormat.Rgba8,
+                (uint)viewWidth, (uint)viewHeight);
+            gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
+                RenderbufferTarget.Renderbuffer, fboColorRb);
+
+            fboDepthRb = gl.GenRenderbuffer();
+            gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, fboDepthRb);
+            gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, InternalFormat.Depth24Stencil8,
+                (uint)viewWidth, (uint)viewHeight);
+            gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthStencilAttachment,
+                RenderbufferTarget.Renderbuffer, fboDepthRb);
+
+            gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, 0);
+
+            GLEnum status = gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
+            if (status != GLEnum.FramebufferComplete)
+                throw new InvalidOperationException($"Framebuffer incomplete: {status}");
+        }
+
+        /// <summary>
+        /// Reads the FBO content into <see cref="targetBitmap"/>. GL rows are bottom-up,
+        /// bitmaps top-down, hence the vertical flip (same as the old PaintToBitmap).
+        /// </summary>
+        private unsafe void CopyFramebufferToBitmap()
+        {
+            if (gl == null || targetBitmap == null || fbo == 0) return;
+            gl.Finish();
+            int w = Math.Min(viewWidth,  targetBitmap.Width);
+            int h = Math.Min(viewHeight, targetBitmap.Height);
+            System.Drawing.Imaging.BitmapData data = targetBitmap.LockBits(
+                new Rectangle(0, 0, w, h),
+                System.Drawing.Imaging.ImageLockMode.WriteOnly,
+                System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            try
+            {
+                // Format32bppArgb is BGRA in memory; a 32bpp stride is always width*4
+                gl.ReadPixels(0, 0, (uint)w, (uint)h, PixelFormat.Bgra, PixelType.UnsignedByte,
+                    (void*)data.Scan0);
+            }
+            finally
+            {
+                targetBitmap.UnlockBits(data);
+            }
+            targetBitmap.RotateFlip(RotateFlipType.RotateNoneFlipY);
         }
 
         internal void Disconnect(Control ctrl)
@@ -332,7 +434,7 @@ namespace CADability.Forms
         public bool TriangulateText   { get => triangulateText;   set => triangulateText = value; }
         public bool DontRecalcTriangulation { get; set; }
         public PaintCapabilities Capabilities => PaintCapabilities.ZoomIndependentDisplayList;
-        public bool IsBitmap => false;
+        public bool IsBitmap => isBitmap;
         public IDisposable FacesBehindEdgesOffset => new PolygonOffsetScope(gl);
 
         private sealed class PolygonOffsetScope : IDisposable
@@ -358,6 +460,7 @@ namespace CADability.Forms
         public void MakeCurrent()
         {
             WglContext.MakeCurrent(hdc, hglrc);
+            if (isBitmap && fbo != 0) gl?.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
         }
 
         public void SetColor(Color color, int lockColor = 0)
@@ -785,7 +888,8 @@ namespace CADability.Forms
 
         public void FinishPaint()
         {
-            WglContext.Present(hdc);
+            if (isBitmap) CopyFramebufferToBitmap(); // off-screen: no swap chain, read back instead
+            else WglContext.Present(hdc);
         }
 
         public void PaintFaces(PaintTo3D.PaintMode mode)
@@ -847,12 +951,27 @@ namespace CADability.Forms
 
         public void Dispose()
         {
+            if (isBitmap && gl != null && hglrc != IntPtr.Zero)
+            {
+                // Printing (LayoutView) disposes without calling FinishPaint: make sure the
+                // rendered image reaches the bitmap. Best effort — FinishPaint is the primary
+                // copy point, so a failure here must not turn cleanup into a crash.
+                try
+                {
+                    MakeCurrent();
+                    CopyFramebufferToBitmap();
+                }
+                catch (Exception) { }
+            }
             if (gl != null)
             {
                 if (surfaceProgram != 0) gl.DeleteProgram(surfaceProgram);
                 if (edgeProgram    != 0) gl.DeleteProgram(edgeProgram);
                 if (streamVao != 0) gl.DeleteVertexArray(streamVao);
                 if (streamVbo != 0) gl.DeleteBuffer(streamVbo);
+                if (fbo        != 0) { gl.DeleteFramebuffer(fbo);         fbo = 0; }
+                if (fboColorRb != 0) { gl.DeleteRenderbuffer(fboColorRb); fboColorRb = 0; }
+                if (fboDepthRb != 0) { gl.DeleteRenderbuffer(fboDepthRb); fboDepthRb = 0; }
                 gl.Dispose();
                 gl = null;
             }
@@ -862,15 +981,60 @@ namespace CADability.Forms
                 hglrc = IntPtr.Zero;
                 hdc   = IntPtr.Zero;
             }
+            if (hiddenWindow != null)
+            {
+                hiddenWindow.DestroyHandle();
+                hiddenWindow = null;
+                hwnd = IntPtr.Zero;
+            }
+            targetBitmap = null;
         }
 
         /// <summary>
-        /// Render a list of geo objects to a bitmap. Off-screen rendering deferred to Phase 4.
+        /// Renders a list of geo objects to a bitmap using off-screen FBO rendering
+        /// (projection setup identical to the old PaintToOpenGL.PaintToBitmap).
         /// </summary>
         public static Bitmap PaintToBitmap(GeoObjectList list, GeoVector viewDirection,
             int width, int height, BoundingCube? extent = null)
         {
-            return OpenGlCustomize.PaintToBitmap(list, viewDirection, width, height, extent);
+            BoundingCube bc = extent ?? list.GetExtent();
+            Bitmap bmp = new Bitmap(width, height);
+            PaintToSilkGL paintTo3D = new PaintToSilkGL(bc.Size / Math.Max(width, height));
+            IPaintTo3D ipaintTo3D = paintTo3D;
+            try
+            {
+                paintTo3D.Init(bmp);
+                ipaintTo3D.MakeCurrent();
+                ipaintTo3D.Clear(Color.White);
+                ipaintTo3D.AvoidColor(Color.White);
+
+                Projection projection = new Projection(Projection.StandardProjection.FromTop);
+                if (CADability.Precision.SameDirection(viewDirection, GeoVector.ZAxis, false))
+                    projection.SetDirection(viewDirection, GeoVector.YAxis, bc);
+                else
+                    projection.SetDirection(viewDirection, GeoVector.ZAxis, bc);
+                projection.Precision = bc.Size * 1e-3;
+
+                BoundingRect ext = bc.GetExtent(projection);
+                ext = ext * 1.1; // inflate by 10 percent
+                projection.SetPlacement(new Rectangle(0, 0, bmp.Width, bmp.Height), ext);
+
+                ipaintTo3D.SetProjection(projection, bc);
+                foreach (IGeoObject go in list)
+                {
+                    go.PrePaintTo3D(ipaintTo3D);
+                }
+                foreach (IGeoObject go in list)
+                {
+                    go.PaintTo3D(ipaintTo3D);
+                }
+                ipaintTo3D.FinishPaint(); // copies the FBO into bmp
+            }
+            finally
+            {
+                ipaintTo3D.Dispose();
+            }
+            return bmp;
         }
     }
 }

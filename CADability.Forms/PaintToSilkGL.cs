@@ -599,7 +599,37 @@ namespace CADability.Forms
             CADability.GeoObject.Text.AlignMode alignment,
             CADability.GeoObject.Text.LineAlignMode lineAlignment)
         {
-            // TriangulateText == true: caller sends triangulated geometry via Triangle()
+            // Direct text calls bypass the Text GeoObject (e.g. the x/y/z axis labels of the
+            // coordinate cross in ModelView.PaintCoordCross), so nothing triangulates for us
+            // here. Route the call through a transient Text object: its PrePaintTo3D/PaintTo3D
+            // triangulate the glyphs via the font cache and feed them back through
+            // List()/Triangle(), including the unlit FlatTextMode handling.
+            if (string.IsNullOrEmpty(textString)) return;
+            if (lineDirection.IsNullVector() || glyphDirection.IsNullVector()) return;
+
+            GeoObject.Text text = GeoObject.Text.Construct();
+            text.Font = fontName;
+            text.TextString = textString;
+            text.Location = location;
+            text.SetDirections(lineDirection, glyphDirection);
+            text.Alignment = alignment;
+            text.LineAlignment = lineAlignment;
+            text.Bold      = (fontStyle & FontStyle.Bold) != 0;
+            text.Italic    = (fontStyle & FontStyle.Italic) != 0;
+            text.Underline = (fontStyle & FontStyle.Underline) != 0;
+            text.Strikeout = (fontStyle & FontStyle.Strikeout) != 0;
+
+            bool savedTriangulate = triangulateText;
+            triangulateText = true; // with TriangulateText == false Text.PaintTo3D would call back into this method
+            try
+            {
+                text.PrePaintTo3D(this); // creates the per-character display lists in the font cache
+                text.PaintTo3D(this);    // replays them at the character positions
+            }
+            finally
+            {
+                triangulateText = savedTriangulate;
+            }
         }
 
         private void DrawListSurface(PaintToSilkGLList list)

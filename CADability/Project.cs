@@ -19,9 +19,6 @@ using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Runtime.Serialization;
-using ACadSharp;
-using ACadSharp.IO;
-using Color = System.Drawing.Color;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading;
 // using System.Runtime.Serialization.Formatters.Soap; Müsste man mal einführen, referenz muss verwendet werden
@@ -1185,7 +1182,7 @@ namespace CADability
                 case "html":
                     return true;
                 case "dxf":
-                    CADability.DXF.Export export = new DXF.Export(ACadVersion.AC1015);
+                    CADability.DXF.Export export = new DXF.Export(netDxf.Header.DxfVersion.AutoCad2000);
                     export.WriteToFile(this, fileName);
                     return true;
                 case "dwg":
@@ -1680,24 +1677,127 @@ namespace CADability
             if (res != null) res.WriteToFile(FileName); // und gleich wieder rausschreiben, denn an den konvertierten Objekten hängt die falsche DLL
             return res;
         }
+        /// <summary>
+        /// If necessary, a dxf or dwg file is converted to ACAD2000 dxf version and the temporary filename is returned. Upon Dispose, the temporary files are deleted.
+        /// There is a free converter program from open design https://www.opendesign.com/guestfiles/oda_file_converter (odafileconverter.exe).
+        /// if this program is installed on the computer and the global setting "DwgDxfConverter" contains the path and filename to this program, it will be automatically executed
+        /// and the dwg file will be converted to a dxf file, which can then be imported.
+        /// </summary>
+        private class ConvertToDxfAutoCad2000 : IDisposable
+        {
+            private string folderOrg, folderConverted;
+            public string DxfFileName;
+            public ConvertToDxfAutoCad2000(string fileName, string format)
+            {
+                if ((format.Equals("dxf", StringComparison.OrdinalIgnoreCase) && !DXF.Import.CanImportVersion(fileName)) || format.Equals("dwg", StringComparison.OrdinalIgnoreCase))
+                {
+                    string converter = Settings.GlobalSettings.GetStringValue("DwgDxfConverter", null);
+                    bool isInSetting = true;
+                    if (String.IsNullOrEmpty(converter))
+                    {
+                        isInSetting = false;
+
+                        string programFilesPath = string.Empty;
+
+                        if (Environment.Is64BitOperatingSystem && !Environment.Is64BitProcess)
+                        {
+                            programFilesPath = Environment.GetEnvironmentVariable("ProgramW6432");
+                        }
+                        else
+                        {
+                            programFilesPath = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+                        }
+
+                        //converter = @"C:\Program Files\ODA\ODAFileConverter_title 21.3.0\ODAFileConverter.exe";                        
+                        string odaFolder = System.IO.Path.Combine(programFilesPath, "ODA");
+                        if (Directory.Exists(odaFolder))
+                        {
+                            string[] oda = Directory.GetFiles(odaFolder, "odafileconverter.exe", SearchOption.AllDirectories);
+
+                            for (int i = 0; i < oda.Length; i++)
+                            {
+                                string fn = System.IO.Path.GetDirectoryName(oda[i]);
+                                if (!string.IsNullOrEmpty(converter))
+                                {
+                                    string fnc = System.IO.Path.GetDirectoryName(converter);
+                                    if (string.Compare(fnc, fn, true) < 0) converter = oda[i];
+                                }
+                                else
+                                {
+                                    converter = oda[i];
+                                }
+                            }
+                        }
+                    }
+                    if (!String.IsNullOrEmpty(converter))
+                    {
+                        folderOrg = GetTemporaryDirectory();
+                        folderConverted = GetTemporaryDirectory();
+                        Directory.CreateDirectory(folderOrg);
+                        Directory.CreateDirectory(folderConverted);
+                        File.Copy(fileName, System.IO.Path.Combine(folderOrg, System.IO.Path.GetFileName(fileName)));
+                        DxfFileName = System.IO.Path.Combine(folderConverted, System.IO.Path.GetFileNameWithoutExtension(fileName) + ".dxf");
+                        System.Diagnostics.Process process = new System.Diagnostics.Process();
+                        // Configure the process using the StartInfo properties.
+                        process.StartInfo.FileName = converter;
+                        process.StartInfo.Arguments = "\"" + folderOrg + "\" " + "\"" + folderConverted + "\" " + "ACAD2000 DXF 0 0";
+                        process.Start();
+                        process.WaitForExit();// Waits here for the process to exit.                    
+                        if (!isInSetting && process.ExitCode == 0) Settings.GlobalSettings.SetValue("DwgDxfConverter", converter);
+                    }
+                }
+                else
+                {
+                    DxfFileName = fileName;
+                }
+            }
+            private string GetTemporaryDirectory()
+            {
+                string tempDirectory = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.IO.Path.GetRandomFileName());
+                Directory.CreateDirectory(tempDirectory);
+                return tempDirectory;
+            }
+            void IDisposable.Dispose()
+            {
+                if (folderOrg != null)
+                {
+                    try
+                    {
+                        if (Directory.Exists(folderOrg))
+                            Directory.Delete(folderOrg, true);
+                        if (Directory.Exists(folderConverted))
+                            Directory.Delete(folderConverted, true);
+                    }
+                    catch (Exception ex)
+                    {
+                        if (ex is DirectoryNotFoundException || ex is IOException || ex is UnauthorizedAccessException)
+                        {
+                            //Best effort, if the folders could not be deleted there is nothing we can do.
+                        }
+                        else
+                        {
+                            throw;
+                        }
+                    }
+                }
+            }
+        }
         private static Project ImportDXF(string filename)
         {
-            CADability.DXF.Import import = new DXF.Import(filename);
-            return import.Project;
-        }
-
-        private static Project ImportDWG(string filename)
-        {
-            try
+            using (ConvertToDxfAutoCad2000 converted = new ConvertToDxfAutoCad2000(filename, "dxf"))
             {
-                var reader = new DwgReader(filename, null);
-                var cadDoc = reader.Read();
-                CADability.DXF.Import import = new DXF.Import(cadDoc);
+                string fn = converted.DxfFileName;
+                if (string.IsNullOrEmpty(fn)) fn = filename;
+                CADability.DXF.Import import = new DXF.Import(fn); // DEBUGGING! change to fn again
                 return import.Project;
             }
-            catch (Exception ex)
+        }
+        private static Project ImportDWG(string filename)
+        {
+            using (ConvertToDxfAutoCad2000 converted = new ConvertToDxfAutoCad2000(filename, "dxf"))
             {
-                throw new InvalidOperationException("Failed to read DWG file '" + filename + "': " + ex.Message, ex);
+                CADability.DXF.Import import = new DXF.Import(converted.DxfFileName);
+                return import.Project;
             }
         }
         public static Project ReadFromFile(string FileName, string Format, bool useProgress, bool makeCompounds = true)

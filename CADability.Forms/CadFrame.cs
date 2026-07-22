@@ -248,9 +248,7 @@ namespace CADability.Forms
         }
         IPaintTo3D IUIService.CreatePaintInterface(Bitmap paintToBitmap, double precision)
         {
-            PaintToOpenGL paintTo3D = new PaintToOpenGL(precision);
-            paintTo3D.Init(paintToBitmap);
-            return paintTo3D;
+            throw new NotImplementedException("Off-screen bitmap rendering not yet implemented in PaintToSilkGL");
         }
         Substitutes.DialogResult IUIService.ShowPageSetupDlg(ref PrintDocument printDocument, PageSettings pageSettings, out int width, out int height, out bool landscape)
         {

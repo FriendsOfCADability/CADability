@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net48;net6.0</TargetFrameworks>
+    <Version>3.0.0</Version>
+    <Authors>Daniel Carvajal</Authors>
+    <Owners>haplokuon</Owners>
+    <Company>netDxf</Company>
+    <Product />
+    <Copyright>Daniel Carvajal © 2023</Copyright>
+    <Description>.net Dxf Reader-Writer</Description>
+    <SignAssembly>true</SignAssembly>
+    <DelaySign>false</DelaySign>
+    <AssemblyOriginatorKeyFile>netDxf.snk</AssemblyOriginatorKeyFile>
+    <PackageProjectUrl>https://github.com/haplokuon/netDxf</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/haplokuon/netDxf</RepositoryUrl>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <PackageLicenseFile></PackageLicenseFile>
+    <PackageReleaseNotes>netDxf is a .net library programmed in C# to read and write AutoCAD DXF files. It supports AutoCad2000, AutoCad2004, AutoCad2007, AutoCad2010, AutoCad2013, and AutoCad2018 DXF database versions, in both text and binary format.</PackageReleaseNotes>
+    <PackageTags>netDxf, Dxf, Dxf reader, Dxf writer, AutoCad</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Title>netDxf</Title>
+    <RunAnalyzersDuringLiveAnalysis>false</RunAnalyzersDuringLiveAnalysis>
+    <RunAnalyzersDuringBuild>false</RunAnalyzersDuringBuild>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DocumentationFile>netDxf.xml</DocumentationFile>
+    <NoWarn>1701;1702</NoWarn>
+    <OutputPath></OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DocumentationFile>netDxf.xml</DocumentationFile>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <NoWarn>1701;1702</NoWarn>
+    <OutputPath></OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(TargetFramework)' == 'net48'">
+    <DefineConstants>NET4X</DefineConstants>
+  </PropertyGroup>
+  
+</Project>

@@ -864,6 +864,9 @@ namespace CADability.Forms
 
             if (inList)
             {
+                // one growth step instead of repeated doubling: big faces add millions of floats
+                int needed = listSurfBuf.Count + vc * 6;
+                if (listSurfBuf.Capacity < needed) listSurfBuf.Capacity = needed;
                 for (int i = 0; i < vc; i++)
                 {
                     int idx = indextriples[i];

@@ -719,6 +719,7 @@ namespace CADability.Forms
         {
             WglContext.MakeCurrent(hdc, hglrc);
             if (isBitmap && fbo != 0) gl?.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
+            if (gl != null) PaintToSilkGLList.FreeDeleted(gl); // reclaim buffers of collected lists
         }
 
         public void SetColor(Color color, int lockColor = 0)

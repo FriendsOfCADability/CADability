@@ -63,6 +63,7 @@ namespace CADability.Forms
         internal bool IsGpuUploaded;
         internal GL Gl;
         private bool disposed;
+        private long gpuBytes; // registered with GC.AddMemoryPressure while the buffers live
 
         // GPU resources of garbage collected lists. GL calls are not possible on the finalizer
         // thread, so the ids are queued here and deleted by FreeDeleted on the render thread
@@ -81,6 +82,7 @@ namespace CADability.Forms
                     if (SurfaceVbo != 0) vbosToDelete.Add(SurfaceVbo);
                     if (EdgeVbo    != 0) vbosToDelete.Add(EdgeVbo);
                 }
+                if (gpuBytes > 0) GC.RemoveMemoryPressure(gpuBytes);
             }
         }
 
@@ -134,8 +136,16 @@ namespace CADability.Forms
                 gl.BindVertexArray(0);
             }
 
-            // the vertex data now lives on the GPU; keeping the arrays alive as well would
-            // roughly double the memory footprint of every display list
+            // The vertex data now lives on the GPU; keeping the arrays alive as well would
+            // roughly double the memory footprint of every display list. The GPU size is
+            // registered as memory pressure: display lists are re-created on every zoom step
+            // (unscaled objects, precision changes) and their buffers are only reclaimed via
+            // the finalizer — without pressure the GC has no reason to ever run, and the
+            // driver memory grows unbounded (observed with a zoomed sphere).
+            gpuBytes = 0;
+            if (SurfaceVertexCount > 0) gpuBytes += (long)SurfaceVertexCount * 6 * sizeof(float);
+            if (EdgeVertexCount    > 0) gpuBytes += (long)EdgeVertexCount    * 4 * sizeof(float);
+            if (gpuBytes > 0) GC.AddMemoryPressure(gpuBytes);
             SurfaceVertices = null;
             EdgeVertices    = null;
 
@@ -153,6 +163,7 @@ namespace CADability.Forms
                 if (EdgeVao != 0) { Gl.DeleteVertexArray(EdgeVao); EdgeVao = 0; }
                 if (EdgeVbo != 0) { Gl.DeleteBuffer(EdgeVbo); EdgeVbo = 0; }
                 IsGpuUploaded = false;
+                if (gpuBytes > 0) { GC.RemoveMemoryPressure(gpuBytes); gpuBytes = 0; }
             }
         }
     }

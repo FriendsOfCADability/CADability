@@ -16,7 +16,7 @@ namespace CADability.Forms
         internal uint SurfaceVbo;
 
         // edge geometry
-        internal float[] EdgeVertices;      // vec3 position per vertex (3 floats)
+        internal float[] EdgeVertices;      // vec3 position + cumulative polyline distance (4 floats per vertex)
         internal int EdgeVertexCount;
         internal uint EdgeVao;
         internal uint EdgeVbo;
@@ -57,7 +57,8 @@ namespace CADability.Forms
 
         // per-entity color batches: each entry means "from startVertex, use this color"
         internal List<(int startVertex, Color color)> SurfaceBatches = new();
-        internal List<(int startVertex, Color color)> EdgeBatches = new();
+        // edge batches additionally carry the dash pattern (pixel segment lengths, null = solid)
+        internal List<(int startVertex, Color color, float[] pattern)> EdgeBatches = new();
 
         internal bool IsGpuUploaded;
         internal GL Gl;
@@ -93,9 +94,11 @@ namespace CADability.Forms
                 EdgeVbo = gl.GenBuffer();
                 gl.BindVertexArray(EdgeVao);
                 gl.BindBuffer(BufferTargetARB.ArrayBuffer, EdgeVbo);
-                gl.BufferData<float>(BufferTargetARB.ArrayBuffer, (ReadOnlySpan<float>)EdgeVertices.AsSpan(0, EdgeVertexCount * 3), BufferUsageARB.StaticDraw);
-                gl.VertexAttribPointer(0, 3, GLEnum.Float, false, (uint)(3 * sizeof(float)), (void*)0);
+                gl.BufferData<float>(BufferTargetARB.ArrayBuffer, (ReadOnlySpan<float>)EdgeVertices.AsSpan(0, EdgeVertexCount * 4), BufferUsageARB.StaticDraw);
+                gl.VertexAttribPointer(0, 3, GLEnum.Float, false, (uint)(4 * sizeof(float)), (void*)0);
                 gl.EnableVertexAttribArray(0);
+                gl.VertexAttribPointer(1, 1, GLEnum.Float, false, (uint)(4 * sizeof(float)), (void*)(3 * sizeof(float)));
+                gl.EnableVertexAttribArray(1);
                 gl.BindVertexArray(0);
             }
 

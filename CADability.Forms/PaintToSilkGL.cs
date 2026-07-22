@@ -49,6 +49,53 @@ namespace CADability.Forms
         private readonly Dictionary<Bitmap, (uint tex, int xoff, int yoff)> sprites = new(); // DisplayBitmap (unscaled icons with anchor)
         private readonly Dictionary<Bitmap, uint> iconMasks = new();                      // DisplayIcon (mask in current color)
 
+        // point symbol bitmaps: 0-5 thin (dot, plus, cross, line, square, circle),
+        // 6-11 thin or bold depending on the PointSymbolsBold setting, 12 filled square (select)
+        private static List<Bitmap> bitmapList = null;
+        internal static List<Bitmap> BitmapList
+        {
+            get
+            {
+                if (bitmapList == null)
+                {
+                    bitmapList = new List<Bitmap>();
+                    Bitmap bmp = BitmapTable.GetBitmap("PointSymbols.bmp");
+                    Color clr = bmp.GetPixel(0, 0);
+                    if (clr.A != 0) bmp.MakeTransparent(clr);
+                    int h = bmp.Height;
+                    ImageList imageList = new ImageList();
+                    imageList.ImageSize = new Size(h, h);
+                    imageList.Images.AddStrip(bmp); // the non-bold symbols
+                    if (Settings.GlobalSettings.GetBoolValue("PointSymbolsBold", false))
+                    {
+                        bmp = BitmapTable.GetBitmap("PointSymbolsB.bmp"); // the bold symbols
+                        clr = bmp.GetPixel(0, 0);
+                        if (clr.A != 0) bmp.MakeTransparent(clr);
+                        imageList.Images.AddStrip(bmp);
+                    }
+                    else
+                    {   // again the non bold symbols
+                        imageList.Images.AddStrip(bmp);
+                    }
+                    // full black square for selecting
+                    bmp = new Bitmap(h, h);
+                    for (int i = 0; i < h; i++)
+                    {
+                        for (int j = 0; j < h; j++)
+                        {
+                            bmp.SetPixel(i, j, Color.Black);
+                        }
+                    }
+                    imageList.Images.Add(bmp);
+                    for (int i = 0; i < imageList.Images.Count; ++i)
+                    {
+                        bitmapList.Add(imageList.Images[i] as Bitmap);
+                    }
+                }
+                return bitmapList;
+            }
+        }
+
         private int surfLoc_projection;
         private int surfLoc_modelview;
         private int surfLoc_normal_matrix;
@@ -58,6 +105,14 @@ namespace CADability.Forms
         private int edgeLoc_projection;
         private int edgeLoc_modelview;
         private int edgeLoc_color;
+        private int edgeLoc_pattern;
+        private int edgeLoc_patternCount;
+        private int edgeLoc_patternTotal;
+        private int edgeLoc_distScale;
+
+        // current dash pattern as pixel segment lengths (alternating on/off, starting on);
+        // null = solid. Like the old glLineStipple path, patterns repeat over 16 pixels.
+        private float[] currentPatternPx;
 
         // GL column-major float[16] matrices
         private float[] projectionMatrix = Identity4();
@@ -281,9 +336,13 @@ namespace CADability.Forms
             surfLoc_color         = gl.GetUniformLocation(surfaceProgram, "u_color");
             surfLoc_light_pos     = gl.GetUniformLocation(surfaceProgram, "u_light_pos");
 
-            edgeLoc_projection = gl.GetUniformLocation(edgeProgram, "u_projection");
-            edgeLoc_modelview  = gl.GetUniformLocation(edgeProgram, "u_modelview");
-            edgeLoc_color      = gl.GetUniformLocation(edgeProgram, "u_color");
+            edgeLoc_projection   = gl.GetUniformLocation(edgeProgram, "u_projection");
+            edgeLoc_modelview    = gl.GetUniformLocation(edgeProgram, "u_modelview");
+            edgeLoc_color        = gl.GetUniformLocation(edgeProgram, "u_color");
+            edgeLoc_pattern      = gl.GetUniformLocation(edgeProgram, "u_pattern");
+            edgeLoc_patternCount = gl.GetUniformLocation(edgeProgram, "u_patternCount");
+            edgeLoc_patternTotal = gl.GetUniformLocation(edgeProgram, "u_patternTotal");
+            edgeLoc_distScale    = gl.GetUniformLocation(edgeProgram, "u_distScale");
 
             textureProgram = LinkProgram(
                 CompileShader(ShaderType.VertexShader,   ReadShader("texture.vert")),
@@ -331,6 +390,23 @@ namespace CADability.Forms
             gl.UniformMatrix4(edgeLoc_modelview,  1, false, ref mv[0]);
             Color c = selectMode ? selectColor : currentColor;
             gl.Uniform4(edgeLoc_color, c.R / 255f, c.G / 255f, c.B / 255f, c.A / 255f);
+        }
+
+        // must be called with the edge program in use; pattern == null means solid
+        private void UploadEdgePattern(float[] pattern)
+        {
+            if (pattern == null || pattern.Length == 0)
+            {
+                gl.Uniform1(edgeLoc_patternCount, 0);
+                return;
+            }
+            float total = 0f;
+            for (int i = 0; i < pattern.Length; ++i) total += pattern[i];
+            gl.Uniform1(edgeLoc_patternCount, pattern.Length);
+            gl.Uniform1(edgeLoc_patternTotal, total);
+            gl.Uniform1(edgeLoc_pattern, (uint)pattern.Length, ref pattern[0]);
+            // the pattern is defined in screen pixels, the distance attribute in world units
+            gl.Uniform1(edgeLoc_distScale, pixelToWorld > 0.0 ? (float)(1.0 / pixelToWorld) : 1f);
         }
 
         // -------------------------------------------------------------------------
@@ -385,6 +461,17 @@ namespace CADability.Forms
             batches.Add((vertexCount, color));
         }
 
+        private static void AddEdgeBatch(List<(int startVertex, Color color, float[] pattern)> batches,
+            int vertexCount, Color color, float[] pattern)
+        {
+            if (batches.Count > 0)
+            {
+                var last = batches[batches.Count - 1];
+                if (last.color == color && ReferenceEquals(last.pattern, pattern)) return;
+            }
+            batches.Add((vertexCount, color, pattern));
+        }
+
         private static float[] Ortho2D(float w, float h)
         {
             // left=0, right=w, bottom=h, top=0, near=-1, far=1  (WinForms y-down)
@@ -419,8 +506,9 @@ namespace CADability.Forms
             gl.BindVertexArray(0);
         }
 
+        // verts: 4 floats per vertex (position xyz + cumulative polyline distance)
         private unsafe void DrawEdge(float[] verts, int vertCount, PrimitiveType mode,
-            float[] proj = null, float[] mv = null)
+            float[] proj = null, float[] mv = null, bool applyPattern = false)
         {
             if (vertCount == 0) return;
             proj ??= projectionMatrix;
@@ -428,12 +516,14 @@ namespace CADability.Forms
             gl.BindVertexArray(streamVao);
             gl.BindBuffer(BufferTargetARB.ArrayBuffer, streamVbo);
             gl.BufferData<float>(BufferTargetARB.ArrayBuffer,
-                (ReadOnlySpan<float>)verts.AsSpan(0, vertCount * 3), BufferUsageARB.StreamDraw);
-            gl.VertexAttribPointer(0, 3, GLEnum.Float, false, (uint)(3 * sizeof(float)), (void*)0);
+                (ReadOnlySpan<float>)verts.AsSpan(0, vertCount * 4), BufferUsageARB.StreamDraw);
+            gl.VertexAttribPointer(0, 3, GLEnum.Float, false, (uint)(4 * sizeof(float)), (void*)0);
             gl.EnableVertexAttribArray(0);
-            gl.DisableVertexAttribArray(1);
+            gl.VertexAttribPointer(1, 1, GLEnum.Float, false, (uint)(4 * sizeof(float)), (void*)(3 * sizeof(float)));
+            gl.EnableVertexAttribArray(1);
             gl.UseProgram(edgeProgram);
             UploadEdgeUniforms(proj, mv);
+            UploadEdgePattern(applyPattern ? currentPatternPx : null);
             gl.DrawArrays(mode, 0, (uint)vertCount);
             gl.BindVertexArray(0);
         }
@@ -621,7 +711,7 @@ namespace CADability.Forms
             if (inList)
             {
                 AddColorBatch(currentList.SurfaceBatches, currentList.SurfaceVertexCount, color);
-                AddColorBatch(currentList.EdgeBatches,    currentList.EdgeVertexCount,    color);
+                AddEdgeBatch(currentList.EdgeBatches,     currentList.EdgeVertexCount,    color, currentPatternPx);
             }
         }
 
@@ -632,7 +722,31 @@ namespace CADability.Forms
             gl?.LineWidth(lineWidth == null ? 1f : Math.Max(1f, (float)lineWidth.Width));
         }
 
-        public void SetLinePattern(LinePattern pattern) { /* dash via shader — phase 3 */ }
+        public void SetLinePattern(LinePattern pattern)
+        {
+            double[] p = pattern?.Pattern;
+            float[] px = null;
+            if (p != null && p.Length > 0 && p.Length <= 8)
+            {
+                double sum = 0.0;
+                for (int i = 0; i < p.Length; ++i) sum += p[i];
+                if (sum > 0.0)
+                {
+                    // like the old glLineStipple path: only the proportions are used and the
+                    // pattern repeats over 16 screen pixels; every segment is at least 1 px
+                    px = new float[p.Length];
+                    for (int i = 0; i < p.Length; ++i)
+                    {
+                        px[i] = Math.Max(1f, (float)(p[i] * 16.0 / sum));
+                    }
+                }
+            }
+            currentPatternPx = px;
+            if (inList)
+            {
+                AddEdgeBatch(currentList.EdgeBatches, currentList.EdgeVertexCount, currentColor, px);
+            }
+        }
 
         public void Polyline(GeoPoint[] points)
         {
@@ -640,44 +754,81 @@ namespace CADability.Forms
 
             if (inList)
             {
-                // Polylines in a list are stored as line segments
+                // Polylines in a list are stored as line segments; the cumulative distance
+                // continues over the whole polyline so dash patterns don't restart per segment
+                double dist = 0.0;
                 for (int i = 0; i + 1 < points.Length; i++)
                 {
+                    double segLen = SegmentLength(points[i], points[i + 1]);
                     listEdgeBuf.Add((float)points[i].x);
                     listEdgeBuf.Add((float)points[i].y);
                     listEdgeBuf.Add((float)points[i].z);
+                    listEdgeBuf.Add((float)dist);
                     listEdgeBuf.Add((float)points[i + 1].x);
                     listEdgeBuf.Add((float)points[i + 1].y);
                     listEdgeBuf.Add((float)points[i + 1].z);
+                    listEdgeBuf.Add((float)(dist + segLen));
+                    dist += segLen;
                     currentList.EdgeVertexCount += 2;
                 }
                 return;
             }
 
-            var v = new float[(points.Length - 1) * 6];
+            var v = new float[(points.Length - 1) * 8];
+            double d = 0.0;
             for (int i = 0; i + 1 < points.Length; i++)
             {
-                int o = i * 6;
-                v[o+0] = (float)points[i].x;     v[o+1] = (float)points[i].y;     v[o+2] = (float)points[i].z;
-                v[o+3] = (float)points[i+1].x;   v[o+4] = (float)points[i+1].y;   v[o+5] = (float)points[i+1].z;
+                double segLen = SegmentLength(points[i], points[i + 1]);
+                int o = i * 8;
+                v[o+0] = (float)points[i].x;     v[o+1] = (float)points[i].y;     v[o+2] = (float)points[i].z;     v[o+3] = (float)d;
+                v[o+4] = (float)points[i+1].x;   v[o+5] = (float)points[i+1].y;   v[o+6] = (float)points[i+1].z;   v[o+7] = (float)(d + segLen);
+                d += segLen;
             }
-            DrawEdge(v, (points.Length - 1) * 2, PrimitiveType.Lines);
+            DrawEdge(v, (points.Length - 1) * 2, PrimitiveType.Lines, null, null, true);
+        }
+
+        private static double SegmentLength(GeoPoint a, GeoPoint b)
+        {
+            double dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
+            return Math.Sqrt(dx * dx + dy * dy + dz * dz);
         }
 
         public void FilledPolyline(GeoPoint[] points) { /* deprecated */ }
 
         public void Points(GeoPoint[] points, float size, PointSymbol pointSymbol)
         {
+            // point symbols are drawn as screen-aligned icon sprites in the current color,
+            // like the old renderer (which routed everything through DisplayIcon/glBitmap)
             if (points == null || points.Length == 0) return;
-            gl.PointSize(size);
-            var v = new float[points.Length * 3];
-            for (int i = 0; i < points.Length; i++)
+            List<Bitmap> bl = BitmapList;
+            Bitmap bmp;
+            if ((pointSymbol & PointSymbol.Select) != 0)
             {
-                v[i*3+0] = (float)points[i].x;
-                v[i*3+1] = (float)points[i].y;
-                v[i*3+2] = (float)points[i].z;
+                bmp = bl[12];
+                for (int i = 0; i < points.Length; ++i) DisplayIcon(points[i], bmp);
+                return; // only show the full square, nothing else
             }
-            DrawEdge(v, points.Length, PrimitiveType.Points);
+            int offset = useLineWidth ? 6 : 0; // thin or (optionally) bold symbol variants
+            bmp = null;
+            switch ((PointSymbol)((int)pointSymbol & 0x07))
+            {
+                case PointSymbol.Empty: bmp = null; break;
+                case PointSymbol.Dot:   bmp = bl[0 + offset]; break;
+                case PointSymbol.Plus:  bmp = bl[1 + offset]; break;
+                case PointSymbol.Cross: bmp = bl[2 + offset]; break;
+                case PointSymbol.Line:  bmp = bl[3 + offset]; break;
+            }
+            if (bmp != null)
+            {
+                for (int i = 0; i < points.Length; ++i) DisplayIcon(points[i], bmp);
+            }
+            bmp = null;
+            if ((pointSymbol & PointSymbol.Circle) != 0) bmp = bl[5 + offset];
+            if ((pointSymbol & PointSymbol.Square) != 0) bmp = bl[4 + offset];
+            if (bmp != null)
+            {
+                for (int i = 0; i < points.Length; ++i) DisplayIcon(points[i], bmp);
+            }
         }
 
         public void Triangle(GeoPoint[] vertex, GeoVector[] normals, int[] indextriples)
@@ -732,7 +883,27 @@ namespace CADability.Forms
         }
 
         public void PrepareText(string fontName, string textString, FontStyle fontStyle) { }
-        public void PreparePointSymbol(PointSymbol pointSymbol) { }
+
+        public void PreparePointSymbol(PointSymbol pointSymbol)
+        {
+            List<Bitmap> bl = BitmapList;
+            int offset = useLineWidth ? 6 : 0;
+            Bitmap bmp = null;
+            switch ((PointSymbol)((int)pointSymbol & 0x07))
+            {
+                case PointSymbol.Empty: bmp = null; break;
+                case PointSymbol.Dot:   bmp = bl[0 + offset]; break;
+                case PointSymbol.Plus:  bmp = bl[1 + offset]; break;
+                case PointSymbol.Cross: bmp = bl[2 + offset]; break;
+                case PointSymbol.Line:  bmp = bl[3 + offset]; break;
+            }
+            if (bmp != null) PrepareIcon(bmp);
+            bmp = null;
+            if ((pointSymbol & PointSymbol.Circle) != 0) bmp = bl[5 + offset];
+            if ((pointSymbol & PointSymbol.Square) != 0) bmp = bl[4 + offset];
+            if ((pointSymbol & PointSymbol.Select) != 0) bmp = bl[12];
+            if (bmp != null) PrepareIcon(bmp);
+        }
 
         public void PrepareIcon(Bitmap icon)
         {
@@ -853,6 +1024,7 @@ namespace CADability.Forms
             if (batches == null || batches.Count == 0)
             {
                 UploadEdgeUniforms(projectionMatrix, modelviewMatrix);
+                UploadEdgePattern(null);
                 gl.DrawArrays(PrimitiveType.Lines, 0, (uint)list.EdgeVertexCount);
             }
             else
@@ -865,6 +1037,7 @@ namespace CADability.Forms
                     if (end <= first) continue;
                     currentColor = batches[i].color;
                     UploadEdgeUniforms(projectionMatrix, modelviewMatrix);
+                    UploadEdgePattern(batches[i].pattern);
                     gl.DrawArrays(PrimitiveType.Lines, first, (uint)(end - first));
                 }
                 currentColor = savedColor;
@@ -971,7 +1144,7 @@ namespace CADability.Forms
         {
             float[] ortho = Ortho2D(viewWidth, viewHeight);
             float[] iden  = Identity4();
-            var v = new float[] { sx, sy, 0, ex, ey, 0 };
+            var v = new float[] { sx, sy, 0, 0, ex, ey, 0, 0 };
             DrawEdge(v, 2, PrimitiveType.Lines, ortho, iden);
         }
 
@@ -984,8 +1157,8 @@ namespace CADability.Forms
             float[] iden  = Identity4();
             var v = new float[]
             {
-                p1.X, p1.Y, 0,  p2.X, p1.Y, 0,  p2.X, p2.Y, 0,
-                p1.X, p1.Y, 0,  p2.X, p2.Y, 0,  p1.X, p2.Y, 0,
+                p1.X, p1.Y, 0, 0,  p2.X, p1.Y, 0, 0,  p2.X, p2.Y, 0, 0,
+                p1.X, p1.Y, 0, 0,  p2.X, p2.Y, 0, 0,  p1.X, p2.Y, 0, 0,
             };
             DrawEdge(v, 6, PrimitiveType.Triangles, ortho, iden);
         }

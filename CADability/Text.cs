@@ -589,12 +589,10 @@ namespace CADability.GeoObject
             int em = ff.GetEmHeight((FontStyle)fs);
             if (em == 0) em = 1000;
             Font font = new Font(ff, em, (FontStyle)fs, GraphicsUnit.Pixel);
+
+            // GDI P/Invoke is used only for kerning pairs.
             IntPtr hfont = font.ToHfont();
             IntPtr oldfont = Gdi.SelectObject(hDC, hfont);
-            Gdi.ABC[] abc = new Gdi.ABC[1];
-            Gdi.GetCharABCWidths(hDC, (uint)c, (uint)c, abc);
-            //int[] widths = new int[1]; // liefert das selbe wie GetCharABCWidths, nur die Summe halt.
-            //Gdi.GetCharWidth32(hDC, (uint)c, (uint)c, widths);
             if (!kerning.ContainsKey(new KerningKey(fontName, fontStyle)))
             {
                 KerningKey kk = new KerningKey(fontName, fontStyle);
@@ -614,7 +612,14 @@ namespace CADability.GeoObject
             Gdi.SelectObject(hDC, oldfont);
             Gdi.DeleteObject(hfont);
 
-            width = (abc[0].abcA + abc[0].abcB + abc[0].abcC) / (double)em;
+            // Measure advance width via GDI+ MeasureString with GenericTypographic.
+            // This correctly includes side bearings (abcA + abcB + abcC) and space advance.
+            using (var bmp = new System.Drawing.Bitmap(1, 1))
+            using (var g = System.Drawing.Graphics.FromImage(bmp))
+            {
+                SizeF sz = g.MeasureString(c.ToString(), font, int.MaxValue, StringFormat.GenericTypographic);
+                width = sz.Width / em;
+            }
 
             path.AddString(c.ToString(), ff, fs, 1.0f, new PointF(0.0f, 0.0f), sf);
             List<Path2D> res = new List<Path2D>();
@@ -888,7 +893,18 @@ namespace CADability.GeoObject
                             }
                             bool oldpse = paintTo3D.PaintSurfaceEdges;
                             paintTo3D.PaintSurfaceEdges = false;
-                            fc.PaintTo3D(paintTo3D); // will be triangulated according to paintTo3D.Precision 
+                            // glyphs are rendered flat (unlit): text must appear exactly in its
+                            // ColorDef color and not be modified by the scene lighting
+                            IPaintTo3DFlatText flatText = paintTo3D as IPaintTo3DFlatText;
+                            if (flatText != null) flatText.FlatTextMode = true;
+                            try
+                            {
+                                fc.PaintTo3D(paintTo3D); // will be triangulated according to paintTo3D.Precision
+                            }
+                            finally
+                            {
+                                if (flatText != null) flatText.FlatTextMode = false;
+                            }
                             paintTo3D.Precision = oldprecision;
                             paintTo3D.PaintSurfaceEdges = oldpse;
                         }
@@ -906,6 +922,7 @@ namespace CADability.GeoObject
                 }
                 double extwidth = ext.Width;
                 // if (width < extwidth * 0.9) width = extwidth * 1.1; warum diese Zeile? Stört bei Commercial Script
+                if (width == 0.0 && extwidth > 0.0) width = extwidth; // fallback for non-TrueType/SHX fonts
                 found.width = width; // hier könnte man mit TextRenderer.MeasureText arbeiten, wenns so nicht passt
                 if (useLists)
                 {

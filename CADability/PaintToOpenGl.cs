@@ -587,6 +587,18 @@ namespace CADability
     }
 
     /// <summary>
+    /// Optional extension of <see cref="IPaintTo3D"/>: implementations that render triangulated
+    /// faces with scene lighting can render text glyphs flat (unlit, in the plain current color)
+    /// while <see cref="FlatTextMode"/> is set. The font cache sets this mode when tesselating
+    /// characters, so text keeps exactly the color of its ColorDef instead of being brightened
+    /// or darkened by the lighting like a 3D surface.
+    /// </summary>
+    public interface IPaintTo3DFlatText
+    {
+        bool FlatTextMode { get; set; }
+    }
+
+    /// <summary>
     /// This class defines static events that can be used to customize the OpenGL implementation
     /// </summary>
 

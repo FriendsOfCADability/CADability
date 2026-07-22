@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using Wintellect.PowerCollections;
 
 namespace CADability
 {
@@ -114,7 +113,7 @@ namespace CADability
 		private double defaultScale; // Vorzugsmaßstab Welt*Maßstab = Papier, 1:1000 = 0.001
 		private double lineStyleScale; // für LinePattern und LineWidth
 		private Hashtable projectionToExtent;
-		private Set<IGeoObject> continousChanges;
+		private HashSet<IGeoObject> continousChanges;
 		// Displaylisten für alle Objekte nach Layern aufgelistet
 		internal LayerToDisplayListDictionary layerFaceDisplayList; // Alle Faces, geordnet nach Layern
 		internal LayerToDisplayListDictionary layerTransparentDisplayList; // Alle transparenten, geordnet nach Layern
@@ -820,7 +819,7 @@ namespace CADability
 		void OnBeginContinousChanges(object source)
 		{
 			// System.Diagnostics.Trace.WriteLine("OnBeginContinousChanges " + source.ToString());
-			continousChanges = new Set<IGeoObject>();
+			continousChanges = new HashSet<IGeoObject>();
 		}
 
 		/// <summary>
@@ -1848,9 +1847,9 @@ namespace CADability
 		/// <param name="pickMode">Single or multiple objects</param>
 		/// <param name="filterList">List of conditions</param>
 		/// <returns>List of objects that fulfill all conditions</returns>
-		public GeoObjectList GetObjectsFromRect(BoundingRect pickrect, Projection projection, Set<Layer> visibleLayers, PickMode pickMode, FilterList filterList)
+		public GeoObjectList GetObjectsFromRect(BoundingRect pickrect, Projection projection, HashSet<Layer> visibleLayers, PickMode pickMode, FilterList filterList)
 		{
-			if (visibleLayers == null) visibleLayers = new Set<Layer>(); // um nicht immer nach null fragen zu müssen
+			if (visibleLayers == null) visibleLayers = new HashSet<Layer>(); // um nicht immer nach null fragen zu müssen
 			GeoObjectList res = new GeoObjectList();
 			if (octTree == null) InitOctTree();
 
@@ -1951,7 +1950,7 @@ namespace CADability
 					return res;
 				case CADability.PickMode.normal:
 					{
-						Set<IGeoObject> set = new Set<IGeoObject>(new GeoObjectComparer());
+						HashSet<IGeoObject> set = new HashSet<IGeoObject>(new GeoObjectComparer());
 						foreach (IGeoObject go in oct)
 						{
 							if (go.HitTest(projection, pickrect, false))
@@ -2052,12 +2051,12 @@ namespace CADability
 		/// <param name="filterList">List of conditions</param>
 		/// <param name="toAvoid">List of objects not to select</param>
 		/// <returns>List of objects that fulfill all conditions</returns>
-		public GeoObjectList GetObjectsFromRect(Projection.PickArea area, Set<Layer> visibleLayers, PickMode pickMode, FilterList filterList, GeoObjectList toAvoid = null)
+		public GeoObjectList GetObjectsFromRect(Projection.PickArea area, HashSet<Layer> visibleLayers, PickMode pickMode, FilterList filterList, GeoObjectList toAvoid = null)
 		{
 			GeoObjectList res = new GeoObjectList();
 			if (toAvoid == null) toAvoid = new GeoObjectList();
 			if (area == null) return res; // kommt vor, wenn ein Fenster nicht sichtbar ist, aber trotzem irgendwie MouseMoves bekommt
-			if (visibleLayers == null) visibleLayers = new Set<Layer>(); // um nicht immer nach null fragen zu müssen
+			if (visibleLayers == null) visibleLayers = new HashSet<Layer>(); // um nicht immer nach null fragen zu müssen
 			if (octTree == null) InitOctTree();
 
             List<IGeoObject> octl = new List<IGeoObject>(octTree.GetObjectsFromRect(area, false));
@@ -2159,7 +2158,7 @@ namespace CADability
                     return res;
                 case CADability.PickMode.normal:
                     {
-                        Set<IGeoObject> set = new Set<IGeoObject>(new GeoObjectComparer());
+                        HashSet<IGeoObject> set = new HashSet<IGeoObject>(new GeoObjectComparer());
                         foreach (IGeoObject go in oct)
                         {
                             if (go.HitTest(area, false))
@@ -2376,10 +2375,10 @@ namespace CADability
         /// <param name="viewDirection"></param>
         /// <param name="visibleLayers"></param>
         /// <returns></returns>
-        public double GetPickDistance(Projection.PickArea viewDirection, Set<Layer> visibleLayers)
+        public double GetPickDistance(Projection.PickArea viewDirection, HashSet<Layer> visibleLayers)
         {
             GeoObjectList res = new GeoObjectList();
-            if (visibleLayers == null) visibleLayers = new Set<Layer>(); // um nicht immer nach null fragen zu müssen
+            if (visibleLayers == null) visibleLayers = new HashSet<Layer>(); // um nicht immer nach null fragen zu müssen
             if (octTree == null) InitOctTree();
 
 			List<IGeoObject> octl = new List<IGeoObject>(octTree.GetObjectsFromRect(viewDirection, false));
@@ -2420,7 +2419,7 @@ namespace CADability
 		public GeoObjectList GetObjectsFromBox(BoundingCube box)
 		{
 			if (octTree == null) InitOctTree();
-			Set<IGeoObject> res = new Set<IGeoObject>();
+			HashSet<IGeoObject> res = new HashSet<IGeoObject>();
 			IGeoObject[] found = octTree.GetObjectsFromBox(box);
 			for (int i = 0; i < found.Length; ++i)
 			{
@@ -2439,7 +2438,7 @@ namespace CADability
 		/// <param name="spf">Point to be adjusted and mode how to adjust</param>
 		/// <param name="projection">Projection</param>
 		/// <param name="visibleLayers">Visible layers to consider</param>
-		public void AdjustPoint(SnapPointFinder spf, Projection projection, Set<Layer> visibleLayers)
+		public void AdjustPoint(SnapPointFinder spf, Projection projection, HashSet<Layer> visibleLayers)
 		{   // alle relevanten Objekte zunächst im Quadtree suchen
 			//BoundingRect br = new BoundingRect(spf.SourceBeam, spf.MaxDist, spf.MaxDist);
 			//GeoObjectList l = this.GetObjectsFromRect(br, PickMode.normal, null);
@@ -2530,7 +2529,7 @@ namespace CADability
 		/// </summary>
 		/// <param name="spf">SnapPointFinder class which contains the snap mode and the mouse position</param>
 		/// <param name="visibleLayers">Layers to be included in the search</param>
-		public void AdjustPoint(SnapPointFinder spf, Set<Layer> visibleLayers)
+		public void AdjustPoint(SnapPointFinder spf, HashSet<Layer> visibleLayers)
 		{   // alle relevanten Objekte zunächst im Quadtree suchen
 			//BoundingRect br = new BoundingRect(spf.SourceBeam, spf.MaxDist, spf.MaxDist);
 			//GeoObjectList l = this.GetObjectsFromRect(br, PickMode.normal, null);

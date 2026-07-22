@@ -11,7 +11,6 @@ using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Threading;
 
-using Wintellect.PowerCollections;
 
 namespace CADability
 {

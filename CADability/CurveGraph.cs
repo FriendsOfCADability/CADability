@@ -5,7 +5,6 @@ using CADability.GeoObject;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Wintellect.PowerCollections;
 
 namespace CADability.Shapes
 {
@@ -156,7 +155,7 @@ internal class Cluster : IQuadTreeInsertable
         private double clusterSize; // Maximum cluster size, depending on the extent of all objects
         private double maxGap; // Maximum gap to be closed
         private QuadTree clusterTree; // QuadTree of all clusters
-        private UntypedSet clusterSet; // Set of all clusters (parallel to the QuadTree)
+        private HashSet<Cluster> clusterSet; // Set of all clusters (parallel to the QuadTree)
         /// <summary>
         /// List of unusable objects that were generated during the creation of a CompoundShape
         /// </summary>
@@ -279,7 +278,7 @@ internal class Cluster : IQuadTreeInsertable
             clusterTree = new QuadTree(ext);
             clusterTree.MaxDeepth = 8;
             clusterTree.MaxListLen = 3;
-            clusterSet = new UntypedSet();
+            clusterSet = new();
             for (int i = 0; i < curves.Length; ++i)
             {
                 if (curves[i].Length > clusterSize)
@@ -717,7 +716,7 @@ internal class Cluster : IQuadTreeInsertable
                 }
             }
 
-            UntypedSet allJoints = new UntypedSet();
+            HashSet<Joint> allJoints = new();
             foreach (Cluster cl in clusterSet)
             {
                 if (cl.Joints.Count < 3)
@@ -880,7 +879,7 @@ internal class Cluster : IQuadTreeInsertable
             get
             {
                 GeoObjectList res = new GeoObjectList();
-                Set<ICurve2D> c2d = new Set<ICurve2D>();
+                HashSet<ICurve2D> c2d = new HashSet<ICurve2D>();
                 foreach (Cluster cl in clusterSet)
                 {
                     GeoPoint p = new GeoPoint(cl.center);

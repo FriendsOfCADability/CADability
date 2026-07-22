@@ -9,7 +9,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Wintellect.PowerCollections;
 using System.Threading;
 using System.Diagnostics;
 #if WEBASSEMBLY
@@ -1309,7 +1308,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 			roots[Item.ItemType.styledItem] = new List<int>();
 			roots[Item.ItemType.itemDefinedTransformation] = new List<int>();
 			roots[Item.ItemType.constructiveGeometryRepresentationRelationship] = new List<int>();
-			Set<Item> productDefinitions = new Set<Item>();
+			HashSet<Item> productDefinitions = new HashSet<Item>();
 
 			using (tk = new Tokenizer(filename))
 			{
@@ -1333,7 +1332,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 						}
 					}
 #if DEBUG
-					Set<Item> allRootItems = new Set<Item>(definitions);
+					HashSet<Item> allRootItems = new HashSet<Item>(definitions);
 
 					definitionStack = new Stack<int>();
 					for (int i = 0; i < definitions.Count; i++)
@@ -1368,7 +1367,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 							//}
 						}
 					}
-					Set<string> allRootTypes = new Set<string>();
+					HashSet<string> allRootTypes = new HashSet<string>();
 					foreach (Item item in allRootItems)
 					{
 						if (item != null)
@@ -1599,10 +1598,10 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 					{
 						Item item = definitions[roots[Item.ItemType.presentationLayerAssignment][i]];
 						object o = CreateEntity(item);
-						if (o is Pair<Layer, GeoObjectList>)
+						if (o is ValueTuple<Layer, GeoObjectList> lgPair)
 						{
-							Layer layer = ((Pair<Layer, GeoObjectList>)o).First;
-							GeoObjectList list = ((Pair<Layer, GeoObjectList>)o).Second;
+							Layer layer = lgPair.Item1;
+							GeoObjectList list = lgPair.Item2;
 							for (int j = 0; j < list.Count; j++)
 							{
 								list[j].Layer = layer;
@@ -1988,9 +1987,9 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 			if (item.usedBy.Count == 0) res.Add(item.type.ToString() + "(" + item.definingIndex.ToString() + ")"); // a root
 			return res.ToArray();
 		}
-		Set<Item.ItemType> ignoreInSubTree;
+		HashSet<Item.ItemType> ignoreInSubTree;
 
-		private string SubTree(Item item, int deepth, string name, string prefix, Set<Item> used)
+		private string SubTree(Item item, int deepth, string name, string prefix, HashSet<Item> used)
 		{
 			if (ignoreInSubTree.Contains(item.type)) return "";
 			StringBuilder res = new StringBuilder();
@@ -2042,7 +2041,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 		}
 		private string SubTree(int itemId, int deepth)
 		{
-			ignoreInSubTree = new Set<Item.ItemType>(); // break the subtree debug at these types:
+			ignoreInSubTree = new HashSet<Item.ItemType>(); // break the subtree debug at these types:
 			ignoreInSubTree.Add(Item.ItemType.advancedFace);
 			ignoreInSubTree.Add(Item.ItemType.closedShell);
 			ignoreInSubTree.Add(Item.ItemType.openShell);
@@ -2065,7 +2064,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 			if (item.type == Item.ItemType.faceBound) return "";
 			if (item.type == Item.ItemType.cartesianPoint) return "";
 
-			return SubTree(definitions[itemId], deepth, "root", "", new Set<Item>());
+			return SubTree(definitions[itemId], deepth, "root", "", new HashSet<Item>());
 		}
 		private HashSet<Item> ReferencedBy(Item item)
 		{
@@ -2956,7 +2955,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 							object axis = CreateEntity(item.parameter["ref_direction"]);
 							if (loc is GeoPoint2D cnt2d && axis is GeoVector2D dir2d)
 							{
-								item.val = new Pair<GeoPoint2D, GeoVector2D>(cnt2d, dir2d);
+								item.val = (cnt2d, dir2d);
 							}
 							else
 							{
@@ -3792,10 +3791,10 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 								elli.SetCirclePlaneCenterRadius(fcs.plane, fcs.Location, r);
 								item.val = elli;
 							}
-							else if (o is Pair<GeoPoint2D, GeoVector2D> sys2)
+							else if (o is ValueTuple<GeoPoint2D, GeoVector2D> sys2)
 							{
 								double r = item.parameter["radius"].fval;
-								item.val = new Circle2D(sys2.First, r);
+								item.val = new Circle2D(sys2.Item1, r);
 							}
 							else
 							{
@@ -3814,11 +3813,11 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 								elli.SetEllipseArcCenterAxis(fcs.Location, majorRadius * fcs.DirectionX.Normalized, minorRadius * fcs.DirectionY.Normalized, 0.0, 2 * Math.PI);
 								item.val = elli;
 							}
-							else if (o is Pair<GeoPoint2D, GeoVector2D> sys2)
+							else if (o is ValueTuple<GeoPoint2D, GeoVector2D> sys2)
 							{
 								double majorRadius = item.parameter["semi_axis_1"].fval;
 								double minorRadius = item.parameter["semi_axis_2"].fval;
-								item.val = new Ellipse2D(sys2.First, majorRadius * sys2.Second, minorRadius * sys2.Second.ToLeft());
+								item.val = new Ellipse2D(sys2.Item1, majorRadius * sys2.Item2, minorRadius * sys2.Item2.ToLeft());
 							}
 							else
 							{
@@ -4298,7 +4297,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 									}
 								}
 							}
-							item.val = new Pair<Layer, GeoObjectList>(layer, list);
+							item.val = (layer, list);
 						}
 						break;
 					case Item.ItemType.surfaceStyleUsage:

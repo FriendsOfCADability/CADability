@@ -6,7 +6,6 @@ using CADability.UserInterface;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Wintellect.PowerCollections;
 using MouseEventArgs = CADability.Substitutes.MouseEventArgs;
 using DragEventArgs = CADability.Substitutes.DragEventArgs;
 using MouseButtons = CADability.Substitutes.MouseButtons;
@@ -1487,7 +1486,7 @@ namespace CADability
 		GeoObjectList IView.PickObjects(Point MousePoint, PickMode pickMode)
 		{
 			Projection.PickArea pa = Projection.GetPickSpace(new Rectangle(MousePoint.X - 5, MousePoint.Y - 5, 10, 10));
-			return Model.GetObjectsFromRect(pa, new Set<Layer>(projectedModel.GetVisibleLayers()), pickMode, null);
+			return Model.GetObjectsFromRect(pa, new HashSet<Layer>(projectedModel.GetVisibleLayers()), pickMode, null);
 		}
 		IShowProperty IView.GetShowProperties(IFrame Frame)
 		{

@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.Serialization;
-using Wintellect.PowerCollections;
 
 namespace CADability
 {
@@ -21,7 +20,7 @@ namespace CADability
         Dictionary<Face, GeoPoint2D> uvposition; // a cache of already calculated uv positions on faces
         internal static int hashCodeCounter = 0;
         private int hashCode;
-        private Edge[] deserializedEdges; // we need this, because we cannot serialize/deserialize Set<Edge>
+        private Edge[] deserializedEdges; // we need this, because we cannot serialize/deserialize HashSet<Edge>
         public Vertex(GeoPoint position)
         {
             this.position = position;
@@ -151,11 +150,11 @@ namespace CADability
                 return res;
             }
         }
-        public Set<Edge> ConditionalEdgesSet(Predicate<Edge> pr)
+        public HashSet<Edge> ConditionalEdgesSet(Predicate<Edge> pr)
         {
             lock (edges)
             {
-                return new Set<Edge>(edges.Where(e => pr(e)));
+                return new HashSet<Edge>(edges.Where(e => pr(e)));
             }
         }
         internal void AddPositionOnFace(Face fc, GeoPoint2D uv)
@@ -207,11 +206,11 @@ namespace CADability
                 return res;
             }
         }
-        public Set<Edge> AllEdges
+        public HashSet<Edge> AllEdges
         {
             get
             {
-                return new Set<Edge>(edges);
+                return new HashSet<Edge>(edges);
             }
         }
         public override int GetHashCode()
@@ -260,7 +259,7 @@ namespace CADability
         {
             if (ev == this) return;
 #if DEBUG
-            Set<Edge> both = new Set<Edge>(edges.Intersect(ev.edges));
+            HashSet<Edge> both = new HashSet<Edge>(edges.Intersect(ev.edges));
             double dist = Position | ev.Position;
 #endif
             foreach (Edge edge in ev.Edges)
@@ -315,7 +314,7 @@ namespace CADability
 #endif
             GeoPoint mp = new GeoPoint(position, p); // point in between the two starting positions
             // collect all involved surfaces
-            Set<Face> surfaces = new Set<Face>();
+            HashSet<Face> surfaces = new HashSet<Face>();
             foreach (Edge edg in edges)
             {
                 surfaces.Add(edg.PrimaryFace);
@@ -442,7 +441,7 @@ namespace CADability
         /// <returns></returns>
         internal Edge FindOutgoing(Face onThisFace)
         {
-            Set<Edge> edgOnFace = onThisFace.AllEdgesSet;
+            HashSet<Edge> edgOnFace = onThisFace.AllEdgesSet;
             lock (edges)
             {
                 foreach (Edge edg in edges.Intersect(edgOnFace))
@@ -460,7 +459,7 @@ namespace CADability
         /// <param name="stopVertices"></param>
         /// <param name="onThisFace"></param>
         /// <returns></returns>
-        internal static List<Edge> FindConnection(Vertex startVertex, Set<Edge> usableEdges, Set<Vertex> stopVertices, Face onThisFace)
+        internal static List<Edge> FindConnection(Vertex startVertex, HashSet<Edge> usableEdges, HashSet<Vertex> stopVertices, Face onThisFace)
         {
             List<Edge> res = new List<Edge>();
             do
@@ -469,7 +468,7 @@ namespace CADability
                 {   // edges from usableEdges that start at startVertex (on onThisFace)
                     if (!usableEdges.Contains(e)) return false;
                     return e.StartVertex(onThisFace) == startVertex;
-                }).GetAny(); // this should be exactely one
+                }).First(); // this should be exactely one
                 if (edg == null) return res; // this should never be the case
                 res.Add(edg);
                 startVertex = edg.EndVertex(onThisFace);

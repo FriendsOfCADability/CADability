@@ -9,7 +9,6 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Printing;
 
-using Wintellect.PowerCollections;
 
 namespace CADability
 {
@@ -17,10 +16,10 @@ namespace CADability
     internal abstract class IPrintItemImpl : IQuadTreeInsertable
     {
         bool printing, printed;
-        Set<IPrintItemImpl> coveredObjects; // die liegen alle unter mir
+        HashSet<IPrintItemImpl> coveredObjects; // die liegen alle unter mir
         public IPrintItemImpl()
         {
-            coveredObjects = new Set<IPrintItemImpl>();
+            coveredObjects = new HashSet<IPrintItemImpl>();
             printing = false;
             printed = false;
         }

@@ -2,7 +2,6 @@
 using CADability.Shapes;
 using System;
 using System.Collections.Generic;
-using Wintellect.PowerCollections;
 
 namespace CADability.GeoObject
 {
@@ -26,7 +25,7 @@ namespace CADability.GeoObject
         Face[] vertexToFace;
         Dictionary<Face, List<ICurve2D>> all2DCurves;
         Dictionary<Edge, List<double>> splitedEdges;
-        Set<Vertex> outsideVertices;
+        HashSet<Vertex> outsideVertices;
         List<Face> resultingFaces;
         public SplitShellWithCurves(Shell shell, Path closedBorder, double precision)
         {
@@ -63,7 +62,7 @@ namespace CADability.GeoObject
             }
             // jetzt die Faces beschneiden und eine neue Shell bauen
             Vertex[] vertices = shell.Vertices;
-            outsideVertices = new Set<Vertex>();
+            outsideVertices = new HashSet<Vertex>();
             for (int i = 0; i < vertices.Length; i++)
             {   // wenn der Vertex eine Außenkante hat, dann gilt er als außenliegend
                 Edge[] vedges = vertices[i].Edges;
@@ -86,7 +85,7 @@ namespace CADability.GeoObject
             }
 #endif
             // alle Faces, die aufgesplitted werden müssen:
-            Set<Face> splittedFaces = new Set<Face>();
+            HashSet<Face> splittedFaces = new HashSet<Face>();
             foreach (Edge edge in splitedEdges.Keys)
             {
                 splittedFaces.Add(edge.PrimaryFace);

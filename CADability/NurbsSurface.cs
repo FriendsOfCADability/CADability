@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Threading;
-using Wintellect.PowerCollections;
 using MathNet.Numerics.LinearAlgebra.Factorization;
 
 namespace CADability.GeoObject
@@ -4449,7 +4448,7 @@ namespace CADability.GeoObject
             double[] vs = GetVSingularities();
             foreach (GeoVector dir in GeoVector.MainAxis)
             {
-                Dictionary<Pair<int, int>, UVPair> mesh = new Dictionary<Pair<int, int>, UVPair>();
+                Dictionary<(int UInd, int VInd), UVPair> mesh = new();
                 // Dieses Dictinary enthält als key den Index einer Masche, als value den u und v Wert, bei dem sich ein Maximum befindet
                 // Möglicherweise wird der u bzw v Wert auch einmal überschrieben, das sollte aber keine Rolle spielen
                 for (int i = 0; i < vKnots.Length; ++i)
@@ -4479,18 +4478,18 @@ namespace CADability.GeoObject
                         }
                         if (ui >= 0)
                         {
-                            if (!mesh.ContainsKey(new Pair<int, int>(ui, i)))
+                            if (!mesh.ContainsKey((ui, i)))
                             {
-                                mesh[new Pair<int, int>(ui, i)] = new UVPair();
+                                mesh[(ui, i)] = new UVPair();
                             }
-                            mesh[new Pair<int, int>(ui, i)].u = u;
+                            mesh[(ui, i)].u = u;
                             if (i > 0)
                             {
-                                if (!mesh.ContainsKey(new Pair<int, int>(ui, i - 1)))
+                                if (!mesh.ContainsKey((ui, i - 1)))
                                 {
-                                    mesh[new Pair<int, int>(ui, i - 1)] = new UVPair();
+                                    mesh[(ui, i - 1)] = new UVPair();
                                 }
-                                mesh[new Pair<int, int>(ui, i - 1)].u = u;
+                                mesh[(ui, i - 1)].u = u;
                             }
                         }
                     }
@@ -4522,27 +4521,27 @@ namespace CADability.GeoObject
                         }
                         if (vi >= 0)
                         {
-                            if (mesh.ContainsKey(new Pair<int, int>(i, vi)))
+                            if (mesh.ContainsKey((i, vi)))
                             {   // wenns noch keinen Eintrag mit festem v gibt, interessiert auch kein u-Eintrag
-                                mesh[new Pair<int, int>(i, vi)].v = v;
+                                mesh[(i, vi)].v = v;
                             }
                             if (i > 0)
                             {
-                                if (mesh.ContainsKey(new Pair<int, int>(i - 1, vi)))
+                                if (mesh.ContainsKey((i - 1, vi)))
                                 {
-                                    mesh[new Pair<int, int>(i - 1, vi)].v = v;
+                                    mesh[(i - 1, vi)].v = v;
                                 }
                             }
                         }
                     }
                 }
-                foreach (KeyValuePair<Pair<int, int>, UVPair> kv in mesh)
+                foreach (KeyValuePair<(int UInd, int VInd), UVPair> kv in mesh)
                 {
                     if (kv.Value.v != double.MaxValue)
                     {
                         // Iterieren um ein Maximum in der Masche zu finden
                         GeoPoint2D extr;
-                        if (FindExtremum(dir, uKnots[kv.Key.First], uKnots[kv.Key.First + 1], vKnots[kv.Key.Second], vKnots[kv.Key.Second + 1], kv.Value.u, kv.Value.v, out extr))
+                        if (FindExtremum(dir, uKnots[kv.Key.UInd], uKnots[kv.Key.UInd + 1], vKnots[kv.Key.VInd], vKnots[kv.Key.VInd + 1], kv.Value.u, kv.Value.v, out extr))
                         {
                             res.Add(extr);
                         }

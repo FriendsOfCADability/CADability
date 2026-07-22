@@ -9,7 +9,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Text;
-using Wintellect.PowerCollections;
 using MathNet.Numerics.LinearAlgebra.Factorization;
 using System.Collections;
 using System.Security.Cryptography;
@@ -227,7 +226,7 @@ namespace CADability.GeoObject
             {
                 if (edges == null)
                 {
-                    Set<Edge> edgelist = new Set<Edge>();
+                    HashSet<Edge> edgelist = new HashSet<Edge>();
                     foreach (Face fc in Faces)
                     {
                         foreach (Edge ed in fc.AllEdges)
@@ -886,7 +885,7 @@ namespace CADability.GeoObject
         }
         public void MakeRegularSurfaces(double maxError)
         {
-            Set<Edge> recalcEdges = new Set<Edge>(); // hier alle edges sammeln, die neu berechnet werden müssen
+            HashSet<Edge> recalcEdges = new HashSet<Edge>(); // hier alle edges sammeln, die neu berechnet werden müssen
             Dictionary<Face, ModOp2D> FaceModOps = new Dictionary<Face, ModOp2D>();
             for (int i = 0; i < faces.Length; i++)
             {
@@ -914,7 +913,7 @@ namespace CADability.GeoObject
         internal void MakeRegularEdges()
 #endif
         {
-            Set<Face> affectedFaces = new Set<Face>();
+            HashSet<Face> affectedFaces = new HashSet<Face>();
             foreach (Edge edg in Edges)
             {
                 edg.MakeRegular(affectedFaces);
@@ -1512,16 +1511,16 @@ namespace CADability.GeoObject
             //ModOp m = ModOp.Rotate(GeoVector.XAxis, SweepAngle.Deg(30)) * ModOp.Rotate(GeoVector.ZAxis, SweepAngle.Deg(15)); // schief machen zum Debuggen
             //sh.Modify(m);
             //sh.RecalcVertices();
-            Set<Face> allFaces = new Set<Face>(Faces);
-            List<Set<Face>> connected = new List<Set<Face>>();
+            HashSet<Face> allFaces = new HashSet<Face>(Faces);
+            List<HashSet<Face>> connected = new List<HashSet<Face>>();
             int clrdbg = 1;
             Random rnd = new Random();
 
             while (allFaces.Count > 0)
             {
-                Face fc = allFaces.GetAny();
+                Face fc = allFaces.First();
                 allFaces.Remove(fc);
-                Set<Face> c = CollectFaces(fc, allFaces, maxbend);
+                HashSet<Face> c = CollectFaces(fc, allFaces, maxbend);
                 connected.Add(c);
 
                 Color clr = Color.FromArgb((int)(rnd.NextDouble() * 255), (int)(rnd.NextDouble() * 255), (int)(rnd.NextDouble() * 255));
@@ -1533,9 +1532,9 @@ namespace CADability.GeoObject
                 }
             }
             List<Face> created = new List<Face>();
-            foreach (Set<Face> faces in connected)
+            foreach (HashSet<Face> faces in connected)
             {
-                List<Face> fccon = CombineCommonSurfaceFaces(faces, null, this.GetExtent(0.0), new Set<Type>(), precision);
+                List<Face> fccon = CombineCommonSurfaceFaces(faces, null, this.GetExtent(0.0), new HashSet<Type>(), precision);
                 created.AddRange(fccon);
             }
 #if DEBUG
@@ -1644,9 +1643,9 @@ namespace CADability.GeoObject
         /// <param name="dontCheck"></param>
         /// <param name="precision"></param>
         /// <returns></returns>
-        private List<Face> CombineCommonSurfaceFaces(Set<Face> faces, Set<Face> subsetForTest, BoundingCube extent, Set<Type> dontCheck, double precision)
+        private List<Face> CombineCommonSurfaceFaces(HashSet<Face> faces, HashSet<Face> subsetForTest, BoundingCube extent, HashSet<Type> dontCheck, double precision)
         {
-            if (dontCheck == null) dontCheck = new Set<Type>(); // empty set
+            if (dontCheck == null) dontCheck = new HashSet<Type>(); // empty set
             if (subsetForTest == null) subsetForTest = faces; // use all faces for the test
 #if DEBUG
             // faces is connected via edges and verteces with the whole shell, which might be huge (stl import). To show faces in the DebuggerContainer
@@ -1724,10 +1723,10 @@ namespace CADability.GeoObject
                     {
                         cyldirs[i] = cylConeTest.Project(ndirs[i]);
                     }
-                    Set<Vertex> vtcs = new Set<Vertex>();
+                    HashSet<Vertex> vtcs = new HashSet<Vertex>();
                     foreach (Face fc in subsetForTest)
                     {
-                        vtcs.AddMany(fc.Vertices);
+                        vtcs.UnionWith(fc.Vertices);
                     }
                     List<GeoPoint2D> cylPoints = new List<GeoPoint2D>();
                     foreach (Vertex vtx in vtcs)
@@ -1744,10 +1743,10 @@ namespace CADability.GeoObject
                         GeoPoint center = cylConeTest.ToGlobal(cnt2d);
                         CylindricalSurface cs = new CylindricalSurface(center, r * cylConeTest.DirectionX, r * cylConeTest.DirectionY, cylConeTest.Normal);
                         // split the faces into two parts to make sure, there will be no seam
-                        Set<Face> part1 = new Set<Face>();
-                        Set<Face> part2 = new Set<Face>();
-                        Set<Face> subsetPart1 = new Set<Face>();
-                        Set<Face> subsetPart2 = new Set<Face>();
+                        HashSet<Face> part1 = new HashSet<Face>();
+                        HashSet<Face> part2 = new HashSet<Face>();
+                        HashSet<Face> subsetPart1 = new HashSet<Face>();
+                        HashSet<Face> subsetPart2 = new HashSet<Face>();
                         foreach (Face fc in faces) // use all faces and split them in two parts: left and right of a plane going through the cylinder axis
                         {
                             bool onLeftSide = true;
@@ -1760,35 +1759,35 @@ namespace CADability.GeoObject
                         }
                         if (subsetForTest != faces)
                         {
-                            subsetPart1 = part1.Intersection(subsetForTest);
-                            subsetPart2 = part2.Intersection(subsetForTest);
+                            subsetPart1 = new HashSet<Face>(part1); subsetPart1.IntersectWith(subsetForTest);
+                            subsetPart2 = new HashSet<Face>(part2); subsetPart2.IntersectWith(subsetForTest);
                         }
                         else
                         {
                             subsetPart1 = part1;
                             subsetPart2 = part2;
                         }
-                        while (!subsetPart1.IsEmpty())
+                        while (subsetPart1.Count > 0)
                         {
-                            Face created = CreateFaceOnCommonSurface(cs.Clone(), subsetPart1.GetAny(), part1, newEdges, out Set<Face> usedFaces, this.GetExtent(0.0).Size * 1e-6);
+                            Face created = CreateFaceOnCommonSurface(cs.Clone(), subsetPart1.First(), part1, newEdges, out HashSet<Face> usedFaces, this.GetExtent(0.0).Size * 1e-6);
                             if (created != null)
                             {
                                 res.Add(created);
-                                part1.RemoveMany(usedFaces);
-                                subsetPart1.RemoveMany(usedFaces);
-                                faces.RemoveMany(usedFaces);
+                                part1.ExceptWith(usedFaces);
+                                subsetPart1.ExceptWith(usedFaces);
+                                faces.ExceptWith(usedFaces);
                             }
                             else continue;
                         }
-                        while (!subsetPart2.IsEmpty())
+                        while (subsetPart2.Count > 0)
                         {
-                            Face created = CreateFaceOnCommonSurface(cs.Clone(), subsetPart2.GetAny(), part2, newEdges, out Set<Face> usedFaces, this.GetExtent(0.0).Size * 1e-6);
+                            Face created = CreateFaceOnCommonSurface(cs.Clone(), subsetPart2.First(), part2, newEdges, out HashSet<Face> usedFaces, this.GetExtent(0.0).Size * 1e-6);
                             if (created != null)
                             {
                                 res.Add(created);
-                                part2.RemoveMany(usedFaces);
-                                subsetPart2.RemoveMany(usedFaces);
-                                faces.RemoveMany(usedFaces);
+                                part2.ExceptWith(usedFaces);
+                                subsetPart2.ExceptWith(usedFaces);
+                                faces.ExceptWith(usedFaces);
                             }
                             else continue;
                         }
@@ -1800,25 +1799,25 @@ namespace CADability.GeoObject
             // and with the remaining objects we well reiterate this process
             if (!dontCheck.Contains(typeof(PlaneSurface)))
             {
-                Set<Face> copyOfFaces;
+                HashSet<Face> copyOfFaces;
                 if (subsetForTest != faces)
                 {
-                    copyOfFaces = new Set<Face>(subsetForTest);
+                    copyOfFaces = new HashSet<Face>(subsetForTest);
                 }
                 else
                 {
-                    copyOfFaces = new Set<Face>(faces);
+                    copyOfFaces = new HashSet<Face>(faces);
                 }
-                while (!copyOfFaces.IsEmpty())
+                while (copyOfFaces.Count > 0)
                 {
-                    Face startWith = copyOfFaces.GetAny();
-                    Set<Face> c = CollectFaces(startWith, copyOfFaces, 0.01 / 180 * Math.PI); // hardcoded 0.01° precision for planar surfaces?
+                    Face startWith = copyOfFaces.First();
+                    HashSet<Face> c = CollectFaces(startWith, copyOfFaces, 0.01 / 180 * Math.PI); // hardcoded 0.01° precision for planar surfaces?
                     if (c.Count > 3 || (subsetForTest != faces && c.Count > 1)) // more than two triangles: cylindrical and conical faces often consist of pairs of coplanar triangles
                     {
-                        Set<Vertex> vtcs = new Set<Vertex>();
+                        HashSet<Vertex> vtcs = new HashSet<Vertex>();
                         foreach (Face fc in c)
                         {
-                            vtcs.AddMany(fc.Vertices);
+                            vtcs.UnionWith(fc.Vertices);
                         }
                         List<GeoPoint> pnts = new List<GeoPoint>(vtcs.Count);
                         foreach (Vertex vtx in vtcs)
@@ -1840,8 +1839,8 @@ namespace CADability.GeoObject
                         if (!isLinear && ok)
                         {
                             PlaneSurface ps = new PlaneSurface(pln);
-                            Face created = CreateFaceOnCommonSurface(ps, startWith, faces, newEdges, out Set<Face> usedFaces, this.GetExtent(0.0).Size * 1e-6);
-                            faces.RemoveMany(usedFaces);
+                            Face created = CreateFaceOnCommonSurface(ps, startWith, faces, newEdges, out HashSet<Face> usedFaces, this.GetExtent(0.0).Size * 1e-6);
+                            faces.ExceptWith(usedFaces);
                             res.Add(created);
                         }
                     }
@@ -1860,7 +1859,7 @@ namespace CADability.GeoObject
                     dontCheck.Add(typeof(PlaneSurface)); // dont check for planes any more
                     while (faces.Count > 0)
                     {
-                        Set<Face> facesSubSet = CollectFaces(faces.GetAny(), faces, 10.0 / 180 * Math.PI);
+                        HashSet<Face> facesSubSet = CollectFaces(faces.First(), faces, 10.0 / 180 * Math.PI);
                         res.AddRange(CombineCommonSurfaceFaces(facesSubSet, null, extent, dontCheck, precision));
                     }
                     return res;
@@ -1874,7 +1873,7 @@ namespace CADability.GeoObject
                 // Here we try to find longitude/latitude curves.
 
                 // First filter all edges at close to 90° triangles
-                Set<Edge> rectangularEdges = new Set<Edge>();
+                HashSet<Edge> rectangularEdges = new HashSet<Edge>();
                 foreach (Face fc in subsetForTest)
                 {
                     double minDiff90 = double.MaxValue;
@@ -1903,9 +1902,9 @@ namespace CADability.GeoObject
                 }
                 // then try to connect them to almost straight curves
                 List<List<Vertex>> orthoCurves = new List<List<Vertex>>();
-                while (!rectangularEdges.IsEmpty())
+                while (rectangularEdges.Count > 0)
                 {
-                    Edge startWith = rectangularEdges.GetAndRemoveAny();
+                    Edge startWith = rectangularEdges.First(); rectangularEdges.Remove(startWith);
                     List<Vertex> orthoCurve = CollectConnectedEdges(startWith, rectangularEdges, Math.PI / 4.0);
                     if (orthoCurve.Count >= 3) orthoCurves.Add(orthoCurve);
                 }
@@ -1979,7 +1978,7 @@ namespace CADability.GeoObject
                 }
 
                 List<List<int>> circleCluster = new List<List<int>>();
-                Set<int> usedCircles = new Set<int>();
+                HashSet<int> usedCircles = new HashSet<int>();
                 while (usedCircles.Count < circleVertices.Count)
                 {
                     int ind = -1;
@@ -1992,16 +1991,16 @@ namespace CADability.GeoObject
                         }
                     }
                     usedCircles.Add(ind);
-                    Set<Vertex> currentVtx = new Set<Vertex>();
-                    currentVtx = new Set<Vertex>(circleVertices[ind]);
+                    HashSet<Vertex> currentVtx = new HashSet<Vertex>();
+                    currentVtx = new HashSet<Vertex>(circleVertices[ind]);
                     circleCluster.Add(new List<int>());
                     circleCluster[circleCluster.Count - 1].Add(ind);
                     for (int i = 0; i < circleVertices.Count; i++)
                     {
                         if (usedCircles.Contains(i)) continue;
-                        if (currentVtx.IsDisjointFrom(new Set<Vertex>(circleVertices[i]))) continue;
+                        if (!currentVtx.Overlaps(circleVertices[i])) continue;
                         usedCircles.Add(i);
-                        currentVtx.AddMany(circleVertices[i]);
+                        currentVtx.UnionWith(circleVertices[i]);
                         circleCluster[circleCluster.Count - 1].Add(i);
                     }
                 }
@@ -2090,8 +2089,8 @@ namespace CADability.GeoObject
                             {
                                 surface = new ToroidalSurface(axisPoint, axisPlane.DirectionX, axisPlane.DirectionY, axisDir, R, circles[lower].First);
                             }
-                            Face created = CreateFaceOnCommonSurface(surface, subsetForTest.GetAny(), faces, newEdges, out Set<Face> usedFaces, this.GetExtent(0.0).Size * 1e-4);
-                            faces.RemoveMany(usedFaces);
+                            Face created = CreateFaceOnCommonSurface(surface, subsetForTest.First(), faces, newEdges, out HashSet<Face> usedFaces, this.GetExtent(0.0).Size * 1e-4);
+                            faces.ExceptWith(usedFaces);
                             res.Add(created);
                             return res;
                         }
@@ -2109,8 +2108,8 @@ namespace CADability.GeoObject
             {
                 // probably a mix of tangentially connected surfaces.
                 // try to categorize the triangles and use similar triangles as a subset
-                List<Pair<double, Face>> areas = new List<Pair<double, Face>>();
-                List<Pair<double, Face>> ratios = new List<Pair<double, Face>>();
+                List<(double Value, Face Face)> areas = new();
+                List<(double Value, Face Face)> ratios = new();
                 foreach (Face fc in faces)
                 {
                     GeoPoint pus = GeoPoint.Origin + (fc.Surface as PlaneSurface).Normal.Normalized;
@@ -2125,16 +2124,16 @@ namespace CADability.GeoObject
                             circ += d;
                         }
                         double area = ((fc.Vertices[1].Position - fc.Vertices[0].Position) ^ (fc.Vertices[2].Position - fc.Vertices[0].Position)).Length / 2;
-                        areas.Add(new Pair<double, Face>(area, fc));
-                        ratios.Add(new Pair<double, Face>(area / circ, fc));
+                        areas.Add((area, fc));
+                        ratios.Add((area / circ, fc));
                     }
                     else
                     {
                         // should not happen
                     }
                 }
-                areas.Sort(delegate (Pair<double, Face> p1, Pair<double, Face> p2) { return p1.First.CompareTo(p2.First); });
-                ratios.Sort(delegate (Pair<double, Face> p1, Pair<double, Face> p2) { return p1.First.CompareTo(p2.First); });
+                areas.Sort(delegate ((double Value, Face Face) p1, (double Value, Face Face) p2) { return p1.Value.CompareTo(p2.Value); });
+                ratios.Sort(delegate ((double Value, Face Face) p1, (double Value, Face Face) p2) { return p1.Value.CompareTo(p2.Value); });
                 // search for the smalles 1% intervall of the ratios
                 int intv = ratios.Count / 100;
                 do
@@ -2143,7 +2142,7 @@ namespace CADability.GeoObject
                     int besti = -1;
                     for (int i = intv; i < ratios.Count; i++)
                     {
-                        double d = (ratios[i].First - ratios[i - intv].First);
+                        double d = (ratios[i].Value - ratios[i - intv].Value);
                         if (d < mindist)
                         {
                             mindist = d;
@@ -2151,15 +2150,15 @@ namespace CADability.GeoObject
                         }
                     }
 
-                    Set<Face> sameRatio = new Set<Face>();
+                    HashSet<Face> sameRatio = new HashSet<Face>();
                     for (int i = besti; i < besti + intv; i++)
                     {
-                        sameRatio.Add(ratios[i].Second); // clone, weil sonst der Debugger die ganze Shell mit serialisiert
+                        sameRatio.Add(ratios[i].Face); // clone, weil sonst der Debugger die ganze Shell mit serialisiert
                     }
-                    Set<Face> biggestConnected = new Set<Face>();
-                    while (!sameRatio.IsEmpty())
+                    HashSet<Face> biggestConnected = new HashSet<Face>();
+                    while (sameRatio.Count > 0)
                     {
-                        Set<Face> c = CollectFaces(sameRatio.GetAny(), sameRatio, Math.PI);
+                        HashSet<Face> c = CollectFaces(sameRatio.First(), sameRatio, Math.PI);
                         if (c.Count > biggestConnected.Count) biggestConnected = c;
                     }
                     if (biggestConnected.Count > 3)
@@ -2177,7 +2176,7 @@ namespace CADability.GeoObject
 
         }
 
-        private List<Vertex> CollectConnectedEdges(Edge startWith, Set<Edge> toUse, double maxDerivation)
+        private List<Vertex> CollectConnectedEdges(Edge startWith, HashSet<Edge> toUse, double maxDerivation)
         {
             Vertex v1 = startWith.Vertex1;
             Vertex v2 = startWith.Vertex2;
@@ -2192,7 +2191,7 @@ namespace CADability.GeoObject
                 while (found)
                 {
                     found = false;
-                    Set<Edge> connected = currentVertex.ConditionalEdgesSet(delegate (Edge e) { return toUse.Contains(e); });
+                    HashSet<Edge> connected = new HashSet<Edge>(currentVertex.ConditionalEdgesSet(delegate (Edge e) { return toUse.Contains(e); }));
                     double bestAngle = double.MaxValue;
                     Edge bestEdge = null;
                     foreach (Edge cn in connected)
@@ -2221,13 +2220,13 @@ namespace CADability.GeoObject
             return res;
         }
 
-        private Face CreateFaceOnCommonSurface(ISurface surface, Face startWith, Set<Face> toUse, Dictionary<Edge, Edge> newEdges, out Set<Face> usedFaces, double eps)
+        private Face CreateFaceOnCommonSurface(ISurface surface, Face startWith, HashSet<Face> toUse, Dictionary<Edge, Edge> newEdges, out HashSet<Face> usedFaces, double eps)
         {
             // the two faces connected to the provided edge are in a plane. Find all connected faces
             List<Edge> edges = new List<Edge>(startWith.Edges);
             List<Edge> outline = new List<Edge>();
-            Set<Edge> toConnect = new Set<Edge>(startWith.Edges);
-            usedFaces = new Set<Face>();
+            HashSet<Edge> toConnect = new HashSet<Edge>(startWith.Edges);
+            usedFaces = new HashSet<Face>();
             for (int i = 0; i < edges.Count; i++)
             {
                 Edge clone = edges[i].CloneWithVertices();
@@ -2239,14 +2238,14 @@ namespace CADability.GeoObject
 
             while (toConnect.Count > 0)
             {
-                Edge tst = toConnect.GetAny();
+                Edge tst = toConnect.First();
                 toConnect.Remove(tst);
                 Face toConnectWith;
                 if (usedFaces.Contains(tst.PrimaryFace)) toConnectWith = tst.SecondaryFace;
                 else toConnectWith = tst.PrimaryFace;
                 if (usedFaces.Contains(toConnectWith)) continue;
                 if (!toUse.Contains(toConnectWith)) continue;
-                Set<Vertex> vpoints = new Set<Vertex>(toConnectWith.Vertices);
+                HashSet<Vertex> vpoints = new HashSet<Vertex>(toConnectWith.Vertices);
                 vpoints.Remove(tst.Vertex1);
                 vpoints.Remove(tst.Vertex2);
                 double maxerr = 0.0;
@@ -2297,15 +2296,15 @@ namespace CADability.GeoObject
             return fc;
         }
 
-        private Set<Face> CollectFaces(Face fc, Set<Face> allFaces, double maxbend)
+        private HashSet<Face> CollectFaces(Face fc, HashSet<Face> allFaces, double maxbend)
         {
-            Set<Face> res = new Set<Face>();
+            HashSet<Face> res = new HashSet<Face>();
             res.Add(fc);
             allFaces.Remove(fc);
-            Set<Edge> toFollow = fc.AllEdgesSet;
+            HashSet<Edge> toFollow = new HashSet<Edge>(fc.AllEdgesSet);
             while (toFollow.Count > 0)
             {
-                Edge edg = toFollow.GetAny();
+                Edge edg = toFollow.First();
                 toFollow.Remove(edg);
                 Face toCheck;
                 if (res.Contains(edg.PrimaryFace)) toCheck = edg.SecondaryFace;
@@ -2327,7 +2326,7 @@ namespace CADability.GeoObject
             }
             return res;
         }
-        private Face CollectPlanarFaces(Edge edg, Set<Face> usedFaces, Dictionary<Edge, Edge> newEdges)
+        private Face CollectPlanarFaces(Edge edg, HashSet<Face> usedFaces, Dictionary<Edge, Edge> newEdges)
         {
             // the two faces connected to the provided edge are in a plane. Find all connected faces
             PlaneSurface ps = edg.PrimaryFace.Surface.Clone() as PlaneSurface;
@@ -2337,7 +2336,7 @@ namespace CADability.GeoObject
             Edge[] o2 = edg.SecondaryFace.OutlineEdges;
             int i2 = Array.IndexOf<Edge>(o2, edg);
             List<Edge> outline = new List<Edge>();
-            Set<Edge> toConnect = new Set<Edge>();
+            HashSet<Edge> toConnect = new HashSet<Edge>();
             for (int i = 1; i < o1.Length; i++)
             {
                 Edge clone = o1[(i1 + i) % o1.Length].CloneWithVertices();
@@ -2357,7 +2356,7 @@ namespace CADability.GeoObject
             Face fc = Face.MakeFace(ps, outline.ToArray());
             while (toConnect.Count > 0)
             {
-                Edge tst = toConnect.GetAny();
+                Edge tst = toConnect.First();
                 toConnect.Remove(tst);
                 Face toConnectWith;
                 if (usedFaces.Contains(tst.PrimaryFace)) toConnectWith = tst.SecondaryFace;
@@ -2809,7 +2808,7 @@ namespace CADability.GeoObject
         {
             get
             {
-                Set<Edge> edgeset = new Set<Edge>();
+                HashSet<Edge> edgeset = new HashSet<Edge>();
                 foreach (Face fc in faces)
                 {
                     foreach (Edge ed in fc.AllEdges)
@@ -2819,10 +2818,10 @@ namespace CADability.GeoObject
                 }
                 foreach (Face fc in faces)
                 {
-                    Set<Edge> all = new Set<Edge>(fc.AllEdges);
+                    HashSet<Edge> all = new HashSet<Edge>(fc.AllEdges);
                     if (!all.IsSubsetOf(edgeset)) return false;
                 }
-                Set<Face> faceset = new Set<Face>(faces);
+                HashSet<Face> faceset = new HashSet<Face>(faces);
                 foreach (Edge ed in edgeset)
                 {
                     if (!faceset.Contains(ed.PrimaryFace)) return false;
@@ -2839,12 +2838,12 @@ namespace CADability.GeoObject
         {
             get
             {
-                Set<Edge> edgeset = new Set<Edge>();
+                HashSet<Edge> edgeset = new HashSet<Edge>();
                 foreach (Face fc in faces)
                 {
-                    edgeset.AddMany(fc.AllEdges);
+                    edgeset.UnionWith(fc.AllEdges);
                 }
-                Set<Face> facesset = new Set<Face>(faces);
+                HashSet<Face> facesset = new HashSet<Face>(faces);
                 foreach (Edge e in edgeset)
                 {
                     if (e.SecondaryFace == null) return false;
@@ -2862,13 +2861,13 @@ namespace CADability.GeoObject
         {
             get
             {
-                Set<Edge> edgeset = new Set<Edge>();
+                HashSet<Edge> edgeset = new HashSet<Edge>();
                 foreach (Face fc in faces)
                 {
-                    edgeset.AddMany(fc.AllEdges);
+                    edgeset.UnionWith(fc.AllEdges);
                 }
-                Set<Face> facesset = new Set<Face>(faces);
-                Set<Edge> res = new Set<Edge>();
+                HashSet<Face> facesset = new HashSet<Face>(faces);
+                HashSet<Edge> res = new HashSet<Edge>();
                 foreach (Edge e in edgeset)
                 {
                     if (e.SecondaryFace == null) res.Add(e);
@@ -3484,7 +3483,7 @@ namespace CADability.GeoObject
             }
             if (correctOriented != null)
             {
-                Set<Face> correctFaces = new Set<Face>();
+                HashSet<Face> correctFaces = new HashSet<Face>();
                 correctFaces.Add(correctOriented);
                 SortedDictionary<Edge, Face> toOrient = new SortedDictionary<Edge, Face>(new EdgeLengthComparer());
                 foreach (Edge e in correctOriented.AllEdges)
@@ -3593,16 +3592,16 @@ namespace CADability.GeoObject
                 if (trianglePoint != null)
                 {
                     alltrianglePoints.AddRange(trianglePoint);
-                    Set<Pair<int, int>> openEdges = new Set<Pair<int, int>>();
+                    HashSet<(int FromIndex, int ToIndex)> openEdges = new();
                     for (int i = 0; i < triangleIndex.Length; i += 3)
                     {
                         // jede innere Kante kommt einmal vorwärts und einmal rückwärts vor
-                        if (!openEdges.Remove(new Pair<int, int>(triangleIndex[i + 1], triangleIndex[i]))) openEdges.Add(new Pair<int, int>(triangleIndex[i], triangleIndex[i + 1]));
-                        if (!openEdges.Remove(new Pair<int, int>(triangleIndex[i + 2], triangleIndex[i + 1]))) openEdges.Add(new Pair<int, int>(triangleIndex[i + 1], triangleIndex[i + 2]));
-                        if (!openEdges.Remove(new Pair<int, int>(triangleIndex[i], triangleIndex[i + 2]))) openEdges.Add(new Pair<int, int>(triangleIndex[i + 2], triangleIndex[i]));
+                        if (!openEdges.Remove((triangleIndex[i + 1], triangleIndex[i]))) openEdges.Add((triangleIndex[i], triangleIndex[i + 1]));
+                        if (!openEdges.Remove((triangleIndex[i + 2], triangleIndex[i + 1]))) openEdges.Add((triangleIndex[i + 1], triangleIndex[i + 2]));
+                        if (!openEdges.Remove((triangleIndex[i], triangleIndex[i + 2]))) openEdges.Add((triangleIndex[i + 2], triangleIndex[i]));
                         allFaces.Add(new Tripel<int, int, int>(triangleIndex[i] + baseIndex, triangleIndex[i + 1] + baseIndex, triangleIndex[i + 2] + baseIndex));
                     }
-                    Set<int> openVertices = new Set<int>();
+                    HashSet<int> openVertices = new HashSet<int>();
                     // die vertices muss man dann noch unterscheiden zwischen denen, wo zwei fremde dreiecke aneinanderstoßen, die also mit einer Pipe gefüllt werden müssen, und denen,
                     // die echte vertices der Shell sind, wo also eine kuge eingefüllt wertden muss. Und dann noch die selbstüberschneidungen
                 }
@@ -3699,7 +3698,7 @@ namespace CADability.GeoObject
             if (splitted) edges = null;
             List<Face> fcs = new List<Face>();
             OctTree<Vertex> vertexOctTree = new OctTree<Vertex>(ext, ext.Size * 1e-8);
-            Dictionary<Pair<Face, Vertex>, Vertex> orgToOffsetVtx = new Dictionary<Pair<Face, Vertex>, Vertex>();
+            Dictionary<(Face OriginalFace, Vertex OriginalVertex), Vertex> orgToOffsetVtx = new();
             // 1. alle Offset-Faces erzeugen, gleichzeitig die Vertices sammeln
             foreach (Face face in Faces)
             {
@@ -3715,7 +3714,7 @@ namespace CADability.GeoObject
                         GeoPoint p = v.Position + dist * normal.Normalized;
                         Vertex vn = new Vertex(p);
                         offsetvtx[v] = vn;
-                        orgToOffsetVtx[new Pair<Face, Vertex>(face, v)] = vn;
+                        orgToOffsetVtx[(face, v)] = vn;
                     }
                 }
                 Face offsetFace = face.GetOffset(dist, offsetvtx);
@@ -3879,10 +3878,10 @@ namespace CADability.GeoObject
                         //}
                         // DebuggerContainer dc = gsc.BoxedSurfaceEx.Debug;
 #endif
-                        Vertex v1 = orgToOffsetVtx[new Pair<Face, Vertex>(edg.PrimaryFace, startHere)];
-                        Vertex v2 = orgToOffsetVtx[new Pair<Face, Vertex>(edg.PrimaryFace, endHere)];
-                        Vertex v3 = orgToOffsetVtx[new Pair<Face, Vertex>(edg.SecondaryFace, endHere)];
-                        Vertex v4 = orgToOffsetVtx[new Pair<Face, Vertex>(edg.SecondaryFace, startHere)];
+                        Vertex v1 = orgToOffsetVtx[(edg.PrimaryFace, startHere)];
+                        Vertex v2 = orgToOffsetVtx[(edg.PrimaryFace, endHere)];
+                        Vertex v3 = orgToOffsetVtx[(edg.SecondaryFace, endHere)];
+                        Vertex v4 = orgToOffsetVtx[(edg.SecondaryFace, startHere)];
                         // die entstandene Fläche muss tangential an die beiden Ausgangsflächen anschließen. Sie kann dies auf zweierlei Art tun: in die gleiche
                         // Richtung oder in die Gegenrichtung. Ausrundungsflächen, die rückläufig sind, müssen nicht in Betracht gezogen werden. Sie fallen beim Berechnen
                         // der SelfIntersection ohnehin weg, und erzeugen dort nur zusätzlichen Aufwand, indem sie unnötige Schnittkanten berechnen lassen.
@@ -4099,7 +4098,7 @@ namespace CADability.GeoObject
                 List<Vertex> vl = new List<Vertex>();
                 foreach (Face f in v.Faces)
                 {
-                    Vertex vf = orgToOffsetVtx[new Pair<Face, Vertex>(f, v)];
+                    Vertex vf = orgToOffsetVtx[(f, v)];
                     if (vf != null)
                     {
                         bool found = false;
@@ -4606,7 +4605,7 @@ namespace CADability.GeoObject
                 return res;
             }
         }
-        private void OrientFaces(Set<Face> correctFaces, SortedDictionary<Edge, Face> toOrient)
+        private void OrientFaces(HashSet<Face> correctFaces, SortedDictionary<Edge, Face> toOrient)
         {
             List<KeyValuePair<Edge, Face>> l = new List<KeyValuePair<Edge, Face>>(toOrient);
             toOrient.Clear();
@@ -4637,7 +4636,7 @@ namespace CADability.GeoObject
 #if DEBUG
         static public Stack<Face> orienting = new Stack<Face>();
 #endif
-        private void OrientFace(Set<Face> correctFaces, Face face, Edge correctEdge)
+        private void OrientFace(HashSet<Face> correctFaces, Face face, Edge correctEdge)
         {
             if (face == null) return;
 #if DEBUG
@@ -4750,12 +4749,12 @@ namespace CADability.GeoObject
         public new void Debug()
         {
             Edge[] oe = OpenEdges;
-            Set<Edge> edgeset = new Set<Edge>();
+            HashSet<Edge> edgeset = new HashSet<Edge>();
             foreach (Face fc in faces)
             {
-                edgeset.AddMany(fc.AllEdges);
+                edgeset.UnionWith(fc.AllEdges);
             }
-            edgeset.RemoveMany(oe);
+            edgeset.ExceptWith(oe);
 
             GeoObjectList res = new GeoObjectList();
             for (int i = 0; i < oe.Length; i++)
@@ -4783,7 +4782,7 @@ namespace CADability.GeoObject
         }
         internal void ReplaceFace(Face toReplace, Face[] replaceBy, double precision)
         {
-            Set<Face> affectedFaces = new Set<Face>();
+            HashSet<Face> affectedFaces = new HashSet<Face>();
             Edge[] allEdges = toReplace.AllEdges;
             List<Edge> disconnectedEdges = new List<Edge>(); // das sind die aufgebrochenen Kanten
             foreach (Edge edg in allEdges)
@@ -4802,7 +4801,7 @@ namespace CADability.GeoObject
                 //    if (edg.Vertex2 != null) edg.Vertex2.RemoveEdge(edg);
                 //}
             }
-            affectedFaces.AddMany(replaceBy);
+            affectedFaces.UnionWith(replaceBy);
 #if DEBUG
             DebuggerContainer dcf = new CADability.DebuggerContainer();
             foreach (Face fce in affectedFaces)
@@ -4814,7 +4813,7 @@ namespace CADability.GeoObject
                                                               // aber die Kanten in replaceBy, die aufgebrochen wurden, haben noch innere Punkte, die nicht verbunden sind
                                                               // auf der einen Seite haben wir die aufgebrochenen Kanten, die nicht wieder verbunden wurden, weli ihr Gegenstück
                                                               // geteilt wurde, auf der anderen Seite die offenen kanten von replaceby, das sind die geteilten
-            Set<Vertex> splitVertices = new Set<Vertex>(); // das sollen alle vertices sein, die in replaceBy sind, aber nicht in affected
+            HashSet<Vertex> splitVertices = new HashSet<Vertex>(); // das sollen alle vertices sein, die in replaceBy sind, aber nicht in affected
             foreach (Face fc in replaceBy)
             {
                 foreach (Edge edg in fc.Edges)
@@ -4960,7 +4959,7 @@ namespace CADability.GeoObject
         }
         public static void ConnectFaces(Face[] toConnect, double precision)
         {
-            Set<Vertex> toAdd = new Set<Vertex>(); // alle vertices von offenen Kanten
+            HashSet<Vertex> toAdd = new HashSet<Vertex>(); // alle vertices von offenen Kanten
             BoundingCube ext = BoundingCube.EmptyBoundingCube;
             for (int i = 0; i < toConnect.Length; i++)
             {
@@ -4980,11 +4979,11 @@ namespace CADability.GeoObject
             {
                 ovtx.AddObject(vtx);
             }
-            Set<Vertex> allVertices = new Set<Vertex>(ovtx.GetAllObjects());
-            Set<Vertex> mergedVertices = new Set<Vertex>();
+            HashSet<Vertex> allVertices = new HashSet<Vertex>(ovtx.GetAllObjects());
+            HashSet<Vertex> mergedVertices = new HashSet<Vertex>();
             while (allVertices.Count > 0)
             {
-                Vertex vtx = allVertices.GetAny();
+                Vertex vtx = allVertices.First();
                 allVertices.Remove(vtx);
                 Vertex[] hits = ovtx.GetObjectsFromBox(new BoundingCube(vtx.Position, precision), null);
                 for (int i = 0; i < hits.Length; i++)
@@ -5013,7 +5012,7 @@ namespace CADability.GeoObject
             DebuggerContainer dc1 = new DebuggerContainer();
             foreach (Vertex vtx in toAdd)
             {
-                Set<Edge> toShow = new Set<Edge>();
+                HashSet<Edge> toShow = new HashSet<Edge>();
                 foreach (Edge edg in vtx.AllEdges)
                 {
                     toShow.Add(edg);
@@ -5061,7 +5060,7 @@ namespace CADability.GeoObject
             DebuggerContainer dc2 = new DebuggerContainer();
             foreach (Vertex vtx in toAdd)
             {
-                Set<Edge> toShow = new Set<Edge>();
+                HashSet<Edge> toShow = new HashSet<Edge>();
                 foreach (Edge edg in vtx.AllEdges)
                 {
                     toShow.Add(edg);
@@ -5076,7 +5075,7 @@ namespace CADability.GeoObject
         }
         internal void TryConnectOpenEdges()
         {
-            Set<Edge> openEdges = new Set<Edge>(OpenEdges);
+            HashSet<Edge> openEdges = new HashSet<Edge>(OpenEdges);
             foreach (Edge openEdge in openEdges)
             {
                 if (openEdge.PrimaryFace == null) continue; // has already been merged
@@ -5218,16 +5217,18 @@ namespace CADability.GeoObject
         }
         internal void ReduceFaces(double precision)
         {
-            Set<Face> facesset = new Set<Face>(faces); // die Faces ändern sich ggf.
+            HashSet<Face> facesset = new HashSet<Face>(faces); // die Faces ändern sich ggf.
                                                        // zuerst mal degenerierte Edges entfernen:
             Edge[] alledges = this.Edges;
-            OrderedMultiDictionary<DoubleVertexKey, Edge> dict = new OrderedMultiDictionary<DoubleVertexKey, Edge>(true);
+            SortedDictionary<DoubleVertexKey, List<Edge>> dict = new SortedDictionary<DoubleVertexKey, List<Edge>>();
             foreach (Edge e in alledges)
             {
-                dict.Add(new DoubleVertexKey(e.Vertex1, e.Vertex2), e);
+                var _k = new DoubleVertexKey(e.Vertex1, e.Vertex2);
+                if (!dict.ContainsKey(_k)) dict[_k] = new List<Edge>();
+                dict[_k].Add(e);
             }
             // Wenn eine Verbindung zweier Vertices öfter vorkommt, dann testen, ob geometrisch identisch
-            foreach (KeyValuePair<DoubleVertexKey, ICollection<Edge>> kv in dict)
+            foreach (KeyValuePair<DoubleVertexKey, List<Edge>> kv in dict)
             {
                 if (kv.Value.Count > 1)
                 {
@@ -5281,7 +5282,7 @@ namespace CADability.GeoObject
             // return; // der rest muss noch besser implementiert werden
             // TODO: hier wird nicht berücksichtigt, dass auch ein Face and das Loch eines anderen
             // von innen her anstossen kann...
-            Set<Edge> removededges = new Set<Edge>();
+            HashSet<Edge> removededges = new HashSet<Edge>();
             for (int i = 0; i < alledges.Length; ++i)
             {
                 Edge e = alledges[i];
@@ -5290,29 +5291,29 @@ namespace CADability.GeoObject
                 if (e.SecondaryFace != null && e.PrimaryFace.Surface.SameGeometry(e.PrimaryFace.GetUVBounds(), e.SecondaryFace.Surface, e.SecondaryFace.GetUVBounds(), precision, out firstToSecond))
                 {
                     ModOp2D secondToFirst = firstToSecond.GetInverse();
-                    Set<Edge> prim = new Set<Edge>(e.PrimaryFace.OutlineEdges);
-                    Set<Edge> secd = new Set<Edge>(e.SecondaryFace.OutlineEdges);
-                    Set<Edge> cmn = prim.Intersection(secd); // gemeinsame edges zwischen den beiden
+                    HashSet<Edge> prim = new HashSet<Edge>(e.PrimaryFace.OutlineEdges);
+                    HashSet<Edge> secd = new HashSet<Edge>(e.SecondaryFace.OutlineEdges);
+                    var cmn = new HashSet<Edge>(prim); cmn.IntersectWith(secd); // gemeinsame edges zwischen den beiden
                     if (cmn.Count > 0)
                     {
                         // Alle aus den beiden outlineedges, die nicht in cmn sind
                         // nach dem Startvertex sortieren und eine zusammenhängende outline erzeugen.
                         // beim Iterieren über alledges ist allerdings noch zu beachten, dass bereits entfernte nicht mehr verwendet werden
-                        removededges.AddMany(cmn); // die nicht mehr testen, schon entfernt
-                        OrderedMultiDictionary<Vertex, Edge> sortedEdges = new OrderedMultiDictionary<Vertex, Edge>(false);
+                        removededges.UnionWith(cmn); // die nicht mehr testen, schon entfernt
+                        SortedDictionary<Vertex, Edge> sortedEdges = new SortedDictionary<Vertex, Edge>();
                         foreach (Edge ee in prim)
                         {
-                            if (!cmn.Contains(ee)) sortedEdges.Add(ee.StartVertex(e.PrimaryFace), ee);
+                            if (!cmn.Contains(ee)) sortedEdges[ee.StartVertex(e.PrimaryFace)] = ee;
                         }
                         foreach (Edge ee in secd)
                         {
-                            if (!cmn.Contains(ee)) sortedEdges.Add(ee.StartVertex(e.SecondaryFace), ee);
+                            if (!cmn.Contains(ee)) sortedEdges[ee.StartVertex(e.SecondaryFace)] = ee;
                         }
                         List<List<Edge>> outlines = new List<List<Edge>>();
                         while (sortedEdges.Count > 0)
                         {
                             List<Edge> ol = new List<Edge>();
-                            KeyValuePair<Vertex, Edge> first = sortedEdges.FirstItem;
+                            KeyValuePair<Vertex, Edge> first = sortedEdges.First();
                             Edge toAdd = first.Value;
                             Vertex endVertex = first.Key;
                             while (toAdd != null)
@@ -5329,7 +5330,7 @@ namespace CADability.GeoObject
                                     toAdd.ReplaceFace(e.SecondaryFace, e.PrimaryFace);
                                 }
                                 ol.Add(toAdd);
-                                toAdd = sortedEdges.Item(endVertex); // kann auch null geben
+                                toAdd = sortedEdges.ContainsKey(endVertex) ? sortedEdges[endVertex] : null; // kann auch null geben
                             }
                             outlines.Add(ol);
                         }
@@ -5372,7 +5373,7 @@ namespace CADability.GeoObject
             // heraustrennen des Faces: die betreffenden Kanten dieser Shell werden zu offenen Kanten
             using (new Changing(this, "AddFace", face))
             {
-                Set<Face> remainingFaces = new Set<Face>(faces);
+                HashSet<Face> remainingFaces = new HashSet<Face>(faces);
                 remainingFaces.Remove(face);
                 faces = remainingFaces.ToArray();
                 Edge[] dumy = OpenEdges; // this disconnects the common edges
@@ -5397,7 +5398,7 @@ namespace CADability.GeoObject
                 // zuerst schauen, ob irgendwelche Kanten gesplittet werden müssen
                 // bei SplitCommonFace ist das nicht der Fall, da bereits BRepoperation die Kanten splittet
                 // somit ist der folgende Abschnitt noch nicht getestet
-                Set<Edge> freeEdges = new Set<Edge>(OpenEdges); // ggf. als OctTree, ber Edge ist nicht OctTreeInsertable
+                HashSet<Edge> freeEdges = new HashSet<Edge>(OpenEdges); // ggf. als OctTree, ber Edge ist nicht OctTreeInsertable
                 Dictionary<Edge, SortedList<double, Vertex>> edgesToSplit = new Dictionary<Edge, SortedList<double, Vertex>>();
                 foreach (Edge edge in face.Edges)
                 {
@@ -5433,7 +5434,7 @@ namespace CADability.GeoObject
                     kv.Key.Split(kv.Value, Precision.eps);
                 }
                 // jetzt entprechen sich Kanten entweder komplett oder garnicht
-                freeEdges = new Set<Edge>(OpenEdges); // ggf. als OctTree, ber Edge ist nicht OctTreeInsertable
+                freeEdges = new HashSet<Edge>(OpenEdges); // ggf. als OctTree, ber Edge ist nicht OctTreeInsertable
                 foreach (Edge edge in face.Edges)
                 {
                     foreach (Edge freeEdge in freeEdges)
@@ -5583,7 +5584,7 @@ namespace CADability.GeoObject
             // we assume everything is topologically ok, i.e. all edges are connected and have common vertices
             foreach (Vertex vtx in Vertices)
             {
-                Set<Face> involvedFaces = new Set<Face>();
+                HashSet<Face> involvedFaces = new HashSet<Face>();
                 foreach (Edge edg in vtx.AllEdges)
                 {
                     if (edg.PrimaryFace != null) involvedFaces.Add(edg.PrimaryFace);
@@ -5732,7 +5733,7 @@ namespace CADability.GeoObject
 #if DEBUG
             if (!CheckConsistency()) { }
 #endif
-            Set<Face> allFaces = new Set<Face>(faces);
+            HashSet<Face> allFaces = new HashSet<Face>(faces);
 #if DEBUG
             foreach (Face fcdbg in allFaces)
             {
@@ -5755,12 +5756,12 @@ namespace CADability.GeoObject
                 double precision = this.GetExtent(0.0).Size * 1e-6;
                 bool combined = true;
                 int res = 0;
-                Set<Edge> edges = new Set<Edge>(Edges);
+                HashSet<Edge> edges = new HashSet<Edge>(Edges);
                 while (combined)
                 {
                     combined = false;
-                    Set<Edge> toRemove = null;
-                    Set<Edge> notSameSurface = new Set<Edge>();
+                    HashSet<Edge> toRemove = null;
+                    HashSet<Edge> notSameSurface = new HashSet<Edge>();
                     foreach (Edge edge in edges)
                     {
                         ModOp2D firstToSecond;
@@ -5800,7 +5801,7 @@ namespace CADability.GeoObject
                                 if (edge.SecondaryFace.Surface.IsVPeriodic && ext.Height >= edge.SecondaryFace.Surface.VPeriod * 0.75) continue;
                             }
                             if (edge.PrimaryFace.Surface is SurfaceOfRevolution) continue; // this must be fixed (e.g. in "1_Assembly_Light.stp")
-                            toRemove = edge.SecondaryFace.CombineWith(edge.PrimaryFace, firstToSecond);
+                            toRemove = new HashSet<Edge>(edge.SecondaryFace.CombineWith(edge.PrimaryFace, firstToSecond));
                             // isolate the face, which will no longer be used:
                             Face faceToRemove = edge.PrimaryFace;
                             Face combinedFace = edge.SecondaryFace;
@@ -5822,7 +5823,7 @@ namespace CADability.GeoObject
                             if (toRemove != null && toRemove.Count > 0)
                             {
                                 combined = true;
-                                edges.RemoveMany(toRemove);
+                                edges.ExceptWith(toRemove);
                                 allFaces.Remove(faceToRemove);
 #if DEBUG
                                 if (!combinedFace.CheckConsistency())
@@ -5841,7 +5842,7 @@ namespace CADability.GeoObject
                             notSameSurface.Add(edge);
                         }
                     }
-                    edges.RemoveMany(notSameSurface); // die müssen wir nicht nochmal testen
+                    edges.ExceptWith(notSameSurface); // die müssen wir nicht nochmal testen
                 }
                 faces = allFaces.ToArray();
                 foreach (Face face in faces)
@@ -5933,7 +5934,7 @@ namespace CADability.GeoObject
         public Face[][] FindSameForm(Face[] form, double precision, FindSameFormSearchMode mode)
         {   // für FST (Montanari) geschrieben
             List<Face[]> res = new List<Face[]>();
-            Set<Face> formSet = new Set<Face>(form); // zum schnellen entscheiden, ob in der Form oder nicht
+            HashSet<Face> formSet = new HashSet<Face>(form); // zum schnellen entscheiden, ob in der Form oder nicht
             BoundingCube ext = GetExtent(precision);
             OctTree<Face> octtree = new OctTree<Face>(ext, precision); // mit allen faces außer den in form gegebenen
             for (int i = 0; i < faces.Length; i++)
@@ -6059,10 +6060,10 @@ namespace CADability.GeoObject
             res.SetFaces(faces);
             if (tryToConnectOpenEdges)
             {
-                Set<Edge> open = new Set<Edge>(res.OpenEdges);
+                HashSet<Edge> open = new HashSet<Edge>(res.OpenEdges);
                 while (open.Count > 0)
                 {
-                    Edge startWith = open.GetAny();
+                    Edge startWith = open.First();
                     open.Remove(startWith);
                     foreach (Edge edg in Vertex.ConnectingEdges(startWith.Vertex1, startWith.Vertex2))
                     {
@@ -6119,11 +6120,11 @@ namespace CADability.GeoObject
         {
             try
             {
-                Set<Face> featureFaces = new Set<Face>();
+                HashSet<Face> featureFaces = new HashSet<Face>();
                 featureFaces.Add(toStartWith); // start with the provided face as part of the feature
                 while (featureFaces.Count < Faces.Length) // not all faces used
                 {
-                    Set<Edge> openFeatureEdges = new Set<Edge>(); // open edges of the feature
+                    HashSet<Edge> openFeatureEdges = new HashSet<Edge>(); // open edges of the feature
                     foreach (Face fc in featureFaces)
                     {
                         foreach (Edge edg in fc.OutlineEdges)
@@ -6133,20 +6134,20 @@ namespace CADability.GeoObject
                     }
                     // try to find a loop from one of the open edges
                     List<Edge[]> loops = new List<Edge[]>();
-                    List<Set<Face>> outsideFaces = new List<Set<Face>>();
+                    List<HashSet<Face>> outsideFaces = new List<HashSet<Face>>();
                     foreach (Edge edg in openFeatureEdges)
                     {
-                        Set<Face> loopFaces = new Set<Face>(); // faces connecting to the loop but not part of the feature
+                        HashSet<Face> loopFaces = new HashSet<Face>(); // faces connecting to the loop but not part of the feature
                         Edge[] loop = FindHole(edg, featureFaces, loopFaces);
                         if (loop != null)
                         {
                             // found a loop making a hole on the loopfaces and beeing connected to one of the open edges of the feature
                             // make sure not to add a loop already created
-                            Set<Edge> thisLoop = new Set<Edge>(loop);
+                            HashSet<Edge> thisLoop = new HashSet<Edge>(loop);
                             bool foundloop = false;
                             for (int i = 0; i < loops.Count; i++)
                             {
-                                if (thisLoop.ContainsAll(loops[i]))
+                                if (thisLoop.IsSupersetOf(loops[i]))
                                 {
                                     foundloop = true;
                                     break;
@@ -6161,12 +6162,12 @@ namespace CADability.GeoObject
                     }
                     if (loops.Count > 0)
                     {
-                        Set<Edge> barrier = new Set<Edge>(); // barrier is a set of edges which should isolate the feature, it consist of one ore more loops
+                        HashSet<Edge> barrier = new HashSet<Edge>(); // barrier is a set of edges which should isolate the feature, it consist of one ore more loops
                         for (int i = 0; i < loops.Count; i++)
                         {
-                            barrier.AddMany(loops[i]);
+                            barrier.UnionWith(loops[i]);
                         }
-                        Set<Face> testFeature = new Set<Face>(featureFaces);
+                        HashSet<Face> testFeature = new HashSet<Face>(featureFaces);
                         if (CollectFaces(testFeature, barrier))
                         {   // there is a true subset of this shell isolated by the barrier, which makes the feature
                             Dictionary<Edge, Edge> clonedEdges = new Dictionary<Edge, Edge>();
@@ -6184,7 +6185,7 @@ namespace CADability.GeoObject
                                     lidEdges[i] = clonedEdges[loops[j][i]];
                                 }
                                 Face lid = Face.Construct();
-                                Face outside = outsideFaces[j].GetAny();
+                                Face outside = outsideFaces[j].First();
                                 ISurface srf = outside.Surface.Clone(); // all cutoff faces are asumed to have (geometrically) the same surface
                                 BoundingRect domain = outside.Area.GetExtent();
                                 for (int i = 0; i < lidEdges.Length; i++)
@@ -6223,8 +6224,8 @@ namespace CADability.GeoObject
                         }
                     }
                     bool found = false;
-                    Set<Edge> loopEdges = new Set<Edge>();
-                    for (int i = 0; i < loops.Count; i++) loopEdges.AddMany(loops[i]);
+                    HashSet<Edge> loopEdges = new HashSet<Edge>();
+                    for (int i = 0; i < loops.Count; i++) loopEdges.UnionWith(loops[i]);
                     foreach (Edge edg in openFeatureEdges)
                     {
                         if (loopEdges.Contains(edg)) continue;
@@ -6247,11 +6248,11 @@ namespace CADability.GeoObject
             return null;
         }
 
-        private bool CollectFaces(Set<Face> faces, Set<Edge> barrier)
+        private bool CollectFaces(HashSet<Face> faces, HashSet<Edge> barrier)
         {
             do
             {
-                Set<Face> toAdd = new Set<Face>();
+                HashSet<Face> toAdd = new HashSet<Face>();
                 foreach (Face fc in faces)
                 {
                     foreach (Edge edg in fc.AllEdges)
@@ -6264,12 +6265,12 @@ namespace CADability.GeoObject
                     }
                 }
                 if (toAdd.Count == 0) break;
-                faces.AddMany(toAdd);
+                faces.UnionWith(toAdd);
             } while (true);
             return (faces.Count < this.faces.Length);
         }
 
-        private static Edge[] FindHole(Edge toStartWith, Set<Face> toAvoid, Set<Face> loopFaces)
+        private static Edge[] FindHole(Edge toStartWith, HashSet<Face> toAvoid, HashSet<Face> loopFaces)
         {
             List<Edge> res = new List<Edge>();
             Face onThisFace;
@@ -6347,9 +6348,9 @@ namespace CADability.GeoObject
             Dictionary<Edge, Edge> clonedEdges = new Dictionary<Edge, Edge>();
             Shell res = Clone(clonedEdges);
             // res and this contain the same faces in the same order
-            Set<Face> originalOutsideFaces = new Set<Face>(facesToCutOff); // Original-Faces not belonging to the feature
-            Set<Face> outsideFaces = new Set<Face>(); // Faces not belonging to the feature (in the clone)
-            Set<Face> featureFaces = new Set<Face>(); // Faces belonging to the feature (in the clone)
+            HashSet<Face> originalOutsideFaces = new HashSet<Face>(facesToCutOff); // Original-Faces not belonging to the feature
+            HashSet<Face> outsideFaces = new HashSet<Face>(); // Faces not belonging to the feature (in the clone)
+            HashSet<Face> featureFaces = new HashSet<Face>(); // Faces belonging to the feature (in the clone)
             Dictionary<Face, int> faceToIndex = new Dictionary<Face, int>();
             for (int i = 0; i < Faces.Length; i++)
             {
@@ -6376,7 +6377,7 @@ namespace CADability.GeoObject
                     featureFaces.Add(res.Faces[faceToIndex[edgeLoop[i].PrimaryFace]]);
                 }
             }
-            Set<Face> saveFeatureFaces = new Set<Face>(featureFaces); // maybe we need this later, when the feature is not closed
+            HashSet<Face> saveFeatureFaces = new HashSet<Face>(featureFaces); // maybe we need this later, when the feature is not closed
             foreach (Face fce in outsideFaces)
             {
                 res.RemoveFace(fce);
@@ -6423,7 +6424,7 @@ namespace CADability.GeoObject
                 saveFeatureFaces.Add(lid);
                 Face toCloseWith = null;
                 bool singleSurface = true;
-                Set<Edge> openEdges = new Set<Edge>();
+                HashSet<Edge> openEdges = new HashSet<Edge>();
                 foreach (Face fce in saveFeatureFaces)
                 {
                     foreach (Edge edg in fce.Edges)
@@ -7076,56 +7077,58 @@ namespace CADability.GeoObject
             }
             return res;
         }
-        private static void AccumulateConnectedFaces(Set<Face> connectedFaces)
+        private static void AccumulateConnectedFaces(HashSet<Face> connectedFaces)
         {
-            Set<Edge> edgesToTest = new Set<Edge>();
+            HashSet<Edge> edgesToTest = new HashSet<Edge>();
             foreach (Face fce in connectedFaces)
             {
-                edgesToTest.AddMany(fce.AllEdges);
+                edgesToTest.UnionWith(fce.AllEdges);
             }
-            Set<Edge> handledEdges = new Set<Edge>();
+            HashSet<Edge> handledEdges = new HashSet<Edge>();
             while (edgesToTest.Count > 0)
             {
-                Set<Edge> newEdges = new Set<Edge>();
+                HashSet<Edge> newEdges = new HashSet<Edge>();
                 foreach (Edge edg in edgesToTest)
                 {
                     if (handledEdges.Contains(edg)) continue;
                     if (!connectedFaces.Contains(edg.PrimaryFace))
                     {
                         connectedFaces.Add(edg.PrimaryFace);
-                        newEdges.AddMany(edg.PrimaryFace.AllEdges);
+                        newEdges.UnionWith(edg.PrimaryFace.AllEdges);
                     }
                     if (edg.SecondaryFace != null && !connectedFaces.Contains(edg.SecondaryFace))
                     {
                         connectedFaces.Add(edg.SecondaryFace);
-                        newEdges.AddMany(edg.SecondaryFace.AllEdges);
+                        newEdges.UnionWith(edg.SecondaryFace.AllEdges);
                     }
                     handledEdges.Add(edg);
                 }
-                edgesToTest = newEdges.Difference(handledEdges);
+                newEdges.ExceptWith(handledEdges);
+                edgesToTest = newEdges;
             }
         }
 
-        internal static Shell CollectConnected(Set<Face> allFaces)
+        internal static Shell CollectConnected(HashSet<Face> allFaces)
         {
-            Set<Face> connected = new Set<Face>();
-            Set<Edge> toCheck = new Set<Edge>();
-            Face startWith = allFaces.GetAndRemoveAny();
+            HashSet<Face> connected = new HashSet<Face>();
+            HashSet<Edge> toCheck = new HashSet<Edge>();
+            Face startWith = allFaces.First();
+            allFaces.Remove(startWith);
             connected.Add(startWith);
-            toCheck.AddMany(startWith.AllEdges);
-            while (!toCheck.IsEmpty())
+            toCheck.UnionWith(startWith.AllEdges);
+            while (toCheck.Count > 0)
             {
-                Edge edg = toCheck.GetAny();
+                Edge edg = toCheck.First();
                 if (!connected.Contains(edg.PrimaryFace) && allFaces.Contains(edg.PrimaryFace))
                 {
                     connected.Add(edg.PrimaryFace);
-                    toCheck.AddMany(edg.PrimaryFace.AllEdges);
+                    toCheck.UnionWith(edg.PrimaryFace.AllEdges);
                     allFaces.Remove(edg.PrimaryFace);
                 }
                 if (edg.SecondaryFace != null && !connected.Contains(edg.SecondaryFace) && allFaces.Contains(edg.SecondaryFace))
                 {
                     connected.Add(edg.SecondaryFace);
-                    toCheck.AddMany(edg.SecondaryFace.AllEdges);
+                    toCheck.UnionWith(edg.SecondaryFace.AllEdges);
                     allFaces.Remove(edg.SecondaryFace);
                 }
                 toCheck.Remove(edg);

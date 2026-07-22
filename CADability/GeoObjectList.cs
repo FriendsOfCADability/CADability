@@ -3,7 +3,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
-using Wintellect.PowerCollections;
 
 namespace CADability.GeoObject
 {
@@ -465,7 +464,7 @@ namespace CADability.GeoObject
         /// </summary>
         public void ReduceToOwner()
         {
-            Set<IGeoObject> set = new Set<IGeoObject>();
+            HashSet<IGeoObject> set = new HashSet<IGeoObject>();
             for (int i = 0; i < this.list.Count; ++i)
             {
                 IGeoObject owner = list[i] as IGeoObject;

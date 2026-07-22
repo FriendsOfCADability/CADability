@@ -10,7 +10,6 @@ using CADability.WebDrawing;
 using System.Drawing;
 #endif
 using System.Runtime.Serialization;
-using Wintellect.PowerCollections;
 
 namespace CADability
 {
@@ -558,7 +557,7 @@ namespace CADability
         public void AdjustPoint(SnapPointFinder spf)
         {	
 	        // find relevant objects in octtree
-            GeoObjectList objectsFromRect = model.GetObjectsFromRect(spf.pickArea, new Set<Layer>(GetVisibleLayers()), PickMode.children, null);
+            GeoObjectList objectsFromRect = model.GetObjectsFromRect(spf.pickArea, new HashSet<Layer>(GetVisibleLayers()), PickMode.children, null);
             foreach (IGeoObject geo in objectsFromRect)
             {
 	            if (spf.IgnoreList != null && spf.IgnoreList.Contains(geo)) continue;
@@ -762,7 +761,7 @@ namespace CADability
                     return res;
                 case PickMode.normal:
                     {
-                        Set<IGeoObject> set = new Set<IGeoObject>(new GeoObjectComparer());
+                        HashSet<IGeoObject> set = new HashSet<IGeoObject>(new GeoObjectComparer());
                         foreach (IGeoObject go in oct)
                         {
                             if (go.HitTest(projection, pickrect, false))
@@ -1151,7 +1150,7 @@ namespace CADability
                 // wenn Curve ein Path ist, dann enthält l alle Unterobjekte, und die müssen raus
                 // selbstüberschneidende Path Objekte werden noch Probleme machen
                 l.RemoveChildrenOf(Curve as IGeoObject);
-                List<Pair<double, ICurve>> resCurves = new List<Pair<double, ICurve>>();
+                List<(double Z, ICurve Curve)> resCurves = new();
                 foreach (IGeoObject go in l)
                 {
                     if (go.Layer != null && !IsLayerVisible(go.Layer)) continue; // 04.16 wg. Nürnberger
@@ -1191,7 +1190,7 @@ namespace CADability
                                 }
                                 if (add)
                                 {
-                                    resCurves.Add(new Pair<double, ICurve>(Curve.PositionOf(pl.ToGlobal(pp[i].p), 0.5), cv));
+                                    resCurves.Add((Curve.PositionOf(pl.ToGlobal(pp[i].p), 0.5), cv));
                                 }
                             }
                         }
@@ -1204,7 +1203,7 @@ namespace CADability
                         (go as Face).Intersect(Curve, out ip, out uvOnFace, out uOnCurve);
                         for (int i = 0; i < uOnCurve.Length; i++)
                         {
-                            resCurves.Add(new Pair<double, ICurve>(uOnCurve[i], null));
+                            resCurves.Add((uOnCurve[i], null));
                         }
                     }
                 }
@@ -1213,23 +1212,23 @@ namespace CADability
                     double[] sintp = Curve.GetSelfIntersections();
                     for (int i = 0; i < sintp.Length; i++)
                     {
-                        resCurves.Add(new Pair<double, ICurve>(sintp[i], Curve));
+                        resCurves.Add((sintp[i], Curve));
                     }
                 }
-                resCurves.Sort(new Comparison<Pair<double, ICurve>>(
-                                        delegate (Pair<double, ICurve> pi1, Pair<double, ICurve> pi2)
+                resCurves.Sort(new Comparison<(double Z, ICurve Curve)>(
+                                        delegate ((double Z, ICurve Curve) pi1, (double Z, ICurve Curve) pi2)
                                         {
-                                            return pi1.First.CompareTo(pi2.First);
+                                            return pi1.Z.CompareTo(pi2.Z);
                                         }));
                 // following commented out because of right circle in Test_Trim_cerchio.cdb
-                // if (resCurves.Count > 0 && resCurves[0].First < 1e-8) resCurves.RemoveAt(0); // no intersection points at the beginning (this is used for trimming)
-                // if (resCurves.Count > 0 && resCurves[resCurves.Count-1].First >1- 1e-8) resCurves.RemoveAt(resCurves.Count - 1); // no intersection points at the beginning (this is used for trimming)
+                // if (resCurves.Count > 0 && resCurves[0].Z < 1e-8) resCurves.RemoveAt(0); // no intersection points at the beginning (this is used for trimming)
+                // if (resCurves.Count > 0 && resCurves[resCurves.Count-1].Z >1- 1e-8) resCurves.RemoveAt(resCurves.Count - 1); // no intersection points at the beginning (this is used for trimming)
                 double[] res = new double[resCurves.Count];
                 targetCurves = new ICurve[resCurves.Count];
                 for (int i = 0; i < resCurves.Count; i++)
                 {
-                    res[i] = resCurves[i].First;
-                    targetCurves[i] = resCurves[i].Second;
+                    res[i] = resCurves[i].Z;
+                    targetCurves[i] = resCurves[i].Curve;
                 }
                 return res;
             }

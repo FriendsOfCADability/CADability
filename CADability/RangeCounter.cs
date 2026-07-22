@@ -1,8 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using Wintellect.PowerCollections;
-
 namespace CADability
 {
     /// <summary>
@@ -70,7 +67,7 @@ namespace CADability
 
         double precision; // maximale Breite des Intervalls
         double period; // 0.0, wenn nicht periodisch, sonst die Periode
-        OrderedMultiDictionary<interval, int> dictionary;
+        SortedDictionary<interval, int> dictionary;
         private List<interval> currentKeys; // für den Enumerator. Es darf immer nur einer laufen, sonst müsste man eine eigene Klasse dafür machen
         private int currentIndex;
 
@@ -78,26 +75,35 @@ namespace CADability
         {
             this.precision = precision;
             this.period = period;
-            dictionary = new OrderedMultiDictionary<interval, int>(false);
+            dictionary = new SortedDictionary<interval, int>();
         }
 
         public void Add(double val)
         {
-            OrderedMultiDictionary<interval, int>.View view = dictionary.Range(new interval(val - precision), false, new interval(val + precision), false);
-            foreach (interval intv in view.Keys)
+            interval lower = new interval(val - precision);
+            interval upper = new interval(val + precision);
+            List<interval> keysInRange = new List<interval>();
+            foreach (interval k in dictionary.Keys)
+            {
+                if (((IComparable)k).CompareTo(lower) >= 0 && ((IComparable)k).CompareTo(upper) <= 0)
+                    keysInRange.Add(k);
+                else if (((IComparable)k).CompareTo(upper) > 0)
+                    break;
+            }
+            foreach (interval intv in keysInRange)
             {
                 intv.adjustPeriodic(ref val, period, precision);
                 if (intv.accept(val, precision))
                 {
-                    int count = dictionary[intv].First(); // es gibt ja nur ein int
+                    int count = dictionary[intv];
                     dictionary.Remove(intv);
                     intv.expand(val);
-                    dictionary.Add(intv, count + 1);
+                    dictionary[intv] = count + 1;
                     return; // fertig
                 }
             }
             // es wurde nicht zugefügt
-            dictionary.Add(new interval(val), 1);
+            dictionary[new interval(val)] = 1;
         }
 
 
@@ -119,7 +125,7 @@ namespace CADability
         {
             get
             {
-                return new KeyValuePair<double, int>((currentKeys[currentIndex].min + currentKeys[currentIndex].max) / 2, dictionary[currentKeys[currentIndex]].First());
+                return new KeyValuePair<double, int>((currentKeys[currentIndex].min + currentKeys[currentIndex].max) / 2, dictionary[currentKeys[currentIndex]]);
             }
         }
 

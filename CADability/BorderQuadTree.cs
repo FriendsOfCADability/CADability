@@ -1,7 +1,6 @@
-﻿using CADability.Curve2D;
 using System;
 using System.Collections.Generic;
-using Wintellect.PowerCollections;
+using CADability.Curve2D;
 
 namespace CADability.Shapes
 {
@@ -19,10 +18,10 @@ namespace CADability.Shapes
          * Sollte es beim Aufbau eines Borders Probleme geben (z.B. ein Eintrittspunkt aber kein Austrittspunkt) dann wird eine exception geworfen
          * und der Quadtree etwas verruckelt neu gemacht.
          * Jedes Quadrat enthält also maximal zwei Bordersegmente, deren Start- und Endparameter bekannt sind. Und maximal einen Schnittpunkt.
-         * Je nach Operation werden die Intervalle der Segmente aus allen Quadraten zusammengesammelt. Dabei muss man wissen, ob der Eintritts- 
+         * Je nach Operation werden die Intervalle der Segmente aus allen Quadraten zusammengesammelt. Dabei muss man wissen, ob der Eintritts-
          * oder Austrittspunkt des einen Borders innerhalb oder außerhalb des anderen Borders liegt. Dieses wird rein logisch anhand der Eintritts-
          * und Austrittspunkte bestimmt, also ohne das Border selbst zu fragen.
-         * 
+         *
          * Es wird mit einem Integer Koordinatensystem gearbeitet und die horizontalen und vertikalen Schnittpunkte der Border mit dem Quadtree
          * nur einmal bestimmt. Deshalb kann man immer gut mit Gleichheiten rechnen
          */
@@ -138,7 +137,7 @@ namespace CADability.Shapes
                     return ranges.Count > 0;
                 }
             }
-            public Pair<double, double> removeInterval(double startHere)
+            public (double Start, double End) removeInterval(double startHere)
             {
                 int ind = -1;
                 if (startHere == -1)
@@ -158,14 +157,14 @@ namespace CADability.Shapes
                 }
                 if (ind >= 0 && ind < ranges.Count)
                 {
-                    Pair<double, double> res = new Pair<double, double>(ranges[ind], ranges[ind + 1]);
+                    (double Start, double End) res = (ranges[ind], ranges[ind + 1]);
                     ranges.RemoveRange(ind, 2);
                     return res;
                 }
-                return new Pair<double, double>(-1, -1);
+                return (-1, -1);
             }
 
-            internal Pair<double, double> removeIntervalEnd(double endHere)
+            internal (double Start, double End) removeIntervalEnd(double endHere)
             {
                 int ind = -1;
                 if (endHere == -1)
@@ -185,11 +184,11 @@ namespace CADability.Shapes
                 }
                 if (ind >= 0 && ind < ranges.Count)
                 {
-                    Pair<double, double> res = new Pair<double, double>(ranges[ind], ranges[ind + 1]);
+                    (double Start, double End) res = (ranges[ind], ranges[ind + 1]);
                     ranges.RemoveRange(ind, 2);
                     return res;
                 }
-                return new Pair<double, double>(-1, -1);
+                return (-1, -1);
             }
         }
         class CriticalPosition : ApplicationException
@@ -209,14 +208,14 @@ namespace CADability.Shapes
         /// Ein Quadrat des Quadtrees, wenn nicht unterteilt, dann enthält es von jedem Border nur ein Segment mit definierten Eintritts und Austrittspunkt.
         /// Tangentiale Schnitte sind nicht erlaubt, dann muss der ganze Quadtree anders positioniert werden.
         /// Enthält maximal einen Schnittpunkt der beiden Border.
-        /// 
+        ///
         /// Integer Koordinatensystem: so kann man einfache Hash-Tabellen machen, in denen für horizontale und vertikale Linien die Schnittpunkte erfasst werden
         /// </summary>
         class Node
         {
             BorderQuadTree borderQuadTree; // Rückverweis
             quad quad; // die Lage des Quadranten im int-System
-            // entweder: 
+            // entweder:
             Node[] subTree; // wenn null, dann Blatt
             // oder:
             // Eigenschaften des Blattes:
@@ -528,7 +527,7 @@ namespace CADability.Shapes
             }
 
             private bool inside(double par, bool border1)
-            {   // bei Gleichheit von par und enter1/2 bzw. leave1/2 liefert bdr2 true und bdr1 false. 
+            {   // bei Gleichheit von par und enter1/2 bzw. leave1/2 liefert bdr2 true und bdr1 false.
                 // damit trift, wenn par selbst das andere enter/leave ist, jeweils nur einer der beiden Überprüfungen zu
                 if (border1)
                 {
@@ -652,7 +651,7 @@ namespace CADability.Shapes
         private BorderPosition position;
 
         double precision;
-        Dictionary<int, intersection[]> horIntSect1, horIntSect2, verIntSect1, verIntSect2; // die horizontalen und vertikalen Schnittpunkte der beiden Borders. 
+        Dictionary<int, intersection[]> horIntSect1, horIntSect2, verIntSect1, verIntSect2; // die horizontalen und vertikalen Schnittpunkte der beiden Borders.
 
         const double radianEps = 1e-6; // leider fällt mir dafür nix gescheites ein
         public BorderQuadTree(Border bdr1, Border bdr2, double precision)
@@ -833,7 +832,7 @@ namespace CADability.Shapes
 #endif
             // Stücke zusammensammeln:
             bool onBdr1;
-            Pair<double, double> act;
+            (double Start, double End) act;
             if (bdr1parts.hasInterval)
             {
                 onBdr1 = true;
@@ -846,16 +845,16 @@ namespace CADability.Shapes
             }
             List<ICurve2D> currentCollection = new List<ICurve2D>();
             List<Border> borders = new List<Border>();
-            while (act.First != -1)
+            while (act.Start != -1)
             {
                 if (onBdr1)
                 {
-                    ICurve2D[] parts = bdr1.GetPart(act.First, act.Second, true);
+                    ICurve2D[] parts = bdr1.GetPart(act.Start, act.End, true);
                     currentCollection.AddRange(parts);
                 }
                 else
                 {
-                    ICurve2D[] parts = bdr2.GetPart(act.First, act.Second, true);
+                    ICurve2D[] parts = bdr2.GetPart(act.Start, act.End, true);
                     if (op == op.subtract)
                     {   // das Ergebnis muss umgedreht werden!
                         Array.Reverse(parts);
@@ -891,7 +890,7 @@ namespace CADability.Shapes
                     // nächstes Teilstück auf dem anderen Border suchen
                     if (onBdr1)
                     {
-                        if (act.Second == bdr1.Segments.Length && bdr1parts.hasInterval && bdr1parts.ranges[0] == 0.0)
+                        if (act.End == bdr1.Segments.Length && bdr1parts.hasInterval && bdr1parts.ranges[0] == 0.0)
                         {   // es geht im selben Border über "Los"
                             act = bdr1parts.removeInterval(0.0);
                         }
@@ -899,7 +898,7 @@ namespace CADability.Shapes
                         {
                             for (int i = 0; i < borderIntersection.Count; i++)
                             {
-                                if (borderIntersection[i].par1 == act.Second) // überprüfung auf Gleichheit ist ok, da dieser Parameter nur einmal berechnet wird
+                                if (borderIntersection[i].par1 == act.End) // überprüfung auf Gleichheit ist ok, da dieser Parameter nur einmal berechnet wird
                                 {
                                     if (op == op.subtract)
                                         act = bdr2parts.removeIntervalEnd(borderIntersection[i].par2);
@@ -916,7 +915,7 @@ namespace CADability.Shapes
                     {
                         if (op == op.subtract)
                         {   // das 2. Stück läuft rückwärts
-                            if (act.First == 0.0 && bdr2parts.hasInterval && bdr2parts.ranges[bdr2parts.ranges.Count - 1] == bdr2.Segments.Length)
+                            if (act.Start == 0.0 && bdr2parts.hasInterval && bdr2parts.ranges[bdr2parts.ranges.Count - 1] == bdr2.Segments.Length)
                             {   // es geht im selben Border über "Los"
                                 act = bdr2parts.removeInterval(bdr2parts.ranges[bdr2parts.ranges.Count - 2]); // das letzte Stück liefern
                             }
@@ -924,7 +923,7 @@ namespace CADability.Shapes
                             {
                                 for (int i = 0; i < borderIntersection.Count; i++)
                                 {
-                                    if (borderIntersection[i].par2 == act.First)
+                                    if (borderIntersection[i].par2 == act.Start)
                                     {
                                         act = bdr1parts.removeInterval(borderIntersection[i].par1);
                                         onBdr1 = true;
@@ -936,7 +935,7 @@ namespace CADability.Shapes
                         }
                         else
                         {
-                            if (act.Second == bdr2.Segments.Length && bdr2parts.hasInterval && bdr2parts.ranges[0] == 0.0)
+                            if (act.End == bdr2.Segments.Length && bdr2parts.hasInterval && bdr2parts.ranges[0] == 0.0)
                             {   // es geht im selben Border über "Los"
                                 act = bdr2parts.removeInterval(0.0);
                             }
@@ -944,7 +943,7 @@ namespace CADability.Shapes
                             {
                                 for (int i = 0; i < borderIntersection.Count; i++)
                                 {
-                                    if (borderIntersection[i].par2 == act.Second)
+                                    if (borderIntersection[i].par2 == act.End)
                                     {
                                         act = bdr1parts.removeInterval(borderIntersection[i].par1);
                                         onBdr1 = true;
@@ -978,7 +977,7 @@ namespace CADability.Shapes
                     SimpleShape[] ss = new SimpleShape[borders.Count];
                     for (int i = 0; i < borders.Count; ++i)
                     {
-                        ss[i] = new SimpleShape(borders[i] as Border);
+                        ss[i] = new SimpleShape(borders[i]);
                     }
                     return new CompoundShape(ss);
                 }

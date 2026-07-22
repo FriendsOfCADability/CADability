@@ -1,4 +1,4 @@
-﻿// #undef DEBUG // zum Performancetest
+// #undef DEBUG // zum Performancetest
 
 using CADability.Curve2D;
 using CADability.GeoObject;
@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading;
-using Wintellect.PowerCollections;
 
 namespace CADability.Shapes
 {
@@ -28,12 +27,11 @@ namespace CADability.Shapes
 	/// A Border is always invariant, i.e. you annot change it (like System.String).
 	/// If a border is closed, then it is oriented counterclockwise. A border may be
 	/// produced by the BorderBuilder object (or by its constructors).
-	/// </summary>   
+	/// </summary>
 	[Serializable()]
 	public class Border : ISerializable, IDeserializationCallback, IJsonSerialize, IJsonSerializeDone
 	{
 		static private int idCounter = 0;
-		private int id;
 		private ICurve2D[] segment;
 		private QuadTree quadTree;
 		private bool isClosed;
@@ -109,20 +107,14 @@ namespace CADability.Shapes
 		}
 		protected Border()
 		{
-			id = ++idCounter;
+			Id = Interlocked.Increment(ref idCounter);
 		}
-		internal int Id
-		{
-			get
-			{
-				return id;
-			}
-		}
-		internal Border(ArrayList SegemntsToAdd, BoundingRect ext, bool IsClosed)
+		internal int Id { get; }
+		internal Border(IReadOnlyList<ICurve2D> segmentsToAdd, BoundingRect ext, bool IsClosed)
 			: this()
 		{
 			isClosed = IsClosed;
-			Segments = (ICurve2D[])SegemntsToAdd.ToArray(typeof(ICurve2D));
+			Segments = segmentsToAdd.ToArray();
 			flatten();
 			extent = ext;
 			area = 0.0;
@@ -296,7 +288,7 @@ namespace CADability.Shapes
 				dist[Geometry.Dist(segments[0].StartPoint, segments[1].EndPoint)] = 3;
 				dist[Geometry.Dist(segments[0].EndPoint, segments[1].EndPoint)] = 4;
 				if (uperiod != 0.0)
-				{   // die Frage bei den ersten beiden Objekten ist hier: welche Verschiebung ist besser: 
+				{   // die Frage bei den ersten beiden Objekten ist hier: welche Verschiebung ist besser:
 					// die von segment[0] oder die von segment[1]. Wenn man nämlich falsch anfängt, dann gehts am Ende nicht gut aus
 					GeoVector2D offset = new GeoVector2D(uperiod, 0.0);
 					double extra = 0.0;
@@ -616,7 +608,7 @@ namespace CADability.Shapes
 				dist[Geometry.Dist(segments[0].EndPoint, segments[1].EndPoint)] = 4;
 				dist[Geometry.Dist(segments[0].StartPoint, segments[1].StartPoint)] = 1;
 				dist[Geometry.Dist(segments[0].EndPoint, segments[1].StartPoint)] = 2;
-				// der letzte Fall ist bei bereits richtig orientierten Segmenten der Standard und wenn der abstand 0 hat, 
+				// der letzte Fall ist bei bereits richtig orientierten Segmenten der Standard und wenn der abstand 0 hat,
 				// dann soll er vorherige mit Abstand 0 überschreiben. Problemfall: Kreisfläche mit zwei Halbkreisen: die einmal vorhandene
 				// Reihenfolge der outline soll erhalten bleiben
 				switch (dist.Values[0]) // das ist der Fall für den kleinsten Abstand
@@ -871,7 +863,6 @@ namespace CADability.Shapes
 		protected double getRoughArea()
 		{
 			double a = 0.0;
-			ArrayList al = new ArrayList();
 			for (int i = 0; i < segment.Length; ++i)
 			{
 				if (segment[i] is BSpline2D)
@@ -932,7 +923,7 @@ namespace CADability.Shapes
 			if (isClosed)
 			{
 				// area = RecalcArea();
-				// die Berechnung von area braucht enorm viel Zeit bei NURBS Kurven, 
+				// die Berechnung von area braucht enorm viel Zeit bei NURBS Kurven,
 				// daher ist sie bei Sichtbarkeitsprüfungen nicht zu gebrauchen
 				double d = 0.0; // die akkumulierte Winkeldifferenz
 				GeoVector2D lastDir = segment[segment.Length - 1].EndDirection;
@@ -1082,8 +1073,7 @@ namespace CADability.Shapes
 			bool wasClosed = isClosed;
 			Segments = red.ToArray();
 			if (wasClosed) forceClosed();
-			bool dumy;
-			Recalc(out dumy);
+			Recalc(out _);
 		}
 		internal bool ReduceDeadEnd()
 		{
@@ -1152,13 +1142,12 @@ namespace CADability.Shapes
 				area = 0.0;
 				return false;
 			}
-			bool dumy;
-			Recalc(out dumy);
+			Recalc(out _);
 			return true;
 		}
         internal void SplitSingleCurve()
         {
-            if (segment.Length != 1) 
+            if (segment.Length != 1)
                 return;
 
             ICurve2D orgSegment = segment[0].Clone();
@@ -1531,7 +1520,7 @@ namespace CADability.Shapes
 			return new Border(segments);
 		}
 		internal Border[] GetParallel(double dist)
-		{   // Versuch mit Vereinigung oder Differenz zu arbeiten. 
+		{   // Versuch mit Vereinigung oder Differenz zu arbeiten.
 			// Natürlich wälzt man die Epsilon Problematik dorthin ab, aber mal sehen...
 			Border original = this.Clone();
 			original.flatten();
@@ -1639,7 +1628,7 @@ namespace CADability.Shapes
 		private PositionInternal GetPosition(GeoPoint2D StartPoint, GeoPoint2D EndPoint, double precision)
 		{   // Bestimme die Anzahl der Schnittpunkte auf dem Strahl StartPoint->EndPoint.
 			// ungerade: Inside, gerade: Outside. In Zweifelsfällen: Unknown
-			ArrayList IntersectionPoints = new ArrayList();
+			var intersectionPoints = new List<GeoPoint2DWithParameter>();
 			Line2D sl = new Line2D(StartPoint, EndPoint);
 			ICollection cl = QuadTree.GetObjectsCloseTo(sl);
 			foreach (ICurve2D curve in cl)
@@ -1652,22 +1641,21 @@ namespace CADability.Shapes
 					if (ips[i].p.TaxicabDistance(curve.EndPoint) < precision * 2) return PositionInternal.Unknown;
 					if (ips[i].par1 >= 0.0 && ips[i].par1 <= 1.0 && ips[i].par2 >= 0.0 && ips[i].par2 <= 1.0)
 					{
-						IntersectionPoints.Add(ips[i]);
+						intersectionPoints.Add(ips[i]);
 					}
 				}
 			}
 			// bei 0 oder einem Schnittpunkt ist die Aussage schon klar:
-			if (IntersectionPoints.Count == 0) return PositionInternal.Outside;
-			if (IntersectionPoints.Count == 1) return PositionInternal.Inside;
+			if (intersectionPoints.Count == 0) return PositionInternal.Outside;
+			if (intersectionPoints.Count == 1) return PositionInternal.Inside;
 			// IntersectionPoints enthält jetzt alle gefundenen Schnittpunkt. i.A. sind das wenige
 			// jetzt feststellen, ob welche doppelt sind, dann ist das Ergebnis untauglich
-			GeoPoint2DWithParameter[] gpIntersectionPoints = (GeoPoint2DWithParameter[])IntersectionPoints.ToArray(typeof(GeoPoint2DWithParameter));
-			double[] Parameters = new double[gpIntersectionPoints.Length];
-			GeoPoint2D[] Points = new GeoPoint2D[gpIntersectionPoints.Length];
-			for (int i = 0; i < gpIntersectionPoints.Length; ++i)
+			double[] Parameters = new double[intersectionPoints.Count];
+			GeoPoint2D[] Points = new GeoPoint2D[intersectionPoints.Count];
+			for (int i = 0; i < intersectionPoints.Count; ++i)
 			{
-				Parameters[i] = gpIntersectionPoints[i].par1;
-				Points[i] = gpIntersectionPoints[i].p;
+				Parameters[i] = intersectionPoints[i].par1;
+				Points[i] = intersectionPoints[i].p;
 			}
 			Array.Sort(Parameters, Points);
 			for (int i = 0; i < Points.Length - 1; ++i)
@@ -1675,7 +1663,7 @@ namespace CADability.Shapes
 				if (Points[i].TaxicabDistance(Points[i + 1]) < precision * 2) return PositionInternal.Unknown;
 			}
 			// jetzt zählt nur noch die Anzahl
-			if ((gpIntersectionPoints.Length & 0x01) == 0) return PositionInternal.Outside; // gerade Schnittzahl
+			if ((intersectionPoints.Count & 0x01) == 0) return PositionInternal.Outside; // gerade Schnittzahl
 			else return PositionInternal.Inside; // ungerade Schnittanzahl
 		}
 		/// <summary>
@@ -1937,14 +1925,14 @@ namespace CADability.Shapes
 		/// of the curve (0.0&lt;=par1&lt;=1.0).
 		/// </summary>
 		/// <param name="IntersectWith">curve to intersect this border with</param>
-		/// <returns>list of intersection points</returns>
+		/// <returns>array of intersection points</returns>
 		public GeoPoint2DWithParameter[] GetIntersectionPoints(ICurve2D IntersectWith)
 		{
 			return GetIntersectionPoints(IntersectWith, extent.Size * 1e-6);
 		}
 		public GeoPoint2DWithParameter[] GetIntersectionPoints(ICurve2D IntersectWith, double precision)
 		{
-			ArrayList result = new ArrayList();
+			var result = new List<GeoPoint2DWithParameter>();
 			ICollection cl = QuadTree.GetObjectsCloseTo(IntersectWith);
 			foreach (ICurve2D curve in cl)
 			{
@@ -2005,27 +1993,27 @@ namespace CADability.Shapes
 					}
 				}
 			}
-			return (GeoPoint2DWithParameter[])result.ToArray(typeof(GeoPoint2DWithParameter));
+			return result.ToArray();
 		}
 		public GeoPoint2DWithParameter[] GetIntersectionPoints(Border IntersectWith)
 		{
 			return GetIntersectionPoints(IntersectWith, extent.Size * 1e-6 + IntersectWith.extent.Size * 1e-6);
 		}
-		public GeoPoint2DWithParameter[] GetIntersectionPoints(Border IntersectWith, double precision)
+		public GeoPoint2DWithParameter[] GetIntersectionPoints(Border intersectWith, double precision)
 		{
-			ArrayList res = new ArrayList();
-			for (int i = 0; i < IntersectWith.Count; ++i)
+			var res = new List<GeoPoint2DWithParameter>();
+			for (int i = 0; i < intersectWith.Count; ++i)
 			{
-				ICurve2D c = IntersectWith[i];
-				GeoPoint2DWithParameter[] ips = GetIntersectionPoints(c, precision);
-				for (int j = 0; j < ips.Length; ++j)
-				{
-					ips[j].par2 += i;
-					if (IntersectWith.isClosed && ips[j].par2 >= IntersectWith.Count) ips[j].par2 -= IntersectWith.Count;
-				}
-				res.AddRange(ips);
+				ICurve2D c = intersectWith[i];
+                foreach (var ip in GetIntersectionPoints(c, precision))
+                {
+                    var copy = ip;
+                    copy.par2 += i;
+                    if (intersectWith.isClosed && copy.par2 >= intersectWith.Count) copy.par2 -= intersectWith.Count;
+                    res.Add(copy);
+                }
 			}
-			return (GeoPoint2DWithParameter[])res.ToArray(typeof(GeoPoint2DWithParameter));
+			return res.ToArray();
 		}
 		/// <summary>
 		/// Returns an array of Border objects by breaking this border at the given positions.
@@ -2036,10 +2024,10 @@ namespace CADability.Shapes
 		/// <returns></returns>
 		public Border[] Split(double[] Parameter)
 		{
-			ArrayList res = new ArrayList();
+			var res = new List<Border>();
 			double lastPos = 0.0;
 			for (int i = 0; i <= Parameter.Length; ++i)
-			{   // die Schleife läuft um 1 weiter als Parameter.Length, um den letzten 
+			{   // die Schleife läuft um 1 weiter als Parameter.Length, um den letzten
 				// Abschnitt auch noch zu bekommen
 				int StartIndex = (int)lastPos;
 				double nextPos;
@@ -2058,7 +2046,7 @@ namespace CADability.Shapes
 				}
 				else
 				{
-					ArrayList curves = new ArrayList(EndIndex - StartIndex + 1);
+					var curves = new List<ICurve2D>(EndIndex - StartIndex + 1);
 					ICurve2D FirstCurve = segment[StartIndex].Clone();
 					FirstCurve = FirstCurve.Trim(lastPos - StartIndex, 1.0);
 					if (FirstCurve != null && FirstCurve.Length > Precision.eps) curves.Add(FirstCurve);
@@ -2072,18 +2060,16 @@ namespace CADability.Shapes
 					if (LastCurve != null && LastCurve.Length > Precision.eps) curves.Add(LastCurve);
 					if (curves.Count > 0)
 					{
-						res.Add(new Border((ICurve2D[])(curves.ToArray(typeof(ICurve2D)))));
+						res.Add(new Border(curves.ToArray()));
 					}
 				}
 				lastPos = nextPos;
 			}
-			return (Border[])res.ToArray(typeof(Border));
+			return res.ToArray();
 		}
 		/// <summary>
-		/// Splits the border into parts according to <paramref name="positions"/>. 
+		/// Splits the border into parts according to <paramref name="positions"/>.
 		/// </summary>
-		/// <param name="positions"></param>
-		/// <returns></returns>
 		private List<List<ICurve2D>> SplitCyclical(double[] positions)
 		{
 			List<List<ICurve2D>> res = new List<List<ICurve2D>>();
@@ -2137,10 +2123,10 @@ namespace CADability.Shapes
 		/// <returns></returns>
 		internal Border[] Split(double[] parameter, GeoPoint2D[] points, double[] orientation)
 		{
-			ArrayList res = new ArrayList();
+			var res = new List<Border>();
 			double lastPos = 0.0;
 			for (int i = 0; i <= parameter.Length; ++i)
-			{   // die Schleife läuft um 1 weiter als Parameter.Length, um den letzten 
+			{   // die Schleife läuft um 1 weiter als Parameter.Length, um den letzten
 				// Abschnitt auch noch zu bekommen
 				int startIndex = (int)lastPos;
 				if (startIndex == segment.Length) --startIndex;
@@ -2187,7 +2173,7 @@ namespace CADability.Shapes
 				}
 				else
 				{
-					ArrayList curves = new ArrayList(endIndex - startIndex + 1);
+					var curves = new List<ICurve2D>(endIndex - startIndex + 1);
 					ICurve2D firstCurve = segment[startIndex].Clone();
 					firstCurve = firstCurve.Trim(lastPos - startIndex, 1.0);
 					if (firstCurve != null)
@@ -2212,7 +2198,7 @@ namespace CADability.Shapes
 					}
 					if (curves.Count > 0)
 					{
-						Border toAdd = new Border((ICurve2D[])(curves.ToArray(typeof(ICurve2D))));
+						Border toAdd = new Border(curves.ToArray());
 						if (i == 0)
 						{
 							if (orientation[i] > 1e-6) toAdd.orientation = Orientation.negative;
@@ -2236,7 +2222,7 @@ namespace CADability.Shapes
 				}
 				lastPos = nextPos;
 			}
-			return (Border[])res.ToArray(typeof(Border));
+			return res.ToArray();
 		}
 		/// <summary>
 		/// Returns the position of this point on the border.
@@ -2319,12 +2305,9 @@ namespace CADability.Shapes
 		}
 		/// <summary>
 		/// Concatenates two border objects. Both borders must be open (not closed) and
-		/// the endpoint of the first border must be equal to the startpoint of the second 
+		/// the endpoint of the first border must be equal to the startpoint of the second
 		/// border (as defined by Precision.IsEqual).
 		/// </summary>
-		/// <param name="first"></param>
-		/// <param name="second"></param>
-		/// <returns></returns>
 		public static Border operator +(Border first, Border second)
 		{
 			if (!Precision.IsEqual(first.EndPoint, second.StartPoint)) throw new BorderException("Border operator +: Borders not connected", BorderException.BorderExceptionType.NotConnected);
@@ -2424,7 +2407,7 @@ namespace CADability.Shapes
 			#endregion
 		}
 		/* NEUES KONZEPT:
-         * Mache aus der Border ein CompoundShape objekt 
+         * Mache aus der Border ein CompoundShape objekt
          * Für negative dist: entferne davon für jedes Segment
          * das entprechende Stück (paralleles Segment, Ecken verbinden)
          * Für jeden Innenknick entferne zusätzlich das "Tortenstück".
@@ -2445,7 +2428,7 @@ namespace CADability.Shapes
 		{
 			/* Das Konzept ist schlecht:
              * Besser: Verbinde alles äußere mit einem Bogen, das tangentiale muss sichergestellt zusammenhängen
-             * der Rest kann offen bleiben. Alles in einen QuadTree werfen und Schnittpunkte der einzelnen Pfade miteinander 
+             * der Rest kann offen bleiben. Alles in einen QuadTree werfen und Schnittpunkte der einzelnen Pfade miteinander
              * berechnen. Anhand der Richtungen in einem Schnittpunkt bestimmen was wegfallen muss. Den Rest liefern.
              */
 			// precision bedeutet Genauigkeit in anbhängigkeit von dist
@@ -2466,15 +2449,15 @@ namespace CADability.Shapes
 			// Polylinien und Pfade stören
 			for (int i = toIterate.Count - 1; i >= 0; --i)
 			{
-				if (toIterate[i] is Polyline2D)
+				if (toIterate[i] is Polyline2D poly1)
 				{
-					ICurve2D[] sub = (toIterate[i] as Polyline2D).GetSubCurves();
+					ICurve2D[] sub = poly1.GetSubCurves();
 					toIterate.RemoveAt(i);
 					toIterate.InsertRange(i, sub);
 				}
-				else if (toIterate[i] is Path2D)
+				else if (toIterate[i] is Path2D path1)
 				{
-					ICurve2D[] sub = (toIterate[i] as Path2D).SubCurves;
+					ICurve2D[] sub = path1.SubCurves;
 					toIterate.RemoveAt(i);
 					toIterate.InsertRange(i, sub);
 				}
@@ -2482,14 +2465,14 @@ namespace CADability.Shapes
 				{
 					ICurve2D aprx = toIterate[i].Approximate(true, precision);
 					toIterate.RemoveAt(i);
-					if (aprx is Polyline2D)
+					if (aprx is Polyline2D poly2)
 					{
-						ICurve2D[] sub = (aprx as Polyline2D).GetSubCurves();
+						ICurve2D[] sub = poly2.GetSubCurves();
 						toIterate.InsertRange(i, sub);
 					}
-					else if (aprx is Path2D)
+					else if (aprx is Path2D path2)
 					{
-						ICurve2D[] sub = (aprx as Path2D).SubCurves;
+						ICurve2D[] sub = path2.SubCurves;
 						toIterate.InsertRange(i, sub);
 					}
 				}
@@ -2519,7 +2502,7 @@ namespace CADability.Shapes
 					double a = Math.PI - new Angle(toIterate[i - 1].EndDirection, toIterate[i].StartDirection);
 					bool round = a < roundAngle; // wir suchen den Innenwinkel
 					if (InsertParallelConnection(lastCurve, c, toIterate[i - 1].EndDirection, toIterate[i].StartDirection, dist, toIterate[i].StartPoint, contcurves, round))
-					{   // es gab einen Zusammenhang. Entweder wurde ein Verbindungsobjekt zwischen lastCurve und c 
+					{   // es gab einen Zusammenhang. Entweder wurde ein Verbindungsobjekt zwischen lastCurve und c
 						// zugefügt, oder die beiden Kurven (lastCurve,c) wurden zurechtgeruckelt
 						if (c.Length > Precision.eps) contcurves.Add(c);
 					}
@@ -2663,41 +2646,35 @@ namespace CADability.Shapes
 						scap = new Arc2D(RawSegments[i].StartPoint, -dist, RawSegments[i].segment[0].StartDirection.ToLeft().Angle, -2.0 * Math.PI);
 						ecap = new Arc2D(RawSegments[i].EndPoint, -dist, RawSegments[i].segment[RawSegments[i].segment.Length - 1].StartDirection.ToLeft().Angle, -2.0 * Math.PI);
 					}
-					GeoPoint2DWithParameter[] pointlist = RawSegments[i].GetIntersectionPoints(scap);
-					for (int k = 0; k < pointlist.Length; ++k)
+					var pointlist = RawSegments[i].GetIntersectionPoints(scap);
+					foreach (var point in pointlist)
 					{
-						if (((pointlist[k].p | RawSegments[i].StartPoint) < Math.Abs(dist * precision)) ||
-						((pointlist[k].p | RawSegments[i].EndPoint) < Math.Abs(dist * precision)))
+						if (((point.p | RawSegments[i].StartPoint) < Math.Abs(dist * precision)) ||
+						((point.p | RawSegments[i].EndPoint) < Math.Abs(dist * precision)))
 						{   // der Schnittpunkt ist in Wahrheit ein Zusammenhang am Anfang oder Ende
-							if ((Math.Floor(pointlist[k].par1) == 0 || Math.Floor(pointlist[k].par1) == 1) &&
-								(Math.Floor(pointlist[k].par2) == 0 || Math.Floor(pointlist[k].par2) == 1))
+							if ((Math.Floor(point.par1) is 0 or 1) &&
+								(Math.Floor(point.par2) is 0 or 1))
 							{   // aber es darf auch ein noch so kleines Stück vom Border nicht überstehen
 								continue;
 							}
 						}
-						BreakSegment[i][pointlist[k].par1] = pointlist[k].p;
-						GeoVector2D dir = (1.0 / RawSegments[i].Length) * RawSegments[i].DirectionAt(pointlist[k].par1);
-						GeoVector2D other = (1.0 / scap.Length) * scap.DirectionAt(pointlist[k].par2);
-						double or = GeoVector2D.Orientation(dir, other);
-						intersectionDirection[i][pointlist[k].par1] = 0.0;
+						BreakSegment[i][point.par1] = point.p;
+						intersectionDirection[i][point.par1] = 0.0;
 					}
 					pointlist = RawSegments[i].GetIntersectionPoints(ecap);
-					for (int k = 0; k < pointlist.Length; ++k)
+					foreach (var point in pointlist)
 					{
-						if (((pointlist[k].p | RawSegments[i].StartPoint) < Math.Abs(dist * precision)) ||
-						((pointlist[k].p | RawSegments[i].EndPoint) < Math.Abs(dist * precision)))
+						if (((point.p | RawSegments[i].StartPoint) < Math.Abs(dist * precision)) ||
+						((point.p | RawSegments[i].EndPoint) < Math.Abs(dist * precision)))
 						{   // der Schnittpunkt ist in Wahrheit ein Zusammenhang am Anfang oder Ende
-							if ((Math.Floor(pointlist[k].par1) == 0 || Math.Floor(pointlist[k].par1) == 1) &&
-								(Math.Floor(pointlist[k].par2) == 0 || Math.Floor(pointlist[k].par2) == 1))
+							if ((Math.Floor(point.par1) is 0 or 1) &&
+								(Math.Floor(point.par2) is 0 or 1))
 							{   // aber es darf auch ein noch so kleines Stück vom Border nicht überstehen
 								continue;
 							}
 						}
-						BreakSegment[i][pointlist[k].par1] = pointlist[k].p;
-						GeoVector2D dir = (1.0 / RawSegments[i].Length) * RawSegments[i].DirectionAt(pointlist[k].par1);
-						GeoVector2D other = (1.0 / ecap.Length) * ecap.DirectionAt(pointlist[k].par2);
-						double or = GeoVector2D.Orientation(dir, other);
-						intersectionDirection[i][pointlist[k].par1] = 0.0;
+						BreakSegment[i][point.par1] = point.p;
+						intersectionDirection[i][point.par1] = 0.0;
 					}
 				}
 			}
@@ -2724,10 +2701,10 @@ namespace CADability.Shapes
 			// PROBLEM: angenäherte Splines befinden sich zu nahe an der Originalkurve und werden im folgenden
 			// entfernt. Das darf nicht passieren...
 			// VERBESSERUNG: BrokenSegments, die keinen Zusammenhang an beiden Enden mit anderen haben
-			// könnten eigentlich verworfen werden. Das würde die kommende Schleife entlasten und zu 
+			// könnten eigentlich verworfen werden. Das würde die kommende Schleife entlasten und zu
 			// höherer Sicherheit führen.
-			// BrokenSegments sind jetzt alle Teilstücke der RawSegments an ihren Schnittpunkten 
-			// aufgebrochen. Jetzt werden alle Stücke daraufhin untersucht, ob sie zu nahe an der 
+			// BrokenSegments sind jetzt alle Teilstücke der RawSegments an ihren Schnittpunkten
+			// aufgebrochen. Jetzt werden alle Stücke daraufhin untersucht, ob sie zu nahe an der
 			// Ausgangs-Border liegen. Die zu nahe liegenden werden verworfen.
 #if DEBUG
 			DebuggerContainer dc2 = new DebuggerContainer();
@@ -3375,25 +3352,22 @@ namespace CADability.Shapes
 		}
 		public Border Project(Plane fromPlane, Plane toPlane)
 		{
-			ArrayList segs = new ArrayList(segment.Length);
+			var segs = new List<ICurve2D>(segment.Length);
 			for (int i = 0; i < segment.Length; ++i)
 			{
 				ICurve2D c = segment[i].Project(fromPlane, toPlane);
 				if (c != null) segs.Add(c);
 			}
 			GeoVector n = toPlane.ToLocal(fromPlane.Normal);
-			ICurve2D[] asegs = (ICurve2D[])(segs.ToArray(typeof(ICurve2D)));
 			if (n.z < 0.0)
 			{   // Richtung umdrehen
-				Array.Reverse(asegs);
-				for (int i = 0; i < asegs.Length; ++i)
-				{
-					asegs[i].Reverse();
-				}
+                segs.Reverse();
+				foreach (var c in segs)
+					c.Reverse();
 			}
 			try
 			{
-				return new Border(asegs);
+				return new Border(segs.ToArray());
 			}
 			catch (CADability.Shapes.BorderException)
 			{ // DEBUG!!!
@@ -3416,7 +3390,7 @@ namespace CADability.Shapes
 			}
 		}
 		//public Border GetModified(ModOp2D m)
-		//{	// über den Umweg IGeoObject ist das Problem vom Kreis zur Ellipse u.s.w. 
+		//{	// über den Umweg IGeoObject ist das Problem vom Kreis zur Ellipse u.s.w.
 		//    // umgangen
 		//    ArrayList segs = new ArrayList(segment.Length);
 		//    ModOp m3d = ModOp.From2D(m);
@@ -3499,7 +3473,7 @@ namespace CADability.Shapes
 			}
 			// else
 			{
-				ArrayList res = new ArrayList();
+				var res = new List<ICurve2D>();
 				ICurve2D c2d = null;
 				if (pars < 1) c2d = segment[inds].Trim(pars, 1.0);
 				if (c2d != null && c2d.Length > Precision.eps)
@@ -3534,16 +3508,13 @@ namespace CADability.Shapes
 						res.Add(c2d);
 					}
 				}
-				ICurve2D[] toReturn = (ICurve2D[])res.ToArray(typeof(ICurve2D));
 				if (!forward)
 				{
-					for (int i = 0; i < toReturn.Length; ++i)
-					{
-						toReturn[i].Reverse();
-					}
-					Array.Reverse(toReturn);
+                    foreach(var seg in res)
+                        seg.Reverse();
+                    res.Reverse();
 				}
-				return toReturn;
+				return res.ToArray();
 			}
 		}
 		internal void Trimm(int firstIndex, int lastIndex)
@@ -3757,8 +3728,7 @@ namespace CADability.Shapes
 			if (Area < precision * precision)
 			{
 				Segments = new ICurve2D[0];
-				bool rev;
-				Recalc(out rev);
+				Recalc(out _);
 				return true;
 			}
 			while (Area > precision * precision)
@@ -3768,9 +3738,8 @@ namespace CADability.Shapes
 					double d1 = Math.Abs(segment[0].MinDistance(segment[1].PointAt(0.5)));
 					if (d1 < precision)
 					{
-						Segments = new ICurve2D[0];
-						bool rev;
-						Recalc(out rev);
+						Segments = Array.Empty<ICurve2D>();
+						Recalc(out _);
 						return true;
 					}
 				}
@@ -3803,8 +3772,7 @@ namespace CADability.Shapes
 							Border[] parts = Split(new double[] { pos, endpos });
 							Segments = parts[1].Segments;
 							forceClosed();
-							bool reversed;
-							Recalc(out reversed);
+							Recalc(out _);
 							if (pos == 1.0)
 							{
 								// das ganze erste Segment wurde entfernt, versuche es mit dem nächsten Segment
@@ -3917,9 +3885,8 @@ namespace CADability.Shapes
 			return -1;
 		}
 		/// <summary>
-		/// Returns this Border as a <see cref="Path2D"/> object. 
+		/// Returns this Border as a <see cref="Path2D"/> object.
 		/// </summary>
-		/// <returns></returns>
 		public Path2D AsPath()
 		{
 			Path2D res = new Path2D(segment, true);
@@ -4015,7 +3982,7 @@ namespace CADability.Shapes
 		/// </summary>
 		/// <param name="info">SerializationInfo</param>
 		/// <param name="context">StreamingContext</param>
-		protected Border(SerializationInfo info, StreamingContext context)
+		protected Border(SerializationInfo info, StreamingContext context) : this()
 		{
 			Segments = (ICurve2D[])InfoReader.Read(info, "Segments", typeof(ICurve2D[]));
 		}
@@ -4070,8 +4037,8 @@ namespace CADability.Shapes
 		internal static Border[] ClosedBordersFromList(GeoObjectList l, Plane pln, double precision)
 		{
 			QuadTree<ICurve2D> qt = new QuadTree<ICurve2D>();
-			Set<ICurve2D> forwardUsed = new Set<ICurve2D>(); // schon vorwärts verwendet
-			Set<ICurve2D> backwardUsed = new Set<ICurve2D>(); // schon rückwärts verwendet
+			var forwardUsed = new HashSet<ICurve2D>(); // schon vorwärts verwendet
+			var backwardUsed = new HashSet<ICurve2D>(); // schon rückwärts verwendet
 			for (int i = 0; i < l.Count; ++i)
 			{
 				if (l[i] is ICurve)
@@ -4086,8 +4053,7 @@ namespace CADability.Shapes
 				{
 					forwardUsed.Add(c2d);
 					Path2D collect = new Path2D(new ICurve2D[] { c2d.Clone() });
-					Set<ICurve2D> usedInThisPath = new Set<ICurve2D>();
-					usedInThisPath.Add(c2d);
+					var usedInThisPath = new HashSet<ICurve2D>() { c2d };
 					bool connected = false;
 					do
 					{
@@ -4128,8 +4094,7 @@ namespace CADability.Shapes
 				{
 					backwardUsed.Add(c2d);
 					Path2D collect = new Path2D(new ICurve2D[] { c2d.CloneReverse(true) });
-					Set<ICurve2D> usedInThisPath = new Set<ICurve2D>();
-					usedInThisPath.Add(c2d);
+					var usedInThisPath = new HashSet<ICurve2D> { c2d };
 					bool connected = false;
 					do
 					{
@@ -4204,9 +4169,6 @@ namespace CADability.Shapes
 		/// <summary>
 		/// returns triples: x or y of intersectionPoint, parameter on border, intersection angle
 		/// </summary>
-		/// <param name="hor"></param>
-		/// <param name="xy"></param>
-		/// <returns></returns>
 		internal double[] GetOrthoIntersection(bool hor, double xy, double precision)
 		{
 			List<double> res = new List<double>();
@@ -4316,7 +4278,7 @@ namespace CADability.Shapes
 			do
 			{
 				found = false;
-				// 2. from segments, which represent an outer bulge 
+				// 2. from segments, which represent an outer bulge
 				for (int i = 0; i < segments.Count; i++)
 				{
 					if (segments[i].Sweep > 0)
@@ -4583,7 +4545,7 @@ namespace CADability.Shapes
 			}
 			if (toMinSize.IsNull)
 			{
-				// there are no lines in the convex hull, i.e. it is only convex arcs or curves, no idea how to find minimum rectangle except for iteration                
+				// there are no lines in the convex hull, i.e. it is only convex arcs or curves, no idea how to find minimum rectangle except for iteration
 				ext = ch.Extent;
 				SmallestEnclosingRect sbr = new SmallestEnclosingRect(ext.GetLowerLeft(),
 																	  ext.Width * GeoVector2D.XAxis,
@@ -4708,12 +4670,11 @@ namespace CADability.Shapes
 
 	public class BorderBuilder
 	{
-		private ArrayList segment;
+        private readonly List<ICurve2D> segment = new();
 		private BoundingRect currentExtent;
 		private double precision;
 		public BorderBuilder()
 		{
-			segment = new ArrayList();
 			currentExtent = BoundingRect.EmptyBoundingRect;
 			precision = -1.0; // nicht gesetzt
 		}
@@ -4734,7 +4695,6 @@ namespace CADability.Shapes
 		/// Clone arbeiten!
 		/// </summary>
 		/// <param name="ToAdd">zuzufügendes Segment</param>
-		/// <returns></returns>
 		public bool AddSegment(ICurve2D ToAdd)
 		{
 			if (segment.Count == 0)
@@ -4747,7 +4707,7 @@ namespace CADability.Shapes
 			{
 				double prec = precision;
 				if (prec < 0.0) prec = (currentExtent.Width + currentExtent.Height) * 1e-8;
-				if (Geometry.Dist(((ICurve2D)segment[segment.Count - 1]).EndPoint, ToAdd.StartPoint) < prec)
+				if (Geometry.Dist(segment[segment.Count - 1].EndPoint, ToAdd.StartPoint) < prec)
 				{
 					segment.Add(ToAdd);
 					currentExtent.MinMax(ToAdd.GetExtent());
@@ -4765,8 +4725,8 @@ namespace CADability.Shapes
 			{
 				double prec = precision;
 				if (prec < 0.0) prec = (currentExtent.Width + currentExtent.Height) * 1e-8;
-				double ds = Geometry.Dist(((ICurve2D)segment[segment.Count - 1]).EndPoint, ToAdd.StartPoint);
-				double de = Geometry.Dist(((ICurve2D)segment[segment.Count - 1]).EndPoint, ToAdd.EndPoint);
+				double ds = Geometry.Dist(segment[segment.Count - 1].EndPoint, ToAdd.StartPoint);
+				double de = Geometry.Dist(segment[segment.Count - 1].EndPoint, ToAdd.EndPoint);
 				if (ds < de)
 				{
 				}
@@ -4790,7 +4750,7 @@ namespace CADability.Shapes
 			//    IsClosed = true;
 			//}
 			// Border res = new Border(segment, currentExtent, IsClosed);
-			ICurve2D[] ss = (ICurve2D[])segment.ToArray(typeof(ICurve2D));
+			ICurve2D[] ss = segment.ToArray();
 			Border res = new Border(ss, forceClosed);
 
 			return res;

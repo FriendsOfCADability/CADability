@@ -4,7 +4,6 @@ using CADability.UserInterface;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Wintellect.PowerCollections;
 
 namespace CADability
 {
@@ -325,7 +324,7 @@ namespace CADability
         List<Triangle> triangle;
         List<Vertex> vertex;
         List<Edge> edges; // anfängliche Liste der Kanten
-        List<Pair<Edge, Edge>> edgepairs;
+        List<(Edge Edge1, Edge Edge2)> edgepairs;
         QuadTree<VertexInQuadTree> vertexQuadTree;
         QuadTree<EdgeInQuadTree> edgequadtree;
         GeoPoint2D[] polygonWithHoles;
@@ -389,7 +388,7 @@ namespace CADability
             this.maxDeflection = maxDeflection;
             this.maxBending = maxBending;
             triangle = new List<Triangle>();
-            edgepairs = new List<Pair<Edge, Edge>>();
+            edgepairs = new();
             List<GeoPoint2D> lPolygonWithHoles = new List<GeoPoint2D>();
             for (int i = 0; i < points.Length; ++i)
             {
@@ -578,7 +577,7 @@ namespace CADability
             // verboten, aber die richtige Reihenfolge wäre wichtig. Diese Fälle werden deshalb ebenfalls ausgeschlossen.
             int tc0 = System.Environment.TickCount;
             Dictionary<PolygonPair, Connection> connections = new Dictionary<PolygonPair, Connection>();
-            Dictionary<int, Set<int>> sortedConnections = new Dictionary<int, Set<int>>();
+            Dictionary<int, HashSet<int>> sortedConnections = new Dictionary<int, HashSet<int>>();
             foreach (List<EdgeInQuadTree> list in edgequadtree.AllLists)
             {   // Betrachte alle Listen im QuadTree, d.h. Linien, die nahe beieinander liegen
                 for (int i = 0; i < list.Count - 1; ++i)
@@ -617,15 +616,15 @@ namespace CADability
                                 }
                                 if (checkIt)
                                 {
-                                    Set<int> s1, s2;
+                                    HashSet<int> s1, s2;
                                     if (!sortedConnections.TryGetValue(ind.i1, out s1))
                                     {
-                                        s1 = new Set<int>();
+                                        s1 = new HashSet<int>();
                                         sortedConnections[ind.i1] = s1;
                                     }
                                     if (!sortedConnections.TryGetValue(ind.i2, out s2))
                                     {
-                                        s2 = new Set<int>();
+                                        s2 = new HashSet<int>();
                                         sortedConnections[ind.i2] = s2;
                                     }
                                     s1.Add(ind.i2);
@@ -641,9 +640,9 @@ namespace CADability
             // fehlende Verbindungen zwischen Löchern müssen noch erzeugt werden
             QuadTree<Line2D> insertedConnections = new QuadTree<Line2D>(extent); // sammelt die Verbindungen, weil die sich nicht kreuzen dürfen
             insertedConnections.MaxDeepth = -1;
-            Set<int> usedPolygons = new Set<int>();
+            HashSet<int> usedPolygons = new HashSet<int>();
             usedPolygons.Add(0);
-            Set<int> usedVertices = new Set<int>();
+            HashSet<int> usedVertices = new HashSet<int>();
             ConnectionTree start = new ConnectionTree(0);
             while (usedPolygons.Count < polygonCount)
             {
@@ -652,7 +651,7 @@ namespace CADability
                 foreach (ConnectionTree ct in start.Items)
                 {   // hier fangen wir immer wieder in der selben Reihenfolge an, das ist nicht sehr effektiv
                     // besser wäre es das zuletzt eingefügte zu bevorzugen, ist aber sschwierig
-                    Set<int> test;
+                    HashSet<int> test;
                     if (sortedConnections.TryGetValue(ct.polygonIndex, out test))
                     {
                         foreach (int j in test)
@@ -696,15 +695,15 @@ namespace CADability
                     // oder man könnte Seitenmittelpunkte als zusätzliche Punkte einführen und so das Problem beheben.
                     // mit dem "return" wird diese Insel ignoriert.
                     PolygonPair ind = new PolygonPair(used.polygon, unused.polygon);
-                    Set<int> s1, s2;
+                    HashSet<int> s1, s2;
                     if (!sortedConnections.TryGetValue(ind.i1, out s1))
                     {
-                        s1 = new Set<int>();
+                        s1 = new HashSet<int>();
                         sortedConnections[ind.i1] = s1;
                     }
                     if (!sortedConnections.TryGetValue(ind.i2, out s2))
                     {
-                        s2 = new Set<int>();
+                        s2 = new HashSet<int>();
                         sortedConnections[ind.i2] = s2;
                     }
                     s1.Add(ind.i2);
@@ -743,7 +742,7 @@ namespace CADability
                         e2.next.previous = e2;
                         edges.Add(e1);
                         edges.Add(e2);
-                        edgepairs.Add(new Pair<Edge, Edge>(e1, e2));
+                        edgepairs.Add((e1, e2));
                         edgequadtree.AddObject(new EdgeInQuadTree(vertex, e1));
                         edgequadtree.AddObject(new EdgeInQuadTree(vertex, e2));
                         insertedConnections.AddObject(new Line2D(vertex[e1.v1].p2d, vertex[e1.v2].p2d)); // die darf nicht geschnitten werden
@@ -754,7 +753,7 @@ namespace CADability
 
             int tc1 = System.Environment.TickCount - tc0;
         }
-        private void FindConnection(Set<int> usedPolygons, Set<int> usedVertices, QuadTree<Line2D> insertedConnections, out Edge used, out Edge unused)
+        private void FindConnection(HashSet<int> usedPolygons, HashSet<int> usedVertices, QuadTree<Line2D> insertedConnections, out Edge used, out Edge unused)
         {   // stelle eine gültige Verbindung her zwischen einem usedPolygon und einem welches nicht in usedPolygons ist
             // wird aufgerufen, wenn alleine aus dem Quadtree keine Verbindung herstellbar ist
             used = null; unused = null;
@@ -959,7 +958,7 @@ namespace CADability
         }
 
 
-        void InsertEdge(OrderedMultiDictionary<double, Edge> byAngle, Edge edge)
+        void InsertEdge(SortedDictionary<double, List<Edge>> byAngle, Edge edge)
         {   // wird nicht verwendet
             //double f = 1.0 - 1e-13; // liefert den nächsten double wert
             GeoVector2D v1 = vertex[edge.v2].p2d - vertex[edge.v1].p2d;
@@ -993,7 +992,8 @@ namespace CADability
             //edge.angle = -a;
             //byAngle.Add(-a, edge);
             edge.angle = d; // doch lieber spitze Winkel?
-            byAngle.Add(d, edge);
+            if (!byAngle.ContainsKey(d)) byAngle[d] = new List<Edge>();
+            byAngle[d].Add(edge);
         }
         void InsertLengthEdge(SortedList<double, Edge> sortededges, params Edge[] edges)
         {
@@ -1955,8 +1955,8 @@ namespace CADability
             {
                 for (int i = 0; i < edgepairs.Count; ++i)
                 {
-                    Edge e1 = edgepairs[i].First;
-                    Edge e2 = edgepairs[i].Second;
+                    Edge e1 = edgepairs[i].Edge1;
+                    Edge e2 = edgepairs[i].Edge2;
                     // e1 und e2 sind identisch bis auf die Richtung, sie werden jetzt zusammengefasst
                     Triangle t = e2.t1;
                     if (t == null)
@@ -2029,8 +2029,8 @@ namespace CADability
             {
                 for (int i = 0; i < edgepairs.Count; ++i)
                 {
-                    Edge e1 = edgepairs[i].First;
-                    Edge e2 = edgepairs[i].Second;
+                    Edge e1 = edgepairs[i].Edge1;
+                    Edge e2 = edgepairs[i].Edge2;
                     // e1 und e2 sind identisch bis auf die Richtung, sie werden jetzt zusammengefasst
                     Triangle t = e2.t1;
                     if (t == null)
@@ -2106,8 +2106,8 @@ namespace CADability
             {
                 for (int i = 0; i < edgepairs.Count; ++i)
                 {
-                    Edge e1 = edgepairs[i].First;
-                    Edge e2 = edgepairs[i].Second;
+                    Edge e1 = edgepairs[i].Edge1;
+                    Edge e2 = edgepairs[i].Edge2;
                     // e1 und e2 sind identisch bis auf die Richtung, sie werden jetzt zusammengefasst
                     Triangle t = e2.t1;
                     if (t == null)

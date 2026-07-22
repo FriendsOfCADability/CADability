@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.Serialization;
 using System.Threading;
-using Wintellect.PowerCollections;
 #if WEBASSEMBLY
 using CADability.WebDrawing;
 using Point = CADability.WebDrawing.Point;
@@ -952,7 +951,7 @@ namespace CADability
         }
 #endif
 
-        internal bool MakeRegular(Set<Face> affectedFaces)
+        internal bool MakeRegular(HashSet<Face> affectedFaces)
         {
             // Wenn beide Surfaces gesetzt sind, dann soll durch die beiden Vertices und ggf. innere Punkte
             // eine exakte Darstellung der 3d und 2d Kurven gefunden werden.
@@ -1065,7 +1064,7 @@ namespace CADability
         /// Use the vertices in the provided Set. If the endpoints of the curve don't coincide with one of the vertices, create a new one and add it to the set.
         /// </summary>
         /// <param name="toUse"></param>
-        internal void UseVertices(Set<Vertex> toUse, double precision = 1e-6)
+        internal void UseVertices(HashSet<Vertex> toUse, double precision = 1e-6)
         {
             if (curve3d != null)
             {
@@ -3555,7 +3554,7 @@ namespace CADability
         /// <param name="available"></param>
         /// <param name="onThisFace"></param>
         /// <returns></returns>
-        internal List<Edge> FindLoop(Set<Edge> available, Face onThisFace)
+        internal List<Edge> FindLoop(HashSet<Edge> available, Face onThisFace)
         {
             List<Edge> res = new List<Edge>();
             res.Add(this);

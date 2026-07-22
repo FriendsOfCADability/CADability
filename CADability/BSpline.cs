@@ -12,7 +12,6 @@ using Point = System.Drawing.Point;
 #endif
 using System.Runtime.Serialization;
 using System.Threading;
-using Wintellect.PowerCollections;
 using MathNet.Numerics.LinearAlgebra.Double;
 
 namespace CADability.GeoObject
@@ -1096,7 +1095,7 @@ namespace CADability.GeoObject
         }
         public bool Approximate(GeoPoint[] vertex, double precision)
         {
-            Set<int> selectedPoints = new Set<int>();
+            HashSet<int> selectedPoints = new HashSet<int>();
             selectedPoints.Add(0);
             selectedPoints.Add(vertex.Length - 1);
             bool closed = (vertex[0] | vertex[vertex.Length - 1]) < precision / 10.0;

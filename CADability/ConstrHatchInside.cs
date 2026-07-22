@@ -1,8 +1,8 @@
 ﻿using CADability.Attribute;
 using CADability.GeoObject;
 using CADability.Shapes;
+using System.Collections.Generic;
 using System.Threading;
-using Wintellect.PowerCollections;
 
 namespace CADability.Actions
 {
@@ -134,15 +134,15 @@ namespace CADability.Actions
                 GeoPoint2D onPlane = foundOnPlane.Project(p);
                 // hier müsste man irgendwie erst wenig picken und wenn nix geht dann immer mehr
                 BoundingRect pickrect = new BoundingRect(onPlane, base.WorldViewSize, base.WorldViewSize);
-                Set<Layer> visibleLayers = null;
+                HashSet<Layer> visibleLayers = null;
                 if (Frame.ActiveView is ModelView)
                 {
-                    visibleLayers = new Set<Layer>((Frame.ActiveView as ModelView).GetVisibleLayers());
+                    visibleLayers = new HashSet<Layer>((Frame.ActiveView as ModelView).GetVisibleLayers());
                 }
 #if !WEBASSEMBLY
                 else if (Frame.ActiveView is GDI2DView)
                 {
-                    visibleLayers = new Set<Layer>((Frame.ActiveView as GDI2DView).VisibleLayers.Checked);
+                    visibleLayers = new HashSet<Layer>((Frame.ActiveView as GDI2DView).VisibleLayers.Checked);
                 }
 #endif
                 GeoObjectList l = Frame.ActiveView.Model.GetObjectsFromRect(pickrect, CurrentMouseView.Projection, visibleLayers, PickMode.normal, Frame.Project.FilterList);

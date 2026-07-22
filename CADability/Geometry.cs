@@ -6,7 +6,7 @@ using MathNet.Numerics.LinearAlgebra.Factorization;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using Wintellect.PowerCollections;
+using System.Linq;
 
 namespace CADability
 {
@@ -814,7 +814,7 @@ namespace CADability
                 int numsolerror = 0; // Anzahl der Lösungen für Fehlerkorrektur
                 double[] res = null;
 
-                OrderedMultiDictionary<double, double> best = null;
+                SortedDictionary<double, List<double>> best = null;
                 for (int i = 0; i < n; i++)
                 {
                     double y = r[i];
@@ -920,14 +920,15 @@ namespace CADability
                             }
                         }
                         numsol = res.Length - numsol;
-                        OrderedMultiDictionary<double, double> tmp = new OrderedMultiDictionary<double, double>(true);
+                        SortedDictionary<double, List<double>> tmp = new SortedDictionary<double, List<double>>();
                         double er = 0;
                         for (int j = 0; j < res.Length; j++)
                         {
                             double x = res[j];
                             double ee = Math.Abs(x * x * x * x + b * x * x * x + c * x * x + d * x + e);
                             er += ee;
-                            tmp.Add(ee, x);
+                            if (!tmp.ContainsKey(ee)) tmp[ee] = new List<double>();
+                            tmp[ee].Add(x);
                         }
                         if (er < error && numsol >= numsolerror)
                         {
@@ -939,9 +940,9 @@ namespace CADability
                 }
                 if (best != null)
                 {
-                    if (best.LastItem.Key > 1e-8) // Fehler nach Größe der Ableitung testen!
+                    if (best.Keys.Last() > 1e-8) // Fehler nach Größe der Ableitung testen!
                     {   // Polynom durch die beste Nullstelle teilen, dann 3. Grad bestimmen
-                        double x0 = best.FirstItem.Value;
+                        double x0 = best[best.Keys.First()].First();
                         // a*x*x*x+(a*x0+b)*x*x + (a*x0*x0+b*x0+c)*x + (a*x0*x0*x0+b*x0*x0+c*x0+d)
                         n = ragle3(1, x0 + b, x0 * x0 + b * x0 + c, x0 * x0 * x0 + b * x0 * x0 + c * x0 + d, r);
                         List<double> rr = new List<double>();
@@ -952,7 +953,7 @@ namespace CADability
                         }
                         return rr.ToArray();
                     }
-                    return best.SortedValues.ToArray();
+                    return best.Values.SelectMany(v => v).ToArray();
                 }
                 else return new double[] { };
             }
@@ -3682,13 +3683,12 @@ namespace CADability
             return res;
         }
 
-        private static List<Pair<int, int>> GetPairList(int n)
+        private static List<(int I, int J)> GetPairList(int n)
         {
-            List<Pair<int, int>> res = new List<Pair<int, int>>();
+            List<(int I, int J)> res = new();
             for (int i = 0; i <= n; i++)
             {
-                Pair<int, int> p = new Pair<int, int>(i, n - i);
-                res.Add(p);
+                res.Add((i, n - i));
             }
             return res;
         }
@@ -3698,10 +3698,10 @@ namespace CADability
             List<Tripel<int, int, int>> res = new List<CADability.Tripel<int, int, int>>();
             for (int i = 0; i <= n; i++)
             {
-                List<Pair<int, int>> pairs = GetPairList(n - i);
+                var pairs = GetPairList(n - i);
                 for (int j = 0; j < pairs.Count; j++)
                 {
-                    Tripel<int, int, int> t = new Tripel<int, int, int>(i, pairs[j].First, pairs[j].Second);
+                    Tripel<int, int, int> t = new Tripel<int, int, int>(i, pairs[j].I, pairs[j].J);
                     res.Add(t);
                 }
             }

@@ -7,7 +7,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
-using Wintellect.PowerCollections;
+using System.Linq;
 
 namespace CADability.GeoObject
 {
@@ -1963,12 +1963,12 @@ namespace CADability.GeoObject
                     }
                 }
             }
-            Set<Face> allFaces = new Set<Face>(faces);
+            HashSet<Face> allFaces = new HashSet<Face>(faces);
             List<Shell> res = new List<Shell>();
             while (allFaces.Count > 0)
             {
-                Set<Face> sf = new Set<Face>();
-                extractConnectedFaces(allFaces, allFaces.GetAny(), sf);
+                HashSet<Face> sf = new HashSet<Face>();
+                extractConnectedFaces(allFaces, allFaces.First(), sf);
 #if DEBUG
                 foreach (Face fc in sf)
                 {
@@ -1984,7 +1984,7 @@ namespace CADability.GeoObject
             }
             return res.ToArray();
         }
-        private static void extractConnectedFaces(Set<Face> allFaces, Face startWith, Set<Face> result)
+        private static void extractConnectedFaces(HashSet<Face> allFaces, Face startWith, HashSet<Face> result)
         {
             result.Add(startWith);
             allFaces.Remove(startWith);

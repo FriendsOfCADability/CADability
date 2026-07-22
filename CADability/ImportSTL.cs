@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using Wintellect.PowerCollections;
 
 namespace CADability
 {
@@ -65,7 +64,7 @@ namespace CADability
             OctTree<Vertex> verticesOctTree = null;
             triangle tr;
             int cnt = 0;
-            Set<Face> allFaces = new Set<Face>();
+            HashSet<Face> allFaces = new HashSet<Face>();
             GeoObjectList dbgl = new GeoObjectList();
             do
             {
@@ -116,7 +115,7 @@ namespace CADability
                     // empty triangle, plane construction failed
                 }
             } while (tr != null);
-            while (!allFaces.IsEmpty())
+            while (allFaces.Count > 0)
             {
                 Shell part = Shell.CollectConnected(allFaces);
 #if DEBUG
@@ -158,7 +157,7 @@ namespace CADability
             OctTree<Vertex> verticesOctTree = null;
             triangle tr;
             int cnt = 0;
-            Set<Face> allFaces = new Set<Face>();
+            HashSet<Face> allFaces = new HashSet<Face>();
             GeoObjectList dbgl = new GeoObjectList();
             do
             {
@@ -209,7 +208,7 @@ namespace CADability
                     // empty triangle, plane construction failed
                 }
             } while (tr != null);
-            while (!allFaces.IsEmpty())
+            while (allFaces.Count > 0)
             {
                 Shell part = Shell.CollectConnected(allFaces);
 #if DEBUG

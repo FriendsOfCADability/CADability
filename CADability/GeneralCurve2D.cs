@@ -5,7 +5,6 @@ using System.Collections;
 using System.Collections.Generic;
 using CADability.GeoObject;
 using System.Runtime.Serialization;
-using Wintellect.PowerCollections;
 using MathNet.Numerics.Optimization;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.LinearAlgebra.Double;

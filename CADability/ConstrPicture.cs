@@ -6,7 +6,6 @@ using CADability.GeoObject;
 using CADability.Shapes;
 using CADability.Curve2D;
 using CADability.Attribute;
-using Wintellect.PowerCollections;
 using CADability.Actions;
 using CADability;
 

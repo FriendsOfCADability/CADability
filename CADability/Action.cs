@@ -12,7 +12,6 @@ using Point = CADability.WebDrawing.Point;
 using System.Drawing;
 using Point = System.Drawing.Point;
 #endif
-using Wintellect.PowerCollections;
 using MouseEventArgs = CADability.Substitutes.MouseEventArgs;
 using DragEventArgs = CADability.Substitutes.DragEventArgs;
 using MouseButtons = CADability.Substitutes.MouseButtons;
@@ -614,7 +613,7 @@ namespace CADability.Actions
             int pickRadius = Frame.GetIntSetting("Select.PickRadius", 5);
             Projection.PickArea pa = vw.Projection.GetPickSpace(new Rectangle(mousePoint.X - pickRadius, mousePoint.Y - pickRadius, pickRadius * 2, pickRadius * 2));
             IActionInputView pm = vw as IActionInputView;
-            GeoObjectList fromquadtree = vw.Model.GetObjectsFromRect(pa, new Set<Layer>(pm.GetVisibleLayers()), PickMode.normal, null);
+            GeoObjectList fromquadtree = vw.Model.GetObjectsFromRect(pa, new HashSet<Layer>(pm.GetVisibleLayers()), PickMode.normal, null);
 
             foreach (IGeoObject go in fromquadtree)
             {

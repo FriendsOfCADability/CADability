@@ -18,7 +18,6 @@ using System.Drawing.Drawing2D;
 using System.Runtime.Serialization;
 using System.Threading;
 
-using Wintellect.PowerCollections;
 
 namespace CADability.GeoObject
 {
@@ -498,7 +497,7 @@ namespace CADability.GeoObject
         readonly Dictionary<DictKey, DictVal> cache; // Cache von CompundShapes und Breiten für einzelne zeichen
         readonly Dictionary<DictKey, CenterLineVal> centerLineCache; // Cache für die CenterLines, Größe 1
         readonly Dictionary<FontKey, FontCharacteristics> fontCharacteristicsCache; // Cache für die FontCharacteristics
-        readonly Dictionary<KerningKey, Dictionary<Pair<char, char>, double>> kerning; // Kerningtabellen
+        readonly Dictionary<KerningKey, Dictionary<(char Left, char Right), double>> kerning; // Kerningtabellen
         readonly IntPtr hDC; // fester DeviceContext (für die ganze Lebensdauer)
         public FontCache()
         {
@@ -507,7 +506,7 @@ namespace CADability.GeoObject
             cache = new Dictionary<DictKey, DictVal>();
             centerLineCache = new Dictionary<DictKey, CenterLineVal>();
             fontCharacteristicsCache = new Dictionary<FontKey, FontCharacteristics>();
-            kerning = new Dictionary<KerningKey, Dictionary<Pair<char, char>, double>>();
+            kerning = new Dictionary<KerningKey, Dictionary<(char Left, char Right), double>>();
             hDC = Gdi.CreateCompatibleDC(IntPtr.Zero);
         }
         ~FontCache()
@@ -597,7 +596,7 @@ namespace CADability.GeoObject
             if (!kerning.ContainsKey(new KerningKey(fontName, fontStyle)))
             {
                 KerningKey kk = new KerningKey(fontName, fontStyle);
-                Dictionary<Pair<char, char>, double> pairs = new Dictionary<Pair<char, char>, double>();
+                Dictionary<(char Left, char Right), double> pairs = new Dictionary<(char Left, char Right), double>();
                 kerning[kk] = pairs;
                 int num = Gdi.GetKerningPairs(hDC, 0, null);
                 if (num > 0)
@@ -606,7 +605,7 @@ namespace CADability.GeoObject
                     int ok = Gdi.GetKerningPairs(hDC, num, kp);
                     for (int i = 0; i < kp.Length; ++i)
                     {
-                        pairs[new Pair<char, char>((char)kp[i].wFirst, (char)kp[i].wSecond)] = kp[i].iKernAmount / (double)em;
+                        pairs[((char)kp[i].wFirst, (char)kp[i].wSecond)] = kp[i].iKernAmount / (double)em;
                     }
                 }
             }
@@ -747,16 +746,19 @@ namespace CADability.GeoObject
                 {
                     found = new DictVal();
                     Path2D[] paths = GetOutline2D(font, fontStyle, c, out width);
-                    OrderedMultiDictionary<BoundingRect, SimpleShape> sortedshapes = new OrderedMultiDictionary<BoundingRect, SimpleShape>(true);
+                    SortedDictionary<BoundingRect, List<SimpleShape>> sortedshapes = new SortedDictionary<BoundingRect, List<SimpleShape>>();
                     for (int i = 0; i < paths.Length; ++i)
                     {
                         if (paths[i].IsClosed)
                         {
                             SimpleShape ss = new SimpleShape(paths[i].MakeBorder());
-                            sortedshapes.Add(ss.GetExtent(), ss);
+                            var _ssKey = ss.GetExtent();
+                            if (!sortedshapes.ContainsKey(_ssKey)) sortedshapes[_ssKey] = new List<SimpleShape>();
+                            sortedshapes[_ssKey].Add(ss);
                         }
                     }
-                    List<SimpleShape> sortedList = sortedshapes.SortedValues;
+                    List<SimpleShape> sortedList = new List<SimpleShape>();
+                    foreach (var _e in sortedshapes) sortedList.AddRange(_e.Value);
                     CompoundShape res = new CompoundShape(); // leer
                     while (sortedList.Count > 0)
                     {
@@ -791,11 +793,11 @@ namespace CADability.GeoObject
         }
         public double GetKerning(string font, int fontStyle, char a, char b)
         {
-            Dictionary<Pair<char, char>, double> pairs;
+            Dictionary<(char Left, char Right), double> pairs;
             double res = 0.0;
             if (kerning.TryGetValue(new KerningKey(font, fontStyle), out pairs))
             {
-                pairs.TryGetValue(new Pair<char, char>(a, b), out res);
+                pairs.TryGetValue((a, b), out res);
             }
             return res;
         }
@@ -836,16 +838,19 @@ namespace CADability.GeoObject
                     }
                     else
                     {
-                        OrderedMultiDictionary<BoundingRect, SimpleShape> sortedshapes = new OrderedMultiDictionary<BoundingRect, SimpleShape>(true);
+                        SortedDictionary<BoundingRect, List<SimpleShape>> sortedshapes = new SortedDictionary<BoundingRect, List<SimpleShape>>();
                         for (int i = 0; i < paths.Length; ++i)
                         {
                             if (paths[i].IsClosed)
                             {
                                 SimpleShape ss = new SimpleShape(paths[i].MakeBorder());
-                                sortedshapes.Add(ss.GetExtent(), ss);
+                                var _ssKey = ss.GetExtent();
+                                if (!sortedshapes.ContainsKey(_ssKey)) sortedshapes[_ssKey] = new List<SimpleShape>();
+                                sortedshapes[_ssKey].Add(ss);
                             }
                         }
-                        List<SimpleShape> sortedList = sortedshapes.SortedValues;
+                        List<SimpleShape> sortedList = new List<SimpleShape>();
+                        foreach (var _e in sortedshapes) sortedList.AddRange(_e.Value);
                         CompoundShape res = new CompoundShape(); // empty
                         while (sortedList.Count > 0)
                         {
@@ -946,16 +951,19 @@ namespace CADability.GeoObject
                     dc.Add(paths[i], Color.Red, i);
                 }
 #endif
-                OrderedMultiDictionary<BoundingRect, SimpleShape> sortedshapes = new OrderedMultiDictionary<BoundingRect, SimpleShape>(true);
+                SortedDictionary<BoundingRect, List<SimpleShape>> sortedshapes = new SortedDictionary<BoundingRect, List<SimpleShape>>();
                 for (int i = 0; i < paths.Length; ++i)
                 {
                     if (paths[i].IsClosed)
                     {
                         SimpleShape ss = new SimpleShape(paths[i].MakeBorder());
-                        sortedshapes.Add(ss.GetExtent(), ss);
+                        var _ssKey = ss.GetExtent();
+                        if (!sortedshapes.ContainsKey(_ssKey)) sortedshapes[_ssKey] = new List<SimpleShape>();
+                        sortedshapes[_ssKey].Add(ss);
                     }
                 }
-                List<SimpleShape> sortedList = sortedshapes.SortedValues;
+                List<SimpleShape> sortedList = new List<SimpleShape>();
+                foreach (var _e in sortedshapes) sortedList.AddRange(_e.Value);
                 CompoundShape ccs = new CompoundShape(); // leer
                 while (sortedList.Count > 0)
                 {
@@ -1136,15 +1144,15 @@ namespace CADability.GeoObject
         private AlignMode alignment;
         private LineAlignMode lineAlignment;
         // private IGeoObject[] cachedDisplayItems;
-        private static Set<string> fontFamilyNames;
-        internal static Set<string> FontFamilyNames
+        private static HashSet<string> fontFamilyNames;
+        internal static HashSet<string> FontFamilyNames
         {
             get
             {
                 if (fontFamilyNames == null)
                 {
                     FontFamily[] ff = FontFamily.Families;
-                    fontFamilyNames = new Set<string>();
+                    fontFamilyNames = new HashSet<string>();
                     for (int i = 0; i < ff.Length; i++)
                     {
                         fontFamilyNames.Add(ff[i].Name.ToUpper());

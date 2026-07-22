@@ -7,7 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Wintellect.PowerCollections;
+
 using static CADability.Actions.SelectObjectsAction;
 using CADability.Curve2D;
 using CADability.Shapes;
@@ -123,7 +123,7 @@ namespace CADability
                 {
                     // we are not in accumulation mode. Nothing was selected when the right click occurred
                     IActionInputView pm = vw as IActionInputView;
-                    fl = vw.Model.GetObjectsFromRect(pa, new Set<Layer>(pm.GetVisibleLayers()), PickMode.singleFaceAndCurve, null); // returns all the face under the cursor
+                    fl = vw.Model.GetObjectsFromRect(pa, new HashSet<Layer>(pm.GetVisibleLayers()), PickMode.singleFaceAndCurve, null); // returns all the face under the cursor
                 }
                 else
                 {
@@ -302,7 +302,7 @@ namespace CADability
             int pickRadius = soa.Frame.GetIntSetting("Select.PickRadius", 5);
             Projection.PickArea pa = vw.Projection.GetPickSpace(new Rectangle(mousePoint.X - pickRadius, mousePoint.Y - pickRadius, pickRadius * 2, pickRadius * 2));
             IActionInputView pm = vw as IActionInputView;
-            GeoObjectList fl = vw.Model.GetObjectsFromRect(pa, new Set<Layer>(pm.GetVisibleLayers()), PickMode.onlyFaces, null); // returns all the face under the cursor
+            GeoObjectList fl = vw.Model.GetObjectsFromRect(pa, new HashSet<Layer>(pm.GetVisibleLayers()), PickMode.onlyFaces, null); // returns all the face under the cursor
             // in most cases there is only a single face, which is of interest, only when we have two solids with same or overlapping faces
             // and one of them is not selectable without also selecting the other, we want both.
             faces = new List<Face>();
@@ -365,7 +365,7 @@ namespace CADability
                     }
                 }
             }
-            curves = vw.Model.GetObjectsFromRect(pa, new Set<Layer>(pm.GetVisibleLayers()), PickMode.onlyEdges, null); // returns only edges
+            curves = vw.Model.GetObjectsFromRect(pa, new HashSet<Layer>(pm.GetVisibleLayers()), PickMode.onlyEdges, null); // returns only edges
             edges = new List<Edge>();
             // we only accept edges, which belong to one of the selected faces
             for (int i = curves.Count - 1; i >= 0; --i)

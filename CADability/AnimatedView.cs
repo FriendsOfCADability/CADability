@@ -11,7 +11,6 @@ using System.Drawing;
 using Point = System.Drawing.Point;
 #endif
 using System.Runtime.Serialization;
-using Wintellect.PowerCollections;
 using MouseEventArgs = CADability.Substitutes.MouseEventArgs;
 using DragEventArgs = CADability.Substitutes.DragEventArgs;
 using MouseButtons = CADability.Substitutes.MouseButtons;
@@ -505,7 +504,7 @@ namespace CADability
                 BoundingRect pickrect = projection.BoundingRectWorld2d(e.X - 5, e.X + 5, e.Y + 5, e.Y - 5);
                 Projection.PickArea area = projection.GetPickSpace(pickrect);
 
-                res = model.GetObjectsFromRect(area, new Set<Layer>(visibleLayers.Checked), PickMode.single, null);
+                res = model.GetObjectsFromRect(area, new HashSet<Layer>(visibleLayers.Checked), PickMode.single, null);
             }
 
             return res;
@@ -662,7 +661,7 @@ namespace CADability
             spf.SnapLocalOrigin = Frame.GetBooleanSetting("Snap.SnapLocalOrigin", false);
             spf.SnapGlobalOrigin = Frame.GetBooleanSetting("Snap.SnapGlobalOrigin", false);
             spf.IgnoreList = ToIgnore;
-            model.AdjustPoint(spf, new Set<Layer>(visibleLayers.Checked));
+            model.AdjustPoint(spf, new HashSet<Layer>(visibleLayers.Checked));
             WorldPoint = spf.SnapPoint; // ist auch gesetzt, wenn nicht gefangen (gemäß DrawingPlane)
             //lastSnapObject = spf.BestObject;
             //lastSnapMode = spf.DidSnap;
@@ -679,7 +678,7 @@ namespace CADability
             spf.SnapLocalOrigin = Frame.GetBooleanSetting("Snap.SnapLocalOrigin", false);
             spf.SnapGlobalOrigin = Frame.GetBooleanSetting("Snap.SnapGlobalOrigin", false);
             spf.IgnoreList = ToIgnore;
-            model.AdjustPoint(spf, new Set<Layer>(visibleLayers.Checked));
+            model.AdjustPoint(spf, new HashSet<Layer>(visibleLayers.Checked));
             WorldPoint = spf.SnapPoint;
             //lastSnapObject = spf.BestObject;
             //lastSnapMode = spf.DidSnap;

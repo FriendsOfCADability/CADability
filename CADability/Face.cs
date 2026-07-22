@@ -10,7 +10,6 @@ using System.Diagnostics;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Threading;
-using Wintellect.PowerCollections;
 using System.Linq;
 
 #if WEBASSEMBLY
@@ -543,10 +542,10 @@ namespace CADability.GeoObject
                 // We try here to remove smaller parts
                 double vprec = Math.Min(precision, minCurveLength / 10.0);
                 BoundingCube vertexExtent = BoundingCube.EmptyBoundingCube;
-                Set<Vertex> allVertices = new Set<Vertex>();
+                HashSet<Vertex> allVertices = new HashSet<Vertex>();
                 for (int i = 0; i < loops.Count; i++)
                 {
-                    Set<Vertex> vertices = new Set<Vertex>();
+                    HashSet<Vertex> vertices = new HashSet<Vertex>();
                     for (int j = 0; j < loops[i].Count; j++)
                     {
                         vertexExtent.MinMax(loops[i][j].vertex1.Position);
@@ -576,7 +575,7 @@ namespace CADability.GeoObject
                         }
                         if (!duplicateFound) vertices.Add(loops[i][j].vertex2);
                     }
-                    allVertices.AddMany(vertices);
+                    allVertices.UnionWith(vertices);
                     if (vertices.Count > loops[i].Count)
                     {
                         // there must be different vertices with the same coordinate, because the loop must always be closed (in 3d)
@@ -593,7 +592,7 @@ namespace CADability.GeoObject
                             if (!vertexUsage.ContainsKey(loops[i][j].vertex2)) vertexUsage[loops[i][j].vertex2] = 0;
                             ++vertexUsage[loops[i][j].vertex2];
                         }
-                        Set<Vertex> selfIntersections = new Set<Vertex>();
+                        HashSet<Vertex> selfIntersections = new HashSet<Vertex>();
                         foreach (KeyValuePair<Vertex, int> item in vertexUsage)
                         {
                             if (item.Value > 2) selfIntersections.Add(item.Key);
@@ -679,7 +678,7 @@ namespace CADability.GeoObject
                             List<StepEdgeDescriptor> toInsert = new List<StepEdgeDescriptor>();
                             for (int k = 0; k < loops[i][j].createdEdges.Count; k++)
                             {
-                                Set<Vertex> toUse = new Set<Vertex>();
+                                HashSet<Vertex> toUse = new HashSet<Vertex>();
                                 toUse.Add(loops[i][j].vertex1);
                                 toUse.Add(loops[i][j].vertex2);
                                 loops[i][j].createdEdges[k].UseVertices(toUse, vertexDist);
@@ -693,9 +692,9 @@ namespace CADability.GeoObject
                     }
                     if (needsResort)
                     {
-                        Set<StepEdgeDescriptor> loopcurves = new Set<StepEdgeDescriptor>(loops[i]);
+                        HashSet<StepEdgeDescriptor> loopcurves = new HashSet<StepEdgeDescriptor>(loops[i]);
                         loops[i].Clear();
-                        StepEdgeDescriptor se = loopcurves.GetAny();
+                        StepEdgeDescriptor se = loopcurves.First();
                         loopcurves.Remove(se);
                         loops[i].Add(se);
                         while (loopcurves.Count > 0)
@@ -1197,7 +1196,7 @@ namespace CADability.GeoObject
                 //        }
                 //    }
                 //}
-                List<Pair<StepEdgeDescriptor, List<StepEdgeDescriptor>>> splittedByPoles = new List<Pair<StepEdgeDescriptor, List<StepEdgeDescriptor>>>();
+                List<(StepEdgeDescriptor Original, List<StepEdgeDescriptor> SplitParts)> splittedByPoles = new();
                 if (poles.Count > 0)
                 {
                     // check whether a loop-curve goes through a pole. In this case we have to split the loop-curve into parts in order to be able to insert
@@ -1236,7 +1235,7 @@ namespace CADability.GeoObject
                                         }
                                         if (!se.forward) toInsert.Reverse();
                                         loops[i].InsertRange(j, toInsert);
-                                        splittedByPoles.Add(new Pair<StepEdgeDescriptor, List<StepEdgeDescriptor>>(se, toInsert));
+                                        splittedByPoles.Add((se, toInsert));
                                     }
                                 }
                             }
@@ -1974,8 +1973,8 @@ namespace CADability.GeoObject
                     // we have to propagate the partial edges to the original loop curve
                     for (int i = splittedByPoles.Count - 1; i >= 0; --i)
                     {
-                        StepEdgeDescriptor original = splittedByPoles[i].First;
-                        List<StepEdgeDescriptor> replacedBy = splittedByPoles[i].Second;
+                        StepEdgeDescriptor original = splittedByPoles[i].Original;
+                        List<StepEdgeDescriptor> replacedBy = splittedByPoles[i].SplitParts;
                         if (original.createdEdges.Count > 0) // there is only one
                         {
                             Edge[] replacingEdges = new Edge[replacedBy.Count];
@@ -2147,7 +2146,7 @@ namespace CADability.GeoObject
                     List<ICurve2D> crvs2d = new List<ICurve2D>(); // all 2d curves (split and unsplit)
                     List<ICurve> crvs3d = new List<ICurve>(); // synchronous list of 3d curves
                     List<int> loopSpan = new List<int>(); // indices in crvs2d where a new loop begins
-                    allVertices = new Set<Vertex>();
+                    allVertices = new HashSet<Vertex>();
                     double minLength = double.MaxValue;
                     for (int i = 0; i < loops.Count; i++)
                     {
@@ -2479,11 +2478,11 @@ namespace CADability.GeoObject
                     // *** check 2d split curves and directions
 #endif
                     // now we make two or four sets of curves (corresponding to the non periodic sub-patches of the surface) and make faces from each set
-                    Set<int>[,] part = new Set<int>[2, 2];
-                    part[0, 0] = new Set<int>();
-                    part[0, 1] = new Set<int>();
-                    part[1, 0] = new Set<int>();
-                    part[1, 1] = new Set<int>();
+                    HashSet<int>[,] part = new HashSet<int>[2, 2];
+                    part[0, 0] = new HashSet<int>();
+                    part[0, 1] = new HashSet<int>();
+                    part[1, 0] = new HashSet<int>();
+                    part[1, 1] = new HashSet<int>();
                     // distribute the 2d curves into the appropriate patch
                     for (int i = 0; i < crvs2d.Count; i++)
                     {
@@ -2495,7 +2494,7 @@ namespace CADability.GeoObject
                     }
                     // and for each set we calculate a list of parameters for the counterclockwise rectangle, starting at the lower left point of the bounding rectangle
                     // for each patch collect the parts of the 2d curves of this patch together with the appropriate parts of the bounding rectangle
-                    Set<Face> res = new Set<Face>();
+                    HashSet<Face> res = new HashSet<Face>();
                     Dictionary<DoubleVertexKey, Edge> seams = new Dictionary<DoubleVertexKey, Edge>();
                     for (int ui = 0; ui < 2; ui++)
                         for (int vi = 0; vi < 2; vi++)
@@ -2522,15 +2521,15 @@ namespace CADability.GeoObject
                                 top = vmax;
                             }
                             BoundingRect patch = new BoundingRect(left, bottom, right, top);
-                            Set<int> s = part[ui, vi];
+                            HashSet<int> s = part[ui, vi];
                             if (s.Count == 0) continue;
                             List<List<ICurve2D>> looplist = new List<List<ICurve2D>>();
-                            Set<ICurve2D> seamLines = new Set<ICurve2D>();
+                            HashSet<ICurve2D> seamLines = new HashSet<ICurve2D>();
                             BoundingRect precisionExt = ext;
                             precisionExt.Inflate(ext.Width * 10, ext.Height * 10); // this is for precision only
                                                                                    // we get problems with almost tangential intersections
-                            Set<int> entering = new Set<int>();
-                            Set<int> leaving = new Set<int>();
+                            HashSet<int> entering = new HashSet<int>();
+                            HashSet<int> leaving = new HashSet<int>();
                             for (int i = 0; i < crvs2d.Count; i++)
                             {
                                 int ni = NextInSameLoop(i, loopSpan);
@@ -2547,7 +2546,7 @@ namespace CADability.GeoObject
                             while (s.Count > 0)
                             {
                                 List<ICurve2D> loop = new List<ICurve2D>();
-                                int currentInd = s.GetAny();
+                                int currentInd = s.First();
                                 int startInd = currentInd;
                                 loop.Add(crvs2d[currentInd]);
                                 s.Remove(currentInd);
@@ -2862,7 +2861,7 @@ namespace CADability.GeoObject
                                 {
                                     Edge onOtherFace = loops[i][j].createdEdges[0]; // this edges belongs to an other Face not to this split faces
                                     List<Edge> replacementEdges = new List<Edge>();
-                                    Set<Vertex> toUse = new Set<Vertex>();
+                                    HashSet<Vertex> toUse = new HashSet<Vertex>();
                                     toUse.Add(onOtherFace.Vertex1);
                                     toUse.Add(onOtherFace.Vertex2);
                                     for (int k = 0; k < loops[i][j].createdEdges.Count - 1; k++)
@@ -3708,7 +3707,7 @@ namespace CADability.GeoObject
                 if (boutline.Segments[0] == segments[segments.Length - 1])
                 {
                     Array.Reverse(outline);
-                    Set<Edge> exchanged = new Set<Edge>();
+                    HashSet<Edge> exchanged = new HashSet<Edge>();
                     // ganz vertrackt: bei periodic edges wird immer eine bestimmte 2D Curve zuerst geliefert
                     // auch das muss umgedreht werden.
                     for (int i = 0; i < outline.Length; ++i)
@@ -4174,7 +4173,7 @@ namespace CADability.GeoObject
                             if (boutline.Segments[0] == segments[segments.Length - 1])
                             {
                                 Array.Reverse(outline);
-                                Set<Edge> exchanged = new Set<Edge>();
+                                HashSet<Edge> exchanged = new HashSet<Edge>();
                                 // ganz vertrackt: bei periodic edges wird immer eine bestimmte 2D Curve zuerst geliefert
                                 // auch das muss umgedreht werden.
                                 for (int i = 0; i < outline.Length; ++i)
@@ -4405,14 +4404,14 @@ namespace CADability.GeoObject
             }
         }
 
-        public Set<Edge> AllEdgesSet
+        public HashSet<Edge> AllEdgesSet
         {
             get
             {
-                Set<Edge> res = new Set<Edge>(outline);
+                HashSet<Edge> res = new HashSet<Edge>(outline);
                 for (int i = 0; i < holes.Length; i++)
                 {
-                    res.AddMany(holes[i]);
+                    res.UnionWith(holes[i]);
                 }
                 return res;
             }
@@ -4482,7 +4481,7 @@ namespace CADability.GeoObject
             {
                 if (vertices == null)
                 {
-                    Set<Vertex> res = new Set<Vertex>();
+                    HashSet<Vertex> res = new HashSet<Vertex>();
                     foreach (Edge edge in AllEdges)
                     {
                         edge.MakeVertices();
@@ -4496,7 +4495,7 @@ namespace CADability.GeoObject
         }
         public void RecalcVertices()
         {
-            Set<Vertex> res = new Set<Vertex>();
+            HashSet<Vertex> res = new HashSet<Vertex>();
             foreach (Edge edge in AllEdges)
             {
                 edge.MakeVertices();
@@ -4509,7 +4508,7 @@ namespace CADability.GeoObject
         {
             get
             {
-                Set<Vertex> res = new Set<Vertex>();
+                HashSet<Vertex> res = new HashSet<Vertex>();
                 foreach (Edge edge in outline)
                 {
                     edge.MakeVertices();
@@ -5416,7 +5415,8 @@ namespace CADability.GeoObject
         /// <returns></returns>
         internal Edge[] FindEdgeChain(Vertex from, Vertex to)
         {
-            Set<Edge> fromEdges = from.AllEdges.Intersection(this.AllEdgesSet); // use this intersection, because there might be intersection edges, which don't belong to this outline and holes edges
+            var fromEdges = new HashSet<Edge>(from.AllEdges);
+            fromEdges.IntersectWith(this.AllEdgesSet); // use this intersection, because there might be intersection edges, which don't belong to this outline and holes edges
             Edge startWith = null;
             foreach (Edge edge in fromEdges)
             {
@@ -5557,7 +5557,7 @@ namespace CADability.GeoObject
         /// <param name="startVertex"></param>
         /// <param name="stopVertices"></param>
         /// <returns></returns>
-        internal List<Edge> FindConnection(Vertex startVertex, Set<Vertex> stopVertices)
+        internal List<Edge> FindConnection(Vertex startVertex, HashSet<Vertex> stopVertices)
         {
             List<Edge> res = new List<Edge>();
             Edge startWith = startVertex.FindOutgoing(this);
@@ -7592,7 +7592,7 @@ namespace CADability.GeoObject
             go.Style = EdgeStyle;
             go.Layer = this.Layer;
         }
-        internal static bool CheckOutlineDirection(Face fc, Edge[] outline, double uperiod, double vperiod, OrderedMultiDictionary<double, int>[] selections)
+        internal static bool CheckOutlineDirection(Face fc, Edge[] outline, double uperiod, double vperiod, SortedDictionary<double, List<int>>[] selections)
         {
             try
             {
@@ -7606,7 +7606,7 @@ namespace CADability.GeoObject
                     // zu entscheiden, welche Möglichkeit die beste ist, und wenn man die falsche nimmt, läuft
                     // die Kurve aus dem Ruder. Selections gibtdie Liste der berechneten Abstände und ihre Codierungen an
                     //
-                    selections = new OrderedMultiDictionary<double, int>[outline.Length - 1];
+                    selections = new SortedDictionary<double, List<int>>[outline.Length - 1];
                 }
                 // Beste Reglung: so wier hier verfahren (ohne das Verschieben in u bei zwei gleichen Linien
                 // wenn man am Ende nicht zusammen ist, dann eine neue Routine aufrufen, alle Kurven in ihrer Periode
@@ -7766,7 +7766,7 @@ namespace CADability.GeoObject
                     ++counter;
                     if (counter == 100 && (uperiod != 0.0 || vperiod != 0.0))
                     {   // neu anfangen mit dem Versuch alle Kurven in das Standardintervall der Periode zu bringen
-                        selections = new OrderedMultiDictionary<double, int>[outline.Length - 1];
+                        selections = new SortedDictionary<double, List<int>>[outline.Length - 1];
                         if (uperiod != 0.0)
                         {
                             for (int i = 0; i < clonedSegments.Length; i++)
@@ -7806,45 +7806,65 @@ namespace CADability.GeoObject
                         }
                         if (selections[0] == null)
                         {
-                            OrderedMultiDictionary<double, int> dist = new Wintellect.PowerCollections.OrderedMultiDictionary<double, int>(true);
+                            SortedDictionary<double, List<int>> dist = new SortedDictionary<double, List<int>>();
                             if (segments[0] != null && segments[1] != null)
                             {
                                 if (uperiod != 0.0)
                                 {   // segments[0] verschieben
                                     GeoVector2D offset = new GeoVector2D(uperiod, 0.0);
-                                    dist.Add(Geometry.Dist(segments[0].StartPoint + offset, segments[1].StartPoint), 4);
-                                    dist.Add(Geometry.Dist(segments[0].EndPoint + offset, segments[1].StartPoint), 5);
-                                    dist.Add(Geometry.Dist(segments[0].StartPoint + offset, segments[1].EndPoint), 6);
-                                    dist.Add(Geometry.Dist(segments[0].EndPoint + offset, segments[1].EndPoint), 7);
-                                    dist.Add(Geometry.Dist(segments[0].StartPoint - offset, segments[1].StartPoint), 8);
-                                    dist.Add(Geometry.Dist(segments[0].EndPoint - offset, segments[1].StartPoint), 9);
-                                    dist.Add(Geometry.Dist(segments[0].StartPoint - offset, segments[1].EndPoint), 10);
-                                    dist.Add(Geometry.Dist(segments[0].EndPoint - offset, segments[1].EndPoint), 11);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[0].StartPoint + offset, segments[1].StartPoint))) dist[Geometry.Dist(segments[0].StartPoint + offset, segments[1].StartPoint)] = new List<int>();
+                                    dist[Geometry.Dist(segments[0].StartPoint + offset, segments[1].StartPoint)].Add(4);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[0].EndPoint + offset, segments[1].StartPoint))) dist[Geometry.Dist(segments[0].EndPoint + offset, segments[1].StartPoint)] = new List<int>();
+                                    dist[Geometry.Dist(segments[0].EndPoint + offset, segments[1].StartPoint)].Add(5);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[0].StartPoint + offset, segments[1].EndPoint))) dist[Geometry.Dist(segments[0].StartPoint + offset, segments[1].EndPoint)] = new List<int>();
+                                    dist[Geometry.Dist(segments[0].StartPoint + offset, segments[1].EndPoint)].Add(6);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[0].EndPoint + offset, segments[1].EndPoint))) dist[Geometry.Dist(segments[0].EndPoint + offset, segments[1].EndPoint)] = new List<int>();
+                                    dist[Geometry.Dist(segments[0].EndPoint + offset, segments[1].EndPoint)].Add(7);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[0].StartPoint - offset, segments[1].StartPoint))) dist[Geometry.Dist(segments[0].StartPoint - offset, segments[1].StartPoint)] = new List<int>();
+                                    dist[Geometry.Dist(segments[0].StartPoint - offset, segments[1].StartPoint)].Add(8);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[0].EndPoint - offset, segments[1].StartPoint))) dist[Geometry.Dist(segments[0].EndPoint - offset, segments[1].StartPoint)] = new List<int>();
+                                    dist[Geometry.Dist(segments[0].EndPoint - offset, segments[1].StartPoint)].Add(9);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[0].StartPoint - offset, segments[1].EndPoint))) dist[Geometry.Dist(segments[0].StartPoint - offset, segments[1].EndPoint)] = new List<int>();
+                                    dist[Geometry.Dist(segments[0].StartPoint - offset, segments[1].EndPoint)].Add(10);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[0].EndPoint - offset, segments[1].EndPoint))) dist[Geometry.Dist(segments[0].EndPoint - offset, segments[1].EndPoint)] = new List<int>();
+                                    dist[Geometry.Dist(segments[0].EndPoint - offset, segments[1].EndPoint)].Add(11);
                                 }
                                 if (vperiod != 0.0)
                                 {   // segments[0] verschieben
                                     GeoVector2D offset = new GeoVector2D(0.0, vperiod);
-                                    dist.Add(Geometry.Dist(segments[0].StartPoint + offset, segments[1].StartPoint), 12);
-                                    dist.Add(Geometry.Dist(segments[0].EndPoint + offset, segments[1].StartPoint), 13);
-                                    dist.Add(Geometry.Dist(segments[0].StartPoint + offset, segments[1].EndPoint), 14);
-                                    dist.Add(Geometry.Dist(segments[0].EndPoint + offset, segments[1].EndPoint), 15);
-                                    dist.Add(Geometry.Dist(segments[0].StartPoint - offset, segments[1].StartPoint), 16);
-                                    dist.Add(Geometry.Dist(segments[0].EndPoint - offset, segments[1].StartPoint), 17);
-                                    dist.Add(Geometry.Dist(segments[0].StartPoint - offset, segments[1].EndPoint), 18);
-                                    dist.Add(Geometry.Dist(segments[0].EndPoint - offset, segments[1].EndPoint), 19);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[0].StartPoint + offset, segments[1].StartPoint))) dist[Geometry.Dist(segments[0].StartPoint + offset, segments[1].StartPoint)] = new List<int>();
+                                    dist[Geometry.Dist(segments[0].StartPoint + offset, segments[1].StartPoint)].Add(12);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[0].EndPoint + offset, segments[1].StartPoint))) dist[Geometry.Dist(segments[0].EndPoint + offset, segments[1].StartPoint)] = new List<int>();
+                                    dist[Geometry.Dist(segments[0].EndPoint + offset, segments[1].StartPoint)].Add(13);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[0].StartPoint + offset, segments[1].EndPoint))) dist[Geometry.Dist(segments[0].StartPoint + offset, segments[1].EndPoint)] = new List<int>();
+                                    dist[Geometry.Dist(segments[0].StartPoint + offset, segments[1].EndPoint)].Add(14);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[0].EndPoint + offset, segments[1].EndPoint))) dist[Geometry.Dist(segments[0].EndPoint + offset, segments[1].EndPoint)] = new List<int>();
+                                    dist[Geometry.Dist(segments[0].EndPoint + offset, segments[1].EndPoint)].Add(15);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[0].StartPoint - offset, segments[1].StartPoint))) dist[Geometry.Dist(segments[0].StartPoint - offset, segments[1].StartPoint)] = new List<int>();
+                                    dist[Geometry.Dist(segments[0].StartPoint - offset, segments[1].StartPoint)].Add(16);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[0].EndPoint - offset, segments[1].StartPoint))) dist[Geometry.Dist(segments[0].EndPoint - offset, segments[1].StartPoint)] = new List<int>();
+                                    dist[Geometry.Dist(segments[0].EndPoint - offset, segments[1].StartPoint)].Add(17);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[0].StartPoint - offset, segments[1].EndPoint))) dist[Geometry.Dist(segments[0].StartPoint - offset, segments[1].EndPoint)] = new List<int>();
+                                    dist[Geometry.Dist(segments[0].StartPoint - offset, segments[1].EndPoint)].Add(18);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[0].EndPoint - offset, segments[1].EndPoint))) dist[Geometry.Dist(segments[0].EndPoint - offset, segments[1].EndPoint)] = new List<int>();
+                                    dist[Geometry.Dist(segments[0].EndPoint - offset, segments[1].EndPoint)].Add(19);
                                 }
                                 // hinten angestellt, denn es soll die vorherigen bei Gleichheit überschreiben
                                 // leider genügt das mit der Gleichheit nicht wg. Rechengenauigkeit, deshalb -Precision.eps
-                                dist.Add(Geometry.Dist(segments[0].StartPoint, segments[1].StartPoint) - Precision.eps, 0);
-                                dist.Add(Geometry.Dist(segments[0].EndPoint, segments[1].StartPoint) - Precision.eps, 1);
-                                dist.Add(Geometry.Dist(segments[0].StartPoint, segments[1].EndPoint) - Precision.eps, 2);
-                                dist.Add(Geometry.Dist(segments[0].EndPoint, segments[1].EndPoint) - Precision.eps, 3);
+                                if (!dist.ContainsKey(Geometry.Dist(segments[0].StartPoint, segments[1].StartPoint) - Precision.eps)) dist[Geometry.Dist(segments[0].StartPoint, segments[1].StartPoint) - Precision.eps] = new List<int>();
+                                dist[Geometry.Dist(segments[0].StartPoint, segments[1].StartPoint) - Precision.eps].Add(0);
+                                if (!dist.ContainsKey(Geometry.Dist(segments[0].EndPoint, segments[1].StartPoint) - Precision.eps)) dist[Geometry.Dist(segments[0].EndPoint, segments[1].StartPoint) - Precision.eps] = new List<int>();
+                                dist[Geometry.Dist(segments[0].EndPoint, segments[1].StartPoint) - Precision.eps].Add(1);
+                                if (!dist.ContainsKey(Geometry.Dist(segments[0].StartPoint, segments[1].EndPoint) - Precision.eps)) dist[Geometry.Dist(segments[0].StartPoint, segments[1].EndPoint) - Precision.eps] = new List<int>();
+                                dist[Geometry.Dist(segments[0].StartPoint, segments[1].EndPoint) - Precision.eps].Add(2);
+                                if (!dist.ContainsKey(Geometry.Dist(segments[0].EndPoint, segments[1].EndPoint) - Precision.eps)) dist[Geometry.Dist(segments[0].EndPoint, segments[1].EndPoint) - Precision.eps] = new List<int>();
+                                dist[Geometry.Dist(segments[0].EndPoint, segments[1].EndPoint) - Precision.eps].Add(3);
                                 // das "-Precision.eps" fehlte am 18.1.11, wieder reingemacht wg. NEED_REGULARIZATION.stp
                                 selections[0] = dist;
                             }
                         }
-                        if (selections[0] == null || selections[0].TotalCount == 0 || selections[0].FirstItem.Key > precision) return false;
-                        switch (selections[0].FirstItem.Value % 4) // das ist der Fall für den kleinsten Abstand
+                        if (selections[0] == null || selections[0].Count == 0 || selections[0].Keys.First() > precision) return false;
+                        switch (selections[0].Values.First().First() % 4) // das ist der Fall für den kleinsten Abstand
                         {
                             case 0:
                                 segments[0].Reverse();
@@ -7859,7 +7879,7 @@ namespace CADability.GeoObject
                                 segments[1].Reverse();
                                 break;
                         }
-                        switch (selections[0].FirstItem.Value / 4)
+                        switch (selections[0].Values.First().First() / 4)
                         {
                             case 0: break; // nix, kein offset
                             case 1:
@@ -7919,45 +7939,55 @@ namespace CADability.GeoObject
                     {
                         if (selections[i - 1] == null)
                         {
-                            OrderedMultiDictionary<double, int> dist = new Wintellect.PowerCollections.OrderedMultiDictionary<double, int>(true);
+                            SortedDictionary<double, List<int>> dist = new SortedDictionary<double, List<int>>();
                             if (segments[i - 1] != null && segments[i] != null)
                             {
                                 if (uperiod != 0.0)
                                 {   // segments[0] verschieben
                                     GeoVector2D offset = new GeoVector2D(uperiod, 0.0);
-                                    dist.Add(Geometry.Dist(segments[i - 1].EndPoint, segments[i].StartPoint + offset), 2);
-                                    dist.Add(Geometry.Dist(segments[i - 1].EndPoint, segments[i].EndPoint + offset), 3);
-                                    dist.Add(Geometry.Dist(segments[i - 1].EndPoint, segments[i].StartPoint - offset), 4);
-                                    dist.Add(Geometry.Dist(segments[i - 1].EndPoint, segments[i].EndPoint - offset), 5);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[i - 1].EndPoint, segments[i].StartPoint + offset))) dist[Geometry.Dist(segments[i - 1].EndPoint, segments[i].StartPoint + offset)] = new List<int>();
+                                    dist[Geometry.Dist(segments[i - 1].EndPoint, segments[i].StartPoint + offset)].Add(2);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[i - 1].EndPoint, segments[i].EndPoint + offset))) dist[Geometry.Dist(segments[i - 1].EndPoint, segments[i].EndPoint + offset)] = new List<int>();
+                                    dist[Geometry.Dist(segments[i - 1].EndPoint, segments[i].EndPoint + offset)].Add(3);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[i - 1].EndPoint, segments[i].StartPoint - offset))) dist[Geometry.Dist(segments[i - 1].EndPoint, segments[i].StartPoint - offset)] = new List<int>();
+                                    dist[Geometry.Dist(segments[i - 1].EndPoint, segments[i].StartPoint - offset)].Add(4);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[i - 1].EndPoint, segments[i].EndPoint - offset))) dist[Geometry.Dist(segments[i - 1].EndPoint, segments[i].EndPoint - offset)] = new List<int>();
+                                    dist[Geometry.Dist(segments[i - 1].EndPoint, segments[i].EndPoint - offset)].Add(5);
                                 }
                                 if (vperiod != 0.0)
                                 {   // segments[0] verschieben
                                     GeoVector2D offset = new GeoVector2D(0.0, vperiod);
-                                    dist.Add(Geometry.Dist(segments[i - 1].EndPoint, segments[i].StartPoint + offset), 6);
-                                    dist.Add(Geometry.Dist(segments[i - 1].EndPoint, segments[i].EndPoint + offset), 7);
-                                    dist.Add(Geometry.Dist(segments[i - 1].EndPoint, segments[i].StartPoint - offset), 8);
-                                    dist.Add(Geometry.Dist(segments[i - 1].EndPoint, segments[i].EndPoint - offset), 9);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[i - 1].EndPoint, segments[i].StartPoint + offset))) dist[Geometry.Dist(segments[i - 1].EndPoint, segments[i].StartPoint + offset)] = new List<int>();
+                                    dist[Geometry.Dist(segments[i - 1].EndPoint, segments[i].StartPoint + offset)].Add(6);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[i - 1].EndPoint, segments[i].EndPoint + offset))) dist[Geometry.Dist(segments[i - 1].EndPoint, segments[i].EndPoint + offset)] = new List<int>();
+                                    dist[Geometry.Dist(segments[i - 1].EndPoint, segments[i].EndPoint + offset)].Add(7);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[i - 1].EndPoint, segments[i].StartPoint - offset))) dist[Geometry.Dist(segments[i - 1].EndPoint, segments[i].StartPoint - offset)] = new List<int>();
+                                    dist[Geometry.Dist(segments[i - 1].EndPoint, segments[i].StartPoint - offset)].Add(8);
+                                    if (!dist.ContainsKey(Geometry.Dist(segments[i - 1].EndPoint, segments[i].EndPoint - offset))) dist[Geometry.Dist(segments[i - 1].EndPoint, segments[i].EndPoint - offset)] = new List<int>();
+                                    dist[Geometry.Dist(segments[i - 1].EndPoint, segments[i].EndPoint - offset)].Add(9);
                                 }
                                 // hinten angestellt, denn es soll die vorherigen bei Gleichheit überschreiben
-                                dist.Add(Geometry.Dist(segments[i - 1].EndPoint, segments[i].StartPoint) - Precision.eps, 0);
-                                dist.Add(Geometry.Dist(segments[i - 1].EndPoint, segments[i].EndPoint) - Precision.eps, 1);
+                                if (!dist.ContainsKey(Geometry.Dist(segments[i - 1].EndPoint, segments[i].StartPoint) - Precision.eps)) dist[Geometry.Dist(segments[i - 1].EndPoint, segments[i].StartPoint) - Precision.eps] = new List<int>();
+                                dist[Geometry.Dist(segments[i - 1].EndPoint, segments[i].StartPoint) - Precision.eps].Add(0);
+                                if (!dist.ContainsKey(Geometry.Dist(segments[i - 1].EndPoint, segments[i].EndPoint) - Precision.eps)) dist[Geometry.Dist(segments[i - 1].EndPoint, segments[i].EndPoint) - Precision.eps] = new List<int>();
+                                dist[Geometry.Dist(segments[i - 1].EndPoint, segments[i].EndPoint) - Precision.eps].Add(1);
                                 selections[i - 1] = dist;
                                 //System.Diagnostics.Trace.WriteLine("Adding: " + (i - 1).ToString());
                             }
                         }
-                        if (selections[i - 1].TotalCount == 0 || selections[i - 1].FirstItem.Key > precision)
+                        if (selections[i - 1].Count == 0 || selections[i - 1].Keys.First() > precision)
                         {
                             // System.Diagnostics.Trace.WriteLine("Removing: " + (i - 1).ToString());
                             selections[i - 1] = null;
-                            selections[i - 2].Remove(selections[i - 2].FirstItem.Key, selections[i - 2].FirstItem.Value);
+                            { var _fk = selections[i - 2].Keys.First(); selections[i - 2][_fk].RemoveAt(0); if (selections[i - 2][_fk].Count == 0) selections[i - 2].Remove(_fk); }
                             broken = true;
                             break;
                         }
-                        if (selections[i - 1].FirstItem.Value % 2 == 1)
+                        if (selections[i - 1].Values.First().First() % 2 == 1)
                         {
                             segments[i].Reverse();
                         }
-                        switch (selections[i - 1].FirstItem.Value / 2)
+                        switch (selections[i - 1].Values.First().First() / 2)
                         {
                             case 0: break; // nix, kein offset
                             case 1:
@@ -8044,7 +8074,7 @@ namespace CADability.GeoObject
                     else
                     {
                         if (segments.Length < 2) return false; // eine nicht geschlossene Kurve
-                        selections[segments.Length - 2].Remove(selections[segments.Length - 2].FirstItem.Key, selections[segments.Length - 2].FirstItem.Value);
+                        { var _fk = selections[segments.Length - 2].Keys.First(); selections[segments.Length - 2][_fk].RemoveAt(0); if (selections[segments.Length - 2][_fk].Count == 0) selections[segments.Length - 2].Remove(_fk); }
                     }
                 }
             }
@@ -8647,7 +8677,7 @@ namespace CADability.GeoObject
             }
             return false;
         }
-        internal ModOp2D MakeRegularSurface(double maxError, Set<Edge> recalcEdges)
+        internal ModOp2D MakeRegularSurface(double maxError, HashSet<Edge> recalcEdges)
         {
             if (surface is NurbsSurface)
             {
@@ -8656,7 +8686,7 @@ namespace CADability.GeoObject
                 if ((surface as NurbsSurface).GetSimpleSurface(maxError, out simpleSurface, out modify))
                 {   // die Kanten werden grundlegend neu berechnet, die 2D Kurven werden neu gemacht, es ist hier also
                     // keine Modifikation der 2D Kurven nötig.
-                    recalcEdges.AddMany(Edges);
+                    recalcEdges.UnionWith(Edges);
                     this.surface = simpleSurface;
                     this.area = null; // aber noch nicht neu berechnen
                     return modify;
@@ -8902,7 +8932,7 @@ namespace CADability.GeoObject
 
 #endif
                 Array.Reverse(outline);
-                Set<Edge> seam = new Set<Edge>(); // die Saumkurven ansammeln (jede kommt zweimal vor
+                HashSet<Edge> seam = new HashSet<Edge>(); // die Saumkurven ansammeln (jede kommt zweimal vor
                 for (int i = 0; i < outline.Length; ++i)
                 {
                     if (outline[i].IsSeam()) seam.Add(outline[i]);
@@ -9036,7 +9066,7 @@ namespace CADability.GeoObject
                 segments[i].Reverse();
             }
             Array.Reverse(outline);
-            Set<Edge> seam = new Set<Edge>(); // die Saumkurven ansammeln (jede kommt zweimal vor
+            HashSet<Edge> seam = new HashSet<Edge>(); // die Saumkurven ansammeln (jede kommt zweimal vor
             for (int i = 0; i < outline.Length; ++i)
             {
                 if (outline[i].IsSeam()) seam.Add(outline[i]);
@@ -9171,7 +9201,7 @@ namespace CADability.GeoObject
                     }
                 }
                 Array.Reverse(outline);
-                Set<Edge> seam = new Set<Edge>(); // die Saumkurven ansammeln (jede kommt zweimal vor
+                HashSet<Edge> seam = new HashSet<Edge>(); // die Saumkurven ansammeln (jede kommt zweimal vor
                 for (int i = 0; i < outline.Length; ++i)
                 {
                     if (outline[i].IsSeam()) seam.Add(outline[i]);
@@ -9221,7 +9251,7 @@ namespace CADability.GeoObject
             else
             {
                 Array.Reverse(outline);
-                Set<Edge> seam = new Set<Edge>(); // die Saumkurven ansammeln (jede kommt zweimal vor
+                HashSet<Edge> seam = new HashSet<Edge>(); // die Saumkurven ansammeln (jede kommt zweimal vor
                 for (int i = 0; i < outline.Length; ++i)
                 {
                     if (outline[i].IsSeam()) seam.Add(outline[i]);
@@ -9519,7 +9549,7 @@ namespace CADability.GeoObject
             }
             // jetzt werden neue faces erzeugt, indem man einmal die neuen Edges nur vorwärts und einmal nur rückwärts benutzt
             // die neuen Kanten:
-            Set<Edge> intersectionEdges = new Set<Edge>();
+            HashSet<Edge> intersectionEdges = new HashSet<Edge>();
             // TODO: wenn splitPoints.Count nicht gerade ist, dann andere Position nehmen:
             // whileschleife, die nicht abbricht oder so...
             for (int i = 0; i < splitPoints.Count - 1; i = i + 2)
@@ -9540,7 +9570,7 @@ namespace CADability.GeoObject
                 e.Orient();
             }
             // wie werden die periodic edges verwendet? Hier erstmal alle sammeln
-            Set<Edge> periodicEdges = new Set<Edge>();
+            HashSet<Edge> periodicEdges = new HashSet<Edge>();
             for (int i = 0; i < all.Length; ++i)
             {
                 if (all[i].IsPeriodicEdge) periodicEdges.Add(all[i]);
@@ -9550,11 +9580,11 @@ namespace CADability.GeoObject
             // gegeben, obwohl beide faces gleich sind. Deshalb werden in der 1. Schleife alle periodic Edges
             // so umgedreht, dass sie für den 1. teil richtig sind. Für den 2. Teil werden dann alle amgedreht
             // so dass man in der 2. Schleife davon ausgehen kann, dass sie schon richtig sind
-            Set<Edge> intersectionEdgesCopy = new Set<Edge>(intersectionEdges);
+            HashSet<Edge> intersectionEdgesCopy = new HashSet<Edge>(intersectionEdges);
             while (intersectionEdges.Count > 0)
             {
                 List<Edge> outline = new List<Edge>();
-                Edge startWith = intersectionEdges.GetAny();
+                Edge startWith = intersectionEdges.First();
                 intersectionEdges.Remove(startWith);
                 outline.Add(startWith);
                 Vertex stopAt = startWith.Vertex1;
@@ -9626,11 +9656,11 @@ namespace CADability.GeoObject
                                    // damit sind sie für den 2. Durchlauf richtigrum
             }
             intersectionEdges.Clear(); // sollte eh leer sein, wenn nicht, exception
-            intersectionEdges.AddMany(intersectionEdgesCopy); // leichter so zu schreiben
+            intersectionEdges.UnionWith(intersectionEdgesCopy); // leichter so zu schreiben
             while (intersectionEdges.Count > 0)
             {
                 List<Edge> outline = new List<Edge>();
-                Edge startWith = intersectionEdges.GetAny();
+                Edge startWith = intersectionEdges.First();
                 intersectionEdges.Remove(startWith);
                 outline.Add(startWith);
                 Vertex stopAt = startWith.Vertex2; // jetzt rückwärts auf denselben
@@ -10290,7 +10320,7 @@ namespace CADability.GeoObject
         {
             get
             {
-                Set<int> n = new Set<int>();
+                HashSet<int> n = new HashSet<int>();
                 for (int i = 0; i < outline.Length; i++)
                 {
                     if (outline[i].PrimaryFace != this) n.Add(outline[i].PrimaryFace.hashCode);
@@ -10329,17 +10359,19 @@ namespace CADability.GeoObject
         /// <param name="other">the other face</param>
         /// <param name="toOtherSurface">the ModOp2D, which transforms the 2d system of this surface to the other surface when appropriate, otherwise ModOp2D.Null</param>
         /// <returns>the removed edges</returns>
-        internal Set<Edge> CombineWith(Face other, ModOp2D toOtherSurface)
+        internal HashSet<Edge> CombineWith(Face other, ModOp2D toOtherSurface)
         {
             this.vertices = null;
             other.vertices = null;
             Vertex[] dbg1 = this.Vertices;
             Vertex[] dbg2 = other.Vertices;
 
-            Set<Edge> onThis = new Set<Edge>(Edges);
-            Set<Edge> onOther = new Set<Edge>(other.Edges);
-            Set<Edge> usableEdges = onThis.SymmetricDifference(onOther); // all edges of the resulting face, which belong to one of the faces but not to both
-            Set<Edge> commonEdges = onThis.Intersection(onOther); // these will be removed
+            HashSet<Edge> onThis = new HashSet<Edge>(Edges);
+            HashSet<Edge> onOther = new HashSet<Edge>(other.Edges);
+            var usableEdges = new HashSet<Edge>(onThis);
+            usableEdges.SymmetricExceptWith(onOther); // all edges of the resulting face, which belong to one of the faces but not to both
+            var commonEdges = new HashSet<Edge>(onThis);
+            commonEdges.IntersectWith(onOther); // these will be removed
             List<List<Edge>> loops = new List<List<Edge>>(); // the loops, one of them is the outline, the others are holes
             if (this.surface is IRestrictedDomain rd)
             {
@@ -10368,7 +10400,7 @@ namespace CADability.GeoObject
             }
             while (usableEdges.Count > 0)
             {
-                Edge startWith = usableEdges.GetAny();
+                Edge startWith = usableEdges.First();
                 Vertex startVertex;
                 if (startWith.PrimaryFace == this || startWith.SecondaryFace == this) startVertex = startWith.StartVertex(this);
                 else startVertex = startWith.StartVertex(other);
@@ -10408,7 +10440,7 @@ namespace CADability.GeoObject
                             }
                         }
                     }
-                    if (next == null) return new Set<CADability.Edge>(); // should never happen
+                    if (next == null) return new HashSet<CADability.Edge>(); // should never happen
                     startWith = next;
                 }
                 loops.Add(loop);
@@ -10438,7 +10470,7 @@ namespace CADability.GeoObject
                     outerLoop = i;
                 }
             }
-            if (outerLoop < 0) return new Set<CADability.Edge>(); // sollte nicht vorkommen
+            if (outerLoop < 0) return new HashSet<CADability.Edge>(); // sollte nicht vorkommen
             outline = loops[outerLoop].ToArray();
             List<Edge[]> lholes = new List<Edge[]>();
             for (int i = 0; i < loops.Count; i++)
@@ -10480,7 +10512,7 @@ namespace CADability.GeoObject
                     if (boutline.Segments[0] == segments[segments.Length - 1])
                     {
                         Array.Reverse(outline);
-                        Set<Edge> exchanged = new Set<Edge>();
+                        HashSet<Edge> exchanged = new HashSet<Edge>();
                         // ganz vertrackt: bei periodic edges wird immer eine bestimmte 2D Curve zuerst geliefert
                         // auch das muss umgedreht werden.
                         for (int i = 0; i < outline.Length; ++i)
@@ -10937,7 +10969,7 @@ namespace CADability.GeoObject
             }
             // collect pairs of edge, which are geomatrically identical
             // we collect the edges rather than combining them immediately, because we are iterating over the edges
-            List<Pair<Edge, Edge>> edgePairs = new List<Pair<Edge, Edge>>();
+            List<(Edge Face1Edge, Edge Face2Edge)> edgePairs = new();
             foreach (Edge edg in face1.Edges)
             {
                 if (vertexPairs.ContainsKey(edg.Vertex1) && vertexPairs.ContainsKey(edg.Vertex2))
@@ -10953,7 +10985,7 @@ namespace CADability.GeoObject
                         {
                             if (edg.Curve3D.DistanceTo(other[i].Curve3D.PointAt(0.5)) < precision)
                             {   // ther middle points also have the same position
-                                edgePairs.Add(new Pair<Edge, Edge>(edg, other[i]));
+                                edgePairs.Add((edg, other[i]));
                             }
                         }
                     }
@@ -10961,7 +10993,7 @@ namespace CADability.GeoObject
             }
             for (int i = 0; i < edgePairs.Count; i++)
             {
-                face1.ReplaceEdge(edgePairs[i].First, edgePairs[i].Second);
+                face1.ReplaceEdge(edgePairs[i].Face1Edge, edgePairs[i].Face2Edge);
             }
             return edgePairs.Count > 0;
 

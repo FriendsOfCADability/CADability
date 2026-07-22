@@ -2,7 +2,7 @@
 using CADability.GeoObject;
 using System;
 using System.Collections.Generic;
-using Wintellect.PowerCollections;
+using System.Linq;
 
 namespace CADability
 {
@@ -408,17 +408,19 @@ namespace CADability
             {
                 improved = false;
                 // 1. bestimme die "Ausreißer", Verbindungen die viel länger als der Durchschnitt sind
-                OrderedMultiDictionary<double, int> sortedConnections = new OrderedMultiDictionary<double, int>(true);
+                SortedDictionary<double, List<int>> sortedConnections = new SortedDictionary<double, List<int>>();
                 for (int i = 0; i < vertices.Length; i++)
                 {
                     if (vertices[i].toNext != null && !vertices[i].keepConnection)
                     {
-                        sortedConnections.Add(-vertices[i].toNext.Length, i); // das "-", damit die längste Kante zuerst kommt
+                        double _scKey = -vertices[i].toNext.Length; // das "-", damit die längste Kante zuerst kommt
+                        if (!sortedConnections.TryGetValue(_scKey, out var _scList)) { _scList = new List<int>(); sortedConnections[_scKey] = _scList; }
+                        _scList.Add(i);
                     }
                 }
-                int[] connectionsToCheck = new int[Math.Min(maxConnectionToCheck, sortedConnections.Count)];
+                int[] connectionsToCheck = new int[Math.Min(maxConnectionToCheck, sortedConnections.Values.Sum(v => v.Count))];
                 int index = 0;
-                foreach (KeyValuePair<double, ICollection<int>> item in sortedConnections)
+                foreach (KeyValuePair<double, List<int>> item in sortedConnections)
                 {
                     foreach (int ind in item.Value)
                     {
@@ -453,7 +455,7 @@ namespace CADability
             // es entstehen 4 Stücke wenn die 3 Verbindungen entfernt werden
             // wenn der Anfang fest ist, bleibt eines der Anfang, es gibt dann 6 Möglichkeiten, wenn nicht, gibt es 24 Möglichkeiten
             // 1. Anfangs und Endpunkte der Stücke suchen
-            Pair<int, int>[] segments = new Pair<int, int>[4];
+            var segments = new (int StartId, int EndId)[4];
             int index = 0;
             int start = startWith.id; // id ist auch der Index im Array
             vertex v;
@@ -461,12 +463,12 @@ namespace CADability
             {
                 if (v.id == i || v.id == j || v.id == k)
                 {
-                    segments[index] = new Pair<int, int>(start, v.id);
+                    segments[index] = (start, v.id);
                     ++index;
                     start = v.next.id; // Start für die nächste Runde
                 }
             }
-            segments[index] = new Pair<int, int>(start, v.id); // das letzte Stück
+            segments[index] = (start, v.id); // das letzte Stück
             if (index != 3) return false; // kann nicht vorkommen
             // jetzt gibt es 4 Segmente und es können drei neue Verbindungen überprüft werden
             double orgLength = vertices[i].toNext.Length + vertices[j].toNext.Length + vertices[k].toNext.Length;
@@ -478,8 +480,8 @@ namespace CADability
                 double len = 0.0;
                 for (int l = 0; l < 3; l++)
                 {
-                    vertex v1 = vertices[segments[permutations[si, l]].Second];
-                    vertex v2 = vertices[segments[permutations[si, l + 1]].First];
+                    vertex v1 = vertices[segments[permutations[si, l]].EndId];
+                    vertex v2 = vertices[segments[permutations[si, l + 1]].StartId];
                     len += v1.position | v2.position;
                 }
                 if (len < minLength)
@@ -496,14 +498,14 @@ namespace CADability
                 CADability.Attribute.ColorDef cold = new CADability.Attribute.ColorDef("alt", System.Drawing.Color.Gray);
                 for (int l = 0; l < 3; l++)
                 {
-                    vertex v1 = vertices[segments[permutations[bestPermutation, l]].Second];
-                    vertex v2 = vertices[segments[permutations[bestPermutation, l + 1]].First];
+                    vertex v1 = vertices[segments[permutations[bestPermutation, l]].EndId];
+                    vertex v2 = vertices[segments[permutations[bestPermutation, l + 1]].StartId];
                     Line line = Line.Construct();
                     line.SetTwoPoints(new GeoPoint(v1.position), new GeoPoint(v2.position));
                     line.ColorDef = cnew;
                     dc.Add(line, l);
-                    v1 = vertices[segments[l].Second];
-                    v2 = vertices[segments[l + 1].First];
+                    v1 = vertices[segments[l].EndId];
+                    v2 = vertices[segments[l + 1].StartId];
                     line = Line.Construct();
                     line.SetTwoPoints(new GeoPoint(v1.position), new GeoPoint(v2.position));
                     line.ColorDef = cold;
@@ -513,8 +515,8 @@ namespace CADability
                 // die alten Verbindungen auflösen
                 for (int l = 0; l < 3; l++)
                 {
-                    vertex v1 = vertices[segments[l].Second];
-                    vertex v2 = vertices[segments[l + 1].First];
+                    vertex v1 = vertices[segments[l].EndId];
+                    vertex v2 = vertices[segments[l + 1].StartId];
                     v1.next = null;
                     v2.previous = null;
                     connectionTree.RemoveObject(v1.toNext);
@@ -523,8 +525,8 @@ namespace CADability
                 // die neuen Verbindungen einfügen
                 for (int l = 0; l < 3; l++)
                 {
-                    vertex v1 = vertices[segments[permutations[bestPermutation, l]].Second];
-                    vertex v2 = vertices[segments[permutations[bestPermutation, l + 1]].First];
+                    vertex v1 = vertices[segments[permutations[bestPermutation, l]].EndId];
+                    vertex v2 = vertices[segments[permutations[bestPermutation, l + 1]].StartId];
                     v1.next = v2;
                     v2.previous = v1;
                     connection con = new connection(v1, v2);
@@ -581,7 +583,7 @@ namespace CADability
                 // 1. Überkreuzungen sind eigentlich immer schlecht. Diese hier beseitigen
                 didChange = false;
                 // 1.1: alle Überkreuzungen ansammeln durch betrachten der Listen im QuadTree
-                Set<crossing> crossings = new Set<crossing>();
+                HashSet<crossing> crossings = new HashSet<crossing>();
                 int dbgnum = 0;
                 foreach (List<connection> list in connectionTree.AllLists)
                 {
@@ -610,7 +612,7 @@ namespace CADability
                 sortedCrossings.Sort(); // implementiert IComparable
                 // mit den besten beginnend alle entflechten. Aber wenn einer der betreffenden vertices bereits in einer
                 // Entflechtung beteiligt war, dann nicht verwenden, die Überkreuzung könnte bereits behoben sein.
-                Set<vertex> usedVertices = new Set<vertex>();
+                HashSet<vertex> usedVertices = new HashSet<vertex>();
                 foreach (crossing crossing in sortedCrossings)
                 {
                     if (!usedVertices.Add(crossing.first.from) &&
@@ -905,7 +907,7 @@ namespace CADability
                 }
             }
             improvementList.Sort();
-            Set<vertex> usedVertices = new Set<vertex>();
+            HashSet<vertex> usedVertices = new HashSet<vertex>();
             bool didImprove = false;
             for (int i = 0; i < improvementList.Count; i++)
             {
@@ -1366,7 +1368,7 @@ namespace CADability
 
         BoundingRect[] forbiddenArea;
         BoundingRect[] forbiddenAreaShrunk; // etwas kleiner, damit HitTest funktioniert
-        Set<GeoPoint2D> forbiddenPoints;
+        HashSet<GeoPoint2D> forbiddenPoints;
         double forbiddenPointsOffset;
 
         /// <summary>
@@ -1390,7 +1392,7 @@ namespace CADability
                     forbiddenAreaShrunk[i].Inflate(-eps);
                 }
             }
-            forbiddenPoints = new Set<GeoPoint2D>();
+            forbiddenPoints = new HashSet<GeoPoint2D>();
             forbiddenPointsOffset = 0.0;
             for (int i = 0; i < forbiddenArea.Length; i++)
             {
@@ -1473,7 +1475,7 @@ namespace CADability
             if (xyOffset != forbiddenPointsOffset)
             {   // forbiddenPoints are vertex-points of one forbiddenArea which reside in another forbiddenArea
                 // should only be calculated once, but xyOffset should be respected
-                forbiddenPoints = new Set<GeoPoint2D>();
+                forbiddenPoints = new HashSet<GeoPoint2D>();
                 BoundingRect[] fbaoff = new BoundingRect[forbiddenArea.Length];
                 for (int i = 0; i < forbiddenArea.Length; i++)
                 {

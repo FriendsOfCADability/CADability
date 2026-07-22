@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using Wintellect.PowerCollections;
 
 namespace CADability.Forms
 {
@@ -14,7 +13,7 @@ namespace CADability.Forms
     {
         class DisplayList : IPaintTo3DList
         {   // eine Liste ist einfach ein Bitmap
-            // im Falle von Zoom oder Grˆﬂen‰nderung wird die Displayliste ung¸ltig, daf¸r fehlt noch der Mechanismus
+            // im Falle von Zoom oder Gr√∂√üen√§nderung wird die Displayliste ung√ºltig, daf√ºr fehlt noch der Mechanismus
             public System.Drawing.Bitmap bitmap;
             public Graphics graphics;
             public DisplayList(int width, int height)
@@ -59,15 +58,15 @@ namespace CADability.Forms
         DisplayList displayList;
         Graphics oldGraphics;
         bool thinLinesOnly;
-        private static Set<string> fontFamilyNames;
-        internal static Set<string> FontFamilyNames
+        private static HashSet<string> fontFamilyNames;
+        internal static HashSet<string> FontFamilyNames
         {
             get
             {
                 if (fontFamilyNames == null)
                 {
                     FontFamily[] ff = FontFamily.Families;
-                    fontFamilyNames = new Set<string>();
+                    fontFamilyNames = new HashSet<string>();
                     for (int i = 0; i < ff.Length; i++)
                     {
                         fontFamilyNames.Add(ff[i].Name.ToUpper());
@@ -400,7 +399,7 @@ namespace CADability.Forms
             {
                 PointF[] pointsf = new PointF[points.Length];
                 for (int i = 0; i < points.Length; i++)
-                {   // hier ist halt die Frage: enth‰lt die Projektion schon die ganze Zoom/Scroll Info
+                {   // hier ist halt die Frage: enth√§lt die Projektion schon die ganze Zoom/Scroll Info
                     // oder wird das nach graphics gesteckt. Aber das ist ja auch egal hier.
                     pointsf[i] = projection.ProjectF(points[i]);
                 }
@@ -417,7 +416,7 @@ namespace CADability.Forms
                 }
             }
             catch (OverflowException)
-            {   // Werte offensichtlich zu groﬂ, wenn man extrem weit hineinzoomt
+            {   // Werte offensichtlich zu gro√ü, wenn man extrem weit hineinzoomt
             }
         }
 
@@ -454,7 +453,7 @@ namespace CADability.Forms
                 res = new Pen(clr, (float)(lineWidth.Width * projection.WorldToDeviceFactor));
             else
                 res = new Pen(clr, 1.0f);
-            // hier kˆnnte man einen zoom-unabh‰ngigen Faktor implementieren
+            // hier k√∂nnte man einen zoom-unabh√§ngigen Faktor implementieren
             if (thinLinesOnly) res.Width = 1.0f;
             if (pattern != null && pattern.Pattern.Length > 0)
             {
@@ -479,7 +478,7 @@ namespace CADability.Forms
                     }
                 }
                 res.DashPattern = fpattern;
-                res.DashOffset = 0.5f; // eine halbe Strichst‰rke versetzt ist wichtig wg. Mauells Raster
+                res.DashOffset = 0.5f; // eine halbe Strichst√§rke versetzt ist wichtig wg. Mauells Raster
             }
             // ACHTUNG: das sollte einstellbar sein:
             res.StartCap = LineCap.Round;
@@ -529,7 +528,7 @@ namespace CADability.Forms
             CADability.GeoObject.Text.LineAlignMode lineAlignment)
         {
             // graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.SingleBitPerPixel; 
-            // das w‰re f¸r Kastenholz, beim selektieren von kleinen Schriften keine R‰nder
+            // das w√§re f√ºr Kastenholz, beim selektieren von kleinen Schriften keine R√§nder
             bool makeLine = false;
             PointF[] pnt = new PointF[3];
             pnt[0] = projection.ProjectF(location + glyphDirection);
@@ -600,7 +599,7 @@ namespace CADability.Forms
                                 //case Text.AlignMode.Bottom:
                                 //    sf.LineAlignment = StringAlignment.Near;
                                 //    break;
-                                //case Text.AlignMode.Baseline: // hier m¸sste man den Punkt verschieben
+                                //case Text.AlignMode.Baseline: // hier m√ºsste man den Punkt verschieben
                                 //    sf.LineAlignment = StringAlignment.Near;
                                 //    //loc.Y = 
                                 //    break;
@@ -640,7 +639,7 @@ namespace CADability.Forms
                 }
                 catch (System.OverflowException)
                 {
-                    // kann nicht dargestellt werden, da irgndwas zu groﬂ ist
+                    // kann nicht dargestellt werden, da irgndwas zu gro√ü ist
                 }
                 pen.Dispose();
             }
@@ -666,7 +665,7 @@ namespace CADability.Forms
 
         void IPaintTo3D.Line2D(int sx, int sy, int ex, int ey)
         {
-            using (new Transform(graphics, new Matrix())) // Identit‰t 
+            using (new Transform(graphics, new Matrix())) // Identit√§t 
             {
                 try
                 {
@@ -676,14 +675,14 @@ namespace CADability.Forms
                 }
                 catch (System.OverflowException)
                 {
-                    // kann nicht dargestellt werden, da irgndwas zu groﬂ ist
+                    // kann nicht dargestellt werden, da irgndwas zu gro√ü ist
                 }
             }
         }
 
         void IPaintTo3D.Line2D(PointF p1, PointF p2)
         {
-            using (new Transform(graphics, new Matrix())) // Identit‰t 
+            using (new Transform(graphics, new Matrix())) // Identit√§t 
             {
                 try
                 {
@@ -693,14 +692,14 @@ namespace CADability.Forms
                 }
                 catch (System.OverflowException)
                 {
-                    // kann nicht dargestellt werden, da irgndwas zu groﬂ ist
+                    // kann nicht dargestellt werden, da irgndwas zu gro√ü ist
                 }
             }
         }
 
         void IPaintTo3D.FillRect2D(PointF p1, PointF p2)
         {
-            using (new Transform(graphics, new Matrix())) // Identit‰t 
+            using (new Transform(graphics, new Matrix())) // Identit√§t 
             {
                 try
                 {
@@ -711,7 +710,7 @@ namespace CADability.Forms
                 }
                 catch (System.OverflowException)
                 {
-                    // kann nicht dargestellt werden, da irgndwas zu groﬂ ist
+                    // kann nicht dargestellt werden, da irgndwas zu gro√ü ist
                 }
 
             }
@@ -842,7 +841,7 @@ namespace CADability.Forms
                     par = Geometry.LinePar(center, dir, center + Math.Cos(startParameter + sweepParameter) * majorAxis + Math.Sin(startParameter + sweepParameter) * minorAxis);
                     if (par < pmin) pmin = par;
                     if (par > pmax) pmax = par;
-                    // fehlt noch: jetzt noch die Achsenpunkt abpr¸fen...
+                    // fehlt noch: jetzt noch die Achsenpunkt abpr√ºfen...
                     (this as IPaintTo3D).Polyline(new GeoPoint[] { center + pmin * dir, center + pmax * dir });
                 }
                 else
@@ -873,7 +872,7 @@ namespace CADability.Forms
                     float swPar = (float)(ea2d.axisSweep / Math.PI * 180);
                     float stPar = (float)(ea2d.axisStart / Math.PI * 180);
                     if (sweepParameter >= Math.PI * 2.0 || sweepParameter <= -Math.PI * 2.0)
-                    {   // Notlˆsung wg. ERSACAD und wg. N¸rnberger 5.12.13
+                    {   // Notl√∂sung wg. ERSACAD und wg. N√ºrnberger 5.12.13
                         swPar = 360.0f;
                     }
                     try
@@ -884,7 +883,7 @@ namespace CADability.Forms
                         if ((maxRad + minRad) * Projection.WorldToDeviceFactor < 1)
                         {   // sonst gibt es ein out of memory exception
                             if (graphicsPath != null)
-                            {   // kann auch schr‰ge Ellipsen zuf¸gen mit Transformation
+                            {   // kann auch schr√§ge Ellipsen zuf√ºgen mit Transformation
                                 GraphicsPath tmpPath = new GraphicsPath();
                                 tmpPath.AddLine((float)center2d.x, (float)center2d.y, (float)center2d.x, (float)center2d.y);
                                 tmpPath.Transform(r);
@@ -905,7 +904,7 @@ namespace CADability.Forms
                         else
                         {
                             if (graphicsPath != null)
-                            {   // kann auch schr‰ge Ellipsen zuf¸gen mit Transformation
+                            {   // kann auch schr√§ge Ellipsen zuf√ºgen mit Transformation
                                 GraphicsPath tmpPath = new GraphicsPath();
                                 tmpPath.AddArc((float)(center2d.x - maxRad), (float)(center2d.y - minRad), (float)(2.0 * maxRad), (float)(2.0 * minRad), stPar, swPar);
                                 tmpPath.Transform(r);
@@ -936,13 +935,13 @@ namespace CADability.Forms
                 }
             }
             catch
-            {   // damit es sicher durchl‰uft. z.B. eine Ellipse, bei der beide Achsen dieselbe Richtung haben, erzeugt eine ModOp Exception
+            {   // damit es sicher durchl√§uft. z.B. eine Ellipse, bei der beide Achsen dieselbe Richtung haben, erzeugt eine ModOp Exception
             }
         }
         //void IPaintTo3D.Arc(GeoPoint center, GeoVector majorAxis, GeoVector minorAxis, double startParameter, double sweepParameter)
         //{   // Das Problem ist, dass GDI nur achsenorientierte Ellipsen zeichnen kann.
-        //    // Wir m¸ssen die Drehung hier rausrechnen, denn die zu verwendende Matrix 
-        //    // darf nicht skalieren wegen der Strichst‰rke und der Strichlierung
+        //    // Wir m√ºssen die Drehung hier rausrechnen, denn die zu verwendende Matrix 
+        //    // darf nicht skalieren wegen der Strichst√§rke und der Strichlierung
 
         //    GeoVector normal = majorAxis ^ minorAxis; // normale der Ebene des Bogens
         //    // wird der Bogen von vorne oder hinten betrachtet?
@@ -957,7 +956,7 @@ namespace CADability.Forms
         //        par = Geometry.LinePar(center, dir, center + Math.Cos(startParameter + sweepParameter) * majorAxis + Math.Sin(startParameter + sweepParameter) * minorAxis);
         //        if (par < pmin) pmin = par;
         //        if (par > pmax) pmax = par;
-        //        // fehlt noch: jetzt noch die Achsenpunkt abpr¸fen...
+        //        // fehlt noch: jetzt noch die Achsenpunkt abpr√ºfen...
         //        (this as IPaintTo3D).Polyline(new GeoPoint[] { center + pmin * dir, center + pmax * dir });
         //    }
         //    else
@@ -976,7 +975,7 @@ namespace CADability.Forms
         //        Angle rot = prmaj2D.Angle;
         //        ModOp2D toHorizontal = ModOp2D.Rotate(center2d, -rot.Radian);
         //        ModOp2D fromHorizontal = ModOp2D.Rotate(center2d, rot.Radian);
-        //        sp = toHorizontal * sp; // Start- und Endpunkt bez¸glich der horizontalen Ellipse
+        //        sp = toHorizontal * sp; // Start- und Endpunkt bez√ºglich der horizontalen Ellipse
         //        ep = toHorizontal * ep;
         //        Angle startAngle = new Angle(sp, center2d);
         //        Angle EndAngle = new Angle(ep, center2d);
@@ -994,7 +993,7 @@ namespace CADability.Forms
         //            double maxRad = prmaj2D.Length;
         //            double minRad = prmin2D.Length;
         //            if (graphicsPath != null)
-        //            {   // kann auch schr‰ge Ellipsen zuf¸gen mit Transformation
+        //            {   // kann auch schr√§ge Ellipsen zuf√ºgen mit Transformation
         //                GraphicsPath tmpPath = new GraphicsPath();
         //                tmpPath.AddArc((float)(center2d.x - maxRad), (float)(center2d.y - minRad), (float)(2.0 * maxRad), (float)(2.0 * minRad), stPar, swPar);
         //                tmpPath.Transform(r);
@@ -1060,7 +1059,7 @@ namespace CADability.Forms
         //    //    //float fStartAng = -(float)(spar / Math.PI * 180.0);
         //    //    //float fSweepAng = -(float)(sw / Math.PI * 180.0);
         //    //    if (graphicsPath != null)
-        //    //    {   // kann auch schr‰ge Ellipsen zuf¸gen mit Transformation
+        //    //    {   // kann auch schr√§ge Ellipsen zuf√ºgen mit Transformation
         //    //        GraphicsPath tmpPath = new GraphicsPath();
         //    //        tmpPath.AddArc((float)(center2d.x - majorRadius), (float)(center2d.y - minorRadius), (float)(2.0 * majorRadius), (float)(2.0 * minorRadius), fStartAng, fSweepAng);
         //    //        tmpPath.Transform(r);

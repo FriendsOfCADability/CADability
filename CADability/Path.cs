@@ -270,7 +270,7 @@ namespace CADability.GeoObject
 		/// <returns>The path or null if no cennecting objects found</returns>
 		public static Path CreateFromModel(ICurve BeginWith, Model model, Projection projection, bool flatten)
 		{
-			UntypedSet usedObjects = new UntypedSet();
+			HashSet<ICurve> usedObjects = new();
 			ArrayList connectedObjects = new ArrayList();
 			usedObjects.Add(BeginWith);
 			IGeoObject go = BeginWith.Clone() as IGeoObject; ;
@@ -391,7 +391,7 @@ namespace CADability.GeoObject
 		/// <returns>The path or null if no cennecting objects found</returns>
 		public static Path CreateFromModel(ICurve BeginWith, Model model, bool flatten)
 		{
-			UntypedSet usedObjects = new UntypedSet();
+			HashSet<ICurve> usedObjects = new();
 			ArrayList connectedObjects = new ArrayList();
 			usedObjects.Add(BeginWith);
 			IGeoObject go = BeginWith.Clone() as IGeoObject; ;

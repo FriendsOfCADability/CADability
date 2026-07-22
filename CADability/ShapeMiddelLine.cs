@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
-using Wintellect.PowerCollections;
 
 namespace CADability
 {
@@ -247,7 +246,7 @@ namespace CADability
             }
             // alle Schraffurlinien wurden erzeugt, jetzt mit Anfangs/Endpunkt checken, welche Kurvenpaare zusammen gehören
             double eps = extent.Size / 10000;
-            Dictionary<Pair<int, int>, List<Position>> connections = new Dictionary<Pair<int, int>, List<Position>>();
+            Dictionary<(int Index1, int Index2), List<Position>> connections = new();
             for (int i = 0; i < allHatchLines.Count; i++)
             {
                 GeoPoint2D sp = (allHatchLines[i] as Line).StartPoint.To2D();
@@ -309,17 +308,17 @@ namespace CADability
                         if (dist < 3 * maxWidth) // von 2 auf 3 erhöht
                         {
                             List<Position> positionlist;
-                            if (!connections.TryGetValue(new Pair<int, int>(ind1, ind2), out positionlist))
+                            if (!connections.TryGetValue((ind1, ind2), out positionlist))
                             {
                                 positionlist = new List<Position>();
-                                connections[new Pair<int, int>(ind1, ind2)] = positionlist;
+                                connections[(ind1, ind2)] = positionlist;
                             }
                             positionlist.Add(new Position(pos1, pos2, dist));
                         }
                     }
                 }
             }
-            foreach (KeyValuePair<Pair<int, int>, List<Position>> kv in connections)
+            foreach (KeyValuePair<(int Index1, int Index2), List<Position>> kv in connections)
             {
                 kv.Value.Sort(delegate (Position b1, Position b2)
                 {
@@ -331,10 +330,10 @@ namespace CADability
                 }
                 );
 #if DEBUG
-                dc.Add(new Line2D(allParts[kv.Key.First].PointAt(kv.Value[0].pos1), allParts[kv.Key.Second].PointAt(kv.Value[0].pos2)));
+                dc.Add(new Line2D(allParts[kv.Key.Index1].PointAt(kv.Value[0].pos1), allParts[kv.Key.Index2].PointAt(kv.Value[0].pos2)));
 #endif
-                ICurve2D curve1 = allParts[kv.Key.First];
-                ICurve2D curve2 = allParts[kv.Key.Second];
+                ICurve2D curve1 = allParts[kv.Key.Index1];
+                ICurve2D curve2 = allParts[kv.Key.Index2];
                 List<ParallelInfo> pi1 = curve1.UserData.GetData("Parallel") as List<ParallelInfo>;
                 if (pi1 == null)
                 {
@@ -1679,7 +1678,7 @@ namespace CADability
             int numSamples = 10;
             for (int i = 0; i < allParts.Count; i++)
             {
-                Set<ICurve2D> toCheckWith = new Set<ICurve2D>();
+                HashSet<ICurve2D> toCheckWith = new HashSet<ICurve2D>();
                 for (int j = 1; j < numSamples - 1; j++) // Start- und Endpunkt ignorieren
                 {
                     double pos = (double)j / (double)numSamples;
@@ -1687,7 +1686,7 @@ namespace CADability
                     GeoVector2D dir = allParts[i].DirectionAt(pos);
                     GeoPoint2D pe = ps + maxWidth * dir.ToLeft().Normalized;
                     ICurve2D[] hit = quadtree.GetObjectsCloseTo(new Line2D(ps, pe));
-                    toCheckWith.AddMany(hit);
+                    toCheckWith.UnionWith(hit);
                 }
                 //FindMiddleLine(allParts[i]);
                 //double minpc1, maxpc1, minpc2, maxpc2;

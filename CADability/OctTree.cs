@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Wintellect.PowerCollections;
 
 namespace CADability
 {
@@ -473,13 +472,13 @@ namespace CADability
                     }
                 }
             }
-            internal void GetObjectsFromLine(GeoPoint start, GeoVector dir, double maxdist, Set<TT> addToList)
+            internal void GetObjectsFromLine(GeoPoint start, GeoVector dir, double maxdist, HashSet<TT> addToList)
             {
                 if (cube.Interferes(start, dir, maxdist, false))
                 {
                     if (list != null)
                     {
-                        addToList.AddMany(list);
+                        addToList.UnionWith(list);
                     }
                     else if (ppp != null)
                     {
@@ -494,7 +493,7 @@ namespace CADability
                     }
                 }
             }
-            internal void GetObjectsFromRect(Projection projection, BoundingRect rect, bool onlyInside, Set<TT> addToList, HashSet<TT> alreadyTested)
+            internal void GetObjectsFromRect(Projection projection, BoundingRect rect, bool onlyInside, HashSet<TT> addToList, HashSet<TT> alreadyTested)
             {
                 if (cube.Interferes(projection, rect))
                 {
@@ -521,7 +520,7 @@ namespace CADability
                     }
                 }
             }
-            internal void GetObjectsFromRect(Projection.PickArea area, bool onlyInside, Set<TT> addToList, HashSet<TT> alreadyTested)
+            internal void GetObjectsFromRect(Projection.PickArea area, bool onlyInside, HashSet<TT> addToList, HashSet<TT> alreadyTested)
             {
                 if (area == null) return;
                 if (cube.Interferes(area))
@@ -549,7 +548,7 @@ namespace CADability
                     }
                 }
             }
-            internal void GetObjectsCloseTo(IOctTreeInsertable closeToThis, Set<TT> addToList)
+            internal void GetObjectsCloseTo(IOctTreeInsertable closeToThis, HashSet<TT> addToList)
             {
                 BoundingCube clone = cube;
                 if (closeToThis.HitTest(ref clone, root.precision))
@@ -558,7 +557,7 @@ namespace CADability
                     {
                         lock (addToList)
                         {
-                            addToList.AddMany(list);
+                            addToList.UnionWith(list);
                         }
                     }
                     else
@@ -646,7 +645,7 @@ namespace CADability
                     }
                 }
             }
-            internal void GetObjectsFromBox(BoundingCube box, Set<TT> addToList, Filter filter)
+            internal void GetObjectsFromBox(BoundingCube box, HashSet<TT> addToList, Filter filter)
             {
                 if (!BoundingCube.Disjoint(cube, box))
                 {
@@ -692,13 +691,13 @@ namespace CADability
                     }
                 }
             }
-            internal void GetObjectsFromPoint(GeoPoint p, Set<TT> addToList)
+            internal void GetObjectsFromPoint(GeoPoint p, HashSet<TT> addToList)
             {
                 if (cube.Contains(p))
                 {
                     if (list != null)
                     {
-                        addToList.AddMany(list);
+                        addToList.UnionWith(list);
                     }
                     else if (ppp != null)
                     {
@@ -713,7 +712,7 @@ namespace CADability
                     }
                 }
             }
-            internal void GetObjectsFromPlane(Plane plane, Set<T> addToList)
+            internal void GetObjectsFromPlane(Plane plane, HashSet<T> addToList)
             {
                 if (cube.Interferes(plane))
                 {
@@ -998,7 +997,7 @@ namespace CADability
 
 #endregion
 
-            internal void GetAllObjects(Set<T> addToList)
+            internal void GetAllObjects(HashSet<T> addToList)
             {
                 if (list != null)
                 {
@@ -1189,7 +1188,7 @@ namespace CADability
         /// <returns>Array of all objects which match the criterion</returns>
         public T[] GetObjectsFromLine(GeoPoint start, GeoVector dir, double maxdist)
         {
-            Set<T> addToList = new Set<T>();
+            HashSet<T> addToList = new HashSet<T>();
             node.GetObjectsFromLine(start, dir, maxdist, addToList);
             return addToList.ToArray();
         }
@@ -1204,7 +1203,7 @@ namespace CADability
         public T[] GetObjectsFromRect(Projection projection, BoundingRect rect, bool onlyInside)
         {
             //GeoObjectList dbg = DebugCheck(delegate(IOctTreeInsertable[] theList, BoundingCube bc) { return bc.Interferes(projection, rect); });
-            Set<T> addToList = new Set<T>();
+            HashSet<T> addToList = new HashSet<T>();
             node.GetObjectsFromRect(projection, rect, onlyInside, addToList, new HashSet<T>());
             return addToList.ToArray();
         }
@@ -1219,7 +1218,7 @@ namespace CADability
         public T[] GetObjectsFromRect(Projection.PickArea area, bool onlyInside)
         {
             //GeoObjectList dbg = DebugCheck(delegate(IOctTreeInsertable[] theList, BoundingCube bc) { return bc.Interferes(projection, rect); });
-            Set<T> addToList = new Set<T>();
+            HashSet<T> addToList = new HashSet<T>();
             node.GetObjectsFromRect(area, onlyInside, addToList, new HashSet<T>());
             return addToList.ToArray();
         }
@@ -1231,7 +1230,7 @@ namespace CADability
         public T[] GetObjectsFromBox(BoundingCube box)
         {
             //GeoObjectList dbg = DebugCheck(delegate(IOctTreeInsertable[] theList, BoundingCube bc) { return bc.Interferes(projection, rect); });
-            Set<T> addToList = new Set<T>();
+            HashSet<T> addToList = new HashSet<T>();
             node.GetObjectsFromBox(box, addToList, null);
             return addToList.ToArray();
         }
@@ -1244,7 +1243,7 @@ namespace CADability
         public T[] GetObjectsFromBox(BoundingCube box, Filter filter)
         {
             //GeoObjectList dbg = DebugCheck(delegate(IOctTreeInsertable[] theList, BoundingCube bc) { return bc.Interferes(projection, rect); });
-            Set<T> addToList = new Set<T>();
+            HashSet<T> addToList = new HashSet<T>();
             node.GetObjectsFromBox(box, addToList, filter);
             return addToList.ToArray();
         }
@@ -1269,7 +1268,7 @@ namespace CADability
         public T[] GetObjectsFromPoint(GeoPoint p)
         {
             //GeoObjectList dbg = DebugCheck(delegate(IOctTreeInsertable[] theList, BoundingCube bc) { return bc.Interferes(projection, rect); });
-            Set<T> addToList = new Set<T>();
+            HashSet<T> addToList = new HashSet<T>();
             if (node != null) node.GetObjectsFromPoint(p, addToList);
             return addToList.ToArray();
         }
@@ -1280,7 +1279,7 @@ namespace CADability
         /// <returns>All objects close to the plane</returns>
         public T[] GetObjectsFromPlane(Plane plane)
         {
-            Set<T> addToList = new Set<T>();
+            HashSet<T> addToList = new HashSet<T>();
             node.GetObjectsFromPlane(plane, addToList);
             return addToList.ToArray();
         }
@@ -1291,7 +1290,7 @@ namespace CADability
         /// <returns>All objects close to <paramref name="closeToThis"/></returns>
         public T[] GetObjectsCloseTo(IOctTreeInsertable closeToThis)
         {
-            Set<T> addToList = new Set<T>();
+            HashSet<T> addToList = new HashSet<T>();
             if (node != null) node.GetObjectsCloseTo(closeToThis, addToList);
             return addToList.ToArray();
         }
@@ -1526,14 +1525,14 @@ namespace CADability
             }
             return res;
         }
-        public GeoObjectList DebugCubesByObject(Set<T> objs)
+        public GeoObjectList DebugCubesByObject(HashSet<T> objs)
         {
             GeoObjectList res = new GeoObjectList();
             foreach (Node<T> node in Leaves)
             {
                 if (node.list != null)
                 {
-                    if (objs.Intersection(new Set<T>(node.list)).Count > 0)
+                    if (objs.Overlaps(node.list))
                     {
                         res.Add(node.cube.AsBox);
                     }
@@ -1574,7 +1573,7 @@ namespace CADability
 
         public T[] GetAllObjects()
         {
-            Set<T> res = new Set<T>();
+            HashSet<T> res = new HashSet<T>();
             if (!IsEmpty) node.GetAllObjects(res);
             return res.ToArray();
         }

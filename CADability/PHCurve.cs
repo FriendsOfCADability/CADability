@@ -3,7 +3,6 @@ using System.Numerics;
 using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
-using Wintellect.PowerCollections;
 
 
 
@@ -734,7 +733,7 @@ namespace CADability.GeoObject
             Complex d0, d1, rho1, rho2, rhosqr, alpha11, alpha12, alpha21, alpha22;
             Complex mu111, mu112, mu121, mu122, mu211, mu212, mu221, mu222;
             Complex a11, a12, a21, a22, b11, b12, b21, b22;
-            SortedList<double, Pair<Complex, Complex>> ab = new SortedList<double, Pair<Complex, Complex>>(4);
+            SortedList<double, (Complex A, Complex B)> ab = new(4);
             d0 = stdDeriv(derivs[i], i);
             d1 = stdDeriv(derivs2[i], i);
             rho1 = (d0 / d1).SquareRoot();
@@ -760,12 +759,12 @@ namespace CADability.GeoObject
             b21 = mu212 / (mu212 + 1);
             a22 = mu221 / (mu221 + 1);
             b22 = mu222 / (mu222 + 1);
-            ab[absRotInd(a11, b11)] = new Pair<Complex, Complex>(a11, b11);
-            ab[absRotInd(a12, b12)] = new Pair<Complex, Complex>(a12, b12);
-            ab[absRotInd(a21, b21)] = new Pair<Complex, Complex>(a21, b21);
-            ab[absRotInd(a22, b22)] = new Pair<Complex, Complex>(a22, b22);
-            a[i] = ab.Values[0].First;
-            b[i] = ab.Values[0].Second;
+            ab[absRotInd(a11, b11)] = (a11, b11);
+            ab[absRotInd(a12, b12)] = (a12, b12);
+            ab[absRotInd(a21, b21)] = (a21, b21);
+            ab[absRotInd(a22, b22)] = (a22, b22);
+            a[i] = ab.Values[0].A;
+            b[i] = ab.Values[0].B;
             k[i] = d0 / (a[i].Square() * b[i].Square());
             c[i] = k[i] / 30 * (a[i].Power(5.0) - 5 * a[i].Power(4.0) * b[i] + 10 * a[i].Square() * a[i] * b[i].Square());
         }

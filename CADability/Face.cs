@@ -5764,6 +5764,8 @@ namespace CADability.GeoObject
         private object lockTriangulationRecalc;
         private object lockTriangulationData;
         private GeoPoint[] trianglePoint;
+        private GeoVector[] triangleNormal;    // cached normals for trianglePoint (see PaintFaceTo3D)
+        private GeoPoint[] triangleNormalFor;  // the trianglePoint array the cache was computed for
         private GeoPoint2D[] triangleUVPoint;
         private int[] triangleIndex;
         private double trianglePrecision;
@@ -6910,14 +6912,22 @@ namespace CADability.GeoObject
                                 paintTo3D.SetColor(colorDef.Color);
                         }
                     }
-                    GeoVector[] normals = new GeoVector[trianglePoint.Length];
-                    for (int i = 0; i < trianglePoint.Length; ++i)
+                    // The normals only depend on the triangulation: cache them instead of
+                    // recomputing surface.GetNormal for every vertex on every paint — for a
+                    // finely tessellated face that was hundreds of thousands of evaluations
+                    // and a multi MB allocation per frame/recording.
+                    if (triangleNormal == null || !ReferenceEquals(triangleNormalFor, trianglePoint))
                     {
-                        normals[i] = surface.GetNormal(triangleUVPoint[i]);
-                        normals[i].NormIfNotNull();
-
+                        GeoVector[] normals = new GeoVector[trianglePoint.Length];
+                        for (int i = 0; i < trianglePoint.Length; ++i)
+                        {
+                            normals[i] = surface.GetNormal(triangleUVPoint[i]);
+                            normals[i].NormIfNotNull();
+                        }
+                        triangleNormal = normals;
+                        triangleNormalFor = trianglePoint;
                     }
-                    paintTo3D.Triangle(trianglePoint, normals, triangleIndex);
+                    paintTo3D.Triangle(trianglePoint, triangleNormal, triangleIndex);
                 }
             }
         }

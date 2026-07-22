@@ -8,12 +8,10 @@ uniform mat4 u_modelview;
 uniform mat3 u_normal_matrix;
 
 out vec3 vNormal;
-out vec3 vFragPos;
 
 void main()
 {
     vec4 worldPos = u_modelview * vec4(aPosition, 1.0);
-    vFragPos = worldPos.xyz;
     // a zero normal marks unlit geometry (text glyphs, see IPaintTo3DFlatText);
     // it must be passed through as zero, normalize() of a zero vector is undefined
     if (dot(aNormal, aNormal) < 1e-12)

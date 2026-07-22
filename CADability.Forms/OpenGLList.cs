@@ -62,6 +62,38 @@ namespace CADability.Forms
 
         internal bool IsGpuUploaded;
         internal GL Gl;
+        private bool disposed;
+
+        // GPU resources of garbage collected lists. GL calls are not possible on the finalizer
+        // thread, so the ids are queued here and deleted by FreeDeleted on the render thread
+        // (same pattern as the old OpenGlList.FreeLists).
+        private static readonly List<uint> vaosToDelete = new();
+        private static readonly List<uint> vbosToDelete = new();
+
+        ~PaintToSilkGLList()
+        {
+            if (IsGpuUploaded && !disposed)
+            {
+                lock (vaosToDelete)
+                {
+                    if (SurfaceVao != 0) vaosToDelete.Add(SurfaceVao);
+                    if (EdgeVao    != 0) vaosToDelete.Add(EdgeVao);
+                    if (SurfaceVbo != 0) vbosToDelete.Add(SurfaceVbo);
+                    if (EdgeVbo    != 0) vbosToDelete.Add(EdgeVbo);
+                }
+            }
+        }
+
+        internal static void FreeDeleted(GL gl)
+        {
+            lock (vaosToDelete)
+            {
+                for (int i = 0; i < vaosToDelete.Count; i++) gl.DeleteVertexArray(vaosToDelete[i]);
+                for (int i = 0; i < vbosToDelete.Count; i++) gl.DeleteBuffer(vbosToDelete[i]);
+                vaosToDelete.Clear();
+                vbosToDelete.Clear();
+            }
+        }
 
         public string Name { get; set; }
 
@@ -102,11 +134,18 @@ namespace CADability.Forms
                 gl.BindVertexArray(0);
             }
 
+            // the vertex data now lives on the GPU; keeping the arrays alive as well would
+            // roughly double the memory footprint of every display list
+            SurfaceVertices = null;
+            EdgeVertices    = null;
+
             IsGpuUploaded = true;
         }
 
         public void Dispose()
         {
+            disposed = true;
+            GC.SuppressFinalize(this);
             if (IsGpuUploaded && Gl != null)
             {
                 if (SurfaceVao != 0) { Gl.DeleteVertexArray(SurfaceVao); SurfaceVao = 0; }

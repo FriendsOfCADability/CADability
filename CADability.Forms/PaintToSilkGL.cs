@@ -18,6 +18,28 @@ namespace CADability.Forms
         private IntPtr hdc;
         private IntPtr hglrc;
 
+        // One WGL context shared by all views (and off-screen renderers): the categorized
+        // display lists live on the Model and are painted by every view, so their VAOs/VBOs
+        // (and the font/texture caches) must be valid in each of them. A WGL context can be
+        // made current against any DC with the same pixel format. Replacement for the old
+        // MainRenderContext + wglShareLists mechanism; lives until the process ends.
+        private static IntPtr sharedHglrc = IntPtr.Zero;
+        private static GL sharedGl;
+
+        private void InitSharedContext(IntPtr windowHandle)
+        {
+            hdc = WglContext.PrepareDC(windowHandle);
+            if (sharedHglrc == IntPtr.Zero)
+            {
+                sharedHglrc = WglContext.CreateContext(hdc);
+                WglContext.MakeCurrent(hdc, sharedHglrc);
+                sharedGl = WglContext.CreateSilkGL();
+            }
+            hglrc = sharedHglrc;
+            WglContext.MakeCurrent(hdc, hglrc);
+            gl = sharedGl;
+        }
+
         // Off-screen rendering (see Init(Bitmap)): a hidden window hosts the GL context,
         // rendering goes into a framebuffer object which is copied into targetBitmap
         private NativeWindow hiddenWindow;
@@ -101,6 +123,7 @@ namespace CADability.Forms
         private int surfLoc_normal_matrix;
         private int surfLoc_color;
         private int surfLoc_light_pos;
+        private int surfLoc_view_dir;
 
         private int edgeLoc_projection;
         private int edgeLoc_modelview;
@@ -120,6 +143,7 @@ namespace CADability.Forms
         private Stack<float[]> modopStack = new();
 
         private float lightX, lightY, lightZ;
+        private float viewDirX = 0f, viewDirY = 0f, viewDirZ = 1f; // toward the viewer, world space
 
         private Color currentColor = Color.White;
         private int colorLock;
@@ -163,9 +187,7 @@ namespace CADability.Forms
         internal void Init(Control ctrl)
         {
             hwnd = ctrl.Handle;
-            (hdc, hglrc) = WglContext.Create(hwnd);
-            WglContext.MakeCurrent(hdc, hglrc);
-            gl = WglContext.CreateSilkGL();
+            InitSharedContext(hwnd);
             viewWidth  = Math.Max(1, ctrl.ClientSize.Width);
             viewHeight = Math.Max(1, ctrl.ClientSize.Height);
 
@@ -197,9 +219,7 @@ namespace CADability.Forms
                 hiddenWindow = new NativeWindow();
                 hiddenWindow.CreateHandle(new CreateParams { Width = 1, Height = 1 }); // no WS_VISIBLE: never shown
                 hwnd = hiddenWindow.Handle;
-                (hdc, hglrc) = WglContext.Create(hwnd);
-                WglContext.MakeCurrent(hdc, hglrc);
-                gl = WglContext.CreateSilkGL();
+                InitSharedContext(hwnd);
 
                 CompileShaders();
                 InitStreamBuffer();
@@ -335,6 +355,7 @@ namespace CADability.Forms
             surfLoc_normal_matrix = gl.GetUniformLocation(surfaceProgram, "u_normal_matrix");
             surfLoc_color         = gl.GetUniformLocation(surfaceProgram, "u_color");
             surfLoc_light_pos     = gl.GetUniformLocation(surfaceProgram, "u_light_pos");
+            surfLoc_view_dir      = gl.GetUniformLocation(surfaceProgram, "u_view_dir");
 
             edgeLoc_projection   = gl.GetUniformLocation(edgeProgram, "u_projection");
             edgeLoc_modelview    = gl.GetUniformLocation(edgeProgram, "u_modelview");
@@ -382,6 +403,7 @@ namespace CADability.Forms
             Color c = selectMode ? selectColor : currentColor;
             gl.Uniform4(surfLoc_color, c.R / 255f, c.G / 255f, c.B / 255f, c.A / 255f);
             gl.Uniform3(surfLoc_light_pos, lightX, lightY, lightZ);
+            gl.Uniform3(surfLoc_view_dir, viewDirX, viewDirY, viewDirZ);
         }
 
         private void UploadEdgeUniforms(float[] proj, float[] mv)
@@ -1063,21 +1085,20 @@ namespace CADability.Forms
 
             if (!list.IsGpuUploaded) list.UploadToGpu(gl);
 
-            if (paintSurfaces) DrawListSurface(list);
-            if (paintEdges)    DrawListEdge(list);
-
-            // textured quads and sprites replay in the faces phase only, so the two-phase
-            // replay (faces + curves) of the categorized display lists draws them once
-            if (paintSurfaces)
-            {
-                if (list.TexQuads != null)
-                    foreach (var q in list.TexQuads)
-                        DrawTexturedVerts(q.Texture, q.Verts, Color.White, projectionMatrix, modelviewMatrix);
-                if (list.Sprites != null)
-                    foreach (var s in list.Sprites)
-                        DrawSpriteQuad(s.Texture, s.X, s.Y, s.Z, s.W, s.H, s.Ax, s.Ay,
-                            s.Mask ? (selectMode ? selectColor : currentColor) : Color.White);
-            }
+            // The whole list content replays unconditionally, like the old glCallList did:
+            // the PaintFaces mode controls what core code emits while recording (and the
+            // polygon offset), not what an already recorded list draws. Curve-phase lists
+            // legitimately contain surface geometry — dimension text and filled arrow heads,
+            // point symbol sprites — which must not be dropped at replay time.
+            DrawListSurface(list);
+            DrawListEdge(list);
+            if (list.TexQuads != null)
+                foreach (var q in list.TexQuads)
+                    DrawTexturedVerts(q.Texture, q.Verts, Color.White, projectionMatrix, modelviewMatrix);
+            if (list.Sprites != null)
+                foreach (var s in list.Sprites)
+                    DrawSpriteQuad(s.Texture, s.X, s.Y, s.Z, s.W, s.H, s.Ax, s.Ay,
+                        s.Mask ? (selectMode ? selectColor : currentColor) : Color.White);
 
             // Replay static composite sub-lists (from MakeList)
             if (list.SubLists != null)
@@ -1101,6 +1122,31 @@ namespace CADability.Forms
 
         public void SelectedList(IPaintTo3DList paintThisList, int wobbleRadius)
         {
+            if (paintThisList == null) return;
+            if (wobbleRadius <= 0)
+            {
+                // Feedback highlight (e.g. the trim candidate, ActionFeedBack passes -1):
+                // the old renderer drew the whole list once in the select color, translated
+                // 2*precision toward the viewer so it wins the depth test over the object.
+                bool fbSelect   = selectMode;
+                bool fbSurfaces = paintSurfaces;
+                bool fbEdges    = paintEdges;
+                selectMode    = true;
+                paintSurfaces = true;
+                paintEdges    = true;
+                float[] savedMV = modelviewMatrix;
+                modelviewMatrix = (float[])savedMV.Clone();
+                modelviewMatrix[12] += (float)(2.0 * precision) * viewDirX;
+                modelviewMatrix[13] += (float)(2.0 * precision) * viewDirY;
+                modelviewMatrix[14] += (float)(2.0 * precision) * viewDirZ;
+                List(paintThisList);
+                modelviewMatrix = savedMV;
+                selectMode    = fbSelect;
+                paintSurfaces = fbSurfaces;
+                paintEdges    = fbEdges;
+                return;
+            }
+
             float[] savedProj = projectionMatrix;
 
             // Draw all geometry in select color at every shifted position — yellow halo.
@@ -1226,6 +1272,16 @@ namespace CADability.Forms
             lightY = (float)v.y;
             lightZ = (float)v.z;
 
+            // view direction toward the viewer (projection.Direction points into the scene)
+            GeoVector d = projection.Direction;
+            double dlen = Math.Sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
+            if (dlen > 0.0)
+            {
+                viewDirX = (float)(-d.x / dlen);
+                viewDirY = (float)(-d.y / dlen);
+                viewDirZ = (float)(-d.z / dlen);
+            }
+
             pixelToWorld = projection.DeviceToWorldFactor;
             useLineWidth = projection.UseLineWidth;
             if (useLineWidth) gl.Enable(EnableCap.LineSmooth);
@@ -1247,6 +1303,9 @@ namespace CADability.Forms
 
         public void OpenList(string name = null)
         {
+            // creating new lists is a good moment to delete the GPU buffers of collected ones
+            // (same place as the old OpenGlList.FreeLists call)
+            if (gl != null && !inList) PaintToSilkGLList.FreeDeleted(gl);
             // Always record with selectMode=false so SubListCall colors capture the object's
             // own color, not the caller's selection color. selectMode only applies at replay time.
             listNestStack.Push((currentList, listSurfBuf, listEdgeBuf, modelviewMatrix, selectMode));
@@ -1305,7 +1364,10 @@ namespace CADability.Forms
             Polyline(pts);
         }
 
-        public void FreeUnusedLists() { /* GC and Dispose handle GPU resources */ }
+        public void FreeUnusedLists()
+        {
+            if (gl != null) PaintToSilkGLList.FreeDeleted(gl);
+        }
 
         public void UseZBuffer(bool use)
         {
@@ -1398,28 +1460,35 @@ namespace CADability.Forms
                 }
                 catch (Exception) { }
             }
-            if (gl != null)
+            if (gl != null && hglrc != IntPtr.Zero)
             {
-                if (surfaceProgram != 0) gl.DeleteProgram(surfaceProgram);
-                if (edgeProgram    != 0) gl.DeleteProgram(edgeProgram);
-                if (textureProgram != 0) gl.DeleteProgram(textureProgram);
-                foreach (uint tex in textures.Values) gl.DeleteTexture(tex);
-                foreach ((uint tex, _, _) in sprites.Values) gl.DeleteTexture(tex);
-                foreach (uint tex in iconMasks.Values) gl.DeleteTexture(tex);
+                try
+                {
+                    WglContext.MakeCurrent(hdc, hglrc); // GL deletes need the context current
+                    if (surfaceProgram != 0) gl.DeleteProgram(surfaceProgram);
+                    if (edgeProgram    != 0) gl.DeleteProgram(edgeProgram);
+                    if (textureProgram != 0) gl.DeleteProgram(textureProgram);
+                    foreach (uint tex in textures.Values) gl.DeleteTexture(tex);
+                    foreach ((uint tex, _, _) in sprites.Values) gl.DeleteTexture(tex);
+                    foreach (uint tex in iconMasks.Values) gl.DeleteTexture(tex);
+                    if (streamVao != 0) gl.DeleteVertexArray(streamVao);
+                    if (streamVbo != 0) gl.DeleteBuffer(streamVbo);
+                    if (fbo        != 0) { gl.DeleteFramebuffer(fbo);         fbo = 0; }
+                    if (fboColorRb != 0) { gl.DeleteRenderbuffer(fboColorRb); fboColorRb = 0; }
+                    if (fboDepthRb != 0) { gl.DeleteRenderbuffer(fboDepthRb); fboDepthRb = 0; }
+                }
+                catch (Exception) { } // best effort — the window may already be destroyed
                 textures.Clear(); sprites.Clear(); iconMasks.Clear();
-                if (streamVao != 0) gl.DeleteVertexArray(streamVao);
-                if (streamVbo != 0) gl.DeleteBuffer(streamVbo);
-                if (fbo        != 0) { gl.DeleteFramebuffer(fbo);         fbo = 0; }
-                if (fboColorRb != 0) { gl.DeleteRenderbuffer(fboColorRb); fboColorRb = 0; }
-                if (fboDepthRb != 0) { gl.DeleteRenderbuffer(fboDepthRb); fboDepthRb = 0; }
-                gl.Dispose();
+                // gl is the process wide shared GL api object: it stays alive for other views
                 gl = null;
             }
-            if (hglrc != IntPtr.Zero)
+            if (hdc != IntPtr.Zero)
             {
-                WglContext.Delete(hdc, hwnd, hglrc);
-                hglrc = IntPtr.Zero;
+                // the rendering context is shared with other views and lives until the process
+                // ends; only the device context belongs to this window
+                WglContext.ReleaseDeviceContext(hdc, hwnd);
                 hdc   = IntPtr.Zero;
+                hglrc = IntPtr.Zero;
             }
             if (hiddenWindow != null)
             {

@@ -1,10 +1,10 @@
 #version 330 core
 
 in vec3 vNormal;
-in vec3 vFragPos;
 
 uniform vec4 u_color;
 uniform vec3 u_light_pos;
+uniform vec3 u_view_dir; // direction from the surface toward the viewer, constant per view
 
 out vec4 FragColor;
 
@@ -27,10 +27,14 @@ void main()
     vec3 ambient = 0.2 * u_color.rgb;
     vec3 diffuse = diff * u_color.rgb;
 
-    vec3 viewDir = normalize(-vFragPos);
+    // The view direction is constant (orthographic viewer at infinity), like the old
+    // fixed-function pipeline. A per-fragment direction toward some point would smear
+    // the highlight over curved surfaces. Old shininess was 5 (broad, soft highlight);
+    // the strength is halved because per-fragment specular is punchier than Gouraud.
+    vec3 viewDir = normalize(u_view_dir);
     vec3 reflectDir = reflect(-lightDir, norm);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
-    vec3 specular = 0.3 * spec * vec3(1.0);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 5.0);
+    vec3 specular = 0.5 * spec * vec3(1.0);
 
     FragColor = vec4(ambient + diffuse + specular, u_color.a);
 }

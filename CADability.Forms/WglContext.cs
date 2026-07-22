@@ -54,7 +54,11 @@ namespace CADability.Forms
 
         #endregion
 
-        public static (IntPtr hdc, IntPtr hglrc) Create(IntPtr hwnd)
+        /// <summary>
+        /// Gets the DC of the window and sets the standard pixel format on it, so that the
+        /// shared rendering context can be made current against it.
+        /// </summary>
+        public static IntPtr PrepareDC(IntPtr hwnd)
         {
             IntPtr hdc = GetDC(hwnd);
             if (hdc == IntPtr.Zero)
@@ -79,11 +83,15 @@ namespace CADability.Forms
             if (!SetPixelFormat(hdc, pixelFormat, ref pfd))
                 throw new InvalidOperationException("SetPixelFormat failed");
 
+            return hdc;
+        }
+
+        public static IntPtr CreateContext(IntPtr hdc)
+        {
             IntPtr hglrc = wglCreateContext(hdc);
             if (hglrc == IntPtr.Zero)
                 throw new InvalidOperationException("wglCreateContext failed");
-
-            return (hdc, hglrc);
+            return hglrc;
         }
 
         public static void MakeCurrent(IntPtr hdc, IntPtr hglrc)
@@ -97,10 +105,8 @@ namespace CADability.Forms
             SwapBuffers(hdc);
         }
 
-        public static void Delete(IntPtr hdc, IntPtr hwnd, IntPtr hglrc)
+        public static void ReleaseDeviceContext(IntPtr hdc, IntPtr hwnd)
         {
-            wglMakeCurrent(IntPtr.Zero, IntPtr.Zero);
-            wglDeleteContext(hglrc);
             ReleaseDC(hwnd, hdc);
         }
 

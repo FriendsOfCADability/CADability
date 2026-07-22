@@ -679,7 +679,10 @@ namespace CADability.Forms
         // IPaintTo3D properties
         // -------------------------------------------------------------------------
 
-        public bool PaintSurfaces => paintSurfaces;
+        // flatTextMode: text glyphs are tessellated via Face.PaintTo3D, which skips emission
+        // when PaintSurfaces is false. Glyph display lists can be created while recording a
+        // curve-phase list (e.g. dimension text) — without this they would be cached empty.
+        public bool PaintSurfaces => paintSurfaces || flatTextMode;
         public bool PaintEdges    => paintEdges;
         public bool PaintSurfaceEdges { get => paintSurfaceEdges; set => paintSurfaceEdges = value; }
         public bool UseLineWidth      { get => useLineWidth;      set => useLineWidth = value; }

@@ -2321,6 +2321,22 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
+        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3DList (IPaintTo3D, ICategorizedDislayLists)"/>
+        /// </summary>
+        /// <param name="paintTo3D"></param>
+        /// <param name="lists"></param>
+        public override void PaintTo3DList(IPaintTo3D paintTo3D, ICategorizedDislayLists lists)
+        {
+            PrePaintTo3D(paintTo3D);
+            // A dimension contains curves (dimension and extension lines) as well as surface
+            // geometry: triangulated text glyphs and filled arrow heads (solid Hatch). The
+            // base implementation registers only for the curve category, whose display list
+            // is recorded with PaintSurfaces == false, so the text and the arrow fillings
+            // were never recorded. Register for both categories like solids do: the face
+            // phase records the text/arrow faces, the curve phase records the lines.
+            lists.Add(Layer, true, true, this);
+        }
+        /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PrepareDisplayList (double)"/>
         /// </summary>
         /// <param name="precision"></param>

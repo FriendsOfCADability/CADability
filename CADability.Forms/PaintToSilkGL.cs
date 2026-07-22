@@ -620,7 +620,15 @@ namespace CADability.Forms
             text.Strikeout = (fontStyle & FontStyle.Strikeout) != 0;
 
             bool savedTriangulate = triangulateText;
+            bool savedSurfaces    = paintSurfaces;
+            bool savedEdges       = paintEdges;
             triangulateText = true; // with TriangulateText == false Text.PaintTo3D would call back into this method
+            // The glyphs replay via List(), which is gated by paintSurfaces/paintEdges. The coordinate
+            // cross is painted right after the model's curve phase (PaintFaces(CurvesOnly), so
+            // paintSurfaces is false there) — the old renderer drew text regardless of the paint mode,
+            // so force the flags on for the duration of this call.
+            paintSurfaces = true;
+            paintEdges    = true;
             try
             {
                 text.PrePaintTo3D(this); // creates the per-character display lists in the font cache
@@ -629,6 +637,8 @@ namespace CADability.Forms
             finally
             {
                 triangulateText = savedTriangulate;
+                paintSurfaces   = savedSurfaces;
+                paintEdges      = savedEdges;
             }
         }
 

@@ -38,6 +38,16 @@ namespace CADability.Forms
 
         private uint surfaceProgram;
         private uint edgeProgram;
+        private uint textureProgram;
+
+        private int texLoc_projection;
+        private int texLoc_modelview;
+        private int texLoc_color;
+
+        // bitmap → GL texture caches (uploaded by the Prepare* methods, deleted in Dispose)
+        private readonly Dictionary<Bitmap, uint> textures = new();                       // RectangularBitmap (Picture objects)
+        private readonly Dictionary<Bitmap, (uint tex, int xoff, int yoff)> sprites = new(); // DisplayBitmap (unscaled icons with anchor)
+        private readonly Dictionary<Bitmap, uint> iconMasks = new();                      // DisplayIcon (mask in current color)
 
         private int surfLoc_projection;
         private int surfLoc_modelview;
@@ -274,6 +284,17 @@ namespace CADability.Forms
             edgeLoc_projection = gl.GetUniformLocation(edgeProgram, "u_projection");
             edgeLoc_modelview  = gl.GetUniformLocation(edgeProgram, "u_modelview");
             edgeLoc_color      = gl.GetUniformLocation(edgeProgram, "u_color");
+
+            textureProgram = LinkProgram(
+                CompileShader(ShaderType.VertexShader,   ReadShader("texture.vert")),
+                CompileShader(ShaderType.FragmentShader, ReadShader("texture.frag")));
+
+            texLoc_projection = gl.GetUniformLocation(textureProgram, "u_projection");
+            texLoc_modelview  = gl.GetUniformLocation(textureProgram, "u_modelview");
+            texLoc_color      = gl.GetUniformLocation(textureProgram, "u_color");
+            gl.UseProgram(textureProgram);
+            gl.Uniform1(gl.GetUniformLocation(textureProgram, "u_texture"), 0); // sampler on texture unit 0
+            gl.UseProgram(0);
         }
 
         // -------------------------------------------------------------------------
@@ -415,6 +436,131 @@ namespace CADability.Forms
             UploadEdgeUniforms(proj, mv);
             gl.DrawArrays(mode, 0, (uint)vertCount);
             gl.BindVertexArray(0);
+        }
+
+        /// <summary>
+        /// Uploads a bitmap as an RGBA texture. Rows are flipped so that texcoord v=0 is the
+        /// bottom row (GL convention, same as the old renderer). With <paramref name="asMask"/>
+        /// the RGB channels are forced to white, keeping only the alpha channel, so the shader
+        /// can tint the sprite with the current color (glBitmap replacement for icons).
+        /// </summary>
+        private uint UploadTexture(Bitmap bmp, bool asMask)
+        {
+            int w = bmp.Width, h = bmp.Height;
+            using var tmp = new Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            using (var g = Graphics.FromImage(tmp))
+            {
+                g.DrawImage(bmp, new Rectangle(0, 0, w, h));
+            }
+            tmp.RotateFlip(RotateFlipType.RotateNoneFlipY);
+            var data = tmp.LockBits(new Rectangle(0, 0, w, h),
+                System.Drawing.Imaging.ImageLockMode.ReadOnly,
+                System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            byte[] pixels = new byte[w * h * 4];
+            try
+            {
+                System.Runtime.InteropServices.Marshal.Copy(data.Scan0, pixels, 0, pixels.Length);
+            }
+            finally
+            {
+                tmp.UnlockBits(data);
+            }
+            if (asMask)
+            {
+                for (int i = 0; i < pixels.Length; i += 4)
+                {
+                    pixels[i] = pixels[i + 1] = pixels[i + 2] = 255; // BGR → white, alpha stays
+                }
+            }
+            uint tex = gl.GenTexture();
+            gl.ActiveTexture(TextureUnit.Texture0);
+            gl.BindTexture(TextureTarget.Texture2D, tex);
+            gl.PixelStore(PixelStoreParameter.UnpackAlignment, 1);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)GLEnum.Repeat);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)GLEnum.Repeat);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Nearest);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Nearest);
+            gl.TexImage2D<byte>(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, (uint)w, (uint)h, 0,
+                PixelFormat.Bgra, PixelType.UnsignedByte, (ReadOnlySpan<byte>)pixels.AsSpan());
+            gl.BindTexture(TextureTarget.Texture2D, 0);
+            return tex;
+        }
+
+        // 6 vertices (2 triangles), 5 floats each (xyz + uv), same corner order as the old
+        // GL_QUADS: p0=location(0,0), p3=+dirHeight(0,1), p2=+both(1,1), p1=+dirWidth(1,0)
+        private static float[] BuildQuadVerts(GeoPoint location, GeoVector dirWidth, GeoVector dirHeight)
+        {
+            GeoPoint p0 = location;
+            GeoPoint p1 = location + dirWidth;
+            GeoPoint p2 = location + dirWidth + dirHeight;
+            GeoPoint p3 = location + dirHeight;
+            return new float[]
+            {
+                (float)p0.x, (float)p0.y, (float)p0.z, 0f, 0f,
+                (float)p3.x, (float)p3.y, (float)p3.z, 0f, 1f,
+                (float)p2.x, (float)p2.y, (float)p2.z, 1f, 1f,
+                (float)p0.x, (float)p0.y, (float)p0.z, 0f, 0f,
+                (float)p2.x, (float)p2.y, (float)p2.z, 1f, 1f,
+                (float)p1.x, (float)p1.y, (float)p1.z, 1f, 0f,
+            };
+        }
+
+        private unsafe void DrawTexturedVerts(uint tex, float[] verts, Color color, float[] proj, float[] mv)
+        {
+            if (tex == 0) return;
+            gl.Enable(EnableCap.Blend); // the alpha channel must always be respected for bitmaps
+            gl.BindVertexArray(streamVao);
+            gl.BindBuffer(BufferTargetARB.ArrayBuffer, streamVbo);
+            gl.BufferData<float>(BufferTargetARB.ArrayBuffer,
+                (ReadOnlySpan<float>)verts.AsSpan(), BufferUsageARB.StreamDraw);
+            gl.VertexAttribPointer(0, 3, GLEnum.Float, false, (uint)(5 * sizeof(float)), (void*)0);
+            gl.EnableVertexAttribArray(0);
+            gl.VertexAttribPointer(1, 2, GLEnum.Float, false, (uint)(5 * sizeof(float)), (void*)(3 * sizeof(float)));
+            gl.EnableVertexAttribArray(1);
+            gl.UseProgram(textureProgram);
+            gl.UniformMatrix4(texLoc_projection, 1, false, ref proj[0]);
+            gl.UniformMatrix4(texLoc_modelview,  1, false, ref mv[0]);
+            gl.Uniform4(texLoc_color, color.R / 255f, color.G / 255f, color.B / 255f, color.A / 255f);
+            gl.ActiveTexture(TextureUnit.Texture0);
+            gl.BindTexture(TextureTarget.Texture2D, tex);
+            gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)(verts.Length / 5));
+            gl.BindTexture(TextureTarget.Texture2D, 0);
+            gl.BindVertexArray(0);
+            if (!blending) gl.Disable(EnableCap.Blend);
+        }
+
+        /// <summary>
+        /// Draws a screen-aligned sprite: the world position is projected with the current
+        /// matrices, the quad is built in normalized device coordinates with a fixed pixel
+        /// size (replacement for the glRasterPos/glBitmap/glDrawPixels raster operations).
+        /// </summary>
+        private void DrawSpriteQuad(uint tex, double x, double y, double z, int w, int h,
+            float ax, float ay, Color color)
+        {
+            if (tex == 0) return;
+            float[] m = Mul4(projectionMatrix, modelviewMatrix);
+            float cx = (float)(m[0] * x + m[4] * y + m[8]  * z + m[12]);
+            float cy = (float)(m[1] * x + m[5] * y + m[9]  * z + m[13]);
+            float cz = (float)(m[2] * x + m[6] * y + m[10] * z + m[14]);
+            float cw = (float)(m[3] * x + m[7] * y + m[11] * z + m[15]);
+            if (cw <= 0f) return; // behind the camera
+            float ndcX = cx / cw, ndcY = cy / cw, ndcZ = cz / cw;
+            float sx = 2f / viewWidth, sy = 2f / viewHeight;
+            float left   = ndcX - ax * sx;
+            float bottom = ndcY - ay * sy;
+            float right  = left + w * sx;
+            float top    = bottom + h * sy;
+            float[] verts = new float[]
+            {
+                left,  bottom, ndcZ, 0f, 0f,
+                right, bottom, ndcZ, 1f, 0f,
+                right, top,    ndcZ, 1f, 1f,
+                left,  bottom, ndcZ, 0f, 0f,
+                right, top,    ndcZ, 1f, 1f,
+                left,  top,    ndcZ, 0f, 1f,
+            };
+            float[] iden = Identity4();
+            DrawTexturedVerts(tex, verts, color, iden, iden);
         }
 
         // -------------------------------------------------------------------------
@@ -587,12 +733,40 @@ namespace CADability.Forms
 
         public void PrepareText(string fontName, string textString, FontStyle fontStyle) { }
         public void PreparePointSymbol(PointSymbol pointSymbol) { }
-        public void PrepareIcon(Bitmap icon) { }
-        public void PrepareBitmap(Bitmap bitmap, int xoffset, int yoffset) { }
-        public void PrepareBitmap(Bitmap bitmap) { }
+
+        public void PrepareIcon(Bitmap icon)
+        {
+            if (gl == null || icon == null) return;
+            if (!iconMasks.ContainsKey(icon)) iconMasks[icon] = UploadTexture(icon, true);
+        }
+
+        public void PrepareBitmap(Bitmap bitmap, int xoffset, int yoffset)
+        {
+            if (gl == null || bitmap == null) return;
+            if (!sprites.ContainsKey(bitmap)) sprites[bitmap] = (UploadTexture(bitmap, false), xoffset, yoffset);
+        }
+
+        public void PrepareBitmap(Bitmap bitmap)
+        {
+            if (gl == null || bitmap == null) return;
+            if (!textures.ContainsKey(bitmap)) textures[bitmap] = UploadTexture(bitmap, false);
+        }
 
         public void RectangularBitmap(Bitmap bitmap, GeoPoint location,
-            GeoVector directionWidth, GeoVector directionHeight) { /* phase 4 */ }
+            GeoVector directionWidth, GeoVector directionHeight)
+        {
+            if (gl == null || bitmap == null) return;
+            PrepareBitmap(bitmap); // no-op when already uploaded
+            uint tex = textures[bitmap];
+            float[] verts = BuildQuadVerts(location, directionWidth, directionHeight);
+            if (inList)
+            {
+                (currentList.TexQuads ??= new()).Add(new PaintToSilkGLList.TexQuad { Texture = tex, Verts = verts });
+                return;
+            }
+            // the image replaces the current color entirely (old GL_TEXTURE_ENV GL_REPLACE)
+            DrawTexturedVerts(tex, verts, Color.White, projectionMatrix, modelviewMatrix);
+        }
 
         public void Text(GeoVector lineDirection, GeoVector glyphDirection, GeoPoint location,
             string fontName, string textString, FontStyle fontStyle,
@@ -719,6 +893,19 @@ namespace CADability.Forms
             if (paintSurfaces) DrawListSurface(list);
             if (paintEdges)    DrawListEdge(list);
 
+            // textured quads and sprites replay in the faces phase only, so the two-phase
+            // replay (faces + curves) of the categorized display lists draws them once
+            if (paintSurfaces)
+            {
+                if (list.TexQuads != null)
+                    foreach (var q in list.TexQuads)
+                        DrawTexturedVerts(q.Texture, q.Verts, Color.White, projectionMatrix, modelviewMatrix);
+                if (list.Sprites != null)
+                    foreach (var s in list.Sprites)
+                        DrawSpriteQuad(s.Texture, s.X, s.Y, s.Z, s.W, s.H, s.Ax, s.Ay,
+                            s.Mask ? (selectMode ? selectColor : currentColor) : Color.White);
+            }
+
             // Replay static composite sub-lists (from MakeList)
             if (list.SubLists != null)
                 foreach (var sub in list.SubLists) List(sub);
@@ -805,8 +992,43 @@ namespace CADability.Forms
 
         public void Point2D(int x, int y) { /* deprecated */ }
 
-        public void DisplayIcon(GeoPoint p, Bitmap icon) { /* phase 4 */ }
-        public void DisplayBitmap(GeoPoint p, Bitmap bitmap) { /* phase 4 */ }
+        public void DisplayIcon(GeoPoint p, Bitmap icon)
+        {
+            if (gl == null || icon == null) return;
+            PrepareIcon(icon);
+            uint tex = iconMasks[icon];
+            // centered on p, drawn in the current color (old glBitmap semantics)
+            if (inList)
+            {
+                (currentList.Sprites ??= new()).Add(new PaintToSilkGLList.Sprite
+                {
+                    Texture = tex, X = (float)p.x, Y = (float)p.y, Z = (float)p.z,
+                    W = icon.Width, H = icon.Height,
+                    Ax = icon.Width / 2f, Ay = icon.Height / 2f, Mask = true,
+                });
+                return;
+            }
+            DrawSpriteQuad(tex, p.x, p.y, p.z, icon.Width, icon.Height,
+                icon.Width / 2f, icon.Height / 2f, selectMode ? selectColor : currentColor);
+        }
+
+        public void DisplayBitmap(GeoPoint p, Bitmap bitmap)
+        {
+            if (gl == null || bitmap == null) return;
+            if (!sprites.ContainsKey(bitmap)) PrepareBitmap(bitmap, 0, 0);
+            (uint tex, int xoff, int yoff) = sprites[bitmap];
+            if (inList)
+            {
+                (currentList.Sprites ??= new()).Add(new PaintToSilkGLList.Sprite
+                {
+                    Texture = tex, X = (float)p.x, Y = (float)p.y, Z = (float)p.z,
+                    W = bitmap.Width, H = bitmap.Height,
+                    Ax = xoff, Ay = yoff, Mask = false,
+                });
+                return;
+            }
+            DrawSpriteQuad(tex, p.x, p.y, p.z, bitmap.Width, bitmap.Height, xoff, yoff, Color.White);
+        }
 
         public void SetProjection(Projection projection, BoundingCube boundingCube)
         {
@@ -1007,6 +1229,11 @@ namespace CADability.Forms
             {
                 if (surfaceProgram != 0) gl.DeleteProgram(surfaceProgram);
                 if (edgeProgram    != 0) gl.DeleteProgram(edgeProgram);
+                if (textureProgram != 0) gl.DeleteProgram(textureProgram);
+                foreach (uint tex in textures.Values) gl.DeleteTexture(tex);
+                foreach ((uint tex, _, _) in sprites.Values) gl.DeleteTexture(tex);
+                foreach (uint tex in iconMasks.Values) gl.DeleteTexture(tex);
+                textures.Clear(); sprites.Clear(); iconMasks.Clear();
                 if (streamVao != 0) gl.DeleteVertexArray(streamVao);
                 if (streamVbo != 0) gl.DeleteBuffer(streamVbo);
                 if (fbo        != 0) { gl.DeleteFramebuffer(fbo);         fbo = 0; }

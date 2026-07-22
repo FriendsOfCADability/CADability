@@ -36,6 +36,25 @@ namespace CADability.Forms
         }
         internal List<SubListCall> SubListCalls;
 
+        // textured quads in world/model coordinates (RectangularBitmap, i.e. Picture objects)
+        internal struct TexQuad
+        {
+            internal uint Texture;
+            internal float[] Verts; // 6 vertices, 5 floats each: position xyz + texcoord uv
+        }
+        internal List<TexQuad> TexQuads;
+
+        // screen-aligned sprites (DisplayIcon/DisplayBitmap); projected at replay time
+        internal struct Sprite
+        {
+            internal uint Texture;
+            internal float X, Y, Z;   // world position
+            internal int W, H;        // size in pixels
+            internal float Ax, Ay;    // anchor in pixels from the lower left corner
+            internal bool Mask;       // true: white mask drawn in the current color (icons)
+        }
+        internal List<Sprite> Sprites;
+
         // per-entity color batches: each entry means "from startVertex, use this color"
         internal List<(int startVertex, Color color)> SurfaceBatches = new();
         internal List<(int startVertex, Color color)> EdgeBatches = new();

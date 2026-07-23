@@ -14,7 +14,7 @@ This document proposes a ground-up redesign of *how graphics are handled*, while
 
 1. A **retained scene layer** replaces display lists: tessellation workers produce indexed triangle/polyline meshes (the data `Face.GetTriangulation` already emits today) into pooled GPU buffers; objects become lightweight `RenderItem`s with material/transform table entries; invalidation is **per object**, culling is per frame, LOD is discrete and memory-bounded.
 2. A **thin, WebGPU-shaped rendering hardware interface (RHI)** owned by CADability abstracts the GPU APIs. Commands are recorded into a compact binary command buffer — which is also what makes a **browser (WebAssembly + WebGL2/WebGPU) backend** practical, since the whole frame crosses the JS boundary in a handful of calls.
-3. **Backends** plug in beneath the RHI: desktop OpenGL 3.3 via Silk.NET first, browser WebGL2 second, WebGPU (desktop `wgpu-native` + browser) later. DirectX support arrives via WebGPU (which runs on D3D12 on Windows) rather than a hand-written D3D backend.
+3. **Backends** plug in beneath the RHI: desktop OpenGL 3.3 via Silk.NET first, browser WebGL2 second, WebGPU (desktop `wgpu-native` + browser) later. **On Windows the default runtime is DirectX from day one**: the GL backend runs over ANGLE (GL-translated-to-D3D11 — the same battle-tested path every browser uses), with a native D3D11 backend and WebGPU-on-D3D12 as further routes (§4.5). The RHI's conventions are WebGPU-shaped and therefore closer to D3D than to GL — DirectX is a first-class fit, not an afterthought.
 4. An **`IPaintTo3D` compatibility adapter** keeps every existing view, sink and downstream application working during the migration. The legacy GL code is deleted only in the final phase.
 
 Constraints this design was written against (agreed with the maintainers up front):
@@ -113,9 +113,10 @@ PR #339 replaces the binding layer (`PaintToSilkGL`, GLSL 330, VBO-backed displa
 | RHI: IRhiDevice, buffers, textures, pipelines, bind groups,      |
 |      command encoder, surfaces/framebuffers (WebGPU-shaped)      |
 +------------------------------------------------------------------+
-| Backends: .OpenGL (Silk.NET, GL 3.3 core)  desktop              |
+| Backends: .OpenGL (Silk.NET GL 3.3; Windows default via         |
+|                    ANGLE -> Direct3D 11)                         |
 |           .WebGL  (JSImport + JS executor)  browser              |
-|           .WebGPU (wgpu-native / browser)   later               |
+|           .D3D11 (optional native) | .WebGPU (D3D12)  later      |
 +------------------------------------------------------------------+
 | Geometry kernel (CADability): Face/Edge/Curve/Model/Projection   |
 |   produces triangles & polylines; owns the picking octree        |
@@ -130,9 +131,10 @@ Data flows one way: kernel geometry → tessellation cache → scene graph → p
 |---|---|---|
 | `CADability` (existing) | Kernel. Eventually loses `OpenGL.cs`, `Gdi.cs`, `System.Drawing.Common`. `IPaintTo3D` stays (public API) through the migration. | `netstandard2.0;net8.0` (multi-target; see open question 1) |
 | `CADability.Rendering` (new) | RHI types, SceneGraph, RenderItem, TessellationCache, ViewScene, FrameComposer, MeshBuilder, `PaintTo3DToScene`, embedded shader sources. **No P/Invoke, no System.Drawing, no windowing.** | `netstandard2.0;net8.0` |
-| `CADability.Rendering.OpenGL` (new) | Desktop backend: Silk.NET.OpenGL (GL 3.3 core) + ~200 lines of WGL/GLX surface glue owned by us. | `net8.0` |
+| `CADability.Rendering.OpenGL` (new) | Desktop backend: Silk.NET.OpenGL (GL 3.3 core / GLES3) + ~200 lines of EGL/WGL/GLX surface glue owned by us. **On Windows it runs over ANGLE by default, so rendering executes on Direct3D 11** (§4.4); raw vendor GL stays selectable, Linux uses GLX/EGL. | `net8.0` |
 | `CADability.Rendering.WebGL` (new) | Browser backend: `[JSImport]` interop + `webgl-executor.js` command interpreter (~500 lines JS). | `net8.0-browser` |
-| `CADability.Rendering.WebGPU` (later) | wgpu-native (desktop) and browser WebGPU via the same executor scheme. | `net8.0` / `net8.0-browser` |
+| `CADability.Rendering.WebGPU` (later) | wgpu-native (desktop, **D3D12 on Windows**) and browser WebGPU via the same executor scheme. | `net8.0` / `net8.0-browser` |
+| `CADability.Rendering.D3D11` (optional, later) | Native Direct3D 11 backend via Silk.NET.Direct3D11 + DXGI flip-model swapchains; HLSL ports of the shader set (§4.4 route 2). | `net8.0-windows` |
 | `CADability.Forms` (existing) | WinForms host; `CadCanvas` gains the new backend branch; keeps `PaintToGDI`; receives `PrintToGDI` when the core drops System.Drawing. | `net8.0-windows` |
 | `CADability.Host.Browser` (new, sample) | Minimal browser app: canvas, DOM events → Substitutes, `requestAnimationFrame` loop. | `net8.0-browser` |
 | `CADability.Host.Avalonia` (future) | Avalonia control hosting a render surface. | `net8.0` |
@@ -216,7 +218,17 @@ Hand-maintained **single-source GLSL**, dual-emitted; hand-ported WGSL later.
 - Hosting: nothing depends on Blazor. A plain `browser-wasm` sample host owns the page; under Blazor/Avalonia-browser/Uno the executor loads as a JS module and the loop hooks `requestAnimationFrame`.
 - .NET WASM is effectively single-threaded today; the scene layer tolerates that (time-sliced tessellation, coarse-LOD-first policy, §5.7). Context loss (`webglcontextlost`) surfaces as `DeviceLost` → full GPU-residency rebuild from CPU-side caches (which are kept anyway).
 
-### 4.4 Contexts and surfaces
+### 4.4 DirectX on Windows
+
+The maintainers prefer DirectX on Windows. The architecture accommodates this without giving up the GL backend's other roles (Linux desktop; dialect-sibling of the WebGL2 browser path). Three routes, in order of availability:
+
+1. **ANGLE as the default Windows runtime (Phase 1, near-zero extra code).** [ANGLE](https://chromium.googlesource.com/angle/angle) implements OpenGL ES on top of **Direct3D 11**; it is the GL implementation inside Chrome, Edge and Firefox on Windows, i.e. the most battle-tested GL-on-Windows stack in existence. Our GL backend targets exactly the GLES3-compatible subset ANGLE serves. Shipping `libEGL.dll`/`libGLESv2.dll` (~a few MB) and creating the context via EGL instead of WGL (comparable glue, ~200 lines) means **all Windows rendering executes on D3D11 from day one** — while the backend code stays identical to Linux. This directly retires the failure class that motivates preferring DirectX on Windows: `wglCreateContext` failures in long-running sessions and docking scenarios (issue #37), Remote Desktop sessions without usable vendor GL, and unreliable OEM GL drivers on office/Intel hardware. Raw vendor GL remains selectable (setting/fallback), and spike S4 is thereby promoted from "sanity check" to qualifying the default.
+2. **Native D3D11 backend (`CADability.Rendering.D3D11`, additive, M effort).** Because the RHI follows WebGPU conventions — immutable pipeline-state objects, constant-buffer-style UBOs with dynamic offsets, 0‥1 depth range — D3D11 (feature level 11_0) is nearly congruent with it; it is the GL backend that does the adapting, not the D3D one. Silk.NET.Direct3D11 keeps the binding ecosystem consistent; DXGI flip-model swapchains replace everything WGL did badly (no pixel-format descriptors, no `wglShareLists`, clean multi-window, real vsync control, composition-friendly for future WPF/WinUI hosts). Cost: HLSL ports of the ~8 shader programs (hand-maintained, exactly like the planned WGSL port) and a loop-emulation of `MultiDrawIndexed` (same as the WebGL2 executor does). Worth building when native D3D interop or PIX-based tooling matters; decided after Phase 2.
+3. **WebGPU backend (already roadmapped)** — `wgpu-native` runs on **D3D12** on Windows; one modern API and shader language for desktop and browser alike.
+
+Recommended sequencing: route 1 as the Windows default at Phase 1; choose between routes 2 and 3 after Phase 2 based on profiling and interop needs — both are additive backends behind the same RHI, neither blocks the other.
+
+### 4.5 Contexts and surfaces
 
 Replaces the process-static WGL sharing and the hidden bitmap contexts:
 
@@ -354,11 +366,11 @@ Merge PR #340 (cached normals + tamed re-triangulation are prerequisites). Add t
 - **S1 — WASM interop throughput** (the riskiest assumption, measured first): net8-browser page issuing ~100k batched WebGL2 commands + ~50 MB uploads through one-call-per-pass interop.
 - **S2 — Multi-canvas shared GL context** across two WinForms controls + one X11 window via Silk.NET (harvests PR #339's `WglContext` learnings).
 - **S3 — Typography glyph tessellation** vs. current text output (screen + print comparison).
-- **S4 — ANGLE sanity**: run the GL backend on ANGLE to catch UBO/instancing edge cases early (ANGLE is WebGL's usual Windows substrate).
+- **S4 — ANGLE qualification**: run the GL backend on ANGLE (D3D11) to catch UBO/instancing edge cases early. ANGLE is both WebGL's usual Windows substrate *and* the intended default Windows runtime (§4.4), so this spike qualifies the day-one DirectX path.
 
 **Phase 1 — Rendering core + desktop GL + adapter (L)**
-New projects `CADability.Rendering` + `.OpenGL`: RHI, shader set, geometry pools, materials, FrameComposer, `PaintTo3DToScene`. Opt-in via a new `IView.PaintType` value (e.g. `"3D-RHI"`) or a setting; legacy remains default. Golden-image comparison tests introduced here.
-*Exit: ModelView + SelectObjectsAction + AnimatedView at visual parity on sample models, Windows + Linux.*
+New projects `CADability.Rendering` + `.OpenGL`: RHI, shader set, geometry pools, materials, FrameComposer, `PaintTo3DToScene`. On Windows the backend runs over ANGLE by default (Direct3D 11 underneath, §4.4); raw GL selectable. Opt-in via a new `IView.PaintType` value (e.g. `"3D-RHI"`) or a setting; legacy remains default. Golden-image comparison tests introduced here.
+*Exit: ModelView + SelectObjectsAction + AnimatedView at visual parity on sample models, Windows (on ANGLE/D3D11) + Linux.*
 
 **Phase 2 — Native scene path for ModelView (L)**
 `SceneSync` per-object dirty tracking, `TessellationCache` with LOD levels, culling, transform nodes, id-based selection/hover, sorted transparency. ModelView's paint bypasses `ProjectedModel.Paint`/display lists **when the canvas supplies an RHI device**; the classic `IPaintTo3D`-driven path stays intact and supported for overlays, legacy sinks and third-party engines (§7.4).
@@ -411,7 +423,7 @@ Net effect for a downstream engine through the phases: Phases 0–2 change nothi
 ## 8. Open questions for the maintainers
 
 1. **Core TFM policy:** keep `netstandard2.0` in the multi-target (are there .NET Framework 4.8 NuGet consumers?), or move to net8.0-only and unlock Span-based kernel APIs?
-2. **Minimum GL / macOS stance:** GL 3.3 core is proposed (matches WebGL2, runs on old Intel). macOS deprecates OpenGL (4.1 max) — if macOS matters, the path is ANGLE or the WebGPU backend; decide priority.
+2. **Windows end-state and macOS stance:** Windows ships DirectX-backed from day one via ANGLE/D3D11 (maintainer preference, §4.4); the open part is the *end-state* — stay on ANGLE, add the native D3D11 backend (route 2), or land WebGPU/D3D12 (route 3)? Related: macOS deprecates OpenGL (4.1 max) — if macOS matters, ANGLE's Metal backend or WebGPU covers it; decide priority.
 3. **Host order:** Avalonia host (issue #256's ask) before or after the browser host? The architecture supports either; browser-first exercises more constraints.
 4. **GDI2DView / PrintToGDI long-term:** keep indefinitely on the WinForms host (recommended for plotter fidelity), or retire after the new renderer demonstrates 2D/vector-print parity?
 5. **`IPaintTo3D` type modernization in a future 2.0:** external implementers *do* exist (§7.4), so the interface stays supported as-is. The remaining question is only whether a major version ever replaces the `Bitmap`/`FontStyle`-typed members with portable abstractions (with migration guide + shims), or whether the additive-overload route (§7.4.4) is permanent. Worth a call for feedback in #256 to find all downstream implementers.

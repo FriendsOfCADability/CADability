@@ -248,7 +248,7 @@ namespace CADability.Forms
         }
         IPaintTo3D IUIService.CreatePaintInterface(Bitmap paintToBitmap, double precision)
         {
-            PaintToOpenGL paintTo3D = new PaintToOpenGL(precision);
+            PaintToSilkGL paintTo3D = new PaintToSilkGL(precision);
             paintTo3D.Init(paintToBitmap);
             return paintTo3D;
         }

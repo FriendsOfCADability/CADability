@@ -5,6 +5,7 @@
     <RootNamespace>CADability.Forms</RootNamespace>
     <AssemblyName>CADability.Forms</AssemblyName>
     <UseWindowsForms>true</UseWindowsForms>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Deterministic>true</Deterministic>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>CADabilityKey.snk</AssemblyOriginatorKeyFile>
@@ -83,6 +84,7 @@
   <!-- Packages -->
   <ItemGroup>
     <PackageReference Include="MathNet.Numerics.Signed" Version="5.0.0" />
+    <PackageReference Include="Silk.NET.OpenGL" Version="2.*" />
   </ItemGroup>
 
   <!-- Project Reference -->
@@ -95,6 +97,8 @@
     <EmbeddedResource Include="Cursors\**\*.cur" />
     <EmbeddedResource Include="Bitmaps\**\*.bmp" />
     <EmbeddedResource Include="Bitmaps\Hotspots.png" />
+    <EmbeddedResource Include="Shaders\**\*.vert" />
+    <EmbeddedResource Include="Shaders\**\*.frag" />
   </ItemGroup>
 
   <!-- Content & Meta -->

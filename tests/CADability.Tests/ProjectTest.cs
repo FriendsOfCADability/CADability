@@ -33,7 +33,7 @@ namespace CADability.Tests
 
 
             using (var expected = (Bitmap)Image.FromFile(bmpFile))
-            using (var actual = PaintToOpenGL.PaintToBitmap(model.AllObjects, GeoVector.ZAxis, 100, 100))
+            using (var actual = PaintToSilkGL.PaintToBitmap(model.AllObjects, GeoVector.ZAxis, 100, 100))
             {
                 Assert.That.BitmapsAreEqual(expected, actual);
             }
@@ -73,7 +73,7 @@ namespace CADability.Tests
             Assert.IsTrue(cylinder.OutwardOriented);
 
             using (var expected = (Bitmap)Image.FromFile(bmpFile))
-            using (var actual = PaintToOpenGL.PaintToBitmap(model.AllObjects, GeoVector.NullVector, 200, 200))
+            using (var actual = PaintToSilkGL.PaintToBitmap(model.AllObjects, GeoVector.NullVector, 200, 200))
             {
                 Assert.That.BitmapsAreEqual(expected, actual);
             }
@@ -131,7 +131,7 @@ namespace CADability.Tests
             Assert.IsTrue(ellipse2.HasValidData());
 
             using (var expected = (Bitmap)Image.FromFile(bmpFile))
-            using (var actual = PaintToOpenGL.PaintToBitmap(model.AllObjects, GeoVector.NullVector, 200, 200))
+            using (var actual = PaintToSilkGL.PaintToBitmap(model.AllObjects, GeoVector.NullVector, 200, 200))
             {
                 // Uncomment once to generate bitmap for later comparison
                 //actual.Save(bmpFile);

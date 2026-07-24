@@ -1,98 +1,131 @@
-﻿using CADability.Attribute;
+using CADability.Attribute;
+using CADability.Curve2D;
 using CADability.GeoObject;
-using MathNet.Numerics.Statistics.Mcmc;
-using netDxf;
-using netDxf.Blocks;
-using netDxf.Entities;
-using netDxf.Tables;
+using CADability.Shapes;
+using ACadSharp;
+using ACadSharp.Entities;
+using ACadSharp.IO;
+using ACadSharp.Tables;
+using ACadSharp.Types.Units;
+using ACadSharp.XData;
+using CSMath;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.IO;
-using System.Net.WebSockets;
-using System.Text;
+using Color = System.Drawing.Color;
 
 namespace CADability.DXF
 {
     public class Export
     {
-        private DxfDocument doc;
-        private Dictionary<CADability.Attribute.Layer, netDxf.Tables.Layer> createdLayers;
-        Dictionary<CADability.Attribute.LinePattern, netDxf.Tables.Linetype> createdLinePatterns;
-        int anonymousBlockCounter = 0;
-        double triangulationPrecision = 0.1;
-        public Export(netDxf.Header.DxfVersion version)
+        private CadDocument doc;
+        private Dictionary<CADability.Attribute.Layer, ACadSharp.Tables.Layer> createdLayers;
+        private Dictionary<CADability.Attribute.LinePattern, ACadSharp.Tables.LineType> createdLinePatterns;
+        private Dictionary<string, ACadSharp.Tables.TextStyle> createdTextStyles;
+        private HashSet<string> createdBlockNames;
+        private int anonymousBlockCounter = 0;
+        private double triangulationPrecision = 0.1;
+
+        public Export(ACadVersion version = ACadVersion.AC1015)
         {
-            doc = new DxfDocument(version);
-            createdLayers = new Dictionary<Attribute.Layer, netDxf.Tables.Layer>();
-            createdLinePatterns = new Dictionary<LinePattern, Linetype>();
+            doc = new CadDocument(version);
+            doc.Header.AngularDirection = AngularDirection.CounterClockWise;
+            doc.Header.InsUnits = UnitsType.Millimeters;
+            createdLayers = new Dictionary<CADability.Attribute.Layer, ACadSharp.Tables.Layer>();
+            createdLinePatterns = new Dictionary<CADability.Attribute.LinePattern, ACadSharp.Tables.LineType>();
+            createdTextStyles = new Dictionary<string, ACadSharp.Tables.TextStyle>();
+            createdBlockNames = new HashSet<string>();
         }
+
         public byte[] WriteToByteArray(Project toExport)
         {
-            var memoryStream = new System.IO.MemoryStream();
             Model modelSpace = null;
             if (toExport.GetModelCount() == 1) modelSpace = toExport.GetModel(0);
-            else
-            {
-                modelSpace = toExport.FindModel("*Model_Space");
-            }
+            else modelSpace = toExport.FindModel("*Model_Space");
             if (modelSpace == null) modelSpace = toExport.GetActiveModel();
+
+            BlockRecord msBlock = doc.ModelSpace;
             for (int i = 0; i < modelSpace.Count; i++)
             {
-                EntityObject[] entity = GeoObjectToEntity(modelSpace[i]);
-                if (entity != null) doc.Entities.Add(entity);
+                Entity[] entities = GeoObjectToEntity(modelSpace[i]);
+                if (entities != null)
+                    foreach (var e in entities)
+                        msBlock.Entities.Add(e);
             }
-            doc.Save(memoryStream);
-            return memoryStream.ToArray();
+            SetExtents(modelSpace);
+            var ms = new MemoryStream();
+            using (var writer = new DxfWriter(ms, doc, false))
+                writer.Write();
+            return ms.ToArray();
         }
 
         public void WriteToFile(Project toExport, string filename)
         {
             Model modelSpace = null;
             if (toExport.GetModelCount() == 1) modelSpace = toExport.GetModel(0);
-            else
-            {
-                modelSpace = toExport.FindModel("*Model_Space");
-            }
+            else modelSpace = toExport.FindModel("*Model_Space");
             if (modelSpace == null) modelSpace = toExport.GetActiveModel();
+
             GeoObjectList geoObjects = new GeoObjectList();
-            List<Face> faces = new List<Face>(); // all top level faces collected
+            List<Face> faces = new List<Face>();
             for (int i = 0; i < modelSpace.Count; i++)
             {
-                if (modelSpace[i] is Face face) faces.Add(face.Clone() as Face); // Clone() to keep ownership
+                if (modelSpace[i] is Face face) faces.Add(face.Clone() as Face);
                 else geoObjects.Add(modelSpace[i]);
             }
-            if (faces.Count > 0) geoObjects.Add(Shell.FromFaces(faces.ToArray())); // this shell is only to combine same color faces to a single mesh
+            if (faces.Count > 0) geoObjects.Add(Shell.FromFaces(faces.ToArray()));
+
+            BlockRecord msBlock = doc.ModelSpace;
             for (int i = 0; i < geoObjects.Count; i++)
             {
-                EntityObject[] entity = GeoObjectToEntity(geoObjects[i]);
-                if (entity != null) doc.Entities.Add(entity);
+                Entity[] entities = GeoObjectToEntity(geoObjects[i]);
+                if (entities != null)
+                    foreach (var e in entities)
+                        msBlock.Entities.Add(e);
             }
-            doc.Save(filename);
+            SetExtents(modelSpace);
+            using (var writer = new DxfWriter(filename, doc, false))
+                writer.Write();
         }
 
-        private EntityObject[] GeoObjectToEntity(IGeoObject geoObject)
+        private void SetExtents(Model model)
         {
-            EntityObject entity = null;
-            EntityObject[] entities = null;
+            try
+            {
+                BoundingCube ext = model.Extent;
+                if (!ext.IsEmpty)
+                {
+                    doc.Header.ModelSpaceExtMin = new XYZ(ext.Xmin, ext.Ymin, ext.Zmin);
+                    doc.Header.ModelSpaceExtMax = new XYZ(ext.Xmax, ext.Ymax, ext.Zmax);
+                    doc.Header.ModelSpaceLimitsMin = new CSMath.XY(ext.Xmin, ext.Ymin);
+                    doc.Header.ModelSpaceLimitsMax = new CSMath.XY(ext.Xmax, ext.Ymax);
+                }
+            }
+            catch { }
+        }
+
+        private Entity[] GeoObjectToEntity(IGeoObject geoObject)
+        {
+            Entity entity = null;
+            Entity[] entities = null;
             switch (geoObject)
             {
                 case GeoObject.Point point: entity = ExportPoint(point); break;
+                case GeoObject.ConstructionLine constructionLine: entity = ExportConstructionLine(constructionLine); break;
                 case GeoObject.Line line: entity = ExportLine(line); break;
                 case GeoObject.Ellipse elli: entity = ExportEllipse(elli); break;
                 case GeoObject.Polyline polyline: entity = ExportPolyline(polyline); break;
                 case GeoObject.BSpline bspline: entity = ExportBSpline(bspline); break;
                 case GeoObject.Path path:
-                    if (Settings.GlobalSettings.GetBoolValue("DxfExport.ExportPathsAsBlocks", true))
-                    {
+                    if (Settings.GlobalSettings.GetBoolValue("DxfExport.ExportPathsAsBlocks", false))
                         entity = ExportPath(path);
-                    }
                     else
-                    {
                         entities = ExportPathWithoutBlock(path);
-                    }
                     break;
                 case GeoObject.Text text: entity = ExportText(text); break;
+                case GeoObject.Hatch hatch: entity = ExportHatch(hatch); break;
                 case GeoObject.Block block: entity = ExportBlock(block); break;
                 case GeoObject.Face face: entity = ExportFace(face); break;
                 case GeoObject.Shell shell: entities = ExportShell(shell); break;
@@ -102,31 +135,21 @@ namespace CADability.DXF
             {
                 SetAttributes(entity, geoObject);
                 SetUserData(entity, geoObject);
-                return new EntityObject[] { entity };
+                return new Entity[] { entity };
             }
             if (entities != null)
             {
                 for (int i = 0; i < entities.Length; i++)
                 {
-                    if (geoObject.Layer == null)
-                    {
-                        entities[i].Layer = netDxf.Tables.Layer.Default;
-                        continue;
-                    }
-                    if (!createdLayers.TryGetValue(geoObject.Layer, out netDxf.Tables.Layer layer))
-                    {
-                        layer = new netDxf.Tables.Layer(geoObject.Layer.Name);
-                        doc.Layers.Add(layer);
-                        createdLayers[geoObject.Layer] = layer;
-                    }
-                    entities[i].Layer = layer;
+                    if (geoObject.Layer == null) continue;
+                    entities[i].Layer = GetOrCreateLayer(geoObject.Layer);
                 }
                 return entities;
             }
             return null;
         }
 
-        private void SetUserData(netDxf.Entities.EntityObject entity, IGeoObject go)
+        private void SetUserData(Entity entity, IGeoObject go)
         {
             if (entity is null || go is null || go.UserData is null || go.UserData.Count == 0)
                 return;
@@ -135,511 +158,600 @@ namespace CADability.DXF
             {
                 if (de.Value is ExtendedEntityData xData)
                 {
-                    ApplicationRegistry registry = new ApplicationRegistry(xData.ApplicationName);
-                    XData data = new XData(registry);
-
+                    AppId appId = GetOrCreateAppId(xData.ApplicationName);
+                    ExtendedData extData = new ExtendedData();
                     foreach (var item in xData.Data)
                     {
-                        XDataCode code = item.Key;
-                        object newValue = null;
-                        //Make the export more robust to wrong XDataCode entries.
-                        //Try to fit the data into an existing datatype. Otherwise ignore entry.
-                        switch (code)
+                        ExtendedDataRecord record = CreateXDataRecord(item.Key, item.Value);
+                        if (record != null)
                         {
-                            case XDataCode.Int16:
-                                if (item.Value is short int16val_1)
-                                    newValue = int16val_1;
-                                else if (item.Value is int int32val_1 && int32val_1 >= Int16.MinValue && int32val_1 <= Int16.MaxValue)
-                                    newValue = Convert.ToInt16(int32val_1);
-                                else if (item.Value is long int64val_1 && int64val_1 >= Int16.MinValue && int64val_1 <= Int16.MaxValue)
-                                    newValue = Convert.ToInt16(int64val_1);
-                                break;
-                            case XDataCode.Int32:
-                                if (item.Value is short int16val_2)
-                                    newValue = Convert.ToInt32(int16val_2);
-                                else if (item.Value is int int32val_2)
-                                    newValue = int32val_2;
-                                else if (item.Value is long int64val_2 && int64val_2 >= Int32.MinValue && int64val_2 <= Int32.MaxValue)
-                                    newValue = Convert.ToInt32(int64val_2);
-                                break;
-                            default:
-                                newValue = item.Value;
-                                break;
-                        }
-
-                        if (newValue != null)
-                        {
-                            XDataRecord record = new XDataRecord(code, newValue);
-                            data.XDataRecord.Add(record);
+                            try { extData.Records.Add(record); }
+                            catch { /* skip unserializable values */ }
                         }
                     }
-                    if (data.XDataRecord.Count > 0)
-                        entity.XData.Add(data);
+                    if (extData.Records.Count > 0)
+                        entity.ExtendedData.Add(appId, extData);
                 }
-                else
+                else if (de.Value != null && !(de.Value is UserInterface.StringProperty))
                 {
-                    ApplicationRegistry registry = new ApplicationRegistry(ApplicationRegistry.DefaultName);
-                    XData data = new XData(registry);
-
-                    XDataRecord record = null;
-
+                    AppId appId = GetOrCreateAppId("CADABILITY");
+                    ExtendedDataRecord record = null;
                     switch (de.Value)
                     {
-                        case string strValue:
-                            record = new XDataRecord(XDataCode.String, strValue);
-                            break;
-                        case short shrValue:
-                            record = new XDataRecord(XDataCode.Int16, shrValue);
-                            break;
-                        case int intValue:
-                            record = new XDataRecord(XDataCode.Int32, intValue);
-                            break;
-                        case double dblValue:
-                            record = new XDataRecord(XDataCode.Real, dblValue);
-                            break;
-                        case byte[] bytValue:
-                            record = new XDataRecord(XDataCode.BinaryData, bytValue);
-                            break;
+                        case string strVal: record = new ExtendedDataString(strVal); break;
+                        case short shrVal: record = new ExtendedDataInteger16(shrVal); break;
+                        case int intVal: record = new ExtendedDataInteger32(intVal); break;
+                        case double dblVal: record = new ExtendedDataReal(dblVal); break;
+                        case byte[] bytVal: record = new ExtendedDataBinaryChunk(bytVal); break;
+                        default: continue;
                     }
-
-                    if (record != null)
-                        data.XDataRecord.Add(record);
+                    try
+                    {
+                        if (!entity.ExtendedData.ContainsKey(appId))
+                            entity.ExtendedData.Add(appId, new ExtendedData());
+                        if (entity.ExtendedData.TryGet(appId, out ExtendedData existing))
+                            existing.Records.Add(record);
+                    }
+                    catch { /* skip */ }
                 }
             }
         }
 
-        private EntityObject[] ExportShell(GeoObject.Shell shell)
+        private ACadSharp.Tables.Layer GetOrCreateLayer(CADability.Attribute.Layer cadLayer)
+        {
+            if (createdLayers.TryGetValue(cadLayer, out ACadSharp.Tables.Layer layer))
+                return layer;
+            foreach (ACadSharp.Tables.Layer existing in doc.Layers)
+                if (string.Equals(existing.Name, cadLayer.Name, StringComparison.OrdinalIgnoreCase)) { createdLayers[cadLayer] = existing; return existing; }
+            layer = new ACadSharp.Tables.Layer(cadLayer.Name);
+            doc.Layers.Add(layer);
+            createdLayers[cadLayer] = layer;
+            return layer;
+        }
+
+        private ACadSharp.Tables.LineType GetOrCreateLineType(CADability.Attribute.LinePattern lp)
+        {
+            if (createdLinePatterns.TryGetValue(lp, out ACadSharp.Tables.LineType lt))
+                return lt;
+            foreach (ACadSharp.Tables.LineType existing in doc.LineTypes)
+                if (string.Equals(existing.Name, lp.Name, StringComparison.OrdinalIgnoreCase)) { createdLinePatterns[lp] = existing; return existing; }
+            lt = new ACadSharp.Tables.LineType(lp.Name);
+            if (lp.Pattern != null)
+                for (int i = 0; i < lp.Pattern.Length; i++)
+                {
+                    double len = (i & 1) == 0 ? lp.Pattern[i] : -lp.Pattern[i];
+                    lt.AddSegment(new ACadSharp.Tables.LineType.Segment { Length = len });
+                }
+            doc.LineTypes.Add(lt);
+            createdLinePatterns[lp] = lt;
+            return lt;
+        }
+
+        private AppId GetOrCreateAppId(string name)
+        {
+            foreach (AppId existing in doc.AppIds)
+                if (existing.Name == name) return existing;
+            AppId appId = new AppId(name);
+            doc.AppIds.Add(appId);
+            return appId;
+        }
+
+        private static ExtendedDataRecord CreateXDataRecord(XDataCode code, object value)
+        {
+            try
+            {
+                switch (code)
+                {
+                    case XDataCode.Int16:
+                        short s16 = value is short sh ? sh
+                            : value is int i16 ? (short)i16
+                            : value is long l16 ? (short)l16
+                            : (short)0;
+                        return new ExtendedDataInteger16(s16);
+                    case XDataCode.Int32:
+                        int i32 = value is int ii ? ii
+                            : value is short si ? (int)si
+                            : value is long li ? (int)li
+                            : 0;
+                        return new ExtendedDataInteger32(i32);
+                    case XDataCode.Real:
+                    case XDataCode.Distance:
+                    case XDataCode.ScaleFactor:
+                        double d = value is double dv ? dv : Convert.ToDouble(value);
+                        return new ExtendedDataReal(d);
+                    case XDataCode.BinaryData:
+                        return value is byte[] bytes ? new ExtendedDataBinaryChunk(bytes) : null;
+                    case XDataCode.DatabaseHandle:
+                        string hStr = value?.ToString() ?? "";
+                        ulong hVal = ulong.TryParse(hStr, System.Globalization.NumberStyles.HexNumber, null, out ulong hParsed) ? hParsed : 0;
+                        return new ExtendedDataHandle(hVal);
+                    case XDataCode.ControlString:
+                        // { = opening (isClosing=false), } = closing (isClosing=true)
+                        string cs = value?.ToString() ?? "";
+                        return new ExtendedDataControlString(cs == "}");
+                    default:
+                        return new ExtendedDataString(value?.ToString() ?? "");
+                }
+            }
+            catch { return null; }
+        }
+
+        private Entity[] ExportShell(GeoObject.Shell shell)
         {
             if (Settings.GlobalSettings.GetBoolValue("DxfImport.SingleMeshPerFace", false))
             {
-                List<EntityObject> res = new List<EntityObject>();
+                List<Entity> res = new List<Entity>();
                 for (int i = 0; i < shell.Faces.Length; i++)
                 {
-                    EntityObject mesh = ExportFace(shell.Faces[i]);
+                    Entity mesh = ExportFace(shell.Faces[i]);
                     if (mesh != null) res.Add(mesh);
                 }
                 return res.ToArray();
             }
             else
             {
-                List<EntityObject> res = new List<EntityObject>();
-                Dictionary<int, (List<Vector3>, List<short[]>)> mesh = new Dictionary<int, (List<Vector3>, List<short[]>)>();
+                List<Entity> res = new List<Entity>();
+                Dictionary<int, (List<XYZ>, List<short[]>)> mesh = new Dictionary<int, (List<XYZ>, List<short[]>)>();
                 for (int i = 0; i < shell.Faces.Length; i++)
-                {
                     CollectMeshByColor(mesh, shell.Faces[i]);
-                }
-                foreach (KeyValuePair<int, (List<Vector3> vertices, List<short[]> indices)> item in mesh)
+                foreach (var item in mesh)
                 {
-                    PolyfaceMesh pfm = new PolyfaceMesh(item.Value.vertices, item.Value.indices);
-                    SetColor(pfm, item.Key);
+                    Entity pfm = BuildPolyfaceMesh(item.Value.Item1, item.Value.Item2);
+                    SetColorOnEntity(pfm, item.Key);
                     res.Add(pfm);
                 }
                 return res.ToArray();
             }
         }
-        private netDxf.Entities.EntityObject ExportFace(GeoObject.Face face)
+
+        private Entity ExportFace(GeoObject.Face face)
         {
             if (Settings.GlobalSettings.GetBoolValue("DxfImport.UseMesh", false))
             {
-                if (face.Surface is PlaneSurface ps)
+                if (face.Surface is PlaneSurface && face.OutlineEdges.Length == 4 &&
+                    face.OutlineEdges[0].Curve3D is GeoObject.Line &&
+                    face.OutlineEdges[1].Curve3D is GeoObject.Line &&
+                    face.OutlineEdges[2].Curve3D is GeoObject.Line &&
+                    face.OutlineEdges[3].Curve3D is GeoObject.Line)
                 {
-                    if (face.OutlineEdges.Length == 4 && face.OutlineEdges[0].Curve3D is GeoObject.Line && face.OutlineEdges[1].Curve3D is GeoObject.Line && face.OutlineEdges[2].Curve3D is GeoObject.Line && face.OutlineEdges[3].Curve3D is GeoObject.Line)
-                    {
-                        // 4 lines, export as a simple PolyfaceMesh with 4 vertices
-                        List<Vector3> vertices = new List<Vector3>();
-                        for (int i = 0; i < 4; i++)
-                        {
-                            vertices.Add(Vector3(face.OutlineEdges[i].StartVertex(face).Position));
-                        }
-                        netDxf.Entities.Mesh res = new Mesh(vertices, new int[][] { new int[] { 0, 1, 2, 3 } });
-                        SetAttributes(res, face);
-                        return res;
-                    }
+                    var mesh = new ACadSharp.Entities.Mesh();
+                    for (int i = 0; i < 4; i++)
+                        mesh.Vertices.Add(ToXYZ(face.OutlineEdges[i].StartVertex(face).Position));
+                    mesh.Faces.Add(new int[] { 0, 1, 2, 3 });
+                    SetAttributes(mesh, face);
+                    return mesh;
                 }
+                else
                 {
-                    face.GetTriangulation(triangulationPrecision, out GeoPoint[] trianglePoint, out GeoPoint2D[] triangleUVPoint, out int[] triangleIndex, out BoundingCube triangleExtent);
-                    int[][] indices = new int[triangleIndex.Length / 3][];
-                    for (int i = 0; i < triangleIndex.Length - 2; i += 3)
-                    {   // it is strange, but the indices must be +1
-                        indices[i / 3] = new int[] { triangleIndex[i], triangleIndex[i + 1], triangleIndex[i + 2] };
-                    }
-                    Vector3[] vertices = new Vector3[trianglePoint.Length];
-                    for (int i = 0; i < trianglePoint.Length; i++)
-                    {
-                        vertices[i] = Vector3(trianglePoint[i]);
-                    }
-                    Mesh res = new Mesh(vertices, indices);
-                    SetAttributes(res, face);
-                    return res;
+                    face.GetTriangulation(triangulationPrecision, out GeoPoint[] pts, out GeoPoint2D[] uvPts,
+                        out int[] triIdx, out BoundingCube ext);
+                    var mesh = new ACadSharp.Entities.Mesh();
+                    foreach (var pt in pts) mesh.Vertices.Add(ToXYZ(pt));
+                    for (int i = 0; i + 2 < triIdx.Length; i += 3)
+                        mesh.Faces.Add(new int[] { triIdx[i], triIdx[i + 1], triIdx[i + 2] });
+                    SetAttributes(mesh, face);
+                    return mesh;
                 }
             }
             else
             {
-                if (face.Surface is PlaneSurface ps)
+                if (face.Surface is PlaneSurface && face.OutlineEdges.Length == 4 &&
+                    face.OutlineEdges[0].Curve3D is GeoObject.Line &&
+                    face.OutlineEdges[1].Curve3D is GeoObject.Line &&
+                    face.OutlineEdges[2].Curve3D is GeoObject.Line &&
+                    face.OutlineEdges[3].Curve3D is GeoObject.Line)
                 {
-                    if (face.OutlineEdges.Length == 4 && face.OutlineEdges[0].Curve3D is GeoObject.Line && face.OutlineEdges[1].Curve3D is GeoObject.Line && face.OutlineEdges[2].Curve3D is GeoObject.Line && face.OutlineEdges[3].Curve3D is GeoObject.Line)
-                    {
-                        // 4 lines, export as a simple PolyfaceMesh with 4 vertices
-                        List<Vector3> vertices = new List<Vector3>();
-                        for (int i = 0; i < 4; i++)
-                        {
-                            vertices.Add(Vector3(face.OutlineEdges[i].StartVertex(face).Position));
-                        }
-                        netDxf.Entities.PolyfaceMesh res = new PolyfaceMesh(vertices, new short[][] { new short[] { 1, 2, 3, 4 } });
-                        SetAttributes(res, face);
-                        return res;
-                    }
+                    List<XYZ> verts = new List<XYZ>();
+                    for (int i = 0; i < 4; i++)
+                        verts.Add(ToXYZ(face.OutlineEdges[i].StartVertex(face).Position));
+                    Entity pfm = BuildPolyfaceMesh(verts, new List<short[]> { new short[] { 1, 2, 3, 4 } });
+                    SetAttributes(pfm, face);
+                    return pfm;
                 }
+                else
                 {
-                    face.GetTriangulation(triangulationPrecision, out GeoPoint[] trianglePoint, out GeoPoint2D[] triangleUVPoint, out int[] triangleIndex, out BoundingCube triangleExtent);
-                    short[][] indices = new short[triangleIndex.Length / 3][];
-                    for (int i = 0; i < triangleIndex.Length - 2; i += 3)
-                    {   // it is strange, but the indices must be +1
-                        indices[i / 3] = new short[] { (short)(triangleIndex[i] + 1), (short)(triangleIndex[i + 1] + 1), (short)(triangleIndex[i + 2] + 1) };
-                    }
-                    Vector3[] vertices = new Vector3[trianglePoint.Length];
-                    for (int i = 0; i < trianglePoint.Length; i++)
-                    {
-                        vertices[i] = Vector3(trianglePoint[i]);
-                    }
-                    PolyfaceMesh res = new PolyfaceMesh(vertices, indices);
-                    SetAttributes(res, face);
-                    return res;
+                    face.GetTriangulation(triangulationPrecision, out GeoPoint[] pts, out GeoPoint2D[] uvPts,
+                        out int[] triIdx, out BoundingCube ext);
+                    List<short[]> idxList = new List<short[]>();
+                    for (int i = 0; i + 2 < triIdx.Length; i += 3)
+                        idxList.Add(new short[] {
+                            (short)(triIdx[i] + 1),
+                            (short)(triIdx[i + 1] + 1),
+                            (short)(triIdx[i + 2] + 1)
+                        });
+                    List<XYZ> verts = new List<XYZ>();
+                    foreach (var pt in pts) verts.Add(ToXYZ(pt));
+                    Entity pfm = BuildPolyfaceMesh(verts, idxList);
+                    SetAttributes(pfm, face);
+                    return pfm;
                 }
             }
         }
-        private void CollectMeshByColor(Dictionary<int, (List<Vector3>, List<short[]>)> mesh, Face face)
+
+        private static ACadSharp.Entities.PolyfaceMesh BuildPolyfaceMesh(List<XYZ> vertices, List<short[]> faceIndices)
         {
-            if (!mesh.TryGetValue(face.ColorDef.Color.ToArgb(), out (List<Vector3> vertices, List<short[]> indices) mc))
+            var pfm = new ACadSharp.Entities.PolyfaceMesh();
+            foreach (var v in vertices)
+                pfm.Vertices.Add(new VertexFaceMesh(v));
+            foreach (var idx in faceIndices)
             {
-                mesh[face.ColorDef.Color.ToArgb()] = mc = (new List<Vector3>(), new List<short[]>());
+                var rec = new VertexFaceRecord
+                {
+                    Index1 = idx.Length > 0 ? idx[0] : (short)0,
+                    Index2 = idx.Length > 1 ? idx[1] : (short)0,
+                    Index3 = idx.Length > 2 ? idx[2] : (short)0,
+                    Index4 = idx.Length > 3 ? idx[3] : (short)0,
+                };
+                pfm.Faces.Add(rec);
             }
-            short offset = (short)(mc.vertices.Count + 1);
-            face.GetTriangulation(triangulationPrecision, out GeoPoint[] trianglePoint, out GeoPoint2D[] triangleUVPoint, out int[] triangleIndex, out BoundingCube triangleExtent);
-            short[][] indices = new short[triangleIndex.Length / 3][];
-            for (int i = 0; i < triangleIndex.Length - 2; i += 3)
-            {   // it is strange, but the indices must be +1
-                indices[i / 3] = new short[] { (short)(triangleIndex[i] + offset), (short)(triangleIndex[i + 1] + offset), (short)(triangleIndex[i + 2] + offset) };
-            }
-            mc.indices.AddRange(indices);
-            Vector3[] vertices = new Vector3[trianglePoint.Length];
-            for (int i = 0; i < trianglePoint.Length; i++)
-            {
-                vertices[i] = Vector3(trianglePoint[i]);
-            }
-            mc.vertices.AddRange(vertices);
+            return pfm;
         }
-        private netDxf.Entities.Text ExportText(GeoObject.Text text)
+
+        private void CollectMeshByColor(Dictionary<int, (List<XYZ>, List<short[]>)> mesh, Face face)
         {
-            var textStringValue = text.TextString.Replace("\r\n", " ");
+            int argb = face.ColorDef?.Color.ToArgb() ?? Color.White.ToArgb();
+            if (!mesh.TryGetValue(argb, out var mc))
+                mesh[argb] = mc = (new List<XYZ>(), new List<short[]>());
+            short offset = (short)(mc.Item1.Count + 1);
+            face.GetTriangulation(triangulationPrecision, out GeoPoint[] pts, out GeoPoint2D[] uvPts,
+                out int[] triIdx, out BoundingCube ext);
+            for (int i = 0; i + 2 < triIdx.Length; i += 3)
+                mc.Item2.Add(new short[] {
+                    (short)(triIdx[i] + offset),
+                    (short)(triIdx[i + 1] + offset),
+                    (short)(triIdx[i + 2] + offset)
+                });
+            foreach (var pt in pts) mc.Item1.Add(ToXYZ(pt));
+        }
+
+        private Entity ExportHatch(GeoObject.Hatch hatch)
+        {
+            if (hatch.CompoundShape == null || hatch.CompoundShape.SimpleShapes.Length == 0)
+                return null;
+            // Export simple solid-fill triangles/quads (from DXF SOLID import) back as SOLID.
+            if (hatch.HatchStyle is HatchStyleSolid)
+            {
+                SimpleShape ss = hatch.CompoundShape.SimpleShapes[0];
+                ICurve2D[] segs = ss.Outline.Segments;
+                if (segs.Length >= 3 && segs.Length <= 4 && segs.All(s => s is CADability.Curve2D.Line2D))
+                {
+                    GeoPoint[] pts = new GeoPoint[4];
+                    for (int i = 0; i < segs.Length; i++)
+                        pts[i] = hatch.Plane.ToGlobal(segs[i].StartPoint);
+                    // DXF SOLID requires 4 corners; duplicate last for triangles
+                    if (segs.Length == 3) pts[3] = pts[2];
+                    return new ACadSharp.Entities.Solid
+                    {
+                        FirstCorner  = ToXYZ(pts[0]),
+                        SecondCorner = ToXYZ(pts[1]),
+                        ThirdCorner  = ToXYZ(pts[2]),
+                        FourthCorner = ToXYZ(pts[3]),
+                        Normal = ToXYZ(hatch.Plane.Normal)
+                    };
+                }
+            }
+            return null;
+        }
+
+        private Entity ExportText(GeoObject.Text text)
+        {
+            var textString = text.TextString.Replace("\r\n", " ");
             System.Drawing.FontStyle fs = System.Drawing.FontStyle.Regular;
             if (text.Bold) fs |= System.Drawing.FontStyle.Bold;
             if (text.Italic) fs |= System.Drawing.FontStyle.Italic;
-            System.Drawing.Font font = new System.Drawing.Font(text.Font, 1000.0f, fs);
-            netDxf.Entities.Text res = new netDxf.Entities.Text(textStringValue, Vector2.Zero, text.TextSize * 1000 / font.Height, new TextStyle(text.Font, text.Font + ".ttf"));
-            ModOp toText = ModOp.Fit(GeoPoint.Origin, new GeoVector[] { GeoVector.XAxis, GeoVector.YAxis, GeoVector.ZAxis }, text.Location, new GeoVector[] { text.LineDirection.Normalized, text.GlyphDirection.Normalized, text.LineDirection.Normalized ^ text.GlyphDirection.Normalized });
-            res.TransformBy(Matrix4(toText)); // easier than setting normal and rotation
+
+            // TextSize is the raw DXF cap-height (group 40) stored unchanged during import.
+            // Do not apply any font-metric scaling here — it would corrupt the value.
+            double height = text.TextSize;
+
+            string fontName = text.Font ?? "Standard";
+            if (!createdTextStyles.TryGetValue(fontName, out ACadSharp.Tables.TextStyle textStyle))
+            {
+                foreach (ACadSharp.Tables.TextStyle existing in doc.TextStyles)
+                    if (string.Equals(existing.Name, fontName, StringComparison.OrdinalIgnoreCase)) { textStyle = existing; break; }
+                if (textStyle == null)
+                {
+                    textStyle = new ACadSharp.Tables.TextStyle(fontName) { Filename = fontName + ".ttf" };
+                    doc.TextStyles.Add(textStyle);
+                }
+                createdTextStyles[fontName] = textStyle;
+            }
+
+            // Map CADability alignment to DXF group 72/73
+            TextHorizontalAlignment hAlign = TextHorizontalAlignment.Left;
+            TextVerticalAlignmentType vAlign = TextVerticalAlignmentType.Baseline;
+            switch (text.LineAlignment)
+            {
+                case GeoObject.Text.LineAlignMode.Center: hAlign = TextHorizontalAlignment.Center; break;
+                case GeoObject.Text.LineAlignMode.Right:  hAlign = TextHorizontalAlignment.Right; break;
+            }
+            switch (text.Alignment)
+            {
+                case GeoObject.Text.AlignMode.Bottom:   vAlign = TextVerticalAlignmentType.Bottom; break;
+                case GeoObject.Text.AlignMode.Center:   vAlign = TextVerticalAlignmentType.Middle; break;
+                case GeoObject.Text.AlignMode.Top:      vAlign = TextVerticalAlignmentType.Top; break;
+            }
+            bool defaultAlign = hAlign == TextHorizontalAlignment.Left
+                             && vAlign == TextVerticalAlignmentType.Baseline;
+
+            // Group 10 (InsertPoint) always holds the text anchor so viewers that ignore
+            // group 11 still render text at the correct position.
+            // For non-default alignment, group 11 (AlignmentPoint) is also set to the
+            // same anchor — that is the convention real DXF writers use.
+            var res = new ACadSharp.Entities.TextEntity
+            {
+                Value = textString,
+                Height = height,
+                Style = textStyle,
+                HorizontalAlignment = hAlign,
+                VerticalAlignment = vAlign,
+                InsertPoint = ToXYZ(text.Location),
+            };
+            if (!defaultAlign)
+                res.AlignmentPoint = ToXYZ(text.Location);
+
+            GeoVector lineDir = text.LineDirection.Normalized;
+            GeoVector glyphDir = text.GlyphDirection.Normalized;
+            GeoVector normal = lineDir ^ glyphDir;
+            res.Normal = ToXYZ(normal);
+
+            // Compute rotation in OCS using the Arbitrary Axis Algorithm
+            Plane ocsPlane = Import.Plane(ToXYZ(text.Location), ToXYZ(normal));
+            GeoVector2D dir2D = ocsPlane.Project(lineDir);
+            res.Rotation = Math.Atan2(dir2D.y, dir2D.x) * (180.0 / Math.PI);
             return res;
         }
 
-        private netDxf.Entities.Insert ExportBlock(GeoObject.Block blk)
+        private ACadSharp.Entities.Insert ExportBlock(GeoObject.Block blk)
         {
-            List<EntityObject> entities = new List<EntityObject>();
+            List<Entity> entities = new List<Entity>();
             for (int i = 0; i < blk.Children.Count; i++)
             {
-                EntityObject[] entity = GeoObjectToEntity(blk.Child(i));
-                if (entity != null) entities.AddRange(entity);
+                Entity[] ents = GeoObjectToEntity(blk.Child(i));
+                if (ents != null) entities.AddRange(ents);
             }
             string name = blk.Name;
-            if (name == null || doc.Blocks.Contains(name) || !TableObject.IsValidName(name)) name = GetNextAnonymousBlockName();
-            netDxf.Blocks.Block block = new netDxf.Blocks.Block(name, entities);
-            doc.Blocks.Add(block);
-            return new netDxf.Entities.Insert(block);
-        }
-        private netDxf.Entities.Insert ExportPath(GeoObject.Path path)
-        {
-            List<EntityObject> entities = new List<EntityObject>();
-            for (int i = 0; i < path.Curves.Length; i++)
-            {
-                EntityObject[] curve = GeoObjectToEntity(path.Curves[i] as IGeoObject);
-                if (curve != null) entities.AddRange(curve);
-            }
-            netDxf.Blocks.Block block = new netDxf.Blocks.Block(GetNextAnonymousBlockName(), entities);
-            doc.Blocks.Add(block);
-            return new netDxf.Entities.Insert(block);
+            if (name == null || createdBlockNames.Contains(name) || !IsValidBlockName(name))
+                name = GetNextAnonymousBlockName();
+            createdBlockNames.Add(name);
+            var blockRec = new BlockRecord(name);
+            foreach (var e in entities) blockRec.Entities.Add(e);
+            doc.BlockRecords.Add(blockRec);
+            return new ACadSharp.Entities.Insert(blockRec);
         }
 
-        private EntityObject[] ExportPathWithoutBlock(GeoObject.Path path)
+        private ACadSharp.Entities.Insert ExportPath(GeoObject.Path path)
         {
-            List<EntityObject> entities = new List<EntityObject>();
+            List<Entity> entities = new List<Entity>();
             for (int i = 0; i < path.Curves.Length; i++)
             {
-                EntityObject[] curve = GeoObjectToEntity(path.Curves[i] as IGeoObject);
-                if (curve != null) entities.AddRange(curve);
+                Entity[] ents = GeoObjectToEntity(path.Curves[i] as IGeoObject);
+                if (ents != null) entities.AddRange(ents);
+            }
+            string name = GetNextAnonymousBlockName();
+            var blockRec = new BlockRecord(name);
+            foreach (var e in entities) blockRec.Entities.Add(e);
+            doc.BlockRecords.Add(blockRec);
+            return new ACadSharp.Entities.Insert(blockRec);
+        }
+
+        private Entity[] ExportPathWithoutBlock(GeoObject.Path path)
+        {
+            List<Entity> entities = new List<Entity>();
+            for (int i = 0; i < path.Curves.Length; i++)
+            {
+                Entity[] ents = GeoObjectToEntity(path.Curves[i] as IGeoObject);
+                if (ents != null) entities.AddRange(ents);
             }
             return entities.ToArray();
         }
 
-        private netDxf.Entities.Spline ExportBSpline(BSpline bspline)
+        private ACadSharp.Entities.Spline ExportBSpline(BSpline bspline)
         {
-            List<Vector3> poles = new List<Vector3>(bspline.Poles.Length);
-
+            List<XYZ> poles = new List<XYZ>(bspline.Poles.Length);
             for (int i = 0; i < bspline.Poles.Length; i++)
-                poles.Add(Vector3(bspline.Poles[i]));
+                poles.Add(ToXYZ(bspline.Poles[i]));
 
             List<double> knots = new List<double>();
             for (int i = 0; i < bspline.Knots.Length; i++)
-            {
-                for (int j = 0; j < bspline.Multiplicities[i]; j++) knots.Add(bspline.Knots[i]);
-            }
+                for (int j = 0; j < bspline.Multiplicities[i]; j++)
+                    knots.Add(bspline.Knots[i]);
 
+            var spline = new ACadSharp.Entities.Spline();
+            spline.Degree = bspline.Degree;
+            spline.IsClosed = bspline.IsClosed;
+            foreach (var pt in poles) spline.ControlPoints.Add(pt);
+            foreach (var k in knots) spline.Knots.Add(k);
             if (bspline.HasWeights)
-                return new netDxf.Entities.Spline(poles, bspline.Weights, knots, (short)bspline.Degree, bspline.IsClosed);
-            else
-                return new netDxf.Entities.Spline(poles, null, knots, (short)bspline.Degree, bspline.IsClosed);
+                foreach (var w in bspline.Weights) spline.Weights.Add(w);
+            return spline;
         }
 
-        private netDxf.Entities.Polyline3D ExportPolyline(GeoObject.Polyline polyline)
+        private ACadSharp.Entities.Polyline3D ExportPolyline(GeoObject.Polyline polyline)
         {
-            //TODO: Check if a new method for Polyline2D (old LwPolyline) is necessary
-            List<Vector3> vertices = new List<Vector3>();
+            var poly = new ACadSharp.Entities.Polyline3D();
             for (int i = 0; i < polyline.Vertices.Length; i++)
-            {
-                vertices.Add(Vector3(polyline.Vertices[i]));
-            }
-            if (polyline.IsClosed) vertices.Add(Vector3(polyline.Vertices[0]));
-            return new netDxf.Entities.Polyline3D(vertices);
+                poly.Vertices.Add(new Vertex3D(ToXYZ(polyline.Vertices[i])));
+            if (polyline.IsClosed)
+                poly.Vertices.Add(new Vertex3D(ToXYZ(polyline.Vertices[0])));
+            return poly;
         }
 
-        private netDxf.Entities.Point ExportPoint(GeoObject.Point point)
+        private ACadSharp.Entities.Point ExportPoint(GeoObject.Point point)
         {
-            return new netDxf.Entities.Point(Vector3(point.Location));
+            return new ACadSharp.Entities.Point(ToXYZ(point.Location));
         }
-        private netDxf.Entities.Line ExportLine(GeoObject.Line line)
+
+        private ACadSharp.Entities.Line ExportLine(GeoObject.Line line)
         {
-            return new netDxf.Entities.Line(Vector3(line.StartPoint), Vector3(line.EndPoint));
-        }
-        private EntityObject ExportEllipse(GeoObject.Ellipse elli)
-        {
-            netDxf.Entities.EntityObject entity = null;
-            if (elli.IsArc)
+            return new ACadSharp.Entities.Line
             {
-                Plane dxfPlane;
-                if (elli.CounterClockWise) dxfPlane = Import.Plane(Vector3(elli.Center), Vector3(elli.Plane.Normal));
-                else dxfPlane = Import.Plane(Vector3(elli.Center), Vector3(-elli.Plane.Normal));
-                if (elli.IsCircle)
+                StartPoint = ToXYZ(line.StartPoint),
+                EndPoint = ToXYZ(line.EndPoint)
+            };
+        }
+
+        private Entity ExportConstructionLine(GeoObject.ConstructionLine constructionLine)
+        {
+            if (constructionLine.IsRay)
+            {
+                return new ACadSharp.Entities.Ray
                 {
+                    StartPoint = ToXYZ(constructionLine.BasePoint),
+                    Direction = ToXYZ(constructionLine.Direction)
+                };
+            }
+            return new ACadSharp.Entities.XLine
+            {
+                FirstPoint = ToXYZ(constructionLine.BasePoint),
+                Direction = ToXYZ(constructionLine.Direction)
+            };
+        }
+
+        private Entity ExportEllipse(GeoObject.Ellipse elli)
+        {
+            if (elli.IsCircle)
+            {
+                if (elli.IsArc)
+                {
+                    // Always keep the arc's own normal (never flip for CW arcs).
+                    // CW arcs are represented as CCW by swapping start/end endpoints,
+                    // so all exported arcs use Normal=(0,0,1) and work in viewers that
+                    // don't implement the OCS transformation.
+                    GeoVector normal = elli.Plane.Normal;
+                    Plane dxfPlane = Import.Plane(ToXYZ(elli.Center), ToXYZ(normal));
                     GeoObject.Ellipse aligned = GeoObject.Ellipse.Construct();
-                    aligned.SetArcPlaneCenterStartEndPoint(dxfPlane, dxfPlane.Project(elli.Center), dxfPlane.Project(elli.StartPoint), dxfPlane.Project(elli.EndPoint), dxfPlane, true);
-
-                    //Check if ellipse is actually a closed circle
+                    if (elli.CounterClockWise)
+                    {
+                        aligned.SetArcPlaneCenterStartEndPoint(dxfPlane, dxfPlane.Project(elli.Center),
+                            dxfPlane.Project(elli.StartPoint), dxfPlane.Project(elli.EndPoint), dxfPlane, true);
+                    }
+                    else
+                    {
+                        // Swap start/end to get the equivalent CCW arc covering the same geometric portion
+                        aligned.SetArcPlaneCenterStartEndPoint(dxfPlane, dxfPlane.Project(elli.Center),
+                            dxfPlane.Project(elli.EndPoint), dxfPlane.Project(elli.StartPoint), dxfPlane, true);
+                    }
                     if (Math.Abs(elli.SweepParameter) > Math.PI && Precision.IsEqual(elli.StartPoint, elli.EndPoint))
-                        entity = new netDxf.Entities.Circle(Vector3(aligned.Center), aligned.Radius);
-                    else
-                        entity = new netDxf.Entities.Arc(Vector3(aligned.Center), aligned.Radius, aligned.StartParameter / Math.PI * 180, (aligned.StartParameter + aligned.SweepParameter) / Math.PI * 180);
-
-                    entity.Normal = Vector3(dxfPlane.Normal);
-                }
-                else
-                {
-                    netDxf.Entities.Ellipse expelli = new netDxf.Entities.Ellipse(Vector3(elli.Center), 2 * elli.MajorRadius, 2 * elli.MinorRadius);
-                    entity = expelli;
-                    entity.Normal = Vector3(elli.Plane.Normal);
-                    Plane cdbplane = elli.Plane;
-                    GeoVector2D dir = dxfPlane.Project(cdbplane.DirectionX);
-                    SweepAngle rot = new SweepAngle(GeoVector2D.XAxis, dir);
-                    if (elli.SweepParameter < 0)
-                    {   // there are no clockwise oriented ellipse arcs in dxf
-                        expelli.Rotation = -rot.Degree;
-
-                        double startParameter = elli.StartParameter + elli.SweepParameter + Math.PI;
-                        expelli.StartAngle = CalcStartEndAngle(startParameter, expelli.MajorAxis, expelli.MinorAxis);
-
-                        double endParameter = elli.StartParameter + Math.PI;
-                        expelli.EndAngle = CalcStartEndAngle(endParameter, expelli.MajorAxis, expelli.MinorAxis);
+                    {
+                        return new ACadSharp.Entities.Circle
+                        {
+                            Center = ToXYZ(aligned.Center),
+                            Radius = aligned.Radius,
+                            Normal = ToXYZ(normal)
+                        };
                     }
                     else
                     {
-                        expelli.Rotation = rot.Degree;
-                        expelli.StartAngle = CalcStartEndAngle(elli.StartParameter, expelli.MajorAxis, expelli.MinorAxis);
-
-                        double endParameter = elli.StartParameter + elli.SweepParameter;
-                        expelli.EndAngle = CalcStartEndAngle(endParameter, expelli.MajorAxis, expelli.MinorAxis);
+                        return new ACadSharp.Entities.Arc
+                        {
+                            Center = ToXYZ(aligned.Center),
+                            Radius = aligned.Radius,
+                            StartAngle = aligned.StartParameter,
+                            EndAngle = aligned.StartParameter + aligned.SweepParameter,
+                            Normal = ToXYZ(normal)
+                        };
                     }
                 }
-            }
-            else
-            {
-                if (elli.IsCircle)
-                {
-                    entity = new netDxf.Entities.Circle(Vector3(elli.Center), elli.Radius);
-                    entity.Normal = Vector3(elli.Plane.Normal);
-                }
                 else
                 {
-                    netDxf.Entities.Ellipse expelli = new netDxf.Entities.Ellipse(Vector3(elli.Center), 2 * elli.MajorRadius, 2 * elli.MinorRadius);
-                    entity = expelli;
-                    entity.Normal = Vector3(elli.Plane.Normal);
-                    Plane dxfplane = Import.Plane(expelli.Center, expelli.Normal); // this plane is not correct, it has to be rotated
-                    Plane cdbplane = elli.Plane;
-                    GeoVector2D dir = dxfplane.Project(cdbplane.DirectionX);
-                    SweepAngle rot = new SweepAngle(GeoVector2D.XAxis, dir);
-                    expelli.Rotation = rot.Degree;
-                }
-            }
-            return entity;
-        }
-
-        private double CalcStartEndAngle(double startEndParameter, double majorAxis, double minorAxis)
-        {
-            double a = majorAxis * 0.5d;
-            double b = minorAxis * 0.5d;
-            Vector2 startPoint = new Vector2(a * Math.Cos(startEndParameter), b * Math.Sin(startEndParameter));
-            return Vector2.Angle(startPoint) * netDxf.MathHelper.RadToDeg;
-        }
-
-        private static void SetEllipseParameters(netDxf.Entities.Ellipse ellipse, double startparam, double endparam)
-        {
-            //CADability: also set the start and end parameter
-            //ellipse.StartParameter = startparam;
-            //ellipse.EndParameter = endparam;
-            if (MathHelper.IsZero(startparam) && MathHelper.IsEqual(endparam, MathHelper.TwoPI))
-            {
-                ellipse.StartAngle = 0.0;
-                ellipse.EndAngle = 0.0;
-            }
-            else
-            {
-                double a = ellipse.MajorAxis * 0.5;
-                double b = ellipse.MinorAxis * 0.5;
-
-                Vector2 startPoint = new Vector2(a * Math.Cos(startparam), b * Math.Sin(startparam));
-                Vector2 endPoint = new Vector2(a * Math.Cos(endparam), b * Math.Sin(endparam));
-
-                if (Vector2.Equals(startPoint, endPoint))
-                {
-                    ellipse.StartAngle = 0.0;
-                    ellipse.EndAngle = 0.0;
-                }
-                else
-                {
-                    ellipse.StartAngle = Vector2.Angle(startPoint) * MathHelper.RadToDeg;
-                    ellipse.EndAngle = Vector2.Angle(endPoint) * MathHelper.RadToDeg;
-                }
-            }
-        }
-
-        private void SetColor(EntityObject entity, int argb)
-        {
-            AciColor clr;
-            if (argb.Equals(Color.White.ToArgb()) || argb.Equals(Color.Black.ToArgb()))
-            {
-                clr = AciColor.Default;
-            }
-            else
-            {
-                clr = AciColor.FromTrueColor(argb);
-                if (clr.Index > 0 && clr.Index < 256)
-                {
-                    var indexColor = AciColor.FromCadIndex(clr.Index);
-                    if (indexColor.ToColor().ToArgb().Equals(argb))
+                    return new ACadSharp.Entities.Circle
                     {
-                        // if the color matches the index color exactly
-                        // we don't need to use TruColor
-                        clr.UseTrueColor = false;
-                    }
+                        Center = ToXYZ(elli.Center),
+                        Radius = elli.Radius,
+                        Normal = ToXYZ(elli.Plane.Normal)
+                    };
                 }
             }
-            entity.Color = clr;
+            else
+            {
+                // True ellipse
+                GeoVector normal;
+                double startParam, endParam;
+                GeoVector majorDir;
+
+                if (elli.IsArc && elli.SweepParameter < 0)
+                {
+                    // Clockwise arc: flip normal and swap start/end
+                    normal = -elli.Plane.Normal;
+                    majorDir = elli.Plane.DirectionX;
+                    double start = elli.StartParameter + elli.SweepParameter;
+                    while (start < 0) start += 2.0 * Math.PI;
+                    startParam = start;
+                    endParam = elli.StartParameter;
+                    if (endParam < startParam) endParam += 2.0 * Math.PI;
+                }
+                else
+                {
+                    normal = elli.Plane.Normal;
+                    majorDir = elli.Plane.DirectionX;
+                    startParam = elli.IsArc ? elli.StartParameter : 0.0;
+                    endParam = elli.IsArc ? elli.StartParameter + elli.SweepParameter : 2.0 * Math.PI;
+                }
+
+                GeoVector majorAxisEnd = elli.MajorRadius * majorDir.Normalized;
+                return new ACadSharp.Entities.Ellipse
+                {
+                    Center = ToXYZ(elli.Center),
+                    MajorAxisEndPoint = ToXYZ(majorAxisEnd),
+                    RadiusRatio = elli.MinorRadius / elli.MajorRadius,
+                    Normal = ToXYZ(normal),
+                    StartParameter = startParam,
+                    EndParameter = endParam
+                };
+            }
         }
-        private void SetAttributes(EntityObject entity, IGeoObject go)
+
+        private void SetColorOnEntity(Entity entity, int argb)
+        {
+            System.Drawing.Color clr = System.Drawing.Color.FromArgb(argb);
+            if (argb == System.Drawing.Color.White.ToArgb() || argb == System.Drawing.Color.Black.ToArgb())
+                entity.Color = ACadSharp.Color.ByLayer;
+            else
+                entity.Color = new ACadSharp.Color(clr.R, clr.G, clr.B);
+        }
+
+        private void SetAttributes(Entity entity, IGeoObject go)
         {
             if (go is IColorDef cd && cd.ColorDef != null)
             {
-                AciColor clr;
-                if (cd.ColorDef.Color.ToArgb().Equals(Color.White.ToArgb()) || cd.ColorDef.Color.ToArgb().Equals(Color.Black.ToArgb()))
-                {
-                    clr = AciColor.Default;
-                }
+                System.Drawing.Color clr = cd.ColorDef.Color;
+                if (clr.ToArgb() == System.Drawing.Color.White.ToArgb() ||
+                    clr.ToArgb() == System.Drawing.Color.Black.ToArgb())
+                    entity.Color = ACadSharp.Color.ByLayer;
                 else
-                {
-                    clr = AciColor.FromTrueColor(cd.ColorDef.Color.ToArgb());
-                    if (clr.Index > 0 && clr.Index < 256)
-                    {
-                        var indexColor = AciColor.FromCadIndex(clr.Index);
-                        if (indexColor.ToColor().ToArgb().Equals(cd.ColorDef.Color.ToArgb()))
-                        {
-                            // if the color matches the index color exactly
-                            // we don't need to use TruColor
-                            clr.UseTrueColor = false;
-                        }
-                    }
-                }
-                entity.Color = clr;
+                    entity.Color = new ACadSharp.Color(clr.R, clr.G, clr.B);
             }
             if (go.Layer != null)
-            {
-                if (!createdLayers.TryGetValue(go.Layer, out netDxf.Tables.Layer layer))
-                {
-                    layer = new netDxf.Tables.Layer(go.Layer.Name);
-                    doc.Layers.Add(layer);
-                    createdLayers[go.Layer] = layer;
-                }
-                entity.Layer = layer;
-            }
-            if (go is ILinePattern lp && lp.LinePattern != null)
-            {
-                if (!createdLinePatterns.TryGetValue(lp.LinePattern, out Linetype linetype))
-                {
-                    List<LinetypeSegment> segments = new List<LinetypeSegment>();
-                    if (lp.LinePattern.Pattern != null)
-                    {
-                        for (int i = 0; i < lp.LinePattern.Pattern.Length; i++)
-                        {
-                            LinetypeSegment ls;
-                            if ((i & 0x01) == 0) ls = new LinetypeSimpleSegment(lp.LinePattern.Pattern[i]);
-                            else ls = new LinetypeSimpleSegment(-lp.LinePattern.Pattern[i]);
-                            segments.Add(ls);
-                        }
-                    }
-                    linetype = new Linetype(lp.LinePattern.Name);
-                    linetype.Segments.AddRange(segments);
-                    doc.Linetypes.Add(linetype);
-                    createdLinePatterns[lp.LinePattern] = linetype;
-                }
-                entity.Linetype = linetype;
-            }
+                entity.Layer = GetOrCreateLayer(go.Layer);
+            if (go is ILinePattern ilp && ilp.LinePattern != null)
+                entity.LineType = GetOrCreateLineType(ilp.LinePattern);
             if (go is ILineWidth lw && lw.LineWidth != null)
             {
+                LineWeightType found = LineWeightType.Default;
                 double minError = double.MaxValue;
-                Lineweight found = Lineweight.Default;
-                foreach (Lineweight lwe in Enum.GetValues(typeof(Lineweight)))
+                foreach (LineWeightType lwe in Enum.GetValues(typeof(LineWeightType)))
                 {
-                    double err = Math.Abs(((int)lwe) / 100.0 - lw.LineWidth.Width);
-                    if (err < minError)
-                    {
-                        minError = err;
-                        found = lwe;
-                    }
+                    int val = (int)lwe;
+                    if (val < 0) continue; // skip Default, ByLayer, ByBlock
+                    double err = Math.Abs(val / 100.0 - lw.LineWidth.Width);
+                    if (err < minError) { minError = err; found = lwe; }
                 }
-                entity.Lineweight = found;
+                entity.LineWeight = found;
             }
         }
-        private Vector3 Vector3(GeoPoint p)
+
+        private static XYZ ToXYZ(GeoPoint p) => new XYZ(p.x, p.y, p.z);
+        private static XYZ ToXYZ(GeoVector v) => new XYZ(v.x, v.y, v.z);
+
+        private static bool IsValidBlockName(string name)
         {
-            return new Vector3(p.x, p.y, p.z);
+            if (string.IsNullOrWhiteSpace(name)) return false;
+            foreach (char c in name)
+                if (c < 0x20 || "<>/\\\":;?*|,=`".IndexOf(c) >= 0) return false;
+            return true;
         }
-        private Vector3 Vector3(GeoVector v)
-        {
-            return new Vector3(v.x, v.y, v.z);
-        }
-        private netDxf.Matrix4 Matrix4(ModOp toText)
-        {
-            return new netDxf.Matrix4(toText[0, 0], toText[0, 1], toText[0, 2], toText[0, 3], toText[1, 0], toText[1, 1], toText[1, 2], toText[1, 3], toText[2, 0], toText[2, 1], toText[2, 2], toText[2, 3], 0, 0, 0, 1);
-        }
-        private string GetNextAnonymousBlockName()
-        {
-            return "AnonymousBlock" + (++anonymousBlockCounter).ToString();
-        }
+
+        private string GetNextAnonymousBlockName() => "AnonymousBlock" + (++anonymousBlockCounter);
     }
 }

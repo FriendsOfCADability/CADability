@@ -8,6 +8,14 @@
 		<label>Linie</label>
 		<info>Die Eigenschaften der Linie</info>
 	</data>
+	<data name="Ray.Object">
+		<label>Strahl</label>
+		<info>Die Eigenschaften des Strahls (einseitig unendliche Konstruktionslinie)</info>
+	</data>
+	<data name="XLine.Object">
+		<label>Konstruktionslinie</label>
+		<info>Die Eigenschaften der Konstruktionslinie (beidseitig unendlich)</info>
+	</data>
 	<data name="Line.StartPoint">
 		<label>Startpunkt</label>
 		<info>Anzeige für den Startpunkt der Linie\n. Eingabe des Startpunktes, x und y durch Leerzeichen getrennt</info>
@@ -2111,6 +2119,10 @@
 	<data name="Text.TextSize">
 		<label>Schriftgröße</label>
 		<info>Die Schriftgröße des Textes kann durch Tastatureingabe oder den Hotspot geändert werden</info>
+	</data>
+	<data name="Text.ColumnWidth">
+		<label>Spaltenbreite</label>
+		<info>Breite für den automatischen Zeilenumbruch: der Text wird an Wortgrenzen umbrochen, so dass keine Zeile breiter als dieser Wert wird. 0 bedeutet kein automatischer Umbruch, der Text bricht nur an expliziten Zeilenumbrüchen um.</info>
 	</data>
 	<data name="Text.Font">
 		<label>Schriftart</label>

@@ -261,7 +261,7 @@ namespace CADability.GeoObject
             }
             else
             {
-                paintTo3D.Points(new GeoPoint[] { location }, 1.0f, symbol);
+                paintTo3D.Points(new GeoPoint[] { location }, (float)size, symbol);
                 // folgendes geht viel schneller:
                 //paintTo3D.Polyline(new GeoPoint[] { location - size * GeoVector.XAxis, location + size * GeoVector.XAxis });
                 //paintTo3D.Polyline(new GeoPoint[] { location - size * GeoVector.YAxis, location + size * GeoVector.YAxis });

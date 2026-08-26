@@ -1,4 +1,4 @@
-﻿using CADability.Curve2D;
+using CADability.Curve2D;
 using MathNet.Numerics.LinearAlgebra.Double;
 using CADability.UserInterface;
 using System;
@@ -1172,219 +1172,220 @@ namespace CADability.GeoObject
             GetNaturalBounds(out umin, out umax, out vmin, out vmax);
             double[] us = GetUSingularities();
             double[] vs = GetVSingularities();
-            double[] upars = GetPars(umin, umax, IsUPeriodic, us, 5);
-            double[] vpars = GetPars(vmin, vmax, IsVPeriodic, vs, 5);
+            double[] upars = GetPars(umin, umax, IsUPeriodic, us, 5, out bool uok);
+            double[] vpars = GetPars(vmin, vmax, IsVPeriodic, vs, 5, out bool vok);
             // upars, vpars describe an almost evenly spaced 5x5 grid while singularities and seams (of closed surface) are avoided
             // now lets see, whether in the middle we have a line or circular arc
 
-            precision = Math.Max(precision, PolesExtent.Size * 1e-3);
+            if (uok && vok)
+            {
+                precision = Math.Max(precision, PolesExtent.Size * 1e-3);
 
-            GeoPoint[,] samples = new GeoPoint[5, 5];
-            for (int i = 0; i < 5; i++)
-            {
-                samples[i, 2] = PointAt(new GeoPoint2D(upars[i], vpars[2]));
-                if (i != 2) samples[2, i] = PointAt(new GeoPoint2D(upars[2], vpars[i]));
-            }
-            bool uIsLine = false, uIsCircle = false, vIsLine = false, vIsCircle = false;
-            GeoPoint cnt;
-            double rad;
-            GeoPoint[] ucnt = null, vcnt = null; // centers of the circles in u resp. v
-            double[] urad = null, vrad = null; //radii of the circles in u resp. v
-            if (IsLine(samples.Row(2), precision)) uIsLine = true;
-            else if (IsCircle(samples.Row(2), precision, out cnt, out rad))
-            {
-                uIsCircle = true;
-                ucnt = new GeoPoint[5];
-                urad = new double[5];
-                ucnt[2] = cnt;
-                urad[2] = rad;
-            }
-            if (IsLine(samples.Column(2), precision)) vIsLine = true;
-            else if (IsCircle(samples.Column(2), precision, out cnt, out rad))
-            {
-                vIsCircle = true;
-                vcnt = new GeoPoint[5];
-                vrad = new double[5];
-                vcnt[2] = cnt;
-                vrad[2] = rad;
-            }
-            if ((uIsLine || uIsCircle) && (vIsLine || vIsCircle))
-            {   // we can try to create a plane, cylinder, cone, sphere or torus
-                for (int i = 0; i < 5; i++) for (int j = 0; j < 5; j++)
+                GeoPoint[,] samples = new GeoPoint[5, 5];
+                for (int i = 0; i < 5; i++)
+                {
+                    samples[i, 2] = PointAt(new GeoPoint2D(upars[i], vpars[2]));
+                    if (i != 2) samples[2, i] = PointAt(new GeoPoint2D(upars[2], vpars[i]));
+                }
+                bool uIsLine = false, uIsCircle = false, vIsLine = false, vIsCircle = false;
+                GeoPoint cnt;
+                double rad;
+                GeoPoint[] ucnt = null, vcnt = null; // centers of the circles in u resp. v
+                double[] urad = null, vrad = null; //radii of the circles in u resp. v
+                if (IsLine(samples.Row(2), precision)) uIsLine = true;
+                else if (IsCircle(samples.Row(2), precision, out cnt, out rad))
+                {
+                    uIsCircle = true;
+                    ucnt = new GeoPoint[5];
+                    urad = new double[5];
+                    ucnt[2] = cnt;
+                    urad[2] = rad;
+                }
+                if (IsLine(samples.Column(2), precision)) vIsLine = true;
+                else if (IsCircle(samples.Column(2), precision, out cnt, out rad))
+                {
+                    vIsCircle = true;
+                    vcnt = new GeoPoint[5];
+                    vrad = new double[5];
+                    vcnt[2] = cnt;
+                    vrad[2] = rad;
+                }
+                if ((uIsLine || uIsCircle) && (vIsLine || vIsCircle))
+                {   // we can try to create a plane, cylinder, cone, sphere or torus
+                    for (int i = 0; i < 5; i++) for (int j = 0; j < 5; j++)
                     {
                         //if (i == 2 || j == 2) continue; // already calculated
                         samples[i, j] = PointAt(new GeoPoint2D(upars[i], vpars[j]));
                     }
-                bool failed = false;
-                foreach (int i in new int[] { 0, 4 })
-                {
-                    if (failed) break;
-                    if (uIsCircle)
+                    bool failed = false;
+                    foreach (int i in new int[] { 0, 4 })
                     {
-                        if (IsCircle(samples.Row(i), precision, out cnt, out rad))
+                        if (failed) break;
+                        if (uIsCircle)
                         {
-                            ucnt[i] = cnt;
-                            urad[i] = rad;
-                        }
-                        else failed = true;
-                    }
-                    if (uIsLine) if (!IsLine(samples.Row(i), precision)) failed = true;
-                    if (vIsCircle)
-                    {
-                        if (IsCircle(samples.Column(i), precision, out cnt, out rad))
-                        {
-                            vcnt[i] = cnt;
-                            vrad[i] = rad;
-                        }
-                        else failed = true;
-                    }
-                    if (vIsLine) if (!IsLine(samples.Column(i), precision)) failed = true;
-                }
-                if (!failed)
-                {
-                    ISurface found = null;
-                    // now in each direction there are either 3 circles or 3 lines
-                    if (uIsLine && vIsLine)
-                    {   // a plane or a hyperboloid
-                        //double minerror = GaussNewtonMinimizer.PlaneFit(samples.Linear(), precision, out Plane pln);
-                        //if (minerror < precision)
-                        //{
-                        //    found = new PlaneSurface(pln);
-                        //}
-                        //else
-                        //{
-                        Plane plfp = Plane.FromPoints(samples.Linear().ToArray(), out double maxdist1, out bool islin1);
-                        if (maxdist1 < precision) found = new PlaneSurface(plfp); // GaussNewtonMinimizer not well implemented
-                        //}
-
-                    }
-                    else if (uIsCircle && vIsCircle)
-                    {   // a sphere or a torus
-                        // which circles are the longitude and which are the latitudes (latitudes differ in radius)
-                        double du = Math.Abs(urad[0] - urad[2]) + Math.Abs(urad[2] - urad[4]);
-                        double dv = Math.Abs(vrad[0] - vrad[2]) + Math.Abs(vrad[2] - vrad[4]);
-                        GeoPoint[] latcnt, loncnt;
-                        double[] latrad, lonrad;
-                        if (du < dv)
-                        {
-                            loncnt = ucnt;
-                            latcnt = vcnt;
-                            lonrad = urad;
-                            latrad = vrad;
-                        }
-                        else
-                        {
-                            loncnt = vcnt;
-                            latcnt = ucnt;
-                            lonrad = vrad;
-                            latrad = urad;
-                        }
-                        double c = (loncnt[0] | loncnt[2]) + (loncnt[2] | loncnt[4]);
-                        if (c < 2 * precision)
-                        {   // this should be a sphere, because all longitudes have the same center
-                            double minerror = GaussNewtonMinimizer.SphereFit(samples.Linear(), new GeoPoint(loncnt[0], loncnt[2], loncnt[4]), (lonrad[0] + lonrad[2] + lonrad[4]) / 3, precision, out SphericalSurface ss);
-                            if (minerror < precision) found = ss;
-                            else
+                            if (IsCircle(samples.Row(i), precision, out cnt, out rad))
                             {
-
+                                ucnt[i] = cnt;
+                                urad[i] = rad;
                             }
+                            else failed = true;
                         }
-                        else
-                        {   // this could be a torus
-                            // the axis should be the longest connection of the three latitude centers (two could be identical)
-                            double d0 = latcnt[0] | latcnt[2];
-                            double d2 = latcnt[2] | latcnt[4];
-                            double d4 = latcnt[4] | latcnt[0];
-                            GeoVector axis;
-                            if (d0 < d2)
+                        if (uIsLine) if (!IsLine(samples.Row(i), precision)) failed = true;
+                        if (vIsCircle)
+                        {
+                            if (IsCircle(samples.Column(i), precision, out cnt, out rad))
                             {
-                                if (d2 < d4) axis = latcnt[4] - latcnt[0];
-                                else axis = latcnt[2] - latcnt[4];
+                                vcnt[i] = cnt;
+                                vrad[i] = rad;
+                            }
+                            else failed = true;
+                        }
+                        if (vIsLine) if (!IsLine(samples.Column(i), precision)) failed = true;
+                    }
+                    if (!failed)
+                    {
+                        ISurface found = null;
+                        // now in each direction there are either 3 circles or 3 lines
+                        if (uIsLine && vIsLine)
+                        {   // a plane or a hyperboloid
+                            //double minerror = GaussNewtonMinimizer.PlaneFit(samples.Linear(), precision, out Plane pln);
+                            //if (minerror < precision)
+                            //{
+                            //    found = new PlaneSurface(pln);
+                            //}
+                            //else
+                            //{
+                            Plane plfp = Plane.FromPoints(samples.Linear().ToArray(), out double maxdist1, out bool islin1);
+                            if (maxdist1 < precision) found = new PlaneSurface(plfp); // GaussNewtonMinimizer not well implemented
+                                                                                      //}
+
+                        }
+                        else if (uIsCircle && vIsCircle)
+                        {   // a sphere or a torus
+                            // which circles are the longitude and which are the latitudes (latitudes differ in radius)
+                            double du = Math.Abs(urad[0] - urad[2]) + Math.Abs(urad[2] - urad[4]);
+                            double dv = Math.Abs(vrad[0] - vrad[2]) + Math.Abs(vrad[2] - vrad[4]);
+                            GeoPoint[] latcnt, loncnt;
+                            double[] latrad, lonrad;
+                            if (du < dv)
+                            {
+                                loncnt = ucnt;
+                                latcnt = vcnt;
+                                lonrad = urad;
+                                latrad = vrad;
                             }
                             else
                             {
-                                if (d0 < d4) axis = latcnt[4] - latcnt[0];
-                                else axis = latcnt[0] - latcnt[2];
+                                loncnt = vcnt;
+                                latcnt = ucnt;
+                                lonrad = vrad;
+                                latrad = urad;
                             }
-                            GeoPoint center = Geometry.DropPL(loncnt[0], latcnt[0], axis);
-                            axis.Length = center | loncnt[0];
-                            double minerror = BoxedSurfaceExtension.TorusFit(samples.Linear(), center, axis, lonrad[0], precision, out ToroidalSurface ts);
-                            if (minerror < precision)
-                            {
-                                if (ts.MinorRadius > ts.XAxis.Length * 10)
-                                {   // almost a sphere
-                                    minerror = GaussNewtonMinimizer.SphereFit(samples.Linear(), ts.Location, ts.MinorRadius, precision, out SphericalSurface ss);
-                                    if (minerror < precision) found = ss;
+                            double c = (loncnt[0] | loncnt[2]) + (loncnt[2] | loncnt[4]);
+                            if (c < 2 * precision)
+                            {   // this should be a sphere, because all longitudes have the same center
+                                double minerror = GaussNewtonMinimizer.SphereFit(samples.Linear(), new GeoPoint(loncnt[0], loncnt[2], loncnt[4]), (lonrad[0] + lonrad[2] + lonrad[4]) / 3, precision, out SphericalSurface ss);
+                                if (minerror < precision) found = ss;
+                                else
+                                {
+
+                                }
+                            }
+                            else
+                            {   // this could be a torus
+                                // the axis should be the longest connection of the three latitude centers (two could be identical)
+                                double d0 = latcnt[0] | latcnt[2];
+                                double d2 = latcnt[2] | latcnt[4];
+                                double d4 = latcnt[4] | latcnt[0];
+                                GeoVector axis;
+                                if (d0 < d2)
+                                {
+                                    if (d2 < d4) axis = latcnt[4] - latcnt[0];
+                                    else axis = latcnt[2] - latcnt[4];
                                 }
                                 else
                                 {
-                                    found = ts; // no torus with pole, this is usually meant to be a sphere
-                                    foreach (GeoPoint point in samples)
+                                    if (d0 < d4) axis = latcnt[4] - latcnt[0];
+                                    else axis = latcnt[0] - latcnt[2];
+                                }
+                                GeoPoint center = Geometry.DropPL(loncnt[0], latcnt[0], axis);
+                                axis.Length = center | loncnt[0];
+                                double minerror = BoxedSurfaceExtension.TorusFit(samples.Linear(), center, axis, lonrad[0], precision, out ToroidalSurface ts);
+                                if (minerror < precision)
+                                {
+                                    if (ts.MinorRadius > ts.XAxis.Length * 10)
+                                    {   // almost a sphere
+                                        minerror = GaussNewtonMinimizer.SphereFit(samples.Linear(), ts.Location, ts.MinorRadius, precision, out SphericalSurface ss);
+                                        if (minerror < precision) found = ss;
+                                    }
+                                    else
                                     {
-                                        if (ts.GetDistance(point) > precision)
+                                        found = ts; // no torus with pole, this is usually meant to be a sphere
+                                        foreach (GeoPoint point in samples)
                                         {
-                                            found = null;
-                                            break;
+                                            if (ts.GetDistance(point) > precision)
+                                            {
+                                                found = null;
+                                                break;
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
-                    else // mixed case: a line and a circle
-                    {   // a cylinder or a cone
-                        GeoPoint[] centers = uIsCircle ? ucnt : vcnt;
-                        double[] radii = uIsCircle ? urad : vrad;
-                        if (Math.Abs(radii[0] - radii[2]) < precision && Math.Abs(radii[4] - radii[2]) < precision)
-                        {   // could be a cylinder
-                            GeoVector axis = (centers[4] - centers[0]).Normalized;
-                            // GaussNewtonMinimizer.CylinderFit not working with 6.stp
-                            //double minerror = GaussNewtonMinimizer.CylinderFit(samples.Linear(), centers[2], axis, radii[0], precision, out CylindricalSurface cs);
-                            //if (minerror < precision) found = cs;
-                            //else
-                            //{
+                        else // mixed case: a line and a circle
+                        {   // a cylinder or a cone
+                            GeoPoint[] centers = uIsCircle ? ucnt : vcnt;
+                            double[] radii = uIsCircle ? urad : vrad;
+                            if (Math.Abs(radii[0] - radii[2]) < precision && Math.Abs(radii[4] - radii[2]) < precision)
+                            {   // could be a cylinder
+                                GeoVector axis = (centers[4] - centers[0]).Normalized;
+                                // GaussNewtonMinimizer.CylinderFit not working with 6.stp
+                                //double minerror = GaussNewtonMinimizer.CylinderFit(samples.Linear(), centers[2], axis, radii[0], precision, out CylindricalSurface cs);
+                                //if (minerror < precision) found = cs;
+                                //else
+                                //{
 
-                            //}
-                        }
-                        else
-                        {   // could be a cone
-                            IArray<GeoPoint> l1 = uIsLine ? samples.Row(1) : samples.Column(1);
-                            IArray<GeoPoint> l2 = uIsLine ? samples.Row(3) : samples.Column(3);
-                            if (IsLine(l1, precision) && IsLine(l2, precision))
-                            {
-                                try
+                                //}
+                            }
+                            else
+                            {   // could be a cone
+                                IArray<GeoPoint> l1 = uIsLine ? samples.Row(1) : samples.Column(1);
+                                IArray<GeoPoint> l2 = uIsLine ? samples.Row(3) : samples.Column(3);
+                                if (IsLine(l1, precision) && IsLine(l2, precision))
                                 {
-                                    GeoPoint apex = Geometry.IntersectLL(l1.First, l1.Last - l1.First, l2.First, l2.Last - l2.First); // they are not parallel
-                                    GeoVector axis = centers[4] - centers[0];
-                                    double a = axis.Length;
-                                    double x = a * radii[0] / (radii[0] - radii[4]);
-                                    GeoPoint a1 = centers[0] + x * axis.Normalized;
-                                    double openingAngle = Math.Atan2(Math.Abs(radii[0] - radii[4]), centers[0] | centers[4]);
-                                    double minerror = BoxedSurfaceExtension.ConeFit(samples.Linear(), a1, axis, openingAngle, precision, out ConicalSurface cs);
-                                    if (minerror < precision) found = cs;
-                                    if (Math.Abs(radii[0] - radii[4]) < 10 * precision)
-                                    {   // could still be a cylinder
-                                        double minerrorcyl = GaussNewtonMinimizer.CylinderFit(samples.Linear(), centers[2], axis, radii[0], precision, out CylindricalSurface cyls);
-                                        if (minerrorcyl < precision && minerrorcyl < minerror) found = cyls;
+                                    try
+                                    {
+                                        GeoPoint apex = Geometry.IntersectLL(l1.First, l1.Last - l1.First, l2.First, l2.Last - l2.First); // they are not parallel
+                                        GeoVector axis = centers[4] - centers[0];
+                                        double a = axis.Length;
+                                        double x = a * radii[0] / (radii[0] - radii[4]);
+                                        GeoPoint a1 = centers[0] + x * axis.Normalized;
+                                        double openingAngle = Math.Atan2(Math.Abs(radii[0] - radii[4]), centers[0] | centers[4]);
+                                        double minerror = BoxedSurfaceExtension.ConeFit(samples.Linear(), a1, axis, openingAngle, precision, out ConicalSurface cs);
+                                        if (minerror < precision) found = cs;
+                                        if (Math.Abs(radii[0] - radii[4]) < 10 * precision)
+                                        {   // could still be a cylinder
+                                            double minerrorcyl = GaussNewtonMinimizer.CylinderFit(samples.Linear(), centers[2], axis, radii[0], precision, out CylindricalSurface cyls);
+                                            if (minerrorcyl < precision && minerrorcyl < minerror) found = cyls;
+                                        }
                                     }
+                                    catch (Geometry.GeometryException) { }
                                 }
-                                catch (Geometry.GeometryException) { }
                             }
                         }
-                    }
-                    if (found != null)
-                    {
-                        // test the orientation:
-                        GeoPoint2D uvcnt = new GeoPoint2D((umin + umax) / 2.0, (vmin + vmax) / 2.0);
-                        GeoVector normalnrbs = GetNormal(uvcnt);
-                        GeoVector normalts = found.GetNormal(found.PositionOf(PointAt(uvcnt)));
-                        if (normalts * normalnrbs < 0) found.ReverseOrientation();
-                        return found;
+                        if (found != null)
+                        {
+                            // test the orientation:
+                            GeoPoint2D uvcnt = new GeoPoint2D((umin + umax) / 2.0, (vmin + vmax) / 2.0);
+                            GeoVector normalnrbs = GetNormal(uvcnt);
+                            GeoVector normalts = found.GetNormal(found.PositionOf(PointAt(uvcnt)));
+                            if (normalts * normalnrbs < 0) found.ReverseOrientation();
+                            return found;
+                        }
                     }
                 }
             }
-
-
 
             return null;
         }
@@ -1405,212 +1406,215 @@ namespace CADability.GeoObject
             // fixedu, fixedv Ebenen finden
             double[] us = GetUSingularities();
             double[] vs = GetVSingularities();
-            double[] upars = GetPars(umin, umax, IsUPeriodic, us, 3);
-            double[] vpars = GetPars(vmin, vmax, IsVPeriodic, vs, 3);
-            int numLines = 0;
-            int numCircles = 0;
-            List<ICurve> curves = new List<ICurve>();
-#if DEBUG
-            DebuggerContainer dc = new DebuggerContainer();
-#endif
-            for (int i = 0; i < 3; ++i)
+            double[] upars = GetPars(umin, umax, IsUPeriodic, us, 3, out bool uok);
+            double[] vpars = GetPars(vmin, vmax, IsVPeriodic, vs, 3, out bool vok);
+            if (uok && vok)
             {
-                BSpline bsp = FixedU(upars[i]);
-                ICurve simpleCurve;
-                if (bsp.GetSimpleCurve(precision, out simpleCurve))
+                int numLines = 0;
+                int numCircles = 0;
+                List<ICurve> curves = new List<ICurve>();
+#if DEBUG
+                DebuggerContainer dc = new DebuggerContainer();
+#endif
+                for (int i = 0; i < 3; ++i)
                 {
-                    if (simpleCurve is Ellipse)
+                    BSpline bsp = FixedU(upars[i]);
+                    ICurve simpleCurve;
+                    if (bsp.GetSimpleCurve(precision, out simpleCurve))
                     {
-                        if (Math.Abs((simpleCurve as Ellipse).MajorRadius - (simpleCurve as Ellipse).MinorRadius) < precision)
+                        if (simpleCurve is Ellipse)
                         {
-                            ++numCircles;
+                            if (Math.Abs((simpleCurve as Ellipse).MajorRadius - (simpleCurve as Ellipse).MinorRadius) < precision)
+                            {
+                                ++numCircles;
+                                curves.Add(simpleCurve);
+                            }
+                        }
+                        else if (simpleCurve is Line)
+                        {
+                            ++numLines;
                             curves.Add(simpleCurve);
                         }
+                        else return null;
                     }
-                    else if (simpleCurve is Line)
-                    {
-                        ++numLines;
-                        curves.Add(simpleCurve);
-                    }
-                    else return null;
-                }
 #if DEBUG
-                dc.Add(bsp);
+                    dc.Add(bsp);
 #endif
-            }
-            for (int i = 0; i < 3; ++i)
-            {
-                BSpline bsp = FixedV(vpars[i]);
-                ICurve simpleCurve;
-                if (bsp.GetSimpleCurve(precision, out simpleCurve))
+                }
+                for (int i = 0; i < 3; ++i)
                 {
-                    if (simpleCurve is Ellipse)
+                    BSpline bsp = FixedV(vpars[i]);
+                    ICurve simpleCurve;
+                    if (bsp.GetSimpleCurve(precision, out simpleCurve))
                     {
-                        if (Math.Abs((simpleCurve as Ellipse).MajorRadius - (simpleCurve as Ellipse).MinorRadius) < precision)
+                        if (simpleCurve is Ellipse)
                         {
-                            ++numCircles;
+                            if (Math.Abs((simpleCurve as Ellipse).MajorRadius - (simpleCurve as Ellipse).MinorRadius) < precision)
+                            {
+                                ++numCircles;
+                                curves.Add(simpleCurve);
+                            }
+                        }
+                        else if (simpleCurve is Line)
+                        {
+                            ++numLines;
                             curves.Add(simpleCurve);
                         }
+                        else return null;
                     }
-                    else if (simpleCurve is Line)
-                    {
-                        ++numLines;
-                        curves.Add(simpleCurve);
-                    }
-                    else return null;
-                }
 #if DEBUG
-                dc.Add(bsp);
+                    dc.Add(bsp);
 #endif
-            }
-            GeoPoint[] samples = new GeoPoint[9];
-            GeoVector[] normals = new GeoVector[9];
-            for (int i = 0; i < 3; i++)
-            {
-                for (int j = 0; j < 3; j++)
-                {
-                    samples[i * 3 + j] = PointAt(new GeoPoint2D(upars[i], vpars[j]));
-                    normals[i * 3 + j] = GetNormal(new GeoPoint2D(upars[i], vpars[j]));
                 }
-            }
-            if (numCircles == 6)
-            {   // maybe a sphere or a torus
-                samples = new GeoPoint[25]; // 25 evenly spread points
-                double ustep = (umax - umin) / 4;
-                if (IsUPeriodic) ustep = (umax - umin) / 5;
-                double vstep = (vmax - vmin) / 4;
-                if (IsVPeriodic) vstep = (vmax - vmin) / 5;
-                for (int i = 0; i < 5; i++)
+                GeoPoint[] samples = new GeoPoint[9];
+                GeoVector[] normals = new GeoVector[9];
+                for (int i = 0; i < 3; i++)
                 {
-                    for (int j = 0; j < 5; j++)
+                    for (int j = 0; j < 3; j++)
                     {
-                        samples[5 * i + j] = PointAt(new GeoPoint2D(umin + i * ustep, vmin + j * vstep));
+                        samples[i * 3 + j] = PointAt(new GeoPoint2D(upars[i], vpars[j]));
+                        normals[i * 3 + j] = GetNormal(new GeoPoint2D(upars[i], vpars[j]));
                     }
                 }
-                double d1 = Math.Abs((curves[0] as Ellipse).MajorRadius - (curves[1] as Ellipse).MajorRadius) +
-                    Math.Abs((curves[1] as Ellipse).MajorRadius - (curves[2] as Ellipse).MajorRadius) +
-                    Math.Abs((curves[2] as Ellipse).MajorRadius - (curves[0] as Ellipse).MajorRadius);
-                double d2 = Math.Abs((curves[3] as Ellipse).MajorRadius - (curves[4] as Ellipse).MajorRadius) +
-                    Math.Abs((curves[4] as Ellipse).MajorRadius - (curves[5] as Ellipse).MajorRadius) +
-                    Math.Abs((curves[5] as Ellipse).MajorRadius - (curves[3] as Ellipse).MajorRadius);
-                Axis ax = new Axis();
-
-                if (d2 < d1) curves.Reverse(); // now the first 3 circles are longitudes (same radius) and the other 3 circles are latitudes
-                GaussNewtonMinimizer.LineFit(new GeoPoint[] { (curves[3] as Ellipse).Center, (curves[4] as Ellipse).Center, (curves[5] as Ellipse).Center }.ToIArray(), precision, out ax.Location, out ax.Direction);
-                double minrad = ((curves[0] as Ellipse).MajorRadius + (curves[1] as Ellipse).MajorRadius + (curves[2] as Ellipse).MajorRadius) / 3.0;
-                double majrad = (Geometry.DistPL((curves[0] as Ellipse).Center, ax) + Geometry.DistPL((curves[1] as Ellipse).Center, ax) + Geometry.DistPL((curves[2] as Ellipse).Center, ax)) / 3.0;
-                double maxError;
-                ISurface approx = null;
-                if (majrad < precision * 10)
-                {
-                    maxError = GaussNewtonMinimizer.SphereFit(samples.ToIArray(), (curves[0] as Ellipse).Center, minrad, precision, out SphericalSurface ss);
-                    if (maxError < precision)
+                if (numCircles == 6)
+                {   // maybe a sphere or a torus
+                    samples = new GeoPoint[25]; // 25 evenly spread points
+                    double ustep = (umax - umin) / 4;
+                    if (IsUPeriodic) ustep = (umax - umin) / 5;
+                    double vstep = (vmax - vmin) / 4;
+                    if (IsVPeriodic) vstep = (vmax - vmin) / 5;
+                    for (int i = 0; i < 5; i++)
                     {
-                        approx = ss;
-                    }
-                }
-                if (approx == null)
-                {
-                    maxError = GaussNewtonMinimizer.TorusFit(samples.ToIArray(), ax.Location, majrad * ax.Direction.Normalized, minrad, precision, out ToroidalSurface ts);
-                    if (maxError < precision)
-                    {
-                        approx = ts;
-                    }
-                }
-                if (approx != null)
-                {
-                    // test the orientation:
-                    GeoPoint2D uvcnt = new GeoPoint2D((umin + umax) / 2.0, (vmin + vmax) / 2.0);
-                    GeoVector normalnrbs = GetNormal(uvcnt);
-                    GeoVector normalts = approx.GetNormal(approx.PositionOf(PointAt(uvcnt)));
-                    if (normalts * normalnrbs < 0) approx.ReverseOrientation();
-#if DEBUG
-                    double dd = 0.0;
-                    for (int i = 0; i < 4; i++)
-                    {
-                        for (int j = 0; j < 4; j++)
+                        for (int j = 0; j < 5; j++)
                         {
-                            GeoPoint p0 = PointAt(new GeoPoint2D(umin + ustep / 2 + i * ustep, vmin + vstep / 2 + j * vstep));
-                            double d = p0 | approx.PointAt(approx.PositionOf(p0));
-                            dd += d;
+                            samples[5 * i + j] = PointAt(new GeoPoint2D(umin + i * ustep, vmin + j * vstep));
                         }
                     }
-                    DebuggerContainer dtc = new DebuggerContainer();
-                    dc.Add(Face.MakeFace(approx, new BoundingRect(0, 0, Math.PI, Math.PI)));
-                    dc.Add(Face.MakeFace(approx, new BoundingRect(0, Math.PI, Math.PI, 2 * Math.PI)));
-                    dc.Add(Face.MakeFace(approx, new BoundingRect(Math.PI, 0, 2 * Math.PI, Math.PI)));
-                    dc.Add(Face.MakeFace(approx, new BoundingRect(Math.PI, Math.PI, 2 * Math.PI, 2 * Math.PI)));
-                    dc.Add(this.DebugGrid);
-#endif
-                    return approx;
-                }
-            }
-            else if (numCircles == 3 && numLines == 3)
-            {
-                // 3 circles, 3 lines:
-                double maxError = findBestFitCylinder(samples, normals, out GeoPoint location, out GeoVector direction, out double radius);
-                if (maxError < precision)
-                {
-                    direction.ArbitraryNormals(out GeoVector dirx, out GeoVector diry);
-                    CylindricalSurface approx = new CylindricalSurface(location, radius * dirx.Normalized, radius * diry.Normalized, direction);
-                    if (TestIntermediatePoints(approx, upars, vpars, precision)) return approx;
-                }
+                    double d1 = Math.Abs((curves[0] as Ellipse).MajorRadius - (curves[1] as Ellipse).MajorRadius) +
+                        Math.Abs((curves[1] as Ellipse).MajorRadius - (curves[2] as Ellipse).MajorRadius) +
+                        Math.Abs((curves[2] as Ellipse).MajorRadius - (curves[0] as Ellipse).MajorRadius);
+                    double d2 = Math.Abs((curves[3] as Ellipse).MajorRadius - (curves[4] as Ellipse).MajorRadius) +
+                        Math.Abs((curves[4] as Ellipse).MajorRadius - (curves[5] as Ellipse).MajorRadius) +
+                        Math.Abs((curves[5] as Ellipse).MajorRadius - (curves[3] as Ellipse).MajorRadius);
+                    Axis ax = new Axis();
 
-                samples = new GeoPoint[25]; // 25 evenly spread points
-                double ustep = (umax - umin) / 4;
-                if (IsUPeriodic) ustep = (umax - umin) / 5;
-                double vstep = (vmax - vmin) / 4;
-                if (IsVPeriodic) vstep = (vmax - vmin) / 5;
-                for (int i = 0; i < 5; i++)
-                {
-                    for (int j = 0; j < 5; j++)
+                    if (d2 < d1) curves.Reverse(); // now the first 3 circles are longitudes (same radius) and the other 3 circles are latitudes
+                    GaussNewtonMinimizer.LineFit(new GeoPoint[] { (curves[3] as Ellipse).Center, (curves[4] as Ellipse).Center, (curves[5] as Ellipse).Center }.ToIArray(), precision, out ax.Location, out ax.Direction);
+                    double minrad = ((curves[0] as Ellipse).MajorRadius + (curves[1] as Ellipse).MajorRadius + (curves[2] as Ellipse).MajorRadius) / 3.0;
+                    double majrad = (Geometry.DistPL((curves[0] as Ellipse).Center, ax) + Geometry.DistPL((curves[1] as Ellipse).Center, ax) + Geometry.DistPL((curves[2] as Ellipse).Center, ax)) / 3.0;
+                    double maxError;
+                    ISurface approx = null;
+                    if (majrad < precision * 10)
                     {
-                        samples[5 * i + j] = PointAt(new GeoPoint2D(umin + i * ustep, vmin + j * vstep));
-                    }
-                }
-                int ci = 0;
-                if (curves[0] is Line) ci = 3;
-                Axis ax = new Axis();
-                GaussNewtonMinimizer.LineFit(new GeoPoint[] { (curves[ci] as Ellipse).Center, (curves[ci + 1] as Ellipse).Center, (curves[ci + 2] as Ellipse).Center }.ToIArray(), precision, out ax.Location, out ax.Direction);
-                double dr = (curves[ci + 1] as Ellipse).Radius - (curves[ci] as Ellipse).Radius;
-                GeoVector dir = (curves[ci + 1] as Ellipse).Center - (curves[ci] as Ellipse).Center;
-                double theta = Math.Atan2(dr, dir.Length);
-                GeoPoint c0 = Geometry.IntersectLL(curves[3 - ci].StartPoint, curves[3 - ci].StartDirection, curves[4 - ci].StartPoint, curves[4 - ci].StartDirection);
-                maxError = GaussNewtonMinimizer.ConeFit(samples.ToIArray(), c0, ax.Direction.Normalized, theta, Precision.eps, out ConicalSurface cs);
-                if (maxError < precision && cs.OpeningAngle > 0.0)
-                {
-                    GeoPoint2D uvcnt = new GeoPoint2D((umin + umax) / 2.0, (vmin + vmax) / 2.0);
-                    GeoVector normalnrbs = GetNormal(uvcnt);
-                    GeoVector normalts = cs.GetNormal(cs.PositionOf(PointAt(uvcnt)));
-                    if (normalts * normalnrbs < 0) cs.ReverseOrientation();
-#if DEBUG
-                    double dd = 0.0;
-                    for (int i = 0; i < 4; i++)
-                    {
-                        for (int j = 0; j < 4; j++)
+                        maxError = GaussNewtonMinimizer.SphereFit(samples.ToIArray(), (curves[0] as Ellipse).Center, minrad, precision, out SphericalSurface ss);
+                        if (maxError < precision)
                         {
-                            GeoPoint p0 = PointAt(new GeoPoint2D(umin + ustep / 2 + i * ustep, vmin + vstep / 2 + j * vstep));
-                            double d = p0 | cs.PointAt(cs.PositionOf(p0));
-                            dd += d;
+                            approx = ss;
                         }
                     }
-                    DebuggerContainer dtc = new DebuggerContainer();
-                    dtc.Add(Face.MakeFace(cs, new BoundingRect(0, 0.1, Math.PI, 0.2)));
-                    dtc.Add(Face.MakeFace(cs, new BoundingRect(Math.PI, 0.1, 2 * Math.PI, 0.2)));
-                    Face.MakeFace(cs, new BoundingRect(Math.PI, 0.1, 2 * Math.PI, 0.2)).ForceTriangulation(0.001);
-                    dtc.Add(this.DebugGrid);
+                    if (approx == null)
+                    {
+                        maxError = GaussNewtonMinimizer.TorusFit(samples.ToIArray(), ax.Location, majrad * ax.Direction.Normalized, minrad, precision, out ToroidalSurface ts);
+                        if (maxError < precision)
+                        {
+                            approx = ts;
+                        }
+                    }
+                    if (approx != null)
+                    {
+                        // test the orientation:
+                        GeoPoint2D uvcnt = new GeoPoint2D((umin + umax) / 2.0, (vmin + vmax) / 2.0);
+                        GeoVector normalnrbs = GetNormal(uvcnt);
+                        GeoVector normalts = approx.GetNormal(approx.PositionOf(PointAt(uvcnt)));
+                        if (normalts * normalnrbs < 0) approx.ReverseOrientation();
+#if DEBUG
+                        double dd = 0.0;
+                        for (int i = 0; i < 4; i++)
+                        {
+                            for (int j = 0; j < 4; j++)
+                            {
+                                GeoPoint p0 = PointAt(new GeoPoint2D(umin + ustep / 2 + i * ustep, vmin + vstep / 2 + j * vstep));
+                                double d = p0 | approx.PointAt(approx.PositionOf(p0));
+                                dd += d;
+                            }
+                        }
+                        DebuggerContainer dtc = new DebuggerContainer();
+                        dc.Add(Face.MakeFace(approx, new BoundingRect(0, 0, Math.PI, Math.PI)));
+                        dc.Add(Face.MakeFace(approx, new BoundingRect(0, Math.PI, Math.PI, 2 * Math.PI)));
+                        dc.Add(Face.MakeFace(approx, new BoundingRect(Math.PI, 0, 2 * Math.PI, Math.PI)));
+                        dc.Add(Face.MakeFace(approx, new BoundingRect(Math.PI, Math.PI, 2 * Math.PI, 2 * Math.PI)));
+                        dc.Add(this.DebugGrid);
 #endif
-                    return cs;
+                        return approx;
+                    }
                 }
-            }
-            else if (numLines == 6)
-            {
-                // 6 lines: a plane or a hyperboloid
-                Plane pln = Plane.FromPoints(samples, out double maxdist, out bool isLinear);
-                if (!isLinear && maxdist < precision)
+                else if (numCircles == 3 && numLines == 3)
                 {
-                    PlaneSurface approx = new PlaneSurface(pln);
-                    if (TestIntermediatePoints(approx, upars, vpars, precision)) return approx;
+                    // 3 circles, 3 lines:
+                    double maxError = findBestFitCylinder(samples, normals, out GeoPoint location, out GeoVector direction, out double radius);
+                    if (maxError < precision)
+                    {
+                        direction.ArbitraryNormals(out GeoVector dirx, out GeoVector diry);
+                        CylindricalSurface approx = new CylindricalSurface(location, radius * dirx.Normalized, radius * diry.Normalized, direction);
+                        if (TestIntermediatePoints(approx, upars, vpars, precision)) return approx;
+                    }
+
+                    samples = new GeoPoint[25]; // 25 evenly spread points
+                    double ustep = (umax - umin) / 4;
+                    if (IsUPeriodic) ustep = (umax - umin) / 5;
+                    double vstep = (vmax - vmin) / 4;
+                    if (IsVPeriodic) vstep = (vmax - vmin) / 5;
+                    for (int i = 0; i < 5; i++)
+                    {
+                        for (int j = 0; j < 5; j++)
+                        {
+                            samples[5 * i + j] = PointAt(new GeoPoint2D(umin + i * ustep, vmin + j * vstep));
+                        }
+                    }
+                    int ci = 0;
+                    if (curves[0] is Line) ci = 3;
+                    Axis ax = new Axis();
+                    GaussNewtonMinimizer.LineFit(new GeoPoint[] { (curves[ci] as Ellipse).Center, (curves[ci + 1] as Ellipse).Center, (curves[ci + 2] as Ellipse).Center }.ToIArray(), precision, out ax.Location, out ax.Direction);
+                    double dr = (curves[ci + 1] as Ellipse).Radius - (curves[ci] as Ellipse).Radius;
+                    GeoVector dir = (curves[ci + 1] as Ellipse).Center - (curves[ci] as Ellipse).Center;
+                    double theta = Math.Atan2(dr, dir.Length);
+                    GeoPoint c0 = Geometry.IntersectLL(curves[3 - ci].StartPoint, curves[3 - ci].StartDirection, curves[4 - ci].StartPoint, curves[4 - ci].StartDirection);
+                    maxError = GaussNewtonMinimizer.ConeFit(samples.ToIArray(), c0, ax.Direction.Normalized, theta, Precision.eps, out ConicalSurface cs);
+                    if (maxError < precision && cs.OpeningAngle > 0.0)
+                    {
+                        GeoPoint2D uvcnt = new GeoPoint2D((umin + umax) / 2.0, (vmin + vmax) / 2.0);
+                        GeoVector normalnrbs = GetNormal(uvcnt);
+                        GeoVector normalts = cs.GetNormal(cs.PositionOf(PointAt(uvcnt)));
+                        if (normalts * normalnrbs < 0) cs.ReverseOrientation();
+#if DEBUG
+                        double dd = 0.0;
+                        for (int i = 0; i < 4; i++)
+                        {
+                            for (int j = 0; j < 4; j++)
+                            {
+                                GeoPoint p0 = PointAt(new GeoPoint2D(umin + ustep / 2 + i * ustep, vmin + vstep / 2 + j * vstep));
+                                double d = p0 | cs.PointAt(cs.PositionOf(p0));
+                                dd += d;
+                            }
+                        }
+                        DebuggerContainer dtc = new DebuggerContainer();
+                        dtc.Add(Face.MakeFace(cs, new BoundingRect(0, 0.1, Math.PI, 0.2)));
+                        dtc.Add(Face.MakeFace(cs, new BoundingRect(Math.PI, 0.1, 2 * Math.PI, 0.2)));
+                        Face.MakeFace(cs, new BoundingRect(Math.PI, 0.1, 2 * Math.PI, 0.2)).ForceTriangulation(0.001);
+                        dtc.Add(this.DebugGrid);
+#endif
+                        return cs;
+                    }
+                }
+                else if (numLines == 6)
+                {
+                    // 6 lines: a plane or a hyperboloid
+                    Plane pln = Plane.FromPoints(samples, out double maxdist, out bool isLinear);
+                    if (!isLinear && maxdist < precision)
+                    {
+                        PlaneSurface approx = new PlaneSurface(pln);
+                        if (TestIntermediatePoints(approx, upars, vpars, precision)) return approx;
+                    }
                 }
             }
             return null;
@@ -2126,21 +2130,21 @@ namespace CADability.GeoObject
                 }
                 // Zylinder und Kegelflächen kommen oft so, natürlich andersrum auch noch testen
             }
-            if (uDegree == 2 && vDegree == 2)
+#if DEBUG
+            DebuggerContainer dc = new DebuggerContainer();
+#endif
+            double[] us = GetUSingularities();
+            double[] vs = GetVSingularities();
+            GeoPoint[,] points = new GeoPoint[3, 3];
+            GeoVector[,] normals = new GeoVector[3, 3];
+            double[] upars = GetPars(umin, umax, IsUPeriodic, us, 3, out bool uok);
+            double[] vpars = GetPars(vmin, vmax, IsVPeriodic, vs, 3, out bool vok);
+            if (uDegree == 2 && vDegree == 2 && uok && vok)
             {   // Test aut Kugel oder Torus
-                double[] us = GetUSingularities();
-                double[] vs = GetVSingularities();
-                GeoPoint[,] points = new GeoPoint[3, 3];
-                GeoVector[,] normals = new GeoVector[3, 3];
-                double[] upars = GetPars(umin, umax, IsUPeriodic, us, 3);
-                double[] vpars = GetPars(vmin, vmax, IsVPeriodic, vs, 3);
                 GeoPoint[] cnt = new GeoPoint[6];
                 double[] rad = new double[6];
                 bool ok = true;
                 int curvesok = 0;
-#if DEBUG
-                DebuggerContainer dc = new DebuggerContainer();
-#endif
                 for (int i = 0; i < 3; ++i)
                 {
                     BSpline bsp = FixedU(upars[i]);
@@ -2191,7 +2195,7 @@ namespace CADability.GeoObject
                     if ((d1 > d2) && (r1 < r2))
                     {   // die ersten 3 Kreise sin "v" Kreise
                         Plane pln = new Plane(cnt[0], cnt[1], cnt[2]); // Ebene der Mittelpunkte der 3 kleinen Kreise
-                                                                       // die Location der Ebene stimmt noch nicht
+                                                                        // die Location der Ebene stimmt noch nicht
                         GeoPoint tcnt = new GeoPoint(pln.ToGlobal(pln.Project(cnt[3])), pln.ToGlobal(pln.Project(cnt[4])), pln.ToGlobal(pln.Project(cnt[5])));
                         // GeoPoint tcnt = new GeoPoint(cnt[0], cnt[1], cnt[2]);
                         pln = new Plane(tcnt, cnt[0], cnt[2]);
@@ -2205,7 +2209,7 @@ namespace CADability.GeoObject
                     else if ((d1 < d2) && (r1 > r2) && r2 < precision)
                     {
                         Plane pln = new Plane(cnt[3], cnt[4], cnt[5]); // Ebene der Mittelpunkte der 3 kleinen Kreise
-                                                                       // die Location der Ebene stimmt noch nicht
+                                                                        // die Location der Ebene stimmt noch nicht
                         GeoPoint tcnt = new GeoPoint(pln.ToGlobal(pln.Project(cnt[0])), pln.ToGlobal(pln.Project(cnt[1])), pln.ToGlobal(pln.Project(cnt[2])));
                         // GeoPoint tcnt = new GeoPoint(cnt[0], cnt[1], cnt[2]);
                         pln = new Plane(tcnt, cnt[3], cnt[5]);
@@ -2271,7 +2275,7 @@ namespace CADability.GeoObject
                     dst[1] = sph.PositionOf(PointAt(src[1]));
                     dst[2] = sph.PositionOf(PointAt(src[2]));
                     reparametrisation = ModOp2D.Fit(src, dst, true);
-                    if (reparametrisation.Determinant == 0.0)
+                    if (Math.Abs(reparametrisation.Determinant) < 1e-16)
                     {
                         double umin1 = umin + 0.25 * (umax - umin);
                         double umax1 = umin + 0.75 * (umax - umin);
@@ -2288,121 +2292,114 @@ namespace CADability.GeoObject
                     return true;
                 }
             }
+
+            ICurve[] ucurves = new ICurve[3];
+            ICurve[] vcurves = new ICurve[3];
+            int numcurves = 0;
+#if DEBUG
+            GeoPoint[] dbgpoints = new GeoPoint[upars.Length * vpars.Length];
+            GeoVector[] dbgnormals = new GeoVector[upars.Length * vpars.Length];
+            int ii = 0;
+            for (int i = 0; i < upars.Length; i++)
             {
-                double[] us = GetUSingularities();
-                double[] vs = GetVSingularities();
-                GeoPoint[,] points = new GeoPoint[3, 3];
-                GeoVector[,] normals = new GeoVector[3, 3];
-                double[] upars = GetPars(umin, umax, IsUPeriodic, us, 3);
-                double[] vpars = GetPars(vmin, vmax, IsVPeriodic, vs, 3);
-                ICurve[] ucurves = new ICurve[3];
-                ICurve[] vcurves = new ICurve[3];
-                int numcurves = 0;
-#if DEBUG
-                GeoPoint[] dbgpoints = new GeoPoint[upars.Length * vpars.Length];
-                GeoVector[] dbgnormals = new GeoVector[upars.Length * vpars.Length];
-                int ii = 0;
-                for (int i = 0; i < upars.Length; i++)
+                for (int j = 0; j < vpars.Length; j++)
                 {
-                    for (int j = 0; j < vpars.Length; j++)
-                    {
-                        dbgpoints[ii] = PointAt(new GeoPoint2D(upars[i], vpars[j]));
-                        dbgnormals[ii] = GetNormal(new GeoPoint2D(upars[i], vpars[j]));
-                        ++ii;
-                    }
+                    dbgpoints[ii] = PointAt(new GeoPoint2D(upars[i], vpars[j]));
+                    dbgnormals[ii] = GetNormal(new GeoPoint2D(upars[i], vpars[j]));
+                    ++ii;
                 }
-                GeoPoint location;
-                GeoVector direction;
-                double radius;
+            }
+            GeoPoint location;
+            GeoVector direction;
+            double radius;
 
-                double cylerr = findBestFitCylinder(dbgpoints, dbgnormals, out location, out direction, out radius);
-                DebuggerContainer dc = new DebuggerContainer();
+            double cylerr = findBestFitCylinder(dbgpoints, dbgnormals, out location, out direction, out radius);
 #endif
-                for (int i = 0; i < 3; ++i)
+            for (int i = 0; i < 3; ++i)
+            {
+                BSpline bsp = FixedU(upars[i]);
+                ICurve simpleCurve;
+                if (bsp.GetSimpleCurve(precision, out simpleCurve))
                 {
-                    BSpline bsp = FixedU(upars[i]);
-                    ICurve simpleCurve;
-                    if (bsp.GetSimpleCurve(precision, out simpleCurve))
-                    {
-                        ucurves[i] = simpleCurve;
-                        ++numcurves;
-                    }
-#if DEBUG
-                    dc.Add(bsp);
-#endif
+                    ucurves[i] = simpleCurve;
+                    ++numcurves;
                 }
-                for (int i = 0; i < 3; ++i)
+#if DEBUG
+                dc.Add(bsp);
+#endif
+            }
+            for (int i = 0; i < 3; ++i)
+            {
+                BSpline bsp = FixedV(vpars[i]);
+                ICurve simpleCurve;
+                if (bsp.GetSimpleCurve(precision, out simpleCurve))
                 {
-                    BSpline bsp = FixedV(vpars[i]);
-                    ICurve simpleCurve;
-                    if (bsp.GetSimpleCurve(precision, out simpleCurve))
-                    {
-                        vcurves[i] = simpleCurve;
-                        ++numcurves;
-                    }
-#if DEBUG
-                    dc.Add(bsp);
-#endif
+                    vcurves[i] = simpleCurve;
+                    ++numcurves;
                 }
+#if DEBUG
+                dc.Add(bsp);
+#endif
+            }
 
-                if (numcurves == 6)
-                {   // also alles sind entweder Linien oder Kreise
-                    if (ucurves[0] is Line && ucurves[1] is Line && ucurves[2] is Line)
-                    {
-                        if (vcurves[0] is Line && vcurves[1] is Line && vcurves[2] is Line)
-                        {   // möglicherweise Ebene
-                            // kann aber auch eine Hyperbelfläche sein
-                            // oder eine verzerrende Ebene
-                            // für eine unverzerrte Ebene müssen die Längen der Linien gleich sein
-                            if (Math.Abs(ucurves[0].Length - ucurves[1].Length) < precision &&
-                                Math.Abs(ucurves[1].Length - ucurves[2].Length) < precision &&
-                                Math.Abs(ucurves[2].Length - ucurves[0].Length) < precision &&
-                                Math.Abs(vcurves[0].Length - vcurves[1].Length) < precision &&
-                                Math.Abs(vcurves[1].Length - vcurves[2].Length) < precision &&
-                                Math.Abs(vcurves[2].Length - vcurves[0].Length) < precision)
-                            {
-                                Plane pln = new Plane(ucurves[0].StartPoint, (ucurves[0].StartDirection + ucurves[1].StartDirection + ucurves[2].StartDirection), (vcurves[0].StartDirection + vcurves[1].StartDirection + vcurves[2].StartDirection));
-                                PlaneSurface ps = new PlaneSurface(pln);
-                                if (SameSurface(ps, precision, out reparametrisation))
-                                {
-                                    simpleSurface = ps;
-                                    return true;
-                                }
-                            }
-                            // hier auf RuledSurface testen
-                        }
-                        else if (vcurves[0] is Ellipse && vcurves[1] is Ellipse && vcurves[2] is Ellipse)
-                        {   // Zylinder oder Kegel
-                            Ellipse e0 = vcurves[0] as Ellipse;
-                            Ellipse e1 = vcurves[1] as Ellipse;
-                            Ellipse e2 = vcurves[2] as Ellipse;
-                            simpleSurface = CylinderOrCone(e0, e1, e2, precision);
-                            if (simpleSurface != null && SameSurface(simpleSurface, precision, out reparametrisation))
-                            {
-                                return true;
-                            }
-                        }
-                    }
-                    else if (ucurves[0] is Ellipse && ucurves[1] is Ellipse && ucurves[2] is Ellipse)
-                    {
-                        if (vcurves[0] is Line && vcurves[1] is Line && vcurves[2] is Line)
+            if (numcurves == 6)
+            {   // also alles sind entweder Linien oder Kreise
+                if (ucurves[0] is Line && ucurves[1] is Line && ucurves[2] is Line)
+                {
+                    if (vcurves[0] is Line && vcurves[1] is Line && vcurves[2] is Line)
+                    {   // möglicherweise Ebene
+                        // kann aber auch eine Hyperbelfläche sein
+                        // oder eine verzerrende Ebene
+                        // für eine unverzerrte Ebene müssen die Längen der Linien gleich sein
+                        if (Math.Abs(ucurves[0].Length - ucurves[1].Length) < precision &&
+                            Math.Abs(ucurves[1].Length - ucurves[2].Length) < precision &&
+                            Math.Abs(ucurves[2].Length - ucurves[0].Length) < precision &&
+                            Math.Abs(vcurves[0].Length - vcurves[1].Length) < precision &&
+                            Math.Abs(vcurves[1].Length - vcurves[2].Length) < precision &&
+                            Math.Abs(vcurves[2].Length - vcurves[0].Length) < precision)
                         {
-                            Ellipse e0 = ucurves[0] as Ellipse;
-                            Ellipse e1 = ucurves[1] as Ellipse;
-                            Ellipse e2 = ucurves[2] as Ellipse;
-                            simpleSurface = CylinderOrCone(e0, e1, e2, precision);
-                            if (simpleSurface != null && SameSurface(simpleSurface, precision, out reparametrisation))
+                            Plane pln = new Plane(ucurves[0].StartPoint, (ucurves[0].StartDirection + ucurves[1].StartDirection + ucurves[2].StartDirection), (vcurves[0].StartDirection + vcurves[1].StartDirection + vcurves[2].StartDirection));
+                            PlaneSurface ps = new PlaneSurface(pln);
+                            if (SameSurface(ps, precision, out reparametrisation))
                             {
-                                GeoPoint2D dbg1 = new GeoPoint2D((umin + umax) / 2, (vmin + vmax) / 2);
-                                GeoPoint pp1 = PointAt(dbg1);
-                                GeoPoint pp2 = simpleSurface.PointAt(reparametrisation * dbg1);
-
+                                simpleSurface = ps;
                                 return true;
                             }
+                        }
+                        // hier auf RuledSurface testen
+                    }
+                    else if (vcurves[0] is Ellipse && vcurves[1] is Ellipse && vcurves[2] is Ellipse)
+                    {   // Zylinder oder Kegel
+                        Ellipse e0 = vcurves[0] as Ellipse;
+                        Ellipse e1 = vcurves[1] as Ellipse;
+                        Ellipse e2 = vcurves[2] as Ellipse;
+                        simpleSurface = CylinderOrCone(e0, e1, e2, precision);
+                        if (simpleSurface != null && SameSurface(simpleSurface, precision, out reparametrisation))
+                        {
+                            return true;
+                        }
+                    }
+                }
+                else if (ucurves[0] is Ellipse && ucurves[1] is Ellipse && ucurves[2] is Ellipse)
+                {
+                    if (vcurves[0] is Line && vcurves[1] is Line && vcurves[2] is Line)
+                    {
+                        Ellipse e0 = ucurves[0] as Ellipse;
+                        Ellipse e1 = ucurves[1] as Ellipse;
+                        Ellipse e2 = ucurves[2] as Ellipse;
+                        simpleSurface = CylinderOrCone(e0, e1, e2, precision);
+                        if (simpleSurface != null && SameSurface(simpleSurface, precision, out reparametrisation))
+                        {
+                            GeoPoint2D dbg1 = new GeoPoint2D((umin + umax) / 2, (vmin + vmax) / 2);
+                            GeoPoint pp1 = PointAt(dbg1);
+                            GeoPoint pp2 = simpleSurface.PointAt(reparametrisation * dbg1);
+
+                            return true;
                         }
                     }
                 }
             }
+
             return false;
         }
         private ISurface CylinderOrCone(Ellipse e0, Ellipse e1, Ellipse e2, double precision)
@@ -2670,9 +2667,9 @@ namespace CADability.GeoObject
 #endif
             return true;
         }
-        private double[] GetPars(double min, double max, bool isClosed, double[] singularities, int numRes)
+        private double[] GetPars(double min, double max, bool isClosed, double[] singularities, int numRes, out bool ok)
         {
-            double[] res = new double[numRes];
+            List<double> res = new List<double>();
             double d;
             if (isClosed)
             {
@@ -2682,37 +2679,50 @@ namespace CADability.GeoObject
             {
                 d = (max - min) / (numRes - 1);
             }
+
+            //Adapt tolerance based on the size of the domain and avoid 0.0.
+            double domainSpan = max - min;
+            double tolerance = Math.Max(1e-8, domainSpan * 1e-7);
+
+            //To avoid infinite loop.
+            int safetyCounter = 0;
+            int maxIterations = numRes * 100;
+
             double par = min;
-            int ind = 0;
-            while (ind < numRes)
+            while (res.Count < numRes && safetyCounter < maxIterations)
             {
                 bool singular = false;
                 for (int i = 0; i < singularities.Length; i++)
                 {
-                    if (Math.Abs(par - singularities[i]) < 1e-6)
+                    if (Math.Abs(par - singularities[i]) < tolerance)
                     {
                         singular = true;
                         break;
                     }
                 }
-                if (isClosed && Math.Abs(par - max) < 1e-6)
+                if (isClosed && Math.Abs(par - max) < tolerance)
                 {   // bei geschlossen nicht den Endpunkt nehmen
                     singular = true;
                 }
                 if (!singular)
                 {
-                    res[ind] = par;
-                    ind++;
+                    if (!res.Contains(par))
+                    {
+                        res.Add(par);
+                    }
                 }
                 par += d;
                 if (par > max)
                 {
-                    par -= (max - min);
+                    par -= domainSpan;
                     par += d / Math.E; // inkommensurabel, man kommt nicht auf die gleichen Punkte und ungefähr um die Hälfte versetzt
                 }
+                safetyCounter++;
             }
-            Array.Sort(res);
-            return res;
+            double[] finalRes = res.ToArray();
+            Array.Sort(finalRes);
+            ok = finalRes.Length == numRes;
+            return finalRes;
         }
         private bool TestCircle(GeoPoint p1, GeoVector v1, GeoPoint p2, GeoVector v2, GeoPoint p3, GeoVector v3, out Plane plane, out double radius)
         {

@@ -563,7 +563,7 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public override BoundingBox GetBoundingCube()
         {
-            BoundingBox res = BoundingBox.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingBox;
             if (vertex != null)
             {
                 for (int i = 0; i < vertex.Length; ++i)

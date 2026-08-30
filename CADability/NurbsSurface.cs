@@ -87,7 +87,7 @@ namespace CADability.GeoObject
             {
                 if (!simpleSurfaceChecked)
                 {
-                    BoundingBox polesext = BoundingBox.EmptyBoundingCube;
+                    BoundingBox polesext = BoundingBox.EmptyBoundingBox;
                     foreach (GeoPoint point in poles)
                     {
                         polesext.MinMax(point);
@@ -4202,7 +4202,7 @@ namespace CADability.GeoObject
         {
             if (rough && uvPatch.Left == UKnots[0] && uvPatch.Right == UKnots[UKnots.Length - 1] && uvPatch.Bottom == VKnots[0] && uvPatch.Top == VKnots[VKnots.Length - 1])
             {   // die Pole geben eine Hülle vor
-                BoundingBox res = BoundingBox.EmptyBoundingCube;
+                BoundingBox res = BoundingBox.EmptyBoundingBox;
                 for (int i = 0; i < poles.GetLength(0); i++)
                 {
                     for (int j = 0; j < poles.GetLength(1); j++)
@@ -5357,7 +5357,7 @@ namespace CADability.GeoObject
         {
             get
             {
-                BoundingBox res = BoundingBox.EmptyBoundingCube;
+                BoundingBox res = BoundingBox.EmptyBoundingBox;
                 for (int i = 0; i < poles.GetLength(0); i++)
                 {
                     for (int j = 0; j < poles.GetLength(1); j++)

@@ -130,7 +130,7 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public override BoundingBox GetBoundingCube()
         {
-            BoundingBox res = BoundingBox.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingBox;
             // lock (this)
             {
                 for (int i = 0; i < containedObjects.Count; ++i)

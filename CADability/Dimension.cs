@@ -120,7 +120,7 @@ namespace CADability.GeoObject
         private GeoVector normal; // Normalenrichtung der Ebene, in der sich die Bemaßung befindet
 
         private Plane plane; // die Ebene, in der alle stattfindet, rekonstruierbar
-        private BoundingBox extent = BoundingBox.EmptyBoundingCube;
+        private BoundingBox extent = BoundingBox.EmptyBoundingBox;
 
         /// <summary>
         /// Die folgenden Daten für den Fall, dass der Text editiert wird
@@ -2270,7 +2270,7 @@ namespace CADability.GeoObject
             {
                 if (e is ThreadAbortException) throw (e);
             }
-            BoundingBox res = BoundingBox.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingBox;
             for (int i = 0; i < list.Count; ++i)
             {
                 res.MinMax(list[i].GetBoundingCube());

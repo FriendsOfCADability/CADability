@@ -1112,7 +1112,7 @@ namespace CADability
                 fc.ReverseOrientation();
             }
             ff.AddRange(connection.Select(fc => fc.Clone() as Face));
-            BoundingBox ext = BoundingBox.EmptyBoundingCube;
+            BoundingBox ext = BoundingBox.EmptyBoundingBox;
             ext.MinMax(ff);
             Shell.ConnectFaces(ff.ToArray(), Math.Max(Precision.eps, ext.Size * 1e-6));
             Shell feature = Shell.FromFaces(ff.ToArray());
@@ -1421,7 +1421,7 @@ namespace CADability
             {
                 List<Face> lconnected = new List<Face>(connected);
                 lconnected.Add(face);
-                BoundingBox ext = BoundingBox.EmptyBoundingCube;
+                BoundingBox ext = BoundingBox.EmptyBoundingBox;
                 foreach (Face fc in connected)
                 {
                     ext.MinMax(fc.GetExtent(0.0));

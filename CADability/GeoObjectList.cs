@@ -375,7 +375,7 @@ namespace CADability.GeoObject
         }
         public BoundingBox GetExtent()
         {
-            BoundingBox res = BoundingBox.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingBox;
             foreach (IGeoObject go in list)
             {
                 res.MinMax(go.GetBoundingCube());

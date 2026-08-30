@@ -1105,7 +1105,7 @@ namespace CADability
 #endif
         internal void Repair(BoundingRect bounds1, BoundingRect bounds2)
         {
-            BoundingBox ext = BoundingBox.EmptyBoundingCube;
+            BoundingBox ext = BoundingBox.EmptyBoundingBox;
             for (int i = 0; i < basePoints.Length; i++) ext.MinMax(basePoints[i].p3d);
             double eps = ext.Size * 1e-5;
             bool needsRepair = false;
@@ -1639,7 +1639,7 @@ namespace CADability
         /// <returns></returns>
         public override BoundingBox GetExtent(double precision)
         {
-            BoundingBox res = BoundingBox.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingBox;
             for (int i = 0; i < basePoints.Length; ++i)
             {
                 res.MinMax(basePoints[i].p3d);

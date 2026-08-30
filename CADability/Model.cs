@@ -724,7 +724,7 @@ namespace CADability
 
 			nullLayer = new Layer("NullLayer");
 			displayListsDirty = true;
-			minExtend = BoundingBox.EmptyBoundingCube;
+			minExtend = BoundingBox.EmptyBoundingBox;
 			noSingleAddEvents = false;
 			showTransparentFaceEdges = Settings.GlobalSettings.GetBoolValue("Display.ShowTransparentFaceEdges", false);
 		}
@@ -1369,7 +1369,7 @@ namespace CADability
 		}
 		internal BoundingBox CalculateExtent()
 		{   // muss noch mit cache versehen werden
-			BoundingBox res = BoundingBox.EmptyBoundingCube;
+			BoundingBox res = BoundingBox.EmptyBoundingBox;
 			foreach (IGeoObject go in geoObjects)
 			{
 				res.MinMax(go.GetBoundingCube());
@@ -1418,7 +1418,7 @@ namespace CADability
 			}
 			catch (SerializationException)
 			{   // später hinzugefügt, also initialisieren
-				minExtend = BoundingBox.EmptyBoundingCube;
+				minExtend = BoundingBox.EmptyBoundingBox;
 			}
 			try
 			{

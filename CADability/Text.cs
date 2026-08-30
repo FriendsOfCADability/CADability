@@ -2783,7 +2783,7 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public override BoundingBox GetBoundingCube()
         {
-            BoundingBox res = BoundingBox.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingBox;
             CalcExtent();
             res.MinMax(location);
             res.MinMax(lowerLeft);

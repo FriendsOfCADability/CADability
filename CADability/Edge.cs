@@ -3332,7 +3332,7 @@ namespace CADability
 
         internal static List<Vertex> RecalcVertices(IEnumerable<Edge> edges)
         {
-            BoundingBox ext = BoundingBox.EmptyBoundingCube;
+            BoundingBox ext = BoundingBox.EmptyBoundingBox;
             List<Vertex> allVertices = new List<Vertex>();
             foreach (Edge edg in edges)
             {

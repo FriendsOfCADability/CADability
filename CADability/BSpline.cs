@@ -499,7 +499,7 @@ namespace CADability.GeoObject
             : base()
         {
             if (Constructed != null) Constructed(this);
-            extent = BoundingBox.EmptyBoundingCube;
+            extent = BoundingBox.EmptyBoundingBox;
         }
         private void InvalidateSecondaryData()
         {
@@ -515,7 +515,7 @@ namespace CADability.GeoObject
                 interdir = null;
                 interparam = null;
                 approximation = null;
-                extent = BoundingBox.EmptyBoundingCube;
+                extent = BoundingBox.EmptyBoundingBox;
                 tetraederHull = null;
                 extrema = null;
             }
@@ -1747,11 +1747,11 @@ namespace CADability.GeoObject
         {
             if (extent.IsEmpty && poles != null)
             {
-                extent = BoundingBox.EmptyBoundingCube;
+                extent = BoundingBox.EmptyBoundingBox;
                 double[] extx = (this as ICurve).GetExtrema(GeoVector.XAxis);
                 double[] exty = (this as ICurve).GetExtrema(GeoVector.YAxis);
                 double[] extz = (this as ICurve).GetExtrema(GeoVector.ZAxis);
-                BoundingBox res = BoundingBox.EmptyBoundingCube;
+                BoundingBox res = BoundingBox.EmptyBoundingBox;
                 for (int i = 0; i < extx.Length; ++i)
                 {
                     extent.MinMax((this as ICurve).PointAt(extx[i]));
@@ -1980,7 +1980,7 @@ namespace CADability.GeoObject
                         break;
                 }
             }
-            extent = BoundingBox.EmptyBoundingCube;
+            extent = BoundingBox.EmptyBoundingBox;
             if (Constructed != null) Constructed(this);
         }
         /// <summary>
@@ -3877,7 +3877,7 @@ namespace CADability.GeoObject
         }
         internal BoundingBox GetIntervalExtent(double pmin, double pmax)
         {   // liefert die Ausdehnung eines Abschnitts der Kurve in 3D
-            BoundingBox res = BoundingBox.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingBox;
             res.MinMax(PointAtParam(pmin));
             res.MinMax(PointAtParam(pmax));
             foreach (GeoVector dir in GeoVector.MainAxis)

@@ -436,7 +436,7 @@ namespace CADability.GeoObject
             get
             {
                 GetNaturalBounds(out double umin, out double umax, out double vmin, out double vmax);
-                BoundingBox ext = BoundingBox.EmptyBoundingCube;
+                BoundingBox ext = BoundingBox.EmptyBoundingBox;
                 ext.MinMax(PointAt(new GeoPoint2D(umin, vmin)));
                 ext.MinMax(PointAt(new GeoPoint2D(umax, vmin)));
                 ext.MinMax(PointAt(new GeoPoint2D(umin, vmax)));

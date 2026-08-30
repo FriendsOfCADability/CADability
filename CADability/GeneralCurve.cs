@@ -199,7 +199,7 @@ namespace CADability.GeoObject
         private double[] tetraederParams; // Parameter zu tetraederBase
         private GeoPoint[] tetraederVertex; // zu jedem tetraederBase (bis auf den letzten) gibt es zwei Punkte, so dass ein Tetraeder aufgespannt wird
         private TetraederHull tetraederHull;
-        private BoundingBox extent = BoundingBox.EmptyBoundingCube;
+        private BoundingBox extent = BoundingBox.EmptyBoundingBox;
         internal TetraederHull TetraederHull
         {
             get
@@ -306,7 +306,7 @@ namespace CADability.GeoObject
         protected virtual void InvalidateSecondaryData()
         {
             tetraederHull = null;
-            extent = BoundingBox.EmptyBoundingCube;
+            extent = BoundingBox.EmptyBoundingBox;
         }
         // public abstract void Modify(ModOp m); ist schon abstract
         /// <summary>
@@ -764,7 +764,7 @@ namespace CADability.GeoObject
             // int xmin, xmax, ymin, ymax, zmin, zmax; // Indizes der extremen Vertexpunkte
             // noch nicht sauber implementiert: Gesucht werden müssen die lokalen
             // Minima und Maxima in x, y und z.
-            BoundingBox res = BoundingBox.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingBox;
             for (int i = 0; i < tetraederBase.Length; ++i)
             {
                 res.MinMax(tetraederBase[i]);
@@ -1482,7 +1482,7 @@ namespace CADability.GeoObject
             {
                 if (octTree == null)
                 {
-                    BoundingBox ext = BoundingBox.EmptyBoundingCube;
+                    BoundingBox ext = BoundingBox.EmptyBoundingBox;
                     for (int i = 0; i < tetraederBase.Length - 1; ++i)
                     {
                         ext.MinMax(tetraederBase[i]);

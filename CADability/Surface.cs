@@ -3741,7 +3741,7 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public virtual BoundingBox GetPatchExtent(BoundingRect uvPatch, bool rough)
         {   // kann natürlich in den einzelnen flächen besser gelöst werden
-            BoundingBox res = BoundingBox.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingBox;
             GeoPoint2D[] extr = GetExtrema();
             for (int i = 0; i < extr.Length; ++i)
             {

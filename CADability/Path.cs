@@ -501,7 +501,7 @@ namespace CADability.GeoObject
 		}
 		//public static Path[] CreateFromCurves(ICurve[] curves)
 		//{
-		//    BoundingBox bc = BoundingBox.EmptyBoundingCube;
+		//    BoundingBox bc = BoundingBox.EmptyBoundingBox;
 		//    for (int i = 0; i < curves.Length; i++)
 		//    {
 		//        bc.MinMax(curves[i].GetExtent());
@@ -1304,7 +1304,7 @@ namespace CADability.GeoObject
 		/// <returns></returns>
 		public override BoundingBox GetBoundingCube()
 		{
-			BoundingBox res = BoundingBox.EmptyBoundingCube;
+			BoundingBox res = BoundingBox.EmptyBoundingBox;
 			for (int i = 0; i < subCurves.Length; ++i)
 			{
 				res.MinMax((subCurves[i] as IGeoObject).GetBoundingCube());

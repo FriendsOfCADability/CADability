@@ -87,7 +87,7 @@ namespace CADability.Actions
             pnts[1] = pln.ToGlobal(new GeoPoint2D(width / 2, -height / 2));
             pnts[2] = pln.ToGlobal(new GeoPoint2D(width / 2, height / 2));
             pnts[3] = pln.ToGlobal(new GeoPoint2D(-width / 2, height / 2));
-            BoundingBox res = BoundingBox.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingBox;
             for (int i = 0; i < 4; i++)
             {
                 res.MinMax(pnts[i]);

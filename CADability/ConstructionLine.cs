@@ -148,7 +148,7 @@ namespace CADability.GeoObject
         /// <returns>the extent of the displayed segment</returns>
         public override BoundingBox GetExtent(double precision)
         {
-            BoundingBox res = BoundingBox.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingBox;
             res.MinMax(StartPoint);
             res.MinMax(EndPoint);
             return res;

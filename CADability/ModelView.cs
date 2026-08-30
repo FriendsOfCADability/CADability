@@ -428,7 +428,7 @@ namespace CADability
 			allowDrop = Settings.GlobalSettings.GetBoolValue("AllowDrop", true);
 			allowContextMenu = Settings.GlobalSettings.GetBoolValue("AllowContextMenu", true);
 			displayPrecision = -1.0; // automatisch
-			additionalExtent = BoundingBox.EmptyBoundingCube;
+			additionalExtent = BoundingBox.EmptyBoundingBox;
 		}
 
 		/// <summary>

@@ -291,7 +291,7 @@ namespace CADability.Actions
             if (!up) // also beim Drücken, nicht beim Loslassen
             {
                 // statt des umgebenden Kubus der Objekte ist es nun der definierter Punkt p
-                cube = BoundingBox.EmptyBoundingCube;
+                cube = BoundingBox.EmptyBoundingBox;
                 cube.MinMax(base.BasePoint); // der FixPunkt 
                 cube.MinMax(MousePosition); // der Skalierungspunkt kommt dazu
                 startPoint = MousePosition; // den Runterdrückpunkt merken
@@ -313,7 +313,7 @@ namespace CADability.Actions
         {
             // statt des umgebenden Rechtecks der Objekte ist es nun der definierter Punkt p
             startPoint = p;
-            cube = BoundingBox.EmptyBoundingCube;
+            cube = BoundingBox.EmptyBoundingBox;
             cube.MinMax(base.BasePoint); // der FixPunkt 
             cube.MinMax(p); // der Skalierungspunkt kommt hinzu
         }
@@ -430,7 +430,7 @@ namespace CADability.Actions
             copy.SetBooleanEvent += new CADability.Actions.ConstructAction.BooleanInput.SetBooleanDelegate(SetCopy);
 
             // erstmal wird das umgebende Rechteck bestimmt
-            cube = BoundingBox.EmptyBoundingCube;
+            cube = BoundingBox.EmptyBoundingBox;
             foreach (IGeoObject go in originals)
             {
                 cube.MinMax(go.GetBoundingCube());

@@ -31,7 +31,7 @@ namespace CADability
                 polygon.Add(plane.Project(edgeStart)); // die beiden Punkte geben die Linie an, die die Ebene begrenzt
                 polygon.Add(plane.Project(edgeEnd));
                 isOpen = true; // die Linie "halbiert" die Ebene, links davon ist innerhalb
-                extend = BoundingBox.EmptyBoundingCube;
+                extend = BoundingBox.EmptyBoundingBox;
             }
 
             BoundingBox IOctTreeInsertable.GetExtent(double precision)

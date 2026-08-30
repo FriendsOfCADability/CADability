@@ -413,7 +413,7 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public override BoundingBox GetExtent(double precision)
         {
-            BoundingBox res = BoundingBox.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingBox;
             if (compoundShape != null)
             {
                 for (int i = 0; i < compoundShape.SimpleShapes.Length; ++i)

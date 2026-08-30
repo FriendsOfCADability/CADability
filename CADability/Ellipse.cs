@@ -134,7 +134,7 @@ namespace CADability.GeoObject
 			{
 				ellipse.projectionData.Clear();
 				ellipse.currentApproximation = null;
-				ellipse.extent = BoundingBox.EmptyBoundingCube;
+				ellipse.extent = BoundingBox.EmptyBoundingBox;
 			}
 
 			public Changing(Ellipse ellipse, string PropertyName)
@@ -142,7 +142,7 @@ namespace CADability.GeoObject
 			{
 				ellipse.projectionData.Clear();
 				ellipse.currentApproximation = null;
-				ellipse.extent = BoundingBox.EmptyBoundingCube;
+				ellipse.extent = BoundingBox.EmptyBoundingBox;
 			}
 
 			public Changing(Ellipse ellipse, string MethodOrPropertyName, params object[] Parameters)
@@ -150,7 +150,7 @@ namespace CADability.GeoObject
 			{
 				ellipse.projectionData.Clear();
 				ellipse.currentApproximation = null;
-				ellipse.extent = BoundingBox.EmptyBoundingCube;
+				ellipse.extent = BoundingBox.EmptyBoundingBox;
 			}
 
 			public Changing(Ellipse ellipse, Type interfaceForMethod, string MethodOrPropertyName,
@@ -159,7 +159,7 @@ namespace CADability.GeoObject
 			{
 				ellipse.projectionData.Clear();
 				ellipse.currentApproximation = null;
-				ellipse.extent = BoundingBox.EmptyBoundingCube;
+				ellipse.extent = BoundingBox.EmptyBoundingBox;
 			}
 
 			public Changing(Ellipse ellipse, bool noUndo, bool onlyAttribute, string MethodOrPropertyName,
@@ -168,7 +168,7 @@ namespace CADability.GeoObject
 			{
 				if (!onlyAttribute) ellipse.projectionData.Clear();
 				ellipse.currentApproximation = null;
-				ellipse.extent = BoundingBox.EmptyBoundingCube;
+				ellipse.extent = BoundingBox.EmptyBoundingBox;
 			}
 		}
 
@@ -691,7 +691,7 @@ namespace CADability.GeoObject
 		{
 			lockApproximationRecalc = new object();
 			projectionData = new Dictionary<Projection, EllipseData2D>();
-			extent = BoundingBox.EmptyBoundingCube;
+			extent = BoundingBox.EmptyBoundingBox;
 			plane = new Plane(Plane.StandardPlane.XYPlane, 0.0);
 			if (Constructed != null) Constructed(this);
 		}
@@ -1757,7 +1757,7 @@ namespace CADability.GeoObject
 		{
 			return GetBoundingCube();
 			//GeoPoint[] points = GetCashedApproximation(precision);
-			//BoundingBox res = BoundingBox.EmptyBoundingCube;
+			//BoundingBox res = BoundingBox.EmptyBoundingBox;
 			//for (int i = 0; i < points.Length; ++i)
 			//{
 			//    res.MinMax(points[i]);
@@ -3062,7 +3062,7 @@ namespace CADability.GeoObject
 			//}
 
 			projectionData = new Dictionary<Projection, EllipseData2D>();
-			extent = BoundingBox.EmptyBoundingCube;
+			extent = BoundingBox.EmptyBoundingBox;
 			lockApproximationRecalc = new object();
 			if (Constructed != null) Constructed(this); // ist hoffentlich nicht zu früh hier...
 		}

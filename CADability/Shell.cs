@@ -1420,7 +1420,7 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public override BoundingBox GetBoundingCube()
         {
-            BoundingBox res = BoundingBox.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingBox;
             for (int i = 0; i < faces.Length; ++i)
             {
                 if (faces[i].Surface is NurbsSurface)
@@ -1653,7 +1653,7 @@ namespace CADability.GeoObject
             GeoObjectList dbgfaces = new GeoObjectList();
             HashSet<Vertex> dbgvtx = new HashSet<Vertex>();
             HashSet<Edge> dbgedg = new HashSet<Edge>();
-            BoundingBox dbgext = BoundingBox.EmptyBoundingCube;
+            BoundingBox dbgext = BoundingBox.EmptyBoundingBox;
             foreach (Face fc in subsetForTest)
             {
                 dbgfaces.Add(fc.Clone());
@@ -1687,7 +1687,7 @@ namespace CADability.GeoObject
                                                                                                                                           // to collect the normals of all faces. This help to classify the faces
                                                                                                                                           // a little bit excentric to collect vetors close to the unit (axis, e.g.: (0,0,1)) in a single OctTree box.
             List<GeoPoint> ndirs = new List<GeoPoint>(); // all normals (on the unit sphere) to check, whether there is a cylinder or cone
-            BoundingBox next = BoundingBox.EmptyBoundingCube;
+            BoundingBox next = BoundingBox.EmptyBoundingBox;
             foreach (Face fc in subsetForTest)
             {
                 GeoPoint pus = GeoPoint.Origin + (fc.Surface as PlaneSurface).Normal.Normalized; // normal as a point on the unit sphere
@@ -4960,7 +4960,7 @@ namespace CADability.GeoObject
         public static void ConnectFaces(Face[] toConnect, double precision)
         {
             HashSet<Vertex> toAdd = new HashSet<Vertex>(); // alle vertices von offenen Kanten
-            BoundingBox ext = BoundingBox.EmptyBoundingCube;
+            BoundingBox ext = BoundingBox.EmptyBoundingBox;
             for (int i = 0; i < toConnect.Length; i++)
             {
                 foreach (Edge edg in toConnect[i].Edges)
@@ -5943,7 +5943,7 @@ namespace CADability.GeoObject
                 octtree.AddObject(faces[i]);
             }
             Face biggestFace = null;
-            BoundingBox currentExt = BoundingBox.EmptyBoundingCube;
+            BoundingBox currentExt = BoundingBox.EmptyBoundingBox;
             double maxSize = 0.0;
             for (int i = 0; i < form.Length; i++)
             {

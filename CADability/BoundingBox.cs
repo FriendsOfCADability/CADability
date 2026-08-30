@@ -242,7 +242,7 @@ namespace CADability
         }
 
         /// <summary>
-        /// Makes this BoundingBox include the provided point. You can start with an <see cref="EmptyBoundingCube"/>
+        /// Makes this BoundingBox include the provided point. You can start with an <see cref="EmptyBoundingBox"/>
         /// </summary>
         /// <param name="p">Point to be included</param>
         public void MinMax(GeoPoint p)
@@ -255,7 +255,7 @@ namespace CADability
             if (p.z > Zmax) Zmax = p.z;
         }
         /// <summary>
-        /// Makes this BoundingBox include the provided BoundingBox. You can start with an <see cref="EmptyBoundingCube"/>
+        /// Makes this BoundingBox include the provided BoundingBox. You can start with an <see cref="EmptyBoundingBox"/>
         /// </summary>
         /// <param name="b">Cube to be included</param>
         public void MinMax(BoundingBox b)
@@ -295,13 +295,18 @@ namespace CADability
         /// Empty BoundingBox. Defined by the special values <see cref="double.MinValue"/> and <see cref="double.MaxValue"/>.
         /// Often used with the <see cref="MinMax(GeoPoint)"/> or <see cref="MinMax(BoundingBox)"/> Methods.
         /// </summary>
-        static public BoundingBox EmptyBoundingCube
+        static public BoundingBox EmptyBoundingBox
         {
             get
             {
                 return new BoundingBox(double.MaxValue, double.MinValue, double.MaxValue, double.MinValue, double.MaxValue, double.MinValue);
             }
         }
+        /// <summary>
+        /// Use <see cref="EmptyBoundingBox"/> instead.
+        /// </summary>
+        [Obsolete("EmptyBoundingCube has been renamed to EmptyBoundingBox.")]
+        static public BoundingBox EmptyBoundingCube => EmptyBoundingBox;
         /// <summary>
         /// Infinite BoundingBox. Ranging from <see cref="double.MinValue"/> to <see cref="double.MaxValue"/>.
         /// </summary>
@@ -466,7 +471,7 @@ namespace CADability
         /// <param name="m">Modification</param>
         public void Modify(ModOp m)
         {
-            BoundingBox res = EmptyBoundingCube;
+            BoundingBox res = EmptyBoundingBox;
             res.MinMax(m * new GeoPoint(Xmin, Ymin, Zmin));
             res.MinMax(m * new GeoPoint(Xmin, Ymin, Zmax));
             res.MinMax(m * new GeoPoint(Xmin, Ymax, Zmin));

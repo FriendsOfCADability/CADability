@@ -321,7 +321,7 @@ namespace CADability
                 case ItemType.Face:
                     return face.GetExtent(precision);
             }
-            return BoundingBox.EmptyBoundingCube;
+            return BoundingBox.EmptyBoundingBox;
         }
         bool IOctTreeInsertable.HitTest(ref BoundingBox cube, double precision)
         {
@@ -1899,7 +1899,7 @@ namespace CADability
             foreach (Face face in multipleFaces) face.ReverseOrientation();
 
             // fill the OctTree
-            BoundingBox ext = BoundingBox.EmptyBoundingCube;
+            BoundingBox ext = BoundingBox.EmptyBoundingBox;
             foreach (Face face in multipleFaces) ext.MinMax(face.GetExtent(0.0));
             // in rare cases the extension isn't a good choice, faces shouldn't exactely reside on the sides of the small cubes of the octtree
             // so we modify the extension a little, to make this case extremely unlikely. The best solution would be to check, whether a vertex

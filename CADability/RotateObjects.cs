@@ -301,7 +301,7 @@ namespace CADability.Actions
 
             base.SetInput(refPointInput, rotAngleInput, startPointInput, endPointInput, rotateLineInput, srcPlane, trgPlane, offset, copy);
 
-            BoundingBox result = BoundingBox.EmptyBoundingCube;
+            BoundingBox result = BoundingBox.EmptyBoundingBox;
             foreach (IGeoObject go in originals)
             {
                 result.MinMax(go.GetBoundingCube());

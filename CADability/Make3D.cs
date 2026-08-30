@@ -1889,7 +1889,7 @@ namespace CADability.GeoObject
             }
 #endif
             List<Vertex> allVertices = new List<Vertex>();
-            BoundingBox ext = BoundingBox.EmptyBoundingCube;
+            BoundingBox ext = BoundingBox.EmptyBoundingBox;
             for (int i = 0; i < faces.Length; i++)
             {
                 Vertex[] v = faces[i].Vertices;

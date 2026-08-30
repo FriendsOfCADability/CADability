@@ -1,4 +1,4 @@
-﻿using CADability.Actions;
+using CADability.Actions;
 using CADability.Attribute;
 using CADability.Curve2D;
 using MathNet.Numerics.LinearAlgebra.Double;

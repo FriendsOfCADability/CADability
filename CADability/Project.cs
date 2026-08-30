@@ -1347,6 +1347,7 @@ namespace CADability
                         typeName = "CADability.Attribute.HatchStyleContour+EHoleMode";
                         break;
                 }
+                typeName = RenamedTypes.Resolve(typeName);
                 Type res = null;
                 res = Type.GetType(typeName);
                 if (res == null)

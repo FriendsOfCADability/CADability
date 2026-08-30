@@ -33,6 +33,7 @@ namespace CADability
                     typeName = typeName.Remove(ind + 20, ind1 - ind - 20);
                     typeName = typeName.Insert(ind + 20, "*");
                 }
+                typeName = RenamedTypes.Resolve(typeName);
                 Type t = Type.GetType(typeName);
                 if (t == null && typeName == "Color") // das macht Probleme wg. verschiedenem Framework
                 {

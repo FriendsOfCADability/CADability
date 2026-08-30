@@ -662,7 +662,7 @@ namespace CADability
                 if (token != Tokenizer.etoken.colon) throw new ApplicationException("Syntax error in json file");
                 res[name] = GetValue(tk);
                 if (name == "$TypeIndex") typeindex = Convert.ToInt32(res[name]);
-                if (name == "$Type") typename = res[name] as string;
+                if (name == "$Type") typename = RenamedTypes.Resolve(res[name] as string);
                 if (name == "$TypeVersion") typeversion = Convert.ToInt32(res[name]);
                 if (name == "$Assembly") assemblyName = res[name] as string;
                 token = tk.NextToken(out line, out start, out length);
@@ -757,7 +757,7 @@ namespace CADability
                 }
                 else if (data[key] is JsonDict && (data[key] as JsonDict).Count == 2 && (data[key] as JsonDict).ContainsKey("$Type") && (data[key] as JsonDict).ContainsKey("$Value"))
                 {   // this is a typed generated from ISerialize
-                    string typename = (data[key] as JsonDict)["$Type"] as string;
+                    string typename = RenamedTypes.Resolve((data[key] as JsonDict)["$Type"] as string);
                     object val = (data[key] as JsonDict)["$Value"];
                     if (!typename.Contains("."))
                     {   // a primitive type

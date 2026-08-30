@@ -31,7 +31,7 @@ namespace CADability.GeoObject
     /// cone. The u parameter always describes a circle or ellipse, the v parameter a Line.
     /// </summary>
     [Serializable()]
-    public class ConicalSurface : ISurfaceImpl, ISerializable, IDeserializationCallback, ISurfaceOfRevolution, IExportStep, ICone
+    public class ConicalSurface : ISurfaceImpl, ISerializable, IDeserializationCallback, ISurfaceOfRevolution, IExportStep, ICone, IDevelopableSurface
     {
         // Der Einheitskegel hat als halben Öffnungswinkel 45°, Der Ursprung ist die Kegelspitze, u geht im Kreis
         // v in die ZRichtung
@@ -119,6 +119,79 @@ namespace CADability.GeoObject
                 return toCone * GeoVector.XAxis;
             }
         }
+        #region IDevelopableSurface
+        /// <summary>Radius of the cone one unit of v away from the apex.</summary>
+        private double RadialScale => (toCone * GeoVector.XAxis).Length;
+
+        /// <summary>Distance along a generator per unit of v - the slant scale.</summary>
+        private double SlantScale
+        {
+            get
+            {
+                double r = RadialScale;
+                double h = (toCone * GeoVector.ZAxis).Length;
+                return Math.Sqrt((r * r) + (h * h));
+            }
+        }
+
+        /// <summary>
+        /// True for a circular cone whose parametrisation is not sheared. The elliptical
+        /// case is refused for the same reason as on the cylinder.
+        /// </summary>
+        public bool IsDevelopable
+        {
+            get
+            {
+                double rx = (toCone * GeoVector.XAxis).Length;
+                double ry = (toCone * GeoVector.YAxis).Length;
+                double h = (toCone * GeoVector.ZAxis).Length;
+                if (rx <= Precision.eps || ry <= Precision.eps || h <= Precision.eps)
+                    return false;
+
+                if (Math.Abs(rx - ry) > Precision.eps * Math.Max(1.0, Math.Max(rx, ry)))
+                    return false;   // elliptical
+
+                return Precision.IsPerpendicular(XAxis, YAxis, false)
+                    && Precision.IsPerpendicular(XAxis, ZAxis, false)
+                    && Precision.IsPerpendicular(YAxis, ZAxis, false);
+            }
+        }
+
+        /// <summary>
+        /// Unrolls the cone into an annular sector centred on the developed apex. A point
+        /// v units from the apex lies v*slant away from it on the flat pattern, and the
+        /// full revolution opens only 2*pi*r/slant rather than 2*pi - which is exactly why
+        /// a cone lies flat and a sphere does not.
+        /// </summary>
+        public GeoPoint2D Develop(GeoPoint2D uv)
+        {
+            double slant = SlantScale;
+            double radius = (uv.y + voffset) * slant;
+            double angle = uv.x * (RadialScale / slant);
+            return new GeoPoint2D(radius * Math.Cos(angle), radius * Math.Sin(angle));
+        }
+
+        /// <summary>
+        /// Implements <see cref="IDevelopableSurface.DevelopInverse"/>.
+        /// <para>
+        /// A cone's development repeats: the flat pattern only knows an angle, and u is
+        /// that angle divided by a factor smaller than one, so every flat point stands for
+        /// infinitely many u. The branch returned is the one matching
+        /// <see cref="PositionOf"/>, u in [0, 2*pi/k), with v on the nappe in front of the
+        /// apex.
+        /// </para>
+        /// </summary>
+        public GeoPoint2D DevelopInverse(GeoPoint2D flat)
+        {
+            double slant = SlantScale;
+            double radius = Math.Sqrt((flat.x * flat.x) + (flat.y * flat.y));
+            double angle = Math.Atan2(flat.y, flat.x);
+            if (angle < 0.0)
+                angle += 2.0 * Math.PI;
+
+            return new GeoPoint2D(angle / (RadialScale / slant), (radius / slant) - voffset);
+        }
+        #endregion
         public GeoVector YAxis
         {
             get

@@ -28,7 +28,7 @@ namespace CADability.GeoObject
     /// </summary>
     [Serializable()]
     public class CylindricalSurface : ISurfaceImpl, ISurfaceOfRevolution, ISerializable, IDeserializationCallback, ISurfacePlaneIntersection,
-        IExportStep, ISurfaceOfArcExtrusion, ICylinder, IJsonSerialize
+        IExportStep, ISurfaceOfArcExtrusion, ICylinder, IJsonSerialize, IDevelopableSurface
     {
         // Der Zylinder ist so beschaffen, dass er lediglich durch eine ModOp definiert ist.
         // Der Einheitszylinder steht im Ursprung mit Radius 1, u beschreibt einen Kreis, v eine Mantellinie
@@ -115,6 +115,49 @@ namespace CADability.GeoObject
                 return toCylinder * GeoVector.ZAxis;
             }
         }
+        #region IDevelopableSurface
+        /// <summary>
+        /// True for a circular cylinder whose parametrisation is not sheared or scaled
+        /// unevenly. An elliptical cylinder says false: its circumferential arc length is
+        /// an incomplete elliptic integral of the second kind, which has no closed form,
+        /// and the circular case should not pay for that generality.
+        /// </summary>
+        public bool IsDevelopable
+        {
+            get
+            {
+                double rx = RadiusX;
+                double ry = RadiusY;
+                double axial = Axis.Length;
+                if (rx <= Precision.eps || ry <= Precision.eps || axial <= Precision.eps)
+                    return false;
+
+                if (Math.Abs(rx - ry) > Precision.eps * Math.Max(1.0, Math.Max(rx, ry)))
+                    return false;   // elliptical
+
+                return Precision.IsPerpendicular(XAxis, YAxis, false)
+                    && Precision.IsPerpendicular(XAxis, Axis, false)
+                    && Precision.IsPerpendicular(YAxis, Axis, false);
+            }
+        }
+        /// <summary>
+        /// Unrolls the cylinder: u is the circumferential angle, so it becomes arc length
+        /// u*r, and v is the axial coordinate of the *unit* cylinder, so it becomes
+        /// v*|Axis|. Missing the axial scale is easy to do and yields a pattern wrong by a
+        /// constant factor.
+        /// </summary>
+        public GeoPoint2D Develop(GeoPoint2D uv)
+        {
+            return new GeoPoint2D(uv.x * RadiusX, uv.y * Axis.Length);
+        }
+        /// <summary>
+        /// Implements <see cref="IDevelopableSurface.DevelopInverse"/>.
+        /// </summary>
+        public GeoPoint2D DevelopInverse(GeoPoint2D flat)
+        {
+            return new GeoPoint2D(flat.x / RadiusX, flat.y / Axis.Length);
+        }
+        #endregion
         public Line AxisLine(double vmin, double vmax)
         {
             return Line.TwoPoints(toCylinder * new GeoPoint(0, 0, vmin), toCylinder * new GeoPoint(0, 0, vmax));

@@ -11,7 +11,7 @@ namespace CADability.GeoObject
     /// The plane is defined by two vectors which are not necessary perpendicular or normalized.
     /// </summary>
     [Serializable()]
-    public class PlaneSurface : ISurfaceImpl, ISerializable, IDeserializationCallback, IExportStep
+    public class PlaneSurface : ISurfaceImpl, ISerializable, IDeserializationCallback, IExportStep, IDevelopableSurface
     {
         private ModOp fromUnitPlane; // projects the XY plane into this surface
         private ModOp toUnitPlane; // inverted fromUnitPlane
@@ -69,6 +69,40 @@ namespace CADability.GeoObject
                 return fromUnitPlane * GeoVector.YAxis;
             }
         }
+        #region IDevelopableSurface
+        /// <summary>
+        /// A plane is already flat, so this is true whenever its parametrisation is not
+        /// sheared. Implementing it anyway is what lets callers treat every developable
+        /// surface alike instead of special-casing the trivial one.
+        /// </summary>
+        public bool IsDevelopable
+        {
+            get
+            {
+                GeoVector dx = DirectionX;
+                GeoVector dy = DirectionY;
+                if (dx.Length <= Precision.eps || dy.Length <= Precision.eps)
+                    return false;
+
+                return Precision.IsPerpendicular(dx, dy, false);
+            }
+        }
+        /// <summary>
+        /// The identity for the usual unit-length axes, and the right scaling when the
+        /// parametrisation carries one.
+        /// </summary>
+        public GeoPoint2D Develop(GeoPoint2D uv)
+        {
+            return new GeoPoint2D(uv.x * DirectionX.Length, uv.y * DirectionY.Length);
+        }
+        /// <summary>
+        /// Implements <see cref="IDevelopableSurface.DevelopInverse"/>.
+        /// </summary>
+        public GeoPoint2D DevelopInverse(GeoPoint2D flat)
+        {
+            return new GeoPoint2D(flat.x / DirectionX.Length, flat.y / DirectionY.Length);
+        }
+        #endregion
         public GeoVector Normal
         {
             get

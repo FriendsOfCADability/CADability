@@ -1,4 +1,4 @@
-using CADability.Actions;
+﻿using CADability.Actions;
 using CADability.Attribute;
 using CADability.Curve2D;
 using MathNet.Numerics.LinearAlgebra.Double;
@@ -284,9 +284,21 @@ namespace CADability.GeoObject
         }
         public double Volume(double precision)
         {
+            return SignedVolume(Faces, precision);
+        }
+        /// <summary>
+        /// Computes the signed volume enclosed by the provided faces. The faces must form a closed shell, otherwise the
+        /// result is meaningless. The sign follows the orientation: faces with outward pointing normals (a hull) enclose a
+        /// positive volume, faces with inward pointing normals (a hole or cavity) enclose a negative volume.
+        /// </summary>
+        /// <param name="shellFaces">The faces of a closed shell</param>
+        /// <param name="precision">The precision of the triangulation</param>
+        /// <returns>The signed enclosed volume</returns>
+        public static double SignedVolume(IEnumerable<Face> shellFaces, double precision)
+        {
             double sum = 0.0;
             double corr = 0.0;
-            foreach (Face fc in Faces)
+            foreach (Face fc in shellFaces)
             {
                 fc.GetTriangulation(precision, out GeoPoint[] trianglePoint, out GeoPoint2D[] triangleUVPoint, out int[] triangleIndex, out BoundingBox triangleExtent);
                 if (triangleIndex == null) continue;
@@ -319,6 +331,172 @@ namespace CADability.GeoObject
                 }
             }
             return sum / 6 + corr;
+        }
+
+        /// <summary>
+        /// Computes volume, center of gravity and inertia tensor of the solid enclosed by this shell in a single pass over
+        /// the triangulation. Like <see cref="Volume(double)"/> this requires a closed shell with outward oriented faces,
+        /// otherwise the results are meaningless.
+        /// <para>
+        /// All moments are calculated as surface integrals over the triangles (divergence theorem), the same principle
+        /// <see cref="Volume(double)"/> uses. The integrands are polynomials of degree 3 at most, so a 4 point quadrature rule
+        /// which is exact for cubic polynomials makes the values exact for the triangulated body. The deviation of the curved
+        /// surface from its triangles is handled by the same correction as in <see cref="Volume(double)"/>: the material
+        /// between the triangle and the surface (volume 3/4*area*sag) is added as an additional lump, which sits above the
+        /// centroid of the triangle at 2/5 of the sag.
+        /// </para>
+        /// <para>
+        /// A homogeneous material with density 1 is assumed, i.e. the mass is the volume. Multiply the tensor by the density
+        /// to get the physical inertia tensor.
+        /// </para>
+        /// </summary>
+        /// <param name="precision">The precision of the triangulation</param>
+        /// <param name="volume">The enclosed volume</param>
+        /// <param name="centerOfGravity">The center of gravity</param>
+        /// <param name="inertiaTensor">The symmetric 3x3 inertia tensor with respect to the center of gravity</param>
+        public void GetMassProperties(double precision, out double volume, out GeoPoint centerOfGravity, out double[,] inertiaTensor)
+        {
+            // 4 point quadrature rule for a triangle: the centroid with weight -27/48 and the three points with barycentric
+            // coordinates (0.6, 0.2, 0.2) with weight 25/48 each. This rule is exact for polynomials up to degree 3.
+            double[] qweight = new double[] { -27.0 / 48.0, 25.0 / 48.0, 25.0 / 48.0, 25.0 / 48.0 };
+            GeoPoint[] qpoint = new GeoPoint[4];
+
+            double vol = 0.0; // integral of 1
+            double mx = 0.0, my = 0.0, mz = 0.0; // first moments, integral of x, y, z
+            double pxx = 0.0, pyy = 0.0, pzz = 0.0, pxy = 0.0, pyz = 0.0, pzx = 0.0; // second moments, integral of x*x, ..., x*y, ...
+
+            foreach (Face fc in Faces)
+            {
+                fc.GetTriangulation(precision, out GeoPoint[] trianglePoint, out GeoPoint2D[] triangleUVPoint, out int[] triangleIndex, out BoundingBox triangleExtent);
+                if (triangleIndex == null) continue;
+                for (int i = 0; i < triangleIndex.Length; i += 3)
+                {
+                    GeoPoint p0 = trianglePoint[triangleIndex[i]];
+                    GeoPoint p1 = trianglePoint[triangleIndex[i + 1]];
+                    GeoPoint p2 = trianglePoint[triangleIndex[i + 2]];
+                    GeoVector d1 = p1 - p0, d2 = p2 - p0;
+                    GeoVector n = 0.5 * (d1 ^ d2); // vector area: the length is the area, the direction is the outward normal
+                    qpoint[0] = new GeoPoint(p0, p1, p2); // the centroid of the triangle
+                    qpoint[1] = p0 + 0.2 * d1 + 0.2 * d2;
+                    qpoint[2] = p0 + 0.6 * d1 + 0.2 * d2;
+                    qpoint[3] = p0 + 0.2 * d1 + 0.6 * d2;
+                    // mean values of the integrands over the triangle
+                    double mex = 0.0, mey = 0.0, mez = 0.0; // x, y, z
+                    double mexx = 0.0, meyy = 0.0, mezz = 0.0; // x², y², z²
+                    double mexxx = 0.0, meyyy = 0.0, mezzz = 0.0; // x³, y³, z³
+                    double mexxy = 0.0, meyyz = 0.0, mezzx = 0.0; // x²y, y²z, z²x
+                    for (int k = 0; k < 4; k++)
+                    {
+                        double w = qweight[k], x = qpoint[k].x, y = qpoint[k].y, z = qpoint[k].z;
+                        mex += w * x; mey += w * y; mez += w * z;
+                        mexx += w * x * x; meyy += w * y * y; mezz += w * z * z;
+                        mexxx += w * x * x * x; meyyy += w * y * y * y; mezzz += w * z * z * z;
+                        mexxy += w * x * x * y; meyyz += w * y * y * z; mezzx += w * z * z * x;
+                    }
+                    // Divergence theorem: the integral of f over the volume is the surface integral of F*n with div(F) == f.
+                    // Over a flat triangle this is the (constant) vector area times the mean value of the integrand.
+                    vol += (n.x * mex + n.y * mey + n.z * mez) / 3.0; // F = P/3
+                    mx += n.x * mexx / 2.0; // F = (x²/2, 0, 0)
+                    my += n.y * meyy / 2.0;
+                    mz += n.z * mezz / 2.0;
+                    pxx += n.x * mexxx / 3.0; // F = (x³/3, 0, 0)
+                    pyy += n.y * meyyy / 3.0;
+                    pzz += n.z * mezzz / 3.0;
+                    pxy += n.x * mexxy / 2.0; // F = (x²y/2, 0, 0)
+                    pyz += n.y * meyyz / 2.0;
+                    pzx += n.z * mezzx / 2.0;
+                    // The same correction as in Volume: the material between the flat triangle and the curved surface. Its
+                    // volume is 3/4*area*sag and its center of gravity is above the centroid of the triangle at 2/5 of the sag
+                    // (both values follow from a quadratic sag which vanishes at the vertices). It is small enough to be
+                    // treated as a point mass for the moments.
+                    try
+                    {
+                        Plane pln = new Plane(p0, d1, d2);
+                        double sag = pln.Distance(fc.Surface.PointAt(new GeoPoint2D(triangleUVPoint[triangleIndex[i]], triangleUVPoint[triangleIndex[i + 1]], triangleUVPoint[triangleIndex[i + 2]])));
+                        double dv = n.Length * sag * 3 / 4;
+                        GeoPoint cg = qpoint[0] + (0.4 * sag) * pln.Normal;
+                        vol += dv;
+                        mx += dv * cg.x; my += dv * cg.y; mz += dv * cg.z;
+                        pxx += dv * cg.x * cg.x; pyy += dv * cg.y * cg.y; pzz += dv * cg.z * cg.z;
+                        pxy += dv * cg.x * cg.y; pyz += dv * cg.y * cg.z; pzx += dv * cg.z * cg.x;
+                    }
+                    catch (PlaneException) { }
+                }
+            }
+            volume = vol;
+            inertiaTensor = new double[3, 3];
+            if (vol == 0.0)
+            {   // not a closed shell or a degenerate body, there is no center of gravity
+                centerOfGravity = GeoPoint.Origin;
+                return;
+            }
+            centerOfGravity = new GeoPoint(mx / vol, my / vol, mz / vol);
+            // move the second moments to the center of gravity (parallel axis theorem)
+            double cx = centerOfGravity.x, cy = centerOfGravity.y, cz = centerOfGravity.z;
+            double sxx = pxx - vol * cx * cx;
+            double syy = pyy - vol * cy * cy;
+            double szz = pzz - vol * cz * cz;
+            double sxy = pxy - vol * cx * cy;
+            double syz = pyz - vol * cy * cz;
+            double szx = pzx - vol * cz * cx;
+            inertiaTensor[0, 0] = syy + szz;
+            inertiaTensor[1, 1] = szz + sxx;
+            inertiaTensor[2, 2] = sxx + syy;
+            inertiaTensor[0, 1] = inertiaTensor[1, 0] = -sxy;
+            inertiaTensor[1, 2] = inertiaTensor[2, 1] = -syz;
+            inertiaTensor[2, 0] = inertiaTensor[0, 2] = -szx;
+        }
+
+        /// <summary>
+        /// Returns the center of gravity (centroid) of the solid enclosed by this shell, assuming a homogeneous material.
+        /// The calculation is based on a triangulation with the provided <paramref name="precision"/>, see
+        /// <see cref="GetMassProperties(double, out double, out GeoPoint, out double[,])"/>.
+        /// </summary>
+        /// <param name="precision">The precision of the triangulation</param>
+        /// <returns>The center of gravity</returns>
+        public GeoPoint Centroid(double precision)
+        {
+            GetMassProperties(precision, out double volume, out GeoPoint centerOfGravity, out double[,] inertiaTensor);
+            return centerOfGravity;
+        }
+
+        /// <summary>
+        /// Returns the inertia tensor of the solid enclosed by this shell with respect to its center of gravity, assuming a
+        /// homogeneous material of density 1 (i.e. the mass is the volume). The diagonal contains the moments of inertia
+        /// Ixx, Iyy, Izz, the off diagonal elements are the (negated) products of inertia. The calculation is based on a
+        /// triangulation with the provided <paramref name="precision"/>, see
+        /// <see cref="GetMassProperties(double, out double, out GeoPoint, out double[,])"/>.
+        /// </summary>
+        /// <param name="precision">The precision of the triangulation</param>
+        /// <returns>The symmetric 3x3 inertia tensor</returns>
+        public double[,] InertiaTensor(double precision)
+        {
+            GetMassProperties(precision, out double volume, out GeoPoint centerOfGravity, out double[,] inertiaTensor);
+            return inertiaTensor;
+        }
+
+        /// <summary>
+        /// Returns the inertia tensor of the solid enclosed by this shell with respect to the provided
+        /// <paramref name="referencePoint"/>, assuming a homogeneous material of density 1 (i.e. the mass is the volume).
+        /// </summary>
+        /// <param name="precision">The precision of the triangulation</param>
+        /// <param name="referencePoint">The point the tensor refers to</param>
+        /// <returns>The symmetric 3x3 inertia tensor</returns>
+        public double[,] InertiaTensor(double precision, GeoPoint referencePoint)
+        {
+            GetMassProperties(precision, out double volume, out GeoPoint centerOfGravity, out double[,] inertiaTensor);
+            GeoVector r = referencePoint - centerOfGravity;
+            // parallel axis theorem (Steiner)
+            inertiaTensor[0, 0] += volume * (r.y * r.y + r.z * r.z);
+            inertiaTensor[1, 1] += volume * (r.z * r.z + r.x * r.x);
+            inertiaTensor[2, 2] += volume * (r.x * r.x + r.y * r.y);
+            inertiaTensor[0, 1] -= volume * r.x * r.y;
+            inertiaTensor[1, 0] = inertiaTensor[0, 1];
+            inertiaTensor[1, 2] -= volume * r.y * r.z;
+            inertiaTensor[2, 1] = inertiaTensor[1, 2];
+            inertiaTensor[2, 0] -= volume * r.z * r.x;
+            inertiaTensor[0, 2] = inertiaTensor[2, 0];
+            return inertiaTensor;
         }
 
         internal List<ParametricProperty> ParametricProperties { get { return parametricProperties; } }

@@ -201,7 +201,7 @@ namespace CADability
         private Matrix4 openGlMatrix; // bildet alles auf den Würfel [-1,1][-1,1][0,1] ab
         private Matrix4 inverseOpenGLMatrix;
         private Rectangle clientRect; // das Fenster
-        private BoundingCube extent; // Größe des Modells
+        private BoundingBox extent; // Größe des Modells
 
         private double Matrix00, Matrix01, Matrix02, Matrix03, Matrix10, Matrix11, Matrix12, Matrix13;
         /// <summary>
@@ -328,7 +328,7 @@ namespace CADability
         {
             return new PickArea(this, World2DToWindow(rectWorld2D));
         }
-        internal void SetExtent(BoundingCube boundingCube)
+        internal void SetExtent(BoundingBox boundingCube)
         {
             extent = boundingCube;
         }
@@ -400,7 +400,7 @@ namespace CADability
         /// <param name="Direction">View direction</param>
         /// <param name="TopDirection">Vertical direction</param>
         /// <param name="extent">Extend of the model in world coordinates</param>
-        public void SetDirection(GeoVector Direction, GeoVector TopDirection, BoundingCube extent)
+        public void SetDirection(GeoVector Direction, GeoVector TopDirection, BoundingBox extent)
         {
             this.extent = extent;
             GeoVector xdir = Direction ^ TopDirection;
@@ -929,7 +929,7 @@ namespace CADability
         {
             return inverseProjection * new GeoPoint((p.X - placementX) / placementFactor, -(p.Y - placementY) / placementFactor, 0.0);
         }
-        private void SetPerspective(GeoPoint fromHere, GeoVector dir, Rectangle clientRect, BoundingCube modelExtent, GeoPoint fixPoint, bool useFixPoint)
+        private void SetPerspective(GeoPoint fromHere, GeoVector dir, Rectangle clientRect, BoundingBox modelExtent, GeoPoint fixPoint, bool useFixPoint)
         {
             GeoPoint2D fixPoint2D = WorldToWindow(fixPoint);
 
@@ -1010,15 +1010,15 @@ namespace CADability
                 SetCoefficients(); // jetzt mit Verschiebung
             }
         }
-        public void SetPerspective(GeoPoint fromHere, GeoVector dir, Rectangle clientRect, BoundingCube modelExtent)
+        public void SetPerspective(GeoPoint fromHere, GeoVector dir, Rectangle clientRect, BoundingBox modelExtent)
         {
             SetPerspective(fromHere, dir, clientRect, modelExtent, GeoPoint.Origin, false);
         }
-        public void SetPerspective(GeoPoint fromHere, GeoVector dir, Rectangle clientRect, BoundingCube modelExtent, GeoPoint fixPoint)
+        public void SetPerspective(GeoPoint fromHere, GeoVector dir, Rectangle clientRect, BoundingBox modelExtent, GeoPoint fixPoint)
         {
             SetPerspective(fromHere, dir, clientRect, modelExtent, fixPoint, true);
         }
-        internal void SetPerspective(GeoPoint fromHere, GeoVector direction, BoundingCube modelExtent, GeoPoint fixPoint)
+        internal void SetPerspective(GeoPoint fromHere, GeoVector direction, BoundingBox modelExtent, GeoPoint fixPoint)
         {
             SetPerspective(fromHere, direction, clientRect, modelExtent, fixPoint, true);
         }
@@ -1049,7 +1049,7 @@ namespace CADability
                     extent.MinMax(lefttop);
                 }
                 // extend.Expand(1.0); 
-                BoundingCube extentex = extent;
+                BoundingBox extentex = extent;
                 extentex.Expand(Math.Max(1.0, extent.Size / 100.0)); // um zu vermeiden, dass die Box in einer Richtung die Dicke 0 hat (selbst 0.5 ist zu wenig)
                 // bei zweidimensionalen Zeichnungen, die sehr groß sind, muss das Z im Verhältnis stehen, sonst sieht man die Markierung nicht
                 if (projdir.x > 0)
@@ -1197,7 +1197,7 @@ namespace CADability
                 return clientRect.Height;
             }
         }
-        public double[,] GetOpenGLProjection(int left, int right, int bottom, int top, BoundingCube extend)
+        public double[,] GetOpenGLProjection(int left, int right, int bottom, int top, BoundingBox extend)
         {
             if (clientRect.Width != right - left || clientRect.Height != top - bottom || !this.extent.Equals(extend))
             {

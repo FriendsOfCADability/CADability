@@ -288,7 +288,7 @@ namespace CADability.GeoObject
             double corr = 0.0;
             foreach (Face fc in Faces)
             {
-                fc.GetTriangulation(precision, out GeoPoint[] trianglePoint, out GeoPoint2D[] triangleUVPoint, out int[] triangleIndex, out BoundingCube triangleExtent);
+                fc.GetTriangulation(precision, out GeoPoint[] trianglePoint, out GeoPoint2D[] triangleUVPoint, out int[] triangleIndex, out BoundingBox triangleExtent);
                 if (triangleIndex == null) continue;
                 // tried to use normals for correction, but the distance from plane had better results
                 //GeoVector[] triangleNormals = new GeoVector[triangleUVPoint.Length];
@@ -1418,9 +1418,9 @@ namespace CADability.GeoObject
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
         /// </summary>
         /// <returns></returns>
-        public override BoundingCube GetBoundingCube()
+        public override BoundingBox GetBoundingCube()
         {
-            BoundingCube res = BoundingCube.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingCube;
             for (int i = 0; i < faces.Length; ++i)
             {
                 if (faces[i].Surface is NurbsSurface)
@@ -1587,12 +1587,12 @@ namespace CADability.GeoObject
                 this.o = o;
             }
 
-            BoundingCube IOctTreeInsertable.GetExtent(double precision)
+            BoundingBox IOctTreeInsertable.GetExtent(double precision)
             {
-                return new BoundingCube(v, precision);
+                return new BoundingBox(v, precision);
             }
 
-            bool IOctTreeInsertable.HitTest(ref BoundingCube cube, double precision)
+            bool IOctTreeInsertable.HitTest(ref BoundingBox cube, double precision)
             {
                 return cube.Contains(v);
             }
@@ -1643,7 +1643,7 @@ namespace CADability.GeoObject
         /// <param name="dontCheck"></param>
         /// <param name="precision"></param>
         /// <returns></returns>
-        private List<Face> CombineCommonSurfaceFaces(HashSet<Face> faces, HashSet<Face> subsetForTest, BoundingCube extent, HashSet<Type> dontCheck, double precision)
+        private List<Face> CombineCommonSurfaceFaces(HashSet<Face> faces, HashSet<Face> subsetForTest, BoundingBox extent, HashSet<Type> dontCheck, double precision)
         {
             if (dontCheck == null) dontCheck = new HashSet<Type>(); // empty set
             if (subsetForTest == null) subsetForTest = faces; // use all faces for the test
@@ -1653,7 +1653,7 @@ namespace CADability.GeoObject
             GeoObjectList dbgfaces = new GeoObjectList();
             HashSet<Vertex> dbgvtx = new HashSet<Vertex>();
             HashSet<Edge> dbgedg = new HashSet<Edge>();
-            BoundingCube dbgext = BoundingCube.EmptyBoundingCube;
+            BoundingBox dbgext = BoundingBox.EmptyBoundingCube;
             foreach (Face fc in subsetForTest)
             {
                 dbgfaces.Add(fc.Clone());
@@ -1683,11 +1683,11 @@ namespace CADability.GeoObject
             // We test for PlanarSurface, CylindricalSurface, ConicalSurface, SphereicalSurface and ToriodalSurface
             Dictionary<Edge, Edge> newEdges = new Dictionary<Edge, Edge>();
             List<Face> res = new List<Face>();
-            OctTree<VectorInOctTree> normals = new OctTree<VectorInOctTree>(new BoundingCube(new GeoPoint(1e-5, 1e-5, 1e-5), 1.1), 1e-6); // octtree around the unit cube,
+            OctTree<VectorInOctTree> normals = new OctTree<VectorInOctTree>(new BoundingBox(new GeoPoint(1e-5, 1e-5, 1e-5), 1.1), 1e-6); // octtree around the unit cube,
                                                                                                                                           // to collect the normals of all faces. This help to classify the faces
                                                                                                                                           // a little bit excentric to collect vetors close to the unit (axis, e.g.: (0,0,1)) in a single OctTree box.
             List<GeoPoint> ndirs = new List<GeoPoint>(); // all normals (on the unit sphere) to check, whether there is a cylinder or cone
-            BoundingCube next = BoundingCube.EmptyBoundingCube;
+            BoundingBox next = BoundingBox.EmptyBoundingCube;
             foreach (Face fc in subsetForTest)
             {
                 GeoPoint pus = GeoPoint.Origin + (fc.Surface as PlaneSurface).Normal.Normalized; // normal as a point on the unit sphere
@@ -1825,7 +1825,7 @@ namespace CADability.GeoObject
                             pnts.Add(vtx.Position);
                         }
                         Plane pln = Plane.FromPoints(pnts.ToArray(), out double maxDist, out bool isLinear);
-                        BoundingCube pntsExt = new BoundingCube(pnts.ToArray()); // as a meassure for precision
+                        BoundingBox pntsExt = new BoundingBox(pnts.ToArray()); // as a meassure for precision
                         bool ok;
                         if (pnts.Count < 6)
                         {
@@ -2572,17 +2572,17 @@ namespace CADability.GeoObject
         /// </summary>
         /// <param name="precision"></param>
         /// <returns></returns>
-        public override BoundingCube GetExtent(double precision)
+        public override BoundingBox GetExtent(double precision)
         {
             return GetBoundingCube();
         }
         /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
+        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingBox, double)"/>
         /// </summary>
         /// <param name="cube"></param>
         /// <param name="precision"></param>
         /// <returns></returns>
-        public override bool HitTest(ref BoundingCube cube, double precision)
+        public override bool HitTest(ref BoundingBox cube, double precision)
         {
             foreach (Face fc in Faces)
             {
@@ -3224,7 +3224,7 @@ namespace CADability.GeoObject
             else
             {
                 GeoPoint cnt = new GeoPoint(pointsForGaussNewton.ToArray());
-                BoundingCube ext = new BoundingCube(pointsForGaussNewton.ToArray());
+                BoundingBox ext = new BoundingBox(pointsForGaussNewton.ToArray());
                 double bestPrecision = double.MaxValue;
                 double error = GaussNewtonMinimizer.CylinderFit(new ListToIArray<GeoPoint>(pointsForGaussNewton), cnt, GeoVector.XAxis, ext.Size, Precision.eps, out CylindricalSurface cyx);
                 if (error < Precision.eps && error < bestPrecision)
@@ -3426,7 +3426,7 @@ namespace CADability.GeoObject
             }
             if (correctOriented == null)
             {
-                BoundingCube ext = GetExtent(0.0);
+                BoundingBox ext = GetExtent(0.0);
                 ext.Expand(ext.Size * 0.1);
                 GeoPoint[] extpnts = ext.Points;
                 GeoPoint cnt = ext.GetCenter();
@@ -3514,12 +3514,12 @@ namespace CADability.GeoObject
                 this.face.Add(face);
             }
 
-            BoundingCube IOctTreeInsertable.GetExtent(double precision)
+            BoundingBox IOctTreeInsertable.GetExtent(double precision)
             {
-                return new BoundingCube(p3d);
+                return new BoundingBox(p3d);
             }
 
-            bool IOctTreeInsertable.HitTest(ref BoundingCube cube, double precision)
+            bool IOctTreeInsertable.HitTest(ref BoundingBox cube, double precision)
             {
                 return cube.Contains(p3d);
             }
@@ -3550,9 +3550,9 @@ namespace CADability.GeoObject
                 this.alltrianglePoints = alltrianglePoints;
             }
 
-            BoundingCube IOctTreeInsertable.GetExtent(double precision)
+            BoundingBox IOctTreeInsertable.GetExtent(double precision)
             {
-                return new CADability.BoundingCube(alltrianglePoints[i1], alltrianglePoints[i2]);
+                return new CADability.BoundingBox(alltrianglePoints[i1], alltrianglePoints[i2]);
             }
 
             bool IOctTreeInsertable.HitTest(Projection.PickArea area, bool onlyInside)
@@ -3560,7 +3560,7 @@ namespace CADability.GeoObject
                 throw new NotImplementedException();
             }
 
-            bool IOctTreeInsertable.HitTest(ref BoundingCube cube, double precision)
+            bool IOctTreeInsertable.HitTest(ref BoundingBox cube, double precision)
             {
                 GeoPoint p1 = alltrianglePoints[i1];
                 GeoPoint p2 = alltrianglePoints[i2];
@@ -3587,7 +3587,7 @@ namespace CADability.GeoObject
                 GeoPoint[] trianglePoint;
                 GeoPoint2D[] triangleUVPoint;
                 int[] triangleIndex;
-                BoundingCube triangleExtent;
+                BoundingBox triangleExtent;
                 fc.GetTriangulation(precision, out trianglePoint, out triangleUVPoint, out triangleIndex, out triangleExtent);
                 if (trianglePoint != null)
                 {
@@ -3658,7 +3658,7 @@ namespace CADability.GeoObject
 
         private Shell GetRawOffset(double dist, Dictionary<Edge, Edge> parallelEdges = null)
         {
-            BoundingCube ext = GetExtent(0.0);
+            BoundingBox ext = GetExtent(0.0);
             ext.Expand(dist);
             double prec = ext.Size * 1e-6;
             Edge[] allEdges = Edges;
@@ -3724,7 +3724,7 @@ namespace CADability.GeoObject
                     GeoPoint[] trianglePoint;
                     GeoPoint2D[] triangleUVPoint;
                     int[] triangleIndex;
-                    BoundingCube triangleExtent;
+                    BoundingBox triangleExtent;
                     offsetFace.GetTriangulation(0.9, out trianglePoint, out triangleUVPoint, out triangleIndex, out triangleExtent);
 #endif
                     if (parallelEdges != null)
@@ -4083,7 +4083,7 @@ namespace CADability.GeoObject
                         GeoPoint[] trianglePoint;
                         GeoPoint2D[] triangleUVPoint;
                         int[] triangleIndex;
-                        BoundingCube triangleExtent;
+                        BoundingBox triangleExtent;
                         connectingFace.GetTriangulation(0.1, out trianglePoint, out triangleUVPoint, out triangleIndex, out triangleExtent);
 #endif
                     }
@@ -4262,8 +4262,8 @@ namespace CADability.GeoObject
                         bool replaced = false;
                         Vertex svedg = edg.StartVertex(edg.PrimaryFace);
                         Vertex evedg = edg.EndVertex(edg.PrimaryFace);
-                        Vertex[] sv = vertexOctTree.GetObjectsFromBox(new BoundingCube(svedg.Position, 2 * prec));
-                        Vertex[] ev = vertexOctTree.GetObjectsFromBox(new BoundingCube(evedg.Position, 2 * prec));
+                        Vertex[] sv = vertexOctTree.GetObjectsFromBox(new BoundingBox(svedg.Position, 2 * prec));
+                        Vertex[] ev = vertexOctTree.GetObjectsFromBox(new BoundingBox(evedg.Position, 2 * prec));
                         for (int j = 0; j < sv.Length; j++)
                         {
                             for (int k = 0; k < ev.Length; k++)
@@ -4712,7 +4712,7 @@ namespace CADability.GeoObject
             {
                 DebuggerContainer res = new DebuggerContainer();
                 ColorDef cd = new ColorDef("normal", Color.BlueViolet);
-                BoundingCube bc = this.GetExtent(0.1);
+                BoundingBox bc = this.GetExtent(0.1);
                 foreach (Face fc in Faces)
                 {
                     res.Add(fc, fc.GetHashCode());
@@ -4929,7 +4929,7 @@ namespace CADability.GeoObject
             this.faces = allfaces.ToArray(); // changing muss außerhalb passieren
 
             //List<Edge> edges = new List<Edge>(toReplace.AllEdges);
-            //BoundingCube ext = toReplace.GetExtent(0.0);
+            //BoundingBox ext = toReplace.GetExtent(0.0);
             //OctTree<Vertex> ovtx = new OctTree<Vertex>(ext, ext.Size * 1e-6);
             //Vertex[] vtx = toReplace.Vertices;
             //for (int i = 0; i < vtx.Length; i++)
@@ -4960,7 +4960,7 @@ namespace CADability.GeoObject
         public static void ConnectFaces(Face[] toConnect, double precision)
         {
             HashSet<Vertex> toAdd = new HashSet<Vertex>(); // alle vertices von offenen Kanten
-            BoundingCube ext = BoundingCube.EmptyBoundingCube;
+            BoundingBox ext = BoundingBox.EmptyBoundingCube;
             for (int i = 0; i < toConnect.Length; i++)
             {
                 foreach (Edge edg in toConnect[i].Edges)
@@ -4985,7 +4985,7 @@ namespace CADability.GeoObject
             {
                 Vertex vtx = allVertices.First();
                 allVertices.Remove(vtx);
-                Vertex[] hits = ovtx.GetObjectsFromBox(new BoundingCube(vtx.Position, precision), null);
+                Vertex[] hits = ovtx.GetObjectsFromBox(new BoundingBox(vtx.Position, precision), null);
                 for (int i = 0; i < hits.Length; i++)
                 {
                     if (hits[i] != vtx && (hits[i].Position | vtx.Position) < precision)
@@ -5653,7 +5653,7 @@ namespace CADability.GeoObject
         }
         public void RecalcVertices()
         {
-            BoundingCube ext = GetExtent(0.0);
+            BoundingBox ext = GetExtent(0.0);
             ext.Expand(ext.Size * 1e-3);
             double prec = ext.Size * 1e-8;
             OctTree<Vertex> vertexOctTree = new OctTree<Vertex>(ext, prec);
@@ -5661,7 +5661,7 @@ namespace CADability.GeoObject
             for (int i = 0; i < allVertices.Length; i++)
             {
                 bool duplicateFound = false;
-                Vertex[] close = vertexOctTree.GetObjectsFromBox(new BoundingCube(allVertices[i].Position, prec));
+                Vertex[] close = vertexOctTree.GetObjectsFromBox(new BoundingBox(allVertices[i].Position, prec));
                 for (int j = 0; j < close.Length; j++)
                 {
                     if ((allVertices[i].Position | close[j].Position) < prec)
@@ -5878,8 +5878,8 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public bool SameForm(Shell other, double precision, out ModOp translation)
         {
-            BoundingCube ext1 = this.GetExtent(precision / 2.0);
-            BoundingCube ext2 = other.GetExtent(precision / 2.0);
+            BoundingBox ext1 = this.GetExtent(precision / 2.0);
+            BoundingBox ext2 = other.GetExtent(precision / 2.0);
             translation = ModOp.Translate(ext1.GetCenter() - ext2.GetCenter()); // sh2 wird verschoben und passt damit auf sh1
             if (Math.Abs(ext1.XDiff - ext2.XDiff) > precision) return false;
             if (Math.Abs(ext1.YDiff - ext2.YDiff) > precision) return false;
@@ -5935,7 +5935,7 @@ namespace CADability.GeoObject
         {   // für FST (Montanari) geschrieben
             List<Face[]> res = new List<Face[]>();
             HashSet<Face> formSet = new HashSet<Face>(form); // zum schnellen entscheiden, ob in der Form oder nicht
-            BoundingCube ext = GetExtent(precision);
+            BoundingBox ext = GetExtent(precision);
             OctTree<Face> octtree = new OctTree<Face>(ext, precision); // mit allen faces außer den in form gegebenen
             for (int i = 0; i < faces.Length; i++)
             {
@@ -5943,11 +5943,11 @@ namespace CADability.GeoObject
                 octtree.AddObject(faces[i]);
             }
             Face biggestFace = null;
-            BoundingCube currentExt = BoundingCube.EmptyBoundingCube;
+            BoundingBox currentExt = BoundingBox.EmptyBoundingCube;
             double maxSize = 0.0;
             for (int i = 0; i < form.Length; i++)
             {
-                BoundingCube e = form[i].GetExtent(precision);
+                BoundingBox e = form[i].GetExtent(precision);
                 double size = e.Size; // mit dem Volumen macht keinen Sinn, denn ebene Faces haben Volumen 0.0
                 if (size > maxSize)
                 {
@@ -5981,7 +5981,7 @@ namespace CADability.GeoObject
             for (int i = 0; i < candidates.Length; i++)
             {
                 dbg.Add(candidates[i]);
-                BoundingCube cext = candidates[i].GetExtent(precision);
+                BoundingBox cext = candidates[i].GetExtent(precision);
                 double size = cext.Size;
                 if (Math.Abs(size - maxSize) < 3 * precision)
                 {
@@ -6021,7 +6021,7 @@ namespace CADability.GeoObject
                 for (int j = 0; j < form.Length; j++)
                 {
                     if (form[j] == biggestFace) continue;
-                    BoundingCube bcform = form[j].GetBoundingCube();
+                    BoundingBox bcform = form[j].GetBoundingCube();
                     Face[] close = octtree.GetObjectsFromBox(bcform.Modify(translation[i]));
 #if DEBUG
                     GeoObjectList dbgcl = new GeoObject.GeoObjectList(close);

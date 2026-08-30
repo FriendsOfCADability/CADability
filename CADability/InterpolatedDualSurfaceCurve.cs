@@ -1105,7 +1105,7 @@ namespace CADability
 #endif
         internal void Repair(BoundingRect bounds1, BoundingRect bounds2)
         {
-            BoundingCube ext = BoundingCube.EmptyBoundingCube;
+            BoundingBox ext = BoundingBox.EmptyBoundingCube;
             for (int i = 0; i < basePoints.Length; i++) ext.MinMax(basePoints[i].p3d);
             double eps = ext.Size * 1e-5;
             bool needsRepair = false;
@@ -1605,9 +1605,9 @@ namespace CADability
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
         /// </summary>
         /// <returns></returns>
-        public override BoundingCube GetBoundingCube()
+        public override BoundingBox GetBoundingCube()
         {
-            BoundingCube res = new BoundingCube();
+            BoundingBox res = new BoundingBox();
             for (int i = 0; i < basePoints.Length; ++i)
             {
                 res.MinMax(basePoints[i].p3d);
@@ -1637,9 +1637,9 @@ namespace CADability
         /// </summary>
         /// <param name="precision"></param>
         /// <returns></returns>
-        public override BoundingCube GetExtent(double precision)
+        public override BoundingBox GetExtent(double precision)
         {
-            BoundingCube res = BoundingCube.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingCube;
             for (int i = 0; i < basePoints.Length; ++i)
             {
                 res.MinMax(basePoints[i].p3d);
@@ -1665,7 +1665,7 @@ namespace CADability
             }
             return res;
         }
-        //public override bool HitTest(ref BoundingCube cube, double precision)
+        //public override bool HitTest(ref BoundingBox cube, double precision)
         //{   // soll in GeneralCurve mit TetraederHülle gemacht werden, vorläufig:
         //    for (int i = 0; i < basePoints.Length - 1; ++i)
         //    {

@@ -6653,7 +6653,7 @@ namespace CADability.Actions
 			{
 				if (vw is IActionInputView)
 				{
-					(vw as IActionInputView).SetAdditionalExtent(BoundingCube.EmptyBoundingCube);
+					(vw as IActionInputView).SetAdditionalExtent(BoundingBox.EmptyBoundingCube);
 				}
 			}
 

@@ -77,7 +77,7 @@ namespace CADability.Tests
             public void Point2D(int x, int y) { }
             public void DisplayIcon(GeoPoint p, Bitmap icon) { }
             public void DisplayBitmap(GeoPoint p, Bitmap bitmap) { }
-            public void SetProjection(Projection projection, BoundingCube boundingCube) { }
+            public void SetProjection(Projection projection, BoundingBox boundingCube) { }
             public void Clear(Color background) { }
             public void Resize(int width, int height) { }
             public void OpenList(string name = null) { }

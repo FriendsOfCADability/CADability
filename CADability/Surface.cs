@@ -313,12 +313,12 @@ namespace CADability.GeoObject
         /// <param name="vmin">Minimum for the v parameter</param>
         /// <param name="vmax">Maximum for the v parameter</param>
         /// <returns>true if the cube and the surface interfere</returns>
-        bool HitTest(BoundingCube cube, double umin, double umax, double vmin, double vmax);
+        bool HitTest(BoundingBox cube, double umin, double umax, double vmin, double vmax);
         /// <summary>
         /// Returns true, if this surface interferes with the provided cube. If this is the case
         /// uv will contain a point (in the parameter system of the surface) which is inside the cube
         /// </summary>
-        bool HitTest(BoundingCube cube, out GeoPoint2D uv);
+        bool HitTest(BoundingBox cube, out GeoPoint2D uv);
         /// <summary>
         /// Returns true, if this surface divides the space into two parts. If the surfaces is Oriented 
         /// <see cref="Orientation"/> returns a valid result
@@ -346,7 +346,7 @@ namespace CADability.GeoObject
         /// <param name="vmin"></param>
         /// <param name="vmax"></param>
         /// <returns></returns>
-        BoundingCube GetPatchExtent(BoundingRect uvPatch, bool rough = false);
+        BoundingBox GetPatchExtent(BoundingRect uvPatch, bool rough = false);
         /// <summary>
         /// Returns a curve where the u parameter of this surface is fixed and the v parameter starts a vmin and ends at vmax
         /// </summary>
@@ -3424,7 +3424,7 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.HitTest (BoundingCube, double, double, double, double)"/>
+        /// Implements <see cref="CADability.GeoObject.ISurface.HitTest (BoundingBox, double, double, double, double)"/>
         /// </summary>
         /// <param name="cube"></param>
         /// <param name="umin"></param>
@@ -3432,17 +3432,17 @@ namespace CADability.GeoObject
         /// <param name="vmin"></param>
         /// <param name="vmax"></param>
         /// <returns></returns>
-        public virtual bool HitTest(BoundingCube cube, double umin, double umax, double vmin, double vmax)
+        public virtual bool HitTest(BoundingBox cube, double umin, double umax, double vmin, double vmax)
         {
             throw new NotImplementedException("HitTest must be implemented");
         }
         /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.HitTest (BoundingCube, out GeoPoint2D)"/>
+        /// Implements <see cref="CADability.GeoObject.ISurface.HitTest (BoundingBox, out GeoPoint2D)"/>
         /// </summary>
         /// <param name="cube"></param>
         /// <param name="uv"></param>
         /// <returns></returns>
-        public virtual bool HitTest(BoundingCube cube, out GeoPoint2D uv)
+        public virtual bool HitTest(BoundingBox cube, out GeoPoint2D uv)
         {
             Polynom implicitSurface = GetImplicitPolynomial();
             uv = GeoPoint2D.Origin;
@@ -3542,7 +3542,7 @@ namespace CADability.GeoObject
             }
             return this.BoxedSurfaceEx.HitTest(cube, out uv);
         }
-        private bool DebugNewHitTest(BoundingCube cube, out GeoPoint2D uv)
+        private bool DebugNewHitTest(BoundingBox cube, out GeoPoint2D uv)
         {
             Polynom implicitSurface = GetImplicitPolynomial();
             uv = GeoPoint2D.Origin;
@@ -3739,9 +3739,9 @@ namespace CADability.GeoObject
         /// </summary>
         /// <param name="uvPatch"></param>
         /// <returns></returns>
-        public virtual BoundingCube GetPatchExtent(BoundingRect uvPatch, bool rough)
+        public virtual BoundingBox GetPatchExtent(BoundingRect uvPatch, bool rough)
         {   // kann natürlich in den einzelnen flächen besser gelöst werden
-            BoundingCube res = BoundingCube.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingCube;
             GeoPoint2D[] extr = GetExtrema();
             for (int i = 0; i < extr.Length; ++i)
             {
@@ -5200,12 +5200,12 @@ namespace CADability.GeoObject
 
         #region IOctTreeInsertable Members
 
-        BoundingCube IOctTreeInsertable.GetExtent(double precision)
+        BoundingBox IOctTreeInsertable.GetExtent(double precision)
         {   // IOctTreeInsertable wird nur verwendet um octtree.GetObjectsCloseTo aufzurufen, das sollte keinen extent verlangen
             throw new Exception("The method or operation is not implemented.");
         }
 
-        bool IOctTreeInsertable.HitTest(ref BoundingCube cube, double precision)
+        bool IOctTreeInsertable.HitTest(ref BoundingBox cube, double precision)
         {
             GeoPoint2D uv;
             return HitTest(cube, out uv);
@@ -6400,7 +6400,7 @@ namespace CADability.GeoObject
         {
             Face fc1 = Face.MakeFace(surface1, new SimpleShape(ext1.ToBorder()));
             Face fc2 = Face.MakeFace(surface2, new SimpleShape(ext2.ToBorder()));
-            BoundingCube ext = fc1.GetExtent(0.0) + fc1.GetExtent(0.0);
+            BoundingBox ext = fc1.GetExtent(0.0) + fc1.GetExtent(0.0);
             bool found = false;
             GeoPoint seed = GeoPoint.Invalid;
             bool SplitTestFunction(OctTree<Face>.Node<Face> node, Face objectToAdd)
@@ -7031,7 +7031,7 @@ namespace CADability.GeoObject
     }
 
     /// <summary>
-    /// Ein Klasse, die ein Surface Objekt mit Würfeln einhüllt: Jeder Patch hat einen BoundingCube. Alle BoundingCubes
+    /// Ein Klasse, die ein Surface Objekt mit Würfeln einhüllt: Jeder Patch hat einen BoundingBox. Alle BoundingCubes
     /// sind in einem OctTree enthalten. Wenn ein Würfelchen verkleinert werden muss, dann wird es aus dem
     /// OctTree entfernt und die kleinen werden eingefügt. Die Würfelchen können sich überlappen
     /// </summary>
@@ -7043,17 +7043,17 @@ namespace CADability.GeoObject
         }
         class Cube : IOctTreeInsertable
         {   // 
-            public BoundingCube boundingCube;
+            public BoundingBox boundingCube;
             public BoundingRect uvPatch;
             public GeoPoint pll, plr, pul, pur; // die 4 Eckpunkte und die 4 Richtungen
             public GeoVector nll, nlr, nul, nur; // die Normalen in den Ecken
                                                  // hier auch noch die 4 Eckpunkte speichern, die werden vermutlich auch öfter gebraucht
             #region IOctTreeInsertable Members
-            BoundingCube IOctTreeInsertable.GetExtent(double precision)
+            BoundingBox IOctTreeInsertable.GetExtent(double precision)
             {
                 return boundingCube;
             }
-            bool IOctTreeInsertable.HitTest(ref BoundingCube cube, double precision)
+            bool IOctTreeInsertable.HitTest(ref BoundingBox cube, double precision)
             {
                 return cube.Interferes(boundingCube);
             }
@@ -7171,13 +7171,13 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
-        /// Stellt fest, ob die Fläche von dem BoundingCube getroffen wird und wenn ja liefert es einen inneren Flächenpunkt
+        /// Stellt fest, ob die Fläche von dem BoundingBox getroffen wird und wenn ja liefert es einen inneren Flächenpunkt
         /// zurück. Der OctTree wird bei deiser Gelegenheit u.U. verfeinert
         /// </summary>
         /// <param name="test"></param>
         /// <param name="uv"></param>
         /// <returns></returns>
-        public bool HitTest(BoundingCube test, out GeoPoint2D uv)
+        public bool HitTest(BoundingBox test, out GeoPoint2D uv)
         {
             Cube[] hits = octtree.GetObjectsFromBox(test);
             List<Cube> untested = new List<Cube>();
@@ -7210,7 +7210,7 @@ namespace CADability.GeoObject
             uv = GeoPoint2D.Origin;
             return false;
         }
-        private bool SplitHit(Cube toSplit, BoundingCube test, out GeoPoint2D uv, List<Cube> unknown)
+        private bool SplitHit(Cube toSplit, BoundingBox test, out GeoPoint2D uv, List<Cube> unknown)
         {
             // Teile toSplit auf bis entweder ein Treffer mit test gefunden ist
             // oder keine Überschneidung mehr da ist
@@ -7259,7 +7259,7 @@ namespace CADability.GeoObject
                 double size = octtree.Extend.Size / 10000;
                 while (cubes.Length == 0)
                 {
-                    cubes = octtree.GetObjectsFromBox(new BoundingCube(p3d, size));
+                    cubes = octtree.GetObjectsFromBox(new BoundingBox(p3d, size));
                     size *= 2.0;
                 }
             }
@@ -8580,7 +8580,7 @@ namespace CADability.GeoObject
 
 
     /// <summary>
-    /// Ein Klasse, die ein Surface Objekt mit Würfeln einhüllt: Jeder Patch hat einen BoundingCube. Alle BoundingCubes
+    /// Ein Klasse, die ein Surface Objekt mit Würfeln einhüllt: Jeder Patch hat einen BoundingBox. Alle BoundingCubes
     /// sind in einem OctTree enthalten. Wenn ein Würfelchen verkleinert werden muss, dann wird es aus dem
     /// OctTree entfernt und die kleinen werden eingefügt. Die Würfelchen können sich überlappen
     /// </summary>
@@ -8615,12 +8615,12 @@ namespace CADability.GeoObject
 #endif
             }
             #region IOctTreeInsertable Members
-            BoundingCube IOctTreeInsertable.GetExtent(double precision)
+            BoundingBox IOctTreeInsertable.GetExtent(double precision)
             {
                 GeoPoint locz = loc + normal;
-                return new BoundingCube(loc, loc + diru, loc + dirv, loc + diru + dirv, locz, locz + diru, locz + dirv, locz + diru + dirv);
+                return new BoundingBox(loc, loc + diru, loc + dirv, loc + diru + dirv, locz, locz + diru, locz + dirv, locz + diru + dirv);
             }
-            bool IOctTreeInsertable.HitTest(ref BoundingCube cube, double precision)
+            bool IOctTreeInsertable.HitTest(ref BoundingBox cube, double precision)
             {
                 return cube.Interferes(loc, diru, dirv, normal);
             }
@@ -8667,7 +8667,7 @@ namespace CADability.GeoObject
                 }
                 else
                 {
-                    return BoundingCube.UnitBoundingCube.Interferes(toUnit * startPoint, toUnit * direction, maxdist, onlyForward);
+                    return BoundingBox.UnitBoundingBox.Interferes(toUnit * startPoint, toUnit * direction, maxdist, onlyForward);
                 }
             }
             public bool Interferes(GeoPoint startPoint, GeoPoint endPoint)
@@ -8691,14 +8691,14 @@ namespace CADability.GeoObject
                 {
                     startPoint = toUnit * startPoint;
                     endPoint = toUnit * endPoint;
-                    return BoundingCube.UnitBoundingCube.Interferes(ref startPoint, ref endPoint);
+                    return BoundingBox.UnitBoundingBox.Interferes(ref startPoint, ref endPoint);
                 }
             }
             public bool ClipLine(ref GeoPoint sp, ref GeoPoint ep)
             {
                 GeoPoint usp = toUnit * sp;
                 GeoPoint uep = toUnit * ep;
-                if (BoundingCube.UnitBoundingCube.ClipLine(ref usp, ref uep))
+                if (BoundingBox.UnitBoundingBox.ClipLine(ref usp, ref uep))
                 {
                     ModOp inv = toUnit.GetInverse();
                     sp = inv * usp;
@@ -8761,17 +8761,17 @@ namespace CADability.GeoObject
                     return GetSolid();
                 }
             }
-            internal BoundingCube BoundingCube
+            internal BoundingBox BoundingBox
             {
                 get
                 {
                     GeoPoint locz = loc + normal;
-                    return new BoundingCube(loc, loc + diru, loc + dirv, loc + diru + dirv, locz, locz + diru, locz + dirv, locz + diru + dirv);
+                    return new BoundingBox(loc, loc + diru, loc + dirv, loc + diru + dirv, locz, locz + diru, locz + dirv, locz + diru + dirv);
                 }
             }
             internal bool Interferes(GeoPoint tb1, GeoPoint tb2, GeoPoint t3, GeoPoint t4)
             {   // Test mit Tetraeder
-                return BoundingCube.UnitBoundingCube.Interferes(toUnit * tb1, toUnit * tb2, toUnit * t3, toUnit * t4);
+                return BoundingBox.UnitBoundingBox.Interferes(toUnit * tb1, toUnit * tb2, toUnit * t3, toUnit * t4);
             }
             internal bool Interferes(ParEpi other)
             {
@@ -8794,14 +8794,14 @@ namespace CADability.GeoObject
                         return other.Interferes(this);
                     }
                 }
-                return BoundingCube.UnitBoundingCube.Interferes(toUnit * other.loc, toUnit * other.diru, toUnit * other.dirv, toUnit * other.normal);
+                return BoundingBox.UnitBoundingBox.Interferes(toUnit * other.loc, toUnit * other.diru, toUnit * other.dirv, toUnit * other.normal);
             }
             internal bool Interferes(ICurve curve, double u1, double u2, GeoPoint tb1, GeoPoint tb2, GeoPoint t3, GeoPoint t4)
             {   // geht das Kurvenstück durch diesen ParEpi?
                 // Endpunkte werden zu oft getestet, private Methode ohne Endpunkttest machen!
                 if (!Interferes(tb1, tb2, t3, t4)) return false;
-                if (BoundingCube.UnitBoundingCube.Contains(toUnit * tb1)) return true;
-                if (BoundingCube.UnitBoundingCube.Contains(toUnit * tb2)) return true;
+                if (BoundingBox.UnitBoundingBox.Contains(toUnit * tb1)) return true;
+                if (BoundingBox.UnitBoundingBox.Contains(toUnit * tb2)) return true;
                 // Start u. Endpunkt nicht drin, wohl aber das Thetraeder, da heißt es aufteilen
                 if (u2 - u1 > 1e-3)
                 {
@@ -8814,7 +8814,7 @@ namespace CADability.GeoObject
             }
             internal bool Contains(GeoPoint p)
             {
-                return BoundingCube.UnitBoundingCube.Contains(toUnit * p);
+                return BoundingBox.UnitBoundingBox.Contains(toUnit * p);
             }
 
             /// <summary>
@@ -9362,7 +9362,7 @@ namespace CADability.GeoObject
                 if (m.IsValid())
                 {
                     // zunächst verwenden wir einen Kubus, da hier die minima/maxima einfacher zu bestimmen sind
-                    BoundingCube bc = new BoundingCube(m * pll, m * plr, m * pul, m * pur);
+                    BoundingBox bc = new BoundingBox(m * pll, m * plr, m * pul, m * pur);
                     // bestimme minima und maxima in alle 6 Richtungen
                     GeoVector[] dirs = new GeoVector[6];
                     dirs[0] = normal;
@@ -9411,7 +9411,7 @@ namespace CADability.GeoObject
 
                     // TEST:
                     //m = Matrix.RowVector(cube.diru, cube.dirv, cube.normal).Inverse();
-                    //bc = new BoundingCube(cube.toUnit * cube.pll, cube.toUnit * cube.plr, cube.toUnit * cube.pul, cube.toUnit * cube.pur);
+                    //bc = new BoundingBox(cube.toUnit * cube.pll, cube.toUnit * cube.plr, cube.toUnit * cube.pul, cube.toUnit * cube.pur);
                 }
                 else
                 {   // wenigstens zwei Vektoren sind linear abhängig, das sollte nicht vorkommen
@@ -9495,7 +9495,7 @@ namespace CADability.GeoObject
                 try
                 {
                     Matrix m = (Matrix)DenseMatrix.OfColumnArrays(cube.diru, cube.dirv, cube.normal).Inverse();
-                    BoundingCube bc = new BoundingCube(m * cube.pll, m * cube.plr, m * cube.pul, m * cube.pur);
+                    BoundingBox bc = new BoundingBox(m * cube.pll, m * cube.plr, m * cube.pul, m * cube.pur);
                     // für die neue Methode (7.7.2016)
                     //                GeoPoint2D found;
                     //                bool innerMaximum = false;
@@ -9614,9 +9614,9 @@ namespace CADability.GeoObject
                     cube.toUnit.SetData(m, m * (-cube.loc));
 
 #if DEBUGx
-                    BoundingCube dbgext = new BoundingCube(cube.pll, cube.plr, cube.pul, cube.pur);
+                    BoundingBox dbgext = new BoundingBox(cube.pll, cube.plr, cube.pul, cube.pur);
                     // System.Diagnostics.Trace.WriteLine("ParallelEpiped " + cube.id.ToString() + ": " + cube.Volume.ToString());
-                    //if (dbgext.Size < cube.BoundingCube.Size * 0.01)
+                    //if (dbgext.Size < cube.BoundingBox.Size * 0.01)
                     if (cube.Volume > 1000)
                     {
                         GeoObjectList dbgl = new GeoObjectList();
@@ -9646,7 +9646,7 @@ namespace CADability.GeoObject
 
                     // TEST:
                     //m = Matrix.RowVector(cube.diru, cube.dirv, cube.normal).Inverse();
-                    bc = new BoundingCube(cube.toUnit * cube.pll, cube.toUnit * cube.plr, cube.toUnit * cube.pul, cube.toUnit * cube.pur);
+                    bc = new BoundingBox(cube.toUnit * cube.pll, cube.toUnit * cube.plr, cube.toUnit * cube.pul, cube.toUnit * cube.pur);
                 }
                 catch (System.ApplicationException)
                 {   // die Matrix ist singulär, d.h. aber dass die u und v Richtung parallel sind
@@ -9669,7 +9669,7 @@ namespace CADability.GeoObject
                 }
             }
         }
-        public BoundingCube GetRawExtent()
+        public BoundingBox GetRawExtent()
         {
             return octtree.Extend;
         }
@@ -9696,7 +9696,7 @@ namespace CADability.GeoObject
         /// <param name="test"></param>
         /// <param name="uv"></param>
         /// <returns></returns>
-        public bool HitTest(BoundingCube test, out GeoPoint2D uv)
+        public bool HitTest(BoundingBox test, out GeoPoint2D uv)
         {
             ParEpi[] hits = octtree.GetObjectsFromBox(test);
             List<ParEpi> totest = new List<ParEpi>();
@@ -9862,7 +9862,7 @@ namespace CADability.GeoObject
             extrema = extr.ToArray();
         }
 
-        private bool SplitHit(ParEpi toSplit, BoundingCube test, out GeoPoint2D uv, List<ParEpi> unknown)
+        private bool SplitHit(ParEpi toSplit, BoundingBox test, out GeoPoint2D uv, List<ParEpi> unknown)
         {
             // Teile toSplit auf bis entweder ein Treffer mit test gefunden ist
             // oder keine Überschneidung mehr da ist
@@ -9991,7 +9991,7 @@ namespace CADability.GeoObject
                 double size = octtree.Extend.Size / 10000;
                 while (cubes.Length == 0)
                 {
-                    cubes = octtree.GetObjectsFromBox(new BoundingCube(p3d, size));
+                    cubes = octtree.GetObjectsFromBox(new BoundingBox(p3d, size));
                     size *= 2.0;
                 }
             }
@@ -11235,7 +11235,7 @@ namespace CADability.GeoObject
                 ParEpi[] cubes = octtree.GetObjectsCloseTo(curve as IOctTreeInsertable);
                 for (int j = 0; j < cubes.Length; ++j)
                 {
-                    BoundingCube bc = cubes[j].BoundingCube;
+                    BoundingBox bc = cubes[j].BoundingBox;
                     if (cubes[j].uvPatch.Interferes(ref uvExtent) && (curve as IOctTreeInsertable).HitTest(ref bc, 0.0))
                     {   // only check the relevant cubes
                         // there is a bug: GetCurveIntersection only finds single intersection points where there might be multiple intersections
@@ -11480,7 +11480,7 @@ namespace CADability.GeoObject
                             ParEpi[] splitted = SplitCube(cube);
                             for (int i = 0; i < splitted.Length; ++i)
                             {
-                                BoundingCube bc = splitted[i].BoundingCube;
+                                BoundingBox bc = splitted[i].BoundingBox;
                                 // der Test ist leider recht mager, aber die Kurve mit ToUnit zu modifizieren und dann zu testen ist 
                                 // zu aufwendig. Vielleicht extra interface, welches den Test mit Parallelepiped zulässt machen
                                 if ((curve as IOctTreeInsertable).HitTest(ref bc, 0.0))
@@ -12739,12 +12739,12 @@ namespace CADability.GeoObject
                 return lip;
             }
 
-            BoundingCube IOctTreeInsertable.GetExtent(double precision)
+            BoundingBox IOctTreeInsertable.GetExtent(double precision)
             {
-                return new CADability.BoundingCube(ip);
+                return new CADability.BoundingBox(ip);
             }
 
-            bool IOctTreeInsertable.HitTest(ref BoundingCube cube, double precision)
+            bool IOctTreeInsertable.HitTest(ref BoundingBox cube, double precision)
             {
                 return cube.Contains(ip);
             }

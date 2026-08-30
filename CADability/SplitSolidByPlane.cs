@@ -40,7 +40,7 @@ namespace CADability.Actions
             base.TitleId = "Constr.PlaneIntersection";
             plane = base.ActiveDrawingPlane;
             feedBackPolyLine = Polyline.Construct();
-            BoundingCube ext = toSplit.GetBoundingCube();
+            BoundingBox ext = toSplit.GetBoundingCube();
             width = ext.DiagonalLength;
             height = ext.DiagonalLength;
             base.ActiveObject = feedBackPolyLine;

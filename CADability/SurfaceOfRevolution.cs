@@ -1028,7 +1028,7 @@ namespace CADability.GeoObject
                     return New;
                 }
 
-                BoundingCube bc = BasisCurve.GetExtent();
+                BoundingBox bc = BasisCurve.GetExtent();
                 ICurve2D c2 = new Hyperbola(sp, dir, bc.Ymin, bc.Ymax);
 
                 GeoPoint2DWithParameter[] hps = c2.Intersect(basisCurve2D);
@@ -1232,12 +1232,12 @@ namespace CADability.GeoObject
             //    return e;
         }
         /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.HitTest (BoundingCube, out GeoPoint2D)"/>
+        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.HitTest (BoundingBox, out GeoPoint2D)"/>
         /// </summary>
         /// <param name="bc"></param>
         /// <param name="uv"></param>
         /// <returns></returns>
-        public override bool HitTest(BoundingCube bc, out GeoPoint2D uv)
+        public override bool HitTest(BoundingBox bc, out GeoPoint2D uv)
         {
             if (curveToRotate != null) return base.HitTest(bc, out uv); // new implementation: check special cases
 

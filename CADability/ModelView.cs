@@ -403,7 +403,7 @@ namespace CADability
 		private IGeoObject lastSnapObject;
 		private SnapPointFinder.DidSnapModes lastSnapMode;
 		private double displayPrecision;
-		private BoundingCube additionalExtent;
+		private BoundingBox additionalExtent;
 
 		private BlockRef dragBlock; // ein Symbol wird aus der Bibliothek per DragDrop plaziert
 		public delegate void DisplayChangedDelegate(object sender, DisplayChangeArg displayChangeArg);
@@ -428,7 +428,7 @@ namespace CADability
 			allowDrop = Settings.GlobalSettings.GetBoolValue("AllowDrop", true);
 			allowContextMenu = Settings.GlobalSettings.GetBoolValue("AllowContextMenu", true);
 			displayPrecision = -1.0; // automatisch
-			additionalExtent = BoundingCube.EmptyBoundingCube;
+			additionalExtent = BoundingBox.EmptyBoundingCube;
 		}
 
 		/// <summary>
@@ -774,7 +774,7 @@ namespace CADability
 				paintTo3D.Clear(BackgroundColor);
 				PaintClearEvent?.Invoke(e.ClipRectangle, this, paintTo3D);
 				paintTo3D.UseZBuffer(true);
-				BoundingCube bc = Model.Extent;
+				BoundingBox bc = Model.Extent;
 				bc.MinMax(Model.MinExtend);
 				// sicherstellen, dass die komplette Rasterebene auch mit angezeigt wird
 				BoundingRect ext = BoundingRect.EmptyBoundingRect;
@@ -2027,7 +2027,7 @@ namespace CADability
 			Projection pr = this.Projection;
 			double factor, ddx, ddy;
 			pr.GetPlacement(out factor, out ddx, out ddy);
-			BoundingCube bc = Model.Extent;
+			BoundingBox bc = Model.Extent;
 			bc.MinMax(Model.MinExtend);
 			BoundingRect ext = BoundingRect.EmptyBoundingRect;
 			ext.MinMax(pr.DrawingPlane.Project(new GeoPoint(bc.Xmin, bc.Ymin, bc.Zmin)));
@@ -2616,7 +2616,7 @@ namespace CADability
 			}
 		}
 
-		public void SetAdditionalExtent(BoundingCube bc)
+		public void SetAdditionalExtent(BoundingBox bc)
 		{
 			if (bc.IsEmpty) additionalExtent = bc; // this is the way to clear the additional extent
 			else additionalExtent.MinMax(bc);

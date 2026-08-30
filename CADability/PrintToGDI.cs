@@ -819,7 +819,7 @@ namespace CADability
 #region IQuadTreeInsertable Members
         public override BoundingRect GetExtent()
         {
-            BoundingCube bc = txt.GetBoundingCube();
+            BoundingBox bc = txt.GetBoundingCube();
             return new BoundingRect(bc.Xmin, bc.Ymin, bc.Xmax, bc.Ymax);
         }
         public override bool HitTest(ref BoundingRect rect, bool includeControlPoints)
@@ -2622,7 +2622,7 @@ namespace CADability
                 currentCollectionQuad.AddObject(pb);
             }
         }
-        void IPaintTo3D.SetProjection(Projection projection, BoundingCube boundingCube)
+        void IPaintTo3D.SetProjection(Projection projection, BoundingBox boundingCube)
         {
             throw new NotImplementedException("The method or operation is not implemented.");
         }

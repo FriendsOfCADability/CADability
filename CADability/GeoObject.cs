@@ -277,7 +277,7 @@ namespace CADability.GeoObject
         /// calculate the exact cube.
         /// </summary>
         /// <returns>the bounding cube</returns>
-        BoundingCube GetBoundingCube();
+        BoundingBox GetBoundingCube();
         /// <summary>
         /// When an IGeoObject changes the context that contains the lists of attributes
         /// it must replace its attributes by those given in the new context. If there are
@@ -1414,7 +1414,7 @@ namespace CADability.GeoObject
         /// Must be overridden.
         /// </summary>
         /// <returns>the bounding cube</returns>
-        public abstract BoundingCube GetBoundingCube();
+        public abstract BoundingBox GetBoundingCube();
         /// <summary>
         /// Implements <see cref="IGeoObject.UpdateAttributes"/> for all CADability attributes.
         /// Non CADability attributes are not handled and must be handled if there are any.
@@ -1885,8 +1885,8 @@ namespace CADability.GeoObject
             }
         }
         #region IOctTreeInsertable members
-        public abstract BoundingCube GetExtent(double precision);
-        public abstract bool HitTest(ref BoundingCube cube, double precision);
+        public abstract BoundingBox GetExtent(double precision);
+        public abstract bool HitTest(ref BoundingBox cube, double precision);
         public abstract bool HitTest(Projection projection, BoundingRect rect, bool onlyInside);
         public abstract bool HitTest(Projection.PickArea area, bool onlyInside);
         public abstract double Position(GeoPoint fromHere, GeoVector direction, double precision);
@@ -1960,7 +1960,7 @@ namespace CADability.GeoObject
 #if DEBUG
 #endif
 
-        BoundingCube IFeedBack.GetExtent()
+        BoundingBox IFeedBack.GetExtent()
         {
             return this.GetExtent(1.0);
         }

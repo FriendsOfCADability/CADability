@@ -292,7 +292,7 @@ namespace CADability
 
         }
 
-        void IPaintTo3D.SetProjection(Projection projection, BoundingCube boundingCube)
+        void IPaintTo3D.SetProjection(Projection projection, BoundingBox boundingCube)
         {
 
         }

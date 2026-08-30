@@ -53,7 +53,7 @@ namespace CADability
         private GeoPoint[] trianglePoint;
         private GeoPoint2D[] triangleUVPoint;
         private int[] triangleIndex;
-        private BoundingCube triangleExtent;
+        private BoundingBox triangleExtent;
         public ThickTriangulatedFace(Face face, double precision)
         {
             this.Face = face;
@@ -61,12 +61,12 @@ namespace CADability
         }
         #region IOctTreeInsertable Members
 
-        BoundingCube IOctTreeInsertable.GetExtent(double precision)
+        BoundingBox IOctTreeInsertable.GetExtent(double precision)
         {
             throw new Exception("The method or operation is not implemented.");
         }
 
-        bool IOctTreeInsertable.HitTest(ref BoundingCube cube, double precision)
+        bool IOctTreeInsertable.HitTest(ref BoundingBox cube, double precision)
         {
             throw new Exception("The method or operation is not implemented.");
         }
@@ -107,9 +107,9 @@ namespace CADability
         }
         private void CalcIntersectionEdges()
         {
-            BoundingCube exts1 = s1.GetExtent(0.0);
-            BoundingCube exts2 = s2.GetExtent(0.0);
-            BoundingCube ext = exts1; // struct, also Kopie!
+            BoundingBox exts1 = s1.GetExtent(0.0);
+            BoundingBox exts2 = s2.GetExtent(0.0);
+            BoundingBox ext = exts1; // struct, also Kopie!
             ext.MinMax(exts2);
             // TODO: hier noch sicherstellen, dass GetExtent mit und ohne vorhandene triangulierung funktioniert
             double precision = ext.Size * 1e-3;
@@ -284,7 +284,7 @@ namespace CADability
             this.face = face;
             hashCode = ++hashCodeCounter;
         }
-        bool FaceHitTest(ref BoundingCube cube, Face face, double precision)
+        bool FaceHitTest(ref BoundingBox cube, Face face, double precision)
         {
             // edges are inserted into the octtree before the faces. So we can check, whether the edges are already in the octtree
             // this is faster than face.HitTest()
@@ -307,7 +307,7 @@ namespace CADability
             return face.HitTest(ref cube, precision);
         }
         #region IOctTreeInsertable Members
-        BoundingCube IOctTreeInsertable.GetExtent(double precision)
+        BoundingBox IOctTreeInsertable.GetExtent(double precision)
         {
             switch (Type)
             {
@@ -315,15 +315,15 @@ namespace CADability
                     if (edge.Curve3D != null)
                         return (edge.Curve3D as IOctTreeInsertable).GetExtent(precision);
                     else
-                        return new BoundingCube();
+                        return new BoundingBox();
                 case ItemType.Vertex:
-                    return new BoundingCube(vertex.Position);
+                    return new BoundingBox(vertex.Position);
                 case ItemType.Face:
                     return face.GetExtent(precision);
             }
-            return BoundingCube.EmptyBoundingCube;
+            return BoundingBox.EmptyBoundingCube;
         }
-        bool IOctTreeInsertable.HitTest(ref BoundingCube cube, double precision)
+        bool IOctTreeInsertable.HitTest(ref BoundingBox cube, double precision)
         {
             switch (Type)
             {
@@ -444,8 +444,8 @@ namespace CADability
                 Face[] close = of2.GetObjectsCloseTo(fc);
                 for (int i = 0; i < close.Length; ++i)
                 {
-                    BoundingCube bc1 = fc.GetExtent(0.0);
-                    BoundingCube bc2 = close[i].GetExtent(0.0);
+                    BoundingBox bc1 = fc.GetExtent(0.0);
+                    BoundingBox bc2 = close[i].GetExtent(0.0);
                     if (bc1.Interferes(bc2))
                     {
                         ModOp2D m;
@@ -465,7 +465,7 @@ namespace CADability
             foreach (Edge edge in s2.Edges)
             {
                 if (edge.Curve3D == null) continue;
-                BoundingCube curveExt = edge.Curve3D.GetExtent();
+                BoundingBox curveExt = edge.Curve3D.GetExtent();
                 Face[] close = of1.GetObjectsCloseTo(edge.Curve3D as IOctTreeInsertable);
                 for (int i = 0; i < close.Length; ++i)
                 {
@@ -549,7 +549,7 @@ namespace CADability
             foreach (Edge edge in s1.Edges)
             {
                 if (edge.Curve3D == null) continue;
-                BoundingCube curveExt = edge.Curve3D.GetExtent();
+                BoundingBox curveExt = edge.Curve3D.GetExtent();
                 Face[] close = of2.GetObjectsCloseTo(edge.Curve3D as IOctTreeInsertable);
                 for (int i = 0; i < close.Length; ++i)
                 {
@@ -660,7 +660,7 @@ namespace CADability
             {
                 if (edge.Curve3D != null && (checkAllFaces || !collisionDetected))
                 {
-                    BoundingCube curveExt = edge.Curve3D.GetExtent();
+                    BoundingBox curveExt = edge.Curve3D.GetExtent();
                     Face[] close = of1.GetObjectsCloseTo(edge.Curve3D as IOctTreeInsertable);
                     for (int i = 0; i < close.Length; ++i)
                     {
@@ -722,7 +722,7 @@ namespace CADability
 
                 if (edge.Curve3D != null && (checkAllFaces || !collisionDetected))
                 {
-                    BoundingCube curveExt = edge.Curve3D.GetExtent();
+                    BoundingBox curveExt = edge.Curve3D.GetExtent();
                     Face[] close = of2.GetObjectsCloseTo(edge.Curve3D as IOctTreeInsertable);
                     for (int i = 0; i < close.Length; ++i)
                     {
@@ -819,7 +819,7 @@ namespace CADability
         //    foreach (Edge edge in s2.Edges)
         //    {
         //        if (edge.Curve3D == null) continue;
-        //        BoundingCube curveExt = edge.Curve3D.GetExtent();
+        //        BoundingBox curveExt = edge.Curve3D.GetExtent();
         //        Face[] close = of1.GetObjectsCloseTo(edge.Curve3D as IOctTreeInsertable);
         //        for (int i = 0; i < close.Length; ++i)
         //        {
@@ -854,7 +854,7 @@ namespace CADability
         //    foreach (Edge edge in s1.Edges)
         //    {
         //        if (edge.Curve3D == null) continue;
-        //        BoundingCube curveExt = edge.Curve3D.GetExtent();
+        //        BoundingBox curveExt = edge.Curve3D.GetExtent();
         //        Face[] close = of2.GetObjectsCloseTo(edge.Curve3D as IOctTreeInsertable);
         //        for (int i = 0; i < close.Length; ++i)
         //        {
@@ -892,7 +892,7 @@ namespace CADability
             Face[] fcs = null;
             while (res == double.MaxValue)
             {
-                fcs = of1.GetObjectsFromBox(new BoundingCube(fromHere, radius));
+                fcs = of1.GetObjectsFromBox(new BoundingBox(fromHere, radius));
 #if DEBUG
                 DebuggerContainer dc = new DebuggerContainer();
                 for (int i = 0; i < fcs.Length; i++)
@@ -964,7 +964,7 @@ namespace CADability
             if (Math.Abs(res) > radius)
             {   // es ist möglich, dass es noch ein Face gibt, welches näher an dem Punkt ist
                 // aber noch nicht berücksichtigt wurde
-                HashSet<Face> fc1 = new HashSet<Face>(of1.GetObjectsFromBox(new BoundingCube(fromHere, Math.Abs(res))));
+                HashSet<Face> fc1 = new HashSet<Face>(of1.GetObjectsFromBox(new BoundingBox(fromHere, Math.Abs(res))));
                 fc1.ExceptWith(fcs); // das sind die faces, die noch nicht untersucht sind und evtl. 
                                      // näher liegen als das schon gefundene res
                                      // alle noch nicht untersuchten Faces checken:
@@ -1207,7 +1207,7 @@ namespace CADability
     }
     class VertexOcttree : OctTree<Vertex>
     {
-        public VertexOcttree(BoundingCube ext, double precision) : base(ext, precision)
+        public VertexOcttree(BoundingBox ext, double precision) : base(ext, precision)
         {
             this.precision = precision;
         }
@@ -1775,7 +1775,7 @@ namespace CADability
         {
             shell1 = toSplit.Clone() as Shell;   // clone the shell because its faces will be modified
             shell1.AssertOutwardOrientation();
-            BoundingCube ext = shell1.GetExtent(0.0);
+            BoundingBox ext = shell1.GetExtent(0.0);
             Face fcpl = Face.MakeFace(new PlaneSurface(splitBy), new BoundingRect(GeoPoint2D.Origin, 2 * ext.DiagonalLength, 2 * ext.DiagonalLength));
             splittingOnplane = fcpl.Surface as PlaneSurface; // remember the plane by which we split to return a proper SplitResult
             Face fcpl1 = fcpl.Clone() as Face;
@@ -1795,7 +1795,7 @@ namespace CADability
         {
             shell1 = toSplit.Clone() as Shell;   // clone the shell because its faces will be modified
             shell1.AssertOutwardOrientation();
-            BoundingCube ext = shell1.GetExtent(0.0);
+            BoundingBox ext = shell1.GetExtent(0.0);
             shell2 = Shell.MakeShell(new Face[] { splitBy.Clone() as Face }, false); // open shell
             operation = Operation.difference;
             prepare();
@@ -1831,9 +1831,9 @@ namespace CADability
             {   // es ist ja shell1 - shell2, also Vereinigung mit dem inversen von shell2
                 shell2.ReverseOrientation();
             }
-            BoundingCube ext1 = shell1.GetExtent(0.0);
-            BoundingCube ext2 = shell2.GetExtent(0.0);
-            BoundingCube ext = ext1;
+            BoundingBox ext1 = shell1.GetExtent(0.0);
+            BoundingBox ext2 = shell2.GetExtent(0.0);
+            BoundingBox ext = ext1;
             ext.MinMax(ext2);
             // in rare cases the extension isn't a good choice, faces shouldn't exactely reside on the sides of the small cubes of the octtree
             // so we modify the extension a little, to make this case extremely unlikely. The best solution would be to check, whether a vertex
@@ -1899,7 +1899,7 @@ namespace CADability
             foreach (Face face in multipleFaces) face.ReverseOrientation();
 
             // fill the OctTree
-            BoundingCube ext = BoundingCube.EmptyBoundingCube;
+            BoundingBox ext = BoundingBox.EmptyBoundingCube;
             foreach (Face face in multipleFaces) ext.MinMax(face.GetExtent(0.0));
             // in rare cases the extension isn't a good choice, faces shouldn't exactely reside on the sides of the small cubes of the octtree
             // so we modify the extension a little, to make this case extremely unlikely. The best solution would be to check, whether a vertex
@@ -1957,9 +1957,9 @@ namespace CADability
                 shell1.ReverseOrientation();
                 shell2.ReverseOrientation();
             }
-            BoundingCube ext1 = shell1.GetExtent(0.0);
-            BoundingCube ext2 = shell2.GetExtent(0.0);
-            BoundingCube ext = ext1;
+            BoundingBox ext1 = shell1.GetExtent(0.0);
+            BoundingBox ext2 = shell2.GetExtent(0.0);
+            BoundingBox ext = ext1;
             ext.MinMax(ext2);
             // in rare cases the extension isn't a good choice, faces shouldn't exactely reside on the sides of the small cubes of the octtree
             // so we modify the extension a little, to make this case extremely unlikely. The best solution would be to check, whether a vertex
@@ -2161,9 +2161,9 @@ namespace CADability
                 edg.CheckConsistency();
             }
 #endif
-            BoundingCube ext1 = shell1.GetExtent(0.0);
-            BoundingCube ext2 = shell2.GetExtent(0.0);
-            BoundingCube ext = ext1;
+            BoundingBox ext1 = shell1.GetExtent(0.0);
+            BoundingBox ext2 = shell2.GetExtent(0.0);
+            BoundingBox ext = ext1;
             ext.MinMax(ext2);
             // in rare cases the extension isn't a good choice, faces shouldn't exactely reside on the sides of the small cubes of the octtree
             // so we modify the extension a little, to make this case extremely unlikely. The best solution would be to check, whether a vertex
@@ -2909,9 +2909,9 @@ namespace CADability
         }
         private void prepare()
         {
-            BoundingCube ext1 = shell1.GetExtent(0.0);
-            BoundingCube ext2 = shell2.GetExtent(0.0);
-            BoundingCube ext = ext1;
+            BoundingBox ext1 = shell1.GetExtent(0.0);
+            BoundingBox ext2 = shell2.GetExtent(0.0);
+            BoundingBox ext = ext1;
             ext.MinMax(ext2);
             ext.Expand(ext.Size * 1e-6);
             Initialize(ext, ext.Size * 1e-6); // der OctTree
@@ -4608,7 +4608,7 @@ namespace CADability
         /// <returns></returns>
         private bool TryFixMissingFaces(Shell shell)
         {
-            BoundingCube ext = shell1.GetExtent(0.0);
+            BoundingBox ext = shell1.GetExtent(0.0);
             ext.MinMax(shell2.GetExtent(0.0));
             // add all faces from the original shells to an octtree
             OctTree<Face> originalFaces = new OctTree<Face>(ext, ext.Size * 1e-6);
@@ -7197,7 +7197,7 @@ namespace CADability
         //                        GeoPoint[] trianglePoint;
         //                        GeoPoint2D[] triangleUVPoint;
         //                        int[] triangleIndex;
-        //                        BoundingCube triangleExtent;
+        //                        BoundingBox triangleExtent;
         //                        fc.GetTriangulation(0.1, out trianglePoint, out triangleUVPoint, out triangleIndex, out triangleExtent);
         //                        HashSet<Vertex> svtx = new HashSet<Vertex>(fc.Vertices);
         //                        bool skip = false;
@@ -10209,7 +10209,7 @@ namespace CADability
             }
 #endif
             Vertex[] dumy = this.shell.Vertices; // nur damits berechnet wird
-            BoundingCube ext = this.shell.GetExtent(0.0);
+            BoundingBox ext = this.shell.GetExtent(0.0);
             ext.Expand(ext.Size * 1e-5);
             octTree = new OctTree<BRepItem>(ext, ext.Size * 1e-6);
             foreach (Face fce in this.shell.Faces) octTree.AddObject(new BRepItem(octTree, fce));
@@ -10433,7 +10433,7 @@ namespace CADability
                         GeoPoint[] trianglePoint;
                         GeoPoint2D[] triangleUVPoint;
                         int[] triangleIndex;
-                        BoundingCube triangleExtent;
+                        BoundingBox triangleExtent;
                         fc.GetTriangulation(0.01, out trianglePoint, out triangleUVPoint, out triangleIndex, out triangleExtent);
                         System.Diagnostics.Debug.Assert(fc.CheckConsistency());
 #endif
@@ -10459,7 +10459,7 @@ namespace CADability
                 GeoPoint[] trianglePoint;
                 GeoPoint2D[] triangleUVPoint;
                 int[] triangleIndex;
-                BoundingCube triangleExtent;
+                BoundingBox triangleExtent;
                 fc.GetTriangulation(0.01, out trianglePoint, out triangleUVPoint, out triangleIndex, out triangleExtent);
                 foreach (Edge edg in fc.Edges)
                 {
@@ -10604,7 +10604,7 @@ namespace CADability
                     foreach (KeyValuePair<double, GeoPoint> kv in ips) // die kommen ja hoffentlich nach u sortiert
                     {
                         // gibts an dem Punkt schon einen vertex?
-                        Vertex[] candidates = newVertices.GetObjectsFromBox(new BoundingCube(kv.Value, octTree.precision));
+                        Vertex[] candidates = newVertices.GetObjectsFromBox(new BoundingBox(kv.Value, octTree.precision));
                         Vertex ev = null;
                         for (int i = 0; i < candidates.Length; i++)
                         {
@@ -10673,7 +10673,7 @@ namespace CADability
 
         private bool distOk(GeoPoint position)
         {
-            Face[] closeFaces = originalFaces.GetObjectsFromBox(new BoundingCube(position, Math.Abs(offset)));
+            Face[] closeFaces = originalFaces.GetObjectsFromBox(new BoundingBox(position, Math.Abs(offset)));
             for (int i = 0; i < closeFaces.Length; i++)
             {
                 if (closeFaces[i].Distance(position) < Math.Abs(offset) * (1 - 1e-6)) return false;

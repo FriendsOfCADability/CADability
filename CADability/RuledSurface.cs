@@ -673,7 +673,7 @@ namespace CADability
         }
 
         // BoxedSurfaceEx is alot faster with the HitTest. Don't override it
-        //public override bool HitTest(BoundingCube cube, out GeoPoint2D uv)
+        //public override bool HitTest(BoundingBox cube, out GeoPoint2D uv)
         //{
         //    foreach (GeoPoint2D pnt in new GeoPoint2D[] { GeoPoint2D.Origin, new GeoPoint2D(0.0, 1.0), new GeoPoint2D(1.0, 0.0), new GeoPoint2D(1.0, 1.0) })
         //    {

@@ -280,9 +280,9 @@ namespace CADability.GeoObject
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
         /// </summary>
         /// <returns></returns>
-        public override BoundingCube GetBoundingCube()
+        public override BoundingBox GetBoundingCube()
         {
-            return new BoundingCube(location, location + directionWidth, location + directionHeight, location + directionWidth + directionHeight);
+            return new BoundingBox(location, location + directionWidth, location + directionHeight, location + directionWidth + directionHeight);
         }
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3D (IPaintTo3D)"/>
@@ -341,17 +341,17 @@ namespace CADability.GeoObject
         /// </summary>
         /// <param name="precision"></param>
         /// <returns></returns>
-        public override BoundingCube GetExtent(double precision)
+        public override BoundingBox GetExtent(double precision)
         {
-            return new BoundingCube(location, location + directionWidth, location + directionWidth + directionHeight, location + directionHeight);
+            return new BoundingBox(location, location + directionWidth, location + directionWidth + directionHeight, location + directionHeight);
         }
         /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
+        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingBox, double)"/>
         /// </summary>
         /// <param name="cube"></param>
         /// <param name="precision"></param>
         /// <returns></returns>
-        public override bool HitTest(ref BoundingCube cube, double precision)
+        public override bool HitTest(ref BoundingBox cube, double precision)
         {
             return cube.Interferes(new GeoPoint[] { location, location + directionWidth, location + directionWidth + directionHeight, location + directionHeight }, new int[] { 0, 1, 2, 0, 2, 3 });
         }
@@ -383,7 +383,7 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public override bool HitTest(Projection.PickArea area, bool onlyInside)
         {
-            return BoundingCube.UnitBoundingCube.Interferes(new GeoPoint[] { area.ToUnitBox * location,
+            return BoundingBox.UnitBoundingBox.Interferes(new GeoPoint[] { area.ToUnitBox * location,
                 area.ToUnitBox * (location + directionWidth),
                 area.ToUnitBox * (location + directionWidth + directionHeight),
                 area.ToUnitBox * (location + directionHeight) },

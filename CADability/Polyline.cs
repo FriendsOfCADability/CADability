@@ -561,9 +561,9 @@ namespace CADability.GeoObject
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
         /// </summary>
         /// <returns></returns>
-        public override BoundingCube GetBoundingCube()
+        public override BoundingBox GetBoundingCube()
         {
-            BoundingCube res = BoundingCube.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingCube;
             if (vertex != null)
             {
                 for (int i = 0; i < vertex.Length; ++i)
@@ -705,17 +705,17 @@ namespace CADability.GeoObject
         /// </summary>
         /// <param name="precision"></param>
         /// <returns></returns>
-        public override BoundingCube GetExtent(double precision)
+        public override BoundingBox GetExtent(double precision)
         {
             return GetBoundingCube();
         }
         /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
+        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingBox, double)"/>
         /// </summary>
         /// <param name="cube"></param>
         /// <param name="precision"></param>
         /// <returns></returns>
-        public override bool HitTest(ref BoundingCube cube, double precision)
+        public override bool HitTest(ref BoundingBox cube, double precision)
         {
             for (int i = 0; i < vertex.Length - 1; ++i)
             {
@@ -753,7 +753,7 @@ namespace CADability.GeoObject
             {
                 for (int i = 0; i < vertex.Length; ++i)
                 {
-                    if (!BoundingCube.UnitBoundingCube.Contains(area.ToUnitBox * vertex[i])) return false;
+                    if (!BoundingBox.UnitBoundingBox.Contains(area.ToUnitBox * vertex[i])) return false;
                 }
                 return true;
             }
@@ -764,10 +764,10 @@ namespace CADability.GeoObject
                 for (int i = 1; i < vertex.Length; ++i)
                 {
                     GeoPoint thisPoint = area.ToUnitBox * vertex[i];
-                    if (BoundingCube.UnitBoundingCube.Interferes(ref lastPoint, ref thisPoint)) return true;
+                    if (BoundingBox.UnitBoundingBox.Interferes(ref lastPoint, ref thisPoint)) return true;
                     lastPoint = thisPoint;
                 }
-                if (closed && BoundingCube.UnitBoundingCube.Interferes(ref lastPoint, ref firstPoint)) return true;
+                if (closed && BoundingBox.UnitBoundingBox.Interferes(ref lastPoint, ref firstPoint)) return true;
                 return false;
             }
         }
@@ -1482,11 +1482,11 @@ namespace CADability.GeoObject
         {
             return false;
         }
-        BoundingCube ICurve.GetExtent()
+        BoundingBox ICurve.GetExtent()
         {
             return GetExtent(0.0);
         }
-        bool ICurve.HitTest(BoundingCube cube)
+        bool ICurve.HitTest(BoundingBox cube)
         {
             return HitTest(ref cube, 0.0);
         }
@@ -1713,12 +1713,12 @@ namespace CADability.GeoObject
 
         #region IOctTreeInsertable Members
 
-        BoundingCube IOctTreeInsertable.GetExtent(double precision)
+        BoundingBox IOctTreeInsertable.GetExtent(double precision)
         {
-            return BoundingCube.InfiniteBoundingCube; // stimmt nicht unbedingt
+            return BoundingBox.InfiniteBoundingCube; // stimmt nicht unbedingt
         }
 
-        bool IOctTreeInsertable.HitTest(ref BoundingCube cube, double precision)
+        bool IOctTreeInsertable.HitTest(ref BoundingBox cube, double precision)
         {
             for (int i = 1; i < vertex.Length - 3; ++i)
             {

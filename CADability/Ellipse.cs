@@ -120,7 +120,7 @@ namespace CADability.GeoObject
 
 		private double majorRadius, minorRadius; // die Radien in Richtung directionX bzw. directionY der Ebene
 		private double startParameter, sweepParameter; // Startwinkel und Überstreichnungswinkel
-		private BoundingCube extent; // cache für den extent
+		private BoundingBox extent; // cache für den extent
 		private object lockApproximationRecalc;
 		private double currentPrecision;
 		private GeoPoint[] currentApproximation;
@@ -134,7 +134,7 @@ namespace CADability.GeoObject
 			{
 				ellipse.projectionData.Clear();
 				ellipse.currentApproximation = null;
-				ellipse.extent = BoundingCube.EmptyBoundingCube;
+				ellipse.extent = BoundingBox.EmptyBoundingCube;
 			}
 
 			public Changing(Ellipse ellipse, string PropertyName)
@@ -142,7 +142,7 @@ namespace CADability.GeoObject
 			{
 				ellipse.projectionData.Clear();
 				ellipse.currentApproximation = null;
-				ellipse.extent = BoundingCube.EmptyBoundingCube;
+				ellipse.extent = BoundingBox.EmptyBoundingCube;
 			}
 
 			public Changing(Ellipse ellipse, string MethodOrPropertyName, params object[] Parameters)
@@ -150,7 +150,7 @@ namespace CADability.GeoObject
 			{
 				ellipse.projectionData.Clear();
 				ellipse.currentApproximation = null;
-				ellipse.extent = BoundingCube.EmptyBoundingCube;
+				ellipse.extent = BoundingBox.EmptyBoundingCube;
 			}
 
 			public Changing(Ellipse ellipse, Type interfaceForMethod, string MethodOrPropertyName,
@@ -159,7 +159,7 @@ namespace CADability.GeoObject
 			{
 				ellipse.projectionData.Clear();
 				ellipse.currentApproximation = null;
-				ellipse.extent = BoundingCube.EmptyBoundingCube;
+				ellipse.extent = BoundingBox.EmptyBoundingCube;
 			}
 
 			public Changing(Ellipse ellipse, bool noUndo, bool onlyAttribute, string MethodOrPropertyName,
@@ -168,7 +168,7 @@ namespace CADability.GeoObject
 			{
 				if (!onlyAttribute) ellipse.projectionData.Clear();
 				ellipse.currentApproximation = null;
-				ellipse.extent = BoundingCube.EmptyBoundingCube;
+				ellipse.extent = BoundingBox.EmptyBoundingCube;
 			}
 		}
 
@@ -691,7 +691,7 @@ namespace CADability.GeoObject
 		{
 			lockApproximationRecalc = new object();
 			projectionData = new Dictionary<Projection, EllipseData2D>();
-			extent = BoundingCube.EmptyBoundingCube;
+			extent = BoundingBox.EmptyBoundingCube;
 			plane = new Plane(Plane.StandardPlane.XYPlane, 0.0);
 			if (Constructed != null) Constructed(this);
 		}
@@ -1643,7 +1643,7 @@ namespace CADability.GeoObject
 		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
 		/// </summary>
 		/// <returns></returns>
-		public override BoundingCube GetBoundingCube()
+		public override BoundingBox GetBoundingCube()
 		{
 			// es hilft nichts, man muss in 2-dimensionalen 2Mal die BoundingBox bestimmen
 			if (extent.IsEmpty)
@@ -1753,11 +1753,11 @@ namespace CADability.GeoObject
 		/// </summary>
 		/// <param name="precision"></param>
 		/// <returns></returns>
-		public override BoundingCube GetExtent(double precision)
+		public override BoundingBox GetExtent(double precision)
 		{
 			return GetBoundingCube();
 			//GeoPoint[] points = GetCashedApproximation(precision);
-			//BoundingCube res = BoundingCube.EmptyBoundingCube;
+			//BoundingBox res = BoundingBox.EmptyBoundingCube;
 			//for (int i = 0; i < points.Length; ++i)
 			//{
 			//    res.MinMax(points[i]);
@@ -1766,12 +1766,12 @@ namespace CADability.GeoObject
 		}
 
 		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
+		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingBox, double)"/>
 		/// </summary>
 		/// <param name="cube"></param>
 		/// <param name="precision"></param>
 		/// <returns></returns>
-		public override bool HitTest(ref BoundingCube cube, double precision)
+		public override bool HitTest(ref BoundingBox cube, double precision)
 		{
 			return (this as ICurve).HitTest(cube);
 		}
@@ -1812,7 +1812,7 @@ namespace CADability.GeoObject
 			if (onlyInside)
 			{
 				// der Startpunkt muss drin sein und es darf keine Schnitte mit den Seitenflächen geben
-				if (!BoundingCube.UnitBoundingCube.Contains(unitsp)) return false;
+				if (!BoundingBox.UnitBoundingBox.Contains(unitsp)) return false;
 				for (int i = 0; i < area.Bounds.Length; ++i)
 				{
 					GeoPoint[] ip = PlaneIntersection(area.Bounds[i]);
@@ -1825,7 +1825,7 @@ namespace CADability.GeoObject
 			{
 				// entweder der Startpunkt ist drin oder es gibt Schnitte mit den Seitenflächen
 				// natürlich reduziert auf die begrenzten Würfelseiten
-				if (BoundingCube.UnitBoundingCube.Contains(unitsp)) return true; // ein Punkt drin genügt
+				if (BoundingBox.UnitBoundingBox.Contains(unitsp)) return true; // ein Punkt drin genügt
 				// Schnittpunkt mit allen Würfelseiten
 				for (int i = 0; i < area.Bounds.Length; ++i)
 				{
@@ -1833,7 +1833,7 @@ namespace CADability.GeoObject
 					for (int j = 0; j < ip.Length; ++j)
 					{
 						GeoPoint p = area.ToUnitBox * ip[j];
-						if (BoundingCube.UnitBoundingCube.Contains(p, 1e-6)) return true;
+						if (BoundingBox.UnitBoundingBox.Contains(p, 1e-6)) return true;
 					}
 				}
 
@@ -2865,12 +2865,12 @@ namespace CADability.GeoObject
 			return true;
 		}
 
-		BoundingCube ICurve.GetExtent()
+		BoundingBox ICurve.GetExtent()
 		{
 			return GetExtent(0.0);
 		}
 
-		bool ICurve.HitTest(BoundingCube bc)
+		bool ICurve.HitTest(BoundingBox bc)
 		{
 			if (!bc.Interferes(this.GetBoundingCube()))
 				return false;
@@ -3062,7 +3062,7 @@ namespace CADability.GeoObject
 			//}
 
 			projectionData = new Dictionary<Projection, EllipseData2D>();
-			extent = BoundingCube.EmptyBoundingCube;
+			extent = BoundingBox.EmptyBoundingCube;
 			lockApproximationRecalc = new object();
 			if (Constructed != null) Constructed(this); // ist hoffentlich nicht zu früh hier...
 		}
@@ -3345,12 +3345,12 @@ namespace CADability.GeoObject
 
 			#region IOctTreeInsertable Members
 
-			BoundingCube IOctTreeInsertable.GetExtent(double precision)
+			BoundingBox IOctTreeInsertable.GetExtent(double precision)
 			{
 				return full.GetExtent(precision);
 			}
 
-			bool IOctTreeInsertable.HitTest(ref BoundingCube cube, double precision)
+			bool IOctTreeInsertable.HitTest(ref BoundingBox cube, double precision)
 			{
 				return full.HitTest(ref cube, precision);
 			}

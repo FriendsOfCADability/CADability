@@ -332,7 +332,7 @@ namespace CADability
                 GeoObjectList res = new GeoObjectList();
                 ICurve c3d = surface.Make3dCurve(c2d);
                 res.Add(c3d as IGeoObject);
-                BoundingCube ext = c3d.GetExtent();
+                BoundingBox ext = c3d.GetExtent();
                 for (int i = 0; i < 100; i++)
                 {
                     double u = i / 100.0;
@@ -839,7 +839,7 @@ namespace CADability
             {
                 GeoObjectList res = new GeoObjectList();
                 res.Add(along as IGeoObject);
-                BoundingCube ext = along.GetExtent();
+                BoundingBox ext = along.GetExtent();
                 double length = ext.Size / 200;
                 ColorDef cdx = new ColorDef("dirx", System.Drawing.Color.Red);
                 ColorDef cdy = new ColorDef("diry", System.Drawing.Color.LawnGreen);

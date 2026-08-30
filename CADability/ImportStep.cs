@@ -1722,7 +1722,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 #endif
 #if DEBUG
 			if (!res.CheckConsistency()) { }
-			BoundingCube ext = res.GetExtent();
+			BoundingBox ext = res.GetExtent();
 			double md = 0.0;
 			Face found = null;
 			for (int i = 0; i < res.Count; i++)

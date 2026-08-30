@@ -1889,7 +1889,7 @@ namespace CADability.GeoObject
             }
 #endif
             List<Vertex> allVertices = new List<Vertex>();
-            BoundingCube ext = BoundingCube.EmptyBoundingCube;
+            BoundingBox ext = BoundingBox.EmptyBoundingCube;
             for (int i = 0; i < faces.Length; i++)
             {
                 Vertex[] v = faces[i].Vertices;
@@ -3058,7 +3058,7 @@ namespace CADability.GeoObject
                             if (fc != null) faces.Add(fc.Clone() as Face); // erstmal clone, damit die edges unabhängig sind. Sonst gibts bei sewfaces einen fehler. Allerdings muss SewFaces gefixt werden
 #if DEBUG
                             bool ccok = faces[faces.Count - 1].CheckConsistency();
-                            faces[faces.Count - 1].GetTriangulation(0.01, out GeoPoint[] tp, out GeoPoint2D[] uv, out int[] ind, out BoundingCube bc);
+                            faces[faces.Count - 1].GetTriangulation(0.01, out GeoPoint[] tp, out GeoPoint2D[] uv, out int[] ind, out BoundingBox bc);
                             DebuggerContainer dc3 = faces[faces.Count - 1].DebugTriangulation3D;
                             DebuggerContainer dc1 = faces[faces.Count - 1].DebugTriangulation;
 #endif
@@ -3130,7 +3130,7 @@ namespace CADability.GeoObject
                 path = c2d.MakeGeoObject(pln) as Path; // jetzt sicher eben
                 if (path == null) return null;
             }
-            BoundingCube ext = shell.GetExtent(0.0);
+            BoundingBox ext = shell.GetExtent(0.0);
             ModOp moveback = ModOp.Translate(-ext.Size * pln.Normal);
             path.Modify(moveback);
             Solid sld = MakePrism(path, ext.Size * 2 * pln.Normal, null, false) as Solid;

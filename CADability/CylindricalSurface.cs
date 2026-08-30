@@ -517,7 +517,7 @@ namespace CADability.GeoObject
             if (curve.GetPlanarState() == PlanarState.Planar)
             {
                 Plane pln = curve.GetPlane();
-                BoundingCube ext = curve.GetExtent();
+                BoundingBox ext = curve.GetExtent();
                 ext.Modify(toUnit); // macht ihn ggf. zu groß, curve.CloneModified(toUnit).GetExtent() geht aber manchmal nicht und dauert zu lange
                 IDualSurfaceCurve[] dsc = GetPlaneIntersection(new PlaneSurface(pln), 0.0, Math.PI * 2.0, ext.Zmin, ext.Zmax, 0.0);
                 // liefert eine Ellipse oder zwei Linien oder nichts
@@ -962,7 +962,7 @@ namespace CADability.GeoObject
                                 //DebuggerContainer dbg4 = new CADability.DebuggerContainer();
                                 //GeoVector dbg5 = elli.StartDirection;
                                 //GeoVector dbg6 = elli.EndDirection;
-                                //BoundingCube dbg7 = elli.GetExtent(0.0);
+                                //BoundingBox dbg7 = elli.GetExtent(0.0);
                                 //dbg4.Add(elli);
                                 ProjectedCurve pc1 = new CADability.ProjectedCurve(elli, this, true, thisBounds);
                                 BoundingRect common = BoundingRect.Common(pc1.GetExtent(), thisBounds);
@@ -2048,7 +2048,7 @@ namespace CADability.GeoObject
             return new ModOp2D(-1, 0, Math.PI, 0, 1, 0);
         }
         /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.HitTest (BoundingCube, double, double, double, double)"/>
+        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.HitTest (BoundingBox, double, double, double, double)"/>
         /// </summary>
         /// <param name="cube"></param>
         /// <param name="umin"></param>
@@ -2056,17 +2056,17 @@ namespace CADability.GeoObject
         /// <param name="vmin"></param>
         /// <param name="vmax"></param>
         /// <returns></returns>
-        public override bool HitTest(BoundingCube cube, double umin, double umax, double vmin, double vmax)
+        public override bool HitTest(BoundingBox cube, double umin, double umax, double vmin, double vmax)
         {
             throw new NotImplementedException("HitTest must be implemented");
         }
         /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.HitTest (BoundingCube, out GeoPoint2D)"/>
+        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.HitTest (BoundingBox, out GeoPoint2D)"/>
         /// </summary>
         /// <param name="bc"></param>
         /// <param name="uv"></param>
         /// <returns></returns>
-        public override bool HitTest(BoundingCube bc, out GeoPoint2D uv)
+        public override bool HitTest(BoundingBox bc, out GeoPoint2D uv)
         {
             // any vertex of the cube on the cylinder?
             uv = GeoPoint2D.Origin;

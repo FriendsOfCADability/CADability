@@ -199,7 +199,7 @@ namespace CADability.GeoObject
         private double[] tetraederParams; // Parameter zu tetraederBase
         private GeoPoint[] tetraederVertex; // zu jedem tetraederBase (bis auf den letzten) gibt es zwei Punkte, so dass ein Tetraeder aufgespannt wird
         private TetraederHull tetraederHull;
-        private BoundingCube extent = BoundingCube.EmptyBoundingCube;
+        private BoundingBox extent = BoundingBox.EmptyBoundingCube;
         internal TetraederHull TetraederHull
         {
             get
@@ -306,7 +306,7 @@ namespace CADability.GeoObject
         protected virtual void InvalidateSecondaryData()
         {
             tetraederHull = null;
-            extent = BoundingCube.EmptyBoundingCube;
+            extent = BoundingBox.EmptyBoundingCube;
         }
         // public abstract void Modify(ModOp m); ist schon abstract
         /// <summary>
@@ -370,7 +370,7 @@ namespace CADability.GeoObject
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
         /// </summary>
         /// <returns></returns>
-        public override BoundingCube GetBoundingCube()
+        public override BoundingBox GetBoundingCube()
         {
             if (extent.IsEmpty)
             {
@@ -427,17 +427,17 @@ namespace CADability.GeoObject
         /// </summary>
         /// <param name="precision"></param>
         /// <returns></returns>
-        public override BoundingCube GetExtent(double precision)
+        public override BoundingBox GetExtent(double precision)
         {
             return GetBoundingCube();
         }
         /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
+        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingBox, double)"/>
         /// </summary>
         /// <param name="cube"></param>
         /// <param name="precision"></param>
         /// <returns></returns>
-        public override bool HitTest(ref BoundingCube cube, double precision)
+        public override bool HitTest(ref BoundingBox cube, double precision)
         {
             return TetraederHull.HitTest(cube);
         }
@@ -758,13 +758,13 @@ namespace CADability.GeoObject
         {
             return false;
         }
-        BoundingCube ICurve.GetExtent()
+        BoundingBox ICurve.GetExtent()
         {
             if (tetraederBase == null) MakeTetraederHull();
             // int xmin, xmax, ymin, ymax, zmin, zmax; // Indizes der extremen Vertexpunkte
             // noch nicht sauber implementiert: Gesucht werden müssen die lokalen
             // Minima und Maxima in x, y und z.
-            BoundingCube res = BoundingCube.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingCube;
             for (int i = 0; i < tetraederBase.Length; ++i)
             {
                 res.MinMax(tetraederBase[i]);
@@ -778,7 +778,7 @@ namespace CADability.GeoObject
             //res.MinMax(tetraederBase[tetraederBase.Length - 1]);
             return res;
         }
-        bool ICurve.HitTest(BoundingCube cube)
+        bool ICurve.HitTest(BoundingBox cube)
         {
             return this.TetraederHull.HitTest(cube);
         }
@@ -1362,12 +1362,12 @@ namespace CADability.GeoObject
             {
                 for (int i = 0; i < tetraederBase.Length; ++i)
                 {
-                    if (!BoundingCube.UnitBoundingCube.Contains(area.ToUnitBox * tetraederBase[i])) return false;
+                    if (!BoundingBox.UnitBoundingBox.Contains(area.ToUnitBox * tetraederBase[i])) return false;
                 }
                 for (int i = 0; i < tetraederBase.Length - 1; ++i)
                 {
-                    if (!BoundingCube.UnitBoundingCube.Contains(area.ToUnitBox * tetraederVertex[2 * i]) ||
-                        !BoundingCube.UnitBoundingCube.Contains(area.ToUnitBox * tetraederVertex[2 * i + 1]))
+                    if (!BoundingBox.UnitBoundingBox.Contains(area.ToUnitBox * tetraederVertex[2 * i]) ||
+                        !BoundingBox.UnitBoundingBox.Contains(area.ToUnitBox * tetraederVertex[2 * i + 1]))
                     {   // wenn nicht das ganze Tetraeder innerhalb ist, dann genauer prüfen
                         if (IsPartOutside(area, tetraederBase[i], tetraederBase[i + 1], tetraederParams[i], tetraederParams[i + 1])) return false;
                     }
@@ -1378,7 +1378,7 @@ namespace CADability.GeoObject
             {
                 for (int i = 0; i < tetraederBase.Length; ++i)
                 {
-                    if (BoundingCube.UnitBoundingCube.Contains(area.ToUnitBox * tetraederBase[i])) return true;
+                    if (BoundingBox.UnitBoundingBox.Contains(area.ToUnitBox * tetraederBase[i])) return true;
                 }
                 for (int i = 0; i < tetraederBase.Length - 1; ++i)
                 {
@@ -1386,9 +1386,9 @@ namespace CADability.GeoObject
                     {
                         GeoPoint p1 = area.ToUnitBox * tetraederBase[i];
                         GeoPoint p2 = area.ToUnitBox * tetraederBase[i + 1];
-                        if (BoundingCube.UnitBoundingCube.Interferes(ref p1, ref p2)) return true;
+                        if (BoundingBox.UnitBoundingBox.Interferes(ref p1, ref p2)) return true;
                     }
-                    else if (BoundingCube.UnitBoundingCube.Interferes(area.ToUnitBox * tetraederBase[i], area.ToUnitBox * tetraederBase[i + 1], area.ToUnitBox * tetraederVertex[2 * i], area.ToUnitBox * tetraederVertex[2 * i + 1]))
+                    else if (BoundingBox.UnitBoundingBox.Interferes(area.ToUnitBox * tetraederBase[i], area.ToUnitBox * tetraederBase[i + 1], area.ToUnitBox * tetraederVertex[2 * i], area.ToUnitBox * tetraederVertex[2 * i + 1]))
                     {   // die Basispunkte sind außerhalb, aber das Tetraeder berührt die area
                         if (IsPartInside(area, tetraederBase[i], tetraederBase[i + 1], tetraederParams[i], tetraederParams[i + 1])) return true;
                     }
@@ -1396,7 +1396,7 @@ namespace CADability.GeoObject
                 return false;
             }
         }
-        public bool HitTest(BoundingCube cube)
+        public bool HitTest(BoundingBox cube)
         {
             for (int i = 0; i < tetraederBase.Length; ++i)
             {
@@ -1482,7 +1482,7 @@ namespace CADability.GeoObject
             {
                 if (octTree == null)
                 {
-                    BoundingCube ext = BoundingCube.EmptyBoundingCube;
+                    BoundingBox ext = BoundingBox.EmptyBoundingCube;
                     for (int i = 0; i < tetraederBase.Length - 1; ++i)
                     {
                         ext.MinMax(tetraederBase[i]);
@@ -1527,22 +1527,22 @@ namespace CADability.GeoObject
             }
             #region IOctTreeInsertable Members
 
-            BoundingCube IOctTreeInsertable.GetExtent(double precision)
+            BoundingBox IOctTreeInsertable.GetExtent(double precision)
             {
                 if (IsFlat)
                 {
-                    BoundingCube res = new BoundingCube(t1, t2, t3);
+                    BoundingBox res = new BoundingBox(t1, t2, t3);
                     res.Expand(precision);
                     return res;
                 }
-                return new BoundingCube(t1, t2, t3, t4);
+                return new BoundingBox(t1, t2, t3, t4);
             }
 
-            bool IOctTreeInsertable.HitTest(ref BoundingCube cube, double precision)
+            bool IOctTreeInsertable.HitTest(ref BoundingBox cube, double precision)
             {
                 if (IsFlat)
                 {
-                    BoundingCube res = new BoundingCube(t1, t2, t3);
+                    BoundingBox res = new BoundingBox(t1, t2, t3);
                     res.Expand(precision);
                     return cube.Interferes(res);
                 }
@@ -1741,45 +1741,45 @@ namespace CADability.GeoObject
 #if DEBUG
                     //DebuggerContainer dc = new DebuggerContainer();
                     //dc.Add(Make3D.MakeTetraeder(p1, p2, p3, p4));
-                    //dc.Add(BoundingCube.UnitBoundingCube.AsBox);
+                    //dc.Add(BoundingBox.UnitBoundingBox.AsBox);
 #endif
-                    if (!BoundingCube.UnitBoundingCube.Interferes(p1, p2, p3, p4)) return false;
+                    if (!BoundingBox.UnitBoundingBox.Interferes(p1, p2, p3, p4)) return false;
                     // jetzt noch schwieriger Fall: kein Punkt innerhalb, aber auch nicht außerhalb des cubes
-                    // eine der 6 Kanten muss schneiden. Wenn man mit dem UnitBoundingCube trimmt, dann muss ein Punkt
+                    // eine der 6 Kanten muss schneiden. Wenn man mit dem UnitBoundingBox trimmt, dann muss ein Punkt
                     // durch eine der 3 Standartseiten-Dreieck gehen, wenn es überschneidung gibt
                     if (t.Contains(t1)) return true; // der Fall ganz enthalten
                     GeoPoint start = p1, end = p2;
-                    if (BoundingCube.UnitBoundingCube.ClipLine(ref start, ref end))
+                    if (BoundingBox.UnitBoundingBox.ClipLine(ref start, ref end))
                     {
                         if ((start.x + start.y + start.z <= 1.0) && (start.x >= 0.0) && (start.x <= 1.0) && (start.y >= 0.0) && (start.y <= 1.0) && (start.z >= 0.0) && (start.z <= 1.0)) return true;
                         if ((end.x + end.y + end.z <= 1.0) && (end.x >= 0.0) && (end.x <= 1.0) && (end.y >= 0.0) && (end.y <= 1.0) && (end.z >= 0.0) && (end.z <= 1.0)) return true;
                     }
                     start = p1; end = p3;
-                    if (BoundingCube.UnitBoundingCube.ClipLine(ref start, ref end))
+                    if (BoundingBox.UnitBoundingBox.ClipLine(ref start, ref end))
                     {
                         if ((start.x + start.y + start.z <= 1.0) && (start.x >= 0.0) && (start.x <= 1.0) && (start.y >= 0.0) && (start.y <= 1.0) && (start.z >= 0.0) && (start.z <= 1.0)) return true;
                         if ((end.x + end.y + end.z <= 1.0) && (end.x >= 0.0) && (end.x <= 1.0) && (end.y >= 0.0) && (end.y <= 1.0) && (end.z >= 0.0) && (end.z <= 1.0)) return true;
                     }
                     start = p1; end = p4;
-                    if (BoundingCube.UnitBoundingCube.ClipLine(ref start, ref end))
+                    if (BoundingBox.UnitBoundingBox.ClipLine(ref start, ref end))
                     {
                         if ((start.x + start.y + start.z <= 1.0) && (start.x >= 0.0) && (start.x <= 1.0) && (start.y >= 0.0) && (start.y <= 1.0) && (start.z >= 0.0) && (start.z <= 1.0)) return true;
                         if ((end.x + end.y + end.z <= 1.0) && (end.x >= 0.0) && (end.x <= 1.0) && (end.y >= 0.0) && (end.y <= 1.0) && (end.z >= 0.0) && (end.z <= 1.0)) return true;
                     }
                     start = p2; end = p3;
-                    if (BoundingCube.UnitBoundingCube.ClipLine(ref start, ref end))
+                    if (BoundingBox.UnitBoundingBox.ClipLine(ref start, ref end))
                     {
                         if ((start.x + start.y + start.z <= 1.0) && (start.x >= 0.0) && (start.x <= 1.0) && (start.y >= 0.0) && (start.y <= 1.0) && (start.z >= 0.0) && (start.z <= 1.0)) return true;
                         if ((end.x + end.y + end.z <= 1.0) && (end.x >= 0.0) && (end.x <= 1.0) && (end.y >= 0.0) && (end.y <= 1.0) && (end.z >= 0.0) && (end.z <= 1.0)) return true;
                     }
                     start = p2; end = p4;
-                    if (BoundingCube.UnitBoundingCube.ClipLine(ref start, ref end))
+                    if (BoundingBox.UnitBoundingBox.ClipLine(ref start, ref end))
                     {
                         if ((start.x + start.y + start.z <= 1.0) && (start.x >= 0.0) && (start.x <= 1.0) && (start.y >= 0.0) && (start.y <= 1.0) && (start.z >= 0.0) && (start.z <= 1.0)) return true;
                         if ((end.x + end.y + end.z <= 1.0) && (end.x >= 0.0) && (end.x <= 1.0) && (end.y >= 0.0) && (end.y <= 1.0) && (end.z >= 0.0) && (end.z <= 1.0)) return true;
                     }
                     start = p3; end = p4;
-                    if (BoundingCube.UnitBoundingCube.ClipLine(ref start, ref end))
+                    if (BoundingBox.UnitBoundingBox.ClipLine(ref start, ref end))
                     {
                         if ((start.x + start.y + start.z <= 1.0) && (start.x >= 0.0) && (start.x <= 1.0) && (start.y >= 0.0) && (start.y <= 1.0) && (start.z >= 0.0) && (start.z <= 1.0)) return true;
                         if ((end.x + end.y + end.z <= 1.0) && (end.x >= 0.0) && (end.x <= 1.0) && (end.y >= 0.0) && (end.y <= 1.0) && (end.z >= 0.0) && (end.z <= 1.0)) return true;
@@ -1790,37 +1790,37 @@ namespace CADability.GeoObject
                     p3 = t.ToUnit * t3;
                     p4 = t.ToUnit * t4;
                     start = p1; end = p2;
-                    if (BoundingCube.UnitBoundingCube.ClipLine(ref start, ref end))
+                    if (BoundingBox.UnitBoundingBox.ClipLine(ref start, ref end))
                     {
                         if ((start.x + start.y + start.z <= 1.0) && (start.x >= 0.0) && (start.x <= 1.0) && (start.y >= 0.0) && (start.y <= 1.0) && (start.z >= 0.0) && (start.z <= 1.0)) return true;
                         if ((end.x + end.y + end.z <= 1.0) && (end.x >= 0.0) && (end.x <= 1.0) && (end.y >= 0.0) && (end.y <= 1.0) && (end.z >= 0.0) && (end.z <= 1.0)) return true;
                     }
                     start = p1; end = p3;
-                    if (BoundingCube.UnitBoundingCube.ClipLine(ref start, ref end))
+                    if (BoundingBox.UnitBoundingBox.ClipLine(ref start, ref end))
                     {
                         if ((start.x + start.y + start.z <= 1.0) && (start.x >= 0.0) && (start.x <= 1.0) && (start.y >= 0.0) && (start.y <= 1.0) && (start.z >= 0.0) && (start.z <= 1.0)) return true;
                         if ((end.x + end.y + end.z <= 1.0) && (end.x >= 0.0) && (end.x <= 1.0) && (end.y >= 0.0) && (end.y <= 1.0) && (end.z >= 0.0) && (end.z <= 1.0)) return true;
                     }
                     start = p1; end = p4;
-                    if (BoundingCube.UnitBoundingCube.ClipLine(ref start, ref end))
+                    if (BoundingBox.UnitBoundingBox.ClipLine(ref start, ref end))
                     {
                         if ((start.x + start.y + start.z <= 1.0) && (start.x >= 0.0) && (start.x <= 1.0) && (start.y >= 0.0) && (start.y <= 1.0) && (start.z >= 0.0) && (start.z <= 1.0)) return true;
                         if ((end.x + end.y + end.z <= 1.0) && (end.x >= 0.0) && (end.x <= 1.0) && (end.y >= 0.0) && (end.y <= 1.0) && (end.z >= 0.0) && (end.z <= 1.0)) return true;
                     }
                     start = p2; end = p3;
-                    if (BoundingCube.UnitBoundingCube.ClipLine(ref start, ref end))
+                    if (BoundingBox.UnitBoundingBox.ClipLine(ref start, ref end))
                     {
                         if ((start.x + start.y + start.z <= 1.0) && (start.x >= 0.0) && (start.x <= 1.0) && (start.y >= 0.0) && (start.y <= 1.0) && (start.z >= 0.0) && (start.z <= 1.0)) return true;
                         if ((end.x + end.y + end.z <= 1.0) && (end.x >= 0.0) && (end.x <= 1.0) && (end.y >= 0.0) && (end.y <= 1.0) && (end.z >= 0.0) && (end.z <= 1.0)) return true;
                     }
                     start = p2; end = p4;
-                    if (BoundingCube.UnitBoundingCube.ClipLine(ref start, ref end))
+                    if (BoundingBox.UnitBoundingBox.ClipLine(ref start, ref end))
                     {
                         if ((start.x + start.y + start.z <= 1.0) && (start.x >= 0.0) && (start.x <= 1.0) && (start.y >= 0.0) && (start.y <= 1.0) && (start.z >= 0.0) && (start.z <= 1.0)) return true;
                         if ((end.x + end.y + end.z <= 1.0) && (end.x >= 0.0) && (end.x <= 1.0) && (end.y >= 0.0) && (end.y <= 1.0) && (end.z >= 0.0) && (end.z <= 1.0)) return true;
                     }
                     start = p3; end = p4;
-                    if (BoundingCube.UnitBoundingCube.ClipLine(ref start, ref end))
+                    if (BoundingBox.UnitBoundingBox.ClipLine(ref start, ref end))
                     {
                         if ((start.x + start.y + start.z <= 1.0) && (start.x >= 0.0) && (start.x <= 1.0) && (start.y >= 0.0) && (start.y <= 1.0) && (start.z >= 0.0) && (start.z <= 1.0)) return true;
                         if ((end.x + end.y + end.z <= 1.0) && (end.x >= 0.0) && (end.x <= 1.0) && (end.y >= 0.0) && (end.y <= 1.0) && (end.z >= 0.0) && (end.z <= 1.0)) return true;
@@ -2065,20 +2065,20 @@ namespace CADability.GeoObject
             }
             catch (PlaneException) { }
 #endif
-            if (BoundingCube.UnitBoundingCube.Contains(area.ToUnitBox * pm)) return true; // zwischenpunkt drin, also berührt
-            if (BoundingCube.UnitBoundingCube.Interferes(area.ToUnitBox * p1, area.ToUnitBox * pm, area.ToUnitBox * tv1, area.ToUnitBox * tv2))
+            if (BoundingBox.UnitBoundingBox.Contains(area.ToUnitBox * pm)) return true; // zwischenpunkt drin, also berührt
+            if (BoundingBox.UnitBoundingBox.Interferes(area.ToUnitBox * p1, area.ToUnitBox * pm, area.ToUnitBox * tv1, area.ToUnitBox * tv2))
             {
                 // 1. Hälfte nicht eindeutig, muss noch weiter untersucht werden
                 if (IsPartInside(area, p1, pm, par1, parm)) return true;
             }
-            if (BoundingCube.UnitBoundingCube.Interferes(area.ToUnitBox * pm, area.ToUnitBox * p2, area.ToUnitBox * tv3, area.ToUnitBox * tv4))
+            if (BoundingBox.UnitBoundingBox.Interferes(area.ToUnitBox * pm, area.ToUnitBox * p2, area.ToUnitBox * tv3, area.ToUnitBox * tv4))
             {
                 // 2. Hälfte nicht eindeutig, muss noch weiter untersucht werden
                 if (IsPartInside(area, pm, p2, parm, par2)) return true;
             }
             return false;
         }
-        private bool IsPartInside(BoundingCube cube, GeoPoint p1, GeoPoint p2, double par1, double par2)
+        private bool IsPartInside(BoundingBox cube, GeoPoint p1, GeoPoint p2, double par1, double par2)
         {
             // ist irgend ein Teilstückchen der Kurve innerhalb der area?
             // Start und Endpunkt sind es nicht, sonst wäre man ja schon fertig.
@@ -2125,15 +2125,15 @@ namespace CADability.GeoObject
             GeoPoint pm, tv1, tv2, tv3, tv4;
             double parm;
             SplitTetraeder(p1, p2, par1, par2, out pm, out parm, out tv1, out tv2, out tv3, out tv4);
-            if (!BoundingCube.UnitBoundingCube.Contains(area.ToUnitBox * pm)) return true; // zwischenpunkt draußen, also außerhalb
-            if (!BoundingCube.UnitBoundingCube.Contains(area.ToUnitBox * tv1) ||
-                !BoundingCube.UnitBoundingCube.Contains(area.ToUnitBox * tv2))
+            if (!BoundingBox.UnitBoundingBox.Contains(area.ToUnitBox * pm)) return true; // zwischenpunkt draußen, also außerhalb
+            if (!BoundingBox.UnitBoundingBox.Contains(area.ToUnitBox * tv1) ||
+                !BoundingBox.UnitBoundingBox.Contains(area.ToUnitBox * tv2))
             {
                 // 1. Hälfte nicht eindeutig, muss noch weiter untersucht werden
                 if (IsPartOutside(area, p1, pm, par1, parm)) return true;
             }
-            if (!BoundingCube.UnitBoundingCube.Contains(area.ToUnitBox * tv3) ||
-                !BoundingCube.UnitBoundingCube.Contains(area.ToUnitBox * tv4))
+            if (!BoundingBox.UnitBoundingBox.Contains(area.ToUnitBox * tv3) ||
+                !BoundingBox.UnitBoundingBox.Contains(area.ToUnitBox * tv4))
             {
                 // 2. Hälfte nicht eindeutig, muss noch weiter untersucht werden
                 if (IsPartOutside(area, pm, p2, parm, par2)) return true;
@@ -2309,15 +2309,15 @@ namespace CADability.GeoObject
                     if (d1 < d2) return 0.0;
                     else return 1.0;
                 }
-                CurveTetraeder[] all = OctTree.GetObjectsFromBox(new BoundingCube(p, OctTree.precision)); // we need ...Box, BoundingCube and not ...Point because of linear curves
+                CurveTetraeder[] all = OctTree.GetObjectsFromBox(new BoundingBox(p, OctTree.precision)); // we need ...Box, BoundingBox and not ...Point because of linear curves
                 if (all.Length == 0)
                 {   // Punkt aufblasen bis Tetraeder gefunden werden
-                    BoundingCube bc = new BoundingCube(TetraederBase);
+                    BoundingBox bc = new BoundingBox(TetraederBase);
                     bc.MinMax(p);
                     double d = bc.Size * 1e-6;
                     do
                     {
-                        all = OctTree.GetObjectsFromBox(new BoundingCube(p, d));
+                        all = OctTree.GetObjectsFromBox(new BoundingBox(p, d));
                         d *= 2;
                     }
                     while (all.Length == 0 && d < bc.Size * 2);

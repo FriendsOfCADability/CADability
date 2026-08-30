@@ -87,7 +87,7 @@ namespace CADability.GeoObject
             {
                 if (!simpleSurfaceChecked)
                 {
-                    BoundingCube polesext = BoundingCube.EmptyBoundingCube;
+                    BoundingBox polesext = BoundingBox.EmptyBoundingCube;
                     foreach (GeoPoint point in poles)
                     {
                         polesext.MinMax(point);
@@ -1811,7 +1811,7 @@ namespace CADability.GeoObject
                     }
                     GeoPoint loc; GeoVector dir;
                     GeoPoint uvcenter = PointAt(new GeoPoint2D((umin + umax) / 2, (vmin + vmax) / 2));
-                    BoundingCube bc = new BoundingCube(ucnt);
+                    BoundingBox bc = new BoundingBox(ucnt);
                     if (bc.Size < precision && Geometry.LineFit(vcnt, out loc, out dir) < precision)
                     {   // Kugel, Mittelpunkt: bc, Achse: dir, v sind die Breitengrade
                         GeoPoint center = bc.GetCenter();
@@ -1826,7 +1826,7 @@ namespace CADability.GeoObject
                     }
                     else
                     {
-                        bc = new BoundingCube(vcnt);
+                        bc = new BoundingBox(vcnt);
                         if (bc.Size < precision && Geometry.LineFit(ucnt, out loc, out dir) < precision)
                         {   // Kugel, Mittelpunkt: bc, Achse: dir, u sind die Breitengrade (wie gewöhnlich)
                             GeoPoint center = bc.GetCenter();
@@ -3013,13 +3013,13 @@ namespace CADability.GeoObject
             fixedVCurves.Target = dict;
             return res;
         }
-        internal BoundingCube GetPatchExtent(BoundingRect uvPatch)
+        internal BoundingBox GetPatchExtent(BoundingRect uvPatch)
         {
             BSpline u1 = FixedU(uvPatch.Left);
             BSpline u2 = FixedU(uvPatch.Right);
             BSpline v1 = FixedV(uvPatch.Bottom);
             BSpline v2 = FixedV(uvPatch.Top);
-            BoundingCube res = u1.GetIntervalExtent(uvPatch.Bottom, uvPatch.Top);
+            BoundingBox res = u1.GetIntervalExtent(uvPatch.Bottom, uvPatch.Top);
             res.MinMax(u2.GetIntervalExtent(uvPatch.Bottom, uvPatch.Top));
             res.MinMax(v1.GetIntervalExtent(uvPatch.Left, uvPatch.Right));
             res.MinMax(v2.GetIntervalExtent(uvPatch.Left, uvPatch.Right));
@@ -4198,11 +4198,11 @@ namespace CADability.GeoObject
             intu = uSteps.ToArray();
             intv = vSteps.ToArray();
         }
-        public override BoundingCube GetPatchExtent(BoundingRect uvPatch, bool rough)
+        public override BoundingBox GetPatchExtent(BoundingRect uvPatch, bool rough)
         {
             if (rough && uvPatch.Left == UKnots[0] && uvPatch.Right == UKnots[UKnots.Length - 1] && uvPatch.Bottom == VKnots[0] && uvPatch.Top == VKnots[VKnots.Length - 1])
             {   // die Pole geben eine Hülle vor
-                BoundingCube res = BoundingCube.EmptyBoundingCube;
+                BoundingBox res = BoundingBox.EmptyBoundingCube;
                 for (int i = 0; i < poles.GetLength(0); i++)
                 {
                     for (int j = 0; j < poles.GetLength(1); j++)
@@ -4551,12 +4551,12 @@ namespace CADability.GeoObject
             return res.ToArray();
         }
         /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.HitTest (BoundingCube, out GeoPoint2D)"/>
+        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.HitTest (BoundingBox, out GeoPoint2D)"/>
         /// </summary>
         /// <param name="cube"></param>
         /// <param name="uv"></param>
         /// <returns></returns>
-        public override bool HitTest(BoundingCube cube, out GeoPoint2D uv)
+        public override bool HitTest(BoundingBox cube, out GeoPoint2D uv)
         {
             return BoxedSurfaceEx.HitTest(cube, out uv);
         }
@@ -5353,11 +5353,11 @@ namespace CADability.GeoObject
             }
         }
 
-        private BoundingCube PolesExtent
+        private BoundingBox PolesExtent
         {
             get
             {
-                BoundingCube res = BoundingCube.EmptyBoundingCube;
+                BoundingBox res = BoundingBox.EmptyBoundingCube;
                 for (int i = 0; i < poles.GetLength(0); i++)
                 {
                     for (int j = 0; j < poles.GetLength(1); j++)

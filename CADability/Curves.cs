@@ -272,13 +272,13 @@ namespace CADability.GeoObject
         /// Returns the bounging cube for this curve
         /// </summary>
         /// <returns>The cube bounding this curve</returns>
-        BoundingCube GetExtent();
+        BoundingBox GetExtent();
         /// <summary>
         /// Determins whether this curve interferes with the provided cube.
         /// </summary>
         /// <param name="cube">Cube to check interference with</param>
         /// <returns>True, if curve and cube interfere</returns>
-        bool HitTest(BoundingCube cube);
+        bool HitTest(BoundingBox cube);
         /// <summary>
         /// Returns some positions (parameter values between 0.0 and 1.0) that can savely be used for Approximation purposes
         /// Usually not used by external applications

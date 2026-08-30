@@ -249,7 +249,7 @@ namespace CADability
         {
             get
             {
-                BoundingCube bc = toShow.GetExtent();
+                BoundingBox bc = toShow.GetExtent();
                 ModOp mop;
                 if (bc.Xmax - bc.Xmin > bc.Ymax - bc.Ymin)
                 {

@@ -79,7 +79,7 @@ namespace CADability
                     }
                 }
                 GeoObjectList result = listStack.Pop();
-                BoundingCube ext = result.GetExtent();
+                BoundingBox ext = result.GetExtent();
                 ModOp reflect = ModOp.ReflectPlane(new Plane(new GeoPoint(0, (ext.Ymax + ext.Ymin) / 2.0, 0), GeoVector.YAxis));
                 result.Modify(reflect);
                 return result;

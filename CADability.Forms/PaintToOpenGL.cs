@@ -772,7 +772,7 @@ namespace CADability.Forms
         {
             backgroundColor = color;
         }
-        void IPaintTo3D.SetProjection(Projection projection, BoundingCube boundingCube)
+        void IPaintTo3D.SetProjection(Projection projection, BoundingBox boundingCube)
         {
             // System.Diagnostics.Trace.WriteLine("SetProjection: " + boundingCube.ToString());
             if (Wgl.wglGetCurrentContext() != renderContext) (this as IPaintTo3D).MakeCurrent();
@@ -2114,12 +2114,12 @@ namespace CADability.Forms
             }
         }
         #endregion
-        public static Bitmap PaintToBitmap(GeoObjectList list, GeoVector viewDirection, int width, int height, BoundingCube? extent = null)
+        public static Bitmap PaintToBitmap(GeoObjectList list, GeoVector viewDirection, int width, int height, BoundingBox? extent = null)
         {
             Bitmap bmp = new Bitmap(width, height);
             System.Drawing.Graphics gr = System.Drawing.Graphics.FromImage(bmp);
             IntPtr dc = gr.GetHdc();
-            BoundingCube bc;
+            BoundingBox bc;
             if (extent.HasValue) bc = extent.Value;
             else bc = list.GetExtent();
             PaintToOpenGL paintTo3D = new PaintToOpenGL(bc.Size / Math.Max(width, height));

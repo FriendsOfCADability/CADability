@@ -766,7 +766,7 @@ namespace CADability
             ipaintTo3D.Clear(BackgroundColor);
 
             ipaintTo3D.UseZBuffer(true);
-            BoundingCube bc = model.Extent;
+            BoundingBox bc = model.Extent;
             bc.MinMax(model.MinExtend);
             // sicherstellen, dass die komplette Rasterebene auch mit angezeigt wird
             BoundingRect ext = BoundingRect.EmptyBoundingRect;

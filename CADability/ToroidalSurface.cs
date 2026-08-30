@@ -2332,12 +2332,12 @@ namespace CADability.GeoObject
         }
 
         /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.HitTest (BoundingCube, out GeoPoint2D)"/>
+        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.HitTest (BoundingBox, out GeoPoint2D)"/>
         /// </summary>
         /// <param name="bc"></param>
         /// <param name="uv"></param>
         /// <returns></returns>
-        public override bool HitTest(BoundingCube bc, out GeoPoint2D uv)
+        public override bool HitTest(BoundingBox bc, out GeoPoint2D uv)
         {
             // any vertex of the cube on the torus?
             uv = GeoPoint2D.Origin;

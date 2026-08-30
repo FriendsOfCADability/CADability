@@ -373,7 +373,7 @@ namespace CADability
 
             if (!GlobalSettings.ContainsSetting("DefaultModelSize"))
             {
-                GlobalSettings.AddSetting("DefaultModelSize", new BoundingCube(0, 100, 0, 100, 0, 100));
+                GlobalSettings.AddSetting("DefaultModelSize", new BoundingBox(0, 100, 0, 100, 0, 100));
             }
             if (!GlobalSettings.ContainsSetting("Formatting"))
             {

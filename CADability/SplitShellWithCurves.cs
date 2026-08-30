@@ -289,7 +289,7 @@ namespace CADability.GeoObject
         }
         private Face FindClosestFace(GeoPoint toPoint)
         {
-            Face[] near = faceOcttree.GetObjectsFromBox(new BoundingCube(toPoint, precision));
+            Face[] near = faceOcttree.GetObjectsFromBox(new BoundingBox(toPoint, precision));
             double minDist = double.MaxValue;
             Face found = null;
             for (int i = 0; i < near.Length; i++)

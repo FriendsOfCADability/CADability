@@ -134,7 +134,7 @@ namespace CADability.Actions
 
 
             base.SetInput(reflectPoint, reflectLine, reflectPlane, copy);
-            BoundingCube result = BoundingCube.EmptyBoundingCube;
+            BoundingBox result = BoundingBox.EmptyBoundingCube;
             foreach (IGeoObject go in originals)
             {
                 result.MinMax(go.GetBoundingCube());

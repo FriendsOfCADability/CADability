@@ -1027,13 +1027,13 @@ namespace CADability
             object o = Settings.GlobalSettings.GetValue("DefaultModelSize");
             if (o != null)
             {
-                if (o is BoundingCube) m.Extent = (BoundingCube)o;
-                else if (o is List<object> lo) m.Extent = new BoundingCube((double)lo[0], (double)lo[1], (double)lo[2], (double)lo[3], (double)lo[4], (double)lo[5]);
-                else m.Extent = new BoundingCube(0, 100, 0, 100, 0, 100);
+                if (o is BoundingBox) m.Extent = (BoundingBox)o;
+                else if (o is List<object> lo) m.Extent = new BoundingBox((double)lo[0], (double)lo[1], (double)lo[2], (double)lo[3], (double)lo[4], (double)lo[5]);
+                else m.Extent = new BoundingBox(0, 100, 0, 100, 0, 100);
             }
             else
             {
-                m.Extent = new BoundingCube(0, 100, 0, 100, 0, 100);
+                m.Extent = new BoundingBox(0, 100, 0, 100, 0, 100);
             }
             res.AddModel(m);
             res.SetActiveModel(0);

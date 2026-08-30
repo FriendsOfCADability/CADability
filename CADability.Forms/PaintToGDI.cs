@@ -749,7 +749,7 @@ namespace CADability.Forms
             graphics.DrawImage(bitmap, destPoints);
         }
 
-        void IPaintTo3D.SetProjection(Projection projection, BoundingCube boundingCube)
+        void IPaintTo3D.SetProjection(Projection projection, BoundingBox boundingCube)
         {
             this.projection = projection;
         }
@@ -1191,7 +1191,7 @@ namespace CADability.Forms
             graphics = Graphics.FromImage(bitmap);
             graphics.SetClip(new RectangleF(0.0f, 0.0f, (float)width, (float)height));
             projection = new Projection(Projection.StandardProjection.FromTop); // nur eine Voreinstellung
-            projection.GetOpenGLProjection(0, width, 0, height, BoundingCube.UnitBoundingCube); // zur Bestimmung von clientRect in Projection
+            projection.GetOpenGLProjection(0, width, 0, height, BoundingBox.UnitBoundingBox); // zur Bestimmung von clientRect in Projection
             Brush wbr = new SolidBrush(Color.White);
             graphics.FillRectangle(wbr, new RectangleF(0.0f, 0.0f, (float)width, (float)height));
             (this as IPaintTo3D).Precision = 0.5; // weniger als ein pixel

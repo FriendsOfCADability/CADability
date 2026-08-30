@@ -1159,7 +1159,7 @@ namespace CADability
                     return true;
                 case "MenuId.Projection.Direction.Perspective":
                     {
-                        BoundingCube ext = ActiveView.Model.Extent;
+                        BoundingBox ext = ActiveView.Model.Extent;
                         GeoPoint viewPoint = ext.GetCenter() + ext.Size * new GeoVector(1, 1, 1);
                         ActiveView.Projection.SetPerspective(viewPoint, new GeoVector(-1, -1, -1), ext, ext.GetCenter());
                         ActiveView.InvalidateAll();

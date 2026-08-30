@@ -228,12 +228,12 @@ namespace CADability
             throw new NotImplementedException();
         }
 
-        public bool HitTest(BoundingCube cube, double umin, double umax, double vmin, double vmax)
+        public bool HitTest(BoundingBox cube, double umin, double umax, double vmin, double vmax)
         {
             throw new NotImplementedException();
         }
 
-        public bool HitTest(BoundingCube cube, out GeoPoint2D uv)
+        public bool HitTest(BoundingBox cube, out GeoPoint2D uv)
         {
             throw new NotImplementedException();
         }
@@ -253,7 +253,7 @@ namespace CADability
             throw new NotImplementedException();
         }
 
-        public BoundingCube GetPatchExtent(BoundingRect uvPatch, bool rough)
+        public BoundingBox GetPatchExtent(BoundingRect uvPatch, bool rough)
         {
             throw new NotImplementedException();
         }

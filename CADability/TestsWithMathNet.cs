@@ -1153,7 +1153,7 @@ namespace CADability
             {   // this might be the case when the optimal plane geos through the origin
                 // then we need to move the point cloud
                 // a goo direction seems to be the axis direction where the extent is smallest
-                BoundingCube ext = new BoundingCube(points.ToArray());
+                BoundingBox ext = new BoundingBox(points.ToArray());
                 int ind;
                 if (ext.XDiff < ext.YDiff && ext.XDiff < ext.ZDiff) ind = 0;
                 else if (ext.YDiff < ext.XDiff && ext.YDiff < ext.ZDiff) ind = 1;
@@ -1214,7 +1214,7 @@ namespace CADability
                 A[i, 8] = 2 * points[i].z;
                 B[i] = -1;
             }
-            double size = new BoundingCube(points.ToArray()).Size;
+            double size = new BoundingBox(points.ToArray()).Size;
             Vector res = (Vector)A.Transpose().Multiply(A).Solve(A.Transpose().Multiply(B));
             if (res.IsValid())
             {

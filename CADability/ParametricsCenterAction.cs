@@ -129,7 +129,7 @@ namespace CADability.Actions
             GeoVector normal = GeoVector.NullVector; // this vector defines a plane for the movement
             GeoPoint startPoint = GeoPoint.Invalid, endPoint = GeoPoint.Invalid;
             // preliminary: only extent implemented
-            BoundingCube ext = new BoundingCube(facesToBeCentered);
+            BoundingBox ext = new BoundingBox(facesToBeCentered);
             pointToCenter = ext.GetCenter();
             if (centerOntoObjects.Count() == 1)
             {   // if we have a single axis, this is the center, regardless of ratio

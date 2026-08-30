@@ -80,14 +80,14 @@ namespace CADability.Actions
             paintTo3D.UseZBuffer(true);
         }
 
-        BoundingCube IFeedBack.GetExtent()
+        BoundingBox IFeedBack.GetExtent()
         {
             GeoPoint[] pnts = new GeoPoint[4];
             pnts[0] = pln.ToGlobal(new GeoPoint2D(-width / 2, -height / 2));
             pnts[1] = pln.ToGlobal(new GeoPoint2D(width / 2, -height / 2));
             pnts[2] = pln.ToGlobal(new GeoPoint2D(width / 2, height / 2));
             pnts[3] = pln.ToGlobal(new GeoPoint2D(-width / 2, height / 2));
-            BoundingCube res = BoundingCube.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingCube;
             for (int i = 0; i < 4; i++)
             {
                 res.MinMax(pnts[i]);

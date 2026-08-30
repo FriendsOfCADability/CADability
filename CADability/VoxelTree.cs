@@ -28,34 +28,34 @@ namespace CADability
         {
             byte[] voxels;
             int index;
-            BoundingCube current;
-            public VoxelIterator(VoxelTree vt) //byte[] voxels, int index, BoundingCube start)
+            BoundingBox current;
+            public VoxelIterator(VoxelTree vt) //byte[] voxels, int index, BoundingBox start)
             {
                 voxels = vt.voxels;
                 index = 0;
                 double size;
-                current = new BoundingCube();
+                current = new BoundingBox();
                 if (vt.baseCube >= 0) size = 1 << vt.baseCube;
                 else size = 1.0 / (1 << -vt.baseCube);
-                current.Set(-size, size, -size, size, -size, size); // this BoundingCube contains the whole object
+                current.Set(-size, size, -size, size, -size, size); // this BoundingBox contains the whole object
                 for (int i = 0; i < vt.startCube.Length; i++)
                 {
                     GeoPoint m = current.GetCenter();
                     switch (vt.startCube[i])
                     {
-                        case 0: current = new BoundingCube(m.x, current.Xmax, m.y, current.Ymax, m.z, current.Zmax); break;
-                        case 1: current = new BoundingCube(current.Xmin, m.x, m.y, current.Ymax, m.z, current.Zmax); break;
-                        case 2: current = new BoundingCube(m.x, current.Xmax, current.Ymin, m.y, m.z, current.Zmax); break;
-                        case 3: current = new BoundingCube(current.Xmin, m.x, current.Ymin, m.y, m.z, current.Zmax); break;
-                        case 4: current = new BoundingCube(m.x, current.Xmax, m.y, current.Ymax, current.Zmin, m.z); break;
-                        case 5: current = new BoundingCube(current.Xmin, m.x, m.y, current.Ymax, current.Zmin, m.z); break;
-                        case 6: current = new BoundingCube(m.x, current.Xmax, current.Ymin, m.y, current.Zmin, m.z); break;
-                        case 7: current = new BoundingCube(current.Xmin, m.x, current.Ymin, m.y, current.Zmin, m.z); break;
+                        case 0: current = new BoundingBox(m.x, current.Xmax, m.y, current.Ymax, m.z, current.Zmax); break;
+                        case 1: current = new BoundingBox(current.Xmin, m.x, m.y, current.Ymax, m.z, current.Zmax); break;
+                        case 2: current = new BoundingBox(m.x, current.Xmax, current.Ymin, m.y, m.z, current.Zmax); break;
+                        case 3: current = new BoundingBox(current.Xmin, m.x, current.Ymin, m.y, m.z, current.Zmax); break;
+                        case 4: current = new BoundingBox(m.x, current.Xmax, m.y, current.Ymax, current.Zmin, m.z); break;
+                        case 5: current = new BoundingBox(current.Xmin, m.x, m.y, current.Ymax, current.Zmin, m.z); break;
+                        case 6: current = new BoundingBox(m.x, current.Xmax, current.Ymin, m.y, current.Zmin, m.z); break;
+                        case 7: current = new BoundingBox(current.Xmin, m.x, current.Ymin, m.y, current.Zmin, m.z); break;
                     }
                 }
 
             }
-            public IEnumerable<BoundingCube> AllBoundingCubes
+            public IEnumerable<BoundingBox> AllBoundingCubes
             {
                 get
                 {
@@ -67,15 +67,15 @@ namespace CADability
                     }
                     else
                     {
-                        BoundingCube start = current;
-                        BoundingCube[] sc = VoxelTree.subCubes(current);
+                        BoundingBox start = current;
+                        BoundingBox[] sc = VoxelTree.subCubes(current);
                         for (int i = 0; i < 8; i++)
                         {
                             if ((pattern & 1 << i) != 0)
                             {
                                 ++index;
                                 current = sc[i];
-                                foreach (BoundingCube sb in AllBoundingCubes)
+                                foreach (BoundingBox sb in AllBoundingCubes)
                                 {
                                     yield return sb;
                                 }
@@ -93,8 +93,8 @@ namespace CADability
         /// <param name="precision">the precision, size of the smallest voxel</param>
         public VoxelTree(IOctTreeInsertable obj, double precision)
         {
-            BoundingCube ext = obj.GetExtent(precision);
-            BoundingCube unit = new BoundingCube(-1, 1, -1, 1, -1, 1);
+            BoundingBox ext = obj.GetExtent(precision);
+            BoundingBox unit = new BoundingBox(-1, 1, -1, 1, -1, 1);
             baseCube = 1;
             double size = 1;
             while (unit.Contains(ext))
@@ -116,12 +116,12 @@ namespace CADability
             }
             if (baseCube >= 0) size = 1 << baseCube;
             else size = 1.0 / (1 << -baseCube);
-            unit.Set(-size, size, -size, size, -size, size); // this BoundingCube contains the whole object
+            unit.Set(-size, size, -size, size, -size, size); // this BoundingBox contains the whole object
             List<byte> startCubesList = new List<byte>();
             do
             {
                 byte found = 255;
-                BoundingCube[] sc = subCubes(unit);
+                BoundingBox[] sc = subCubes(unit);
                 for (byte i = 0; i < 8; i++)
                 {
                     if (sc[i].Contains(ext))
@@ -147,27 +147,27 @@ namespace CADability
             voxels = voxelList.ToArray();
         }
 
-        static BoundingCube[] subCubes(BoundingCube start)
+        static BoundingBox[] subCubes(BoundingBox start)
         {
             GeoPoint m = start.GetCenter();
-            BoundingCube[] res = new BoundingCube[8];
-            res[0] = new BoundingCube(m.x, start.Xmax, m.y, start.Ymax, m.z, start.Zmax);
-            res[1] = new BoundingCube(start.Xmin, m.x, m.y, start.Ymax, m.z, start.Zmax);
-            res[2] = new BoundingCube(m.x, start.Xmax, start.Ymin, m.y, m.z, start.Zmax);
-            res[3] = new BoundingCube(start.Xmin, m.x, start.Ymin, m.y, m.z, start.Zmax);
-            res[4] = new BoundingCube(m.x, start.Xmax, m.y, start.Ymax, start.Zmin, m.z);
-            res[5] = new BoundingCube(start.Xmin, m.x, m.y, start.Ymax, start.Zmin, m.z);
-            res[6] = new BoundingCube(m.x, start.Xmax, start.Ymin, m.y, start.Zmin, m.z);
-            res[7] = new BoundingCube(start.Xmin, m.x, start.Ymin, m.y, start.Zmin, m.z);
+            BoundingBox[] res = new BoundingBox[8];
+            res[0] = new BoundingBox(m.x, start.Xmax, m.y, start.Ymax, m.z, start.Zmax);
+            res[1] = new BoundingBox(start.Xmin, m.x, m.y, start.Ymax, m.z, start.Zmax);
+            res[2] = new BoundingBox(m.x, start.Xmax, start.Ymin, m.y, m.z, start.Zmax);
+            res[3] = new BoundingBox(start.Xmin, m.x, start.Ymin, m.y, m.z, start.Zmax);
+            res[4] = new BoundingBox(m.x, start.Xmax, m.y, start.Ymax, start.Zmin, m.z);
+            res[5] = new BoundingBox(start.Xmin, m.x, m.y, start.Ymax, start.Zmin, m.z);
+            res[6] = new BoundingBox(m.x, start.Xmax, start.Ymin, m.y, start.Zmin, m.z);
+            res[7] = new BoundingBox(start.Xmin, m.x, start.Ymin, m.y, start.Zmin, m.z);
             return res;
         }
-        private void Add(List<byte> voxelList, BoundingCube test, IOctTreeInsertable obj, double precision)
+        private void Add(List<byte> voxelList, BoundingBox test, IOctTreeInsertable obj, double precision)
         {
             int ind = voxelList.Count;
             voxelList.Add(0); // 0 means: this is a final voxel, belonging to the object (we know, test interferes with the object)
             if (test.XDiff > precision)
             {
-                BoundingCube[] sc = subCubes(test);
+                BoundingBox[] sc = subCubes(test);
                 for (int i = 0; i < 8; i++)
                 {
                     if (obj.HitTest(ref sc[i], precision))
@@ -178,7 +178,7 @@ namespace CADability
                 }
             }
         }
-        internal IEnumerable<BoundingCube> AllBoundingCubes
+        internal IEnumerable<BoundingBox> AllBoundingCubes
         {
             get
             {
@@ -191,7 +191,7 @@ namespace CADability
             get
             {
                 GeoObjectList res = new GeoObjectList();
-                foreach (BoundingCube boundingCube in AllBoundingCubes)
+                foreach (BoundingBox boundingCube in AllBoundingCubes)
                 {
                     res.Add(boundingCube.AsBox);
                 }

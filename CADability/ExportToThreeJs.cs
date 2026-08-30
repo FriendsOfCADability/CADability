@@ -333,7 +333,7 @@ namespace CADability
             GeoPoint[] trianglePoint;
             GeoPoint2D[] triangleUVPoint;
             int[] triangleIndex;
-            BoundingCube triangleExtent;
+            BoundingBox triangleExtent;
             fce.GetTriangulation(precision, out trianglePoint, out triangleUVPoint, out triangleIndex, out triangleExtent);
             for (int i = 0; i < trianglePoint.Length; i++)
             {

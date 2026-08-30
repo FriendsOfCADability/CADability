@@ -85,7 +85,7 @@ namespace CADability.Actions
                 {
                     Face fc = TheGeoObjects[i] as Face;
                     // man könnte hier den Tangentialpunkt bestimmen, vorläufig nur mit Ebenen Flächen
-                    //BoundingCube bc = fc.GetBoundingCube();
+                    //BoundingBox bc = fc.GetBoundingCube();
                     //bc.GetCenter();
                     //Edge e = new Edge(null,
                     //fc.Intersect(

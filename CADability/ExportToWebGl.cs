@@ -517,7 +517,7 @@ namespace CADability
             [DataMember]
             public List<MemSeg> msg;
             [DataMember]
-            public BoundingCube ext;
+            public BoundingBox ext;
             [DataMember]
             public GeoVector ipd; // initialProjectionDirection
             [DataMember]

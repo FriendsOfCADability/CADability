@@ -279,7 +279,7 @@ namespace CADability
         /// </summary>
         /// <param name="projection">The projection</param>
         /// <param name="boundingCube">The bounding cube, may be used for clipping</param>
-        void SetProjection(Projection projection, BoundingCube boundingCube);
+        void SetProjection(Projection projection, BoundingBox boundingCube);
         /// <summary>
         /// Clear the whole area with this color. Used before painting objects.
         /// </summary>
@@ -612,7 +612,7 @@ namespace CADability
         /// <param name="paintTo3D">The IPaintTo3D interface of the instance beeing involved</param>
         /// <param name="projection">The projetion that has been set</param>
         /// <param name="boundingCube">The bounding cube for the display</param>
-        public delegate void SetProjectionDelegate(IntPtr renderContext, IPaintTo3D paintTo3D, Projection projection, BoundingCube boundingCube);
+        public delegate void SetProjectionDelegate(IntPtr renderContext, IPaintTo3D paintTo3D, Projection projection, BoundingBox boundingCube);
         /// <summary>
         /// Event that is raised when the projection of the OpenGL view was changed. You can modify the light sources and direction.
         /// The original code for setting the light model is:
@@ -627,7 +627,7 @@ namespace CADability
         /// </code>
         /// </summary>
         public static event SetProjectionDelegate SetProjectionEvent;
-        internal static void InvokeSetProjection(IntPtr renderContext, IPaintTo3D paintTo3D, Projection projection, BoundingCube boundingCube)
+        internal static void InvokeSetProjection(IntPtr renderContext, IPaintTo3D paintTo3D, Projection projection, BoundingBox boundingCube)
         {
             if (SetProjectionEvent != null)
             {
@@ -643,13 +643,13 @@ namespace CADability
         /// <param name="width">of the bitmap</param>
         /// <param name="height">of the bitmap</param>
         /// <returns></returns>
-        public static Bitmap PaintToBitmap(GeoObjectList list, GeoVector viewDirection, int width, int height, BoundingCube? extent = null)
+        public static Bitmap PaintToBitmap(GeoObjectList list, GeoVector viewDirection, int width, int height, BoundingBox? extent = null)
         {
             throw new NotImplementedException("PaintToBitmap not implemented, maybe implement in CADability.Forms");
             //Bitmap bmp = new Bitmap(width, height);
             //Graphics gr = Graphics.FromImage(bmp);
             //IntPtr dc = gr.GetHdc();
-            //BoundingCube bc;
+            //BoundingBox bc;
             //if (extent.HasValue) bc = extent.Value;
             //else bc = list.GetExtent();
             //PaintToOpenGl paintTo3D = new PaintToOpenGl(bc.Size / Math.Max(width, height));

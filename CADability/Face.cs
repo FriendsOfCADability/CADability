@@ -3336,6 +3336,114 @@ namespace CADability.GeoObject
             res.orientedOutward = true;
             return res;
         }
+        public static Face MakeFace(ICurve curveToExtrude, GeoVector extrusion)
+        {
+            if (curveToExtrude is Ellipse e && e.IsArc && Precision.SameDirection(extrusion, e.Plane.Normal, false))
+            {
+                CylindricalSurface surface = new CylindricalSurface(e.Center, e.MajorAxis, e.MinorAxis, extrusion);
+                Face res = Face.Construct();
+                Edge e1 = new Edge(res, e.Clone() as ICurve, res, surface.GetProjectedCurve(e, 0.0), true);
+                ICurve opposite = curveToExtrude.CloneModified(ModOp.Translate(extrusion));
+                opposite.Reverse();
+                Edge e3 = new Edge(res, opposite, res, surface.GetProjectedCurve(opposite, 0.0), true);
+                ICurve l2 = Line.TwoPoints(e.EndPoint, e.EndPoint + extrusion);
+                Edge e2 = new Edge(res, l2, res, surface.GetProjectedCurve(l2, 0.0), true);
+                ICurve l4 = Line.TwoPoints(e.StartPoint, e.StartPoint + extrusion);
+                l4.Reverse();
+                Edge e4 = new Edge(res, l4, res, surface.GetProjectedCurve(l4, 0.0), true);
+                res.Set(surface, new Edge[][] { new Edge[] { e1, e2, e3, e4 } }, true);
+                return res;
+            }
+            return null;
+        }
+        public static Face MakeNonPolarSphere(Ellipse Arc0, Ellipse Arc1, Ellipse Arc2)
+        {
+            GeoPoint Center = Arc0.Center;
+            GeoPoint A = Arc0.StartPoint;
+            GeoPoint B = Arc0.EndPoint;
+            GeoPoint C;
+            if (!Precision.IsEqual(Arc1.StartPoint, A) && !Precision.IsEqual(Arc1.StartPoint, B)) C = Arc1.StartPoint;
+            else C = Arc1.EndPoint;
+            // Gegeben: Center C, Radius R, drei Eckpunkte A,B,C3 und drei Bögen arcAB, arcBC, arcCA (mit .Normal)
+            // Ziel: Achsrichtung a (Einheitsvektor), deren Pole nicht im Dreieck liegen
+
+            GeoVector vA = (A - Center).Normalized;
+            GeoVector vB = (B - Center).Normalized;
+            GeoVector vC = (C - Center).Normalized;
+
+            GeoVector nAB = Arc0.Normal.Normalized;
+            GeoVector nBC = Arc1.Normal.Normalized;
+            GeoVector nCA = Arc2.Normal.Normalized;
+
+            // Innenorientierung herstellen
+            if ((nAB * vC) < 0) nAB = -nAB;
+            if ((nBC * vA) < 0) nBC = -nBC;
+            if ((nCA * vB) < 0) nCA = -nCA;
+
+            // Innenpunkt als Summe der Innen-Normalen
+            GeoVector m = (nAB + nBC + nCA);
+            if (m.Length < 1e-12) throw new InvalidOperationException("Degeneriertes sphärisches Dreieck.");
+            m = m.Normalized;
+
+            // Achse orthogonal zu m
+            GeoVector a = (m ^ vA);
+            if (a.Length < 1e-12) a = (m ^ vB);
+            if (a.Length < 1e-12) a = (m ^ vC);
+            if (a.Length < 1e-12) throw new InvalidOperationException("Numerisch instabil.");
+            a = a.Normalized; // <- gesuchte Achsrichtung
+
+            double radius = Arc0.Radius;
+            GeoVector directionz = a;
+            a.ArbitraryNormals(out GeoVector directionx, out GeoVector directiony);
+            directionx.Length = radius;
+            directiony.Length = radius;
+            directionz.Length = radius;
+            SphericalSurface sphericalSurface = new SphericalSurface(Center, directionx, directiony, directionz);
+            // it is important to set the bounds of the spherical surface according to the triangle so MakeFace can create the correct edges
+            BoundingRect domain = BoundingRect.EmptyBoundingRect;
+            domain.MinMax(sphericalSurface.PositionOf(A));
+            GeoPoint2D uv = sphericalSurface.PositionOf(B);
+            SurfaceHelper.AdjustPeriodic(sphericalSurface, domain, ref uv);
+            domain.MinMax(uv);
+            uv = sphericalSurface.PositionOf(C);
+            SurfaceHelper.AdjustPeriodic(sphericalSurface, domain, ref uv);
+            domain.MinMax(uv);
+            sphericalSurface.SetBounds(domain);
+
+            return MakeFace(sphericalSurface, new List<ICurve>(new ICurve[] { Arc0, Arc1, Arc2 }));
+        }
+        public static Face[] MakeNonPolarSphere(GeoPoint location, GeoVector zAxis)
+        {
+            double invsqrt2 = 1.0 / Math.Sqrt(2.0);
+            // start in the unit system
+            Ellipse e0 = Ellipse.Construct();
+            // construct the reference ellipse in the xy plane
+            e0.SetArcPlaneCenterStartEndPoint(Plane.XYPlane, GeoPoint2D.Origin, new GeoPoint2D(0, invsqrt2), new GeoPoint2D(0, -invsqrt2), Plane.XYPlane, true);
+            Ellipse e1 = (e0 as ICurve).CloneModified(ModOp.Translate(0, 0, invsqrt2)) as Ellipse;
+            (e1 as ICurve).Reverse();
+            Ellipse e4 = (e0 as ICurve).CloneModified(ModOp.Rotate(GeoVector.YAxis, new SweepAngle(Math.PI)) * ModOp.Translate(0, -invsqrt2, 0) * ModOp.Rotate(GeoVector.XAxis, new SweepAngle(Math.PI / 2))) as Ellipse;
+            Ellipse e2 = (e0 as ICurve).CloneModified(ModOp.Rotate(GeoVector.YAxis, new SweepAngle(Math.PI)) * ModOp.Translate(0, invsqrt2, 0) * ModOp.Rotate(GeoVector.XAxis, new SweepAngle(-Math.PI / 2))) as Ellipse;
+            Ellipse e3 = (e0 as ICurve).CloneModified(ModOp.Translate(0, 0, -invsqrt2)) as Ellipse;
+            SphericalSurface ss = new SphericalSurface(ModOp.Identity);
+            Face fc1 = MakeFace(ss, new Edge[] {
+                new Edge(null,e1,null,ss.GetProjectedCurve(e1,0),true),
+                new Edge(null,e2,null,ss.GetProjectedCurve(e2,0),true),
+                new Edge(null,e3,null,ss.GetProjectedCurve(e3,0),true),
+                new Edge(null,e4,null,ss.GetProjectedCurve(e4,0),true)
+            });
+            Face fc2 = fc1.Clone() as Face;
+            fc2.Modify(ModOp.Rotate(GeoVector.ZAxis, new SweepAngle(Math.PI)) * ModOp.Rotate(GeoVector.XAxis, new SweepAngle(Math.PI / 2)));
+            ModOp toLocation = ModOp.Translate(location.ToVector()) * ModOp.Scale(zAxis.Length) * ModOp.Rotate(GeoPoint.Origin, GeoVector.XAxis, zAxis);
+            fc1.Modify(toLocation);
+            fc2.Modify(toLocation);
+            return new Face[] { fc1, fc2 };
+        }
+        /// <summary>
+        /// Create a face with the provided surface and an (unordered) set of ICurves, which define the outline
+        /// </summary>
+        /// <param name="surface"></param>
+        /// <param name="outline"></param>
+        /// <returns></returns>
         internal static Face MakeFace(ISurface surface, List<Edge[]> edges, Face toReplace)
         {
             Face res = Face.Construct();

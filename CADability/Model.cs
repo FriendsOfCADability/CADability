@@ -308,6 +308,17 @@ namespace CADability
 				if (!data.CancellationToken.IsCancellationRequested) //If the background thread was aborted during waiting the pool threads, this precision was not computed til the end, ignore it.
 				{
 					displayListPrecision = data.Precision;
+
+					// Triangulating a large smooth surface allocates far more transient data than
+					// remains cached; the aggressive collection also returns the committed heap
+					// segments of that churn to the OS (an ordinary compaction left the process
+					// at ~1 GB working set with only 55 MB of live objects). It must run BEFORE
+					// NewDisplaylistAvailableEvent: that event invalidates the views, so the UI
+					// thread starts rebuilding the display lists immediately and a collection
+					// afterwards would run concurrently with (and be defeated by) that churn.
+					// We are on a background thread, nothing else is running at this point.
+					CollectAggressive();
+
 					displayListsDirty = true; // damits einen Repaint gibt
 											  // System.Diagnostics.Trace.WriteLine("NewDisplaylistAvailableEvent, Genauigkeit: " + precision.ToString());
 					if (NewDisplaylistAvailableEvent != null) NewDisplaylistAvailableEvent(this);
@@ -325,32 +336,61 @@ namespace CADability
 			}
 		}
 
+		/// <summary>
+		/// Full blocking collection that also returns committed heap segments to the OS.
+		/// Triangulating large smooth surfaces leaves the process with hundreds of MB of
+		/// committed-but-empty GC segments (e.g. 55 MB of live objects in a 1 GB working
+		/// set); an ordinary forced compacting collection cleans the heap but never
+		/// decommits. On .NET 7+ GCCollectionMode.Aggressive (enum value 4) does; older
+		/// runtimes fall back to a plain compacting collection.
+		/// </summary>
+		private static void CollectAggressive()
+		{
+			try
+			{
+				GC.Collect(2, (GCCollectionMode)4, true, true); // GCCollectionMode.Aggressive, .NET 7+
+			}
+			catch (ArgumentException)
+			{
+				System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+				GC.Collect(2, GCCollectionMode.Forced, true, true);
+			}
+		}
+
 		internal void RecalcDisplayLists(IPaintTo3D paintTo3D)
 		{   // wird vom Paint in ProjectedModel aufgerufen, wenn dieser "dirty" ist
 			// kann aber nacheinander von mehreren ProjectedModels aufgerufen werden und soll nur einmal berechnet werden
 			if (paintTo3D.Precision < displayListPrecision && !paintTo3D.DontRecalcTriangulation)
 			{
-				double recalcPrecision = paintTo3D.Precision / 2.0; // /2.0, damit es nicht sooft drankommt
-				if (manageBackgroundRecalc != null)
+				// Compute exactly the precision that is displayed. This used to be
+				// paintTo3D.Precision / 2.0 ("damit es nicht sooft drankommt"), but that
+				// speculation started a full re-triangulation at four times the displayed
+				// triangle count after every zoom pause — for a single sphere that was a 20
+				// second background burn allocating gigabytes, followed by another complete
+				// display list rebuild for detail nobody had asked for. Zooming further in
+				// now simply starts the next round at the then needed precision.
+				double recalcPrecision = paintTo3D.Precision;
+				// safety net: never triangulate finer than the finest precision ModelView can
+				// ever request (Extent.MaxSide/HighestDisplayPrecision)
+				double precisionFactor = Settings.GlobalSettings.GetDoubleValue("HighestDisplayPrecision", 1e5);
+				double finestUseful = Extent.MaxSide / precisionFactor;
+				if (recalcPrecision < finestUseful) recalcPrecision = finestUseful;
+				if (recalcPrecision < displayListPrecision) // otherwise there is nothing finer to compute
 				{
-					if (recalcPrecision >= backgroundRecalcPrecision) //If zooming a lot after a while the precision doesn't change anymore.
+					if (manageBackgroundRecalc != null)
 					{
+						// A computation is already running. Do not abort and respawn it for every
+						// zoom notch: during a fast zoom gesture that produced a cascade of aborted
+						// rounds, each leaving hundreds of MB of partial triangulation garbage.
+						// Let it finish — the next paint still sees Precision < displayListPrecision
+						// and starts the finer level then, so the display converges sequentially.
 						return;
 					}
-
-					// abbrechen und warten
-					Thread t = manageBackgroundRecalc;
-					if (t != null)
-					{
-						//System.Diagnostics.Trace.WriteLine("Background Task abgebrochen, Genauigkeit: " + paintTo3D.Precision.ToString());
-						AbortBackgroundRecalc();
-						t.Join(); // manageBackgroundRecalc kann hier drin null werden
-					}
+					cancellationTokenSource = new CancellationTokenSource();
+					manageBackgroundRecalc = new Thread(DoBackgroundRecalcDisplayList);
+					manageBackgroundRecalc.Start(new DoBackgroundRecalcDisplayListData() { Precision = recalcPrecision, CancellationToken = cancellationTokenSource.Token }); // /2.0, damit es nicht sooft drankommt
+																																											  //System.Diagnostics.Trace.WriteLine("Background Task gestartet, Genauigkeit: " + paintTo3D.Precision.ToString());
 				}
-				cancellationTokenSource = new CancellationTokenSource();
-				manageBackgroundRecalc = new Thread(DoBackgroundRecalcDisplayList);
-				manageBackgroundRecalc.Start(new DoBackgroundRecalcDisplayListData() { Precision = recalcPrecision, CancellationToken = cancellationTokenSource.Token }); // /2.0, damit es nicht sooft drankommt
-																																										  //System.Diagnostics.Trace.WriteLine("Background Task gestartet, Genauigkeit: " + paintTo3D.Precision.ToString());
 			}
 			if (displayListsDirty) // nur wenn kein BackgroundRecalc läuft
 			{
@@ -410,6 +450,17 @@ namespace CADability
 					layerTransparentObjects.Clear();
 					layerCurveObjects.Clear();
 					displayListsDirty = false;
+					// Recording finely tessellated geometry churns through large transient
+					// arrays which ordinary collections do not reclaim promptly; without this
+					// the heap stayed at the churn peak (> 1 GB observed). This is the one
+					// reliably quiet-and-effective collection point (the background thread's
+					// own collect races the just-exiting workers), so the gate is an ABSOLUTE
+					// threshold: a delta gate missed the case where the heap was already
+					// ballooned entering the rebuild. Small models never reach it.
+					if (GC.GetTotalMemory(false) > 300 * 1024 * 1024)
+					{
+						CollectAggressive();
+					}
 				}
 				catch (PaintTo3DOutOfMemory)
 				{

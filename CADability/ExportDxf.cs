@@ -771,9 +771,10 @@ namespace CADability.DXF
         private Entity ExportSingleDimension(GeoObject.Dimension dim)
         {
             // GetList draws the dimension and, on the way, establishes its plane, which the
-            // definition points below and GetDimText rely on.
+            // definition points below and GetDimText rely on. An empty result is not a reason
+            // to give up: the definition points still describe the dimension, and a reader
+            // regenerates the picture from them - losing the object would be worse.
             GeoObjectList drawn = dim.GetList();
-            if (drawn == null || drawn.Count == 0) return null;
 
             ACadSharp.Entities.Dimension entity = null;
             GeoVector normal = dim.Normal;
@@ -820,9 +821,11 @@ namespace CADability.DXF
                         GeoPoint onCircle = center + dim.Radius * dir;
                         if (dim.DimType == GeoObject.Dimension.EDimType.DimRadius)
                         {
+                            // DXF puts a radial dimension's center in group 10 and its point
+                            // on the circle in group 15, the other way round than for a diameter
                             var radial = new ACadSharp.Entities.DimensionRadius();
-                            radial.AngleVertex = ToXYZ(center);
-                            radial.DefinitionPoint = ToXYZ(onCircle);
+                            radial.DefinitionPoint = ToXYZ(center);
+                            radial.AngleVertex = ToXYZ(onCircle);
                             radial.LeaderLength = Math.Max(0.0, (dim.DimLineRef - center).Length - dim.Radius);
                             entity = radial;
                         }
@@ -850,7 +853,7 @@ namespace CADability.DXF
             if (!string.IsNullOrEmpty(text)) entity.Text = text;
             try { entity.TextMiddlePoint = ToXYZ(dim.FindTextPosition(0)); }
             catch (Exception) { /* leave it to the reader */ }
-            entity.Block = MakeDimensionBlock(drawn);
+            entity.Block = MakeDimensionBlock(drawn); // null when there was nothing to draw
             return entity;
         }
 

@@ -2261,19 +2261,22 @@ namespace CADability.GeoObject
         {
             if (!extent.IsEmpty) return extent;
             GeoObjectList list = new GeoObjectList();
+            BoundingCube res = BoundingCube.EmptyBoundingCube;
             try
             {
                 // Recalc(new Projection(-Plane.Normal, plane.DirectionY), list);
                 Recalc(new Projection(-Plane.Normal, Precision.SameDirection(plane.Normal, GeoVector.ZAxis, false) ? plane.DirectionY : GeoVector.ZAxis), list);
+                for (int i = 0; i < list.Count; ++i)
+                {
+                    res.MinMax(list[i].GetBoundingCube());
+                }
             }
             catch (Exception e)
             {
+                // A part that cannot say how big it is (a text whose font is unavailable, for
+                // instance) leaves the extent at what was collected so far. Letting it through
+                // would cost the whole dimension the moment it is added to a model.
                 if (e is ThreadAbortException) throw (e);
-            }
-            BoundingCube res = BoundingCube.EmptyBoundingCube;
-            for (int i = 0; i < list.Count; ++i)
-            {
-                res.MinMax(list[i].GetBoundingCube());
             }
             return res;
         }

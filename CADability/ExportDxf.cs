@@ -24,6 +24,7 @@ namespace CADability.DXF
         private Dictionary<CADability.Attribute.Layer, ACadSharp.Tables.Layer> createdLayers;
         private Dictionary<CADability.Attribute.LinePattern, ACadSharp.Tables.LineType> createdLinePatterns;
         private Dictionary<string, ACadSharp.Tables.TextStyle> createdTextStyles;
+        private Dictionary<CADability.Attribute.DimensionStyle, ACadSharp.Tables.DimensionStyle> createdDimensionStyles;
         private HashSet<string> createdBlockNames;
         private int anonymousBlockCounter = 0;
         private double triangulationPrecision = 0.1;
@@ -36,6 +37,7 @@ namespace CADability.DXF
             createdLayers = new Dictionary<CADability.Attribute.Layer, ACadSharp.Tables.Layer>();
             createdLinePatterns = new Dictionary<CADability.Attribute.LinePattern, ACadSharp.Tables.LineType>();
             createdTextStyles = new Dictionary<string, ACadSharp.Tables.TextStyle>();
+            createdDimensionStyles = new Dictionary<CADability.Attribute.DimensionStyle, ACadSharp.Tables.DimensionStyle>();
             createdBlockNames = new HashSet<string>();
             if (version <= ACadVersion.AC1015)
                 RemovePostR2000Objects();
@@ -176,6 +178,7 @@ namespace CADability.DXF
                         entities = ExportPathWithoutBlock(path);
                     break;
                 case GeoObject.Text text: entity = ExportText(text); break;
+                case GeoObject.Dimension dimension: entities = ExportDimension(dimension); break;
                 case GeoObject.Hatch hatch: entity = ExportHatch(hatch); break;
                 case GeoObject.Block block: entity = ExportBlock(block); break;
                 case GeoObject.Face face: entity = ExportFace(face); break;
@@ -709,6 +712,261 @@ namespace CADability.DXF
                 }
             }
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Writes a CADability dimension as a real DXF DIMENSION rather than as loose lines.
+        /// The definition points and the dimension style go into the entity, and the picture
+        /// CADability drew goes into the anonymous block that every DIMENSION carries. A reader
+        /// that shows the block sees exactly what the user saw, one that regenerates still has
+        /// a dimension it can edit and measure.
+        /// Dimensions over more than two points become a chain of DXF dimensions, one per
+        /// measured section, because DXF has no multi point dimension. Labels and coordinate
+        /// dimensions have no DXF counterpart at all and keep their drawing as a block.
+        /// </summary>
+        private Entity[] ExportDimension(GeoObject.Dimension dim)
+        {
+            if (dim.DimensionStyle == null) return null;
+            List<Entity> result = new List<Entity>();
+            try
+            {
+                if (dim.DimType == GeoObject.Dimension.EDimType.DimPoints && dim.PointCount > 2)
+                {
+                    // Drawing the dimension establishes its plane, which GetDimText below
+                    // measures in. Without it the sections would carry the text of a dimension
+                    // lying in the XY plane, which is only right by accident.
+                    dim.GetList();
+                    for (int i = 0; i < dim.PointCount - 1; i++)
+                    {
+                        GeoObject.Dimension section = MakeSectionDimension(dim, i);
+                        Entity e = section == null ? null : ExportSingleDimension(section);
+                        if (e != null) result.Add(e);
+                    }
+                }
+                else
+                {
+                    Entity e = ExportSingleDimension(dim);
+                    if (e != null) result.Add(e);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine("dxf: dimension not written as DIMENSION ("
+                    + ex.Message + "), falling back to a block");
+                result.Clear();
+            }
+            if (result.Count == 0)
+            {
+                BlockRecord blockRec = MakeDimensionBlock(dim.GetList());
+                if (blockRec == null) return null;
+                return new Entity[] { new ACadSharp.Entities.Insert(blockRec) };
+            }
+            return result.ToArray();
+        }
+
+        /// <summary>
+        /// One CADability dimension, holding exactly one measurement, as one DXF DIMENSION.
+        /// Returns null for the types DXF has no entity for.
+        /// </summary>
+        private Entity ExportSingleDimension(GeoObject.Dimension dim)
+        {
+            // GetList draws the dimension and, on the way, establishes its plane, which the
+            // definition points below and GetDimText rely on.
+            GeoObjectList drawn = dim.GetList();
+            if (drawn == null || drawn.Count == 0) return null;
+
+            ACadSharp.Entities.Dimension entity = null;
+            GeoVector normal = dim.Normal;
+            OcsAxes(normal, out GeoVector ocsX, out GeoVector ocsY);
+            switch (dim.DimType)
+            {
+                case GeoObject.Dimension.EDimType.DimPoints:
+                    {
+                        if (dim.PointCount < 2) return null;
+                        GeoVector dir = dim.DimLineDirection;
+                        if (dir.IsNullVector()) return null;
+                        GeoPoint second = dim.GetPoint(1);
+                        // The definition point is where the dimension line meets the second
+                        // extension line, that is the second measured point projected onto the
+                        // dimension line, which runs through DimLineRef along DimLineDirection.
+                        GeoPoint onDimLine = dim.DimLineRef + ProjectOnto(second - dim.DimLineRef, dir);
+                        var linear = new ACadSharp.Entities.DimensionLinear();
+                        linear.FirstPoint = ToXYZ(dim.GetPoint(0));
+                        linear.SecondPoint = ToXYZ(second);
+                        linear.DefinitionPoint = ToXYZ(onDimLine);
+                        linear.Rotation = Math.Atan2(dir * ocsY, dir * ocsX);
+                        entity = linear;
+                    }
+                    break;
+                case GeoObject.Dimension.EDimType.DimAngle:
+                    {
+                        if (dim.PointCount < 3) return null;
+                        var angular = new ACadSharp.Entities.DimensionAngular3Pt();
+                        angular.AngleVertex = ToXYZ(dim.GetPoint(0));
+                        angular.FirstPoint = ToXYZ(dim.GetPoint(1));
+                        angular.SecondPoint = ToXYZ(dim.GetPoint(2));
+                        angular.DefinitionPoint = ToXYZ(dim.DimLineRef); // the dimension arc runs through it
+                        entity = angular;
+                    }
+                    break;
+                case GeoObject.Dimension.EDimType.DimRadius:
+                case GeoObject.Dimension.EDimType.DimDiameter:
+                    {
+                        if (dim.PointCount < 1 || dim.Radius <= 0.0) return null;
+                        GeoPoint center = dim.GetPoint(0);
+                        GeoVector dir = dim.DimLineRef - center;
+                        if (dir.IsNullVector()) dir = ocsX;
+                        dir.Norm();
+                        GeoPoint onCircle = center + dim.Radius * dir;
+                        if (dim.DimType == GeoObject.Dimension.EDimType.DimRadius)
+                        {
+                            var radial = new ACadSharp.Entities.DimensionRadius();
+                            radial.AngleVertex = ToXYZ(center);
+                            radial.DefinitionPoint = ToXYZ(onCircle);
+                            radial.LeaderLength = Math.Max(0.0, (dim.DimLineRef - center).Length - dim.Radius);
+                            entity = radial;
+                        }
+                        else
+                        {
+                            var diametric = new ACadSharp.Entities.DimensionDiameter();
+                            diametric.DefinitionPoint = ToXYZ(onCircle);
+                            diametric.AngleVertex = ToXYZ(center - dim.Radius * dir); // Center is the mid of both
+                            diametric.LeaderLength = Math.Max(0.0, (dim.DimLineRef - center).Length - dim.Radius);
+                            entity = diametric;
+                        }
+                    }
+                    break;
+                default:
+                    // DimCoord and DimLocation have no DXF entity that carries their meaning
+                    return null;
+            }
+
+            entity.Normal = ToXYZ(normal);
+            entity.Style = GetOrCreateDimensionStyle(dim.DimensionStyle);
+            // The text CADability shows wins over what the reader would compute from its own
+            // dimension style: on a manufacturing drawing the number the user approved must not
+            // change on the way. Prefix and postfix are part of it.
+            string text = dim.GetPrefix(0) + dim.GetDimText(0) + dim.GetPostfix(0);
+            if (!string.IsNullOrEmpty(text)) entity.Text = text;
+            try { entity.TextMiddlePoint = ToXYZ(dim.FindTextPosition(0)); }
+            catch (Exception) { /* leave it to the reader */ }
+            entity.Block = MakeDimensionBlock(drawn);
+            return entity;
+        }
+
+        /// <summary>
+        /// The i-th section of a dimension over more than two points, as a dimension of its own,
+        /// so CADability's own renderer draws the block for it.
+        /// </summary>
+        private GeoObject.Dimension MakeSectionDimension(GeoObject.Dimension dim, int index)
+        {
+            GeoObject.Dimension section = GeoObject.Dimension.Construct();
+            section.DimType = dim.DimType;
+            section.DimensionStyle = dim.DimensionStyle;
+            section.Normal = dim.Normal;
+            section.DimLineRef = dim.DimLineRef;
+            section.DimLineDirection = dim.DimLineDirection;
+            section.AddPoint(dim.GetPoint(index));
+            section.AddPoint(dim.GetPoint(index + 1));
+            section.SetDimText(0, dim.GetDimText(index));
+            section.SetPrefix(0, dim.GetPrefix(index));
+            section.SetPostfix(0, dim.GetPostfix(index));
+            return section;
+        }
+
+        /// <summary>
+        /// Puts what CADability drew into an anonymous block, the way a DIMENSION carries its
+        /// picture. AssignDocument renames it to the *D name AutoCAD uses once the entity is
+        /// added to the document.
+        /// </summary>
+        private BlockRecord MakeDimensionBlock(GeoObjectList drawn)
+        {
+            if (drawn == null || drawn.Count == 0) return null;
+            List<Entity> entities = new List<Entity>();
+            for (int i = 0; i < drawn.Count; i++)
+            {
+                Entity[] ents = GeoObjectToEntity(drawn[i]);
+                if (ents != null) entities.AddRange(ents);
+            }
+            if (entities.Count == 0) return null;
+            string name = GetNextAnonymousBlockName();
+            createdBlockNames.Add(name);
+            BlockRecord blockRec = new BlockRecord(name) { IsAnonymous = true };
+            foreach (Entity e in entities) blockRec.Entities.Add(e);
+            doc.BlockRecords.Add(blockRec);
+            return blockRec;
+        }
+
+        /// <summary>
+        /// Translates the part of a CADability dimension style that DXF has a variable for.
+        /// What is left out (the DIN specific text flags, tolerance texts, alternate units)
+        /// does not change the picture, because that comes from the block.
+        /// </summary>
+        private ACadSharp.Tables.DimensionStyle GetOrCreateDimensionStyle(CADability.Attribute.DimensionStyle style)
+        {
+            if (createdDimensionStyles.TryGetValue(style, out ACadSharp.Tables.DimensionStyle found))
+                return found;
+            string name = style.Name;
+            if (!IsValidBlockName(name)) name = "CADability" + (createdDimensionStyles.Count + 1);
+            foreach (ACadSharp.Tables.DimensionStyle existing in doc.DimensionStyles)
+                if (string.Equals(existing.Name, name, StringComparison.OrdinalIgnoreCase)) { found = existing; break; }
+            if (found == null)
+            {
+                found = new ACadSharp.Tables.DimensionStyle(name);
+                doc.DimensionStyles.Add(found);
+            }
+            found.TextHeight = style.TextSize;
+            found.ArrowSize = style.SymbolSize;
+            found.ExtensionLineOffset = style.ExtLineOffset;
+            found.ExtensionLineExtension = style.ExtLineExtension;
+            found.DimensionLineExtension = style.DimLineExtension;
+            found.DimensionLineGap = style.DimensionLineGap;
+            found.DimensionLineIncrement = style.LineIncrement;
+            found.CenterMarkSize = style.CenterMarkSize;
+            found.LinearScaleFactor = style.Scale != 0.0 ? style.Scale : 1.0;
+            // Round > 1 is CADability's fractional denominator, which DIMRND cannot express
+            if (style.Round > 0.0 && style.Round <= 1.0)
+            {
+                found.Rounding = style.Round;
+                found.DecimalPlaces = (short)Math.Min(8, Math.Max(0, (int)Math.Round(-Math.Log10(style.Round))));
+            }
+            found.SuppressFirstExtensionLine = style.DimNoExtLine1 || style.DimNoExtLine;
+            found.SuppressSecondExtensionLine = style.DimNoExtLine2 || style.DimNoExtLine;
+            found.SuppressFirstDimensionLine = style.DimNoDimLine;
+            found.SuppressSecondDimensionLine = style.DimNoDimLine;
+            found.TextInsideHorizontal = style.DimTxtInsideHor;
+            found.TextOutsideHorizontal = style.DimTxtOutsideHor;
+            found.TextOutsideExtensions = style.DimTxtOutside;
+            if (style.DimLineColor != null) found.DimensionLineColor = ToAcadColor(style.DimLineColor.Color);
+            if (style.ExtLineColor != null) found.ExtensionLineColor = ToAcadColor(style.ExtLineColor.Color);
+            if (style.FontColor != null) found.TextColor = ToAcadColor(style.FontColor.Color);
+            createdDimensionStyles[style] = found;
+            return found;
+        }
+
+        /// <summary>
+        /// The OCS axes belonging to a normal, by AutoCAD's arbitrary axis algorithm - the same
+        /// one the import uses, so a dimension's rotation angle survives the round trip.
+        /// </summary>
+        private static void OcsAxes(GeoVector normal, out GeoVector ax, out GeoVector ay)
+        {
+            GeoVector n = normal;
+            if (n.IsNullVector()) n = GeoVector.ZAxis;
+            n.Norm();
+            ax = (Math.Abs(n.x) < 1.0 / 64 && Math.Abs(n.y) < 1.0 / 64)
+                ? GeoVector.YAxis ^ n
+                : GeoVector.ZAxis ^ n;
+            ax.Norm();
+            ay = n ^ ax;
+            ay.Norm();
+        }
+
+        /// <summary>The part of <paramref name="v"/> that runs along <paramref name="dir"/>.</summary>
+        private static GeoVector ProjectOnto(GeoVector v, GeoVector dir)
+        {
+            GeoVector d = dir;
+            d.Norm();
+            return (v * d) * d;
         }
 
         private ACadSharp.Entities.Insert ExportBlock(GeoObject.Block blk)

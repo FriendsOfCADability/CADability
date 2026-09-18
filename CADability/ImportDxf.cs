@@ -33,6 +33,21 @@ namespace CADability.DXF
         private Dictionary<string, GeoObject.Block> blockTable;
         private Dictionary<string, ColorDef> layerColorTable;
         private Dictionary<string, Attribute.Layer> layerTable;
+        /// <summary>
+        /// The entity a block's contents inherit from while that block is being expanded. DXF
+        /// resolves ByBlock color, linetype and lineweight against the entity that placed the
+        /// block, and contents drawn on layer "0" take that entity's layer. Only dimension
+        /// blocks set this so far; <see cref="FindBlock"/> bypasses its cache while it is set,
+        /// because the same block record placed by two entities then yields two results.
+        /// A block nested inside keeps the outermost owner, which is what DXF means as long as
+        /// the nested reference is itself ByBlock - the normal case for arrow head blocks.
+        /// </summary>
+        private Entity byBlockOwner;
+        /// <summary>
+        /// Block records currently being expanded on behalf of <see cref="byBlockOwner"/>, to
+        /// stop a circular block reference from recursing forever on the uncached path.
+        /// </summary>
+        private readonly HashSet<string> expandingBlocks = new HashSet<string>();
 
         public Import(string fileName)
         {
@@ -577,15 +592,30 @@ namespace CADability.DXF
 
         private void SetAttributes(IGeoObject go, Entity entity)
         {
-            if (go is IColorDef cd) cd.ColorDef = FindOrCreateColor(entity.Color, entity.Layer);
-            if (entity.Layer != null && layerTable.TryGetValue(entity.Layer.Name, out Attribute.Layer layer))
+            ACadSharp.Tables.Layer effectiveLayer = entity.Layer;
+            ACadSharp.Color effectiveColor = entity.Color;
+            LineWeightType effectiveWeight = entity.LineWeight;
+            ACadSharp.Tables.LineType effectiveLineType = entity.LineType;
+            if (byBlockOwner != null)
+            {
+                // Inside a block, AutoCAD draws contents on layer "0" with the layer of the
+                // entity that placed the block, and resolves ByBlock against that entity.
+                if (effectiveLayer == null || effectiveLayer.Name == "0")
+                    effectiveLayer = byBlockOwner.Layer ?? effectiveLayer;
+                if (effectiveColor.IsByBlock) effectiveColor = byBlockOwner.Color;
+                if (effectiveWeight == LineWeightType.ByBlock) effectiveWeight = byBlockOwner.LineWeight;
+                if (effectiveLineType == null || effectiveLineType.Name == ACadSharp.Tables.LineType.ByBlockName)
+                    effectiveLineType = byBlockOwner.LineType;
+            }
+            if (go is IColorDef cd) cd.ColorDef = FindOrCreateColor(effectiveColor, effectiveLayer);
+            if (effectiveLayer != null && layerTable.TryGetValue(effectiveLayer.Name, out Attribute.Layer layer))
                 go.Layer = layer;
-            if (go is ILinePattern lp && entity.LineType != null)
-                lp.LinePattern = project.LinePatternList.Find(entity.LineType.Name);
+            if (go is ILinePattern lp && effectiveLineType != null)
+                lp.LinePattern = project.LinePatternList.Find(effectiveLineType.Name);
             if (go is ILineWidth ld)
             {
-                LineWeightType lw = entity.LineWeight;
-                if (lw == LineWeightType.ByLayer && entity.Layer != null) lw = entity.Layer.LineWeight;
+                LineWeightType lw = effectiveWeight;
+                if (lw == LineWeightType.ByLayer && effectiveLayer != null) lw = effectiveLayer.LineWeight;
                 if ((int)lw < 0) lw = LineWeightType.W0;
                 ld.LineWidth = project.LineWidthList.CreateOrFind("DXF_" + lw.ToString(), ((int)lw) / 100.0);
             }
@@ -614,6 +644,14 @@ namespace CADability.DXF
         {
             if (blockRec == null) return null;
             string key = blockRec.Handle.ToString("X");
+            if (byBlockOwner != null)
+            {
+                // The contents depend on the placing entity, so the shared cache cannot serve
+                // them. Nested blocks (custom arrow heads, for instance) land here.
+                if (!expandingBlocks.Add(key)) return null; // circular reference
+                try { return BuildBlock(blockRec); }
+                finally { expandingBlocks.Remove(key); }
+            }
             if (!blockTable.TryGetValue(key, out GeoObject.Block found))
             {
                 found = GeoObject.Block.Construct();
@@ -627,6 +665,42 @@ namespace CADability.DXF
                 }
             }
             return found;
+        }
+
+        /// <summary>
+        /// Builds a block's contents without touching the cache, for the case where they depend
+        /// on the entity that placed the block (see <see cref="byBlockOwner"/>). Entities on the
+        /// non-plotting DEFPOINTS layer are left out: they are construction data, and ACadSharp
+        /// writes them into the blocks it regenerates for dimensions.
+        /// </summary>
+        private GeoObject.Block BuildBlock(BlockRecord blockRec)
+        {
+            GeoObject.Block block = GeoObject.Block.Construct();
+            block.Name = blockRec.Name;
+            block.RefPoint = GeoPoint(blockRec.BlockEntity?.BasePoint ?? XYZ.Zero);
+            foreach (Entity ent in blockRec.Entities)
+            {
+                if (IsDefpointsLayer(ent.Layer)) continue;
+                try
+                {
+                    IGeoObject go = GeoObjectFromEntity(ent);
+                    if (go != null) block.Add(go);
+                }
+                catch (Exception ex)
+                {
+                    // One unreadable part must not cost the whole dimension - the same choice
+                    // ConvertAndAdd makes for the entities of a model space.
+                    System.Diagnostics.Trace.WriteLine("dxf: skipped " + ent.GetType().Name
+                        + " in block '" + blockRec.Name + "': " + ex.Message);
+                }
+            }
+            return block;
+        }
+
+        private static bool IsDefpointsLayer(ACadSharp.Tables.Layer layer)
+        {
+            return layer != null && string.Equals(layer.Name,
+                ACadSharp.Tables.Layer.DefpointsName, StringComparison.OrdinalIgnoreCase);
         }
 
         private IGeoObject CreateLine(ACadSharp.Entities.Line line)
@@ -1637,14 +1711,61 @@ namespace CADability.DXF
             return text;
         }
 
+        /// <summary>
+        /// Imports a DIMENSION as the anonymous block AutoCAD keeps with it, which holds the
+        /// picture it drew: dimension line, extension lines, arrows and the measurement text.
+        /// That is the faithful reading - CADability's own <see cref="GeoObject.Dimension"/>
+        /// would redraw the dimension from its own style engine and look different. The data
+        /// needed to build one is kept in UserData, so it can be upgraded later without a
+        /// second import.
+        /// </summary>
         private IGeoObject CreateDimension(ACadSharp.Entities.Dimension dimension)
         {
-            if (dimension.Block != null)
+            BlockRecord blockRec = dimension.Block;
+            if (blockRec == null || blockRec.Entities.Count == 0)
             {
-                GeoObject.Block block = FindBlock(dimension.Block);
-                if (block != null) return block.Clone();
+                // DXF R12 and several third party writers leave the anonymous block out.
+                // ACadSharp draws the dimension from its definition points and style, which
+                // beats dropping it without a word.
+                try
+                {
+                    dimension.UpdateBlock();
+                    blockRec = dimension.Block;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.WriteLine("dxf: dimension " + dimension.Handle.ToString("X")
+                        + " has no block and could not be regenerated: " + ex.Message);
+                    blockRec = null;
+                }
             }
-            return null;
+            if (blockRec == null || blockRec.Entities.Count == 0) return null;
+
+            Entity previousOwner = byBlockOwner;
+            byBlockOwner = dimension; // the block's contents are mostly ByBlock on layer 0
+            GeoObject.Block block;
+            try { block = BuildBlock(blockRec); }
+            finally { byBlockOwner = previousOwner; }
+            if (block == null || block.Count == 0) return null;
+            SetDimensionUserData(block, dimension);
+            return block;
+        }
+
+        /// <summary>
+        /// Keeps what makes the block a dimension: its type, the measured value, the text
+        /// override and the dimension style it was drawn with. The marker
+        /// "CADability.DxfDimension" lets an application tell imported dimensions from ordinary
+        /// blocks - CADability's own <see cref="GeoObject.Dimension"/> is not used on import.
+        /// </summary>
+        private void SetDimensionUserData(IGeoObject go, ACadSharp.Entities.Dimension dimension)
+        {
+            go.UserData.Add("CADability.DxfDimension", dimension.GetType().Name);
+            try { go.UserData.Add("CADability.DxfDimension.Measurement", dimension.Measurement); }
+            catch (Exception) { /* a degenerate dimension has no measurement */ }
+            if (!string.IsNullOrEmpty(dimension.Text))
+                go.UserData.Add("CADability.DxfDimension.Text", dimension.Text);
+            if (dimension.Style != null)
+                go.UserData.Add("CADability.DxfDimension.Style", dimension.Style.Name);
         }
 
         private string StripMTextFormatCodes(string value)

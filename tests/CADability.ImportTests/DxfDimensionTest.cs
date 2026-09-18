@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -665,23 +666,62 @@ AcDb3PointAngularDimension
         }
 
         /// <summary>
-        /// CADability has no arc length dimension, so that one keeps the picture AutoCAD drew
-        /// instead of turning into something it is not.
+        /// An arc length dimension is an angular dimension whose text is the length of the arc,
+        /// which is exactly CADability's fifth way of writing an angle. Here a quarter circle of
+        /// radius 20 around the origin, so the arc measures 20·π/2.
         /// </summary>
         [TestMethod]
-        public void import_dxf_arc_length_dimension_keeps_its_block()
+        public void import_dxf_arc_length_dimension_measures_the_arc()
         {
-            Model model = ImportAsDimensions(DimensionWithBlock);
-            Assert.AreEqual(1, model.AllObjects.Count);
-            Assert.IsInstanceOfType(model.AllObjects[0], typeof(Dimension),
-                "an aligned dimension has a counterpart and should be rebuilt");
+            Dimension dim = SingleDimensionObject(ImportAsDimensions(StyledPrologue + ArcDimension + Epilogue));
 
-            // The same file, but as the one type CADability cannot express
-            string arcLength = DimensionWithBlock.Replace("AcDbAlignedDimension", "AcDbArcDimension");
-            Model fallback = ImportAsDimensions(arcLength);
-            Assert.AreEqual(1, fallback.AllObjects.Count, "it must not get lost either");
-            Assert.IsInstanceOfType(fallback.AllObjects[0], typeof(Block),
-                "without a counterpart the picture is kept");
+            Assert.AreEqual(Dimension.EDimType.DimAngle, dim.DimType, "it is an angular dimension");
+            Assert.AreEqual(CADability.Attribute.DimensionStyle.EAngleText.ArcLength,
+                dim.DimensionStyle.AngleText, "whose text is the length of the arc");
+            Assert.AreEqual(0.0, dim.GetPoint(0) | new GeoPoint(0, 0, 0), 1e-8, "the center of the arc");
+            Assert.AreEqual(20.0, (dim.GetPoint(1) - dim.GetPoint(0)).Length, 1e-8,
+                "the legs have to keep the radius of the arc, the length is read off it");
+
+            double arcLength = 20.0 * Math.PI / 2.0;
+            Assert.AreEqual(arcLength, double.Parse(dim.GetDimText(0), CultureInfo.InvariantCulture), 1e-3);
+            Assert.AreEqual("\u2312", dim.GetPrefix(0), "AutoCAD marks an arc length with its own symbol");
+        }
+
+        /// <summary>
+        /// A dimension whose definition points describe nothing that can be drawn keeps the
+        /// picture instead of becoming an invisible object. Here an aligned dimension measuring
+        /// along its own normal: there is no plane to draw it in.
+        /// </summary>
+        [TestMethod]
+        public void import_dxf_degenerate_dimension_keeps_its_block()
+        {
+            // drop the rotated subclass to make it an aligned dimension, and put the second
+            // measured point straight above the first, along the normal
+            string degenerate = LinearDimension
+                .Replace("100\nAcDbRotatedDimension\n 50\n0.0\n", "")
+                .Replace(" 14\n100.0", " 14\n0.0")
+                .Replace(" 34\n0.0", " 34\n100.0");
+            Assert.AreNotEqual(LinearDimension, degenerate, "the fixture should have been changed");
+            Model model = ImportAsDimensions(StyledPrologue + degenerate + Epilogue);
+
+            Assert.AreEqual(1, model.AllObjects.Count, "it must not get lost");
+            Assert.IsInstanceOfType(model.AllObjects[0], typeof(Block),
+                "what cannot be rebuilt keeps the picture AutoCAD drew");
+        }
+
+        /// <summary>
+        /// DIMAUNIT picks how an angle is written. All four AutoCAD ways have a counterpart.
+        /// </summary>
+        [TestMethod]
+        public void import_dxf_dimension_translates_the_angle_format()
+        {
+            // DIMAUNIT (group code 275) 1 is degrees, minutes and seconds
+            string prologue = StyledPrologue.Replace("271\n3\n", "271\n3\n275\n1\n");
+            Assert.AreNotEqual(StyledPrologue, prologue, "DIMAUNIT should be set");
+            Dimension dim = SingleDimensionObject(ImportAsDimensions(prologue + LinearDimension + Epilogue));
+
+            Assert.AreEqual(CADability.Attribute.DimensionStyle.EAngleText.DegreeMinuteSecond,
+                dim.DimensionStyle.AngleText);
         }
 
         /// <summary>
@@ -777,6 +817,104 @@ AcDb3PointAngularDimension
                 "the center, not the point on the circle");
             Assert.AreEqual(25.0, after.Radius, 1e-6);
         }
+
+        /// <summary>
+        /// DXF has ARC_DIMENSION only from AutoCAD 2010 on, so an arc length dimension survives
+        /// the round trip in full only for that target.
+        /// </summary>
+        [TestMethod]
+        public void arc_length_dimension_survives_import_export_import()
+        {
+            Model imported = ImportAsDimensions(StyledPrologue + ArcDimension + Epilogue);
+            Dimension before = SingleDimensionObject(imported);
+
+            Project project = Project.CreateSimpleProject();
+            foreach (IGeoObject go in imported.AllObjects) project.GetActiveModel().Add(go.Clone());
+
+            Settings.GlobalSettings.SetValue("DxfExport.Version", "AC1024");
+            Settings.GlobalSettings.SetValue("DxfImport.DimensionsAsDimension", true);
+            Dimension after;
+            try { after = SingleDimensionObject(ExportAndImport(project)); }
+            finally
+            {
+                Settings.GlobalSettings.SetValue("DxfImport.DimensionsAsDimension", false);
+                Settings.GlobalSettings.SetValue("DxfExport.Version", "AC1015");
+            }
+
+            Assert.AreEqual(Dimension.EDimType.DimAngle, after.DimType);
+            Assert.AreEqual(CADability.Attribute.DimensionStyle.EAngleText.ArcLength,
+                after.DimensionStyle.AngleText, "it should still be an arc length dimension");
+            Assert.AreEqual(0.0, before.GetPoint(0) | after.GetPoint(0), 1e-6, "the center of the arc");
+            Assert.AreEqual((before.GetPoint(1) - before.GetPoint(0)).Length,
+                (after.GetPoint(1) - after.GetPoint(0)).Length, 1e-6, "the radius the length is read off");
+        }
+
+        /// <summary>
+        /// An AutoCAD 2000 file, which is what the export writes by default, has no entity for
+        /// it. The angular dimension it becomes still carries the length as its text, so the
+        /// number a reader shows is the one the drawing was approved with.
+        /// </summary>
+        [TestMethod]
+        public void arc_length_dimension_keeps_its_number_on_an_older_target()
+        {
+            Model imported = ImportAsDimensions(StyledPrologue + ArcDimension + Epilogue);
+            string expected = SingleDimensionObject(imported).GetDimText(0);
+
+            Project project = Project.CreateSimpleProject();
+            foreach (IGeoObject go in imported.AllObjects) project.GetActiveModel().Add(go.Clone());
+
+            Settings.GlobalSettings.SetValue("DxfImport.DimensionsAsDimension", true);
+            Dimension after;
+            try { after = SingleDimensionObject(ExportAndImport(project)); }
+            finally { Settings.GlobalSettings.SetValue("DxfImport.DimensionsAsDimension", false); }
+
+            Assert.AreEqual(Dimension.EDimType.DimAngle, after.DimType);
+            StringAssert.Contains(after.GetPrefix(0) + after.GetDimText(0), expected,
+                "the length has to survive as the text even where the entity cannot");
+        }
+
+        // A quarter circle of radius 20 around the origin, measured as an arc length
+        private const string ArcDimension = @"  0
+DIMENSION
+  8
+Bemassung
+100
+AcDbEntity
+100
+AcDbDimension
+  2
+*D1
+  3
+LOGICAL
+ 70
+37
+ 10
+17.68
+ 20
+17.68
+ 30
+0.0
+100
+AcDbArcDimension
+ 13
+20.0
+ 23
+0.0
+ 33
+0.0
+ 14
+0.0
+ 24
+20.0
+ 34
+0.0
+ 15
+0.0
+ 25
+0.0
+ 35
+0.0
+";
 
         private const string LinearDimension = @"  0
 DIMENSION

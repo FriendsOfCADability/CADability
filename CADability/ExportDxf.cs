@@ -802,12 +802,35 @@ namespace CADability.DXF
                 case GeoObject.Dimension.EDimType.DimAngle:
                     {
                         if (dim.PointCount < 3) return null;
-                        var angular = new ACadSharp.Entities.DimensionAngular3Pt();
-                        angular.AngleVertex = ToXYZ(dim.GetPoint(0));
-                        angular.FirstPoint = ToXYZ(dim.GetPoint(1));
-                        angular.SecondPoint = ToXYZ(dim.GetPoint(2));
-                        angular.DefinitionPoint = ToXYZ(dim.DimLineRef); // the dimension arc runs through it
-                        entity = angular;
+                        GeoPoint center = dim.GetPoint(0);
+                        GeoVector leg1 = dim.GetPoint(1) - center;
+                        GeoVector leg2 = dim.GetPoint(2) - center;
+                        // A dimension whose style writes the angle as the length of the arc is
+                        // an arc length dimension. DXF has ARC_DIMENSION for it from AutoCAD
+                        // 2010 on; older targets get the angular dimension, whose text carries
+                        // the length anyway because it is written out below.
+                        bool arcLength = dim.DimensionStyle.AngleText
+                            == CADability.Attribute.DimensionStyle.EAngleText.ArcLength;
+                        if (arcLength && doc.Header.Version >= ACadVersion.AC1024)
+                        {
+                            var arc = new ACadSharp.Entities.DimensionArc();
+                            arc.Center = ToXYZ(center);
+                            arc.FirstPoint = ToXYZ(dim.GetPoint(1));
+                            arc.SecondPoint = ToXYZ(dim.GetPoint(2));
+                            arc.DefinitionPoint = ToXYZ(dim.DimLineRef);
+                            arc.StartAngle = Math.Atan2(leg1 * ocsY, leg1 * ocsX);
+                            arc.EndAngle = Math.Atan2(leg2 * ocsY, leg2 * ocsX);
+                            entity = arc;
+                        }
+                        else
+                        {
+                            var angular = new ACadSharp.Entities.DimensionAngular3Pt();
+                            angular.AngleVertex = ToXYZ(center);
+                            angular.FirstPoint = ToXYZ(dim.GetPoint(1));
+                            angular.SecondPoint = ToXYZ(dim.GetPoint(2));
+                            angular.DefinitionPoint = ToXYZ(dim.DimLineRef); // the dimension arc runs through it
+                            entity = angular;
+                        }
                     }
                     break;
                 case GeoObject.Dimension.EDimType.DimRadius:

@@ -1185,7 +1185,13 @@ namespace CADability
                 case "html":
                     return true;
                 case "dxf":
-                    CADability.DXF.Export export = new DXF.Export(ACadVersion.AC1015);
+                    // AutoCAD 2000 by default: the widest readership. The setting takes an
+                    // ACadVersion name ("AC1024" for AutoCAD 2010, which is where DXF gained
+                    // the arc length dimension) for anyone who needs a newer file.
+                    if (!Enum.TryParse(Settings.GlobalSettings.GetStringValue("DxfExport.Version", "AC1015"),
+                            true, out ACadVersion dxfVersion) || !Enum.IsDefined(typeof(ACadVersion), dxfVersion))
+                        dxfVersion = ACadVersion.AC1015;
+                    CADability.DXF.Export export = new DXF.Export(dxfVersion);
                     export.WriteToFile(this, fileName);
                     return true;
                 case "dwg":

@@ -1823,8 +1823,10 @@ namespace CADability.DXF
 
         /// <summary>
         /// The definition points of a DXF dimension, in the shape CADability's dimension wants
-        /// them. DXF has eight dimension types, CADability six: the arc length dimension has no
-        /// counterpart at all, and returns null here.
+        /// them. All eight DXF types have a counterpart: the three angular ones share CADability's
+        /// DimAngle, the arc length dimension among them, and the ordinate dimension becomes a
+        /// coordinate dimension. Null means the definition points do not describe a dimension
+        /// that can be drawn, and the caller keeps the block.
         /// </summary>
         private GeoObject.Dimension MapDimensionGeometry(ACadSharp.Entities.Dimension dimension)
         {
@@ -1908,7 +1910,8 @@ namespace CADability.DXF
                         GeoPoint center = GeoPoint(angular3.AngleVertex);
                         GeoPoint arcPoint = GeoPoint(angular3.DefinitionPoint);
                         if (!SetAngleDimension(dim, center, GeoPoint(angular3.FirstPoint) - center,
-                                GeoPoint(angular3.SecondPoint) - center, arcPoint, normal))
+                                GeoPoint(angular3.SecondPoint) - center, arcPoint, normal,
+                                (arcPoint - center).Length))
                             return null;
                     }
                     break;
@@ -1920,7 +1923,24 @@ namespace CADability.DXF
                         GeoPoint arcPoint = GeoPoint(angular2.DimensionArc);
                         GeoVector leg1 = GeoPoint(angular2.SecondPoint) - GeoPoint(angular2.FirstPoint);
                         GeoVector leg2 = GeoPoint(angular2.DefinitionPoint) - GeoPoint(angular2.AngleVertex);
-                        if (!SetAngleDimension(dim, center, leg1, leg2, arcPoint, normal)) return null;
+                        if (!SetAngleDimension(dim, center, leg1, leg2, arcPoint, normal,
+                                (arcPoint - center).Length))
+                            return null;
+                    }
+                    break;
+                case ACadSharp.Entities.DimensionArc arc:
+                    {
+                        // An arc length dimension is an angular dimension whose text shows the
+                        // length of the arc instead of the angle - CADability's dimension style
+                        // has that as its fifth way of writing an angle. The legs have to keep
+                        // the arc's own radius, because that is what the length is read off.
+                        GeoPoint center = GeoPoint(arc.Center);
+                        GeoVector leg1 = GeoPoint(arc.FirstPoint) - center;
+                        GeoVector leg2 = GeoPoint(arc.SecondPoint) - center;
+                        if (leg1.IsNullVector()) return null;
+                        if (!SetAngleDimension(dim, center, leg1, leg2,
+                                GeoPoint(arc.DefinitionPoint), normal, leg1.Length))
+                            return null;
                     }
                     break;
                 case ACadSharp.Entities.DimensionOrdinate ordinate:
@@ -1935,7 +1955,7 @@ namespace CADability.DXF
                     }
                     break;
                 default:
-                    return null; // DimensionArc: CADability has no arc length dimension
+                    return null; // a dimension type this version of ACadSharp does not name
             }
             // Every type but the angular one spans its plane from the dimension line and the
             // normal. Where those are parallel the dimension cannot be drawn at all, and the
@@ -1958,12 +1978,11 @@ namespace CADability.DXF
         /// legs are turned into the pair that encloses that point.
         /// </summary>
         private static bool SetAngleDimension(GeoObject.Dimension dim, GeoPoint center,
-            GeoVector leg1, GeoVector leg2, GeoPoint arcPoint, GeoVector normal)
+            GeoVector leg1, GeoVector leg2, GeoPoint arcPoint, GeoVector normal, double legRadius)
         {
             if (leg1.IsNullVector() || leg2.IsNullVector()) return false;
             GeoVector toArc = arcPoint - center;
-            double radius = toArc.Length;
-            if (radius < Precision.eps) return false;
+            if (toArc.Length < Precision.eps || legRadius < Precision.eps) return false;
             Plane plane;
             try { plane = new Plane(center, normal); }
             catch (PlaneException) { return false; }
@@ -1991,8 +2010,8 @@ namespace CADability.DXF
             if ((best1 ^ best2).IsNullVector()) return false; // collinear legs span no plane
             dim.DimType = GeoObject.Dimension.EDimType.DimAngle;
             dim.AddPoint(center);
-            dim.AddPoint(center + radius * best1);
-            dim.AddPoint(center + radius * best2);
+            dim.AddPoint(center + legRadius * best1);
+            dim.AddPoint(center + legRadius * best2);
             dim.DimLineRef = arcPoint;
             return true;
         }
@@ -2017,15 +2036,11 @@ namespace CADability.DXF
             if (acad == null) acad = ACadSharp.Tables.DimensionStyle.Default;
 
             string name = dimension.Style?.Name ?? acad.Name ?? "Standard";
-            if (!dimension.HasStyleOverride)
-            {
-                Attribute.DimensionStyle plain = project.DimensionStyleList.Find(name);
-                if (plain != null) return plain;
-            }
             Attribute.DimensionStyle style = Attribute.DimensionStyle.GetDefault();
             MapDimensionStyle(acad, style, dimension);
-            // Overrides are the rule, not the exception, and a style per dimension would bury
-            // the list. Dimensions that override the same way share one.
+            // Overrides are the rule, not the exception, and an arc length dimension needs a
+            // style of its own even without one. A style per dimension would bury the list, so
+            // dimensions that end up with the same data share one.
             for (int i = 0; i < project.DimensionStyleList.Count; i++)
             {
                 if (project.DimensionStyleList[i].SameData(style)) return project.DimensionStyleList[i];
@@ -2070,7 +2085,16 @@ namespace CADability.DXF
             style.Round = acad.Rounding > 0.0 ? acad.Rounding : DecimalsToRounding(acad.DecimalPlaces);
             style.RoundAlt = acad.AlternateUnitRounding > 0.0
                 ? acad.AlternateUnitRounding : DecimalsToRounding(acad.AlternateUnitDecimalPlaces);
-            style.TextPrefix = acad.Prefix ?? "";
+            // An arc length dimension is an angular one whose text is the length of the arc.
+            // Its symbol has no place of its own in CADability, so it leads the text; AutoCAD
+            // would put it above when DIMARCSYM says so.
+            bool arcLength = owner is ACadSharp.Entities.DimensionArc;
+            style.AngleText = arcLength
+                ? Attribute.DimensionStyle.EAngleText.ArcLength
+                : MapAngleText(acad.AngularUnit);
+            string arcSymbol = arcLength && acad.ArcLengthSymbolPosition != ArcLengthSymbolPosition.None
+                ? "\u2312" : "";
+            style.TextPrefix = arcSymbol + (acad.Prefix ?? "");
             style.TextPostfix = acad.Suffix ?? "";
             style.TextFont = FontNameFromStyle(acad.Style);
             // DIMTAD says whether the text sits on the dimension line or above it, DIMGAP how
@@ -2092,6 +2116,23 @@ namespace CADability.DXF
             style.FillColor = style.DimLineColor;
             style.DimLineWidth = DimensionStyleWidth(acad.DimensionLineWeight, owner);
             style.ExtLineWidth = DimensionStyleWidth(acad.ExtensionLineWeight, owner);
+        }
+
+        /// <summary>DIMAUNIT, the four ways AutoCAD writes an angle. CADability knows a fifth,
+        /// the length of the arc, which only an arc length dimension uses.</summary>
+        private static Attribute.DimensionStyle.EAngleText MapAngleText(ACadSharp.Types.Units.AngularUnitFormat unit)
+        {
+            switch (unit)
+            {
+                case ACadSharp.Types.Units.AngularUnitFormat.DegreesMinutesSeconds:
+                    return Attribute.DimensionStyle.EAngleText.DegreeMinuteSecond;
+                case ACadSharp.Types.Units.AngularUnitFormat.Gradians:
+                    return Attribute.DimensionStyle.EAngleText.Grade;
+                case ACadSharp.Types.Units.AngularUnitFormat.Radians:
+                    return Attribute.DimensionStyle.EAngleText.Radian;
+                default:
+                    return Attribute.DimensionStyle.EAngleText.DegreeDecimal;
+            }
         }
 
         /// <summary>DIMDEC as the rounding increment CADability formats with.</summary>

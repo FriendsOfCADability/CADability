@@ -2192,9 +2192,10 @@ namespace CADability.GeoObject
 			point = plane.Location + Math.Cos(a) * majorRadius * plane.DirectionX +
 			        Math.Sin(a) * minorRadius * plane.DirectionY;
 			GeoVector2D dir = new GeoVector2D(-majorRadius * Math.Sin(a), minorRadius * Math.Cos(a));
-			deriv1 = sweepParameter * plane.ToGlobal(dir); // Achtung, wir brauchen eine Ableitung mit echter Länge
+			// derivatives by the position, which enters the angle with the factor sweepParameter
+			deriv1 = sweepParameter * plane.ToGlobal(dir);
 			GeoVector2D dir2 = new GeoVector2D(-majorRadius * Math.Cos(a), -minorRadius * Math.Sin(a));
-			deriv2 = sweepParameter * plane.ToGlobal(dir2); // Achtung, wir brauchen eine Ableitung mit echter Länge
+			deriv2 = (sweepParameter * sweepParameter) * plane.ToGlobal(dir2);
 			return true;
 		}
 

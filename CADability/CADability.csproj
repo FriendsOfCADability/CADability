@@ -20,7 +20,7 @@
     <AssemblyName>CADability</AssemblyName>
     <Platforms>AnyCPU;x64</Platforms>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
-    <LangVersion>11.0</LangVersion>
+    <LangVersion>12.0</LangVersion>
 
     <!-- Symbols and source stepping for consumers of the package: the symbols travel as a separate
          .snupkg to nuget.org's symbol server, and Source Link records the commit in the package and

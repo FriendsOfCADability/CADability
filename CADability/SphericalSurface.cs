@@ -296,18 +296,7 @@ namespace CADability.GeoObject
 				ICurve res = (curve2d as Curve2DAspect).Get3DCurve(this);
 				if (res != null) return res;
 			}
-			if (curve2d is ProjectedCurve pc)
-			{
-				if (pc.Surface is SphericalSurface)
-				{
-					BoundingRect otherBounds = new BoundingRect(PositionOf(pc.Surface.PointAt(pc.StartPoint)), PositionOf(pc.Surface.PointAt(pc.EndPoint)));
-					if (pc.Surface.SameGeometry(pc.GetExtent(), this, otherBounds, Precision.eps, out ModOp2D notneeded))
-					{
-						if (this.GetDistance(pc.Curve3DFromParams.PointAt(0.5)) < Precision.eps) // the 3d curve must reside on the surface
-							return pc.Curve3DFromParams; // if trimmed or reversed still returns the correct 3d curve (but trimmed and/or reversed)
-					}
-				}
-			}
+			if (Curve3dOfProjected<SphericalSurface>(curve2d) is ICurve onThisSurface) return onThisSurface;
 			// return base.Make3dCurve(curve2d); warum stand das da?
 			if (curve2d is Line2D)
 			{

@@ -322,17 +322,7 @@ namespace CADability.GeoObject
                 ICurve res = (curve2d as Curve2DAspect).Get3DCurve(this);
                 if (res != null) return res;
             }
-            if (curve2d is ProjectedCurve pc)
-            {
-                if (pc.Surface is OffsetSurface)
-                {
-                    BoundingRect otherBounds = new BoundingRect(PositionOf(pc.Surface.PointAt(pc.StartPoint)), PositionOf(pc.Surface.PointAt(pc.EndPoint)));
-                    if (pc.Surface.SameGeometry(pc.GetExtent(), this, otherBounds, Precision.eps, out ModOp2D notneeded))
-                    {
-                        return pc.Curve3DFromParams; // if trimmed or reversed still returns the correct 3d curve (but trimmed and/or reversed)
-                    }
-                }
-            }
+            if (Curve3dOfProjected<OffsetSurface>(curve2d) is ICurve onThisSurface) return onThisSurface;
             return base.Make3dCurve(curve2d);
         }
         /// <summary>

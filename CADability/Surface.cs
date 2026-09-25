@@ -2523,6 +2523,27 @@ namespace CADability.GeoObject
         //    throw new ApplicationException("GetModified must be implemented");
         //}
         /// <summary>
+        /// The 3d curve of <paramref name="curve2d"/>, when it is a <see cref="ProjectedCurve"/> on this surface or on
+        /// a surface of type <typeparamref name="T"/> which is geometrically the same - trimmed and turned the way the
+        /// 2d curve is. Null for any other 2d curve, and also when the 3d curve does not lie on this surface after all:
+        /// SameGeometry may accept two surfaces of which the curve only lies on the other. Every surface used to ask
+        /// this with a copy of its own in <see cref="Make3dCurve"/>, only the sphere checked the distance.
+        /// </summary>
+        /// <typeparam name="T">the type of surface the projected curve must be on</typeparam>
+        protected ICurve Curve3dOfProjected<T>(ICurve2D curve2d) where T : ISurface
+        {
+            if (!(curve2d is ProjectedCurve pc)) return null;
+            if (pc.Surface != this)
+            {
+                if (!(pc.Surface is T)) return null;
+                BoundingRect otherBounds = new BoundingRect(PositionOf(pc.Surface.PointAt(pc.StartPoint)), PositionOf(pc.Surface.PointAt(pc.EndPoint)));
+                if (!pc.Surface.SameGeometry(pc.GetExtent(), this, otherBounds, Precision.eps, out ModOp2D _)) return null;
+            }
+            ICurve res = pc.Curve3DFromParams; // if trimmed or reversed still returns the correct 3d curve (but trimmed and/or reversed)
+            if (GetDistance(res.PointAt(0.5)) > Precision.eps) return null; // the same geometry, but the curve is not on this surface
+            return res;
+        }
+        /// <summary>
         /// Implements <see cref="CADability.GeoObject.ISurface.Make3dCurve (ICurve2D)"/>
         /// </summary>
         /// <param name="curve2d"></param>

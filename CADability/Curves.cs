@@ -78,7 +78,7 @@ namespace CADability.GeoObject
     /// Interface implemented by one-dimensional geometric objects (eg. line, circle, bspline etc.).
     /// The curve may be open or closed.
     /// </summary>
-    public interface ICurve
+    public interface ICurve : IGeoObject
     {
         /// <summary>
         /// The start-point of the curve. If the curve is closed, this is the point where 

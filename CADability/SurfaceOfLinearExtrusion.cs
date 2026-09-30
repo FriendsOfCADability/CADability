@@ -722,7 +722,7 @@ namespace CADability.GeoObject
                     ModOp m = ModOp.Translate((double)i / n * this.direction);
                     ICurve crv = basisCurve.CloneModified(m);
                     crv.Trim(curveStartParameter, curveEndParameter);
-                    res.Add(crv as IGeoObject);
+                    res.Add(crv);
                 }
                 return res;
 

@@ -60,8 +60,8 @@ namespace CADability.Actions
                         for (int i = 0; i < p2.Count; ++i)
                         {
                             IGeoObject obj = null;
-                            if ((p2.Curve(i) as IGeoObject).UserData.ContainsData("CADability.Path.Original"))
-                                obj = (p2.Curve(i) as IGeoObject).UserData.GetData("CADability.Path.Original") as IGeoObject;
+                            if (p2.Curve(i).UserData.ContainsData("CADability.Path.Original"))
+                                obj = p2.Curve(i).UserData.GetData("CADability.Path.Original") as IGeoObject;
                             if (obj != null && obj.Owner != null) obj.Owner.Remove(obj); // löschen
                         }
                     }
@@ -71,8 +71,8 @@ namespace CADability.Actions
                         for (int i = 0; i < p1.Count; ++i)
                         {
                             IGeoObject obj = null;
-                            if ((p1.Curve(i) as IGeoObject).UserData.ContainsData("CADability.Path.Original"))
-                                obj = (p1.Curve(i) as IGeoObject).UserData.GetData("CADability.Path.Original") as IGeoObject;
+                            if (p1.Curve(i).UserData.ContainsData("CADability.Path.Original"))
+                                obj = p1.Curve(i).UserData.GetData("CADability.Path.Original") as IGeoObject;
                             if (obj != null && obj.Owner != null) obj.Owner.Remove(obj); // löschen
                         }
                     }
@@ -441,8 +441,8 @@ namespace CADability.Actions
                             for (int i = 0; i < pathCreatedFromModel1.Count; ++i)
                             {
                                 IGeoObject obj = null;
-                                if ((pathCreatedFromModel1.Curve(i) as IGeoObject).UserData.ContainsData("CADability.Path.Original"))
-                                    obj = (pathCreatedFromModel1.Curve(i) as IGeoObject).UserData.GetData("CADability.Path.Original") as IGeoObject;
+                                if (pathCreatedFromModel1.Curve(i).UserData.ContainsData("CADability.Path.Original"))
+                                    obj = pathCreatedFromModel1.Curve(i).UserData.GetData("CADability.Path.Original") as IGeoObject;
                                 if (obj != null && obj.Owner != null) obj.Owner.Remove(obj); // löschen
                             }
                         }
@@ -453,8 +453,8 @@ namespace CADability.Actions
                             for (int i = 0; i < pathCreatedFromModel2.Count; ++i)
                             {
                                 IGeoObject obj = null;
-                                if ((pathCreatedFromModel2.Curve(i) as IGeoObject).UserData.ContainsData("CADability.Path.Original"))
-                                    obj = (pathCreatedFromModel2.Curve(i) as IGeoObject).UserData.GetData("CADability.Path.Original") as IGeoObject;
+                                if (pathCreatedFromModel2.Curve(i).UserData.ContainsData("CADability.Path.Original"))
+                                    obj = pathCreatedFromModel2.Curve(i).UserData.GetData("CADability.Path.Original") as IGeoObject;
                                 if (obj != null && obj.Owner != null) obj.Owner.Remove(obj); // löschen
                             }
                         }

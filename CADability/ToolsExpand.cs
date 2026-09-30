@@ -200,12 +200,12 @@ namespace CADability.Actions
                             else
                                 newCurve.EndPoint = iCurve.PointAt(param);
                         }
-                        (newCurve as IGeoObject).CopyAttributes(iCurve as IGeoObject);
+                        newCurve.CopyAttributes(iCurve);
                         //Color backColor = base.Frame.GetColorSetting("Colors.Feedback", Color.DarkGray);
                         //if (newCurve is IColorDef)
                         //    (newCurve as IColorDef).ColorDef = new ColorDef("", backColor);
-                        base.ActiveObject = (newCurve as IGeoObject);
-                        base.FeedBack.AddSelected(newCurve as IGeoObject);// letzte Linie einfügen
+                        base.ActiveObject = newCurve;
+                        base.FeedBack.AddSelected(newCurve);// letzte Linie einfügen
                         return true;
                     }
                 }

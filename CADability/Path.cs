@@ -142,7 +142,7 @@ namespace CADability.GeoObject
 				GeoObjectList geoObjects = new GeoObjectList();
 				foreach (ICurve crv in curves)
 				{
-					geoObjects.Add(crv as IGeoObject);
+					geoObjects.Add(crv);
 				}
 				if (res.Set(geoObjects, false, Precision.eps)) return res;
 				else return null;
@@ -154,7 +154,7 @@ namespace CADability.GeoObject
 			GeoObjectList geoObjects = new GeoObjectList();
 			foreach (ICurve crv in curves)
 			{
-				geoObjects.Add(crv as IGeoObject);
+				geoObjects.Add(crv);
 			}
 			bool created = false;
 			do
@@ -207,7 +207,7 @@ namespace CADability.GeoObject
 		private static Path Construct(ICurve[] connectedCurves)
 		{
 			Path res = Path.Construct();
-			if (connectedCurves.Length > 0) res.CopyAttributes(connectedCurves[0] as IGeoObject); // Farbe etc vom der ersten Kurve nehmen
+			if (connectedCurves.Length > 0) res.CopyAttributes(connectedCurves[0]); // Farbe etc vom der ersten Kurve nehmen
 			if (connectedCurves.Length > 1)
 			{   // die Liste darf keine geschlossenen Kurven enthalten, das interaktive vertex-verschieben geht sonst nicht
 				List<ICurve> openCurves = new List<ICurve>(connectedCurves);
@@ -220,7 +220,7 @@ namespace CADability.GeoObject
 			res.subCurves = (ICurve[])connectedCurves.Clone();
 			for (int i = 0; i < res.subCurves.Length; ++i)
 			{
-				IGeoObject go = res.subCurves[i] as IGeoObject;
+				IGeoObject go = res.subCurves[i];
 				if (go != null)
 				{
 					if (go.Owner != null) go.Owner.Remove(go);
@@ -273,7 +273,7 @@ namespace CADability.GeoObject
 			HashSet<ICurve> usedObjects = new();
 			ArrayList connectedObjects = new ArrayList();
 			usedObjects.Add(BeginWith);
-			IGeoObject go = BeginWith.Clone() as IGeoObject; ;
+			IGeoObject go = BeginWith.Clone(); ;
 			go.UserData.Add("CADability.Path.Original", BeginWith);
 			connectedObjects.Add(go);
 			GeoPoint StartPoint = BeginWith.StartPoint;
@@ -297,7 +297,7 @@ namespace CADability.GeoObject
 							if (Precision.IsEqual(crv.StartPoint, lastEndPoint))
 							{
 								found = crv.Clone();
-								go = found as IGeoObject;
+								go = found;
 								go.UserData.Add("CADability.Path.Original", crv);
 								usedObjects.Add(crv);
 								connectedObjects.Add(found);
@@ -307,7 +307,7 @@ namespace CADability.GeoObject
 							{
 								found = crv.Clone();
 								found.Reverse();
-								go = found as IGeoObject;
+								go = found;
 								go.UserData.Add("CADability.Path.Original", crv);
 								usedObjects.Add(crv);
 								connectedObjects.Add(found);
@@ -340,7 +340,7 @@ namespace CADability.GeoObject
 							{
 								found = crv.Clone();
 								found.Reverse();
-								go = found as IGeoObject;
+								go = found;
 								go.UserData.Add("CADability.Path.Original", crv);
 								usedObjects.Add(crv);
 								connectedObjects.Insert(0, found);
@@ -349,7 +349,7 @@ namespace CADability.GeoObject
 							else if (Precision.IsEqual(crv.EndPoint, lastEndPoint))
 							{
 								found = crv.Clone();
-								go = found as IGeoObject;
+								go = found;
 								go.UserData.Add("CADability.Path.Original", crv);
 								usedObjects.Add(crv);
 								connectedObjects.Insert(0, found);
@@ -394,7 +394,7 @@ namespace CADability.GeoObject
 			HashSet<ICurve> usedObjects = new();
 			ArrayList connectedObjects = new ArrayList();
 			usedObjects.Add(BeginWith);
-			IGeoObject go = BeginWith.Clone() as IGeoObject; ;
+			IGeoObject go = BeginWith.Clone(); ;
 			go.UserData.Add("CADability.Path.Original", BeginWith);
 			connectedObjects.Add(go);
 			GeoPoint StartPoint = BeginWith.StartPoint;
@@ -418,7 +418,7 @@ namespace CADability.GeoObject
 							if (Precision.IsEqual(crv.StartPoint, lastEndPoint))
 							{
 								found = crv.Clone();
-								go = found as IGeoObject;
+								go = found;
 								go.UserData.Add("CADability.Path.Original", crv);
 								usedObjects.Add(crv);
 								connectedObjects.Add(found);
@@ -428,7 +428,7 @@ namespace CADability.GeoObject
 							{
 								found = crv.Clone();
 								found.Reverse();
-								go = found as IGeoObject;
+								go = found;
 								go.UserData.Add("CADability.Path.Original", crv);
 								usedObjects.Add(crv);
 								connectedObjects.Add(found);
@@ -461,7 +461,7 @@ namespace CADability.GeoObject
 							{
 								found = crv.Clone();
 								found.Reverse();
-								go = found as IGeoObject;
+								go = found;
 								go.UserData.Add("CADability.Path.Original", crv);
 								usedObjects.Add(crv);
 								connectedObjects.Insert(0, found);
@@ -470,7 +470,7 @@ namespace CADability.GeoObject
 							else if (Precision.IsEqual(crv.EndPoint, lastEndPoint))
 							{
 								found = crv.Clone();
-								go = found as IGeoObject;
+								go = found;
 								go.UserData.Add("CADability.Path.Original", crv);
 								usedObjects.Add(crv);
 								connectedObjects.Insert(0, found);
@@ -640,7 +640,7 @@ namespace CADability.GeoObject
 			this.CopyAttributes(OrderedCurves[0] as IGeoObject);
 			for (int i = 0; i < subCurves.Length; i++)
 			{
-				l.Remove(subCurves[i] as IGeoObject);
+				l.Remove(subCurves[i]);
 			}
 			Recalc();
 			return true;
@@ -682,7 +682,7 @@ namespace CADability.GeoObject
 				{
 					for (int i = 0; i < subCurves.Length; ++i)
 					{
-						IGeoObject go = subCurves[i] as IGeoObject;
+						IGeoObject go = subCurves[i];
 						if (go != null)
 						{
 							go.Owner = null;
@@ -694,7 +694,7 @@ namespace CADability.GeoObject
 				subCurves = (ICurve[])connectedCurves.Clone();
 				for (int i = 0; i < subCurves.Length; ++i)
 				{
-					IGeoObject go = subCurves[i] as IGeoObject;
+					IGeoObject go = subCurves[i];
 					if (go != null)
 					{
 						if (go.Owner != null) go.Owner.Remove(go);
@@ -714,7 +714,7 @@ namespace CADability.GeoObject
 				ICurve[] tmp = toAdd.SubCurves;
 				if (tmp.Length > 0)
 				{
-					(tmp[0] as IGeoObject).UserData.CloneFrom((toAdd as IGeoObject).UserData);
+					tmp[0].UserData.CloneFrom(toAdd.UserData);
 				}
 				AddFlattend(addTo, tmp);
 			}
@@ -810,7 +810,7 @@ namespace CADability.GeoObject
 				{
 					subCurves = new ICurve[] { ToAdd };
 				}
-				IGeoObject go = ToAdd as IGeoObject;
+				IGeoObject go = ToAdd;
 				if (go != null)
 				{
 					if (go.Owner != null) go.Owner.Remove(go);
@@ -843,7 +843,7 @@ namespace CADability.GeoObject
 			}
 			if (ind >= 0)
 			{
-				IGeoObject go = toRemove as IGeoObject;
+				IGeoObject go = toRemove;
 				if (go != null)
 				{
 					go.DidChangeEvent -= new ChangeDelegate(SubCurveDidChange);
@@ -1022,8 +1022,8 @@ namespace CADability.GeoObject
 				//}
 				if (defined)
 				{
-					(subCurves[last] as IGeoObject).Modify(fit1);
-					(subCurves[index] as IGeoObject).Modify(fit2);
+					subCurves[last].Modify(fit1);
+					subCurves[index].Modify(fit2);
 				}
 				else
 				{
@@ -1032,8 +1032,8 @@ namespace CADability.GeoObject
 				}
 				if (!consistent)
 				{
-					(subCurves[last] as IGeoObject).CopyGeometry(scl as IGeoObject);
-					(subCurves[index] as IGeoObject).CopyGeometry(sci as IGeoObject);
+					subCurves[last].CopyGeometry(scl);
+					subCurves[index].CopyGeometry(sci);
 					//subCurves[last].StartPoint = p0;
 					//subCurves[last].EndPoint = p1;
 					//subCurves[index].StartPoint = p1;
@@ -1076,7 +1076,7 @@ namespace CADability.GeoObject
 					tmp.RemoveAt(ind);
 					tmp.Insert(ind, splitted[1]);
 					tmp.Insert(ind, splitted[0]);
-					IGeoObject go = splitted[0] as IGeoObject;
+					IGeoObject go = splitted[0];
 					if (go != null)
 					{
 						if (go.Owner != null) go.Owner.Remove(go);
@@ -1084,7 +1084,7 @@ namespace CADability.GeoObject
 						go.DidChangeEvent += new ChangeDelegate(SubCurveDidChange);
 						go.WillChangeEvent += new ChangeDelegate(SubCurveWillChange);
 					}
-					go = splitted[1] as IGeoObject;
+					go = splitted[1];
 					if (go != null)
 					{
 						if (go.Owner != null) go.Owner.Remove(go);
@@ -1238,7 +1238,7 @@ namespace CADability.GeoObject
 				{   // alten Inhalt abmelden
 					for (int i = 0; i < subCurves.Length; ++i)
 					{
-						IGeoObject go = subCurves[i] as IGeoObject;
+						IGeoObject go = subCurves[i];
 						if (go != null)
 						{
 							go.Owner = null;
@@ -1253,7 +1253,7 @@ namespace CADability.GeoObject
 					for (int i = 0; i < source.subCurves.Length; ++i)
 					{
 						subCurves[i] = source.subCurves[i].Clone();
-						IGeoObject go = subCurves[i] as IGeoObject;
+						IGeoObject go = subCurves[i];
 						if (go != null)
 						{
 							if (go.Owner != null) go.Owner.Remove(go);
@@ -1280,7 +1280,7 @@ namespace CADability.GeoObject
 			{
 				for (int i = 0; i < subCurves.Length; ++i)
 				{
-					(subCurves[i] as IGeoObject).Modify(m);
+					subCurves[i].Modify(m);
 				}
 			}
 		}
@@ -1294,7 +1294,7 @@ namespace CADability.GeoObject
 			if (!spf.Accept(this)) return;
 			for (int i = 0; i < subCurves.Length; ++i)
 			{
-				IGeoObject go = subCurves[i] as IGeoObject;
+				IGeoObject go = subCurves[i];
 				if (go != null) go.FindSnapPoint(spf);
 			}
 		}
@@ -1307,7 +1307,7 @@ namespace CADability.GeoObject
 			BoundingCube res = BoundingCube.EmptyBoundingCube;
 			for (int i = 0; i < subCurves.Length; ++i)
 			{
-				res.MinMax((subCurves[i] as IGeoObject).GetBoundingCube());
+				res.MinMax(subCurves[i].GetBoundingCube());
 			}
 			return res;
 		}
@@ -1341,7 +1341,7 @@ namespace CADability.GeoObject
 		{
 			for (int i = 0; i < subCurves.Length; ++i)
 			{
-				(subCurves[i] as IGeoObject).PrepareDisplayList(precision);
+				subCurves[i].PrepareDisplayList(precision);
 			}
 		}
 		/// <summary>
@@ -1356,7 +1356,7 @@ namespace CADability.GeoObject
 			// warum stand hier i=1 statt i=0 ? (3.4.07)
 			for (int i = 0; i < subCurves.Length; ++i)
 			{
-				res.Add((subCurves[i] as IGeoObject).GetQuadTreeItem(projection, extentPrecision));
+				res.Add(subCurves[i].GetQuadTreeItem(projection, extentPrecision));
 			}
 			return res;
 		}
@@ -1372,7 +1372,7 @@ namespace CADability.GeoObject
                     {
                         for (int i = 0; i < subCurves.Length; ++i)
                         {
-                            (subCurves[i] as IGeoObject).Layer = value;
+                            subCurves[i].Layer = value;
                         }
                     }
                 }
@@ -1399,7 +1399,7 @@ namespace CADability.GeoObject
 		{
 			for (int i = 0; i < subCurves.Length; ++i)
 			{
-				if ((subCurves[i] as IOctTreeInsertable).HitTest(ref cube, precision)) return true;
+				if (subCurves[i].HitTest(ref cube, precision)) return true;
 			}
 			return false;
 		}
@@ -1428,7 +1428,7 @@ namespace CADability.GeoObject
 			{
 				for (int i = 0; i < subCurves.Length; ++i)
 				{
-					if (!(subCurves[i] as IGeoObject).HitTest(area, true)) return false;
+					if (!subCurves[i].HitTest(area, true)) return false;
 				}
 				return true;
 			}
@@ -1436,7 +1436,7 @@ namespace CADability.GeoObject
 			{
 				for (int i = 0; i < subCurves.Length; ++i)
 				{
-					if ((subCurves[i] as IGeoObject).HitTest(area, false)) return true;
+					if (subCurves[i].HitTest(area, false)) return true;
 				}
 				return false;
 			}
@@ -2264,7 +2264,7 @@ namespace CADability.GeoObject
 			{
 				for (int i = 0; i < subCurves.Length; ++i)
 				{
-					IGeoObject go = subCurves[i] as IGeoObject;
+					IGeoObject go = subCurves[i];
 					if (go != null)
 					{
 						if (go.Owner != null) go.Owner.Remove(go);
@@ -2285,7 +2285,7 @@ namespace CADability.GeoObject
 		{
 			for (int i = 0; i < subCurves.Length; ++i)
 			{
-				IGeoObject go = subCurves[i] as IGeoObject;
+				IGeoObject go = subCurves[i];
 				if (go != null)
 				{
 					if (go.Owner != null) go.Owner.Remove(go);
@@ -2511,7 +2511,7 @@ namespace CADability.GeoObject
 			infinite = false;
 			for (int i = 0; i < this.thePath.CurveCount; ++i)
 			{
-				subCurves[i] = this.thePath.Curve(i) as IOctTreeInsertable;
+				subCurves[i] = this.thePath.Curve(i);
 			}
 			if (this.thePath.Curve(0) is IExtentedableCurve && !this.thePath.IsClosed)
 			{

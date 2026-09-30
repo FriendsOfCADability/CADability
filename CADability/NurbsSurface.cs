@@ -3295,11 +3295,11 @@ namespace CADability.GeoObject
             DebuggerContainer dc = new DebuggerContainer();
             for (int i = 0; i < usteps.Length; i++)
             {
-                dc.Add(FixedU(usteps[i], vmin, vmax) as IGeoObject);
+                dc.Add(FixedU(usteps[i], vmin, vmax));
             }
             for (int i = 0; i < vsteps.Length; i++)
             {
-                dc.Add(FixedV(vsteps[i], umin, umax) as IGeoObject);
+                dc.Add(FixedV(vsteps[i], umin, umax));
             }
         }
 #endif

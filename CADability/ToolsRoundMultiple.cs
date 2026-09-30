@@ -168,7 +168,7 @@ namespace CADability.Actions
                         arc1.SetArcPlaneCenterStartEndPoint(base.ActiveDrawingPlane, arcCenter, arcP1, arcP2, pl, true);
                         if (Math.Abs(arc.SweepParameter) > Math.Abs(arc1.SweepParameter)) // es ist immer der kleinere Bogen!
                         { arc = arc1; }
-                        arc.CopyAttributes(iCurve1 as IGeoObject);
+                        arc.CopyAttributes(iCurve1);
                         if (iCurve1.PositionOf(objectPoint) > 0.5)
                             iCurve1.Trim(0.0, iCurve1.PositionOf(arc.StartPoint));
                         else iCurve1.Trim(iCurve1.PositionOf(arc.StartPoint), 1.0);
@@ -177,7 +177,7 @@ namespace CADability.Actions
                         else iCurve2.Trim(iCurve2.PositionOf(arc.EndPoint), 1.0);
                         if (iCurve1.Length > Precision.eps)
                         {
-                            blk.Add(iCurve1 as IGeoObject);
+                            blk.Add(iCurve1);
                             //                        base.FeedBack.AddSelected(iCurve1 as IGeoObject); // darstellen
                         }
                         blk.Add(arc);
@@ -191,7 +191,7 @@ namespace CADability.Actions
             {
                 return false;
             }
-            blk.Add(iCurve1 as IGeoObject); // unveränderte 1. Kurve zufügen, da kein Runden möglich
+            blk.Add(iCurve1); // unveränderte 1. Kurve zufügen, da kein Runden möglich
                                             //            base.FeedBack.AddSelected(iCurve1 as IGeoObject); // darstellen
             iCurve1 = iCurve2; // unveränderte Curve2 als Grundlage zur nächsten Berechnung
             return false;
@@ -203,7 +203,7 @@ namespace CADability.Actions
             base.ActiveObject = null;
             if (iCurveSel == null) return false;
             iCurveOrg = iCurveSel; // zum Weglöschen des Originals in onDone
-            owner = (iCurveSel as IGeoObject).Owner; // owner merken für löschen und Einfügen
+            owner = iCurveSel.Owner; // owner merken für löschen und Einfügen
             // erstmal checken, ob da was dranhängt!
             pathCreatedFromModel = CADability.GeoObject.Path.CreateFromModel(iCurveSel, Frame.ActiveView.Model, Frame.ActiveView.Projection, true);
             if (pathCreatedFromModel != null)
@@ -242,7 +242,7 @@ namespace CADability.Actions
                     }
                     if (rund)
                     {
-                        blk.Add(iCurve1 as IGeoObject); // letzte Linie einfügen
+                        blk.Add(iCurve1); // letzte Linie einfügen
                                                         //                        base.FeedBack.AddSelected(iCurve1 as IGeoObject); // darstellen
                         base.ActiveObject = blk; // merken
                         return true;
@@ -264,14 +264,14 @@ namespace CADability.Actions
                         line.StartPoint = p.GetPoint(0);
                         line.EndPoint = p.GetPoint(1);
                         iCurve1 = line; // 1. Linie vorbesetzen
-                        (iCurve1 as IGeoObject).CopyAttributes(iCurveSel as IGeoObject);
+                        iCurve1.CopyAttributes(iCurveSel);
                         for (int i = 0; i < p.PointCount - 2; ++i)
                         {
                             Line line2 = Line.Construct();
                             line2.StartPoint = p.GetPoint(i + 1);
                             line2.EndPoint = p.GetPoint(i + 2);
                             iCurve2 = line2;
-                            (iCurve2 as IGeoObject).CopyAttributes(iCurveSel as IGeoObject);
+                            iCurve2.CopyAttributes(iCurveSel);
                             if (showRound()) rund = true; // hat er mindestens 1 mal gerundet?
                         }
                         if (p.IsClosed)
@@ -280,15 +280,15 @@ namespace CADability.Actions
                             line2.StartPoint = p.GetPoint(p.PointCount - 1);
                             line2.EndPoint = p.GetPoint(0);
                             iCurve2 = line2;
-                            (iCurve2 as IGeoObject).CopyAttributes(iCurveSel as IGeoObject);
+                            iCurve2.CopyAttributes(iCurveSel);
                             if (showRound()) rund = true; // hat er mindestens 1 mal gerundet?
                             iCurve2 = blk.Item(0) as ICurve;
-                            (iCurve2 as IGeoObject).CopyAttributes(iCurveSel as IGeoObject);
+                            iCurve2.CopyAttributes(iCurveSel);
                             if (showRound()) rund = true; // hat er mindestens 1 mal gerundet?
                         }
                         if (rund)
                         {
-                            blk.Add(iCurve1 as IGeoObject); // letzte Linie einfügen
+                            blk.Add(iCurve1); // letzte Linie einfügen
                                                             //                            base.FeedBack.AddSelected(iCurve1 as IGeoObject); // darstellen
                             base.ActiveObject = blk; // merken
                             return true;
@@ -307,17 +307,17 @@ namespace CADability.Actions
                         base.FeedBack.ClearSelected();
                         base.FeedBack.AddSelected(blk as IGeoObject);
                         iCurve1 = p.Curve(0).Clone(); // 1. Linie vorbesetzen
-                        (iCurve1 as IGeoObject).CopyAttributes(iCurveSel as IGeoObject);
+                        iCurve1.CopyAttributes(iCurveSel);
                         for (int i = 0; i < p.Count - 1; ++i)
                         {
                             iCurve2 = p.Curve(i + 1).Clone();
-                            (iCurve2 as IGeoObject).CopyAttributes(iCurveSel as IGeoObject);
+                            iCurve2.CopyAttributes(iCurveSel);
                             if (showRound()) rund = true; // hat er mindestens 1 mal gerundet?
                         }
                         if (p.IsClosed)
                         {
                             iCurve2 = blk.Item(0) as ICurve;
-                            (iCurve2 as IGeoObject).CopyAttributes(iCurveSel as IGeoObject);
+                            iCurve2.CopyAttributes(iCurveSel);
                             if (showRound())
                             {
                                 rund = true; // hat er mindestens 1 mal gerundet?
@@ -327,7 +327,7 @@ namespace CADability.Actions
                         }
                         if (rund)
                         {
-                            blk.Add(iCurve1 as IGeoObject); // letzte Linie einfügen
+                            blk.Add(iCurve1); // letzte Linie einfügen
                                                             //                            base.FeedBack.AddSelected(iCurve1 as IGeoObject); // darstellen
                             base.ActiveObject = blk; // merken
                             return true;
@@ -431,7 +431,7 @@ namespace CADability.Actions
                 using (base.Frame.Project.Undo.UndoFrame)
                 {
                     if (iCurveOrg != null) // evtl. Einzelobjekt (Polyline oder Path) als Original rauslöschen
-                        owner.Remove(iCurveOrg as IGeoObject);
+                        owner.Remove(iCurveOrg);
 
                     ICurve[] iCurveList = new ICurve[blk.Count]; // der Pfad braucht eine Kurvenliste
                     for (int i = 0; i < blk.Count; ++i) iCurveList[i] = blk.Item(i) as ICurve; // von Block zu Liste
@@ -442,14 +442,14 @@ namespace CADability.Actions
                     {   // das Ergebnis soll in einem Pfad zusammengefasst werden!
                         Path path = Path.Construct();
                         path.Set(iCurveList); // macht den Path mit Header und so
-                        (path as IGeoObject).CopyAttributes(iCurveSel as IGeoObject);
+                        (path as IGeoObject).CopyAttributes(iCurveSel);
                         owner.Add(path); // nur zum owner des angeklickten Ursprungsobjekts
                     }
                     else
                     {
                         for (int i = 0; i < iCurveList.Length; ++i)
                         {
-                            owner.Add(iCurveList[i] as IGeoObject); // nur zum owner des angeklickten Ursprungsobjekts
+                            owner.Add(iCurveList[i]); // nur zum owner des angeklickten Ursprungsobjekts
                         }
                     }
                     if (iCurveOrg == null)  // die Einzelelemente des CreateFromModel identifizieren
@@ -462,10 +462,10 @@ namespace CADability.Actions
                         for (int i = 0; i < pathCreatedFromModel.Count; ++i) // über den ursprünglichen Pfad laufen
                         {
                             IGeoObject obj = null;
-                            if ((pathCreatedFromModel.Curve(i) as IGeoObject).UserData.ContainsData("CADability.Path.Original"))
-                                obj = (pathCreatedFromModel.Curve(i) as IGeoObject).UserData.GetData("CADability.Path.Original") as IGeoObject;
+                            if (pathCreatedFromModel.Curve(i).UserData.ContainsData("CADability.Path.Original"))
+                                obj = pathCreatedFromModel.Curve(i).UserData.GetData("CADability.Path.Original") as IGeoObject;
                             if (obj != null && obj.Owner != null) obj.Owner.Remove(obj); // löschen
-                            (pathCreatedFromModel.Curve(i) as IGeoObject).UserData.RemoveUserData("CADability.Path.Original");
+                            pathCreatedFromModel.Curve(i).UserData.RemoveUserData("CADability.Path.Original");
                         }
                 }
             }

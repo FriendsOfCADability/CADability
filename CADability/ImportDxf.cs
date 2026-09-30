@@ -1077,7 +1077,7 @@ namespace CADability.DXF
                 }
             }
             if (curves.Count == 0) return null;
-            if (curves.Count == 1) return curves[0] as IGeoObject;
+            if (curves.Count == 1) return curves[0];
             GeoObject.Path path = GeoObject.Path.Construct();
             path.Set(new GeoObjectList(curves), false, 1e-6);
             return path.CurveCount > 0 ? (IGeoObject)path : null;
@@ -1475,7 +1475,7 @@ namespace CADability.DXF
                 else
                 {
                     ICurve arc = BulgeToArc(p0, p1, v0.Bulge, plane);
-                    if (arc != null) segments.Add(arc as IGeoObject);
+                    if (arc != null) segments.Add(arc);
                 }
             }
             if (segments.Count == 0) return null;
@@ -1509,7 +1509,7 @@ namespace CADability.DXF
                     // Use the XY plane for old-style 2D polylines
                     Plane plane = Plane(new XYZ(0, 0, 0), new XYZ(0, 0, 1));
                     ICurve arc = BulgeToArc(p0, p1, verts[i].Bulge, plane);
-                    if (arc != null) segments.Add(arc as IGeoObject);
+                    if (arc != null) segments.Add(arc);
                 }
             }
             if (segments.Count == 0) return null;

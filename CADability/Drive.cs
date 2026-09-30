@@ -1483,7 +1483,7 @@ namespace CADability
                     List<IPropertyEntry> res = new List<IPropertyEntry>();
                     if (curveDrive.MoveAlong != null)
                     {
-                        res.Add((curveDrive.MoveAlong as IGeoObject).GetShowProperties(Frame));
+                        res.Add(curveDrive.MoveAlong.GetShowProperties(Frame));
                     }
                     subEntries = res.ToArray();
                 }
@@ -1500,7 +1500,7 @@ namespace CADability
                     if (Frame.ActiveView is AnimatedView)
                     {
                         AnimatedView av = Frame.ActiveView as AnimatedView;
-                        av.SetSelectedObject(curveDrive.MoveAlong as IGeoObject);
+                        av.SetSelectedObject(curveDrive.MoveAlong);
                     }
                     return true;
                 case "MenuId.CurveDriveCurve.Set":

@@ -1544,7 +1544,7 @@ namespace CADability.GeoObject
                     if (edge.Curve3D != null)
                     {   // Leider werden so alle Kanten zweimal durch die Mühle geschickt, wenn sie von einem Solid oder Shell komme
                         // wir bräuchten noch einen Parameter um das zu vermeiden
-                        (edge.Curve3D as IGeoObject).UpdateAttributes(alc);
+                        edge.Curve3D.UpdateAttributes(alc);
                     }
                 }
             }

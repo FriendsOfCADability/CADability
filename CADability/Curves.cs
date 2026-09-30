@@ -193,7 +193,7 @@ namespace CADability.GeoObject
         /// Returns an identical copy of this curve
         /// </summary>
         /// <returns></returns>
-        ICurve Clone();
+        new ICurve Clone();
         /// <summary>
         /// Returns a modified copy of this curve
         /// </summary>
@@ -230,7 +230,7 @@ namespace CADability.GeoObject
         /// <summary>
         /// Returns a description of the curve, used in labels of the controlcenter.
         /// </summary>
-        string Description { get; }
+        new string Description { get; }
         /// <summary>
         /// Returns true, if the curve is composed of other curves. <see cref="Path"/>s and <see cref="Polyline"/>s are composed curves.
         /// </summary>
@@ -758,7 +758,7 @@ namespace CADability.GeoObject
             using (frame.Project.Undo.UndoFrame)
             {
                 addTo.Remove(toApproximate);
-                IGeoObject go = app as IGeoObject;
+                IGeoObject go = app;
                 go.CopyAttributes(toApproximate);
                 addTo.Add(go);
                 soa.SetSelectedObjects(new GeoObjectList(go));

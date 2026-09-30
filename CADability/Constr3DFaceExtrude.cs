@@ -729,8 +729,8 @@ namespace CADability.Actions
                                     for (int j = 0; j < pathCreatedFromModelList[i].Count; ++j)
                                     {
                                         IGeoObject obj = null;
-                                        if ((pathCreatedFromModelList[i].Curve(j) as IGeoObject).UserData.ContainsData("CADability.Path.Original"))
-                                            obj = (pathCreatedFromModelList[i].Curve(j) as IGeoObject).UserData.GetData("CADability.Path.Original") as IGeoObject;
+                                        if (pathCreatedFromModelList[i].Curve(j).UserData.ContainsData("CADability.Path.Original"))
+                                            obj = pathCreatedFromModelList[i].Curve(j).UserData.GetData("CADability.Path.Original") as IGeoObject;
                                         if (obj != null && obj.Owner != null) obj.Owner.Remove(obj); // löschen
                                     }
                                 }

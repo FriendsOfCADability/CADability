@@ -57,7 +57,7 @@ namespace CADability
             IGeoObject owner;
             if (distanceFromHere is Vertex vtx)
             {
-                owner = vtx.Edges[0].Curve3D as IGeoObject;
+                owner = vtx.Edges[0].Curve3D;
                 offsetStartPoint = vtx.Position;
             }
             else if (distanceFromHere is Edge edge)

@@ -452,13 +452,13 @@ namespace CADability.GeoObject
                     for (int j = 0; j < hc.Length; j += 2)
                     {
                         ICurve2D c2d = hor.Trim(hc[j], hc[j + 1]);
-                        res.Add(this.Make3dCurve(c2d).Approximate(true, precision) as IGeoObject);
+                        res.Add(this.Make3dCurve(c2d).Approximate(true, precision));
                     }
                     double[] vc = Clip(hor);
                     for (int j = 0; j < vc.Length; j += 2)
                     {
                         ICurve2D c2d = ver.Trim(vc[j], vc[j + 1]);
-                        res.Add(this.Make3dCurve(c2d).Approximate(true, precision) as IGeoObject);
+                        res.Add(this.Make3dCurve(c2d).Approximate(true, precision));
                     }
                     GeoPoint2D p0 = new GeoPoint2D(umin + i * (umax - umin) / n, vmin + i * (vmax - vmin) / n);
                     GeoPoint2D p1 = new GeoPoint2D(umin + (i + 1) * (umax - umin) / n, vmin + (i + 1) * (vmax - vmin) / n);

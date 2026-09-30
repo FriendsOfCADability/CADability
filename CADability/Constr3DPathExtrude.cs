@@ -241,7 +241,7 @@ namespace CADability.Actions
             {	// er hat was gewählt
                 selectedObjectsList.Clear();
                 base.FeedBack.ClearSelected();
-                selectedObjectsList.Add(Curves[0] as IGeoObject); // das eine in die Liste
+                selectedObjectsList.Add(Curves[0]); // das eine in die Liste
                 ListDefault(1); // die Listen löschen und mit "1" vorbesetzen
                 if (extrudeOrg()) return true;
             }
@@ -255,7 +255,7 @@ namespace CADability.Actions
         {
             selectedObjectsList.Clear();
             base.FeedBack.ClearSelected();
-            selectedObjectsList.Add(SelectedCurve as IGeoObject); // das eine in die Liste
+            selectedObjectsList.Add(SelectedCurve); // das eine in die Liste
             ListDefault(1); // die Listen löschen und mit "1" vorbesetzen
                             //            iCurveSel = SelectedCurve;
             extrudeOrg();
@@ -514,8 +514,8 @@ namespace CADability.Actions
                                     for (int j = 0; j < pathCreatedFromModelList[i].Count; ++j)
                                     {
                                         IGeoObject obj = null;
-                                        if ((pathCreatedFromModelList[i].Curve(j) as IGeoObject).UserData.ContainsData("CADability.Path.Original"))
-                                            obj = (pathCreatedFromModelList[i].Curve(j) as IGeoObject).UserData.GetData("CADability.Path.Original") as IGeoObject;
+                                        if (pathCreatedFromModelList[i].Curve(j).UserData.ContainsData("CADability.Path.Original"))
+                                            obj = pathCreatedFromModelList[i].Curve(j).UserData.GetData("CADability.Path.Original") as IGeoObject;
                                         if (obj != null && obj.Owner != null) obj.Owner.Remove(obj); // löschen
                                     }
                                 }

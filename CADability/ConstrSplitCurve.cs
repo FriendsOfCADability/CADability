@@ -241,7 +241,7 @@ namespace CADability.Actions
 
 				if ((i & 1) == 0)
 				{
-					IGeoObject toAdd = splitted as IGeoObject;
+					IGeoObject toAdd = splitted;
 					base.FeedBack.AddSelected(toAdd);
 				}
 			}
@@ -306,8 +306,8 @@ namespace CADability.Actions
 							sumlen += sections[i] * totlen;
 							double end = theCurve.PositionAtLength(sumlen);
 							splitted.Trim(start, end);
-							(splitted as IGeoObject).CopyAttributes(go);
-							owner.Add(splitted as IGeoObject);
+							splitted.CopyAttributes(go);
+							owner.Add(splitted);
 						}
 
 						//double[] Positions = new double[number];

@@ -133,7 +133,7 @@ namespace CADability
             {
                 if (edg.Curve3D == null)
                 {
-                    ThickTriangulatedFace[] close = octs1.GetObjectsCloseTo(edg.Curve3D as IOctTreeInsertable);
+                    ThickTriangulatedFace[] close = octs1.GetObjectsCloseTo(edg.Curve3D);
                     foreach (ThickTriangulatedFace tf in close)
                     {
                         CheckIntersection(tf.Face, edg);
@@ -149,7 +149,7 @@ namespace CADability
             {
                 if (edg.Curve3D == null)
                 {
-                    ThickTriangulatedFace[] close = octs2.GetObjectsCloseTo(edg.Curve3D as IOctTreeInsertable);
+                    ThickTriangulatedFace[] close = octs2.GetObjectsCloseTo(edg.Curve3D);
                     foreach (ThickTriangulatedFace tf in close)
                     {
                         CheckIntersection(tf.Face, edg);
@@ -313,7 +313,7 @@ namespace CADability
             {
                 case ItemType.Edge:
                     if (edge.Curve3D != null)
-                        return (edge.Curve3D as IOctTreeInsertable).GetExtent(precision);
+                        return edge.Curve3D.GetExtent(precision);
                     else
                         return new BoundingCube();
                 case ItemType.Vertex:
@@ -329,7 +329,7 @@ namespace CADability
             {
                 case ItemType.Edge:
                     if (edge.Curve3D != null)
-                        return (edge.Curve3D as IOctTreeInsertable).HitTest(ref cube, precision);
+                        return edge.Curve3D.HitTest(ref cube, precision);
                     else
                         return false;
                 case ItemType.Vertex:
@@ -374,7 +374,7 @@ namespace CADability
             GeoObjectList res = new GeoObjectList();
             if (edge != null)
             {
-                if (edge.Curve3D != null) res.Add(edge.Curve3D as IGeoObject);
+                if (edge.Curve3D != null) res.Add(edge.Curve3D);
             }
             if (face != null) res.Add(face);
             if (vertex != null)
@@ -466,7 +466,7 @@ namespace CADability
             {
                 if (edge.Curve3D == null) continue;
                 BoundingCube curveExt = edge.Curve3D.GetExtent();
-                Face[] close = of1.GetObjectsCloseTo(edge.Curve3D as IOctTreeInsertable);
+                Face[] close = of1.GetObjectsCloseTo(edge.Curve3D);
                 for (int i = 0; i < close.Length; ++i)
                 {
                     if (overlappingFaces.Contains((close[i], edge.PrimaryFace))) continue;
@@ -550,7 +550,7 @@ namespace CADability
             {
                 if (edge.Curve3D == null) continue;
                 BoundingCube curveExt = edge.Curve3D.GetExtent();
-                Face[] close = of2.GetObjectsCloseTo(edge.Curve3D as IOctTreeInsertable);
+                Face[] close = of2.GetObjectsCloseTo(edge.Curve3D);
                 for (int i = 0; i < close.Length; ++i)
                 {
                     if (overlappingFaces.Contains((edge.PrimaryFace, close[i]))) continue;
@@ -661,7 +661,7 @@ namespace CADability
                 if (edge.Curve3D != null && (checkAllFaces || !collisionDetected))
                 {
                     BoundingCube curveExt = edge.Curve3D.GetExtent();
-                    Face[] close = of1.GetObjectsCloseTo(edge.Curve3D as IOctTreeInsertable);
+                    Face[] close = of1.GetObjectsCloseTo(edge.Curve3D);
                     for (int i = 0; i < close.Length; ++i)
                     {
                         if (!curveExt.Interferes(close[i].GetExtent(0.0))) continue; // schneller Ausschlusstest
@@ -723,7 +723,7 @@ namespace CADability
                 if (edge.Curve3D != null && (checkAllFaces || !collisionDetected))
                 {
                     BoundingCube curveExt = edge.Curve3D.GetExtent();
-                    Face[] close = of2.GetObjectsCloseTo(edge.Curve3D as IOctTreeInsertable);
+                    Face[] close = of2.GetObjectsCloseTo(edge.Curve3D);
                     for (int i = 0; i < close.Length; ++i)
                     {
                         if (!curveExt.Interferes(close[i].GetExtent(0.0))) continue;
@@ -1493,7 +1493,7 @@ namespace CADability
             DebuggerContainer dcfaces = new DebuggerContainer();
             foreach (EdgeFaceKey ef in edgesToFaces.Keys)
             {
-                dcedges.Add(ef.edge.Curve3D as IGeoObject, ef.edge.GetHashCode());
+                dcedges.Add(ef.edge.Curve3D, ef.edge.GetHashCode());
                 dcfaces.Add(ef.face, ef.face.GetHashCode());
             }
 #endif
@@ -2151,13 +2151,13 @@ namespace CADability
             DebuggerContainer dc1 = new DebuggerContainer();
             foreach (Edge edg in shell1.Edges)
             {
-                if (edg.Curve3D != null) dc1.Add(edg.Curve3D as IGeoObject, edg.GetHashCode());
+                if (edg.Curve3D != null) dc1.Add(edg.Curve3D, edg.GetHashCode());
                 edg.CheckConsistency();
             }
             DebuggerContainer dc2 = new DebuggerContainer();
             foreach (Edge edg in shell2.Edges)
             {
-                if (edg.Curve3D != null) dc2.Add(edg.Curve3D as IGeoObject, edg.GetHashCode());
+                if (edg.Curve3D != null) dc2.Add(edg.Curve3D, edg.GetHashCode());
                 edg.CheckConsistency();
             }
 #endif
@@ -2206,7 +2206,7 @@ namespace CADability
             DebuggerContainer dc3 = new DebuggerContainer();
             foreach (Edge edge in edgesToSplit.Keys)
             {
-                dc3.Add(edge.Curve3D as IGeoObject, edge.GetHashCode());
+                dc3.Add(edge.Curve3D, edge.GetHashCode());
             }
             foreach (IntersectionVertex iv in intersectionVertices)
             {
@@ -2231,7 +2231,7 @@ namespace CADability
             {
                 foreach (Edge edg in item.Value)
                 {
-                    dc3.Add(edg.Curve3D as IGeoObject, item.Key.GetHashCode());
+                    dc3.Add(edg.Curve3D, item.Key.GetHashCode());
                 }
             }
             DebuggerContainer dc4 = new DebuggerContainer();
@@ -2438,8 +2438,8 @@ namespace CADability
             DebuggerContainer dcFillets = new DebuggerContainer();
             foreach (var item in rawFillets)
             {
-                dcEdges.Add(item.Key.Curve3D as IGeoObject, item.Key.GetHashCode());
-                dcCurves.Add(item.Value.Item1 as IGeoObject);
+                dcEdges.Add(item.Key.Curve3D, item.Key.GetHashCode());
+                dcCurves.Add(item.Value.Item1);
                 dcFillets.Add(item.Value.Item2);
             }
 #endif
@@ -2868,7 +2868,7 @@ namespace CADability
             DebuggerContainer dc = new DebuggerContainer();
             foreach (KeyValuePair<Edge, Tuple<Face, Face>> item in tangentialIntersectionEdges)
             {
-                dc.Add(item.Key.Curve3D as IGeoObject);
+                dc.Add(item.Key.Curve3D);
             }
 #endif
             Shell[] filletsShell = Make3D.SewFaces(fillets.ToArray()); // the faces are connected at the arcs, the tangential curves should remain unchanged
@@ -2949,7 +2949,7 @@ namespace CADability
             DebuggerContainer dc3 = new DebuggerContainer();
             foreach (Edge edge in edgesToSplit.Keys)
             {
-                dc3.Add(edge.Curve3D as IGeoObject, edge.GetHashCode());
+                dc3.Add(edge.Curve3D, edge.GetHashCode());
             }
             foreach (IntersectionVertex iv in intersectionVertices)
             {
@@ -3088,7 +3088,7 @@ namespace CADability
             foreach (Edge edge in intersectionEdges)
             {
                 List<(double par, bool entering, Vertex v)> edgeIntersection = new List<(double, bool, Vertex)>();
-                BRepItem[] closeObjects = GetObjectsCloseTo(edge.Curve3D as IOctTreeInsertable);
+                BRepItem[] closeObjects = GetObjectsCloseTo(edge.Curve3D);
                 for (int i = 0; i < closeObjects.Length; i++)
                 {
                     if (closeObjects[i].face != null && closeObjects[i].face != edge.PrimaryFace && closeObjects[i].face != edge.SecondaryFace)
@@ -3220,15 +3220,15 @@ namespace CADability
             DebuggerContainer dc3 = new CADability.DebuggerContainer();
             foreach (Edge edg in intsEdgeToEdgeShell1.Keys)
             {
-                dc1.Add(edg.Curve3D as IGeoObject);
+                dc1.Add(edg.Curve3D);
             }
             foreach (Edge edg in intsEdgeToEdgeShell2.Keys)
             {
-                dc2.Add(edg.Curve3D as IGeoObject);
+                dc2.Add(edg.Curve3D);
             }
             foreach (Edge edg in intsEdgeToIntsEdge.Keys)
             {
-                dc3.Add(edg.Curve3D as IGeoObject);
+                dc3.Add(edg.Curve3D);
             }
 #endif
         }
@@ -3711,7 +3711,7 @@ namespace CADability
                 {
                     foreach (Edge edg in face.Edges)
                     {
-                        if (edg.Curve3D != null) dcs1e.Add(edg.Curve3D as IGeoObject, edg.GetHashCode());
+                        if (edg.Curve3D != null) dcs1e.Add(edg.Curve3D, edg.GetHashCode());
                     }
                 }
             }
@@ -3719,11 +3719,11 @@ namespace CADability
             {
                 foreach (Edge edg in shell1.Edges)
                 {
-                    if (edg.Curve3D != null) dcs1e.Add(edg.Curve3D as IGeoObject, edg.GetHashCode());
+                    if (edg.Curve3D != null) dcs1e.Add(edg.Curve3D, edg.GetHashCode());
                 }
                 foreach (Edge edg in shell2.Edges)
                 {
-                    if (edg.Curve3D != null) dcs2e.Add(edg.Curve3D as IGeoObject, edg.GetHashCode());
+                    if (edg.Curve3D != null) dcs2e.Add(edg.Curve3D, edg.GetHashCode());
                 }
             }
             DebuggerContainer dcis = new CADability.DebuggerContainer(); // <----- dcis shows the intersection curves
@@ -3734,7 +3734,7 @@ namespace CADability
             }
             foreach (Edge edg in ise)
             {
-                if (edg.Curve3D != null) dcis.Add(edg.Curve3D as IGeoObject, edg.GetHashCode());
+                if (edg.Curve3D != null) dcis.Add(edg.Curve3D, edg.GetHashCode());
             }
             Dictionary<Face, DebuggerContainer> debugTrimmedFaces = new Dictionary<Face, DebuggerContainer>();
             foreach (KeyValuePair<Face, HashSet<Edge>> kv in faceToIntersectionEdges)
@@ -3758,12 +3758,12 @@ namespace CADability
                 {
                     if (edg.Curve3D != null)
                     {
-                        if (edg.Forward(kv.Key)) l.Add(edg.Curve3D as IGeoObject);
+                        if (edg.Forward(kv.Key)) l.Add(edg.Curve3D);
                         else
                         {
                             ICurve c3d = edg.Curve3D.Clone();
                             c3d.Reverse();
-                            l.Add(c3d as IGeoObject);
+                            l.Add(c3d);
                         }
                     }
                 }
@@ -3787,7 +3787,7 @@ namespace CADability
                 dcif.Add(kv.Key, kv.Key.GetHashCode());
                 foreach (Edge edg in kv.Value)
                 {
-                    dcif.Add(edg.Curve3D as IGeoObject, edg.GetHashCode());
+                    dcif.Add(edg.Curve3D, edg.GetHashCode());
                 }
             }
             Dictionary<Face, DebuggerContainer> dbgEdgePositions = new Dictionary<Face, DebuggerContainer>();
@@ -6507,7 +6507,7 @@ namespace CADability
             {
                 for (int j = 0; j < ecs[i].Count; j++)
                 {
-                    dc1.Add(ecs[i][j].Curve3D as IGeoObject);
+                    dc1.Add(ecs[i][j].Curve3D);
                 }
             }
 #endif
@@ -9105,12 +9105,12 @@ namespace CADability
                 dc0.Add(item.Key.face1, item.Key.face1.GetHashCode());
                 foreach (Edge edg in item.Key.face1.AllEdges)
                 {
-                    dc0.Add(edg.Curve3D as IGeoObject, edg.GetHashCode());
+                    dc0.Add(edg.Curve3D, edg.GetHashCode());
                 }
                 dc0.Add(item.Key.face2, item.Key.face2.GetHashCode());
                 foreach (Edge edg in item.Key.face2.AllEdges)
                 {
-                    dc0.Add(edg.Curve3D as IGeoObject, edg.GetHashCode());
+                    dc0.Add(edg.Curve3D, edg.GetHashCode());
                 }
                 foreach (Vertex vtx in involvedVertices)
                 {
@@ -9469,8 +9469,8 @@ namespace CADability
                             edge.edgeInfo = new EdgeInfo(edge);
                             edge.edgeInfo.isIntersection = true;
 #if DEBUG
-                            (tr as IGeoObject).UserData.Add("DebugIntersectionBy1", item.Key.face1.GetHashCode());
-                            (tr as IGeoObject).UserData.Add("DebugIntersectionBy2", item.Key.face2.GetHashCode());
+                            tr.UserData.Add("DebugIntersectionBy1", item.Key.face1.GetHashCode());
+                            tr.UserData.Add("DebugIntersectionBy2", item.Key.face2.GetHashCode());
                             if (con2 is InterpolatedDualSurfaceCurve.ProjectedCurve)
                             {
                                 BSpline2D dbgbsp2d = (con2 as InterpolatedDualSurfaceCurve.ProjectedCurve).ToBspline(0.0);
@@ -9719,7 +9719,7 @@ namespace CADability
             {
                 if (brep.edge != null)
                 {
-                    if (brep.edge.Curve3D != null) dc.Add(brep.edge.Curve3D as IGeoObject);
+                    if (brep.edge.Curve3D != null) dc.Add(brep.edge.Curve3D);
                 }
                 if (brep.face != null) dc.Add(brep.face);
                 if (brep.vertex != null) dc.Add(brep.vertex.Position, Color.Red, 0);
@@ -9820,7 +9820,7 @@ namespace CADability
                     if (item.Key.Curve3D != null)
                     {
                         ((item.Key.Curve3D as IGeoObject) as IColorDef).ColorDef = cde;
-                        res.Add(item.Key.Curve3D as IGeoObject);
+                        res.Add(item.Key.Curve3D);
                     }
                     foreach (Vertex v in item.Value)
                     {
@@ -10204,7 +10204,7 @@ namespace CADability
             {
                 if (edg.Curve3D != null)
                 {
-                    debuggerContainer.Add((edg.Curve3D.Clone() as IGeoObject), edg.GetHashCode());
+                    debuggerContainer.Add(edg.Curve3D.Clone(), edg.GetHashCode());
                 }
             }
 #endif
@@ -10570,7 +10570,7 @@ namespace CADability
             // hier werden die neu erzeugten Vertices gesammelt ung ggf. mehrfach verwendet
             foreach (Edge edg in allNewEdges)
             {
-                BRepItem[] close = octTree.GetObjectsCloseTo(edg.Curve3D as IOctTreeInsertable);
+                BRepItem[] close = octTree.GetObjectsCloseTo(edg.Curve3D);
                 SortedDictionary<double, GeoPoint> ips = new SortedDictionary<double, GeoPoint>();
                 for (int i = 0; i < close.Length; i++)
                 {
@@ -10753,7 +10753,7 @@ namespace CADability
 #if DEBUG
                         if (edge.GetHashCode() == 117)
                         {
-                            dc0.Add(edge.Curve3D as IGeoObject, edge.GetHashCode());
+                            dc0.Add(edge.Curve3D, edge.GetHashCode());
                         }
 #endif
                         IGeoObjectOwner shell = edge.PrimaryFace.Owner;
@@ -10971,7 +10971,7 @@ namespace CADability
                 dc.Add(item.Key.face2, 2);
                 for (int i = 0; i < item.Value.Count; i++)
                 {
-                    dc.Add(item.Value[i].edge.Curve3D as IGeoObject, 10 + i);
+                    dc.Add(item.Value[i].edge.Curve3D, 10 + i);
                 }
                 for (int i = 0; i < points.Count; i++)
                 {

@@ -804,7 +804,7 @@ namespace CADability
             else
             {
                 res.curve3d = surface.Make3dCurve(curve);
-                if (res.curve3d != null) (res.curve3d as IGeoObject).Owner = res;
+                if (res.curve3d != null) res.curve3d.Owner = res;
             }
             res.curveOnPrimaryFace = curve;
             res.forwardOnPrimaryFace = true; // wird das gebraucht?
@@ -834,14 +834,14 @@ namespace CADability
         {
             this.owner = owner;
             this.curve3d = curve3d;
-            if (curve3d != null) (curve3d as IGeoObject).Owner = this;
+            if (curve3d != null) curve3d.Owner = this;
         }
         internal Edge(ICurve crv, Vertex v1, Vertex v2)
             : this()
         {
             this.owner = null;
             this.curve3d = crv;
-            if (curve3d != null) (curve3d as IGeoObject).Owner = this;
+            if (curve3d != null) curve3d.Owner = this;
             Vertex1 = v1;
             Vertex2 = v2;
             v1.AddEdge(this);
@@ -866,7 +866,7 @@ namespace CADability
             this.secondaryFace = secondaryFace;
             this.curveOnSecondaryFace = curveOnSecondaryFace;
             this.forwardOnSecondaryFace = forwardOnSecondaryFace;
-            if (curve3d != null) (curve3d as IGeoObject).Owner = this;
+            if (curve3d != null) curve3d.Owner = this;
             oriented = true;
         }
 
@@ -923,9 +923,9 @@ namespace CADability
         internal void Modify(ModOp m)
         {   // verändert nur die 3D Kurve, gleichzeitig müssen die Surfaces verändert werden
             // das kann aber nur von höherer Warte aus geschehen
-            if (curve3d is IGeoObject)
+            if (curve3d != null)
             {
-                (curve3d as IGeoObject).Modify(m);
+                curve3d.Modify(m);
                 v1 = null;
                 v2 = null;
             }
@@ -1410,7 +1410,7 @@ namespace CADability
                     curveOnSecondaryFace = secondaryFace.internalSurface.GetProjectedCurve(curve3d, Precision.eps);
                     if (!forwardOnSecondaryFace) curveOnSecondaryFace.Reverse();
                 }
-                (curve3d as IGeoObject).Owner = this;
+                curve3d.Owner = this;
             }
             else if (primaryFace != null && curve3d != null)
             {   // die 3D Kurve ist das Ausgangsdatum, keine zweite Fläche vorhanden, also kann man nichts neu berechnen
@@ -1617,7 +1617,7 @@ namespace CADability
             if (curve3d != null)
             {
                 res.curve3d = curve3d.Clone();
-                (res.curve3d as IGeoObject).Owner = res;
+                res.curve3d.Owner = res;
                 //res.v1 = v1; // usage of vertices introduced later, make sure it is expected this way
                 //res.v2 = v2;
                 //if (v1 != null) v1.AddEdge(res);
@@ -1631,7 +1631,7 @@ namespace CADability
             if (curve3d != null)
             {
                 res.curve3d = curve3d.Clone();
-                (res.curve3d as IGeoObject).Owner = res;
+                res.curve3d.Owner = res;
             }
             // use Vertex1 instead of v1, because v1 might be null
             if (!clonedVertices.TryGetValue(Vertex1, out Vertex cv1))
@@ -1654,7 +1654,7 @@ namespace CADability
             if (curve3d != null)
             {
                 res.curve3d = curve3d.Clone();
-                (res.curve3d as IGeoObject).Owner = res;
+                res.curve3d.Owner = res;
             }
             res.v1 = v1;
             res.v2 = v2;
@@ -1713,7 +1713,7 @@ namespace CADability
             if (curve3d != null)
             {
                 res.curve3d = curve3d.Clone();
-                (res.curve3d as IGeoObject).Owner = res;
+                res.curve3d.Owner = res;
                 res.v1 = v1;
                 res.v2 = v2;
                 if (v1 != null) v1.AddEdge(res);
@@ -2276,7 +2276,7 @@ namespace CADability
         }
         void IJsonSerializeDone.SerializationDone(JsonSerialize jsonSerialize)
         {
-            if (curve3d != null) (curve3d as IGeoObject).Owner = this;
+            if (curve3d != null) curve3d.Owner = this;
         }
         #endregion
         #region ISerializable Members
@@ -2349,7 +2349,7 @@ namespace CADability
         {
             // RecalcCurve3D(); warum, das wurde doch soeben eingelesen
             // außerdem kann man u.U. mit den Flächen und curveOnPrimaryFace etc. noch nicht rechnen!
-            if (curve3d != null) (curve3d as IGeoObject).Owner = this;
+            if (curve3d != null) curve3d.Owner = this;
         }
         #endregion
         internal void CopyPrimary(Edge edge, Face face)
@@ -2940,7 +2940,7 @@ namespace CADability
 #if DEBUG
                     (splittedEdge.curve3d as InterpolatedDualSurfaceCurve).CheckSurfaceParameters();
 #endif
-                    (splittedEdge.curve3d as IGeoObject).Owner = splittedEdge;
+                    splittedEdge.curve3d.Owner = splittedEdge;
                     if ((startVertex.Position | endVertex.Position) > precision)
                     {   // es kommt vor, dass die Vertices gleich sind, wenn genau am Anfang bzw. Ende geschnitten wurde
                         splittedEdge.v1 = startVertex;
@@ -3603,7 +3603,7 @@ namespace CADability
             if (topLevel) orient = ",.T.";
             else orient = ",.F.";
 #if DEBUG
-            IntegerProperty ip = (curve3d as IGeoObject).UserData.GetData("Step.DefiningIndex") as IntegerProperty;
+            IntegerProperty ip = curve3d.UserData.GetData("Step.DefiningIndex") as IntegerProperty;
             int iv = 0;
             if (ip != null) iv = ip.IntegerValue;
             return export.WriteDefinition("ORIENTED_EDGE('" + iv.ToString() + "',*,*,#" + ec.ToString() + orient + ")");

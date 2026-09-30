@@ -147,8 +147,8 @@ namespace CADability
                 CADability.GeoObject.Path path = (go as CADability.GeoObject.Path);
                 for (int i = 0; i < path.CurveCount; ++i)
                 {
-                    (path.Curves[i] as IGeoObject).UserData.Add("Debug", ip);
-                    toShow.Add(path.Curves[i] as IGeoObject);
+                    path.Curves[i].UserData.Add("Debug", ip);
+                    toShow.Add(path.Curves[i]);
                 }
             }
         }
@@ -303,7 +303,7 @@ namespace CADability
                     res.Add(l);
                 }
                 else if (obji is IGeoObject) res.Add(obji as IGeoObject);
-                else if (obji is Edge && (obji as Edge).Curve3D != null) res.Add((obji as Edge).Curve3D as IGeoObject, (obji as Edge).GetHashCode());
+                else if (obji is Edge && (obji as Edge).Curve3D != null) res.Add((obji as Edge).Curve3D, (obji as Edge).GetHashCode());
                 else if (obji is ICurve2D) res.Add(obji as ICurve2D, System.Drawing.Color.Red, i);
                 else if (obji is Vertex) res.Add((obji as Vertex).DebugPoint, (obji as Vertex).GetHashCode());
                 else if (obji is IDebuggerVisualizer) res.Add((obji as IDebuggerVisualizer).GetList());

@@ -1144,18 +1144,18 @@ namespace CADability
                     }
                     else
                     {
-                        l.AddRange(model.octTree.GetObjectsCloseTo(Curve as IOctTreeInsertable));
+                        l.AddRange(model.octTree.GetObjectsCloseTo(Curve));
                     }
                 }
                 else
                 {
-                    l.AddRange(model.octTree.GetObjectsCloseTo(Curve as IOctTreeInsertable));
+                    l.AddRange(model.octTree.GetObjectsCloseTo(Curve));
                 }
-                l.Remove(Curve as IGeoObject);
+                l.Remove(Curve);
                 l.DecomposeBlocks();
                 // wenn Curve ein Path ist, dann enthält l alle Unterobjekte, und die müssen raus
                 // selbstüberschneidende Path Objekte werden noch Probleme machen
-                l.RemoveChildrenOf(Curve as IGeoObject);
+                l.RemoveChildrenOf(Curve);
                 List<(double Z, ICurve Curve)> resCurves = new();
                 foreach (IGeoObject go in l)
                 {

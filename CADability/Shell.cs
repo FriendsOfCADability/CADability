@@ -1241,7 +1241,7 @@ namespace CADability.GeoObject
                 // Edges groß, damit sie sicher existieren
                 for (int i = 0; i < Edges.Length; ++i)
                 {
-                    IGeoObject go = edges[i].Curve3D as IGeoObject;
+                    IGeoObject go = edges[i].Curve3D;
                     if (go != null) go.Modify(m);
                     edges[i].SetVerticesPositions();
                     edges[i].ReflectModification(); // ProjectedCurves must be updated
@@ -1400,7 +1400,7 @@ namespace CADability.GeoObject
             if (!spf.Accept(this)) return;
             for (int i = 0; i < Edges.Length; ++i)
             {
-                IGeoObject go = Edges[i].Curve3D as IGeoObject;
+                IGeoObject go = Edges[i].Curve3D;
                 if (go != null)
                 {
                     go.FindSnapPoint(spf);
@@ -2501,7 +2501,7 @@ namespace CADability.GeoObject
             {
                 if (edges[i].Curve3D != null)
                 {
-                    res.Add((edges[i].Curve3D as IGeoObject).GetQuadTreeItem(projection, extentPrecision));
+                    res.Add(edges[i].Curve3D.GetQuadTreeItem(projection, extentPrecision));
                 }
             }
             return res;
@@ -2999,7 +2999,7 @@ namespace CADability.GeoObject
             {
                 for (int j = 0; j < loops[i].Count; j++)
                 {
-                    dc0.Add(loops[i][j].Curve3D as IGeoObject);
+                    dc0.Add(loops[i][j].Curve3D);
                 }
             }
 #endif
@@ -3914,8 +3914,8 @@ namespace CADability.GeoObject
                         dce.Add(v2.DebugPoint, 2);
                         dce.Add(v3.DebugPoint, 3);
                         dce.Add(v4.DebugPoint, 4);
-                        dce.Add(e1.Curve3D as IGeoObject, 11);
-                        dce.Add(e3.Curve3D as IGeoObject, 33);
+                        dce.Add(e1.Curve3D, 11);
+                        dce.Add(e3.Curve3D, 33);
 #endif
                         //double pos1 = elli.PositionOf(v4.Position);
                         //double pos2 = elli.PositionOf(v1.Position);
@@ -4042,13 +4042,13 @@ namespace CADability.GeoObject
                         dco.Add(e3.SecondaryCurve2D, Color.Red, 3);
                         dco.Add(e2.PrimaryCurve2D, Color.Red, 2);
                         dco.Add(e4.PrimaryCurve2D, Color.Red, 4);
-                        dce.Add(e2.Curve3D as IGeoObject, 22);
-                        dce.Add(e4.Curve3D as IGeoObject, 44);
+                        dce.Add(e2.Curve3D, 22);
+                        dce.Add(e4.Curve3D, 44);
                         DebuggerContainer dcp = new DebuggerContainer();
-                        dcp.Add(gsc.Make3dCurve(e1.SecondaryCurve2D) as IGeoObject, 11);
-                        dcp.Add(gsc.Make3dCurve(e3.SecondaryCurve2D) as IGeoObject, 33);
-                        dcp.Add(gsc.Make3dCurve(e2.PrimaryCurve2D) as IGeoObject, 22);
-                        dcp.Add(gsc.Make3dCurve(e4.PrimaryCurve2D) as IGeoObject, 44);
+                        dcp.Add(gsc.Make3dCurve(e1.SecondaryCurve2D), 11);
+                        dcp.Add(gsc.Make3dCurve(e3.SecondaryCurve2D), 33);
+                        dcp.Add(gsc.Make3dCurve(e2.PrimaryCurve2D), 22);
+                        dcp.Add(gsc.Make3dCurve(e4.PrimaryCurve2D), 44);
 #endif
                         // die Frage nach der Reihenfolge ist noch offen:
                         Polyline2D pl2d = new Polyline2D(new GeoPoint2D[] { c2de3.EndPoint, c2de1.StartPoint, c2de1.EndPoint, c2de3.StartPoint });
@@ -4678,7 +4678,7 @@ namespace CADability.GeoObject
         {
             for (int i = 0; i < Edges.Length; ++i)
             {   // nicht über faces iterieren, denn beim Darstellen wird auch nicht über faces iteriert
-                IGeoObject go = edges[i].Curve3D as IGeoObject;
+                IGeoObject go = edges[i].Curve3D;
                 if (go != null && go.UniqueId == id[index])
                     return go;
             }
@@ -4736,7 +4736,7 @@ namespace CADability.GeoObject
                 GeoObjectList res = new GeoObjectList();
                 for (int i = 0; i < oe.Length; i++)
                 {
-                    if (oe[i].Curve3D != null) res.Add(oe[i].Curve3D as IGeoObject);
+                    if (oe[i].Curve3D != null) res.Add(oe[i].Curve3D);
                 }
                 return res;
             }
@@ -4838,7 +4838,7 @@ namespace CADability.GeoObject
             DebuggerContainer dcd = new DebuggerContainer();
             for (int i = 0; i < disconnectedEdges.Count; i++)
             {
-                dcd.Add(disconnectedEdges[i].Curve3D as IGeoObject, disconnectedEdges[i].GetHashCode());
+                dcd.Add(disconnectedEdges[i].Curve3D, disconnectedEdges[i].GetHashCode());
             }
             foreach (Vertex vtx in splitVertices)
             {
@@ -4891,7 +4891,7 @@ namespace CADability.GeoObject
                 Edge[] edgs = vtx.Edges;
                 for (int i = 0; i < edgs.Length; i++)
                 {
-                    if (edgs[i].Curve3D != null) dcsv.Add(edgs[i].Curve3D as IGeoObject, edgs[i].GetHashCode());
+                    if (edgs[i].Curve3D != null) dcsv.Add(edgs[i].Curve3D, edgs[i].GetHashCode());
                 }
             }
 #endif
@@ -5019,7 +5019,7 @@ namespace CADability.GeoObject
                 }
                 foreach (Edge edg in toShow)
                 {
-                    if (edg.Curve3D != null) dc1.Add(edg.Curve3D as IGeoObject, edg.GetHashCode());
+                    if (edg.Curve3D != null) dc1.Add(edg.Curve3D, edg.GetHashCode());
                 }
             }
 #endif
@@ -5032,7 +5032,7 @@ namespace CADability.GeoObject
                 DebuggerContainer dcae = new DebuggerContainer();
                 for (int i = 0; i < allEdges.Length; i++)
                 {
-                    if (allEdges[i].Curve3D != null) dcae.Add(allEdges[i].Curve3D as IGeoObject, allEdges[i].GetHashCode());
+                    if (allEdges[i].Curve3D != null) dcae.Add(allEdges[i].Curve3D, allEdges[i].GetHashCode());
                 }
 #endif
                 for (int i = 0; i < allEdges.Length; i++)
@@ -5067,7 +5067,7 @@ namespace CADability.GeoObject
                 }
                 foreach (Edge edg in toShow)
                 {
-                    if (edg.SecondaryFace == null && edg.Curve3D != null) dc2.Add(edg.Curve3D as IGeoObject, edg.GetHashCode());
+                    if (edg.SecondaryFace == null && edg.Curve3D != null) dc2.Add(edg.Curve3D, edg.GetHashCode());
                 }
             }
 #endif
@@ -5742,7 +5742,7 @@ namespace CADability.GeoObject
                     DebuggerContainer dc = new DebuggerContainer();
                     for (int i = 0; i < fcdbg.AllEdges.Length; i++)
                     {
-                        dc.Add(fcdbg.AllEdges[i].Curve3D as IGeoObject, fcdbg.AllEdges[i].GetHashCode());
+                        dc.Add(fcdbg.AllEdges[i].Curve3D, fcdbg.AllEdges[i].GetHashCode());
                     }
                     for (int i = 0; i < fcdbg.Vertices.Length; i++)
                     {

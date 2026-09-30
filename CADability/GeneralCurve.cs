@@ -328,7 +328,7 @@ namespace CADability.GeoObject
             try
             {
                 ICurve crv = Approximate(true, paintTo3D.Precision);
-                (crv as IGeoObject).PaintTo3D(paintTo3D);
+                crv.PaintTo3D(paintTo3D);
             }
             catch (PolylineException) { } // zu kurze Linien, nix machen
         }
@@ -2260,7 +2260,7 @@ namespace CADability.GeoObject
                         catch { }
                     }
                 }
-                dbg.Add(theCurve as IGeoObject);
+                dbg.Add(theCurve);
                 return dbg;
             }
         }
@@ -2359,7 +2359,7 @@ namespace CADability.GeoObject
             {
 #if DEBUG
                 GeoObjectList dbg = new GeoObjectList();
-                dbg.Add(theCurve as IGeoObject);
+                dbg.Add(theCurve);
                 dbg.Add(Line.TwoPoints(pfound, pfound + dir));
                 dbg.Add(Line.TwoPoints(theCurve.PointAt(umin), theCurve.PointAt(umax)));
 #endif

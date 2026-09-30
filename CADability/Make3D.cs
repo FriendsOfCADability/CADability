@@ -170,8 +170,8 @@ namespace CADability.GeoObject
                 endEdges[i] = new Edge(upper, curves[i].CloneModified(toEndMiter));
                 allFaces.Add(sides[i]);
 #if DEBUG
-                dc.Add(startEdges[i].Curve3D as IGeoObject);
-                dc.Add(endEdges[i].Curve3D as IGeoObject);
+                dc.Add(startEdges[i].Curve3D);
+                dc.Add(endEdges[i].Curve3D);
 #endif
             }
             for (int i = 0; i < curves.Length; i++)
@@ -215,8 +215,8 @@ namespace CADability.GeoObject
                     startHolesEdges[j][i] = new Edge(lower, holes[j][i].CloneModified(toStartMiter));
                     endHolesEdges[j][i] = new Edge(upper, holes[j][i].CloneModified(toEndMiter));
 #if DEBUG
-                    dc.Add(startHolesEdges[j][i].Curve3D as IGeoObject);
-                    dc.Add(endHolesEdges[j][i].Curve3D as IGeoObject);
+                    dc.Add(startHolesEdges[j][i].Curve3D);
+                    dc.Add(endHolesEdges[j][i].Curve3D);
 #endif
                     allFaces.Add(sides[i]);
                 }
@@ -2816,12 +2816,12 @@ namespace CADability.GeoObject
                     DebuggerContainer dc = new DebuggerContainer();
                     for (int i = 0; i < s1.Length; i++)
                     {
-                        if (s1[i].Curve3D != null) dc.Add(s1[i].Curve3D as IGeoObject, System.Drawing.Color.Red, i); // to here
-                        if (s2[i].Curve3D != null) dc.Add(s2[i].Curve3D as IGeoObject, System.Drawing.Color.Blue, i); // from here
+                        if (s1[i].Curve3D != null) dc.Add(s1[i].Curve3D, System.Drawing.Color.Red, i); // to here
+                        if (s2[i].Curve3D != null) dc.Add(s2[i].Curve3D, System.Drawing.Color.Blue, i); // from here
                     }
                     for (int i = 0; i < edges.Length; i++)
                     {
-                        if (edges[i].Curve3D != null) dc.Add(edges[i].Curve3D as IGeoObject, System.Drawing.Color.Green, i); // connecting arcs
+                        if (edges[i].Curve3D != null) dc.Add(edges[i].Curve3D, System.Drawing.Color.Green, i); // connecting arcs
                     }
 #endif
                     for (int i = 0; i < path.CurveCount; i++)

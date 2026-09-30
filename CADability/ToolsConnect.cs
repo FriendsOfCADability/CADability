@@ -117,8 +117,8 @@ namespace CADability.Actions
                             newCurve.StartPoint = iCurve1.PointAt(param1);
                         else
                             newCurve.EndPoint = iCurve1.PointAt(param1);
-                        (newCurve as IGeoObject).CopyAttributes(iCurve1 as IGeoObject);
-                        base.FeedBack.AddSelected(newCurve as IGeoObject);// erste Linie einfügen
+                        newCurve.CopyAttributes(iCurve1);
+                        base.FeedBack.AddSelected(newCurve);// erste Linie einfügen
                         connect = true;
                     }
                     if ((param2 > (1 + 1e-8) || param2 < -1e-8))
@@ -128,8 +128,8 @@ namespace CADability.Actions
                             newCurve.StartPoint = iCurve2.PointAt(param2);
                         else
                             newCurve.EndPoint = iCurve2.PointAt(param2);
-                        (newCurve as IGeoObject).CopyAttributes(iCurve2 as IGeoObject);
-                        base.FeedBack.AddSelected(newCurve as IGeoObject);// letzte Linie einfügen
+                        newCurve.CopyAttributes(iCurve2);
+                        base.FeedBack.AddSelected(newCurve);// letzte Linie einfügen
                         connect = true;
                     }
                     if (connect) return true;

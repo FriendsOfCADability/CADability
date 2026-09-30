@@ -128,8 +128,8 @@ namespace CADability
             /// <param name="m"></param>
             public override void Modify(ModOp m)
             {
-                (firstCurve as IGeoObject).Modify(m);
-                (secondCurve as IGeoObject).Modify(m);
+                firstCurve.Modify(m);
+                secondCurve.Modify(m);
                 base.InvalidateSecondaryData();
             }
             #endregion

@@ -35,7 +35,7 @@ namespace CADability.Actions
             base.FeedBack.ClearSelected();
             base.ActiveObject = null;
             double[] cutPlace = base.Frame.ActiveView.ProjectedModel.GetIntersectionParameters(iCurve, ProjectedModel.IntersectionMode.InsideAndSelfIntersection);
-            owner = (iCurve as IGeoObject).Owner; // owner merken für löschen und Einfügen
+            owner = iCurve.Owner; // owner merken für löschen und Einfügen
 
             double pos = iCurve.PositionOf(objectPoint); // der Pickpunkt
             trimCurves = null;
@@ -151,12 +151,12 @@ namespace CADability.Actions
             }
             if (trimCurves != null)
             {
-                (trimCurve as IGeoObject).CopyAttributes(iCurve as IGeoObject);
+                trimCurve.CopyAttributes(iCurve);
                 Color backColor = base.Frame.GetColorSetting("Colors.Feedback", Color.DarkGray);
                 if (trimCurve is IColorDef)
                     (trimCurve as IColorDef).ColorDef = new ColorDef("", backColor);
-                base.FeedBack.AddSelected(trimCurve as IGeoObject); // darstellen
-                base.ActiveObject = trimCurve as IGeoObject; // merken
+                base.FeedBack.AddSelected(trimCurve); // darstellen
+                base.ActiveObject = trimCurve; // merken
                 return true;
             }
             return false;
@@ -215,11 +215,11 @@ namespace CADability.Actions
                 base.ActiveObject = null;
                 using (base.Frame.Project.Undo.UndoFrame)
                 {
-                    owner.Remove(iCurve as IGeoObject); // original Löschen
+                    owner.Remove(iCurve); // original Löschen
                     for (int i = 0; i < trimCurves.Length; ++i)// alle einfügen
                     {
-                        (trimCurves[i] as IGeoObject).CopyAttributes(iCurve as IGeoObject);
-                        owner.Add(trimCurves[i] as IGeoObject);
+                        trimCurves[i].CopyAttributes(iCurve);
+                        owner.Add(trimCurves[i]);
                     }
                 }
             }

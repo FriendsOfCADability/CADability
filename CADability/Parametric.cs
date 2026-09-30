@@ -1112,8 +1112,8 @@ namespace CADability
 
         private void CopyAttributes(ICurve from, ICurve to)
         {
-            IGeoObject gfrom = from as IGeoObject;
-            IGeoObject gto = to as IGeoObject;
+            IGeoObject gfrom = from;
+            IGeoObject gto = to;
             gto.CopyAttributes(gfrom);
         }
 

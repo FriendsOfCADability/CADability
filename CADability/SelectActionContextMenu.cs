@@ -651,7 +651,7 @@ namespace CADability
                 {
                     MenuWithHandler mh = new MenuWithHandler();
                     mh.ID = "MenuId.ConstrSelected.Solid";
-                    mh.Text = (curve as IGeoObject).Description; // StringTable.GetString("MenuId.ConstrSelected.Solid", StringTable.Category.label);
+                    mh.Text = curve.Description; // StringTable.GetString("MenuId.ConstrSelected.Solid", StringTable.Category.label);
                     mh.SubMenus = lmh.ToArray();
                     return mh;
                 }

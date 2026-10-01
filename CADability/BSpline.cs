@@ -3104,14 +3104,6 @@ namespace CADability.GeoObject
                 }
             }
         }
-        string ICurve.Description
-        {
-            get
-            {
-                // TODO:  Add BSpline.Description getter implementation
-                return null;
-            }
-        }
         bool ICurve.IsComposed
         {
             get { return false; }

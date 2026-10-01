@@ -1,4 +1,4 @@
-﻿using CADability.Curve2D;
+using CADability.Curve2D;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -81,23 +81,23 @@ namespace CADability.GeoObject
     public interface ICurve : IGeoObject
     {
         /// <summary>
-        /// The start-point of the curve. If the curve is closed, this is the point where 
-        /// the parameter is 0.0. 
+        /// The start-point of the curve. If the curve is closed, this is the point where
+        /// the parameter is 0.0.
         /// </summary>
         GeoPoint StartPoint { get; set; }
         /// <summary>
-        /// The endpoint of the curve. If the curve is closed, this is the point where 
-        /// the parameter is 1.0. 
+        /// The endpoint of the curve. If the curve is closed, this is the point where
+        /// the parameter is 1.0.
         /// </summary>
         GeoPoint EndPoint { get; set; }
         /// <summary>
-        /// The direction of the curve at the start-point. If the curve is closed, this is the direction where 
-        /// the parameter is 0.0. 
+        /// The direction of the curve at the start-point. If the curve is closed, this is the direction where
+        /// the parameter is 0.0.
         /// </summary>
         GeoVector StartDirection { get; }
         /// <summary>
-        /// The direction of the curve at the endpoint. If the curve is closed, this is the direction where 
-        /// the parameter is 1.0. 
+        /// The direction of the curve at the endpoint. If the curve is closed, this is the direction where
+        /// the parameter is 1.0.
         /// </summary>
         GeoVector EndDirection { get; }
         /// <summary>
@@ -203,7 +203,7 @@ namespace CADability.GeoObject
         /// <summary>
         /// Determins the state of the curve in space. A curve may be either
         /// Planar (e.g. a cicle), NonPlanar (e.g. a polyline with vertices that
-        /// dont shear a common plane) or UnderDetermined (e.g. a line defines a 
+        /// dont shear a common plane) or UnderDetermined (e.g. a line defines a
         /// sheaf of planes (Ebenenbüschel))
         /// </summary>
         /// <returns></returns>
@@ -228,10 +228,6 @@ namespace CADability.GeoObject
         /// <returns>The 2D curve in the given plane</returns>
         ICurve2D GetProjectedCurve(Plane p);
         /// <summary>
-        /// Returns a description of the curve, used in labels of the controlcenter.
-        /// </summary>
-        new string Description { get; }
-        /// <summary>
         /// Returns true, if the curve is composed of other curves. <see cref="Path"/>s and <see cref="Polyline"/>s are composed curves.
         /// </summary>
 		bool IsComposed { get; }
@@ -249,7 +245,7 @@ namespace CADability.GeoObject
 		ICurve Approximate(bool linesOnly, double maxError);
         /// <summary>
         /// Returns a list of positions where the curve has the same or opposite direction as the given direction.
-        /// Mainly used for visualisation purposes. If there are no such points (which is true in most cases) 
+        /// Mainly used for visualisation purposes. If there are no such points (which is true in most cases)
         /// An empty array should be returned.
         /// </summary>
         /// <param name="direction"></param>
@@ -300,7 +296,7 @@ namespace CADability.GeoObject
         /// <returns>Intersection parameters, may be empty</returns>
         double[] GetPlaneIntersection(Plane plane);
         /// <summary>
-        /// Returns the minimal distance of point p to the curve. 
+        /// Returns the minimal distance of point p to the curve.
         /// </summary>
         /// <param name="p"></param>
         /// <returns></returns>
@@ -494,8 +490,8 @@ namespace CADability.GeoObject
             return false;
         }
         /// <summary>
-        /// Determines the commomn plane of a point and a curve. Returns the common plane in the 
-        /// parameter and true if there is such a plane. Returns false, if the point lies not 
+        /// Determines the commomn plane of a point and a curve. Returns the common plane in the
+        /// parameter and true if there is such a plane. Returns false, if the point lies not
         /// in the plane. <seealso cref="Precision"/>
         /// </summary>
         /// <param name="p">The point</param>
@@ -599,7 +595,7 @@ namespace CADability.GeoObject
             {
                 if (!curves[i].IsInPlane(CommonPlane)) return false;
             }
-            return true;            
+            return true;
         }
         /// <summary>
         /// Returns the parameters of the intersection points of curve1 with curve2.

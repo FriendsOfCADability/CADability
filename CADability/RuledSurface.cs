@@ -128,8 +128,8 @@ namespace CADability
             /// <param name="m"></param>
             public override void Modify(ModOp m)
             {
-                (firstCurve as IGeoObject).Modify(m);
-                (secondCurve as IGeoObject).Modify(m);
+                firstCurve.Modify(m);
+                secondCurve.Modify(m);
                 base.InvalidateSecondaryData();
             }
             #endregion
@@ -908,13 +908,13 @@ namespace CADability
         public override IPropertyEntry GetPropertyEntry(IFrame frame)
         {
             List<IPropertyEntry> se = new List<IPropertyEntry>();
-                if (firstCurve is IGeoObject first)
+                if (firstCurve is not null)
                 {
-                    se.Add(first.GetShowProperties(frame) as IPropertyEntry);
+                    se.Add(firstCurve.GetShowProperties(frame) as IPropertyEntry);
                 }
-                if (secondCurve is IGeoObject second)
+                if (secondCurve is not null)
                 {
-                    se.Add(second.GetShowProperties(frame) as IPropertyEntry);
+                    se.Add(secondCurve.GetShowProperties(frame) as IPropertyEntry);
                 }
             return new GroupProperty("RuledSurface", se.ToArray());
         }

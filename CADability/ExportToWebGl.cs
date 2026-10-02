@@ -785,7 +785,7 @@ namespace CADability
                     {
                         if (edge.Curve3D != null)
                         {
-                            glItem sub = parse(edge.Curve3D as IGeoObject);
+                            glItem sub = parse(edge.Curve3D);
                             if (sub != null && sub.chunk != null)
                             {
                                 sub.chunk.mode = chunk.vmode.edges;
@@ -812,7 +812,7 @@ namespace CADability
                     {
                         if (edge.Curve3D != null)
                         {
-                            glItem sub = parse(edge.Curve3D as IGeoObject);
+                            glItem sub = parse(edge.Curve3D);
                             if (sub != null && sub.chunk != null)
                             {
                                 sub.chunk.mode = chunk.vmode.edges;

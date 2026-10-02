@@ -92,10 +92,10 @@ namespace CADability.Actions
                     for (int i = 0; i < blk.Count; ++i)
                     {
                         IGeoObject go = blk.Child(i).Clone();
-                        go.CopyAttributes(theBaseCurve as IGeoObject);
+                        go.CopyAttributes(theBaseCurve);
                         if (go is Path && (go as Path).CurveCount == 1)
                         {
-                            go = (go as Path).Curves[0] as IGeoObject;
+                            go = (go as Path).Curves[0];
                         }
                         Frame.Project.GetActiveModel().Add(go);
                     }
@@ -120,7 +120,7 @@ namespace CADability.Actions
             for (int i = 0; i < res.Length; ++i)
             {
                 IGeoObject go = res[i].AsPath().MakeGeoObject(pln);
-                go.CopyAttributes(theBaseCurve as IGeoObject);
+                go.CopyAttributes(theBaseCurve);
                 (go as IColorDef).ColorDef = (theBaseCurve as IColorDef).ColorDef;
                 blk.Add(go);
             }
@@ -150,7 +150,7 @@ namespace CADability.Actions
                     {
                         sender.SetSelectedCurve(TheCurves[i]);
                         theBaseCurve = Path.CreateFromModel(TheCurves[i], base.Frame.ActiveView.Model, true);
-                        (theBaseCurve as IGeoObject).CopyAttributes(TheCurves[i] as IGeoObject);
+                        theBaseCurve.CopyAttributes(TheCurves[i]);
                         if (Recalc())
                         {
                             if (up) distance.ForwardMouseInputTo = null; // jetzt Mouse Input für Abstand zulassen

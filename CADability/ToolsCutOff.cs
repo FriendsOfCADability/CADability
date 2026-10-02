@@ -47,10 +47,10 @@ namespace CADability.Actions
                 if (Curves.GetCommonPlane(iCurve1, iCurve2, out pl))
                 {
                     if (composedSplit)
-                        if (iCurveComposedSplit != null) owner = (iCurveComposedSplit as IGeoObject).Owner; // owner merken für löschen und Einfügen
+                        if (iCurveComposedSplit != null) owner = iCurveComposedSplit.Owner; // owner merken für löschen und Einfügen
                         else owner = ownerCreated;
                     //                        owner = (iCurveComposedSplit as IGeoObject).Owner; // owner merken für löschen und Einfügen
-                    else owner = (iCurve1 as IGeoObject).Owner; // owner merken für löschen und Einfügen
+                    else owner = iCurve1.Owner; // owner merken für löschen und Einfügen
                     pl.Align(base.ActiveDrawingPlane, false); // Winkel anpassen
                     ICurve2D curve1_2D = iCurve1.GetProjectedCurve(pl); // die 2D-Kurven
                     if (curve1_2D is Path2D) (curve1_2D as Path2D).Flatten();
@@ -205,7 +205,7 @@ namespace CADability.Actions
                                             parIndDelta = parIndDelta / 2.0; // delta halbieren (Bisection!!)
                                         } // for schleife Iteration
                                     } // Ende Iteration
-                                    line.CopyAttributes(iCurve1 as IGeoObject);
+                                    line.CopyAttributes(iCurve1);
                                     base.ActiveObject = line; // merken
                                     base.FeedBack.AddSelected(line);// darstellen
                                     return true;
@@ -317,7 +317,7 @@ namespace CADability.Actions
                     Path p = CADability.GeoObject.Path.CreateFromModel(Curves[0] as ICurve, Frame.ActiveView.Model, Frame.ActiveView.Projection, true);
                     if (p != null) pathHit = p as ICurve;
                     pathCreatedFromModel = p;
-                    ownerCreated = (Curves[0] as IGeoObject).Owner;
+                    ownerCreated = Curves[0].Owner;
                 }
                 if (pathHit != null)
                 {
@@ -454,7 +454,7 @@ namespace CADability.Actions
                         //  neu mit dem kleinen Array
                         iCurveComposedSingle2Objects = Path.Construct();
                         (iCurveComposedSingle2Objects as Path).Set(iCurveShort);
-                        (iCurveComposedSingle2Objects as IGeoObject).CopyAttributes(iCurveComposedSplit as IGeoObject); // gemerkte Attribute setzen
+                        iCurveComposedSingle2Objects.CopyAttributes(iCurveComposedSplit); // gemerkte Attribute setzen
                         cutOffObject2.HitCursor = CursorTable.GetCursor("CutOffReady.cur");
                         return true;
                     }
@@ -617,14 +617,14 @@ namespace CADability.Actions
                     if (composedSplit)
                     {
                         if (iCurveComposedSplit != null)
-                            (iCurveComposedSplit as IGeoObject).Owner.Remove(iCurveComposedSplit as IGeoObject);
+                            iCurveComposedSplit.Owner.Remove(iCurveComposedSplit);
                         else
                         { // die Einzelelemente des CreateFromModel identifizieren
                             for (int j = 0; j < pathCreatedFromModel.Count; ++j)
                             {
                                 IGeoObject obj = null;
-                                if ((pathCreatedFromModel.Curve(j) as IGeoObject).UserData.ContainsData("CADability.Path.Original"))
-                                    obj = (pathCreatedFromModel.Curve(j) as IGeoObject).UserData.GetData("CADability.Path.Original") as IGeoObject;
+                                if (pathCreatedFromModel.Curve(j).UserData.ContainsData("CADability.Path.Original"))
+                                    obj = pathCreatedFromModel.Curve(j).UserData.GetData("CADability.Path.Original") as IGeoObject;
                                 if (obj != null && obj.Owner != null) obj.Owner.Remove(obj); // löschen
                             }
                         }
@@ -688,7 +688,7 @@ namespace CADability.Actions
                     //else iCurve2.Trim(iCurve2.PositionOf(arc.EndPoint),1.0);
                     if (doIt)
                     {
-                        (line as IGeoObject).CopyAttributes(iCurve1 as IGeoObject);
+                        (line as IGeoObject).CopyAttributes(iCurve1);
 
                         if (Frame.GetBooleanSetting("Construct.MakePath", true) || composedSingle2Objects)
                         {	// das Ergebnis soll in einem Pfad zusammengefasst werden!
@@ -702,7 +702,7 @@ namespace CADability.Actions
                                 tmpPath.Add(iCurveComposedSingle2Objects);
 
                             }
-                            (tmpPath as IGeoObject).CopyAttributes(iCurve1 as IGeoObject);
+                            (tmpPath as IGeoObject).CopyAttributes(iCurve1);
                             tmpPath.Flatten(); // bringt alles auf die "geometrische" Ebene, Unterpfade werden aufgelöst
                             owner.Add(tmpPath as IGeoObject);
                         }
@@ -712,8 +712,8 @@ namespace CADability.Actions
                             if (composedSplit)
                             {
                                 // da neu erzeugt von SplitAtMousePosition, hier explizit einfügen
-                                owner.Add(iCurve1 as IGeoObject);
-                                owner.Add(iCurve2 as IGeoObject);
+                                owner.Add(iCurve1);
+                                owner.Add(iCurve2);
                             }
                             //if (composedSingle)
                             //{

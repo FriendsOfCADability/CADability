@@ -514,7 +514,7 @@ namespace CADability
 				{
 					if (edges[i].Curve3D != null)
 					{
-						octTree.AddObject(edges[i].Curve3D as IGeoObject);
+						octTree.AddObject(edges[i].Curve3D);
 					}
 				}
 			}
@@ -545,7 +545,7 @@ namespace CADability
 				{
 					if (edges[i].Curve3D != null)
 					{
-						octTree.AddObjectAsync(edges[i].Curve3D as IGeoObject);
+						octTree.AddObjectAsync(edges[i].Curve3D);
 					}
 				}
 			}
@@ -576,7 +576,7 @@ namespace CADability
 				{
 					if (edges[i].Curve3D != null)
 					{
-						octTree.RemoveObject(edges[i].Curve3D as IGeoObject);
+						octTree.RemoveObject(edges[i].Curve3D);
 					}
 				}
 			}
@@ -2304,7 +2304,7 @@ namespace CADability
                             if (zcurve <= zface + this.Extent.Size * 1e-3)
                             {
                                 res.Add(singleFace);
-                                res.Add(singleCurve as IGeoObject);
+                                res.Add(singleCurve);
                             }
                             else
                             {
@@ -2317,7 +2317,7 @@ namespace CADability
                         }
                         else if (singleCurve != null)
                         {
-                            res.Add(singleCurve as IGeoObject);
+                            res.Add(singleCurve);
                         }
                         if (singlePoint != null) res.Add(singlePoint);
                         return res;

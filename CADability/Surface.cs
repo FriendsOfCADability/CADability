@@ -8086,10 +8086,10 @@ namespace CADability.GeoObject
             List<double> luOnCurve = new List<double>();
             if (curve is ISimpleCurve)
             {
-                Cube[] cubes = octtree.GetObjectsCloseTo(curve as IOctTreeInsertable);
+                Cube[] cubes = octtree.GetObjectsCloseTo(curve);
                 for (int j = 0; j < cubes.Length; ++j)
                 {
-                    if ((curve as IOctTreeInsertable).HitTest(ref cubes[j].boundingCube, 0.0))
+                    if (curve.HitTest(ref cubes[j].boundingCube, 0.0))
                     {   // es werden zu viele Würfel geliefert, GetCurveIntersection macht den Test nicht
                         GetCurveIntersection(curve as ISimpleCurve, cubes[j], lips, luvOnFace, luOnCurve);
                     }
@@ -8296,7 +8296,7 @@ namespace CADability.GeoObject
                     dc.Add(fc);
                 }
                 catch (Polyline2DException) { }
-                dc.Add(curve as IGeoObject);
+                dc.Add(curve);
             }
 #endif
             ip = new GeoPoint(loc, curvepoint);
@@ -11232,11 +11232,11 @@ namespace CADability.GeoObject
             List<double> luOnCurve = new List<double>();
             if (curve is ISimpleCurve)
             {
-                ParEpi[] cubes = octtree.GetObjectsCloseTo(curve as IOctTreeInsertable);
+                ParEpi[] cubes = octtree.GetObjectsCloseTo(curve);
                 for (int j = 0; j < cubes.Length; ++j)
                 {
                     BoundingCube bc = cubes[j].BoundingCube;
-                    if (cubes[j].uvPatch.Interferes(ref uvExtent) && (curve as IOctTreeInsertable).HitTest(ref bc, 0.0))
+                    if (cubes[j].uvPatch.Interferes(ref uvExtent) && curve.HitTest(ref bc, 0.0))
                     {   // only check the relevant cubes
                         // there is a bug: GetCurveIntersection only finds single intersection points where there might be multiple intersections
                         GetCurveIntersection(curve as ISimpleCurve, cubes[j], lips, luvOnFace, luOnCurve);
@@ -11661,7 +11661,7 @@ namespace CADability.GeoObject
             catch (Polyline2DException) { }
             ICurve trcurve = curve.Clone();
             trcurve.Trim(spar, epar);
-            dc.Add(trcurve as IGeoObject);
+            dc.Add(trcurve);
             dc.Add(curvepoint, Color.Red, 0);
             dc.Add(loc, Color.Green, 1);
 #endif
@@ -11758,7 +11758,7 @@ namespace CADability.GeoObject
                     dc.Add(fc);
                 }
                 catch (Polyline2DException) { }
-                dc.Add(curve as IGeoObject);
+                dc.Add(curve);
             }
 #endif
             ip = new GeoPoint(loc, curvepoint);
@@ -12460,13 +12460,13 @@ namespace CADability.GeoObject
                         double[] ips = restrictedDomain.Clip(l2d);
                         for (int j = 0; j < ips.Length; j += 2)
                         {
-                            dc.Add(surface.Make3dCurve(l2d.Trim(ips[j], ips[j + 1])) as IGeoObject);
+                            dc.Add(surface.Make3dCurve(l2d.Trim(ips[j], ips[j + 1])));
                         }
                         l2d = new Line2D(new GeoPoint2D(umin, vmin + i * (vmax - vmin) / n), new GeoPoint2D(umax, vmin + i * (vmax - vmin) / n));
                         ips = restrictedDomain.Clip(l2d);
                         for (int j = 0; j < ips.Length; j += 2)
                         {
-                            dc.Add(surface.Make3dCurve(l2d.Trim(ips[j], ips[j + 1])) as IGeoObject);
+                            dc.Add(surface.Make3dCurve(l2d.Trim(ips[j], ips[j + 1])));
                         }
                     }
                 }
@@ -12949,22 +12949,22 @@ namespace CADability.GeoObject
                 foreach (double u in uVal1)
                 {
                     dcuv1.Add(new Line2D(new GeoPoint2D(u, vVal1.Min), new GeoPoint2D(u, vVal1.Max)), Color.Black, 1);
-                    dc3d1.Add(surface.FixedU(u, vVal1.Min, vVal1.Max) as IGeoObject, Color.Black);
+                    dc3d1.Add(surface.FixedU(u, vVal1.Min, vVal1.Max), Color.Black);
                 }
                 foreach (double v in vVal1)
                 {
                     dcuv1.Add(new Line2D(new GeoPoint2D(uVal1.Min, v), new GeoPoint2D(uVal1.Max, v)), Color.Black, 1);
-                    dc3d1.Add(surface.FixedV(v, uVal1.Min, uVal1.Max) as IGeoObject, Color.Black);
+                    dc3d1.Add(surface.FixedV(v, uVal1.Min, uVal1.Max), Color.Black);
                 }
                 foreach (double u in uVal2)
                 {
                     dcuv2.Add(new Line2D(new GeoPoint2D(u, vVal2.Min), new GeoPoint2D(u, vVal2.Max)), Color.Black, 1);
-                    dc3d2.Add(other.FixedU(u, vVal2.Min, vVal2.Max) as IGeoObject, Color.Black);
+                    dc3d2.Add(other.FixedU(u, vVal2.Min, vVal2.Max), Color.Black);
                 }
                 foreach (double v in vVal2)
                 {
                     dcuv2.Add(new Line2D(new GeoPoint2D(uVal2.Min, v), new GeoPoint2D(uVal2.Max, v)), Color.Black, 1);
-                    dc3d2.Add(other.FixedV(v, uVal2.Min, uVal2.Max) as IGeoObject, Color.Black);
+                    dc3d2.Add(other.FixedV(v, uVal2.Min, uVal2.Max), Color.Black);
                 }
 #endif
                 HashSet<LinkedIntersectionPoint> allIps = new HashSet<LinkedIntersectionPoint>();
@@ -14150,25 +14150,25 @@ namespace CADability.GeoObject
             {
                 ICurve crv = this.surface.FixedU(u, thisBounds.Bottom, thisBounds.Top);
                 (crv as IColorDef).ColorDef = cdt;
-                dccrv.Add(crv as IGeoObject, 0);
+                dccrv.Add(crv, 0);
             }
             foreach (double v in vVal)
             {
                 ICurve crv = this.surface.FixedV(v, thisBounds.Left, thisBounds.Right);
                 (crv as IColorDef).ColorDef = cdt;
-                dccrv.Add(crv as IGeoObject, 0);
+                dccrv.Add(crv, 0);
             }
             foreach (double u in ouVal)
             {
                 ICurve crv = other.FixedU(u, otherBounds.Bottom, otherBounds.Top);
                 (crv as IColorDef).ColorDef = cdo;
-                dccrv.Add(crv as IGeoObject, 1);
+                dccrv.Add(crv, 1);
             }
             foreach (double v in ovVal)
             {
                 ICurve crv = other.FixedV(v, otherBounds.Left, otherBounds.Right);
                 (crv as IColorDef).ColorDef = cdo;
-                dccrv.Add(crv as IGeoObject, 1);
+                dccrv.Add(crv, 1);
             }
 #endif
             // ips enthält jetzt in 2er Gruppen zusammenhängende Kurvenschnipsel, die jetzt noch sortiert werden müssen
@@ -14291,22 +14291,22 @@ namespace CADability.GeoObject
                 foreach (KeyValuePair<double, List<GeoPoint3d2d2d>> item in uInts)
                 {
                     ICurve crv = this.surface.FixedU(item.Key, thisBounds.Bottom, thisBounds.Top);
-                    dc4.Add(crv as IGeoObject, 3);
+                    dc4.Add(crv, 3);
                 }
                 foreach (KeyValuePair<double, List<GeoPoint3d2d2d>> item in ovInts)
                 {
                     ICurve crv = this.surface.FixedV(item.Key, thisBounds.Left, thisBounds.Right);
-                    dc4.Add(crv as IGeoObject, 3);
+                    dc4.Add(crv, 3);
                 }
                 foreach (KeyValuePair<double, List<GeoPoint3d2d2d>> item in ouInts)
                 {
                     ICurve crv = other.FixedU(item.Key, otherBounds.Bottom, otherBounds.Top);
-                    dc4.Add(crv as IGeoObject, 3);
+                    dc4.Add(crv, 3);
                 }
                 foreach (KeyValuePair<double, List<GeoPoint3d2d2d>> item in ovInts)
                 {
                     ICurve crv = other.FixedV(item.Key, otherBounds.Left, otherBounds.Right);
-                    dc4.Add(crv as IGeoObject, 3);
+                    dc4.Add(crv, 3);
                 }
             }
 

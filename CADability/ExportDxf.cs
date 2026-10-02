@@ -734,7 +734,7 @@ namespace CADability.DXF
             List<Entity> entities = new List<Entity>();
             for (int i = 0; i < path.Curves.Length; i++)
             {
-                Entity[] ents = GeoObjectToEntity(path.Curves[i] as IGeoObject);
+                Entity[] ents = GeoObjectToEntity(path.Curves[i]);
                 if (ents != null) entities.AddRange(ents);
             }
             string name = GetNextAnonymousBlockName();
@@ -749,7 +749,7 @@ namespace CADability.DXF
             List<Entity> entities = new List<Entity>();
             for (int i = 0; i < path.Curves.Length; i++)
             {
-                Entity[] ents = GeoObjectToEntity(path.Curves[i] as IGeoObject);
+                Entity[] ents = GeoObjectToEntity(path.Curves[i]);
                 if (ents != null) entities.AddRange(ents);
             }
             return entities.ToArray();

@@ -3480,7 +3480,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 									}
 								}
 #if DEBUG
-							(crv as IGeoObject).UserData["Step.DefiningIndex"] = new UserInterface.IntegerProperty(item.SubItem(3).definingIndex, "StepImport.ItemNumber");
+							crv.UserData["Step.DefiningIndex"] = new UserInterface.IntegerProperty(item.SubItem(3).definingIndex, "StepImport.ItemNumber");
 #endif
 								item.val = new StepEdgeDescriptor(crv, v1, v2, true);
 #if DEBUG

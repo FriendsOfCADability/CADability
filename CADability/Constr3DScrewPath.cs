@@ -51,7 +51,7 @@ namespace CADability.Actions
                     clones.Clear();
                     foreach (Edge edg in (selectedObjects[0] as Face).Edges)
                     {
-                        if (edg.Curve3D != null) clones.Add(edg.Curve3D as IGeoObject);
+                        if (edg.Curve3D != null) clones.Add(edg.Curve3D);
                     }
                 }
             }
@@ -87,7 +87,7 @@ namespace CADability.Actions
                     clones.Clear();
                     foreach (Edge edg in (selectedObjects[0] as Face).Edges)
                     {
-                        if (edg.Curve3D != null) clones.Add(edg.Curve3D as IGeoObject);
+                        if (edg.Curve3D != null) clones.Add(edg.Curve3D);
                     }
                 }
             }

@@ -70,9 +70,9 @@ namespace CADability.GeoObject
                     SimplePropertyGroup edgeprops = new SimplePropertyGroup("Face.Edge");
                     foreach (Edge edge in face.AllEdges)
                     {
-                        if (edge.Curve3D != null && edge.Curve3D is IGeoObject)
+                        if (edge.Curve3D != null)
                         {
-                            IPropertyEntry sp = (edge.Curve3D as IGeoObject).GetShowProperties(base.Frame);
+                            IPropertyEntry sp = edge.Curve3D.GetShowProperties(base.Frame);
                             sp.ReadOnly = true;
                             edgeprops.Add(sp);
                         }
@@ -123,7 +123,7 @@ namespace CADability.GeoObject
                                 addTo.Remove(face);
                                 for (int i = 0; i < face.AllEdges.Length; i++)
                                 {
-                                    IGeoObject go = face.AllEdges[i].Curve3D as IGeoObject;
+                                    IGeoObject go = face.AllEdges[i].Curve3D;
                                     if (go != null)
                                     {
                                         go.CopyAttributes(face);
@@ -300,15 +300,15 @@ namespace CADability.GeoObject
                     {
                         if (loops[i][j].createdEdges != null && loops[i][j].createdEdges.Count > 0)
                         {
-                            if (loops[i][j].curve != null) dcLoops.Add(loops[i][j].curve.Clone() as IGeoObject, System.Drawing.Color.Green, i * 1000 + j);
+                            if (loops[i][j].curve != null) dcLoops.Add(loops[i][j].curve.Clone(), System.Drawing.Color.Green, i * 1000 + j);
                             for (int k = 0; k < loops[i][j].createdEdges.Count; k++)
                             {
-                                if (loops[i][j].createdEdges[k] != null) dcLoops.Add(loops[i][j].createdEdges[k].Curve3D.Clone() as IGeoObject, System.Drawing.Color.Blue, i * 1000 + j * 10 + k);
+                                if (loops[i][j].createdEdges[k] != null) dcLoops.Add(loops[i][j].createdEdges[k].Curve3D.Clone(), System.Drawing.Color.Blue, i * 1000 + j * 10 + k);
                             }
                         }
                         else
                         {
-                            if (loops[i][j].curve != null) dcLoops.Add(loops[i][j].curve.Clone() as IGeoObject, System.Drawing.Color.Red, i * 1000 + j);
+                            if (loops[i][j].curve != null) dcLoops.Add(loops[i][j].curve.Clone(), System.Drawing.Color.Red, i * 1000 + j);
                         }
                     }
                 }
@@ -1071,7 +1071,7 @@ namespace CADability.GeoObject
                             GeoPoint ccnt;
                             if (loops[i][j].forward)
                             {
-                                dc.Add(loops[i][j].curve as IGeoObject, System.Drawing.Color.Blue, i * 100 + j);
+                                dc.Add(loops[i][j].curve, System.Drawing.Color.Blue, i * 100 + j);
                                 ccnt = loops[i][j].curve.PointAt(0.5);
                                 GeoVector cdir = loops[i][j].curve.DirectionAt(0.5);
                                 cdir.NormIfNotNull();
@@ -1082,7 +1082,7 @@ namespace CADability.GeoObject
                             {
                                 ICurve crv = loops[i][j].curve.Clone();
                                 crv.Reverse();
-                                dc.Add(crv as IGeoObject, System.Drawing.Color.Blue, i * 100 + j);
+                                dc.Add(crv, System.Drawing.Color.Blue, i * 100 + j);
                                 ccnt = crv.PointAt(0.5);
                                 GeoVector cdir = crv.DirectionAt(0.5).Normalized;
                                 Line dl = Line.TwoPoints(ccnt, ccnt + crv.Length * 0.05 * cdir);
@@ -1123,7 +1123,7 @@ namespace CADability.GeoObject
                     {
                         for (int k = 0; k < loops[i][j].createdEdges.Count; k++)
                         {
-                            dced.Add(loops[i][j].createdEdges[k].Curve3D as IGeoObject, i * 100 + j);
+                            dced.Add(loops[i][j].createdEdges[k].Curve3D, i * 100 + j);
                         }
                     }
                 }
@@ -3488,7 +3488,7 @@ namespace CADability.GeoObject
             }
             foreach (Edge edge in Edges)
             {
-                if (edge.Curve3D is IGeoObject go) go.Style = EdgeStyle;
+                if (edge.Curve3D is not null) edge.Curve3D.Style = EdgeStyle;
             }
             if (surface is ISurfaceImpl si) si.usedArea = Domain;
         }
@@ -3581,7 +3581,7 @@ namespace CADability.GeoObject
             SimpleShape forceArea = res.Area; // das SimpleShape wird hier erstmalig berechnet
             foreach (Edge edge in res.Edges)
             {
-                if (edge.Curve3D is IGeoObject go) go.Style = EdgeStyle;
+                if (edge.Curve3D is not null) edge.Curve3D.Style = EdgeStyle;
             }
             for (int i = 0; i < outline.Length; i++)
             {
@@ -4053,7 +4053,7 @@ namespace CADability.GeoObject
             //}
             for (int i = 0; i < res.Count; i++)
             {
-                (res[i] as IGeoObject).UserData.Add("CADability.PlaneIntersection.Face", this);
+                res[i].UserData.Add("CADability.PlaneIntersection.Face", this);
             }
             return res.ToArray();
         }
@@ -4929,13 +4929,13 @@ namespace CADability.GeoObject
                 DebuggerContainer res = new DebuggerContainer();
                 for (int i = 0; i < outline.Length; ++i)
                 {
-                    if (outline[i].Curve3D != null) res.Add(outline[i].Curve3D as IGeoObject, outline[i].GetHashCode());
+                    if (outline[i].Curve3D != null) res.Add(outline[i].Curve3D, outline[i].GetHashCode());
                 }
                 for (int j = 0; j < holes.Length; ++j)
                 {
                     for (int i = 0; i < holes[j].Length; ++i)
                     {
-                        if (holes[j][i].Curve3D != null) res.Add(holes[j][i].Curve3D as IGeoObject, holes[j][i].GetHashCode());
+                        if (holes[j][i].Curve3D != null) res.Add(holes[j][i].Curve3D, holes[j][i].GetHashCode());
                     }
                 }
                 return res;
@@ -4948,14 +4948,14 @@ namespace CADability.GeoObject
                 DebuggerContainer res = new DebuggerContainer();
                 for (int i = 0; i < outline.Length; ++i)
                 {
-                    if (outline[i].Curve3D != null) res.Add(outline[i].Curve3D as IGeoObject, i);
+                    if (outline[i].Curve3D != null) res.Add(outline[i].Curve3D, i);
                 }
                 int offset = outline.Length;
                 for (int j = 0; j < holes.Length; ++j)
                 {
                     for (int i = 0; i < holes[j].Length; ++i)
                     {
-                        if (holes[j][i].Curve3D != null) res.Add(holes[j][i].Curve3D as IGeoObject, i + offset);
+                        if (holes[j][i].Curve3D != null) res.Add(holes[j][i].Curve3D, i + offset);
                     }
                     offset += holes[j].Length;
                 }
@@ -4971,12 +4971,12 @@ namespace CADability.GeoObject
                 {
                     if (outline[i].Curve3D != null)
                     {
-                        if (outline[i].Forward(this)) res.Add(outline[i].Curve3D as IGeoObject, i);
+                        if (outline[i].Forward(this)) res.Add(outline[i].Curve3D, i);
                         else
                         {
                             ICurve crv = outline[i].Curve3D.Clone();
                             crv.Reverse();
-                            res.Add(crv as IGeoObject, i);
+                            res.Add(crv, i);
                         }
                     }
                 }
@@ -4987,12 +4987,12 @@ namespace CADability.GeoObject
                     {
                         if (holes[j][i].Curve3D != null)
                         {
-                            if (holes[j][i].Forward(this)) res.Add(holes[j][i].Curve3D as IGeoObject, i);
+                            if (holes[j][i].Forward(this)) res.Add(holes[j][i].Curve3D, i);
                             else
                             {
                                 ICurve crv = holes[j][i].Curve3D.Clone();
                                 crv.Reverse();
-                                res.Add(crv as IGeoObject, i);
+                                res.Add(crv, i);
                             }
                         }
                     }
@@ -5688,18 +5688,18 @@ namespace CADability.GeoObject
             // check only those edges, that are hit by the pickArea
             for (int i = 0; i < outline.Length; i++)
             {
-                if (outline[i].Curve3D is IGeoObject crv) // kann null sein
+                if (outline[i].Curve3D is { } curve) // kann null sein
                 {
-                    if (crv.HitTest(spf.pickArea, false)) crv.FindSnapPoint(spf);
+                    if (curve.HitTest(spf.pickArea, false)) curve.FindSnapPoint(spf);
                 }
             }
             for (int i = 0; i < holes.Length; i++)
             {
                 for (int j = 0; j < holes[i].Length; j++)
                 {
-                    if (holes[i][j].Curve3D is IGeoObject crv) // kann null sein
+                    if (holes[i][j].Curve3D is { } curve) // kann null sein
                     {
-                        if (crv.HitTest(spf.pickArea, false)) crv.FindSnapPoint(spf);
+                        if (curve.HitTest(spf.pickArea, false)) curve.FindSnapPoint(spf);
                     }
                 }
             }
@@ -7124,7 +7124,7 @@ namespace CADability.GeoObject
             {
                 if (allEdges[i].Curve3D != null)
                 {
-                    res.Add((allEdges[i].Curve3D as IGeoObject).GetQuadTreeItem(projection, extentPrecision));
+                    res.Add(allEdges[i].Curve3D.GetQuadTreeItem(projection, extentPrecision));
                 }
             }
             return res;
@@ -8592,7 +8592,7 @@ namespace CADability.GeoObject
             Edge[] allEdges = AllEdges;
             for (int i = 0; i < allEdges.Length; ++i)
             {
-                IGeoObject go = allEdges[i].Curve3D as IGeoObject;
+                IGeoObject go = allEdges[i].Curve3D;
                 if (go != null)
                 {
                     if (go.UniqueId == id[index])
@@ -9147,7 +9147,7 @@ namespace CADability.GeoObject
             }
             for (int i = 0; i < sss.Length; i++)
             {
-                dc.Add(surface.Make3dCurve(sss[i]) as IGeoObject);
+                dc.Add(surface.Make3dCurve(sss[i]));
             }
 #endif
         }

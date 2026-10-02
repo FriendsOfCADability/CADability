@@ -132,7 +132,7 @@ namespace CADability.Actions
                         {
                             for (int k = 0; k < crvs.Length; k++)
                             {
-                                IGeoObject go = crvs[k] as IGeoObject;
+                                IGeoObject go = crvs[k];
                                 go.CopyAttributes(base.ActiveObject);
                                 ToAdd.Add(go);
                             }

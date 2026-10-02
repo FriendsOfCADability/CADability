@@ -1631,9 +1631,9 @@ namespace CADability.GeoObject
         public override IPropertyEntry GetPropertyEntry(IFrame frame)
         {
             List<IPropertyEntry> se = new List<IPropertyEntry>();
-            if (curveToRotate is IGeoObject go)
+            if (curveToRotate is not null)
             {
-                se.Add(go.GetShowProperties(frame) as IPropertyEntry);
+                se.Add(curveToRotate.GetShowProperties(frame) as IPropertyEntry);
             }
             GeoPointProperty loc = new GeoPointProperty(frame, "SurfaceOfRevolution.AxisLocation");
             loc.ReadOnly = true;

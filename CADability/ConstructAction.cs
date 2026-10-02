@@ -4398,10 +4398,10 @@ namespace CADability.Actions
 			/// <param name="selectedCurve">currently selected curve</param>
 			public void SetCurves(ICurve[] curves, ICurve selectedCurve)
 			{
-				if (SelectedCurve != null) constructAction.feedBack.RemoveSelected(SelectedCurve as IGeoObject);
+				if (SelectedCurve != null) constructAction.feedBack.RemoveSelected(SelectedCurve);
 				Curves = curves;
 				SelectedCurve = selectedCurve;
-				if (SelectedCurve != null) constructAction.feedBack.AddSelected(SelectedCurve as IGeoObject);
+				if (SelectedCurve != null) constructAction.feedBack.AddSelected(SelectedCurve);
 				if (curvesProperty != null)
 				{
 					curvesProperty.SetCurves(curves, selectedCurve);
@@ -4514,10 +4514,10 @@ namespace CADability.Actions
 					}
 					Path p1 = Path.Construct();
 					p1.Set(c1);
-					p1.CopyAttributes(composedCurve as IGeoObject);
+					p1.CopyAttributes(composedCurve);
 					Path p2 = Path.Construct();
 					p2.Set(c2);
-					p2.CopyAttributes(composedCurve as IGeoObject);
+					p2.CopyAttributes(composedCurve);
 					return new ICurve[] { p1, p2 };
 				}
 				if (ind >= 0 && ind < subCurves.Length - 1)
@@ -4536,10 +4536,10 @@ namespace CADability.Actions
 					}
 					Path p1 = Path.Construct();
 					p1.Set(c1);
-					p1.CopyAttributes(composedCurve as IGeoObject);
+					p1.CopyAttributes(composedCurve);
 					Path p2 = Path.Construct();
 					p2.Set(c2);
-					p2.CopyAttributes(composedCurve as IGeoObject);
+					p2.CopyAttributes(composedCurve);
 					return new ICurve[] { p1, p2 };
 				}
 				return new ICurve[0];
@@ -4627,13 +4627,13 @@ namespace CADability.Actions
 					}
 					if (ModifiableOnly && cv != null)
 					{   // keine Teilobjekte von Blockrefs liefern
-						IGeoObject go = cv as IGeoObject;
+						IGeoObject go = cv;
 						if (IGeoObjectImpl.IsOwnedByBlockRef(go)) cv = null;
 						if (go.Owner is Edge) cv = null;
 					}
 					if (cv != null && constructAction.UseFilter)
 					{
-						if (!constructAction.Frame.Project.FilterList.Accept(cv as IGeoObject))
+						if (!constructAction.Frame.Project.FilterList.Accept(cv))
 							cv = null;
 					}
 					if (cv != null)
@@ -4711,7 +4711,7 @@ namespace CADability.Actions
 
 			void IInputObject.OnActionDone()
 			{
-				if (SelectedCurve != null) constructAction.feedBack.RemoveSelected(SelectedCurve as IGeoObject);
+				if (SelectedCurve != null) constructAction.feedBack.RemoveSelected(SelectedCurve);
 			}
 			IPropertyEntry IInputObject.GetShowProperty()
 			{
@@ -4744,9 +4744,9 @@ namespace CADability.Actions
 			private void OnSelectedCurveChanged(CurvesProperty cp, ICurve selectedCurve)
 			{
 				if (CurveSelectionChangedEvent != null) CurveSelectionChangedEvent(this, selectedCurve);
-				if (SelectedCurve != null) constructAction.feedBack.RemoveSelected(SelectedCurve as IGeoObject);
+				if (SelectedCurve != null) constructAction.feedBack.RemoveSelected(SelectedCurve);
 				SelectedCurve = selectedCurve;
-				if (SelectedCurve != null) constructAction.feedBack.AddSelected(SelectedCurve as IGeoObject);
+				if (SelectedCurve != null) constructAction.feedBack.AddSelected(SelectedCurve);
 				constructAction.RefreshDependantProperties();
 			}
 			public void SetContextMenu(string menuId, ICommandHandler handler)
@@ -5110,7 +5110,7 @@ namespace CADability.Actions
 					return actVertexDisplay;
 				}
 				if (brep is Face) return brep as IGeoObject;
-				if (brep is Edge edge) return edge.Curve3D as IGeoObject;
+				if (brep is Edge edge) return edge.Curve3D;
 				if (brep is Line line)
 				{
 					if (line.UserData.ContainsData("CADability.AxisOf")) return line; // axis are also allowed a brep objects

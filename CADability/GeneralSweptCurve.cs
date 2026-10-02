@@ -331,7 +331,7 @@ namespace CADability
             {
                 GeoObjectList res = new GeoObjectList();
                 ICurve c3d = surface.Make3dCurve(c2d);
-                res.Add(c3d as IGeoObject);
+                res.Add(c3d);
                 BoundingCube ext = c3d.GetExtent();
                 for (int i = 0; i < 100; i++)
                 {
@@ -838,7 +838,7 @@ namespace CADability
             get
             {
                 GeoObjectList res = new GeoObjectList();
-                res.Add(along as IGeoObject);
+                res.Add(along);
                 BoundingCube ext = along.GetExtent();
                 double length = ext.Size / 200;
                 ColorDef cdx = new ColorDef("dirx", System.Drawing.Color.Red);

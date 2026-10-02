@@ -45,7 +45,7 @@ namespace CADability.Actions
             base.ActiveObject = null;
             base.FeedBack.ClearSelected();
             double[] cutPlace;
-            owner = (iCurve as IGeoObject).Owner; // owner merken für löschen und Einfügen
+            owner = iCurve.Owner; // owner merken für löschen und Einfügen
             trimCurve = null;
             param1 = 0.0;
             param2 = 1.0;
@@ -196,12 +196,12 @@ namespace CADability.Actions
             }
             if (trimCurve != null)
             {
-                (trimCurve as IGeoObject).CopyAttributes(iCurve as IGeoObject);
+                trimCurve.CopyAttributes(iCurve);
                 Color backColor = base.Frame.GetColorSetting("Colors.Feedback", Color.DarkGray);
                 if (trimCurve is IColorDef)
                     (trimCurve as IColorDef).ColorDef = new ColorDef("", backColor);
-                base.FeedBack.AddSelected(trimCurve as IGeoObject); // darstellen
-                base.ActiveObject = trimCurve as IGeoObject; // merken
+                base.FeedBack.AddSelected(trimCurve); // darstellen
+                base.ActiveObject = trimCurve; // merken
                 return true;
             }
             return false;
@@ -291,7 +291,7 @@ namespace CADability.Actions
                 {
                     if (deleteObject)
                     {
-                        owner.Remove(iCurve as IGeoObject); // original Löschen
+                        owner.Remove(iCurve); // original Löschen
                     }
                     else
                     {
@@ -308,9 +308,9 @@ namespace CADability.Actions
                                 ICurve trimCurveTemp;
                                 trimCurveTemp = iCurve.Clone();
                                 iCurve.Trim(0.0, param1); // Kurve auf das untere Stück verkürzt
-                                (trimCurveTemp as IGeoObject).CopyAttributes(iCurve as IGeoObject);
+                                trimCurveTemp.CopyAttributes(iCurve);
                                 trimCurveTemp.Trim(param2, 1.0); // Kopie als oberes Stück
-                                owner.Add(trimCurveTemp as IGeoObject);
+                                owner.Add(trimCurveTemp);
                             }
                             else
                             {

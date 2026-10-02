@@ -2362,7 +2362,7 @@ namespace CADability.Actions
 					{
 						ICurve app = (sel[i] as ICurve).Approximate(Frame.GetIntSetting("Approximate.Mode", 0) == 0, Frame.GetDoubleSetting("Approximate.Precision", 0.01));
 						addTo.Remove(sel[i]);
-						IGeoObject go = app as IGeoObject;
+						IGeoObject go = app;
 						go.CopyAttributes(sel[i]);
 						addTo.Add(go);
 						newSelectedObjects.Add(go);
@@ -2550,10 +2550,10 @@ namespace CADability.Actions
 					GeoObjectList toRemove = new GeoObjectList();
 					for (int i = 0; i < NewPath.Count; i++)
 					{
-						if ((NewPath.Curve(i) as IGeoObject).UserData.Contains("CADability.temp.original"))
+						if (NewPath.Curve(i).UserData.Contains("CADability.temp.original"))
 						{
-							toRemove.Add((NewPath.Curve(i) as IGeoObject).UserData.GetData("CADability.temp.original") as IGeoObject);
-							(NewPath.Curve(i) as IGeoObject).UserData.Remove("CADability.temp.original");
+							toRemove.Add(NewPath.Curve(i).UserData.GetData("CADability.temp.original") as IGeoObject);
+							NewPath.Curve(i).UserData.Remove("CADability.temp.original");
 						}
 					}
 					Frame.ActiveView.Model.Remove(toRemove);

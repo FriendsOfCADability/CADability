@@ -100,7 +100,7 @@ namespace CADability.Actions
                                 firstClickClearsAll = false;
                                 foreach (Edge e in edges)
                                 {
-                                    IGeoObject go = e.Curve3D as IGeoObject;
+                                    IGeoObject go = e.Curve3D;
                                     if (go != null)
                                     {
                                         base.FeedBack.RemoveSelected(go);
@@ -111,13 +111,13 @@ namespace CADability.Actions
                             if (edges.Contains(edge))
                             {
                                 edges.Remove(edge);
-                                base.FeedBack.RemoveSelected(edge.Curve3D as IGeoObject);
+                                base.FeedBack.RemoveSelected(edge.Curve3D);
                             }
                             else
                             {
                                 toSelect = edge;
                                 edges.Add(edge);
-                                base.FeedBack.AddSelected(edge.Curve3D as IGeoObject);
+                                base.FeedBack.AddSelected(edge.Curve3D);
                                 edgesInput.Optional = true;
                             }
                         }
@@ -129,10 +129,10 @@ namespace CADability.Actions
                 List<IGeoObject> sel = new List<IGeoObject>();
                 for (int i = 0; i < edges.Count; ++i)
                 {
-                    sel.Add(edges[i].Curve3D as IGeoObject);
+                    sel.Add(edges[i].Curve3D);
                 }
                 if (toSelect != null)
-                    edgesInput.SetGeoObject(sel.ToArray(), toSelect.Curve3D as IGeoObject);
+                    edgesInput.SetGeoObject(sel.ToArray(), toSelect.Curve3D);
                 else
                     edgesInput.SetGeoObject(sel.ToArray(), null);
             }
@@ -151,14 +151,14 @@ namespace CADability.Actions
                         theFace = (TheGeoObjects[i] as Face);
                         foreach (Edge edge in edges)
                         {
-                            base.FeedBack.RemoveSelected(edge.Curve3D as IGeoObject);
+                            base.FeedBack.RemoveSelected(edge.Curve3D);
                         }
                         edges.Clear();
                         edges.AddRange(theFace.AllEdges);
                         List<IGeoObject> geoObjects = new List<IGeoObject>();
                         foreach (Edge edge in edges)
                         {
-                            IGeoObject go = edge.Curve3D as IGeoObject;
+                            IGeoObject go = edge.Curve3D;
                             if (go != null)
                             {
                                 base.FeedBack.AddSelected(go);

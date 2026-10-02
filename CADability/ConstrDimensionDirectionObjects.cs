@@ -62,7 +62,7 @@ namespace CADability.Actions
                 if (Curves.Length > 0)
                 {
                     dim.DimLineRef = base.CurrentMousePosition;
-                    if ((Curves[0] is Ellipse) & !((Curves[0] as IGeoObject).Owner is Dimension))
+                    if ((Curves[0] is Ellipse) & !(Curves[0].Owner is Dimension))
                     {
                         elli = Curves[0] as Ellipse;
                         dim.SetPoint(0, elli.Center); // der Mittelpunkt der Winkelbemassung

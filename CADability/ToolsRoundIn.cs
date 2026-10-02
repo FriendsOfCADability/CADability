@@ -108,10 +108,10 @@ namespace CADability.Actions
 				{
 					if (composedSplit)
 					{
-						if (iCurveComposedSplit != null) owner = (iCurveComposedSplit as IGeoObject).Owner; // owner merken für löschen und Einfügen
+						if (iCurveComposedSplit != null) owner = iCurveComposedSplit.Owner; // owner merken für löschen und Einfügen
 						else owner = ownerCreated;
 					}
-					else owner = (iCurve1 as IGeoObject).Owner; // owner merken für löschen und Einfügen
+					else owner = iCurve1.Owner; // owner merken für löschen und Einfügen
 																//				owner = (iCurve1 as IGeoObject).Owner; // owner merken für löschen und Einfügen
 					bool rndPos = false; // Runden möglich
 					double distCP; // Entfernung Pickpunkt - Schnittpunkte
@@ -196,7 +196,7 @@ namespace CADability.Actions
 							{
 								arc = arc1;
 							}
-							arc.CopyAttributes(iCurve1 as IGeoObject);
+							arc.CopyAttributes(iCurve1);
 							base.ActiveObject = arc; // merken
 							base.FeedBack.AddSelected(arc);// darstellen
 							return true;
@@ -244,7 +244,7 @@ namespace CADability.Actions
 					Path p = CADability.GeoObject.Path.CreateFromModel(Curves[0] as ICurve, Frame.ActiveView.Model, Frame.ActiveView.Projection, true);
 					if (p != null) pathHit = p as ICurve;
 					pathCreatedFromModel = p;
-					ownerCreated = (Curves[0] as IGeoObject).Owner;
+					ownerCreated = Curves[0].Owner;
 				}
 				if (pathHit != null)
 				{   // jetzt an der Mausposition aufknacken in 2 Pathes
@@ -344,7 +344,7 @@ namespace CADability.Actions
 						//  neu mit dem kleinen Array
 						iCurveComposedSingle2Objects = Path.Construct();
 						(iCurveComposedSingle2Objects as Path).Set(iCurveShort);
-						(iCurveComposedSingle2Objects as IGeoObject).CopyAttributes(iCurveComposedSplit as IGeoObject); // gemerkte Attribute setzen
+						iCurveComposedSingle2Objects.CopyAttributes(iCurveComposedSplit); // gemerkte Attribute setzen
 						roundObject2.HitCursor = CursorTable.GetCursor("RoundOffReady.cur");
 						return true;
 					}
@@ -454,14 +454,14 @@ namespace CADability.Actions
 					if (composedSplit)
 					{
 						if (iCurveComposedSplit != null)
-							(iCurveComposedSplit as IGeoObject).Owner.Remove(iCurveComposedSplit as IGeoObject);
+							iCurveComposedSplit.Owner.Remove(iCurveComposedSplit);
 						else
 						{ // die Einzelelemente des CreateFromModel identifizieren
 							for (int j = 0; j < pathCreatedFromModel.Count; ++j)
 							{
 								IGeoObject obj = null;
-								if ((pathCreatedFromModel.Curve(j) as IGeoObject).UserData.ContainsData("CADability.Path.Original"))
-									obj = (pathCreatedFromModel.Curve(j) as IGeoObject).UserData.GetData("CADability.Path.Original") as IGeoObject;
+								if (pathCreatedFromModel.Curve(j).UserData.ContainsData("CADability.Path.Original"))
+									obj = pathCreatedFromModel.Curve(j).UserData.GetData("CADability.Path.Original") as IGeoObject;
 								if (obj != null && obj.Owner != null) obj.Owner.Remove(obj); // löschen
 							}
 						}
@@ -550,7 +550,7 @@ namespace CADability.Actions
 					}
 					if (doIt)
 					{
-						(arc as IGeoObject).CopyAttributes(iCurve1 as IGeoObject);
+						(arc as IGeoObject).CopyAttributes(iCurve1);
 
 						if (Frame.GetBooleanSetting("Construct.MakePath", true) || composedSingle2Objects)
 						{   // das Ergebnis soll in einem Pfad zusammengefasst werden!
@@ -565,7 +565,7 @@ namespace CADability.Actions
 								tmpPath.Add(iCurveComposedSingle2Objects);
 
 							}
-							(tmpPath as IGeoObject).CopyAttributes(iCurve1 as IGeoObject);
+							(tmpPath as IGeoObject).CopyAttributes(iCurve1);
 							tmpPath.Flatten(); // bringt alles auf die "geometrische" Ebene, Unterpfade werden aufgelöst
 							owner.Add(tmpPath as IGeoObject);
 						}
@@ -576,8 +576,8 @@ namespace CADability.Actions
 							if (composedSplit)
 							{
 								// da neu erzeugt von SplitAtMousePosition, hier explizit einfügen
-								owner.Add(iCurve1 as IGeoObject);
-								owner.Add(iCurve2 as IGeoObject);
+								owner.Add(iCurve1);
+								owner.Add(iCurve2);
 							}
 							//if (composedSingle)
 							//{

@@ -60,7 +60,7 @@ namespace CADability.GeoObject
         {
             foreach (ICurve crv in list)
             {
-                this.list.AddIfNotNull(crv as IGeoObject);
+                this.list.AddIfNotNull(crv);
             }
         }
         public void Add(IGeoObject ObjectToAdd)
@@ -121,7 +121,7 @@ namespace CADability.GeoObject
                 Path path = (ObjectToAdd as Path);
                 for (int i = 0; i < path.CurveCount; i++)
                 {
-                    Add(path.Curve(i) as IGeoObject);
+                    Add(path.Curve(i));
                 }
             }
             else if (ObjectToAdd is Polyline && decomposePolyLine)

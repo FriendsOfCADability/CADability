@@ -3488,7 +3488,7 @@ namespace CADability.GeoObject
             }
             foreach (Edge edge in Edges)
             {
-                if (edge.Curve3D is IGeoObject go) go.Style = EdgeStyle;
+                if (edge.Curve3D is not null) edge.Curve3D.Style = EdgeStyle;
             }
             if (surface is ISurfaceImpl si) si.usedArea = Domain;
         }
@@ -3581,7 +3581,7 @@ namespace CADability.GeoObject
             SimpleShape forceArea = res.Area; // das SimpleShape wird hier erstmalig berechnet
             foreach (Edge edge in res.Edges)
             {
-                if (edge.Curve3D is IGeoObject go) go.Style = EdgeStyle;
+                if (edge.Curve3D is not null) edge.Curve3D.Style = EdgeStyle;
             }
             for (int i = 0; i < outline.Length; i++)
             {
@@ -5688,18 +5688,18 @@ namespace CADability.GeoObject
             // check only those edges, that are hit by the pickArea
             for (int i = 0; i < outline.Length; i++)
             {
-                if (outline[i].Curve3D is IGeoObject crv) // kann null sein
+                if (outline[i].Curve3D is { } curve) // kann null sein
                 {
-                    if (crv.HitTest(spf.pickArea, false)) crv.FindSnapPoint(spf);
+                    if (curve.HitTest(spf.pickArea, false)) curve.FindSnapPoint(spf);
                 }
             }
             for (int i = 0; i < holes.Length; i++)
             {
                 for (int j = 0; j < holes[i].Length; j++)
                 {
-                    if (holes[i][j].Curve3D is IGeoObject crv) // kann null sein
+                    if (holes[i][j].Curve3D is { } curve) // kann null sein
                     {
-                        if (crv.HitTest(spf.pickArea, false)) crv.FindSnapPoint(spf);
+                        if (curve.HitTest(spf.pickArea, false)) curve.FindSnapPoint(spf);
                     }
                 }
             }

@@ -870,7 +870,7 @@ namespace CADability.GeoObject
 			GeoObjectList tmpGeoObject = new GeoObjectList();
 			for (int i = 0; i < tmpCurve.Length; i++)
 			{
-				tmpGeoObject.Add((tmpCurve[i] as IGeoObject).Clone());
+				tmpGeoObject.Add(tmpCurve[i].Clone());
 				tmpGeoObject[i].CopyAttributes(this);
 			}
 			return tmpGeoObject;
@@ -1474,9 +1474,9 @@ namespace CADability.GeoObject
 			double res = double.MaxValue;
 			foreach (var curve in subCurves)
 			{
-				if (curve is IOctTreeInsertable insertable)
+				if (curve is not null)
 				{
-					double d = insertable.Position(fromHere, direction, precision);
+					double d = curve.Position(fromHere, direction, precision);
 					if (d < res)
 						res = d;
 				}

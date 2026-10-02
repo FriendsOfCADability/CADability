@@ -2535,7 +2535,7 @@ namespace CADability.GeoObject
                 }
                 for (int i = 0; i < edges.Length; ++i)
                 {
-                    if (edges[i].Curve3D is IGeoObject go) res.Add(go);
+                    if (edges[i].Curve3D is not null) res.Add(edges[i].Curve3D);
                 }
                 for (int i = 0; i < FeatureAxis.Count; i++)
                 {

@@ -732,9 +732,9 @@ namespace CADability.GeoObject
         public override IPropertyEntry GetPropertyEntry(IFrame frame)
         {
             List<IPropertyEntry> se = new List<IPropertyEntry>();
-            if (basisCurve is IGeoObject go)
+            if (basisCurve is not null)
             {
-                se.Add(go.GetShowProperties(frame) as IPropertyEntry);
+                se.Add(basisCurve.GetShowProperties(frame) as IPropertyEntry);
             }
             GeoVectorProperty dir = new GeoVectorProperty(frame, "SurfaceOfLinearExtrusion.Direction");
             dir.ReadOnly = true;

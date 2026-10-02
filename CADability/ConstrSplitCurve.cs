@@ -283,9 +283,9 @@ namespace CADability.Actions
 		{   // zerstückeln, original entfernen und Stücke einfügen
 			// TODO: noch auf 0.0 aufpassen!
 			// TODO: Polyline geht nicht richtig, Ellipse auch nicht, da nicht linear auf dem Umfang
-			if (theCurve is IGeoObject go)
+			if (theCurve is not null)
 			{
-				IGeoObjectOwner owner = go.Owner;
+				IGeoObjectOwner owner = theCurve.Owner;
 				if (owner != null)
 				{
 					using (Frame.Project.Undo.UndoFrame)
@@ -295,7 +295,7 @@ namespace CADability.Actions
 						//    (go as Polyline).IsClosed = false; // aufbrechen
 						//}
 						// nicht aufbrechen, das ist jetzt in Split ordentlich geregelt
-						owner.Remove(go);
+						owner.Remove(theCurve);
 						ICurve toSplit = theCurve;
 						double totlen = theCurve.Length;
 						double sumlen = 0.0;
@@ -306,7 +306,7 @@ namespace CADability.Actions
 							sumlen += sections[i] * totlen;
 							double end = theCurve.PositionAtLength(sumlen);
 							splitted.Trim(start, end);
-							splitted.CopyAttributes(go);
+							splitted.CopyAttributes(theCurve);
 							owner.Add(splitted);
 						}
 

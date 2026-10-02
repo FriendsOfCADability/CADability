@@ -893,10 +893,10 @@ namespace CADability
                 this.curveOnPrimaryFace = curveOnPrimaryFace;
             }
             this.forwardOnPrimaryFace = forwardOnPrimaryFace;
-            if (curve3d is IGeoObject go)
+            if (curve3d is not null)
             {
-                go.Owner = this;
-                go.Style = Face.EdgeStyle;
+                curve3d.Owner = this;
+                curve3d.Style = Face.EdgeStyle;
             }
             oriented = true;
         }
@@ -917,7 +917,7 @@ namespace CADability
             internal set
             {
                 curve3d = value;
-                if (curve3d is IGeoObject go) go.Owner = this;
+                if (curve3d is not null) curve3d.Owner = this;
             }
         }
         internal void Modify(ModOp m)
@@ -2246,7 +2246,7 @@ namespace CADability
             owner = primaryFace;
             if (curve3d != null)
             {
-                if (curve3d is IGeoObject go) go.Owner = this;
+                curve3d.Owner = this;
                 data.AddProperty("Curve3d", curve3d);
             }
             if (primaryFace != null) data.AddProperty("PrimaryFace", primaryFace);

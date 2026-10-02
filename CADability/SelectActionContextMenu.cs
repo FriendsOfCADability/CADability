@@ -430,13 +430,13 @@ namespace CADability
             for (int i = 0; i < curves.Count; i++)
             {   // No implementation for simple curves yet.
                 // We would need a logical connection structure as in vertex->edge->face->shell in 2d curves, which we currently do not have.
-                Face faceWithAxis = (curves[i] as IGeoObject).UserData.GetData("CADability.AxisOf") as Face;
+                Face faceWithAxis = curves[i].UserData.GetData("CADability.AxisOf") as Face;
                 if (faceWithAxis != null)
                 {
                     MenuWithHandler mh = new MenuWithHandler("MenuId.Axis");
                     mh.SubMenus = GetFacesSubmenus(faceWithAxis).ToArray();
                     mh.Target = this;
-                    IGeoObject curveI = curves[i] as IGeoObject;
+                    IGeoObject curveI = curves[i];
                     mh.OnSelected = (m, selected) =>
                     {
                         currentMenuSelection.Clear();
@@ -457,7 +457,7 @@ namespace CADability
                 Edge edgeI = edges[i];
                 selectMoreEdges.OnCommand = (menuId) =>
                 {
-                    soa.SetSelectedObject(edgeI.Curve3D as IGeoObject);
+                    soa.SetSelectedObject(edgeI.Curve3D);
                     soa.Accumulate(PickMode.onlyEdges);
                     return true;
                 };
@@ -630,7 +630,7 @@ namespace CADability
             if (curve.IsClosed && curve.GetPlanarState() == PlanarState.Planar)
             {
                 Plane plane = curve.GetPlane();
-                Face fc = Face.MakeFace(new GeoObjectList(curve as IGeoObject));
+                Face fc = Face.MakeFace(new GeoObjectList(curve));
                 if (fc != null)
                 {
                     MenuWithHandler extrude = SimpleAction("MenuId.Constr.Solid.FaceExtrude", 159, selectAction.Frame, new Constr3DFaceExtrude(fc), curve);
@@ -639,7 +639,7 @@ namespace CADability
                     lmh.Add(rotate);
                     if (!noRuledSurface)
                     {
-                        MenuWithHandler ruled = SimpleAction("MenuId.Constr.Solid.RuledSolid", 161, selectAction.Frame, new Constr3DRuledSolid(new GeoObjectList(curve as IGeoObject), selectAction.Frame), curve);
+                        MenuWithHandler ruled = SimpleAction("MenuId.Constr.Solid.RuledSolid", 161, selectAction.Frame, new Constr3DRuledSolid(new GeoObjectList(curve), selectAction.Frame), curve);
                         lmh.Add(ruled);
                     }
                 }
@@ -669,7 +669,7 @@ namespace CADability
                 currentMenuSelection.Clear();
                 for (int i = 0; i < curves.Count; i++)
                 {
-                    currentMenuSelection.Add(curves[i] as IGeoObject);
+                    currentMenuSelection.Add(curves[i]);
                 }
                 vw.Invalidate(PaintBuffer.DrawingAspect.Select, currentView.DisplayRectangle);
             };
@@ -884,7 +884,7 @@ namespace CADability
             mh.OnSelected = (menuId, selected) =>
             {   // show the provided edge and the "same geometry connected" edges as feedback
                 currentMenuSelection.Clear();
-                currentMenuSelection.AddRange(edges.Select((edge) => edge.Curve3D as IGeoObject));
+                currentMenuSelection.AddRange(edges.Select((edge) => edge.Curve3D));
                 vw.Invalidate(PaintBuffer.DrawingAspect.Select, currentView.DisplayRectangle);
             };
             List<MenuWithHandler> lmh = new List<MenuWithHandler>();
@@ -1632,7 +1632,7 @@ namespace CADability
             else if (selectedMenu.ID.StartsWith("MenuId.Edge."))
             {
                 int ind = int.Parse(selectedMenu.ID.Substring("MenuId.Edge.".Length));
-                currentMenuSelection.Add(edges[ind].Curve3D as IGeoObject);
+                currentMenuSelection.Add(edges[ind].Curve3D);
             }
             else if (selectedMenu.ID.StartsWith("MenuId.Face."))
             {

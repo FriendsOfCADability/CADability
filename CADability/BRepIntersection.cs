@@ -2531,9 +2531,10 @@ namespace CADability
                     }
                     else
                     {
-                        foreach (Edge edg in Extensions.Combine<Edge>(rawFillets[vertexToEdge.Value[0]].Item2.Edges, rawFillets[vertexToEdge.Value[1]].Item2.Edges))
+                        foreach (Edge edg in Extensions.Combine(rawFillets[vertexToEdge.Value[0]].Item2.Edges, rawFillets[vertexToEdge.Value[1]].Item2.Edges))
                         {
-                            if (edg.Curve3D is IGeoObject go) go.UserData["BrepFillet.OriginalEdge"] = edg;
+                            if (edg.Curve3D is not null)
+                                edg.Curve3D.UserData["BrepFillet.OriginalEdge"] = edg;
                         }
                         rawFillets[vertexToEdge.Value[0]].Item2.UserData["BrepFillet.OriginalFace"] = rawFillets[vertexToEdge.Value[0]].Item2.GetHashCode();
                         rawFillets[vertexToEdge.Value[1]].Item2.UserData["BrepFillet.OriginalFace"] = rawFillets[vertexToEdge.Value[1]].Item2.GetHashCode();
@@ -2568,16 +2569,16 @@ namespace CADability
                                     fcs[1].UserData.Remove("BrepFillet.OriginalFace");
                                     foreach (Edge edg in Extensions.Combine<Edge>((fcs[0] as Face).Edges, (fcs[1] as Face).Edges))
                                     {
-                                        if (edg.Curve3D is IGeoObject go)
+                                        if (edg.Curve3D is { } curve)
                                         {
-                                            if (go.UserData.GetData("BrepFillet.OriginalEdge") is Edge edgorg)
+                                            if (curve.UserData.GetData("BrepFillet.OriginalEdge") is Edge edgorg)
                                             {
                                                 if (tangentialIntersectionEdges.TryGetValue(edgorg, out Tuple<Face, Face> faces))
                                                 {
                                                     tangentialIntersectionEdges[edg] = new Tuple<Face, Face>(faces.Item1, oldToNew[faces.Item2]);
                                                     tangentialIntersectionEdges.Remove(edgorg);
                                                 }
-                                                go.UserData.Remove("BrepFillet.OriginalEdge");
+                                                curve.UserData.Remove("BrepFillet.OriginalEdge");
                                             }
                                         }
                                     }
@@ -2787,9 +2788,10 @@ namespace CADability
                         // now we must modify the fillets, i.e. clip them with the sphere. it is easier to clip them with a plane
                         // we need to reconstruct tangentialIntersectionEdges when the brep intersection modifies the faces (and shhortens the tangential edges)
                         // we use UserData for this purpose.
-                        foreach (Edge edg in Extensions.Combine<Edge>(rawFillets[vertexToEdge.Value[0]].Item2.Edges, rawFillets[vertexToEdge.Value[1]].Item2.Edges, rawFillets[vertexToEdge.Value[2]].Item2.Edges))
+                        foreach (Edge edg in Extensions.Combine(rawFillets[vertexToEdge.Value[0]].Item2.Edges, rawFillets[vertexToEdge.Value[1]].Item2.Edges, rawFillets[vertexToEdge.Value[2]].Item2.Edges))
                         {
-                            if (edg.Curve3D is IGeoObject go) go.UserData["BrepFillet.OriginalEdge"] = edg;
+                            if (edg.Curve3D is not null)
+                                edg.Curve3D.UserData["BrepFillet.OriginalEdge"] = edg;
                         }
                         rawFillets[vertexToEdge.Value[0]].Item2.UserData["BrepFillet.OriginalFace"] = rawFillets[vertexToEdge.Value[0]].Item2.GetHashCode();
                         rawFillets[vertexToEdge.Value[1]].Item2.UserData["BrepFillet.OriginalFace"] = rawFillets[vertexToEdge.Value[1]].Item2.GetHashCode();
@@ -2840,18 +2842,18 @@ namespace CADability
                             rawFillets[vertexToEdge.Value[2]] = new Tuple<ICurve, Face>(rawFillets[vertexToEdge.Value[2]].Item1, clippedFillet);
                             clippedFillet.UserData.Remove("BrepFillet.OriginalFace");
                         }
-                        foreach (Edge edg in Extensions.Combine<Edge>(rawFillets[vertexToEdge.Value[0]].Item2.Edges, rawFillets[vertexToEdge.Value[1]].Item2.Edges, rawFillets[vertexToEdge.Value[2]].Item2.Edges))
+                        foreach (Edge edg in Extensions.Combine(rawFillets[vertexToEdge.Value[0]].Item2.Edges, rawFillets[vertexToEdge.Value[1]].Item2.Edges, rawFillets[vertexToEdge.Value[2]].Item2.Edges))
                         {
-                            if (edg.Curve3D is IGeoObject go)
+                            if (edg.Curve3D is { } curve)
                             {
-                                if (go.UserData.GetData("BrepFillet.OriginalEdge") is Edge edgorg)
+                                if (curve.UserData.GetData("BrepFillet.OriginalEdge") is Edge edgorg)
                                 {
                                     if (tangentialIntersectionEdges.TryGetValue(edgorg, out Tuple<Face, Face> faces))
                                     {
                                         tangentialIntersectionEdges[edg] = new Tuple<Face, Face>(faces.Item1, oldToNew[faces.Item2]);
                                         tangentialIntersectionEdges.Remove(edgorg);
                                     }
-                                    go.UserData.Remove("BrepFillet.OriginalEdge");
+                                    curve.UserData.Remove("BrepFillet.OriginalEdge");
                                 }
                             }
                         }
@@ -9819,7 +9821,7 @@ namespace CADability
                 {
                     if (item.Key.Curve3D != null)
                     {
-                        ((item.Key.Curve3D as IGeoObject) as IColorDef).ColorDef = cde;
+                        ((IColorDef)item.Key.Curve3D).ColorDef = cde;
                         res.Add(item.Key.Curve3D);
                     }
                     foreach (Vertex v in item.Value)

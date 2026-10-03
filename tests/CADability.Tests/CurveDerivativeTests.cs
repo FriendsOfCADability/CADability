@@ -171,6 +171,28 @@ namespace CADability.Tests
         }
 
         [TestMethod]
+        public void ellipse_derivatives_carry_the_sweep_twice()
+        {
+            // The second derivative used to be scaled with the sweep only once, not squared.
+            Plane plane = new Plane(new GeoPoint(3, -2, 7), new GeoVector(0.3, -1.7, 0.5), new GeoVector(1, 0.2, -0.4));
+            Ellipse arc = Ellipse.Construct();
+            arc.SetArcPlaneCenterRadiusAngles(plane, new GeoPoint(3, -2, 7), 3.0, 0.4, 2.5);
+            AssertDerivatives("circular arc, sweep 2.5", (ICurve)arc);
+            Ellipse reversed = Ellipse.Construct();
+            reversed.SetArcPlaneCenterRadiusAngles(plane, new GeoPoint(3, -2, 7), 3.0, 2.9, -2.5);
+            AssertDerivatives("circular arc, sweep -2.5", (ICurve)reversed);
+            Ellipse ellipse = Ellipse.Construct();
+            ellipse.SetEllipseCenterAxis(new GeoPoint(3, -2, 7), 7.0 * plane.DirectionX, 2.0 * plane.DirectionY);
+            AssertDerivatives("full ellipse", (ICurve)ellipse);
+        }
+
+        [TestMethod]
+        public void line_derivatives()
+        {
+            AssertDerivatives("line", (ICurve)Line.TwoPoints(new GeoPoint(3, -2, 7), new GeoPoint(-4, 5, 1)));
+        }
+
+        [TestMethod]
         public void the_second_derivative_works_on_a_spline_nobody_has_touched_yet()
         {
             // No warm up call on purpose. The nurbs helper is built lazily and this method used to read the

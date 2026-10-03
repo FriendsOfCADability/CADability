@@ -7022,7 +7022,13 @@ namespace CADability.Actions
 			}
 			return null;
 		}
-		internal virtual void InputChanged(object activeInput) { }
+		/// <summary>
+		/// Called when the input focus moves to another input object, <paramref name="activeInput"/> is the
+		/// newly active input object, or null when the action is done. Override it to adapt the feedback
+		/// or the state of the inputs to the active input.
+		/// </summary>
+		/// <param name="activeInput">the input object which now has the focus, or null</param>
+		protected virtual void InputChanged(object activeInput) { }
 		private void SetCurrentInputIndex(IInputObject io, bool ActivateMouse)
 		{
 			for (int i = 0; i < InputDefinitions.Length; ++i)

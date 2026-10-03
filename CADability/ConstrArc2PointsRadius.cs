@@ -185,7 +185,7 @@ namespace CADability.Actions
             showArc(arcPoint3);
         }
 
-        internal override void InputChanged(object activeInput)
+        protected override void InputChanged(object activeInput)
         {
             if (activeInput == diamInput)
             {

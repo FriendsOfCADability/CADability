@@ -318,7 +318,7 @@ namespace CADability.Actions
         }
 
 
-        internal override void InputChanged(object activeInput)
+        protected override void InputChanged(object activeInput)
         {
             if (activeInput == diamInput)
             {

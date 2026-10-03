@@ -199,13 +199,11 @@ namespace CADability.GeoObject
         /// <param name="uv"></param>
         /// <returns></returns>
         public override GeoVector UDirection(GeoPoint2D uv)
-        {   // geht ohne Rückgriff auf die Kurve
-            double pos = GetPos(uv.y);
-            GeoPoint2D p2d = basisCurve2D.PointAt(pos);
-            if (p2d.x == 0.0) return GeoVector.NullVector;
-            GeoVector dir = new GeoVector(-Math.Sin(uv.x), pitch / (Math.PI * 2.0) / p2d.x, -Math.Cos(uv.x));
-            return p2d.x * (toSurface * dir); // so müsste auch die Länge OK sein, oder?
-            // "p2d.x *" am 26.10.16 eingefügt: die Länge der Richtung ist proportional zum Radius, sonst geht "NewtonLineintersection" nicht
+        {   // does not need the derivative of the curve
+            GeoPoint2D p2d = basisCurve2D.PointAt(GetPos(uv.y));
+            // the rotation contributes a vector proportional to the radius, the pitch a constant one along the axis.
+            // So where the curve touches the axis, the u derivative is the pitch alone and only vanishes when the pitch is 0
+            return toSurface * new GeoVector(-p2d.x * Math.Sin(uv.x), pitch / (Math.PI * 2.0), -p2d.x * Math.Cos(uv.x));
         }
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.VDirection (GeoPoint2D)"/>
@@ -214,11 +212,9 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public override GeoVector VDirection(GeoPoint2D uv)
         {
-            double pos = GetPos(uv.y);
-            GeoVector2D dir = basisCurve2D.DirectionAt(pos);
-            //dir = (1.0 / (curveEndParameter - curveStartParameter)) * dir; // dir ist die Änderung um 1 also volle Kurvenlänge
-            // 15.8.17: die Skalierung von dir ist wohl falsch: NewtonLineintersection läuft mit obiger Zeile nicht richtig, so aber perfekt
-            // pitch fehlt noch, ist vermutlich nicht nötig
+            // the curve is evaluated at GetPos(v), so the derivative of the curve by its position needs the factor
+            // d(pos)/dv. The pitch only depends on u and does not contribute to the v derivative
+            GeoVector2D dir = (1.0 / (curveEndParameter - curveStartParameter)) * basisCurve2D.DirectionAt(GetPos(uv.y));
             ModOp rot = ModOp.Rotate(1, (SweepAngle)uv.x);
             return toSurface * rot * dir;
         }
@@ -243,25 +239,25 @@ namespace CADability.GeoObject
         }
         public override void Derivation2At(GeoPoint2D uv, out GeoPoint location, out GeoVector du, out GeoVector dv, out GeoVector duu, out GeoVector dvv, out GeoVector duv)
         {
+            double pos = GetPos(uv.y);
+            if (!basisCurve2D.TryPointDeriv2At(pos, out GeoPoint2D p2d, out GeoVector2D deriv1, out GeoVector2D deriv2))
+            {   // the profile curve has no analytic second derivative: difference its first derivative
+                const double h = 1e-6;
+                p2d = basisCurve2D.PointAt(pos);
+                deriv1 = basisCurve2D.DirectionAt(pos);
+                deriv2 = (1.0 / (2 * h)) * (basisCurve2D.DirectionAt(pos + h) - basisCurve2D.DirectionAt(pos - h));
+            }
             location = PointAt(uv);
             du = UDirection(uv);
             dv = VDirection(uv);
-            double pos = GetPos(uv.y);
-            GeoPoint2D p2d = basisCurve2D.PointAt(pos);
-            duu = new GeoVector(-Math.Cos(uv.x), 0.0, -Math.Sin(uv.x));
-            GeoVector2D deriv1, deriv2;
-            if (basisCurve2D.TryPointDeriv2At(pos, out p2d, out deriv1, out deriv2))
-            {
-
-                ModOp rot = ModOp.Rotate(1, (SweepAngle)uv.x);
-                dvv = toSurface * rot * deriv2;
-                duv = GeoVector.NullVector;
-            }
-            else
-            {
-                dvv = GeoVector.NullVector;
-                duv = GeoVector.NullVector;
-            }
+            // the curve point (x, y) is rotated to (x*cos(u), y, -x*sin(u)) and moved by pitch*u/(2*pi) along the y axis,
+            // v enters through pos = GetPos(v)
+            double dpos = 1.0 / (curveEndParameter - curveStartParameter);
+            double sin = Math.Sin(uv.x);
+            double cos = Math.Cos(uv.x);
+            duu = toSurface * new GeoVector(-p2d.x * cos, 0.0, p2d.x * sin);
+            dvv = (dpos * dpos) * (toSurface * new GeoVector(deriv2.x * cos, deriv2.y, -deriv2.x * sin));
+            duv = dpos * (toSurface * new GeoVector(-deriv1.x * sin, 0.0, -deriv1.x * cos));
         }
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetZMinMax (Projection, double, double, double, double, ref double, ref double)"/>

@@ -255,7 +255,7 @@ namespace CADability.Actions
             return arcRad * 2.0;
         }
 
-        internal override void InputChanged(object activeInput)
+        protected override void InputChanged(object activeInput)
         {
             if (activeInput == diamInput)
             {

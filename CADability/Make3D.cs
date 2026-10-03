@@ -315,6 +315,11 @@ namespace CADability.GeoObject
                     if (faceShellOrPath is Path) (faceShellOrPath as Path).Flatten();
                     // Polylinien sollten so auch gehen
                     ICurve curve = (faceShellOrPath.Clone() as ICurve); // wir drehen evtl die Richtung um, deshalb Clone
+                    if (curve.SubCurves == null || curve.SubCurves.Length == 0)
+                    {   // a single closed curve like a circle has no subcurves: split it into two halves, one for each side face
+                        Path halves = Path.Construct();
+                        if (halves.Set(curve.Split(0.5))) curve = halves;
+                    }
                     if (curve.SubCurves != null && curve.SubCurves.Length > 0)
                     {
                         if (curve.SubCurves.Length == 1)
@@ -368,16 +373,16 @@ namespace CADability.GeoObject
                             int i1 = i - 1;
                             if (i1 < 0) i1 = lower.OutlineEdges.Length - 1;
                             ISurface surface = ExtrudedSurface(lower.OutlineEdges[i].Curve3D, extrusion);
+                            // All edges need their 2d curves before Face.Set, because Face.Set computes the domain of the face
+                            // from them. The 2d curves are given in the direction of the 3d curves, SetFace reverses them if necessary.
+                            ICurve2D lower2d = surface.GetProjectedCurve(lower.OutlineEdges[i].Curve3D, 0.0);
+                            ICurve2D upper2d = surface.GetProjectedCurve(upper.OutlineEdges[i].Curve3D, 0.0);
+                            // the vertical lines connect the ends of these 2d curves (on a cylinder, this keeps them on the same side of the seam)
+                            extruded[i1].SetFace(sides[i], new Line2D(lower2d.StartPoint, upper2d.StartPoint), false);
+                            extruded[i].SetFace(sides[i], new Line2D(lower2d.EndPoint, upper2d.EndPoint), true);
+                            lower.OutlineEdges[i].SetFace(sides[i], lower2d, true);
+                            upper.OutlineEdges[i].SetFace(sides[i], upper2d, false);
                             sides[i].Set(surface, new Edge[] { extruded[i1], lower.OutlineEdges[i], extruded[i], upper.OutlineEdges[i] }, null);
-                            lower.OutlineEdges[i].SetFace(sides[i], true);
-                            upper.OutlineEdges[i].SetFace(sides[i], false);
-                            // die senkrechten Linien. Beim Zylinder auf der 0/2pi Naht gibts manchmal Fehler
-                            GeoPoint2D sp = lower.OutlineEdges[i].Curve2D(sides[i]).StartPoint;
-                            GeoPoint2D ep = upper.OutlineEdges[i].Curve2D(sides[i]).EndPoint;
-                            extruded[i1].SetFace(sides[i], new Line2D(sp, ep), false);
-                            sp = lower.OutlineEdges[i].Curve2D(sides[i]).EndPoint;
-                            ep = upper.OutlineEdges[i].Curve2D(sides[i]).StartPoint;
-                            extruded[i].SetFace(sides[i], new Line2D(sp, ep), true);
                         }
                         lower.MakeInverseOrientation(); // die untere Fläche war ja falschrum
                         lower.OrientedOutward = true; // das MakeInverseOrientation setzt OrientedOutward auf false, in unserem Fall ist das falsch
@@ -388,6 +393,7 @@ namespace CADability.GeoObject
                         }
                         Shell sh = Shell.Construct();
                         sh.SetFaces(sides);
+                        sh.RecalcVertices(); // the vertical edges have their own vertices, which must be merged with the vertices of the outline
                         if (pathToShell)
                         {
                             if (project != null) project.SetDefaults(sh);

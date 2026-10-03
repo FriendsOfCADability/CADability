@@ -130,7 +130,7 @@ namespace CADability.Actions
             return mindist != double.MaxValue;
         }
 
-        internal override void InputChanged(object activeInput)
+        protected override void InputChanged(object activeInput)
         {
             if (activeInput == diamInput)
             {

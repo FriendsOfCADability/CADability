@@ -63,7 +63,7 @@ namespace CADability.Actions
             return (Geometry.Dist(MousePosition, circle.Center) * 2.0);
         }
 
-        internal override void InputChanged(object activeInput)
+        protected override void InputChanged(object activeInput)
         {
             if (activeInput == diam)
             {

@@ -514,6 +514,26 @@ namespace CADability.GeoObject
                 }
                 return;
             }
+            if (curve is Ellipse elli && elli.IsCircle && this.IsRealCylinder)
+            {   // tangential intersections will be unprecise in the general case
+                if (Precision.IsEqual(Geometry.DistPL(elli.Center, Location, Axis), elli.Radius + this.RadiusX))
+                {   // a tangential intersection
+                    GeoPoint pa = Geometry.DropPL(elli.Center, Location, Axis);
+                    GeoPoint2D[] ip2d = GetLineIntersection(elli.Center, pa - elli.Center);
+                    for (int i = 0; i < ip2d.Length; i++)
+                    {
+                        GeoPoint ip = PointAt(ip2d[i]);
+                        if (Precision.IsEqual(ip | elli.Center, elli.Radius) && Precision.IsPointOnPlane(ip,elli.Plane))
+                        {
+                            uvOnFaces = [ip2d[i]];
+                            uOnCurve3Ds = [elli.PositionOf(ip)];
+                            ips = [ip];
+                            return;
+                        }
+                    }
+
+                }
+            }
             if (curve.GetPlanarState() == PlanarState.Planar)
             {
                 Plane pln = curve.GetPlane();
@@ -2296,16 +2316,19 @@ namespace CADability.GeoObject
                     }
                 case ConicalSurface cos:
                     {
-                        Geometry.DistLL(Location, ZAxis, cos.Location, cos.ZAxis, out double par1, out double par2);
                         extremePositions = new List<Tuple<double, double, double, double>>();
-                        GeoPoint cp = Location + par1 * ZAxis; // point on the cylinder axis closest to cone axis
-                        GeoPoint2D[] fpOnCone = cos.PerpendicularFoot(cp); // perpendicular from this point onto the cone
-                        for (int i = 0; i < fpOnCone.Length; i++)
+                        if (!Precision.SameDirection(ZAxis, cos.ZAxis, false))
                         {
-                            SurfaceHelper.AdjustPeriodic(cos, otherBounds, ref fpOnCone[i]);
-                            if (otherBounds.Contains(fpOnCone[i])) extremePositions.Add(new Tuple<double, double, double, double>(double.NaN, double.NaN, fpOnCone[i].x, fpOnCone[i].y));
+                            Geometry.DistLL(Location, ZAxis, cos.Location, cos.ZAxis, out double par1, out double par2);
+                            GeoPoint cp = Location + par1 * ZAxis; // point on the cylinder axis closest to cone axis
+                            GeoPoint2D[] fpOnCone = cos.PerpendicularFoot(cp); // perpendicular from this point onto the cone
+                            for (int i = 0; i < fpOnCone.Length; i++)
+                            {
+                                SurfaceHelper.AdjustPeriodic(cos, otherBounds, ref fpOnCone[i]);
+                                if (otherBounds.Contains(fpOnCone[i])) extremePositions.Add(new Tuple<double, double, double, double>(double.NaN, double.NaN, fpOnCone[i].x, fpOnCone[i].y));
+                            }
+                            if (par1 >= thisBounds.Bottom && par1 <= thisBounds.Top) extremePositions.Add(new Tuple<double, double, double, double>(double.NaN, par1, double.NaN, double.NaN));
                         }
-                        if (par1 >= thisBounds.Bottom && par1 <= thisBounds.Top) extremePositions.Add(new Tuple<double, double, double, double>(double.NaN, par1, double.NaN, double.NaN));
                         return extremePositions.Count;
                     }
                 case SphericalSurface ss:

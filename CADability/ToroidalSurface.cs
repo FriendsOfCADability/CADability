@@ -12,7 +12,7 @@ namespace CADability.GeoObject
     /// the "big" circles around the main axis, the v parameter describes the "small" circles.
     /// </summary>
     [Serializable()]
-    public class ToroidalSurface : ISurfaceImpl, ISerializable, IDeserializationCallback, IImplicitPSurface, IExportStep, ISurfaceOfArcExtrusion
+    public class ToroidalSurface : ISurfaceImpl, ISerializable, IDeserializationCallback, IImplicitPSurface, IExportStep, ISurfaceOfArcExtrusion, ISurfaceOfRevolution, IJsonSerialize
     {
         private ModOp toTorus; // diese ModOp modifiziert den Einheitstorus in den konkreten Torus
         private ModOp toUnit; // die inverse ModOp zum schnelleren Rechnen
@@ -288,14 +288,25 @@ namespace CADability.GeoObject
         /// <param name="uv"></param>
         /// <returns></returns>
         public override GeoVector GetNormal(GeoPoint2D uv)
-        {   // at a pole, the udirection may be 0, which results in a nullvector here, but there is actually a normal vector
-            // We calculate the normal as the point on the surface - point on the (circular) axis for the provided value of u.
-            // I think the normal should always be normalized per definition
-            GeoPoint paxis = toTorus * new GeoPoint(Math.Cos(uv.x), Math.Sin(uv.x), 0.0);
-            GeoPoint psurface = PointAt(uv);
-            if (toTorus.Determinant < 0) return (paxis - psurface).Normalized; // reverse oriented
-            else return (psurface - paxis).Normalized; // normal orientation
-            // return UDirection(uv) ^ VDirection(uv);
+        {   // At a pole of a spindle torus (minorRadius > 1) the u-direction is the nullvector, so the cross product
+            // UDirection ^ VDirection cannot be used there. But there still is a normal vector, which we calculate
+            // in the unit system: with n = (cos(v)*cos(u), cos(v)*sin(u), sin(v)) (which is the normalized direction
+            // from the point on the circular axis to the point on the surface) we have
+            //     UDirection ^ VDirection == minorRadius * (1 + minorRadius * cos(v)) * n
+            // i.e. n carries the direction, the scalar factor in front of it only carries length and sign.
+            // n is well defined for every (u,v), also at a pole: a pole is a self intersection of the surface (all u
+            // map onto the same point on the axis), so the normal there depends on u, i.e. on the sheet we are on.
+            // The scalar factor changes its sign when v passes a pole (1 + minorRadius * cos(v) becomes negative on
+            // the inner, "spindle" part of the surface). We must respect this sign to stay consistent with
+            // UDirection ^ VDirection. Exactly at the pole we use the sign of the outer part.
+            double factor = minorRadius * (1 + minorRadius * Math.Cos(uv.y));
+            GeoVector n = toTorus * new GeoVector(Math.Cos(uv.y) * Math.Cos(uv.x), Math.Cos(uv.y) * Math.Sin(uv.x), Math.Sin(uv.y));
+            // toTorus is a similarity transformation, so it maps the unit normal onto a vector parallel to the normal
+            // of the transformed surface. A reflecting toTorus (as produced by ReverseOrientation) flips the normal.
+            if (factor < 0.0) n = -n;
+            if (toTorus.Determinant < 0.0) n = -n;
+            // the normal should always be normalized per definition
+            return n.Normalized;
         }
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Make3dCurve (ICurve2D)"/>
@@ -480,6 +491,7 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public override IDualSurfaceCurve[] GetPlaneIntersection(PlaneSurface pl, double umin, double umax, double vmin, double vmax, double precision)
         {
+            BoundingRect domain = new BoundingRect(umin, vmin, umax, vmax);
             Plane pln = new Plane(toUnit * pl.Location, toUnit * pl.DirectionX, toUnit * pl.DirectionY);
             int degree = 3;
             if (Precision.IsPerpendicular(GeoVector.ZAxis, pln.Normal, false))
@@ -509,7 +521,11 @@ namespace CADability.GeoObject
                     elli1.Modify(toTorus);
                     GeoPoint2D tst1 = PositionOf(elli1.PointAt(0.5));
                     ICurve2D c2dpl1 = pl.GetProjectedCurve(elli1, 0.0); // must be a circle (Ellipse)
-                    ICurve2D c2dtr1 = new Line2D(PositionOf(elli1.StartPoint), PositionOf(elli1.EndPoint));
+                    // the parameter of the circle is the v parameter of the torus, so the 2d curve is the line with constant u
+                    // from vmin to vmax. Start- and endpoint alone would collapse to a single point for a full circle.
+                    GeoPoint2D pm = PositionOf(elli1.PointAt(0.5));
+                    SurfaceHelper.AdjustPeriodic(this, domain, ref pm);
+                    ICurve2D c2dtr1 = new Line2D(new GeoPoint2D(pm.x, vmin), new GeoPoint2D(pm.x, vmax));
                     DualSurfaceCurve dsc1 = new DualSurfaceCurve(elli1, this, c2dtr1, pl, c2dpl1);
                     //Der Zweite Kreis
                     Ellipse elli2 = Ellipse.Construct();
@@ -519,7 +535,9 @@ namespace CADability.GeoObject
                     elli2.Modify(toTorus);
                     GeoPoint2D tst2 = PositionOf(elli1.PointAt(0.5));
                     ICurve2D c2dpl2 = pl.GetProjectedCurve(elli2, 0.0); // must be a circle (Ellipse)
-                    ICurve2D c2dtr2 = new Line2D(PositionOf(elli2.StartPoint), PositionOf(elli2.EndPoint));
+                    pm = PositionOf(elli2.PointAt(0.5));
+                    SurfaceHelper.AdjustPeriodic(this, domain, ref pm);
+                    ICurve2D c2dtr2 = new Line2D(new GeoPoint2D(pm.x, vmin), new GeoPoint2D(pm.x, vmax));
                     DualSurfaceCurve dsc2 = new DualSurfaceCurve(elli2, this, c2dtr2, pl, c2dpl2);
                     return new IDualSurfaceCurve[] { dsc1, dsc2 };
                 }
@@ -613,7 +631,7 @@ namespace CADability.GeoObject
                         pnts[i].x = Math.Atan2(pnts1[i].y, pnts1[i].x);
                         pnts[i].y = Math.Atan2(pnts1[i].z, zc);
                     }
-                    BSpline2D.AdjustPeriodic(pnts, 2 * Math.PI, 2 * Math.PI);
+                    SurfaceHelper.UnwrapPeriodic(this, domain, pnts);
                     BSpline2D c2d1p = new BSpline2D(pnts, degree, false);
                     //Kurve 1p auf der Ebene pl
                     ICurve2D c2dpl1p = (c3d1p as ICurve).GetProjectedCurve(new Plane(pl.Location, pl.DirectionX, pl.DirectionY));
@@ -637,7 +655,7 @@ namespace CADability.GeoObject
                         pnts[i].x = Math.Atan2(pnts1[i].y, pnts1[i].x);
                         pnts[i].y = Math.Atan2(pnts1[i].z, zc);
                     }
-                    BSpline2D.AdjustPeriodic(pnts, 2 * Math.PI, 2 * Math.PI);
+                    SurfaceHelper.UnwrapPeriodic(this, domain, pnts);
                     BSpline2D c2d1n = new BSpline2D(pnts, degree, false);
                     //Kurve 1n auf der Ebene pl
                     ICurve2D c2dpl1n = (c3d1n as ICurve).GetProjectedCurve(new Plane(pl.Location, pl.DirectionX, pl.DirectionY));
@@ -662,7 +680,7 @@ namespace CADability.GeoObject
                         pnts[i].x = Math.Atan2(pnts1[i].y, pnts1[i].x);
                         pnts[i].y = Math.Atan2(pnts1[i].z, zc);
                     }
-                    BSpline2D.AdjustPeriodic(pnts, 2 * Math.PI, 2 * Math.PI);
+                    SurfaceHelper.UnwrapPeriodic(this, domain, pnts);
                     BSpline2D c2d2p = new BSpline2D(pnts, degree, false);
                     //Kurve 2p auf der Ebene pl
                     ICurve2D c2dpl2p = (c3d2p as ICurve).GetProjectedCurve(new Plane(pl.Location, pl.DirectionX, pl.DirectionY));
@@ -687,7 +705,7 @@ namespace CADability.GeoObject
                         pnts[i].x = Math.Atan2(pnts1[i].y, pnts1[i].x);
                         pnts[i].y = Math.Atan2(pnts1[i].z, zc);
                     }
-                    BSpline2D.AdjustPeriodic(pnts, 2 * Math.PI, 2 * Math.PI);
+                    SurfaceHelper.UnwrapPeriodic(this, domain, pnts);
                     BSpline2D c2d2n = new BSpline2D(pnts, degree, false);
                     //Kurve 2n auf der Ebene pl
                     ICurve2D c2dpl2n = (c3d2n as ICurve).GetProjectedCurve(new Plane(pl.Location, pl.DirectionX, pl.DirectionY));
@@ -784,7 +802,7 @@ namespace CADability.GeoObject
                     kpnts[i].x = Math.Atan2(kpnts1[i].y, kpnts1[i].x);
                     kpnts[i].y = Math.Atan2(kpnts1[i].z, f);
                 }
-                BSpline2D.AdjustPeriodic(kpnts, 2 * Math.PI, 2 * Math.PI);
+                SurfaceHelper.UnwrapPeriodic(this, domain, kpnts);
                 BSpline2D kc2d = new BSpline2D(kpnts, 3, true);
 
                 ////Kurve auf der Ebene pl
@@ -1169,7 +1187,7 @@ namespace CADability.GeoObject
                     psuv1[i].x = Math.Atan2(pnts1[i].y, pnts1[i].x);
                     psuv1[i].y = Math.Atan2(pnts1[i].z, f);
                 }
-                BSpline2D.AdjustPeriodic(psuv1, 2 * Math.PI, 2 * Math.PI);
+                SurfaceHelper.UnwrapPeriodic(this, domain, psuv1);
                 BSpline2D f3c2d1 = new BSpline2D(psuv1, degree, close);
                 //Kurve 1 auf der Ebene pl
                 ICurve2D f3c2dpl1 = (f3c3d1 as ICurve).GetProjectedCurve(new Plane(pl.Location, pl.DirectionX, pl.DirectionY));
@@ -1193,7 +1211,7 @@ namespace CADability.GeoObject
                     psuv1[i].x = Math.Atan2(pnts1[i].y, pnts1[i].x);
                     psuv1[i].y = Math.Atan2(pnts1[i].z, f);
                 }
-                BSpline2D.AdjustPeriodic(psuv1, 2 * Math.PI, 2 * Math.PI);
+                SurfaceHelper.UnwrapPeriodic(this, domain, psuv1);
                 BSpline2D f3c2d2 = new BSpline2D(psuv1, degree, close);
                 //Kurve 2 auf der Ebene pl
                 ICurve2D f3c2dpl2 = (f3c3d2 as ICurve).GetProjectedCurve(new Plane(pl.Location, pl.DirectionX, pl.DirectionY));
@@ -1343,11 +1361,17 @@ namespace CADability.GeoObject
                                 r2 = Math.Abs(tp[0].x);
                             }
                             tp = Geometry.IntersectLC(new GeoPoint2D(pd.x, 0), GeoVector2D.YAxis, GeoPoint2D.Origin, r1);
-                            alp1.Add(m1 * new GeoPoint(pd.x, Math.Abs(tp[0].y), pd.y));
-                            aln1.Add(m1 * new GeoPoint(pd.x, -Math.Abs(tp[0].y), pd.y));
+                            if (tp.Length > 0)
+                            {
+                                alp1.Add(m1 * new GeoPoint(pd.x, Math.Abs(tp[0].y), pd.y));
+                                aln1.Add(m1 * new GeoPoint(pd.x, -Math.Abs(tp[0].y), pd.y));
+                            }
                             tp = Geometry.IntersectLC(new GeoPoint2D(pd.x, 0), GeoVector2D.YAxis, GeoPoint2D.Origin, r2);
-                            alp2.Add(m1 * new GeoPoint(pd.x, Math.Abs(tp[0].y), pd.y));
-                            aln2.Add(m1 * new GeoPoint(pd.x, -Math.Abs(tp[0].y), pd.y));
+                            if (tp.Length > 0)
+                            {
+                                alp2.Add(m1 * new GeoPoint(pd.x, Math.Abs(tp[0].y), pd.y));
+                                aln2.Add(m1 * new GeoPoint(pd.x, -Math.Abs(tp[0].y), pd.y));
+                            }
                         }
                     }
                     tp = Geometry.IntersectLC(new GeoPoint2D(G1.x, 0), GeoVector2D.YAxis, GeoPoint2D.Origin, 1);
@@ -1369,19 +1393,22 @@ namespace CADability.GeoObject
                     GeoPoint2D pd = np1 + (i * df) * dirp;
                     double r1;
                     tp = Geometry.IntersectLC(pd, GeoVector2D.XAxis, cent1, minorRadius);
-                    if (tp.Length == 1)
-                        r1 = Math.Abs(tp[0].x);
-                    else if (Math.Abs(tp[0].x) > Math.Abs(cent1.x))
+                    if (tp.Length > 0)
                     {
-                        r1 = Math.Abs(tp[0].x);
+                        if (tp.Length == 1)
+                            r1 = Math.Abs(tp[0].x);
+                        else if (Math.Abs(tp[0].x) > Math.Abs(cent1.x))
+                        {
+                            r1 = Math.Abs(tp[0].x);
+                        }
+                        else
+                        {
+                            r1 = Math.Abs(tp[1].x);
+                        }
+                        tp = Geometry.IntersectLC(new GeoPoint2D(pd.x, 0), GeoVector2D.YAxis, GeoPoint2D.Origin, r1);
+                        alp1.Add(m1 * new GeoPoint(pd.x, Math.Abs(tp[0].y), pd.y));
+                        aln1.Add(m1 * new GeoPoint(pd.x, -Math.Abs(tp[0].y), pd.y));
                     }
-                    else
-                    {
-                        r1 = Math.Abs(tp[1].x);
-                    }
-                    tp = Geometry.IntersectLC(new GeoPoint2D(pd.x, 0), GeoVector2D.YAxis, GeoPoint2D.Origin, r1);
-                    alp1.Add(m1 * new GeoPoint(pd.x, Math.Abs(tp[0].y), pd.y));
-                    aln1.Add(m1 * new GeoPoint(pd.x, -Math.Abs(tp[0].y), pd.y));
                 }
                 bool lestepunkt = true;
                 do
@@ -1389,20 +1416,24 @@ namespace CADability.GeoObject
                     double r2 = 0;
                     GeoPoint2D pd = np2;
                     GeoPoint2D[] tp = Geometry.IntersectLC(np2, GeoVector2D.XAxis, cent1, minorRadius);
-                    if (Math.Abs(tp[0].x) < Math.Abs(tp[1].x))
+                    if (tp.Length > 0)
                     {
-                        r2 = Math.Abs(tp[1].x);
-                    }
-                    else
-                    {
-                        r2 = Math.Abs(tp[0].x);
-                    }
-                    alp2.Add(m1 * new GeoPoint(pd.x, 0, pd.y));
-                    aln2.Add(m1 * new GeoPoint(pd.x, 0, pd.y));
+                        if (tp.Length == 1) r2 = Math.Abs(tp[0].x);
+                        else if (Math.Abs(tp[0].x) < Math.Abs(tp[1].x))
+                        {
+                            r2 = Math.Abs(tp[1].x);
+                        }
+                        else
+                        {
+                            r2 = Math.Abs(tp[0].x);
+                        }
+                        alp2.Add(m1 * new GeoPoint(pd.x, 0, pd.y));
+                        aln2.Add(m1 * new GeoPoint(pd.x, 0, pd.y));
 
-                    tp = Geometry.IntersectLC(new GeoPoint2D(pd.x, 0), GeoVector2D.YAxis, GeoPoint2D.Origin, r2);
-                    alp1.Add(m1 * new GeoPoint(pd.x, Math.Abs(tp[0].y), pd.y));
-                    aln1.Add(m1 * new GeoPoint(pd.x, -Math.Abs(tp[0].y), pd.y));
+                        tp = Geometry.IntersectLC(new GeoPoint2D(pd.x, 0), GeoVector2D.YAxis, GeoPoint2D.Origin, r2);
+                        alp1.Add(m1 * new GeoPoint(pd.x, Math.Abs(tp[0].y), pd.y));
+                        aln1.Add(m1 * new GeoPoint(pd.x, -Math.Abs(tp[0].y), pd.y));
+                    }
                     lestepunkt = false;
                 } while (lestepunkt);
 
@@ -1414,32 +1445,38 @@ namespace CADability.GeoObject
                         GeoPoint2D pd = np2 + (i * df) * dirp;
                         double r1, r2;
                         tp = Geometry.IntersectLC(pd, GeoVector2D.XAxis, cent1, minorRadius);
-                        if (Math.Abs(tp[0].x) < Math.Abs(tp[1].x))
+                        if (tp.Length > 1)
                         {
-                            r1 = Math.Abs(tp[0].x);
-                            r2 = Math.Abs(tp[1].x);
+                            if (Math.Abs(tp[0].x) < Math.Abs(tp[1].x))
+                            {
+                                r1 = Math.Abs(tp[0].x);
+                                r2 = Math.Abs(tp[1].x);
+                            }
+                            else
+                            {
+                                r1 = Math.Abs(tp[1].x);
+                                r2 = Math.Abs(tp[0].x);
+                            }
+                            tp = Geometry.IntersectLC(new GeoPoint2D(pd.x, 0), GeoVector2D.YAxis, GeoPoint2D.Origin, r1);
+                            if (tp.Length > 0)
+                            {
+                                alp2.Add(m1 * new GeoPoint(pd.x, Math.Abs(tp[0].y), pd.y));
+                                aln2.Add(m1 * new GeoPoint(pd.x, -Math.Abs(tp[0].y), pd.y));
+                            }
+                            tp = Geometry.IntersectLC(new GeoPoint2D(pd.x, 0), GeoVector2D.YAxis, GeoPoint2D.Origin, r2);
+                            if (tp.Length > 0)
+                            {
+                                alp1.Add(m1 * new GeoPoint(pd.x, Math.Abs(tp[0].y), pd.y));
+                                aln1.Add(m1 * new GeoPoint(pd.x, -Math.Abs(tp[0].y), pd.y));
+                            }
                         }
-                        else
-                        {
-                            r1 = Math.Abs(tp[1].x);
-                            r2 = Math.Abs(tp[0].x);
-                        }
-                        tp = Geometry.IntersectLC(new GeoPoint2D(pd.x, 0), GeoVector2D.YAxis, GeoPoint2D.Origin, r1);
-                        //if (tp.Length != 0)
-                        //{
-                        alp2.Add(m1 * new GeoPoint(pd.x, Math.Abs(tp[0].y), pd.y));
-                        aln2.Add(m1 * new GeoPoint(pd.x, -Math.Abs(tp[0].y), pd.y));
-                        //}
-                        tp = Geometry.IntersectLC(new GeoPoint2D(pd.x, 0), GeoVector2D.YAxis, GeoPoint2D.Origin, r2);
-                        //if (tp.Length != 0)
-                        //{
-                        alp1.Add(m1 * new GeoPoint(pd.x, Math.Abs(tp[0].y), pd.y));
-                        aln1.Add(m1 * new GeoPoint(pd.x, -Math.Abs(tp[0].y), pd.y));
-                        //}
                     }
                     tp = Geometry.IntersectLC(new GeoPoint2D(G2.x, 0), GeoVector2D.YAxis, GeoPoint2D.Origin, 1);
-                    alp1.Add(m1 * new GeoPoint(G2.x, Math.Abs(tp[0].y), G2.y));
-                    aln1.Add(m1 * new GeoPoint(G2.x, -Math.Abs(tp[0].y), G2.y));
+                    if (tp.Length > 0)
+                    {
+                        alp1.Add(m1 * new GeoPoint(G2.x, Math.Abs(tp[0].y), G2.y));
+                        aln1.Add(m1 * new GeoPoint(G2.x, -Math.Abs(tp[0].y), G2.y));
+                    }
                     alp2.Reverse();
                     aln2.Reverse();
                     alp1.AddRange(alp2);
@@ -1469,7 +1506,7 @@ namespace CADability.GeoObject
                     psuv[i].x = Math.Atan2(ps[i].y, ps[i].x);
                     psuv[i].y = Math.Atan2(ps[i].z, f);
                 }
-                BSpline2D.AdjustPeriodic(psuv, 2 * Math.PI, 2 * Math.PI);
+                SurfaceHelper.UnwrapPeriodic(this, domain, psuv);
                 BSpline2D kuv1 = new BSpline2D(psuv, degree, false);
                 ////Kurve 1 auf der Ebene pl
                 ICurve2D kpl1 = (kwlt1 as ICurve).GetProjectedCurve(new Plane(pl.Location, pl.DirectionX, pl.DirectionY));
@@ -1494,7 +1531,7 @@ namespace CADability.GeoObject
                     psuv[i].x = Math.Atan2(ps[i].y, ps[i].x);
                     psuv[i].y = Math.Atan2(ps[i].z, f);
                 }
-                BSpline2D.AdjustPeriodic(psuv, 2 * Math.PI, 2 * Math.PI);
+                SurfaceHelper.UnwrapPeriodic(this, domain, psuv);
                 BSpline2D kuv2 = new BSpline2D(psuv, degree, false);
                 ////Kurve 2 auf der Ebene pl
                 ICurve2D kpl2 = (kwlt2 as ICurve).GetProjectedCurve(new Plane(pl.Location, pl.DirectionX, pl.DirectionY));
@@ -1660,7 +1697,7 @@ namespace CADability.GeoObject
                 puv1[i].x = Math.Atan2(pin[i].y, pin[i].x);
                 puv1[i].y = Math.Atan2(pin[i].z, f);
             }
-            BSpline2D.AdjustPeriodic(puv1, 2 * Math.PI, 2 * Math.PI);
+            SurfaceHelper.UnwrapPeriodic(this, domain, puv1);
             BSpline2D fuv1 = new BSpline2D(puv1, degree, false);
             ////Kurve 1 auf der Ebene pl
             ICurve2D fpl1 = (fwlt1 as ICurve).GetProjectedCurve(new Plane(pl.Location, pl.DirectionX, pl.DirectionY));
@@ -1685,7 +1722,7 @@ namespace CADability.GeoObject
                 puv1[i].x = Math.Atan2(pin[i].y, pin[i].x);
                 puv1[i].y = Math.Atan2(pin[i].z, f);
             }
-            BSpline2D.AdjustPeriodic(puv1, 2 * Math.PI, 2 * Math.PI);
+            SurfaceHelper.UnwrapPeriodic(this, domain, puv1);
             BSpline2D fuv2 = new BSpline2D(puv1, degree, false);
             ////Kurve 2 auf der Ebene pl
             ICurve2D fpl2 = (fwlt2 as ICurve).GetProjectedCurve(new Plane(pl.Location, pl.DirectionX, pl.DirectionY));
@@ -1710,7 +1747,7 @@ namespace CADability.GeoObject
                 puv1[i].x = Math.Atan2(pin[i].y, pin[i].x);
                 puv1[i].y = Math.Atan2(pin[i].z, f);
             }
-            BSpline2D.AdjustPeriodic(puv1, 2 * Math.PI, 2 * Math.PI);
+            SurfaceHelper.UnwrapPeriodic(this, domain, puv1);
             BSpline2D fuv3 = new BSpline2D(puv1, degree, false);
             ////Kurve 3 auf der Ebene pl
             ICurve2D fpl3 = (fwlt3 as ICurve).GetProjectedCurve(new Plane(pl.Location, pl.DirectionX, pl.DirectionY));
@@ -1735,7 +1772,7 @@ namespace CADability.GeoObject
                 puv1[i].x = Math.Atan2(pin[i].y, pin[i].x);
                 puv1[i].y = Math.Atan2(pin[i].z, f);
             }
-            BSpline2D.AdjustPeriodic(puv1, 2 * Math.PI, 2 * Math.PI);
+            SurfaceHelper.UnwrapPeriodic(this, domain, puv1);
             BSpline2D fuv4 = new BSpline2D(puv1, degree, false);
             ////Kurve 4 auf der Ebene pl
             ICurve2D fpl4 = (fwlt4 as ICurve).GetProjectedCurve(new Plane(pl.Location, pl.DirectionX, pl.DirectionY));
@@ -1923,7 +1960,8 @@ namespace CADability.GeoObject
                 uelli.Modify(toUnit);
                 Plane pln = uelli.GetPlane();
                 if (Precision.IsPointOnPlane(GeoPoint.Origin, pln) && Precision.IsPerpendicular(pln.Normal, GeoVector.ZAxis, false))
-                {
+                {   // the plane of the ellipse or circle to intersect with goes through the z-axis of the torus
+                    // intersect the two torus circles in this plane woth the curve
                     GeoPoint cnt = uelli.Center;
                     Plane work;
                     if (Math.Abs(cnt.x) < Precision.eps && Math.Abs(cnt.y) < Precision.eps) work = new Plane(GeoPoint.Origin, pln.Normal ^ GeoVector.ZAxis, GeoVector.ZAxis);
@@ -1932,33 +1970,49 @@ namespace CADability.GeoObject
                     if (prelli is Circle2D) // umfasst auch Arc2D
                     {
                         Circle2D c2d = (prelli as Circle2D);
-                        GeoPoint2D[] ips2d = Geometry.IntersectCC(new GeoPoint2D(1, 0), minorRadius, c2d.Center, c2d.Radius);
-                        uvOnFaces = new GeoPoint2D[ips2d.Length];
-                        uOnCurve3Ds = new double[ips2d.Length];
-                        ips = new GeoPoint[ips2d.Length];
-                        for (int i = 0; i < ips2d.Length; i++)
+                        List<GeoPoint> lips = new List<GeoPoint>();
+                        List<GeoPoint2D> luvOnFaces = new List<GeoPoint2D>();
+                        List<double> luOnCurve3Ds = new List<double>();
+                        foreach (GeoPoint2D p in new GeoPoint2D[] { new GeoPoint2D(1, 0), new GeoPoint2D(-1, 0) })
                         {
-                            ips[i] = toTorus * work.ToGlobal(ips2d[i]);
-                            uvOnFaces[i] = PositionOf(ips[i]);
-                            SurfaceHelper.AdjustPeriodic(this, uvExtent, ref uvOnFaces[i]);
-                            uOnCurve3Ds[i] = curve.PositionOf(ips[i]);
+                            GeoPoint2D[] ips2d = Geometry.IntersectCC(p, minorRadius, c2d.Center, c2d.Radius);
+                            for (int i = 0; i < ips2d.Length; i++)
+                            {
+                                GeoPoint ip = toTorus * work.ToGlobal(ips2d[i]);
+                                lips.Add(ip);
+                                GeoPoint2D uv = PositionOf(ip);
+                                SurfaceHelper.AdjustPeriodic(this, uvExtent, ref uv);
+                                luvOnFaces.Add(uv);
+                                luOnCurve3Ds.Add(curve.PositionOf(ip));
+                            }
                         }
+                        uvOnFaces = luvOnFaces.ToArray();
+                        uOnCurve3Ds = luOnCurve3Ds.ToArray();
+                        ips = lips.ToArray();
                         return;
                     }
                     if (prelli is Ellipse2D) // umfasst auch Arc2D
                     {
                         Ellipse2D c2d = (prelli as Ellipse2D);
-                        GeoPoint2DWithParameter[] ips2d = c2d.Intersect(new Circle2D(new GeoPoint2D(1, 0), minorRadius));
-                        uvOnFaces = new GeoPoint2D[ips2d.Length];
-                        uOnCurve3Ds = new double[ips2d.Length];
-                        ips = new GeoPoint[ips2d.Length];
-                        for (int i = 0; i < ips2d.Length; i++)
+                        List<GeoPoint> lips = new List<GeoPoint>();
+                        List<GeoPoint2D> luvOnFaces = new List<GeoPoint2D>();
+                        List<double> luOnCurve3Ds = new List<double>();
+                        foreach (GeoPoint2D p in new GeoPoint2D[] { new GeoPoint2D(1, 0), new GeoPoint2D(-1, 0) })
                         {
-                            ips[i] = toTorus * work.ToGlobal(ips2d[i].p);
-                            uvOnFaces[i] = PositionOf(ips[i]);
-                            SurfaceHelper.AdjustPeriodic(this, uvExtent, ref uvOnFaces[i]);
-                            uOnCurve3Ds[i] = curve.PositionOf(ips[i]);
+                            GeoPoint2DWithParameter[] ipsp2d = c2d.Intersect(new Circle2D(p, minorRadius));
+                            for (int i = 0; i < ipsp2d.Length; i++)
+                            {
+                                GeoPoint ip = toTorus * work.ToGlobal(ipsp2d[i].p);
+                                lips.Add(ip);
+                                GeoPoint2D uv = PositionOf(ip);
+                                SurfaceHelper.AdjustPeriodic(this, uvExtent, ref uv);
+                                luvOnFaces.Add(uv);
+                                luOnCurve3Ds.Add(curve.PositionOf(ip));
+                            }
                         }
+                        uvOnFaces = luvOnFaces.ToArray();
+                        uOnCurve3Ds = luOnCurve3Ds.ToArray();
+                        ips = lips.ToArray();
                         return;
                     }
                 }
@@ -1970,9 +2024,9 @@ namespace CADability.GeoObject
                     List<double> luOnCurve3Ds = new List<double>();
                     Plane epln = new Plane(Plane.StandardPlane.XYPlane, uelli.Center.z);
                     double s = pln.Location.z / minorRadius;
-                    if (s >= -1.0 && s <= 1.0)
+                    if (s >= -1.0 - Precision.eps && s <= 1.0 + Precision.eps)
                     {
-                        double v = Math.Asin(s);
+                        double v = Math.Asin(Math.Max(-1, Math.Min(1, s)));
                         ImplicitPSurface dbg = (this as IImplicitPSurface).GetImplicitPSurface();
 
                         //ICurve bigCircle1 = FixedV(v, 0, Math.PI * 2);
@@ -2208,13 +2262,16 @@ namespace CADability.GeoObject
                     if (Precision.IsPointOnPlane(this.Location, e.Plane) && Precision.IsPerpendicular(this.ZAxis, e.Plane.Normal, false))
                     {
                         GeoPoint2D uv = PositionOf(e.StartPoint);
+                        // compare with the poles in the standard period [0, 2pi]
+                        GeoPoint2D uvp = uv;
+                        SurfaceHelper.AdjustPeriodic(this, new BoundingRect(0, 0, 2 * Math.PI, 2 * Math.PI), ref uvp);
                         double[] vs = GetVSingularities();
                         if (vs.Length > 0)
                         {
                             for (int i = 0; i < vs.Length; i++)
                             {
-                                if (Math.Abs(uv.y - vs[i]) < 1e-4) uv.x = PositionOf(e.PointAt(0.5372516273)).x; // we did hit a pole with the startpoint, lets take some other point (but not the endpoint, if e is full circle)
-                                // 1e-4 is not critical, because "PositionOf(e.PointAt(..." should always return the same result, the odd value is to assure we don't hit the other pole
+                                if (Math.Abs(uvp.y - vs[i]) < 1e-4) uv.x = PositionOf(e.PointAt(0.5372516273)).x; // we did hit a pole with the startpoint, lets take some other point (but not the endpoint, if e is full circle)
+                                                                                                                  // 1e-4 is not critical, because "PositionOf(e.PointAt(..." should always return the same result, the odd value is to assure we don't hit the other pole
                             }
                         }
 
@@ -2572,7 +2629,7 @@ namespace CADability.GeoObject
                         double v1 = Math.Asin(Math.Max(Math.Min((unitPlane.Location.z / minorRadius), 1), -1)); // -pi/2 ... +pi/2
                         double v2 = Math.PI - v1;
                         if (v1 < 0) v2 = -Math.PI - v1;
-                        if (Math.Abs(v1 - v2) < 1e-5)
+                        if (Math.Abs(v1 - v2) < 1e-4) // changed from 1e-5 to 1e-4, because asin is imprecise at pi/2
                         {   // single solution
                             double v = Math.PI / 2.0;
                             if (v1 < 0) v = -v;
@@ -2684,6 +2741,20 @@ namespace CADability.GeoObject
             toUnit = toTorus.GetInverse();
         }
         #endregion
+        protected ToroidalSurface() { } // we need this for JsonSerialisation
+        public void GetObjectData(IJsonWriteData data)
+        {
+            data.AddProperty("ToTorus", toTorus);
+            data.AddProperty("MinorRadius", minorRadius);
+        }
+
+        public void SetObjectData(IJsonReadData data)
+        {
+            toTorus = data.GetProperty<ModOp>("ToTorus");
+            minorRadius = data.GetProperty<double>("MinorRadius");
+            toUnit = toTorus.GetInverse();
+        }
+
         public override IPropertyEntry GetPropertyEntry(IFrame frame)
         {
             List<IPropertyEntry> se = new List<IPropertyEntry>();
@@ -2772,6 +2843,26 @@ namespace CADability.GeoObject
             // the sign of the result holds the orientation information
             else return res;
         }
+        #region ISurfaceOfRevolution Members
+        Axis ISurfaceOfRevolution.Axis
+        {
+            get
+            {
+                return new Axis(Location, Axis);
+            }
+        }
+        ICurve ISurfaceOfRevolution.Curve
+        {
+            get
+            {
+                if (!usedArea.IsEmpty() && !usedArea.IsInfinite && !usedArea.IsInvalid())
+                {
+                    return FixedU(0, usedArea.Bottom, usedArea.Top);
+                }
+                return FixedU(0, 0, 2 * Math.PI);
+            }
+        }
+        #endregion
 #if DEBUG
         override public GeoObjectList DebugGrid
         {

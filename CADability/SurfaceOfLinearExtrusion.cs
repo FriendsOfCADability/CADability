@@ -14,7 +14,7 @@ namespace CADability.GeoObject
     /// be defined by a startParameter and an endParameter. 
     /// </summary>
     [Serializable()]
-    public class SurfaceOfLinearExtrusion : ISurfaceImpl, ISerializable, IExportStep
+    public class SurfaceOfLinearExtrusion : ISurfaceImpl, ISerializable, IExportStep, IJsonSerialize
     {
         private ICurve basisCurve;
         private GeoVector direction;
@@ -497,7 +497,31 @@ namespace CADability.GeoObject
                     return new IDualSurfaceCurve[] { dsc };
                 }
             }
-            // keine Lösung gefunden
+            if (basisCurve is Ellipse elli)
+            {   // the extrusion of an ellipse is an elliptical cylinder, the intersection with a plane is an ellipse (or empty, or a point, or a line)
+                // create 5 points as intersection of the ellipse and the plane
+                List<GeoPoint> points = new List<GeoPoint>();
+                for (int i = 0; i < 5; i++)
+                {
+                    GeoPoint pe = elli.PointAtParam(i * Math.PI / 2.5);
+                    if (pl.Plane.Intersect(pe, direction, out GeoPoint pi))
+                    {
+                        points.Add(pi);
+                    }
+                }
+                // make an ellipse from these 5 points
+                if (points.Count == 5)
+                {
+                    Ellipse intsElli = Ellipse.FromFivePoints(points.ToArray(), true);
+                    if (intsElli != null && intsElli.MajorRadius / intsElli.MinorRadius < 100)
+                    {   // dont return degenerated ellipses
+                        DualSurfaceCurve dsc = new DualSurfaceCurve(intsElli, this, this.GetProjectedCurve(intsElli, 0.0), pl, pl.GetProjectedCurve(intsElli, 0.0));
+                        return new IDualSurfaceCurve[] { dsc };
+                    }
+
+                }
+            }
+            // no special case, use general approach
             double[] upos = basisCurve.GetSavePositions();
             InterpolatedDualSurfaceCurve.SurfacePoint[] sp = new InterpolatedDualSurfaceCurve.SurfacePoint[upos.Length];
             for (int i = 0; i < upos.Length; ++i)
@@ -747,6 +771,22 @@ namespace CADability.GeoObject
             info.AddValue("Direction", direction, typeof(GeoVector));
             info.AddValue("CurveStartParameter", curveStartParameter, typeof(double));
             info.AddValue("CurveEndParameter", curveEndParameter, typeof(double));
+        }
+
+        protected SurfaceOfLinearExtrusion() { } // for IJsonSerialize
+        public void GetObjectData(IJsonWriteData data)
+        {
+            data.AddProperty("BasisCurve", basisCurve);
+            data.AddProperty("Direction", direction);
+            data.AddProperty("CurveStartParameter", curveStartParameter);
+            data.AddProperty("CurveEndParameter", curveEndParameter);
+        }
+        public void SetObjectData(IJsonReadData data)
+        {
+            basisCurve = data.GetProperty<ICurve>("BasisCurve");
+            direction = data.GetProperty<GeoVector>("Direction");
+            curveStartParameter = data.GetProperty<double>("CurveStartParameter");
+            curveEndParameter = data.GetProperty<double>("CurveEndParameter");
         }
 
         int IExportStep.Export(ExportStep export, bool topLevel)

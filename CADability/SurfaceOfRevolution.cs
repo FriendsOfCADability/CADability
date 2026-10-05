@@ -205,12 +205,11 @@ namespace CADability.GeoObject
                             GeoPoint2D op = perp.Project(curveToRotate.PointAt(ip[0]));
                             GeoPoint2D org = perp.Project(p);
                             SweepAngle sa1 = new SweepAngle(op.ToVector(), org.ToVector());
-                            // 
-                            if ((PointAt(new GeoPoint2D(-sa1.Radian, curveToRotate.PositionToParameter(ip[0]))) | p) <
-                                (PointAt(new GeoPoint2D(sa1.Radian, curveToRotate.PositionToParameter(ip[0]))) | p))
-                                return new GeoPoint2D(-sa1.Radian, curveToRotate.PositionToParameter(ip[0]));
-                            else
-                                return new GeoPoint2D(sa1.Radian, curveToRotate.PositionToParameter(ip[0]));
+                            double vpar = curveToRotate.PositionToParameter(ip[0]);
+                            GeoPoint2D inPlane = (PointAt(new GeoPoint2D(-sa1.Radian, vpar)) | p) < (PointAt(new GeoPoint2D(sa1.Radian, vpar)) | p)
+                                ? new GeoPoint2D(-sa1.Radian, vpar)
+                                : new GeoPoint2D(sa1.Radian, vpar);
+                            return inPlane;
                         }
                     }
                 }
@@ -220,11 +219,11 @@ namespace CADability.GeoObject
                 {   // the plane must intersect the curve, if not, we take the start or endpoint
                     if (Math.Abs(pln.Distance(curveToRotate.StartPoint)) < Math.Abs(pln.Distance(curveToRotate.EndPoint)))
                     {
-                        ipar = new double[] { 0.0 };
+                        ipar = new double[] { 0.0 + Precision.eps };
                     }
                     else
                     {
-                        ipar = new double[] { 1.0 };
+                        ipar = new double[] { 1.0 - Precision.eps };
                     }
                 }
                 GeoPoint2D res = GeoPoint2D.Invalid;
@@ -237,13 +236,21 @@ namespace CADability.GeoObject
                     // SweepAngle sa = new SweepAngle(p - onAxis, curveToRotate.PointAt(ipar[0]) - onAxis);
                     ModOp rotate = ModOp.Rotate(axisLocation, axisDirection, sa);
                     // double y = curveToRotate.PositionToParameter(curveToRotate.PositionOf(rotate * p));
-                    double y = curveToRotate.PositionToParameter(ipar[0]);
+                    // ipar[i], not ipar[0]: the angle above is taken from the i-th intersection, so the curve
+                    // parameter has to come from the same one. With ipar[0] every candidate of the loop was
+                    // measured at the first intersection, which for a CLOSED profile - the cross section of a
+                    // torus, where the perpendicular plane meets the curve twice - returned the point on the
+                    // outer equator for every point of the inner one.
+                    double y = curveToRotate.PositionToParameter(ipar[i]);
                     double d = PointAt(new GeoPoint2D(sa, y)) | p;
                     if (d < mindist) { res = new GeoPoint2D(sa, y); mindist = d; }
                     d = PointAt(new GeoPoint2D(-sa, y)) | p;
                     if (d < mindist) { res = new GeoPoint2D(-sa, y); mindist = d; }
                 }
-                if (mindist < double.MaxValue) return res;
+                if (mindist < double.MaxValue)
+                {
+                    return res;
+                }
                 return base.PositionOf(p); // we could do better here!
             }
             GeoPoint unit = fromSurface * p;
@@ -510,6 +517,37 @@ namespace CADability.GeoObject
         }
         public override ICurve2D GetProjectedCurve(ICurve curve, double precision)
         {
+            if (curve is Ellipse elli)
+            {
+                if (Geometry.DistPL(elli.Center, axisLocation, axisDirection) < Precision.eps && Precision.SameDirection(elli.Normal, axisDirection, false))
+                {   // this is a concentric circle or arc to the surface axis: a line with constant v in the (u,v) system,
+                    // u changes by the sweep angle of the arc. The direction in u is taken from a point close to the start,
+                    // because start- and endpoint alone cannot tell the direction and are the same for a full circle.
+                    GeoPoint2D sp = PositionOf(curve.StartPoint);
+                    if (!usedArea.IsEmpty() && !usedArea.IsInfinite && !usedArea.IsInvalid())
+                    {   // the same area the ProjectedCurve below would use
+                        SurfaceHelper.AdjustPeriodic(this, usedArea, ref sp);
+                    }
+                    GeoPoint2D np = PositionOf(curve.PointAt(1e-3));
+                    double du = np.x - sp.x;
+                    du -= Math.Round(du / (2 * Math.PI)) * 2 * Math.PI; // the step to the near point, not across the seam
+                    double sweep = Math.Abs(elli.SweepParameter);
+                    return new Line2D(sp, new GeoPoint2D(sp.x + Math.Sign(du) * sweep, sp.y));
+                }
+            }
+            if (curveToRotate != null)
+            {   // a meridian: the rotated profile curve, i.e. a line with constant u in the (u,v) system
+                GeoPoint2D uv = PositionOf(curve.PointAt(0.5)); // this should not be a pole
+                ICurve rotated = curveToRotate.CloneModified(ModOp.Rotate(axisLocation, axisDirection, uv.x));
+                if (rotated.SameGeometry(curve, 0.0))
+                {
+                    GeoPoint2D sp = PositionOf(curve.StartPoint);
+                    GeoPoint2D ep = PositionOf(curve.EndPoint);
+                    sp.x = uv.x; // in case one of the points is a pole
+                    ep.x = uv.x;
+                    return new Line2D(sp, ep);
+                }
+            }
             return new ProjectedCurve(curve, this, true, usedArea); // works also with empty usedArea
         }
         /// <summary>
@@ -885,7 +923,15 @@ namespace CADability.GeoObject
                     samples[(i + 1) * 3 + 1] = rot90 * samples[i * 3 + 1];
                     samples[(i + 1) * 3 + 2] = rot90 * samples[i * 3 + 2];
                 }
-                ImplicitPSurface ips = new ImplicitPSurface(samples);
+                // The 12 samples determine that quadric only when the four rotated copies of the line are
+                // not coplanar in pairs. They are exactly when the line is parallel or perpendicular to the
+                // axis, or meets it - then the pair of planes through opposite copies is a second quadric
+                // through the same points, the system is rank deficient and the constructor says so. That is
+                // a degenerate line, not a broken surface, so it falls back on the general implementation
+                // rather than propagating an exception out of a line intersection.
+                ImplicitPSurface ips;
+                try { ips = new ImplicitPSurface(samples); }
+                catch (ApplicationException) { return base.GetLineIntersection(startPoint, direction); }
                 GeoPoint[] itpts = ips.Intersect(expcrv.GetExplicitPCurve3D(), out double[] ipspars);
                 List<GeoPoint2D> res = new List<GeoPoint2D>();
                 for (int i = 0; i < itpts.Length; i++)
@@ -1410,13 +1456,14 @@ namespace CADability.GeoObject
             if (curveToRotate != null)
             {
                 intv = curveToRotate.GetSavePositions();
+                // intv is in position [0,1], we need to convert it to parameter of the curve
                 List<double> vsteps = new List<double>();
                 vsteps.Add(vmin);
                 vsteps.Add(vmax);
                 for (int i = 0; i < intv.Length; ++i)
                 {
-
-                    if (intv[i] > vmin && intv[i] < vmax) vsteps.Add(intv[i]);
+                    double v = curveToRotate.PositionToParameter(intv[i]);
+                    if (v > vmin && v < vmax) vsteps.Add(v);
                 }
                 vsteps.Sort();
                 double udiff = umax - umin;
@@ -1630,13 +1677,30 @@ namespace CADability.GeoObject
             }
             return base.GetCanonicalForm(precision, bounds);
         }
+        public override double[] GetVSingularities()
+        {
+            if (curveToRotate != null)
+            {
+                List<double> res = [];
+                double[] ippars = Curves.Intersect(curveToRotate, Line.TwoPoints(axisLocation, axisLocation + axisDirection), false);
+                for (int i = 0; i < ippars.Length; i++)
+                {
+                    if (ippars[i] > -Precision.eps && ippars[i] < 1 + Precision.eps)
+                    {
+                        res.Add(curveToRotate.PositionToParameter(ippars[i]));
+                    }
+                }
+                return res.ToArray();
+            }
+            return base.GetVSingularities();
+        }
         #endregion
         public override IPropertyEntry GetPropertyEntry(IFrame frame)
         {
             List<IPropertyEntry> se = new List<IPropertyEntry>();
-            if (curveToRotate is not null)
+            if (curveToRotate is IGeoObject go)
             {
-                se.Add(curveToRotate.GetShowProperties(frame) as IPropertyEntry);
+                se.Add(go.GetShowProperties(frame) as IPropertyEntry);
             }
             GeoPointProperty loc = new GeoPointProperty(frame, "SurfaceOfRevolution.AxisLocation");
             loc.ReadOnly = true;

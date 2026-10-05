@@ -249,6 +249,13 @@ namespace CADability
             return false;
         }
         /// <summary>
+        /// Determines whether the point lies on the (infinite) axis, i.e. its distance to the axis is below eps.
+        /// </summary>
+        public static bool IsPointOnAxis(GeoPoint testPoint, Axis axis)
+        {
+            return Math.Abs(Geometry.DistPL(testPoint, axis)) < eps;
+        }
+        /// <summary>
         /// Determines whether all points lie on a straight line. The points are expected to be ordered
         /// from start to end, the line is the connection of the first and the last one.
         /// </summary>

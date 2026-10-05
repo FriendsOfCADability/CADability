@@ -2457,19 +2457,9 @@ namespace CADability
         {
             throw new Exception("The method or operation is not implemented.");
         }
-        public override double Length
-        {
-            get
-            {   // nur eine grobe Annäherung hier, die nie 0 sein sollte.
-                // man müsste irgendwie extrapolieren
-                double d = 0.0;
-                for (int i = 0; i < basePoints.Length - 1; ++i)
-                {
-                    d += basePoints[i].p3d | basePoints[i + 1].p3d;
-                }
-                return d;
-            }
-        }
+        // Length: GeneralCurve.Length measures the curve between the base points, which are the parameters
+        // returned by GetBasePoints. The sum of the distances of the base points, which was used here, is too
+        // short (0.65% for a bore of radius 5 through a tube of radius 30, divided into 8 edges)
         public override ICurve[] Split(double Position)
         {
             List<SurfacePoint> l1 = new List<SurfacePoint>();

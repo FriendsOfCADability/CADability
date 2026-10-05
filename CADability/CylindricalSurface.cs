@@ -119,6 +119,25 @@ namespace CADability.GeoObject
         {
             return Line.TwoPoints(toCylinder * new GeoPoint(0, 0, vmin), toCylinder * new GeoPoint(0, 0, vmax));
         }
+        /// <summary>
+        /// True, when the cross section of this cylinder is a circle (and not an ellipse) and the axis is
+        /// perpendicular to that cross section. Only then a helix on the unit cylinder is mapped onto a helix.
+        /// </summary>
+        private bool IsCircularWithPerpendicularAxis
+        {
+            get
+            {
+                GeoVector xdir = toCylinder * GeoVector.XAxis;
+                GeoVector ydir = toCylinder * GeoVector.YAxis;
+                GeoVector zdir = toCylinder * GeoVector.ZAxis;
+                double rx = xdir.Length;
+                double ry = ydir.Length;
+                if (rx < Precision.eps || ry < Precision.eps) return false;
+                if (Math.Abs(rx - ry) > Precision.eps * Math.Max(rx, ry)) return false; // an elliptical cylinder
+                if (Math.Abs((xdir * ydir) / (rx * ry)) > Precision.epsa) return false; // a sheared cross section
+                return Precision.SameDirection(zdir, xdir ^ ydir, false); // a sheared axis
+            }
+        }
         #region ISurfaceImpl Overrides
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetModified (ModOp)"/>
@@ -609,18 +628,17 @@ namespace CADability.GeoObject
                 if (res != null) return res;
             }
             if (Curve3dOfProjected<CylindricalSurface>(curve2d) is ICurve onThisSurface) return onThisSurface;
-            // wenn es eine Linie ist, dann kommt entweder eine Linie (v-Richtung) oder eine Ellipse (u-Richtung)
-            // oder eine Schraubenlinie raus
-            // das besondere wäre noch ein Sinus, der macht nämlich eine Ellipse, aber das geht besser so:
-            // Es gibt eine besondere 2D Kurve, die ist Parameterkurve auf einer Fläche geschnitten mit 
-            // einer anderen Fläche. Und wenn die andere Fläche eine Ebene ist, dann gibts eine Ellipse
-            // 
+            // a 2d line yields a line (v direction), an ellipse (u direction) or a helical curve (slanted)
+            // a sine curve with the period 2*pi also yields an ellipse, this is handled below. And there is a special
+            // 2d curve, which is the parameter curve of a surface intersected with another surface. When the other
+            // surface is a plane, the result is an ellipse, which is already provided by the Curve2DAspect above
+            //
             if (curve2d is Line2D)
             {
                 Line2D l2d = curve2d as Line2D;
                 GeoVector2D dir = l2d.EndPoint - l2d.StartPoint;
                 if (Math.Abs(dir.x) < Precision.eps)
-                {   // das Ergebnis ist eine Mantel-Linie
+                {   // the result is a line on the surface of the cylinder
                     Line res = Line.Construct();
                     res.StartPoint = PointAt(l2d.StartPoint);
                     res.EndPoint = PointAt(l2d.EndPoint);
@@ -637,15 +655,64 @@ namespace CADability.GeoObject
                     res.SweepParameter = l2d.EndPoint.x - l2d.StartPoint.x;
                     res.Modify(toCylinder);
                     return res;
-                    //// DEBUG
-                    //if (toCylinder.Determinant > 0.0) return res;
-                    //else
-                    //{
-                    //    Line l = Line.Construct();
-                    //    l.StartPoint = PointAt(l2d.StartPoint);
-                    //    l.EndPoint = PointAt(l2d.EndPoint);
-                    //    return l;
-                    //}
+                }
+                else if (IsCircularWithPerpendicularAxis)
+                {   // a slanted line yields a helical curve. On the unit cylinder the v coordinate advances by
+                    // k = dir.y/dir.x per radian, i.e. the pitch (per full turn) is 2*PI*k. The HelicalCurve
+                    // measures its height from the origin of its plane, so that origin has to be the point on the
+                    // axis where the height is 0, which is v - k*u at the start point of the line.
+                    double k = dir.y / dir.x;
+                    Plane pln = new Plane(new GeoPoint(0.0, 0.0, l2d.StartPoint.y - k * l2d.StartPoint.x), GeoVector.XAxis, GeoVector.YAxis);
+                    HelicalCurve res = HelicalCurve.Construct();
+                    res.SetHelix(pln, 1.0, k * 2.0 * Math.PI, l2d.StartPoint.x, dir.x);
+                    res.Modify(toCylinder); // toCylinder is a similarity here, so the helix is preserved
+                    return res;
+                }
+            }
+            if (curve2d is SineCurve2D sc)
+            {   // A sine curve in the (u,v) system of the cylinder is planar - and hence a 3d ellipse - exactly when v
+                // is a pure sine of u with the period 2*pi: v == a*sin(u-phi)+c. With fromUnit mapping the unit sine
+                // curve (t, sin(t)) onto (u,v) this means: u must be a linear function of t with the slope +/-1 (a
+                // negative slope only reverses the direction) and v must not contain a linear part. Any other sine
+                // curve (a different period or a slanted one) is not planar and is left to the base implementation.
+                ModOp2D fromUnit = sc.FromUnit;
+                if (Math.Abs(Math.Abs(fromUnit[0, 0]) - 1.0) < 1e-8 && Math.Abs(fromUnit[0, 1]) < 1e-8 && Math.Abs(fromUnit[1, 0]) < 1e-8)
+                {
+                    double sign = Math.Sign(fromUnit[0, 0]); // u == sign*t+phi, i.e. t == sign*(u-phi) and sin(t) == sign*sin(u-phi)
+                    double phi = fromUnit[0, 2];
+                    double a = sign * fromUnit[1, 1]; // v == a*sin(u-phi)+c
+                    double c = fromUnit[1, 2];
+                    double ustart = sign * sc.UStart + phi; // the angle u at the startpoint
+                    double usweep = sign * sc.UDiff; // the swept angle u
+                    // On the unit cylinder the curve is (cos(u), sin(u), a*sin(u-phi)+c). With w == u-phi this is
+                    // center + cos(w)*(cos(phi), sin(phi), 0) + sin(w)*(-sin(phi), cos(phi), a), where the two vectors
+                    // are perpendicular and the second one is the longer one, i.e. the major axis. An ellipse is
+                    // parametrized as center + cos(t)*majorAxis + sin(t)*minorAxis, which requires t == w-pi/2:
+                    GeoPoint center = toCylinder * new GeoPoint(0.0, 0.0, c);
+                    GeoVector majorAxis = toCylinder * new GeoVector(-Math.Sin(phi), Math.Cos(phi), a);
+                    GeoVector minorAxis = toCylinder * new GeoVector(-Math.Cos(phi), -Math.Sin(phi), 0.0);
+                    double startParameter = ustart - phi - Math.PI / 2.0;
+                    // toCylinder may distort (an elliptical or a sheared cylinder), then the two axes are no more
+                    // perpendicular but still conjugate diameters. Rotating the pair by theta makes them perpendicular
+                    // again, i.e. yields the principal axes:
+                    double theta = 0.5 * Math.Atan2(2.0 * (majorAxis * minorAxis), majorAxis * majorAxis - minorAxis * minorAxis);
+                    if (theta != 0.0)
+                    {   // cos(t)*ma+sin(t)*mi == cos(t-theta)*(cos(theta)*ma+sin(theta)*mi) + sin(t-theta)*(cos(theta)*mi-sin(theta)*ma)
+                        GeoVector ma = Math.Cos(theta) * majorAxis + Math.Sin(theta) * minorAxis;
+                        minorAxis = Math.Cos(theta) * minorAxis - Math.Sin(theta) * majorAxis;
+                        majorAxis = ma;
+                        startParameter -= theta;
+                    }
+                    if (majorAxis.Length < minorAxis.Length)
+                    {   // exchange the axes: cos(t)*ma+sin(t)*mi == cos(t-pi/2)*mi + sin(t-pi/2)*(-ma)
+                        GeoVector ma = minorAxis;
+                        minorAxis = -majorAxis;
+                        majorAxis = ma;
+                        startParameter -= Math.PI / 2.0;
+                    }
+                    Ellipse res = Ellipse.Construct();
+                    res.SetEllipseArcCenterAxis(center, majorAxis, minorAxis, startParameter, usweep);
+                    return res;
                 }
             }
             return base.Make3dCurve(curve2d);
@@ -1851,6 +1918,109 @@ namespace CADability.GeoObject
             return new CylindricalSurface(Location, xaxis, yaxis, ZAxis);
         }
         /// <summary>
+        /// The 2d curve of an elliptical arc on this cylinder (given in the unit system as <paramref name="e"/>): a sine curve
+        /// through the start-, middle- and endpoint, found in closed form. Returns null, if no solution fits the curve.
+        /// </summary>
+        private SineCurve2D TryProjectEllipticalArc(ICurve curve, Ellipse e)
+        {
+            GeoPoint2D pse = PositionOfUnit(e.StartPoint);
+            GeoPoint2D pme = PositionOfUnit(e.PointAt(0.5));
+            GeoPoint2D pee = PositionOfUnit(e.EndPoint);
+            if (Math.Abs(pse.x - pme.x) > Math.PI)
+            {   // the middle point must be less than 180° from the starting point
+                if (pme.x < pse.x) pme.x += 2 * Math.PI;
+                else pme.x -= 2 * Math.PI;
+            }
+            if (Math.Abs(pee.x - pme.x) > Math.PI)
+            {   // the ending point must be less than 180° from the middle point
+                if (pee.x < pme.x) pee.x += 2 * Math.PI;
+                else pee.x -= 2 * Math.PI;
+            }
+            // Polyline2D dbgpl = new Polyline2D(new GeoPoint2D[] { pse, pme, pee });
+            double a = pme.x - pse.x;
+            double b = pee.x - pse.x;
+            double cosa = Math.Cos(a);
+            double sina = Math.Sin(a);
+            double cosb = Math.Cos(b);
+            double sinb = Math.Sin(b);
+            double c = (pme.y - pse.y);
+            double d = (pee.y - pse.y);
+            double c2 = c * c;
+            double d2 = d * d;
+            double cd2 = 2 * c * d;
+            double cos2a = cosa * cosa;
+            double cos2b = cosb * cosb;
+            double sin2a = sina * sina;
+            double sin2b = sinb * sinb;
+            double s = -cd2 * sina * sinb - cd2 * cosa * cosb + cd2 * cosa + d2 * sin2a + d2 * cos2a - 2 * d2 * cosa + c2 * sin2b + c2 * cos2b - 2 * c2 * cosb + cd2 * cosb + c2 - cd2 + d2;
+            // can s ever be negative?
+            if (s >= 0)
+            {
+                double ac = -d * cosa + c * cosb - c + d;
+                double cosarg = Math.Max(-1.0, Math.Min(1.0, ac / Math.Sqrt(s)));
+                double u1 = -Math.Acos(cosarg);
+                double u3 = -Math.Acos(-cosarg);
+                double minDist = double.MaxValue;
+                SineCurve2D res = null;
+                foreach (double u in new double[] { u1, -u1, u3, -u3 })
+                {   // find the correct solution of the 4 possible solutions
+                    double fy = (pee.y - pse.y) / (Math.Sin(u + b) - Math.Sin(u));
+                    double tx = pse.x - u;
+                    double ty = pse.y - fy * Math.Sin(u);
+                    SineCurve2D s2cx = new SineCurve2D(u, b, ModOp2D.Translate(tx, ty) * ModOp2D.Scale(1, fy));
+                    GeoPoint testPoint = PointAt(s2cx.PointAt(0.5));
+                    double dist = curve.PointAt(curve.PositionOf(testPoint)) | testPoint;
+                    if (dist < minDist)
+                    {
+                        minDist = dist;
+                        res = s2cx;
+                    }
+                }
+                if (minDist < (RadiusX + RadiusY) * 1e-5) return res;
+            }
+            return null;
+        }
+        /// <summary>
+        /// The 2d curve of a planar section of this cylinder (given in the unit system as <paramref name="e"/>, which may also be
+        /// a closed ellipse): a sine curve with the period 2*pi fitted through four points of the curve. The points are taken in
+        /// the order of the curve and unwrapped, so a closed ellipse yields a full period. Returns null, if the fit fails.
+        /// </summary>
+        private SineCurve2D FitSineCurve(ICurve curve, Ellipse e)
+        {
+            GeoPoint2D[] testPoints = new GeoPoint2D[4];
+            for (int i = 0; i < 4; i++) testPoints[i] = PositionOfUnit(e.PointAt(i / 3.0));
+            SurfaceHelper.UnwrapPeriodic(this, BoundingRect.EmptyBoundingRect, testPoints); // continuous, also across the seam
+            double tolerance = (RadiusX + RadiusY) * 1e-5;
+            bool Fits(SineCurve2D candidate)
+            {
+                if (candidate == null) return false;
+                foreach (double t in new double[] { 1.0 / 6.0, 0.5, 5.0 / 6.0 })
+                {
+                    if (curve.DistanceTo(PointAt(candidate.PointAt(t))) > tolerance) return false;
+                }
+                return true;
+            }
+            SineCurve2D fitted = SineCurve2D.Create(testPoints[0], testPoints[1], testPoints[2], testPoints[3]);
+            if (Fits(fitted)) return fitted;
+            // the least squares fit did not converge to the right solution: try the four sine curves defined by the normal
+            // of the plane of the ellipse
+            GeoVector normal = e.Plane.Normal;
+            double fy = Math.Sqrt(normal.x * normal.x + normal.y * normal.y) / Math.Abs(normal.z); // the amplitude of the sine curve
+            double tx1 = Math.Atan2(normal.y, normal.x) + Math.PI / 2; // the offset in x of the sine curve, maybe + Math.PI
+            double tx2 = tx1 + Math.PI;
+            double udiff = testPoints[3].x - testPoints[0].x;
+            foreach ((double u0, double tx) in new[] { (testPoints[0].x, tx1), (testPoints[0].x, tx2), (testPoints[0].x + Math.PI, tx1), (testPoints[0].x + Math.PI, tx2) })
+            {
+                SineCurve2D candidate = new SineCurve2D(u0, udiff, new ModOp2D(1, 0, tx, 0, fy, e.Center.z));
+                if (Fits(candidate))
+                {
+                    candidate.StartAt(testPoints[0]);
+                    return candidate;
+                }
+            }
+            return null;
+        }
+        /// <summary>
         /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetProjectedCurve (ICurve, double)"/>
         /// </summary>
         /// <param name="curve"></param>
@@ -1901,7 +2071,8 @@ namespace CADability.GeoObject
         }
         public override ICurve2D GetProjectedCurve(ICurve curve, double precision)
         {
-            ICurve crvunit = curve.CloneModified(toUnit);
+            // only lines and ellipses are handled here, and some other curves (e.g. from STEP files) cannot be modified
+            ICurve crvunit = (curve is Line || curve is Ellipse) ? curve.CloneModified(toUnit) : null;
             if (crvunit is Line)
             {
                 Line l = crvunit as Line;
@@ -1948,6 +2119,11 @@ namespace CADability.GeoObject
                             return new Line2D(new GeoPoint2D(2.0 * Math.PI, e.Center.z), new GeoPoint2D(0.0, e.Center.z));
                     }
                 }
+                else if (Math.Abs(e.Center.x) + Math.Abs(e.Center.y) < Precision.eps && Math.Abs(e.MinorRadius - 1) < Precision.eps)
+                {   // a planar section of the cylinder (center on the axis, minor axis the radius) is a sine curve in 2d
+                    if (!e.IsClosed && TryProjectEllipticalArc(curve, e) is SineCurve2D arc) return arc;
+                    if (FitSineCurve(curve, e) is SineCurve2D fitted) return fitted; // also for the closed ellipse
+                }
                 else
                 {
                     // an ellipse on a cylinder is a sine curve in 2d
@@ -1987,61 +2163,7 @@ namespace CADability.GeoObject
                     // (all roots are the same)
                     // this method can be used when 3 points are known and the deltas of their u-parameters are also known
 
-                    GeoPoint2D pse = PositionOfUnit(e.StartPoint);
-                    GeoPoint2D pme = PositionOfUnit(e.PointAt(0.5));
-                    GeoPoint2D pee = PositionOfUnit(e.EndPoint);
-                    if (Math.Abs(pse.x - pme.x) > Math.PI)
-                    {   // the middle point must be less than 180° from the starting point
-                        if (pme.x < pse.x) pme.x += 2 * Math.PI;
-                        else pme.x -= 2 * Math.PI;
-                    }
-                    if (Math.Abs(pee.x - pme.x) > Math.PI)
-                    {   // the ending point must be less than 180° from the middle point
-                        if (pee.x < pme.x) pee.x += 2 * Math.PI;
-                        else pee.x -= 2 * Math.PI;
-                    }
-                    // Polyline2D dbgpl = new Polyline2D(new GeoPoint2D[] { pse, pme, pee });
-                    double a = pme.x - pse.x;
-                    double b = pee.x - pse.x;
-                    double cosa = Math.Cos(a);
-                    double sina = Math.Sin(a);
-                    double cosb = Math.Cos(b);
-                    double sinb = Math.Sin(b);
-                    double c = (pme.y - pse.y);
-                    double d = (pee.y - pse.y);
-                    double c2 = c * c;
-                    double d2 = d * d;
-                    double cd2 = 2 * c * d;
-                    double cos2a = cosa * cosa;
-                    double cos2b = cosb * cosb;
-                    double sin2a = sina * sina;
-                    double sin2b = sinb * sinb;
-                    double s = -cd2 * sina * sinb - cd2 * cosa * cosb + cd2 * cosa + d2 * sin2a + d2 * cos2a - 2 * d2 * cosa + c2 * sin2b + c2 * cos2b - 2 * c2 * cosb + cd2 * cosb + c2 - cd2 + d2;
-                    // can s ever be negative?
-                    if (s >= 0)
-                    {
-                        double ac = -d * cosa + c * cosb - c + d;
-                        double cosarg = Math.Max(-1.0, Math.Min(1.0, ac / Math.Sqrt(s)));
-                        double u1 = -Math.Acos(cosarg);
-                        double u3 = -Math.Acos(-cosarg);
-                        double minDist = double.MaxValue;
-                        SineCurve2D res = null;
-                        foreach (double u in new double[] { u1, -u1, u3, -u3 })
-                        {   // find the correct solution of the 4 possible solutions
-                            double fy = (pee.y - pse.y) / (Math.Sin(u + b) - Math.Sin(u));
-                            double tx = pse.x - u;
-                            double ty = pse.y - fy * Math.Sin(u);
-                            SineCurve2D s2cx = new SineCurve2D(u, b, ModOp2D.Translate(tx, ty) * ModOp2D.Scale(1, fy));
-                            GeoPoint testPoint = PointAt(s2cx.PointAt(0.5));
-                            double dist = curve.PointAt(curve.PositionOf(testPoint)) | testPoint;
-                            if (dist < minDist)
-                            {
-                                minDist = dist;
-                                res = s2cx;
-                            }
-                        }
-                        if (minDist < (RadiusX + RadiusY) * 1e-5) return res;
-                    }
+                    if (TryProjectEllipticalArc(curve, e) is SineCurve2D res) return res;
                 }
             }
             return base.GetProjectedCurve(curve, precision);

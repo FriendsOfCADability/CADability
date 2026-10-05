@@ -287,6 +287,19 @@ namespace CADability.Tests
             }
         }
 
+        [TestMethod]
+        public void foot_point_on_a_2d_spline()
+        {
+            BSpline2D bsp = new BSpline2D(new GeoPoint2D[] { new GeoPoint2D(0, 0), new GeoPoint2D(3, 2), new GeoPoint2D(6, -1), new GeoPoint2D(9, 1) }, 3, false);
+            double u0 = bsp.StartParam, u1 = bsp.EndParam;
+            double uTarget = u0 + 0.4 * (u1 - u0);
+            GeoPoint2D onCurve = bsp.PointAtParam(uTarget);
+            GeoVector2D normal = bsp.DirectionAt(bsp.PositionOf(onCurve)).ToLeft().Normalized;
+            GeoPoint2D p = onCurve + 0.3 * normal; // close enough, so the foot point is unique
+            Assert.IsTrue(bsp.TryFindFootPoint(p, u0, u1, out double uFoot));
+            Assert.AreEqual(uTarget, uFoot, 1e-8);
+        }
+
         private static GeoPoint DeCasteljau(GeoPoint[] p, double t)
         {
             GeoPoint[] q = (GeoPoint[])p.Clone();

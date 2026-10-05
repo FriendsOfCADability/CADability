@@ -2085,6 +2085,13 @@ namespace CADability.GeoObject
 			return false;
 		}
 		/// <summary>
+		/// Implements <see cref="CADability.GeoObject.ICurve.PointAndDerivativesAt(double, int)"/>.
+		/// </summary>
+		public IReadOnlyList<GeoVector> PointAndDerivativesAt(double position, int grad)
+		{
+			return GeneralCurve.PointAndDerivativesAt(this, position, grad);
+		}
+		/// <summary>
 		/// Returns the index of the subcurve at the given position. Position must be between 0.0 and this.Length
 		/// </summary>
 		/// <param name="position">Position for the query</param>

@@ -1579,6 +1579,13 @@ namespace CADability.GeoObject
             deriv = deriv2 = GeoVector.NullVector;
             return false;
         }
+        /// <summary>
+        /// Implements <see cref="CADability.GeoObject.ICurve.PointAndDerivativesAt(double, int)"/>.
+        /// </summary>
+        public IReadOnlyList<GeoVector> PointAndDerivativesAt(double position, int grad)
+        {
+            return GeneralCurve.PointAndDerivativesAt(this, position, grad);
+        }
         #endregion
         #region ISerializable Members
         /// <summary>

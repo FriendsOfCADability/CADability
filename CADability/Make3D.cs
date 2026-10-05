@@ -2364,16 +2364,23 @@ namespace CADability.GeoObject
                 vmax = tmp;
             }
             Face f1 = Face.MakeFace(cs, new SimpleShape(Border.MakeRectangle(0, Math.PI, vmin, vmax)));
-            Face f2 = Face.MakeFace(cs, new SimpleShape(Border.MakeRectangle(Math.PI, Math.PI * 2, vmin, vmax)));
-            Plane pln1 = new Plane(location, directionX, directionY);
-            Plane pln2 = new Plane(location + directionZ, directionX, directionY);
-            Border bdr1 = Border.MakeCircle(GeoPoint2D.Origin, radius1);
-            Border bdr2 = Border.MakeCircle(GeoPoint2D.Origin, radius2);
-            bdr1.SplitSingleCurve(); // makes two half circles, splitted at 180°
-            bdr2.SplitSingleCurve();
-            Face f3 = Face.MakeFace(new PlaneSurface(pln1), new SimpleShape(bdr1));
-            Face f4 = Face.MakeFace(new PlaneSurface(pln2), new SimpleShape(bdr2));
-            Shell[] sh = SewFaces(new Face[] { f1, f2, f3, f4 });
+            // each face needs its own surface: reversing the orientation of a face reverses its surface
+            Face f2 = Face.MakeFace(cs.Clone(), new SimpleShape(Border.MakeRectangle(Math.PI, Math.PI * 2, vmin, vmax)));
+            List<Face> faces = new List<Face> { f1, f2 };
+            // a pointed cone (radius 0 at one end) has no cap at its apex
+            if (radius1 > 0.0)
+            {
+                Border bdr1 = Border.MakeCircle(GeoPoint2D.Origin, radius1);
+                bdr1.SplitSingleCurve(); // makes two half circles, splitted at 180°
+                faces.Add(Face.MakeFace(new PlaneSurface(new Plane(location, directionX, directionY)), new SimpleShape(bdr1)));
+            }
+            if (radius2 > 0.0)
+            {
+                Border bdr2 = Border.MakeCircle(GeoPoint2D.Origin, radius2);
+                bdr2.SplitSingleCurve();
+                faces.Add(Face.MakeFace(new PlaneSurface(new Plane(location + directionZ, directionX, directionY)), new SimpleShape(bdr2)));
+            }
+            Shell[] sh = SewFaces(faces.ToArray());
             if (sh.Length == 1) return Solid.MakeSolid(sh[0]);
             return null;
         }
@@ -2382,7 +2389,8 @@ namespace CADability.GeoObject
             SphericalSurface ss = new SphericalSurface(location, radius * GeoVector.XAxis, radius * GeoVector.YAxis, radius * GeoVector.ZAxis);
             Border bdr = Border.MakeRectangle(0, Math.PI, -Math.PI / 2, Math.PI / 2);
             Face f1 = Face.MakeFace(ss, new SimpleShape(Border.MakeRectangle(0, Math.PI, -Math.PI / 2, Math.PI / 2)));
-            Face f2 = Face.MakeFace(ss, new SimpleShape(Border.MakeRectangle(Math.PI, Math.PI * 2, -Math.PI / 2, Math.PI / 2)));
+            // each face needs its own surface: reversing the orientation of a face reverses its surface
+            Face f2 = Face.MakeFace(ss.Clone(), new SimpleShape(Border.MakeRectangle(Math.PI, Math.PI * 2, -Math.PI / 2, Math.PI / 2)));
             Shell[] sh = SewFaces(new Face[] { f1, f2 });
             if (sh.Length == 1) return Solid.MakeSolid(sh[0]);
             return null;
@@ -2407,9 +2415,10 @@ namespace CADability.GeoObject
             ToroidalSurface ts = new ToroidalSurface(location, directionX, directionY, normal, radius1, radius2);
             Face[] fcs = new Face[4];
             fcs[0] = Face.MakeFace(ts, new BoundingRect(0, 0, Math.PI, Math.PI));
-            fcs[1] = Face.MakeFace(ts, new BoundingRect(0, Math.PI, Math.PI, 2 * Math.PI));
-            fcs[2] = Face.MakeFace(ts, new BoundingRect(Math.PI, 0, 2 * Math.PI, Math.PI));
-            fcs[3] = Face.MakeFace(ts, new BoundingRect(Math.PI, Math.PI, 2 * Math.PI, 2 * Math.PI));
+            // each face needs its own surface: reversing the orientation of a face reverses its surface
+            fcs[1] = Face.MakeFace(ts.Clone(), new BoundingRect(0, Math.PI, Math.PI, 2 * Math.PI));
+            fcs[2] = Face.MakeFace(ts.Clone(), new BoundingRect(Math.PI, 0, 2 * Math.PI, Math.PI));
+            fcs[3] = Face.MakeFace(ts.Clone(), new BoundingRect(Math.PI, Math.PI, 2 * Math.PI, 2 * Math.PI));
             Shell[] shell = SewFaces(fcs);
             if (shell.Length == 1) return Solid.MakeSolid(shell[0]);
             return null;

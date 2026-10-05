@@ -5373,7 +5373,7 @@ namespace CADability.GeoObject
     }
 
 
-    public class Surfaces
+    public partial class Surfaces
     {
         internal static ICurve Intersect(PlaneSurface surface1, BoundingRect bounds1, CylindricalSurface surface2, BoundingRect bounds2, List<GeoPoint> points)
         {

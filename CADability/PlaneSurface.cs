@@ -11,7 +11,7 @@ namespace CADability.GeoObject
     /// The plane is defined by two vectors which are not necessary perpendicular or normalized.
     /// </summary>
     [Serializable()]
-    public class PlaneSurface : ISurfaceImpl, ISerializable, IDeserializationCallback, IExportStep
+    public class PlaneSurface : ISurfaceImpl, ISerializable, IDeserializationCallback, IExportStep, IJsonSerialize
     {
         private ModOp fromUnitPlane; // projects the XY plane into this surface
         private ModOp toUnitPlane; // inverted fromUnitPlane
@@ -522,21 +522,14 @@ namespace CADability.GeoObject
 #endif
                 return;
             }
-            //else if (curve is IExplicitPCurve3D)
-            //{
-            //    ExplicitPCurve3D epc3d = (curve as IExplicitPCurve3D).GetExplicitPCurve3D();
-            //    double [] res = epc3d.GetPlaneIntersection(Location, DirectionX, DirectionY);
-            //    for (int i = 0; i < res.Length; i++)
-            //    {
-            //        double d = Plane.Distance(epc3d.PointAt(res[i]));
-            //        if (i>0) d = Plane.Distance(epc3d.PointAt((res[i]+res[i-1])/2.0));
-            //    }
-            //    double dd = Plane.Distance(epc3d.PointAt(epc3d.knots[epc3d.knots.Length - 1]));
-            //    for (int i = 0; i < res.Length; i++)
-            //    {
-            //        res[i] = (res[i] - epc3d.knots[0]) / (epc3d.knots[epc3d.knots.Length - 1] - epc3d.knots[0]);
-            //    }
-            //}
+            else if (curve is Ellipse elli && elli.IsCircle && Precision.IsPerpendicular(Normal, elli.Plane.Normal, false) && Math.Abs(GetDistance(elli.Center) - elli.Radius) < Precision.eps)
+            {   // special case: a circle tangential to the plane (and perpendicular)
+                // this is more precise than the general case
+                ips = [Plane.FootPoint(elli.Center)];
+                uvOnFaces = [PositionOf(ips[0])];
+                uOnCurve3Ds = [curve.PositionOf(ips[0])];
+                return;
+            }
             else
             {
                 if (curve.GetPlanarState() == PlanarState.Planar)
@@ -717,6 +710,17 @@ namespace CADability.GeoObject
         {
             info.AddValue("FromUnitPlane", fromUnitPlane, typeof(ModOp));
         }
+        protected PlaneSurface() { } // for IJsonSerialize
+        public void GetObjectData(IJsonWriteData data)
+        {
+            data.AddProperty("FromUnitPlane", fromUnitPlane);
+        }
+        public void SetObjectData(IJsonReadData data)
+        {
+            fromUnitPlane = data.GetProperty<ModOp>("FromUnitPlane");
+            toUnitPlane = fromUnitPlane.GetInverse();
+        }
+
         #endregion
         #region IDeserializationCallback Members
         void IDeserializationCallback.OnDeserialization(object sender)

@@ -67,8 +67,12 @@ namespace CADability.GeoObject
                 return ch;
             }
         }
+        // cached bounding boxes of the knot span patches, see GetPatchExtent(int, int, bool).
+        // BoundingCube.EmptyBoundingCube marks a not yet computed entry
+        private BoundingCube[,] knotSpanExtent;
         private new void InvalidateSecondaryData()
         {
+            knotSpanExtent = null;
             fixedUCurves = null;
             fixedVCurves = null;
             cubeHull = null;
@@ -3014,16 +3018,358 @@ namespace CADability.GeoObject
             return res;
         }
         internal BoundingCube GetPatchExtent(BoundingRect uvPatch)
+        {   // formerly this method only used the four boundary curves, which is not a guaranteed bounding box
+            // (inner bulges of the patch were ignored). Now it is based on the knot span boxes
+            return GetPatchExtent(uvPatch, false);
+        }
+        /// <summary>
+        /// Number of knot spans (intervals between distinct knot values) in u direction. See <see cref="GetPatchExtent(int, int, bool)"/>.
+        /// </summary>
+        public int UKnotSpanCount
         {
-            BSpline u1 = FixedU(uvPatch.Left);
-            BSpline u2 = FixedU(uvPatch.Right);
-            BSpline v1 = FixedV(uvPatch.Bottom);
-            BSpline v2 = FixedV(uvPatch.Top);
-            BoundingCube res = u1.GetIntervalExtent(uvPatch.Bottom, uvPatch.Top);
-            res.MinMax(u2.GetIntervalExtent(uvPatch.Bottom, uvPatch.Top));
-            res.MinMax(v1.GetIntervalExtent(uvPatch.Left, uvPatch.Right));
-            res.MinMax(v2.GetIntervalExtent(uvPatch.Left, uvPatch.Right));
+            get
+            {
+                return uKnots.Length - 1;
+            }
+        }
+        /// <summary>
+        /// Number of knot spans (intervals between distinct knot values) in v direction. See <see cref="GetPatchExtent(int, int, bool)"/>.
+        /// </summary>
+        public int VKnotSpanCount
+        {
+            get
+            {
+                return vKnots.Length - 1;
+            }
+        }
+        /// <summary>
+        /// The uv rectangle of the knot span with the provided indices. The indices refer to the distinct knot
+        /// values, i.e. uKnotIndex may range from 0 to <see cref="UKnotSpanCount"/>-1.
+        /// </summary>
+        public BoundingRect GetKnotSpan(int uKnotIndex, int vKnotIndex)
+        {
+            if (uKnotIndex < 0 || uKnotIndex >= uKnots.Length - 1) throw new ArgumentOutOfRangeException("uKnotIndex");
+            if (vKnotIndex < 0 || vKnotIndex >= vKnots.Length - 1) throw new ArgumentOutOfRangeException("vKnotIndex");
+            return new BoundingRect(uKnots[uKnotIndex], vKnots[vKnotIndex], uKnots[uKnotIndex + 1], vKnots[vKnotIndex + 1]);
+        }
+        /// <summary>
+        /// Returns the extent of the surface patch on the knot span [uKnots[uKnotIndex], uKnots[uKnotIndex+1]] x
+        /// [vKnots[vKnotIndex], vKnots[vKnotIndex+1]] (indices refer to distinct knot values, see
+        /// <see cref="UKnotSpanCount"/> and <see cref="GetKnotSpan(int, int)"/>). The returned box is guaranteed
+        /// to contain the patch. With rough==true the convex hull property of the poles influencing the span is
+        /// used: very fast, but the box may be considerably larger than the patch. With rough==false the box is
+        /// close to the smallest enclosing box: extrema on the four boundary curves and Newton iterations for
+        /// inner extrema yield a reference box (a lower bound, since it only contains points on the surface),
+        /// and the Bézier hull of the span is subdivided until it (almost) matches the reference box. The result
+        /// of the subdivision is returned, so the guarantee to contain the patch is preserved. Tight boxes are
+        /// cached, the cache is invalidated when the surface is modified.
+        /// </summary>
+        /// <param name="uKnotIndex">index of the knot span in u direction (referring to distinct knot values)</param>
+        /// <param name="vKnotIndex">index of the knot span in v direction (referring to distinct knot values)</param>
+        /// <param name="rough">true: fast pole hull, false: tight box</param>
+        public BoundingCube GetPatchExtent(int uKnotIndex, int vKnotIndex, bool rough = false)
+        {
+            if (uKnotIndex < 0 || uKnotIndex >= uKnots.Length - 1) throw new ArgumentOutOfRangeException("uKnotIndex");
+            if (vKnotIndex < 0 || vKnotIndex >= vKnots.Length - 1) throw new ArgumentOutOfRangeException("vKnotIndex");
+            if (nubs == null && nurbs == null) Init(); // may be necessary during deserialization
+            double u0 = uKnots[uKnotIndex], u1 = uKnots[uKnotIndex + 1];
+            double v0 = vKnots[vKnotIndex], v1 = vKnots[vKnotIndex + 1];
+            double um = 0.5 * (u0 + u1), vm = 0.5 * (v0 + v1); // span midpoint identifies the span unambiguously
+            if (rough)
+            {
+                BoundingCube rr = BoundingCube.EmptyBoundingCube;
+                if (nubs != null)
+                {
+                    GeoPoint[] block = nubs.GetSpanPoles(um, vm);
+                    for (int i = 0; i < block.Length; ++i) rr.MinMax(block[i]);
+                }
+                else
+                {
+                    GeoPointH[] block = nurbs.GetSpanPoles(um, vm);
+                    for (int i = 0; i < block.Length; ++i)
+                    {
+                        if (block[i].w <= 0.0) return base.GetPatchExtent(new BoundingRect(u0, v0, u1, v1), true); // no hull property with negative weights
+                        rr.MinMax((GeoPoint)block[i]);
+                    }
+                }
+                return rr;
+            }
+            if (knotSpanExtent == null)
+            {
+                BoundingCube[,] tmp = new BoundingCube[uKnots.Length - 1, vKnots.Length - 1];
+                for (int i = 0; i < tmp.GetLength(0); ++i)
+                {
+                    for (int j = 0; j < tmp.GetLength(1); ++j) tmp[i, j] = BoundingCube.EmptyBoundingCube;
+                }
+                knotSpanExtent = tmp;
+            }
+            if (!knotSpanExtent[uKnotIndex, vKnotIndex].IsEmpty) return knotSpanExtent[uKnotIndex, vKnotIndex];
+            BoundingCube res = ComputeTightExtent(u0, u1, v0, v1);
+            knotSpanExtent[uKnotIndex, vKnotIndex] = res;
             return res;
+        }
+        /// <summary>
+        /// The Bézier control net of the surface restricted to [u0, u1] x [v0, v1] (which must lie within a
+        /// single knot span) in homogeneous coordinates (w == 1 for non rational surfaces). weightsOk is false
+        /// when a weight of the net is not positive, so the convex hull property does not apply.
+        /// </summary>
+        private GeoPointH[] GetBezierNetH(double u0, double u1, double v0, double v1, out bool weightsOk)
+        {
+            weightsOk = true;
+            if (nubs != null)
+            {
+                GeoPoint[] bez = nubs.GetSubPatchBezier(u0, u1, v0, v1);
+                GeoPointH[] net = new GeoPointH[bez.Length];
+                for (int i = 0; i < bez.Length; ++i) net[i] = new GeoPointH(bez[i], 1.0);
+                return net;
+            }
+            else
+            {
+                GeoPointH[] net = nurbs.GetSubPatchBezier(u0, u1, v0, v1);
+                for (int i = 0; i < net.Length; ++i)
+                {
+                    if (net[i].w <= 0.0)
+                    {
+                        weightsOk = false;
+                        break;
+                    }
+                }
+                return net;
+            }
+        }
+        /// <summary>
+        /// Computes a tight and guaranteed enclosing box of the surface patch [u0, u1] x [v0, v1], which must
+        /// lie within a single knot span. See <see cref="GetPatchExtent(int, int, bool)"/> for the algorithm.
+        /// </summary>
+        private BoundingCube ComputeTightExtent(double u0, double u1, double v0, double v1)
+        {
+            GeoPointH[] net = GetBezierNetH(u0, u1, v0, v1, out bool weightsOk);
+            if (!weightsOk) return base.GetPatchExtent(new BoundingRect(u0, v0, u1, v1), false); // no hull property with negative weights
+            int nu = uDegree + 1, nv = vDegree + 1;
+            // reference box: contains only points which are exactly on the patch, so it is a lower bound of the
+            // true extent. It controls how far the Bézier hulls have to be subdivided.
+            BoundingCube reference = BoundingCube.EmptyBoundingCube;
+            reference.MinMax(PointAt(new GeoPoint2D(u0, v0)));
+            reference.MinMax(PointAt(new GeoPoint2D(u1, v0)));
+            reference.MinMax(PointAt(new GeoPoint2D(u0, v1)));
+            reference.MinMax(PointAt(new GeoPoint2D(u1, v1)));
+            // extrema on the four boundary curves of the patch
+            BSpline bdy = FixedU(u0);
+            if (bdy != null) reference.MinMax(bdy.GetIntervalExtent(v0, v1));
+            bdy = FixedU(u1);
+            if (bdy != null) reference.MinMax(bdy.GetIntervalExtent(v0, v1));
+            bdy = FixedV(v0);
+            if (bdy != null) reference.MinMax(bdy.GetIntervalExtent(u0, u1));
+            bdy = FixedV(v1);
+            if (bdy != null) reference.MinMax(bdy.GetIntervalExtent(u0, u1));
+            // inner extrema: only possible when the patch is nonlinear in both directions. Newton iterations
+            // seeded where an inner Bézier pole is extremal in one of the main axis directions
+            if (uDegree > 1 && vDegree > 1 && u1 > u0 && v1 > v0)
+            {
+                BoundingRect spanRect = new BoundingRect(u0, v0, u1, v1);
+                for (int axis = 0; axis < 3; ++axis)
+                {
+                    int imax = -1, jmax = -1, imin = -1, jmin = -1;
+                    double cmax = double.MinValue, cmin = double.MaxValue;
+                    for (int j = 0; j < nv; ++j)
+                    {
+                        for (int i = 0; i < nu; ++i)
+                        {
+                            GeoPoint p = (GeoPoint)net[i + nu * j];
+                            double c = (axis == 0) ? p.x : (axis == 1) ? p.y : p.z;
+                            if (c > cmax) { cmax = c; imax = i; jmax = j; }
+                            if (c < cmin) { cmin = c; imin = i; jmin = j; }
+                        }
+                    }
+                    // when the extremal pole is on the edge of the net, the extremum of the patch in this
+                    // direction is on the boundary, which is already covered by the boundary curves
+                    if (imax > 0 && imax < nu - 1 && jmax > 0 && jmax < nv - 1)
+                    {
+                        GeoPoint2D uv = new GeoPoint2D(u0 + imax * (u1 - u0) / uDegree, v0 + jmax * (v1 - v0) / vDegree);
+                        GaussNewtonMinimizer.SurfaceExtrema(this, spanRect, GeoVector.MainAxis[axis], ref uv);
+                        // whether converged or not: uv stays inside the patch, so PointAt(uv) is a valid reference point
+                        if (spanRect.ContainsEps(uv, spanRect.Size * 1e-6)) reference.MinMax(PointAt(uv));
+                    }
+                    if (imin > 0 && imin < nu - 1 && jmin > 0 && jmin < nv - 1 && (imin != imax || jmin != jmax))
+                    {
+                        GeoPoint2D uv = new GeoPoint2D(u0 + imin * (u1 - u0) / uDegree, v0 + jmin * (v1 - v0) / vDegree);
+                        GaussNewtonMinimizer.SurfaceExtrema(this, spanRect, GeoVector.MainAxis[axis], ref uv);
+                        if (spanRect.ContainsEps(uv, spanRect.Size * 1e-6)) reference.MinMax(PointAt(uv));
+                    }
+                }
+            }
+            // subdivide the Bézier hull until it exceeds the reference box by no more than tol on each side.
+            // The result is the union of the hulls of all subdivision leaves and thus guaranteed to contain the patch
+            BoundingCube hull0 = BoundingCube.EmptyBoundingCube;
+            for (int i = 0; i < net.Length; ++i) hull0.MinMax((GeoPoint)net[i]);
+            double tol = hull0.Size * 1e-3;
+            BoundingCube res = reference; // reference points are on the surface, so they are inside the true extent
+            AddBezierHull(net, nu, nv, ref reference, tol, 4, ref res);
+            return res;
+        }
+        /// <summary>
+        /// Guaranteed enclosing box of the surface patch [u0, u1] x [v0, v1] (which must lie within a single
+        /// knot span) from the convex hull of its Bézier net: fast, but without the tightening subdivision.
+        /// </summary>
+        private BoundingCube ComputeRoughExtent(double u0, double u1, double v0, double v1)
+        {
+            GeoPointH[] net = GetBezierNetH(u0, u1, v0, v1, out bool weightsOk);
+            if (!weightsOk) return base.GetPatchExtent(new BoundingRect(u0, v0, u1, v1), true); // no hull property with negative weights
+            BoundingCube res = BoundingCube.EmptyBoundingCube;
+            for (int i = 0; i < net.Length; ++i) res.MinMax((GeoPoint)net[i]);
+            return res;
+        }
+        /// <summary>
+        /// Splits the interval [a, b] into the parts which lie inside the domain [d0, d1]: for a periodic
+        /// parameter the interval is shifted into the domain and may wrap around into two parts; otherwise it
+        /// is clamped (possibly to a degenerate interval at the domain boundary).
+        /// </summary>
+        private static void AddIntervalsInDomain(double a, double b, double d0, double d1, bool periodic, List<double[]> res)
+        {
+            if (b < a) { double tmp = a; a = b; b = tmp; }
+            if (periodic)
+            {
+                double period = d1 - d0;
+                if (b - a >= period)
+                {
+                    res.Add(new double[] { d0, d1 });
+                    return;
+                }
+                double shift = Math.Floor((a - d0) / period) * period;
+                a -= shift;
+                b -= shift;
+                if (b <= d1) res.Add(new double[] { a, b });
+                else
+                {
+                    res.Add(new double[] { a, d1 });
+                    res.Add(new double[] { d0, b - period });
+                }
+            }
+            else
+            {
+                a = Math.Min(Math.Max(a, d0), d1);
+                b = Math.Min(Math.Max(b, d0), d1);
+                res.Add(new double[] { a, b });
+            }
+        }
+        /// <summary>
+        /// Extent of an arbitrary uv patch as the union of the boxes of the knot spans it covers: fully covered
+        /// spans use the cached span boxes of <see cref="GetPatchExtent(int, int, bool)"/>, partially covered
+        /// spans are computed from the Bézier net of the sub rectangle. Periodic parameters may wrap around the
+        /// seam, non periodic parameters are clamped to the domain.
+        /// </summary>
+        private BoundingCube GetPatchExtentBySpans(BoundingRect uvPatch, bool rough)
+        {
+            if (nubs == null && nurbs == null) Init();
+            List<double[]> uIntervals = new List<double[]>(2);
+            List<double[]> vIntervals = new List<double[]>(2);
+            AddIntervalsInDomain(uvPatch.Left, uvPatch.Right, uKnots[0], uKnots[uKnots.Length - 1], uPeriodic, uIntervals);
+            AddIntervalsInDomain(uvPatch.Bottom, uvPatch.Top, vKnots[0], vKnots[vKnots.Length - 1], vPeriodic, vIntervals);
+            BoundingCube res = BoundingCube.EmptyBoundingCube;
+            for (int ui = 0; ui < uIntervals.Count; ++ui)
+            {
+                double ua = uIntervals[ui][0], ub = uIntervals[ui][1];
+                for (int vi = 0; vi < vIntervals.Count; ++vi)
+                {
+                    double va = vIntervals[vi][0], vb = vIntervals[vi][1];
+                    for (int iu = 0; iu < uKnots.Length - 1; ++iu)
+                    {
+                        double a0 = Math.Max(ua, uKnots[iu]), a1 = Math.Min(ub, uKnots[iu + 1]);
+                        if (a1 < a0) continue;
+                        if (a1 == a0 && ub > ua) continue; // zero width strip at a knot, covered by the neighbor span
+                        bool fullU = a0 == uKnots[iu] && a1 == uKnots[iu + 1];
+                        for (int iv = 0; iv < vKnots.Length - 1; ++iv)
+                        {
+                            double b0 = Math.Max(va, vKnots[iv]), b1 = Math.Min(vb, vKnots[iv + 1]);
+                            if (b1 < b0) continue;
+                            if (b1 == b0 && vb > va) continue;
+                            bool fullV = b0 == vKnots[iv] && b1 == vKnots[iv + 1];
+                            if (fullU && fullV) res.MinMax(GetPatchExtent(iu, iv, rough)); // uses the span box cache
+                            else if (rough) res.MinMax(ComputeRoughExtent(a0, a1, b0, b1));
+                            else res.MinMax(ComputeTightExtent(a0, a1, b0, b1));
+                        }
+                    }
+                }
+            }
+            return res;
+        }
+        /// <summary>
+        /// Adds the extent of the Bézier patch given by net (nu*nv homogeneous poles) to res. If the hull of the
+        /// net exceeds the (growing) reference box by more than tol, the patch is subdivided (de Casteljau) up to
+        /// the provided depth. Every leaf contributes its full pole hull, so res always contains the patch.
+        /// </summary>
+        private static void AddBezierHull(GeoPointH[] net, int nu, int nv, ref BoundingCube reference, double tol, int depth, ref BoundingCube res)
+        {
+            // the corner poles of a Bézier patch are on the surface: they improve the reference box for free
+            reference.MinMax((GeoPoint)net[0]);
+            reference.MinMax((GeoPoint)net[nu - 1]);
+            reference.MinMax((GeoPoint)net[nu * (nv - 1)]);
+            reference.MinMax((GeoPoint)net[nu * nv - 1]);
+            BoundingCube hull = BoundingCube.EmptyBoundingCube;
+            for (int i = 0; i < net.Length; ++i) hull.MinMax((GeoPoint)net[i]);
+            if (depth <= 0 ||
+                (hull.Xmax <= reference.Xmax + tol && hull.Xmin >= reference.Xmin - tol &&
+                 hull.Ymax <= reference.Ymax + tol && hull.Ymin >= reference.Ymin - tol &&
+                 hull.Zmax <= reference.Zmax + tol && hull.Zmin >= reference.Zmin - tol))
+            {
+                res.MinMax(hull);
+                return;
+            }
+            SplitBezierU(net, nu, nv, out GeoPointH[] left, out GeoPointH[] right);
+            SplitBezierV(left, nu, nv, out GeoPointH[] n00, out GeoPointH[] n01);
+            SplitBezierV(right, nu, nv, out GeoPointH[] n10, out GeoPointH[] n11);
+            AddBezierHull(n00, nu, nv, ref reference, tol, depth - 1, ref res);
+            AddBezierHull(n01, nu, nv, ref reference, tol, depth - 1, ref res);
+            AddBezierHull(n10, nu, nv, ref reference, tol, depth - 1, ref res);
+            AddBezierHull(n11, nu, nv, ref reference, tol, depth - 1, ref res);
+        }
+        private static GeoPointH MidH(GeoPointH a, GeoPointH b)
+        {
+            return new GeoPointH(0.5 * (a.x + b.x), 0.5 * (a.y + b.y), 0.5 * (a.z + b.z), 0.5 * (a.w + b.w));
+        }
+        /// <summary>
+        /// Splits the Bézier net at the parametric center in u direction (de Casteljau on each row).
+        /// Subdivision in homogeneous coordinates is also valid for rational patches (the weights of the
+        /// subnets are convex combinations, so they stay positive).
+        /// </summary>
+        private static void SplitBezierU(GeoPointH[] net, int nu, int nv, out GeoPointH[] left, out GeoPointH[] right)
+        {
+            left = new GeoPointH[nu * nv];
+            right = new GeoPointH[nu * nv];
+            GeoPointH[] d = new GeoPointH[nu];
+            for (int j = 0; j < nv; ++j)
+            {
+                for (int i = 0; i < nu; ++i) d[i] = net[i + nu * j];
+                left[0 + nu * j] = d[0];
+                right[nu - 1 + nu * j] = d[nu - 1];
+                for (int r = 1; r < nu; ++r)
+                {
+                    for (int i = 0; i < nu - r; ++i) d[i] = MidH(d[i], d[i + 1]);
+                    left[r + nu * j] = d[0];
+                    right[nu - 1 - r + nu * j] = d[nu - 1 - r];
+                }
+            }
+        }
+        /// <summary>
+        /// Splits the Bézier net at the parametric center in v direction (de Casteljau on each column).
+        /// </summary>
+        private static void SplitBezierV(GeoPointH[] net, int nu, int nv, out GeoPointH[] bottom, out GeoPointH[] top)
+        {
+            bottom = new GeoPointH[nu * nv];
+            top = new GeoPointH[nu * nv];
+            GeoPointH[] d = new GeoPointH[nv];
+            for (int i = 0; i < nu; ++i)
+            {
+                for (int j = 0; j < nv; ++j) d[j] = net[i + nu * j];
+                bottom[i + nu * 0] = d[0];
+                top[i + nu * (nv - 1)] = d[nv - 1];
+                for (int r = 1; r < nv; ++r)
+                {
+                    for (int j = 0; j < nv - r; ++j) d[j] = MidH(d[j], d[j + 1]);
+                    bottom[i + nu * r] = d[0];
+                    top[i + nu * (nv - 1 - r)] = d[nv - 1 - r];
+                }
+            }
         }
         public GeoPoint[,] Poles
         {
@@ -4194,8 +4540,8 @@ namespace CADability.GeoObject
         }
         public override BoundingCube GetPatchExtent(BoundingRect uvPatch, bool rough)
         {
-            if (rough && uvPatch.Left == UKnots[0] && uvPatch.Right == UKnots[UKnots.Length - 1] && uvPatch.Bottom == VKnots[0] && uvPatch.Top == VKnots[VKnots.Length - 1])
-            {   // die Pole geben eine Hülle vor
+            if (rough && uvPatch.Left <= uKnots[0] && uvPatch.Right >= uKnots[uKnots.Length - 1] && uvPatch.Bottom <= vKnots[0] && uvPatch.Top >= vKnots[vKnots.Length - 1])
+            {   // whole domain: all poles provide a hull, no need to look at the individual spans
                 BoundingCube res = BoundingCube.EmptyBoundingCube;
                 for (int i = 0; i < poles.GetLength(0); i++)
                 {
@@ -4206,7 +4552,7 @@ namespace CADability.GeoObject
                 }
                 return res;
             }
-            return base.GetPatchExtent(uvPatch, rough);
+            return GetPatchExtentBySpans(uvPatch, rough);
         }
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.CopyData (ISurface)"/>

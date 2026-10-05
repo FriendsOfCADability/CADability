@@ -1034,6 +1034,19 @@ namespace CADability.GeoObject
             res.surface = surface;
             return res;
         }
+        /// <summary>
+        /// The parameter system of the surface has been changed by <paramref name="toNewSurface"/> (e.g. by
+        /// ISurface.ReverseOrientation): the 2d curve is adapted, so that the 3d curve stays the same.
+        /// </summary>
+        public void SurfaceModified(ModOp2D toNewSurface)
+        {
+            surfaceCurve = surfaceCurve.GetModified(toNewSurface);
+            InvalidateSecondaryData();
+        }
+        public ISurface Surface
+        {
+            get { return surface; }
+        }
         public override IGeoObject Clone()
         {
             return Construct(surfaceCurve, surface);

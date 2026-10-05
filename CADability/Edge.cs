@@ -1144,7 +1144,7 @@ namespace CADability
             }
 
         }
-        internal void UseVertices(params Vertex[] toUse)
+        public void UseVertices(params Vertex[] toUse)
         {
             if (curve3d != null)
             {
@@ -1541,6 +1541,7 @@ namespace CADability
             // keep vertices
             if (toRemove == primaryFace) RemovePrimaryFace();
             else if (toRemove == secondaryFace) RemoveSecondaryFace();
+            toRemove.InvalidateSecondaryData();
             if (v1 != null) v1.RemovePositionOnFace(toRemove); // better remove, even if still used, because here we cannot decide, whether this is still used, 
             if (v2 != null) v2.RemovePositionOnFace(toRemove); // and PositionOnFace is just a cache, it will be recalculated in case it is still used
             if (primaryFace == null) // secondary is always null then
@@ -1576,6 +1577,28 @@ namespace CADability
             if (onThisFace == primaryFace) return curveOnPrimaryFace;
             if (onThisFace == secondaryFace) return curveOnSecondaryFace;
             return null;
+        }
+        /// <summary>
+        /// Sets the 2d curve for this face. Reverses the curve if the appropriate forward on this face is false
+        /// </summary>
+        /// <param name="onThisFace"></param>
+        /// <param name="curve"></param>
+        /// <exception cref="System.ApplicationException"></exception>
+        public void SetCurve2D(Face onThisFace, ICurve2D curve)
+        {
+            if (onThisFace == primaryFace)
+            {
+                curveOnPrimaryFace = curve;
+                if (!forwardOnPrimaryFace) curveOnPrimaryFace.Reverse();
+                return;
+            }
+            if (onThisFace == secondaryFace)
+            {
+                curveOnSecondaryFace = curve;
+                if (!forwardOnSecondaryFace) curveOnSecondaryFace.Reverse();
+                return;
+            }
+            throw new System.ApplicationException("Edge.SetCurve2D called with wrong face");
         }
         /// <summary>
         /// Returns the 2-dimensional curve of this edge in the u/v system of the surface of the given face.
@@ -1739,6 +1762,18 @@ namespace CADability
             if (onThisFace == secondaryFace) return forwardOnSecondaryFace;
             return false; // dürfte nicht vorkommen
         }
+        public bool ForwardOnPrimaryFace
+        {
+            get { return forwardOnPrimaryFace; }
+        }
+        /// <summary>
+        /// The orientation on the secondary face. For a seam edge (primary and secondary face are the same face) this is the
+        /// orientation of the second occurrence of this edge in the loop of the face.
+        /// </summary>
+        public bool ForwardOnSecondaryFace
+        {
+            get { return forwardOnSecondaryFace; }
+        }
         public bool SameGeometry(Edge other, double precision)
         {
             // erstmal von offener Kurve ausgehen
@@ -1759,6 +1794,7 @@ namespace CADability
             this.primaryFace = primaryFace;
             this.curveOnPrimaryFace = curveOnPrimaryFace;
             this.forwardOnPrimaryFace = forwardOnPrimaryFace;
+            if (owner == null) owner = primaryFace;
             oriented = true;
         }
         internal void SetPrimary(Face fc, bool forward)
@@ -1767,6 +1803,7 @@ namespace CADability
             curveOnPrimaryFace = fc.Surface.GetProjectedCurve(curve3d, Precision.eps);
             if (!forward) curveOnPrimaryFace.Reverse();
             forwardOnPrimaryFace = forward;
+            if (owner == null) owner = primaryFace;
             oriented = true;
         }
         internal void SetSecondary(Face fc, bool forward)
@@ -2277,6 +2314,17 @@ namespace CADability
         void IJsonSerializeDone.SerializationDone(JsonSerialize jsonSerialize)
         {
             if (curve3d != null) curve3d.Owner = this;
+            if (curveOnPrimaryFace is Path2D && curve3d != null && primaryFace != null)
+            {   // there should not be a Path2D as a 2d curve of an edge
+                // old cdb files contain such edges, which are repaired here
+                curveOnPrimaryFace = primaryFace.Surface.GetProjectedCurve(curve3d, 0.0);
+                if (!forwardOnPrimaryFace) curveOnPrimaryFace.Reverse();
+            }
+            if (curveOnSecondaryFace is Path2D && curve3d != null && secondaryFace != null)
+            {   // same as above
+                curveOnSecondaryFace = secondaryFace.Surface.GetProjectedCurve(curve3d, 0.0);
+                if (!forwardOnSecondaryFace) curveOnSecondaryFace.Reverse();
+            }
         }
         #endregion
         #region ISerializable Members
@@ -2352,6 +2400,19 @@ namespace CADability
             if (curve3d != null) curve3d.Owner = this;
         }
         #endregion
+        /// <summary>
+        /// The face both edges belong to, or null if there is none.
+        /// </summary>
+        public static Face CommonFace(Edge edge1, Edge edge2)
+        {
+            if (edge1.primaryFace == edge2.primaryFace || edge1.primaryFace == edge2.secondaryFace) return edge1.primaryFace;
+            if (edge1.secondaryFace == edge2.primaryFace || edge1.secondaryFace == edge2.secondaryFace) return edge1.secondaryFace;
+            return null;
+        }
+        /// <summary>
+        /// The two vertices of this edge (the same vertex twice for a closed edge).
+        /// </summary>
+        public IEnumerable<Vertex> Vertices => new Vertex[] { Vertex1, Vertex2 };
         internal void CopyPrimary(Edge edge, Face face)
         {
             this.primaryFace = face; // surface muss identisch sein
@@ -2784,7 +2845,7 @@ namespace CADability
             }
             else throw new System.ApplicationException("Edge.SetFace called with already two faces set");
         }
-        internal void SetFace(Face face, ICurve2D curve2D, bool forward)
+        public void SetFace(Face face, ICurve2D curve2D, bool forward)
         {
             if (primaryFace == null)
             {
@@ -3009,6 +3070,8 @@ namespace CADability
                         if (s2d1 < e2d1) splittedEdge.curveOnPrimaryFace = curveOnPrimaryFace.Trim(s2d1, e2d1);
                         else splittedEdge.curveOnPrimaryFace = curveOnPrimaryFace.Trim(e2d1, s2d1);
                     }
+                    // a newly projected piece may come out in a different period than the curve it is a part of
+                    SurfaceHelper.AdjustPeriodic(primaryFace.Surface, curveOnPrimaryFace.GetExtent(), splittedEdge.curveOnPrimaryFace);
                     s2d1 = e2d1;
                     if (i < sortedVertices.Count - 1)
                         e2d1 = FindPeriodicPosition(curveOnPrimaryFace, sortedVertices.Values[i + 1].GetPositionOnFace(primaryFace), primaryFace.Surface);
@@ -3029,6 +3092,7 @@ namespace CADability
                             if (s2d2 < e2d2) splittedEdge.curveOnSecondaryFace = curveOnSecondaryFace.Trim(s2d2, e2d2);
                             else splittedEdge.curveOnSecondaryFace = curveOnSecondaryFace.Trim(e2d2, s2d2);
                         }
+                        SurfaceHelper.AdjustPeriodic(secondaryFace.Surface, curveOnSecondaryFace.GetExtent(), splittedEdge.curveOnSecondaryFace);
                         s2d2 = e2d2;
                         if (i < sortedVertices.Count - 1) e2d2 = FindPeriodicPosition(curveOnSecondaryFace, sortedVertices.Values[i + 1].GetPositionOnFace(secondaryFace), secondaryFace.Surface);
                         else
@@ -3061,8 +3125,8 @@ namespace CADability
                 }
             }
             Edge[] resa = res.ToArray();
-            if (primaryFace != null) primaryFace.ReplaceEdge(this, resa);
-            if (secondaryFace != null) secondaryFace.ReplaceEdge(this, resa);
+            if (primaryFace != null && primaryFace.AllEdgesSet.Contains(this)) primaryFace.ReplaceEdge(this, resa);
+            if (secondaryFace != null && secondaryFace.AllEdgesSet.Contains(this)) secondaryFace.ReplaceEdge(this, resa);
             if (v1 != null) v1.RemoveEdge(this); // diese beiden braucht man in Shell.ReplaceFace.
             // diese Kante soll ja rausgelöst und ersetzt werden
             if (v2 != null) v2.RemoveEdge(this);
@@ -3588,7 +3652,9 @@ namespace CADability
         int IExportStep.Export(ExportStep export, bool topLevel)
         {
             if (curve3d == null) return -1;
-            if (Vertex1 == Vertex2) return -1; // no closed curves, this must be a minimal curve
+            // a closed edge with a single vertex is either a pole (a curve of length 0) or a closed curve like a full circle,
+            // which is a valid EDGE_CURVE with the same start and end vertex. Only the pole must be omitted.
+            if (Vertex1 == Vertex2 && curve3d.Length < Precision.eps) return -1;
             if (!export.EdgeToDefInd.TryGetValue(this, out int ec))
             {
                 // #64=EDGE_CURVE('',#44,#58,#63,.F.) ;
@@ -3624,9 +3690,11 @@ namespace CADability
             if ((primaryFace.Surface is PlaneSurface && (secondaryFace.Surface is CylindricalSurface || secondaryFace.Surface is ConicalSurface || secondaryFace.Surface is ToroidalSurface)) ||
                 (secondaryFace.Surface is PlaneSurface && (primaryFace.Surface is CylindricalSurface || primaryFace.Surface is ConicalSurface || primaryFace.Surface is ToroidalSurface)))
             {
-                // we only need to check a single position
-                GeoVector n1 = primaryFace.Surface.GetNormal(Vertex1.GetPositionOnFace(primaryFace));
-                GeoVector n2 = secondaryFace.Surface.GetNormal(Vertex1.GetPositionOnFace(secondaryFace));
+                // we only need to check a single position. We use the middle of the edge, not a vertex:
+                // a vertex may be a singular point of the surface (e.g. the apex of a cone), where the normal is undefined
+                GeoPoint m = curve3d.PointAt(0.5);
+                GeoVector n1 = primaryFace.Surface.GetNormal(primaryFace.Surface.PositionOf(m));
+                GeoVector n2 = secondaryFace.Surface.GetNormal(secondaryFace.Surface.PositionOf(m));
                 return Precision.SameNotOppositeDirection(n1, n2);
             }
             else

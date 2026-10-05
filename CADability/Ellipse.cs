@@ -764,6 +764,8 @@ namespace CADability.GeoObject
 				this.startParameter = new Angle(startPoint, GeoPoint2D.Origin);
 				this.sweepParameter = new SweepAngle((Angle)this.startParameter, new Angle(endPoint, GeoPoint2D.Origin),
 					direction);
+				// identical start- and endpoint: a full circle, not an empty arc
+				if (sweepParameter == 0.0) sweepParameter = direction ? 2 * Math.PI : -2 * Math.PI;
 			}
 		}
 
@@ -1369,7 +1371,7 @@ namespace CADability.GeoObject
 					ip[i].y *= minorRadius;
 					GeoPoint p = plane.ToGlobal(ip[i]);
 					double par = (this as ICurve).PositionOf(p);
-					if (par >= 0.0 && par <= 1.0) res.Add(p);
+					if (par > -Precision.eps && par < 1.0 + Precision.eps) res.Add(p);
 				}
 			}
 
@@ -2110,6 +2112,19 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// Replaces the arc by the complementary arc of the same ellipse: same start point, but going the other way
+		/// round, so that both arcs together make the full ellipse. A closed ellipse has no complement and stays as it is.
+		/// </summary>
+		public void Complement()
+		{
+			if (Math.Abs(Math.Abs(sweepParameter) - 2 * Math.PI) < 1e-12) return;
+			using (new Changing(this, "CopyGeometry", Clone()))
+			{
+				if (sweepParameter < 0) sweepParameter = sweepParameter + 2 * Math.PI;
+				else sweepParameter = sweepParameter - 2 * Math.PI;
+			}
+		}
 		public bool CounterClockWise
 		{
 			get { return sweepParameter > 0.0; }
@@ -2716,6 +2731,7 @@ namespace CADability.GeoObject
 			if (other is Ellipse)
 			{
 				Ellipse o = other as Ellipse;
+				if (precision == 0.0) precision = Precision.eps;
 				if ((Center | o.Center) < precision)
 				{
 					// geändert wg. Dan Swope 18.9.15. gegeneinadner verderehte Kreise und invers orientierte Bögen sollen gleich sein
@@ -3000,9 +3016,31 @@ namespace CADability.GeoObject
 		public virtual bool TryPointDeriv2At(double position, out GeoPoint point, out GeoVector deriv,
 			out GeoVector deriv2)
 		{
-			point = GeoPoint.Origin;
-			deriv = deriv2 = GeoVector.NullVector;
-			return false;
+			// the same as the explicit ICurve implementation, which callers of the class itself did not reach
+			return (this as ICurve).TryPointDeriv2At(position, out point, out deriv, out deriv2);
+		}
+		/// <summary>
+		/// Implements <see cref="CADability.GeoObject.ICurve.PointAndDerivativesAt(double, int)"/> analytically.
+		/// </summary>
+		public IReadOnlyList<GeoVector> PointAndDerivativesAt(double position, int grad)
+		{
+			var res = new List<GeoVector>(grad + 1);
+			Angle a = startParameter + position * sweepParameter;
+			double ca = Math.Cos(a);
+			double sa = Math.Sin(a);
+			GeoPoint p = plane.Location + ca * majorRadius * plane.DirectionX + sa * minorRadius * plane.DirectionY;
+			res.Add(p.ToVector());
+			// d^k/da^k of cos and sin (k mod 4)
+			double[] dCos = { ca, -sa, -ca, sa };
+			double[] dSin = { sa, ca, -sa, -ca };
+			double f = 1.0;
+			for (int k = 1; k <= grad; k++)
+			{
+				f *= sweepParameter; // (da/dposition)^k
+				GeoVector2D dir = new GeoVector2D(f * majorRadius * dCos[k % 4], f * minorRadius * dSin[k % 4]);
+				res.Add(plane.ToGlobal(dir));
+			}
+			return res;
 		}
 
 		#endregion

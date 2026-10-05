@@ -3008,6 +3008,7 @@ namespace CADability.GeoObject
         internal void SetOutline(Edge[] outline)
         {
             this.outline = outline;
+            if (holes == null) holes = new Edge[0][];
         }
 
         /// <summary>
@@ -8543,6 +8544,32 @@ namespace CADability.GeoObject
             }
             return res.ToArray();
         }
+        /// <summary>
+        /// Intersects this face with the infinite line through <paramref name="sp"/> with the given direction. For each
+        /// intersection point inside the face, the result contains the line parameter (sp + par*direction) and whether
+        /// the line leaves the face in the direction of the surface normal (true) or enters it against the normal (false).
+        /// <paramref name="isBoundaryCase"/> is set when an intersection point lies on the border of the face or the line
+        /// is (almost) tangential to the surface there: then the result is not reliable for an inside/outside test.
+        /// </summary>
+        public List<(double, bool)> GetOrientedLineIntersection(GeoPoint sp, GeoVector direction, out bool isBoundaryCase)
+        {
+            isBoundaryCase = false;
+            GeoPoint2D[] all = this.surface.GetLineIntersection(sp, direction);
+            List<(double, bool)> res = new List<(double, bool)>();
+            for (int i = 0; i < all.Length; i++)
+            {
+                if (Contains(ref all[i], true)) // also tests for periodic cases and moves the point into the correct periodic domain
+                {
+                    isBoundaryCase |= Area.IsPointOnBorder(all[i], Precision.eps);
+                    GeoPoint p = surface.PointAt(all[i]);
+                    double par = Geometry.LinePar(sp, direction, p);
+                    double dir = surface.GetNormal(all[i]).Normalized * direction;
+                    isBoundaryCase |= Math.Abs(dir) < 1e-4;
+                    res.Add((par, dir > 0));
+                }
+            }
+            return res;
+        }
         internal void GetZMinMax(Projection p, out double zMin, out double zMax)
         {
             zMin = double.MaxValue;
@@ -9126,9 +9153,14 @@ namespace CADability.GeoObject
                         if (!edg.Forward(edg.SecondaryFace)) edg.SecondaryCurve2D.Reverse();
                     }
                 }
+                else if (edg.Curve3D is CurveOnSurface cons && cons.Surface == Surface)
+                {   // the 2d curve of a CurveOnSurface lives in the parameter system of the surface, which has changed
+                    cons.SurfaceModified(m);
+                }
             }
             area = null;
             SimpleShape ss = Area; // force area recalc
+            ClearTriangulation(); // the cached triangulation still has the old orientation (and the old parameters)
 #if DEBUG
             GeoPoint2D dbgv2 = surface.PositionOf(Vertices[0].Position);
             GeoPoint2D dbgv3 = m * dbgv1;
@@ -9721,7 +9753,16 @@ namespace CADability.GeoObject
                 if (((outline[i].PrimaryFace == outline[j].PrimaryFace) && (outline[i].SecondaryFace == outline[j].SecondaryFace)) ||
                     ((outline[i].SecondaryFace == outline[j].PrimaryFace) && (outline[i].PrimaryFace == outline[j].SecondaryFace)))
                 {
-                    if (combineEdges(outline[i], outline[j])) --i; // outline[j] will be removed, iteration must stay at i
+                    if (outline[i].Curve3D == null || outline[j].Curve3D == null) continue;
+                    GeoVector dir1 = (outline[i].Forward(this) ? outline[i].Curve3D.EndDirection : -outline[i].Curve3D.StartDirection);
+                    GeoVector dir2 = (outline[j].Forward(this) ? outline[j].Curve3D.StartDirection : -outline[j].Curve3D.EndDirection);
+                    // only combine edges if they connect tangentially
+                    // Counter example: two cylinders crossing, the two edges at the tangential point: we do not want to connect those.
+                    if (Precision.SameDirection(dir1, dir2, false) && combineEdges(outline[i], outline[j]))
+                    {
+                        --i; // outline[j] will be removed, iteration must stay at i
+                        vertices = null; // collect vertices next time Vertices (get) is called
+                    }
                 }
             }
             for (int k = 0; k < holes.Length; k++)
@@ -9734,7 +9775,15 @@ namespace CADability.GeoObject
                     if (((holes[k][i].PrimaryFace == holes[k][j].PrimaryFace) && (holes[k][i].SecondaryFace == holes[k][j].SecondaryFace)) ||
                         ((holes[k][i].SecondaryFace == holes[k][j].PrimaryFace) && (holes[k][i].PrimaryFace == holes[k][j].SecondaryFace)))
                     {
-                        if (combineEdges(holes[k][i], holes[k][j])) --i; // holes[k][j] will be removed, iteration must stay at i
+                        if (holes[k][i].Curve3D == null || holes[k][j].Curve3D == null) continue;
+                        GeoVector dir1 = (holes[k][i].Forward(this) ? holes[k][i].Curve3D.EndDirection : -holes[k][i].Curve3D.StartDirection);
+                        GeoVector dir2 = (holes[k][j].Forward(this) ? holes[k][j].Curve3D.StartDirection : -holes[k][j].Curve3D.EndDirection);
+                        // see above: only combine edges if they connect tangentially
+                        if (Precision.SameDirection(dir1, dir2, false) && combineEdges(holes[k][i], holes[k][j]))
+                        {
+                            --i; // holes[k][j] will be removed, iteration must stay at i
+                            vertices = null; // collect vertices next time Vertices (get) is called
+                        }
                     }
                 }
             }
@@ -9747,9 +9796,41 @@ namespace CADability.GeoObject
         /// <returns></returns>
         internal bool combineEdges(Edge edg1, Edge edg2)
         {
+            ICurve curve1 = edg1.Curve3D.Clone();
+            ICurve curve2 = edg2.Curve3D.Clone();
+            if (!edg1.Forward(this)) curve1.Reverse();
+            if (!edg2.Forward(this)) curve2.Reverse();
+            ICurve combined = Curves.Combine(curve1, curve2, Precision.eps);
+            if (combined == null) return false; // too many problems, when the curves cannot easily be combined
+            // ShapeIt also refuses a closed result here, because its boolean operations do not support closed edges.
+            // CADability does support them (and parametrics prefer them), so two halves of a circle are still combined.
             Face otherface = edg1.OtherFace(this);
             if (edg2.OtherFace(this) != otherface) return false; // the other face of both edges must be the same
             if (edg1.EndVertex(this) != edg2.StartVertex(this)) return false; // edg2 must be the follower of edg1
+            if (this.surface is SphericalSurface && otherface != null && otherface.surface is SphericalSurface) return false; // problem result could go around a pole
+            if (otherface != null)
+            {   // the two edges on otherface must be in the same outline or hole
+                // there are cases where two holes are connected with a single vertex. We cannot connect two edges
+                // in this case.
+                HashSet<Edge> bothEdges = new HashSet<Edge>([edg1, edg2]);
+                bool ok = false;
+                int n = bothEdges.Intersect(otherface.outline).Count();
+                ok = n == 2;
+                if (!ok)
+                {
+                    for (int i = 0; i < otherface.holes.Length; i++)
+                    {
+                        n = bothEdges.Intersect(otherface.holes[i]).Count();
+                        if (n == 2)
+                        {
+                            ok = true;
+                            break;
+                        }
+                        else if (n == 1) break; // the hole contains only one of the edges: we cannot combine these edges
+                    }
+                }
+                if (!ok) return false; // the two edges are not in the same outline or hole on the other face, we cannot combine them
+            }
             if (!edg1.Forward(this)) edg1.ReverseCurve3D();
             if (!edg2.Forward(this)) edg2.ReverseCurve3D();
             // do single closed edges make problems? For parametric operations we would prefer them
@@ -9757,8 +9838,7 @@ namespace CADability.GeoObject
             // if ((edg1.EndVertex(this) == edg2.StartVertex(this)) && (edg1.StartVertex(this) == edg2.EndVertex(this))) return false; // do not create closed edges
 
             // now edg1 and edg2 are both forward oriented on this face and edg1 precedes edg2
-            ICurve combined = Curves.Combine(edg1.Curve3D, edg2.Curve3D, Precision.eps);
-            if (combined == null && otherface != null)
+            if (combined == null && otherface != null && edg1.Curve3D.GetType() != edg2.Curve3D.GetType()) // we do not want to connect two ellipses on a cylinder, which have a sharp connection
             {
                 Vertex v1 = edg1.StartVertex(this);
                 Vertex v2 = edg1.EndVertex(this);
@@ -9779,7 +9859,7 @@ namespace CADability.GeoObject
                     combined = dsc;
                 }
                 else
-                { // the two surfaces are almost tangential. InterpolatedDualSurfaceCurve is not good here
+                { // the two surfaces are almost tangential. InterpolatedDualSurfaceCurve is not good here 
 
                 }
             }
@@ -9813,6 +9893,7 @@ namespace CADability.GeoObject
                 edg2.Vertex1.RemoveEdge(edg2);
                 edg2.Vertex2.RemoveEdge(edg2);
                 vertices = null;
+                if (otherface != null) otherface.vertices = null; // to force recalculate
                 area = null;
                 return true;
             }
@@ -9887,6 +9968,7 @@ namespace CADability.GeoObject
                         edg2.Vertex1.RemoveEdge(edg2);
                         edg2.Vertex2.RemoveEdge(edg2);
                         vertices = null;
+                        otherface.vertices = null;
                         area = null;
                         return true;
                     }
@@ -10606,43 +10688,79 @@ namespace CADability.GeoObject
             return false;
         }
 
-        internal bool CheckConsistency()
-        {   // Konsistenzcheck
-            for (int i = 0; i < outline.Length; i++)
+        /// <summary>
+        /// Checks the topology of this face: the edges must be connected, belong to this face, connect two faces
+        /// with opposite orientation, start and end at their vertices, and the 2d curves must run in the same
+        /// direction as the 3d curves. Returns false if any of these conditions is violated.
+        /// </summary>
+        /// <summary>
+        /// Whether each edge of the loop ends at the vertex where the next edge starts. A seam edge occurs twice in a loop,
+        /// first with the orientation on the primary face, then with the orientation on the secondary face (the same as
+        /// <see cref="Edge.Curve2D(Face, ICurve2D[])"/> does), so it cannot be found by its vertices like the other edges.
+        /// </summary>
+        private bool IsConnectedLoop(Edge[] loop)
+        {
+            HashSet<Edge> seamsSeen = new HashSet<Edge>();
+            Vertex[] startVertex = new Vertex[loop.Length];
+            Vertex[] endVertex = new Vertex[loop.Length];
+            for (int i = 0; i < loop.Length; i++)
             {
-                int next = i + 1;
-                if (next >= outline.Length) next = 0;
-                if (GetNextEdge(outline[i]) != outline[next])
-                    return false;
+                Edge edg = loop[i];
+                bool forward;
+                if (edg.PrimaryFace == edg.SecondaryFace) forward = seamsSeen.Add(edg) ? edg.ForwardOnPrimaryFace : edg.ForwardOnSecondaryFace;
+                else forward = edg.Forward(this);
+                startVertex[i] = forward ? edg.Vertex1 : edg.Vertex2;
+                endVertex[i] = forward ? edg.Vertex2 : edg.Vertex1;
             }
+            for (int i = 0; i < loop.Length; i++)
+            {
+                if (endVertex[i] != startVertex[(i + 1) % loop.Length]) return false;
+            }
+            return true;
+        }
+        public bool CheckConsistency()
+        {   // consistency check
+            if (!IsConnectedLoop(outline)) return false;
             for (int i = 0; i < holes.Length; i++)
             {
-                for (int j = 0; j < holes[i].Length; j++)
-                {
-                    int next = j + 1;
-                    if (next >= holes[i].Length) next = 0;
-                    if (GetNextEdge(holes[i][j]) != holes[i][next]) return false;
-                }
+                if (!IsConnectedLoop(holes[i])) return false;
             }
             foreach (Edge edg in Edges)
             {
                 if (edg.PrimaryFace != this && edg.SecondaryFace != this) return false;
+                if (edg.Curve3D != null && edg.SecondaryFace != null)
+                {   // the two faces must use the edge in opposite directions. A seam edge (both faces are this face) occurs twice in
+                    // the same loop, there Forward(face) cannot tell the two occurrences apart.
+                    if (edg.PrimaryFace == edg.SecondaryFace)
+                    {
+                        if (edg.ForwardOnPrimaryFace == edg.ForwardOnSecondaryFace) return false;
+                    }
+                    else if (edg.Forward(edg.PrimaryFace) == edg.Forward(edg.SecondaryFace)) return false; // wrong orientation of the two connected faces
+                }
             }
             // sind die 2d Kurven richtig orientiert?
             foreach (Edge edg in Edges)
             {
-                // die Richtung der 2d Kurve ist so, dass auf der rechten Seite das Innere liegt
+                if (edg.Curve3D != null && (edg.Curve3D.StartPoint | edg.Vertex1.Position) > 1e-4)
+                {
+                    return false;
+                }
+                if (edg.Curve3D != null && (edg.Curve3D.EndPoint | edg.Vertex2.Position) > 1e-4)
+                {
+                    return false;
+                }
+                // the orientation of the 2d curve is such that the interior of the face is on the left side
                 ICurve2D c2d = edg.Curve2D(this);
                 GeoPoint sp, ep;
                 sp = surface.PointAt(c2d.StartPoint);
                 ep = surface.PointAt(c2d.EndPoint);
-                if ((sp | edg.StartVertex(this).Position) > 1e-5)
+                if ((sp | edg.StartVertex(this).Position) > 1e-4)
                 {
-                    // return false;
+                    return false;
                 }
-                if ((ep | edg.EndVertex(this).Position) > 1e-5)
+                if ((ep | edg.EndVertex(this).Position) > 1e-4)
                 {
-                    // return false;
+                    return false;
                 }
 
                 GeoPoint loc;
@@ -10650,13 +10768,9 @@ namespace CADability.GeoObject
                 surface.DerivationAt(c2d.StartPoint, out loc, out diru, out dirv);
                 GeoVector normal = diru ^ dirv;
                 if (normal.Length > Precision.eps)
-                {
+                {   // check correct orientation of 2d and 3d curve
                     ModOp fromUnitPlane = new ModOp(diru, dirv, normal, loc);
-                    ModOp toUnitPlane = fromUnitPlane.GetInverse();
                     GeoVector forward = fromUnitPlane * new GeoVector(c2d.StartDirection);
-                    GeoVector toRight = fromUnitPlane * new GeoVector(c2d.StartDirection.ToRight());
-                    double d = normal * (toRight ^ forward);
-                    if (d < 0) return false;
                     GeoVector forward3d;
                     if (edg.Curve3D != null)
                     {
@@ -10668,11 +10782,10 @@ namespace CADability.GeoObject
                         {
                             forward3d = -edg.Curve3D.EndDirection;
                         }
-                        //edg.Orient();
-                        d = forward3d * forward;
+                        double d = forward3d * forward;
+                        if (d < 0) return false;
                     }
                 }
-                //if (d < 0) return false;
             }
             return true;
         }
@@ -11034,9 +11147,17 @@ namespace CADability.GeoObject
             // #65=EDGE_LOOP('',(#66,#67,#68,#69)) ;
             // #70=FACE_OUTER_BOUND('',#65,.T.);
             StringBuilder edgloop = new StringBuilder();
+            HashSet<Edge> seamsSeen = new HashSet<Edge>();
             for (int i = 0; i < edges.Length; i++)
             {
-                int nr = (edges[i] as IExportStep).Export(export, edges[i].Forward(this)); // second parameter misused for orientation
+                bool forward;
+                if (edges[i].PrimaryFace == edges[i].SecondaryFace)
+                {   // a seam edge occurs twice in the loop, in opposite directions: the first occurrence uses the orientation
+                    // on the primary face, the second one the orientation on the secondary face (see Edge.Curve2D(Face, ICurve2D[]))
+                    forward = seamsSeen.Add(edges[i]) ? edges[i].ForwardOnPrimaryFace : edges[i].ForwardOnSecondaryFace;
+                }
+                else forward = edges[i].Forward(this);
+                int nr = (edges[i] as IExportStep).Export(export, forward); // second parameter misused for orientation
                 if (nr == -1) continue; // a pole
                 if (edgloop.Length == 0) edgloop.Append("#" + nr.ToString());
                 else edgloop.Append(",#" + nr.ToString());

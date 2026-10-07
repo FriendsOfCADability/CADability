@@ -245,13 +245,30 @@ namespace CADability
                 else if (ext.YDiff < ext.XDiff && ext.YDiff < ext.ZDiff) ind = 1;
                 else ind = 2;
                 double sz = ext.Size;
-                translation[ind] += sz;
-                for (int i = 0; i < points.Length; i++)
+                // Moving along an axis which lies in the plane leaves the plane where it is, and the rank stays too
+                // small. With x and y extents equal, the choice above is z, which is exactly that for a plane like
+                // x = -y. The points were then reported as linear, and a planar BSpline projected its poles onto an
+                // arbitrary plane through its chord. So the other axes are tried as well: points are only linear if
+                // no translation helps.
+                bool found = false;
+                foreach (int axis in new[] { ind, (ind + 1) % 3, (ind + 2) % 3 })
                 {
-                    A[i, ind] += sz;
+                    Matrix moved = (Matrix)A.Clone();
+                    for (int i = 0; i < points.Length; i++)
+                    {
+                        moved[i, axis] += sz;
+                    }
+                    Matrix movedAAT = (Matrix)(moved.Transpose().Multiply(moved));
+                    if (movedAAT.Rank() == 3)
+                    {
+                        translation[axis] += sz;
+                        A = moved;
+                        AAT = movedAAT;
+                        found = true;
+                        break;
+                    }
                 }
-                AAT = (Matrix)(A.Transpose().Multiply(A));
-                if (AAT.Rank() < 3)
+                if (!found)
                 {
                     isLinear = true;
                     return Plane.XYPlane;

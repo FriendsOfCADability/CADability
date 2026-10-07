@@ -279,13 +279,13 @@ namespace CADability
             }
         }
 
-        BoundingCube IOctTreeInsertable.GetExtent(double precision)
+        BoundingBox IOctTreeInsertable.GetExtent(double precision)
         {
 
-            return new BoundingCube(position);
+            return new BoundingBox(position);
         }
 
-        bool IOctTreeInsertable.HitTest(ref BoundingCube cube, double precision)
+        bool IOctTreeInsertable.HitTest(ref BoundingBox cube, double precision)
         {
             return cube.Contains(position, precision);
         }

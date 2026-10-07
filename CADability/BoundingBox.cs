@@ -7,11 +7,18 @@ using System.Runtime.Serialization;
 namespace CADability
 {
     /// <summary>
+    /// The old name of <see cref="BoundingBox"/>. It is kept only so that code still using it gets an error that says
+    /// what to do instead of an unknown type. Files written with the old name are still read, see <see cref="RenamedTypes"/>.
+    /// </summary>
+    [Obsolete("BoundingCube has been renamed to BoundingBox, because the name was confusing.", true)]
+    public struct BoundingCube { }
+
+    /// <summary>
     /// Represents a bounding cuboid, that is an extent in 3 dimensions
     /// </summary>
     [JsonVersion(serializeAsStruct = true, version = 1)]
     [Serializable()]
-    public struct BoundingCube : ISerializable, IJsonSerialize
+    public struct BoundingBox : ISerializable, IJsonSerialize
     {
         public double Xmin, Xmax, Ymin, Ymax, Zmin, Zmax;
         /// <summary>
@@ -136,7 +143,7 @@ namespace CADability
         }
         private bool isCube; // wird nicht gespeichert, findet beim QuadTree Verwendung
         /// <summary>
-        /// Constructs a BoundingCube from minimum and maximum values
+        /// Constructs a BoundingBox from minimum and maximum values
         /// </summary>
         /// <param name="Xmin">Minimum in x-direction</param>
         /// <param name="Xmax">Maximum in x-direction</param>
@@ -144,7 +151,7 @@ namespace CADability
         /// <param name="Ymax">Maximum in y-direction</param>
         /// <param name="Zmin">Minimum in z-direction</param>
         /// <param name="Zmax">Maximum in z-direction</param>
-        public BoundingCube(double Xmin, double Xmax, double Ymin, double Ymax, double Zmin, double Zmax)
+        public BoundingBox(double Xmin, double Xmax, double Ymin, double Ymax, double Zmin, double Zmax)
         {
             this.Xmin = Xmin;
             this.Xmax = Xmax;
@@ -155,11 +162,11 @@ namespace CADability
             isCube = false;
         }
         /// <summary>
-        /// Constructs a equal sided BoundingCube from a center point and a "radius" (half width)
+        /// Constructs a equal sided BoundingBox from a center point and a "radius" (half width)
         /// </summary>
         /// <param name="center">Center point</param>
         /// <param name="halfSize">Half of the width</param>
-        public BoundingCube(GeoPoint center, double halfSize)
+        public BoundingBox(GeoPoint center, double halfSize)
         {
             this.Xmin = center.x - halfSize;
             this.Xmax = center.x + halfSize;
@@ -170,10 +177,10 @@ namespace CADability
             isCube = true;
         }
         /// <summary>
-        /// Constructs a BoundingCube, that encloses all given points
+        /// Constructs a BoundingBox, that encloses all given points
         /// </summary>
         /// <param name="p">points to enclose</param>
-        public BoundingCube(params GeoPoint[] p)
+        public BoundingBox(params GeoPoint[] p)
         {
             Xmin = double.MaxValue;
             Xmax = double.MinValue;
@@ -192,7 +199,7 @@ namespace CADability
             }
             isCube = false;
         }
-        public BoundingCube(IEnumerable<IGeoObject> objects)
+        public BoundingBox(IEnumerable<IGeoObject> objects)
         {
             Xmin = double.MaxValue;
             Xmax = double.MinValue;
@@ -239,7 +246,7 @@ namespace CADability
         }
 
         /// <summary>
-        /// Makes this BoundingCube include the provided point. You can start with an <see cref="EmptyBoundingCube"/>
+        /// Makes this BoundingBox include the provided point. You can start with an <see cref="EmptyBoundingCube"/>
         /// </summary>
         /// <param name="p">Point to be included</param>
         public void MinMax(GeoPoint p)
@@ -252,10 +259,10 @@ namespace CADability
             if (p.z > Zmax) Zmax = p.z;
         }
         /// <summary>
-        /// Makes this BoundingCube include the provided BoundingCube. You can start with an <see cref="EmptyBoundingCube"/>
+        /// Makes this BoundingBox include the provided BoundingBox. You can start with an <see cref="EmptyBoundingCube"/>
         /// </summary>
         /// <param name="b">Cube to be included</param>
-        public void MinMax(BoundingCube b)
+        public void MinMax(BoundingBox b)
         {
             if (b.Xmin < Xmin) Xmin = b.Xmin;
             if (b.Xmax > Xmax) Xmax = b.Xmax;
@@ -265,7 +272,7 @@ namespace CADability
             if (b.Zmax > Zmax) Zmax = b.Zmax;
         }
         /// <summary>
-        /// Makes this BoundingCube include all the specified objects
+        /// Makes this BoundingBox include all the specified objects
         /// </summary>
         /// <param name="objects"></param>
         public void MinMax(IEnumerable<IGeoObject> objects)
@@ -275,33 +282,33 @@ namespace CADability
                 MinMax(go.GetExtent(0.0));
             }
         }
-        public static BoundingCube operator +(BoundingCube b1, BoundingCube b2)
+        public static BoundingBox operator +(BoundingBox b1, BoundingBox b2)
         {
-            return new BoundingCube(Math.Min(b1.Xmin, b2.Xmin), Math.Max(b1.Xmax, b2.Xmax), Math.Min(b1.Ymin, b2.Ymin), Math.Max(b1.Ymax, b2.Ymax), Math.Min(b1.Zmin, b2.Zmin), Math.Max(b1.Zmax, b2.Zmax));
+            return new BoundingBox(Math.Min(b1.Xmin, b2.Xmin), Math.Max(b1.Xmax, b2.Xmax), Math.Min(b1.Ymin, b2.Ymin), Math.Max(b1.Ymax, b2.Ymax), Math.Min(b1.Zmin, b2.Zmin), Math.Max(b1.Zmax, b2.Zmax));
         }
         /// <summary>
-        /// BoundingCube defining the interval [0,1] in all directions
+        /// BoundingBox defining the interval [0,1] in all directions
         /// </summary>
-        static public BoundingCube UnitBoundingCube = new BoundingCube(0, 1, 0, 1, 0, 1);
+        static public BoundingBox UnitBoundingCube = new BoundingBox(0, 1, 0, 1, 0, 1);
         /// <summary>
-        /// Empty BoundingCube. Defined by the special values <see cref="double.MinValue"/> and <see cref="double.MaxValue"/>.
-        /// Often used with the <see cref="MinMax(GeoPoint)"/> or <see cref="MinMax(BoundingCube)"/> Methods.
+        /// Empty BoundingBox. Defined by the special values <see cref="double.MinValue"/> and <see cref="double.MaxValue"/>.
+        /// Often used with the <see cref="MinMax(GeoPoint)"/> or <see cref="MinMax(BoundingBox)"/> Methods.
         /// </summary>
-        static public BoundingCube EmptyBoundingCube
+        static public BoundingBox EmptyBoundingCube
         {
             get
             {
-                return new BoundingCube(double.MaxValue, double.MinValue, double.MaxValue, double.MinValue, double.MaxValue, double.MinValue);
+                return new BoundingBox(double.MaxValue, double.MinValue, double.MaxValue, double.MinValue, double.MaxValue, double.MinValue);
             }
         }
         /// <summary>
-        /// Infinite BoundingCube. Ranging from <see cref="double.MinValue"/> to <see cref="double.MaxValue"/>.
+        /// Infinite BoundingBox. Ranging from <see cref="double.MinValue"/> to <see cref="double.MaxValue"/>.
         /// </summary>
-        static public BoundingCube InfiniteBoundingCube
+        static public BoundingBox InfiniteBoundingCube
         {
             get
             {
-                return new BoundingCube(double.MinValue, double.MaxValue, double.MinValue, double.MaxValue, double.MinValue, double.MaxValue);
+                return new BoundingBox(double.MinValue, double.MaxValue, double.MinValue, double.MaxValue, double.MinValue, double.MaxValue);
             }
         }
         /// <summary>
@@ -310,7 +317,7 @@ namespace CADability
         /// <param name="b1">First cube</param>
         /// <param name="b2">Second cube</param>
         /// <returns>true if disjoint</returns>
-        public static bool Disjoint(BoundingCube b1, BoundingCube b2) // keine Überschneidung
+        public static bool Disjoint(BoundingBox b1, BoundingBox b2) // keine Überschneidung
         {   // es ist wichtig, dass hier < und nicht <= steht, da sonst Linien, die genau auf einer
             // Seite eines Würfels liegen aus dem QuadTree rausfliegen
             return b1.Xmax < b2.Xmin || b1.Ymax < b2.Ymin || b1.Zmax < b2.Zmin || b2.Xmax < b1.Xmin || b2.Ymax < b1.Ymin || b2.Zmax < b1.Zmin;
@@ -397,7 +404,7 @@ namespace CADability
             }
         }
         /// <summary>
-        /// Returns the center of this BoundingCube
+        /// Returns the center of this BoundingBox
         /// </summary>
         /// <returns></returns>
         public GeoPoint GetCenter()
@@ -410,7 +417,7 @@ namespace CADability
         /// </summary>
         /// <param name="info">SerializationInfo</param>
         /// <param name="context">StreamingContext</param>
-        public BoundingCube(SerializationInfo info, StreamingContext context)
+        public BoundingBox(SerializationInfo info, StreamingContext context)
         {
             Xmin = (double)info.GetValue("Xmin", typeof(double));
             Xmax = (double)info.GetValue("Xmax", typeof(double));
@@ -458,7 +465,7 @@ namespace CADability
         /// <param name="m">Modification</param>
         public void Modify(ModOp m)
         {
-            BoundingCube res = EmptyBoundingCube;
+            BoundingBox res = EmptyBoundingCube;
             res.MinMax(m * new GeoPoint(Xmin, Ymin, Zmin));
             res.MinMax(m * new GeoPoint(Xmin, Ymin, Zmax));
             res.MinMax(m * new GeoPoint(Xmin, Ymax, Zmin));
@@ -507,7 +514,7 @@ namespace CADability
         /// </summary>
         /// <param name="extn">Cube to be checked</param>
         /// <returns><c>true</c> if there is containment</returns>
-        public bool Contains(BoundingCube extn)
+        public bool Contains(BoundingBox extn)
         {
             return Xmin <= extn.Xmin && Xmax >= extn.Xmax &&
             Ymin <= extn.Ymin && Ymax >= extn.Ymax &&
@@ -540,7 +547,7 @@ namespace CADability
                 Zmin - prec <= p.z && Zmax + prec >= p.z;
         }
         /// <summary>
-        /// Returns the extent of the projected BoundingCube
+        /// Returns the extent of the projected BoundingBox
         /// </summary>
         /// <param name="pr">the projection</param>
         /// <returns>the resulting 2-dimensional extent</returns>
@@ -602,7 +609,7 @@ namespace CADability
             }
             else
             {   // normieren auf einen Würfel. In diesem Fall kann es vorkommen, dass weiter unten durch 0.0 geteilt wird (dir.x)
-                // wenn der BoundingCube in eine Richtung keine Ausdehnung hat und die Linie in der gleichen Ebene liegt.
+                // wenn der BoundingBox in eine Richtung keine Ausdehnung hat und die Linie in der gleichen Ebene liegt.
                 if (Xmin == Xmax) mainDirection = 0;
                 else if (Ymax == Ymin) mainDirection = 1;
                 else if (Zmax == Zmin) mainDirection = 2;
@@ -846,7 +853,7 @@ namespace CADability
         }
         /// <summary>
         /// Returns true when the triangle defined by <paramref name="tri1"/>, <paramref name="tri2"/> and <paramref name="tri3"/>
-        /// (including the inside of the triangle) and this BoundingCube interfere.
+        /// (including the inside of the triangle) and this BoundingBox interfere.
         /// </summary>
         /// <param name="tri1">First point of triangle</param>
         /// <param name="tri2">Second point of triangle</param>
@@ -919,7 +926,7 @@ namespace CADability
         }
         /// <summary>
         /// Returns true if the provided tetrahedron (given by the four points tetra1..tetra4) and this
-        /// BoundingCube interfere
+        /// BoundingBox interfere
         /// </summary>
         /// <param name="tetra1">1st tetrahedron vertex</param>
         /// <param name="tetra2">2nd tetrahedron vertex</param>
@@ -948,7 +955,7 @@ namespace CADability
             return false;
         }
         /// <summary>
-        /// Returns true, if the provided rectangle <paramref name="rect"/> and this BoundingCube interfere with the provided <paramref name="projection"/>.
+        /// Returns true, if the provided rectangle <paramref name="rect"/> and this BoundingBox interfere with the provided <paramref name="projection"/>.
         /// </summary>
         /// <param name="projection">The projection</param>
         /// <param name="rect">The rectangle</param>
@@ -1110,7 +1117,7 @@ namespace CADability
             if (this.Interferes(area.FrontCenter, area.Direction, 0.0, true)) return true;
             // schwieriger Fall: nicht alle innerhalb aber auch nicht alle auf einer Seite:
             // hier muss man die Kanten testen
-            BoundingCube bc = BoundingCube.UnitBoundingCube;
+            BoundingBox bc = BoundingBox.UnitBoundingCube;
             int[,] ln = LineNumbers;
             if (bc.Interferes(ref points[ln[0, 0]], ref points[ln[0, 1]])) return true;
             if (bc.Interferes(ref points[ln[1, 0]], ref points[ln[1, 1]])) return true;
@@ -1294,7 +1301,7 @@ namespace CADability
         /// </summary>
         /// <param name="bc">the other cube to test with</param>
         /// <returns>true if the two cubes interfere (overlap)</returns>
-        public bool Interferes(BoundingCube bc)
+        public bool Interferes(BoundingBox bc)
         {
             return ((Xmin <= bc.Xmin && Xmax >= bc.Xmin || Xmin > bc.Xmin && Xmin <= bc.Xmax)
                     && (Ymin <= bc.Ymin && Ymax >= bc.Ymin || Ymin > bc.Ymin && Ymin <= bc.Ymax)
@@ -1420,13 +1427,13 @@ namespace CADability
         /// </returns>
         public override bool Equals(object obj)
         {
-            if (!(obj is BoundingCube)) return false;
-            if (((BoundingCube)obj).Xmin != Xmin) return false;
-            if (((BoundingCube)obj).Xmax != Xmax) return false;
-            if (((BoundingCube)obj).Ymin != Ymin) return false;
-            if (((BoundingCube)obj).Ymax != Ymax) return false;
-            if (((BoundingCube)obj).Zmin != Zmin) return false;
-            if (((BoundingCube)obj).Zmax != Zmax) return false;
+            if (!(obj is BoundingBox)) return false;
+            if (((BoundingBox)obj).Xmin != Xmin) return false;
+            if (((BoundingBox)obj).Xmax != Xmax) return false;
+            if (((BoundingBox)obj).Ymin != Ymin) return false;
+            if (((BoundingBox)obj).Ymax != Ymax) return false;
+            if (((BoundingBox)obj).Zmin != Zmin) return false;
+            if (((BoundingBox)obj).Zmax != Zmax) return false;
             return true;
         }
         public override int GetHashCode()
@@ -1446,9 +1453,9 @@ namespace CADability
             res.MinMax(projection.ProjectUnscaled(new GeoPoint(Xmax, Ymax, Zmax)));
             return res;
         }
-        internal BoundingCube Modify(GeoVector translate)
+        internal BoundingBox Modify(GeoVector translate)
         {
-            return new BoundingCube(Xmin + translate.x, Xmax + translate.x, Ymin + translate.y, Ymax + translate.y, Zmin + translate.z, Zmax + translate.z);
+            return new BoundingBox(Xmin + translate.x, Xmax + translate.x, Ymin + translate.y, Ymax + translate.y, Zmin + translate.z, Zmax + translate.z);
         }
         public ICurve[] Clip(ICurve toClip)
         {
@@ -1478,7 +1485,7 @@ namespace CADability
             return res.ToArray();
 
         }
-        internal BoundingCube(IJsonReadStruct data)
+        internal BoundingBox(IJsonReadStruct data)
         {
             Xmin = data.GetValue<double>();
             Xmax = data.GetValue<double>();

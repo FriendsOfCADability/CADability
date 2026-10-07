@@ -23,7 +23,7 @@ namespace CADability.Actions
         private double faktorX;
         private double faktorY;
         private double faktorZ;
-        private BoundingCube cube; // der umgebende Quader
+        private BoundingBox cube; // der umgebende Quader
         private bool dis; // Verzerrung ja
         private DoubleInput fac;
         private DoubleInput fac1;
@@ -81,7 +81,7 @@ namespace CADability.Actions
             double divMBx; // Abstand MousePosition zu Referenzpunt in x-Richtung
             double divMBy; // Abstand MousePosition zu Referenzpunt in y-Richtung
             double divMBz; // Abstand MousePosition zu Referenzpunt in z-Richtung
-            BoundingCube cubeLoc = cube; // der umgebende Kubus der Objekte
+            BoundingBox cubeLoc = cube; // der umgebende Kubus der Objekte
             cubeLoc.MinMax(base.BasePoint); // der Punkt kommt noch mit dazu, kann ja auch ausserhalb liegen
             // es wird ein Faktor gebildet aus: (Abstand rect-Rand und Referenzpunkt) und (Abstand MousePos. und Referenzpunkt),
             // getrennt für alle vier Quadranten
@@ -291,7 +291,7 @@ namespace CADability.Actions
             if (!up) // also beim Drücken, nicht beim Loslassen
             {
                 // statt des umgebenden Kubus der Objekte ist es nun der definierter Punkt p
-                cube = BoundingCube.EmptyBoundingCube;
+                cube = BoundingBox.EmptyBoundingCube;
                 cube.MinMax(base.BasePoint); // der FixPunkt 
                 cube.MinMax(MousePosition); // der Skalierungspunkt kommt dazu
                 startPoint = MousePosition; // den Runterdrückpunkt merken
@@ -313,7 +313,7 @@ namespace CADability.Actions
         {
             // statt des umgebenden Rechtecks der Objekte ist es nun der definierter Punkt p
             startPoint = p;
-            cube = BoundingCube.EmptyBoundingCube;
+            cube = BoundingBox.EmptyBoundingCube;
             cube.MinMax(base.BasePoint); // der FixPunkt 
             cube.MinMax(p); // der Skalierungspunkt kommt hinzu
         }
@@ -430,7 +430,7 @@ namespace CADability.Actions
             copy.SetBooleanEvent += new CADability.Actions.ConstructAction.BooleanInput.SetBooleanDelegate(SetCopy);
 
             // erstmal wird das umgebende Rechteck bestimmt
-            cube = BoundingCube.EmptyBoundingCube;
+            cube = BoundingBox.EmptyBoundingCube;
             foreach (IGeoObject go in originals)
             {
                 cube.MinMax(go.GetBoundingCube());

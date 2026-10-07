@@ -134,7 +134,7 @@ namespace CADability.Tests
         public void ApproximateKeepsTheParameterApproximately()
         {
             BoundingRect extent2d = BoundingRect.EmptyBoundingRect;
-            BoundingCube extent3d = BoundingCube.EmptyBoundingCube;
+            BoundingBox extent3d = BoundingBox.EmptyBoundingCube;
             for (int i = 0; i <= 200; i++)
             {
                 double u = MinPar + i / 200.0 * (MaxPar - MinPar);

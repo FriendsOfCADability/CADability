@@ -20,7 +20,7 @@ namespace CADability
             bool isOpen; // wenn true, dann ist das Polygon offen und der 1. Punkt nach rückwärts und der letzte Punkt nach vorwärts beliebig verlängerbar
             ModOp2D toUV; // Umwandlung vom Ebenen Koordinatensystem in das tangentiale surface uv-System
             Tangulation tangulation; // Zeigt nach außen
-            BoundingCube extend;
+            BoundingBox extend;
 
             public PlanePolygon(GeoPoint2D uv, GeoPoint loc, GeoVector diru, GeoVector dirv, GeoPoint edgeStart, GeoPoint edgeEnd, Tangulation tangulation)
             {
@@ -31,10 +31,10 @@ namespace CADability
                 polygon.Add(plane.Project(edgeStart)); // die beiden Punkte geben die Linie an, die die Ebene begrenzt
                 polygon.Add(plane.Project(edgeEnd));
                 isOpen = true; // die Linie "halbiert" die Ebene, links davon ist innerhalb
-                extend = BoundingCube.EmptyBoundingCube;
+                extend = BoundingBox.EmptyBoundingCube;
             }
 
-            BoundingCube IOctTreeInsertable.GetExtent(double precision)
+            BoundingBox IOctTreeInsertable.GetExtent(double precision)
             {
                 if (isOpen) return tangulation.octtree.Extend; // nicht endlich, also alles
                 if (extend.IsEmpty)
@@ -47,7 +47,7 @@ namespace CADability
                 return extend;
             }
 
-            bool IOctTreeInsertable.HitTest(ref BoundingCube cube, double precision)
+            bool IOctTreeInsertable.HitTest(ref BoundingBox cube, double precision)
             {
                 throw new NotImplementedException();
             }
@@ -70,7 +70,7 @@ namespace CADability
 
 
         OctTree<PlanePolygon> octtree;
-        BoundingCube extend;
+        BoundingBox extend;
 
         public Tangulation(GeoPoint2D[][] points, ISurface surface, double maxDeflection, Angle maxBending)
         {

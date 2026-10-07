@@ -47,7 +47,7 @@ namespace CADability.Tests
             foreach (SimpleShape ss in cs.SimpleShapes)
             {
                 Face fc = Face.MakeFace(pls, ss);
-                fc.GetTriangulation(0.05, out GeoPoint[] tp, out GeoPoint2D[] tuv, out int[] ti, out BoundingCube te);
+                fc.GetTriangulation(0.05, out GeoPoint[] tp, out GeoPoint2D[] tuv, out int[] ti, out BoundingBox te);
                 res += ti.Length / 3;
             }
             return res;

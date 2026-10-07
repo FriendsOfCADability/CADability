@@ -288,7 +288,7 @@ namespace CADability
     class VertexCloudToPlanes : NDimTree<Vertex>
     {
         private GeoPoint center;
-        public VertexCloudToPlanes(IEnumerable<Vertex> vertices, BoundingCube extent) : base(new double[] { -1, -1, -1, 0 }, new double[] { 1, 1, 1, extent.DiagonalLength / 2.0 }, true)
+        public VertexCloudToPlanes(IEnumerable<Vertex> vertices, BoundingBox extent) : base(new double[] { -1, -1, -1, 0 }, new double[] { 1, 1, 1, extent.DiagonalLength / 2.0 }, true)
         {
             center = extent.GetCenter();
             node.Split(2);
@@ -344,7 +344,7 @@ namespace CADability
                     if ((i & (1 << j)) != 0) minExtent[j] = midpoint[j];
                     else maxExtent[j] = midpoint[j];
                 }
-                BoundingCube ext = new BoundingCube(minExtent[0], maxExtent[0], minExtent[1], maxExtent[1], minExtent[2], maxExtent[2]);
+                BoundingBox ext = new BoundingBox(minExtent[0], maxExtent[0], minExtent[1], maxExtent[1], minExtent[2], maxExtent[2]);
                 double d1 = ext.MinDistTo(GeoPoint.Origin);
                 double d2 = ext.MaxDistTo(GeoPoint.Origin);
                 if (d1 <= 1.0 && d2 >= 1.0) res.Add(new Node(minExtent, maxExtent));
@@ -383,7 +383,7 @@ namespace CADability
             {0b101, 0b111 }
         };
         private GeoPoint center;
-        public EdgeCloudToPlanes(IEnumerable<Edge> edges, BoundingCube extent) : base(new double[] { -1, -1, -1, 0 }, new double[] { 1, 1, 1, extent.DiagonalLength / 2.0 }, true)
+        public EdgeCloudToPlanes(IEnumerable<Edge> edges, BoundingBox extent) : base(new double[] { -1, -1, -1, 0 }, new double[] { 1, 1, 1, extent.DiagonalLength / 2.0 }, true)
         {   // symmetric unit cube, when splitting, the inner cubes at 0 are eliminated
             center = extent.GetCenter();
             node.Split(2); // split for two levels, this makes less than 16*16 nodes, because the inner nodes which contain the origin are not created
@@ -499,7 +499,7 @@ namespace CADability
             }
 #if DEBUG
             //GeoObjectList dbglist = new GeoObjectList();
-            //BoundingCube nbc = new BoundingCube(min[0], max[0], min[1], max[1], min[2], max[2]);
+            //BoundingBox nbc = new BoundingBox(min[0], max[0], min[1], max[1], min[2], max[2]);
             //dbglist.Add(nbc.AsBox);
             //for (int i = 0; i < extremeNormals.Count; i++)
             //{
@@ -572,7 +572,7 @@ namespace CADability
                     if ((i & (1 << j)) != 0) minExtent[j] = midpoint[j];
                     else maxExtent[j] = midpoint[j];
                 }
-                BoundingCube ext = new BoundingCube(minExtent[0], maxExtent[0], minExtent[1], maxExtent[1], minExtent[2], maxExtent[2]);
+                BoundingBox ext = new BoundingBox(minExtent[0], maxExtent[0], minExtent[1], maxExtent[1], minExtent[2], maxExtent[2]);
                 double d1 = ext.MinDistTo(GeoPoint.Origin);
                 double d2 = ext.MaxDistTo(GeoPoint.Origin);
                 if (d1 <= 1.0 && d2 >= 1.0) res.Add(new Node(minExtent, maxExtent));

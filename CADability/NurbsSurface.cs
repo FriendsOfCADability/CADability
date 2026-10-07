@@ -68,8 +68,8 @@ namespace CADability.GeoObject
             }
         }
         // cached bounding boxes of the knot span patches, see GetPatchExtent(int, int, bool).
-        // BoundingCube.EmptyBoundingCube marks a not yet computed entry
-        private BoundingCube[,] knotSpanExtent;
+        // BoundingBox.EmptyBoundingCube marks a not yet computed entry
+        private BoundingBox[,] knotSpanExtent;
         private new void InvalidateSecondaryData()
         {
             knotSpanExtent = null;
@@ -91,7 +91,7 @@ namespace CADability.GeoObject
             {
                 if (!simpleSurfaceChecked)
                 {
-                    BoundingCube polesext = BoundingCube.EmptyBoundingCube;
+                    BoundingBox polesext = BoundingBox.EmptyBoundingCube;
                     foreach (GeoPoint point in poles)
                     {
                         polesext.MinMax(point);
@@ -1815,7 +1815,7 @@ namespace CADability.GeoObject
                     }
                     GeoPoint loc; GeoVector dir;
                     GeoPoint uvcenter = PointAt(new GeoPoint2D((umin + umax) / 2, (vmin + vmax) / 2));
-                    BoundingCube bc = new BoundingCube(ucnt);
+                    BoundingBox bc = new BoundingBox(ucnt);
                     if (bc.Size < precision && Geometry.LineFit(vcnt, out loc, out dir) < precision)
                     {   // Kugel, Mittelpunkt: bc, Achse: dir, v sind die Breitengrade
                         GeoPoint center = bc.GetCenter();
@@ -1830,7 +1830,7 @@ namespace CADability.GeoObject
                     }
                     else
                     {
-                        bc = new BoundingCube(vcnt);
+                        bc = new BoundingBox(vcnt);
                         if (bc.Size < precision && Geometry.LineFit(ucnt, out loc, out dir) < precision)
                         {   // Kugel, Mittelpunkt: bc, Achse: dir, u sind die Breitengrade (wie gewöhnlich)
                             GeoPoint center = bc.GetCenter();
@@ -3017,7 +3017,7 @@ namespace CADability.GeoObject
             fixedVCurves.Target = dict;
             return res;
         }
-        internal BoundingCube GetPatchExtent(BoundingRect uvPatch)
+        internal BoundingBox GetPatchExtent(BoundingRect uvPatch)
         {   // formerly this method only used the four boundary curves, which is not a guaranteed bounding box
             // (inner bulges of the patch were ignored). Now it is based on the knot span boxes
             return GetPatchExtent(uvPatch, false);
@@ -3067,7 +3067,7 @@ namespace CADability.GeoObject
         /// <param name="uKnotIndex">index of the knot span in u direction (referring to distinct knot values)</param>
         /// <param name="vKnotIndex">index of the knot span in v direction (referring to distinct knot values)</param>
         /// <param name="rough">true: fast pole hull, false: tight box</param>
-        public BoundingCube GetPatchExtent(int uKnotIndex, int vKnotIndex, bool rough = false)
+        public BoundingBox GetPatchExtent(int uKnotIndex, int vKnotIndex, bool rough = false)
         {
             if (uKnotIndex < 0 || uKnotIndex >= uKnots.Length - 1) throw new ArgumentOutOfRangeException("uKnotIndex");
             if (vKnotIndex < 0 || vKnotIndex >= vKnots.Length - 1) throw new ArgumentOutOfRangeException("vKnotIndex");
@@ -3077,7 +3077,7 @@ namespace CADability.GeoObject
             double um = 0.5 * (u0 + u1), vm = 0.5 * (v0 + v1); // span midpoint identifies the span unambiguously
             if (rough)
             {
-                BoundingCube rr = BoundingCube.EmptyBoundingCube;
+                BoundingBox rr = BoundingBox.EmptyBoundingCube;
                 if (nubs != null)
                 {
                     GeoPoint[] block = nubs.GetSpanPoles(um, vm);
@@ -3096,15 +3096,15 @@ namespace CADability.GeoObject
             }
             if (knotSpanExtent == null)
             {
-                BoundingCube[,] tmp = new BoundingCube[uKnots.Length - 1, vKnots.Length - 1];
+                BoundingBox[,] tmp = new BoundingBox[uKnots.Length - 1, vKnots.Length - 1];
                 for (int i = 0; i < tmp.GetLength(0); ++i)
                 {
-                    for (int j = 0; j < tmp.GetLength(1); ++j) tmp[i, j] = BoundingCube.EmptyBoundingCube;
+                    for (int j = 0; j < tmp.GetLength(1); ++j) tmp[i, j] = BoundingBox.EmptyBoundingCube;
                 }
                 knotSpanExtent = tmp;
             }
             if (!knotSpanExtent[uKnotIndex, vKnotIndex].IsEmpty) return knotSpanExtent[uKnotIndex, vKnotIndex];
-            BoundingCube res = ComputeTightExtent(u0, u1, v0, v1);
+            BoundingBox res = ComputeTightExtent(u0, u1, v0, v1);
             knotSpanExtent[uKnotIndex, vKnotIndex] = res;
             return res;
         }
@@ -3141,14 +3141,14 @@ namespace CADability.GeoObject
         /// Computes a tight and guaranteed enclosing box of the surface patch [u0, u1] x [v0, v1], which must
         /// lie within a single knot span. See <see cref="GetPatchExtent(int, int, bool)"/> for the algorithm.
         /// </summary>
-        private BoundingCube ComputeTightExtent(double u0, double u1, double v0, double v1)
+        private BoundingBox ComputeTightExtent(double u0, double u1, double v0, double v1)
         {
             GeoPointH[] net = GetBezierNetH(u0, u1, v0, v1, out bool weightsOk);
             if (!weightsOk) return base.GetPatchExtent(new BoundingRect(u0, v0, u1, v1), false); // no hull property with negative weights
             int nu = uDegree + 1, nv = vDegree + 1;
             // reference box: contains only points which are exactly on the patch, so it is a lower bound of the
             // true extent. It controls how far the Bézier hulls have to be subdivided.
-            BoundingCube reference = BoundingCube.EmptyBoundingCube;
+            BoundingBox reference = BoundingBox.EmptyBoundingCube;
             reference.MinMax(PointAt(new GeoPoint2D(u0, v0)));
             reference.MinMax(PointAt(new GeoPoint2D(u1, v0)));
             reference.MinMax(PointAt(new GeoPoint2D(u0, v1)));
@@ -3200,10 +3200,10 @@ namespace CADability.GeoObject
             }
             // subdivide the Bézier hull until it exceeds the reference box by no more than tol on each side.
             // The result is the union of the hulls of all subdivision leaves and thus guaranteed to contain the patch
-            BoundingCube hull0 = BoundingCube.EmptyBoundingCube;
+            BoundingBox hull0 = BoundingBox.EmptyBoundingCube;
             for (int i = 0; i < net.Length; ++i) hull0.MinMax((GeoPoint)net[i]);
             double tol = hull0.Size * 1e-3;
-            BoundingCube res = reference; // reference points are on the surface, so they are inside the true extent
+            BoundingBox res = reference; // reference points are on the surface, so they are inside the true extent
             AddBezierHull(net, nu, nv, ref reference, tol, 4, ref res);
             return res;
         }
@@ -3211,11 +3211,11 @@ namespace CADability.GeoObject
         /// Guaranteed enclosing box of the surface patch [u0, u1] x [v0, v1] (which must lie within a single
         /// knot span) from the convex hull of its Bézier net: fast, but without the tightening subdivision.
         /// </summary>
-        private BoundingCube ComputeRoughExtent(double u0, double u1, double v0, double v1)
+        private BoundingBox ComputeRoughExtent(double u0, double u1, double v0, double v1)
         {
             GeoPointH[] net = GetBezierNetH(u0, u1, v0, v1, out bool weightsOk);
             if (!weightsOk) return base.GetPatchExtent(new BoundingRect(u0, v0, u1, v1), true); // no hull property with negative weights
-            BoundingCube res = BoundingCube.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingCube;
             for (int i = 0; i < net.Length; ++i) res.MinMax((GeoPoint)net[i]);
             return res;
         }
@@ -3258,14 +3258,14 @@ namespace CADability.GeoObject
         /// spans are computed from the Bézier net of the sub rectangle. Periodic parameters may wrap around the
         /// seam, non periodic parameters are clamped to the domain.
         /// </summary>
-        private BoundingCube GetPatchExtentBySpans(BoundingRect uvPatch, bool rough)
+        private BoundingBox GetPatchExtentBySpans(BoundingRect uvPatch, bool rough)
         {
             if (nubs == null && nurbs == null) Init();
             List<double[]> uIntervals = new List<double[]>(2);
             List<double[]> vIntervals = new List<double[]>(2);
             AddIntervalsInDomain(uvPatch.Left, uvPatch.Right, uKnots[0], uKnots[uKnots.Length - 1], uPeriodic, uIntervals);
             AddIntervalsInDomain(uvPatch.Bottom, uvPatch.Top, vKnots[0], vKnots[vKnots.Length - 1], vPeriodic, vIntervals);
-            BoundingCube res = BoundingCube.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingCube;
             for (int ui = 0; ui < uIntervals.Count; ++ui)
             {
                 double ua = uIntervals[ui][0], ub = uIntervals[ui][1];
@@ -3298,14 +3298,14 @@ namespace CADability.GeoObject
         /// net exceeds the (growing) reference box by more than tol, the patch is subdivided (de Casteljau) up to
         /// the provided depth. Every leaf contributes its full pole hull, so res always contains the patch.
         /// </summary>
-        private static void AddBezierHull(GeoPointH[] net, int nu, int nv, ref BoundingCube reference, double tol, int depth, ref BoundingCube res)
+        private static void AddBezierHull(GeoPointH[] net, int nu, int nv, ref BoundingBox reference, double tol, int depth, ref BoundingBox res)
         {
             // the corner poles of a Bézier patch are on the surface: they improve the reference box for free
             reference.MinMax((GeoPoint)net[0]);
             reference.MinMax((GeoPoint)net[nu - 1]);
             reference.MinMax((GeoPoint)net[nu * (nv - 1)]);
             reference.MinMax((GeoPoint)net[nu * nv - 1]);
-            BoundingCube hull = BoundingCube.EmptyBoundingCube;
+            BoundingBox hull = BoundingBox.EmptyBoundingCube;
             for (int i = 0; i < net.Length; ++i) hull.MinMax((GeoPoint)net[i]);
             if (depth <= 0 ||
                 (hull.Xmax <= reference.Xmax + tol && hull.Xmin >= reference.Xmin - tol &&
@@ -4538,11 +4538,11 @@ namespace CADability.GeoObject
             intu = uSteps.ToArray();
             intv = vSteps.ToArray();
         }
-        public override BoundingCube GetPatchExtent(BoundingRect uvPatch, bool rough)
+        public override BoundingBox GetPatchExtent(BoundingRect uvPatch, bool rough)
         {
             if (rough && uvPatch.Left <= uKnots[0] && uvPatch.Right >= uKnots[uKnots.Length - 1] && uvPatch.Bottom <= vKnots[0] && uvPatch.Top >= vKnots[vKnots.Length - 1])
             {   // whole domain: all poles provide a hull, no need to look at the individual spans
-                BoundingCube res = BoundingCube.EmptyBoundingCube;
+                BoundingBox res = BoundingBox.EmptyBoundingCube;
                 for (int i = 0; i < poles.GetLength(0); i++)
                 {
                     for (int j = 0; j < poles.GetLength(1); j++)
@@ -4891,12 +4891,12 @@ namespace CADability.GeoObject
             return res.ToArray();
         }
         /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.HitTest (BoundingCube, out GeoPoint2D)"/>
+        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.HitTest (BoundingBox, out GeoPoint2D)"/>
         /// </summary>
         /// <param name="cube"></param>
         /// <param name="uv"></param>
         /// <returns></returns>
-        public override bool HitTest(BoundingCube cube, out GeoPoint2D uv)
+        public override bool HitTest(BoundingBox cube, out GeoPoint2D uv)
         {
             return BoxedSurfaceEx.HitTest(cube, out uv);
         }
@@ -5693,11 +5693,11 @@ namespace CADability.GeoObject
             }
         }
 
-        private BoundingCube PolesExtent
+        private BoundingBox PolesExtent
         {
             get
             {
-                BoundingCube res = BoundingCube.EmptyBoundingCube;
+                BoundingBox res = BoundingBox.EmptyBoundingCube;
                 for (int i = 0; i < poles.GetLength(0); i++)
                 {
                     for (int j = 0; j < poles.GetLength(1); j++)

@@ -74,7 +74,7 @@ namespace CADability.GeoObject
         private GeoPoint[] interpol; // Interpolation mit einer gewissen Genauigkeit
         private GeoVector[] interdir; // Interpolation mit einer gewissen Genauigkeit
         private double[] interparam; // die Parameter zur Interpolation
-        private BoundingCube extent;
+        private BoundingBox extent;
         private double length = double.MinValue; // cached arc length, see ICurve.Length
         private TetraederHull tetraederHull;
         private GeoPoint[] approximation; // Interpolation mit der Genauigkeit der Auflösung
@@ -364,7 +364,7 @@ namespace CADability.GeoObject
         private void MakeInterpol()
         {   // die Interpolation geht mindestens durch die Knotenpunkte
             // die Abweichung von der Kurve wird erstmal auf ein Verhältnis zur Gesamtgröße festgelegt
-            BoundingCube ext = new BoundingCube(poles);
+            BoundingBox ext = new BoundingBox(poles);
             double maxError = Math.Max(ext.Size / 100.0, Precision.eps * 100); // testweise 1/100 der gesamten Ausdehnung
             // Ein Problem bleibt bestehen. Der Fehlertest in der Mitte des Segments ist unsicher, denn bei einer
             // Art Wendepunkt kann das Segment die Sehne schneiden und so fälschlicherweise einen zu kleinen
@@ -500,7 +500,7 @@ namespace CADability.GeoObject
             : base()
         {
             if (Constructed != null) Constructed(this);
-            extent = BoundingCube.EmptyBoundingCube;
+            extent = BoundingBox.EmptyBoundingCube;
         }
         /// <summary>
         /// Approximates the provided <paramref name="curve"/> by a cubic BSpline which interpolates the curve at
@@ -546,7 +546,7 @@ namespace CADability.GeoObject
             for (int i = 0; i <= initialIntervals; i++) nodes.Add((double)i / initialIntervals);
             if (precision <= 0.0)
             {
-                BoundingCube ext = BoundingCube.EmptyBoundingCube;
+                BoundingBox ext = BoundingBox.EmptyBoundingCube;
                 foreach (double s in nodes) ext.MinMax(Sample(s));
                 precision = ext.Size * 1e-6;
                 if (precision <= 0.0) precision = Precision.eps; // all points coincide
@@ -690,7 +690,7 @@ namespace CADability.GeoObject
                 interdir = null;
                 interparam = null;
                 approximation = null;
-                extent = BoundingCube.EmptyBoundingCube;
+                extent = BoundingBox.EmptyBoundingCube;
                 length = double.MinValue;
                 tetraederHull = null;
                 extrema = null;
@@ -1925,15 +1925,15 @@ namespace CADability.GeoObject
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
         /// </summary>
         /// <returns></returns>
-        public override BoundingCube GetBoundingCube()
+        public override BoundingBox GetBoundingCube()
         {
             if (extent.IsEmpty && poles != null)
             {
-                extent = BoundingCube.EmptyBoundingCube;
+                extent = BoundingBox.EmptyBoundingCube;
                 double[] extx = (this as ICurve).GetExtrema(GeoVector.XAxis);
                 double[] exty = (this as ICurve).GetExtrema(GeoVector.YAxis);
                 double[] extz = (this as ICurve).GetExtrema(GeoVector.ZAxis);
-                BoundingCube res = BoundingCube.EmptyBoundingCube;
+                BoundingBox res = BoundingBox.EmptyBoundingCube;
                 for (int i = 0; i < extx.Length; ++i)
                 {
                     extent.MinMax((this as ICurve).PointAt(extx[i]));
@@ -2017,17 +2017,17 @@ namespace CADability.GeoObject
         /// </summary>
         /// <param name="precision"></param>
         /// <returns></returns>
-        public override BoundingCube GetExtent(double precision)
+        public override BoundingBox GetExtent(double precision)
         {
             return GetBoundingCube();
         }
         /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
+        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingBox, double)"/>
         /// </summary>
         /// <param name="cube"></param>
         /// <param name="precision"></param>
         /// <returns></returns>
-        public override bool HitTest(ref BoundingCube cube, double precision)
+        public override bool HitTest(ref BoundingBox cube, double precision)
         {
             return this.TetraederHull.HitTest(cube);
         }
@@ -2162,7 +2162,7 @@ namespace CADability.GeoObject
                         break;
                 }
             }
-            extent = BoundingCube.EmptyBoundingCube;
+            extent = BoundingBox.EmptyBoundingCube;
             if (Constructed != null) Constructed(this);
         }
         /// <summary>
@@ -3599,11 +3599,11 @@ namespace CADability.GeoObject
         {
             return false;
         }
-        BoundingCube ICurve.GetExtent()
+        BoundingBox ICurve.GetExtent()
         {
             return GetExtent(0.0);
         }
-        bool ICurve.HitTest(BoundingCube cube)
+        bool ICurve.HitTest(BoundingBox cube)
         {
             return this.TetraederHull.HitTest(cube);
         }
@@ -4092,9 +4092,9 @@ namespace CADability.GeoObject
             }
             return 0;
         }
-        internal BoundingCube GetIntervalExtent(double pmin, double pmax)
+        internal BoundingBox GetIntervalExtent(double pmin, double pmax)
         {   // liefert die Ausdehnung eines Abschnitts der Kurve in 3D
-            BoundingCube res = BoundingCube.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingCube;
             res.MinMax(PointAtParam(pmin));
             res.MinMax(PointAtParam(pmax));
             if (!nurbsHelper) MakeNurbsHelper();
@@ -4123,7 +4123,7 @@ namespace CADability.GeoObject
         /// TetraederHull based ICurve.GetExtrema this is exact and complete (extrema without a sign change of
         /// the derivative at the tetraeder base points cannot be missed) and needs no iteration.
         /// </summary>
-        private void AddSpanExtremaExact(double pmin, double pmax, ref BoundingCube res)
+        private void AddSpanExtremaExact(double pmin, double pmax, ref BoundingBox res)
         {
             for (int i = 0; i < knots.Length - 1; ++i)
             {

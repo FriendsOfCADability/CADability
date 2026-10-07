@@ -248,9 +248,9 @@ namespace CADability.Tests
             bsp.GetData(out int degree, out GeoPoint[] _, out double[] _, out double[] knots, out int[] _);
             double pmin = knots[0] + 0.1 * (knots[knots.Length - 1] - knots[0]);
             double pmax = knots[0] + 0.85 * (knots[knots.Length - 1] - knots[0]);
-            BoundingCube ext = bsp.GetIntervalExtent(pmin, pmax);
+            BoundingBox ext = bsp.GetIntervalExtent(pmin, pmax);
             // dense sampling of the interval: every sample is inside, and the extreme samples touch the box
-            BoundingCube sampled = BoundingCube.EmptyBoundingCube;
+            BoundingBox sampled = BoundingBox.EmptyBoundingCube;
             for (int i = 0; i <= 20000; i++)
             {
                 GeoPoint p = bsp.PointAtParam(pmin + i * (pmax - pmin) / 20000);

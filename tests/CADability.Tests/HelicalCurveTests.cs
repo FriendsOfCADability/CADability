@@ -176,7 +176,7 @@ namespace CADability.Tests
         public void GetBoundingCube_ContainsTheCurve()
         {
             HelicalCurve h = MakeTestHelix();
-            BoundingCube bb = h.GetBoundingCube();
+            BoundingBox bb = h.GetBoundingCube();
             for (int i = 0; i <= 100; ++i)
             {
                 Assert.IsTrue(bb.Contains(h.PointAt(i / 100.0), 1e-6), "point at " + i);

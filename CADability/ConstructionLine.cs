@@ -135,9 +135,9 @@ namespace CADability.GeoObject
         /// and zoom-to-extents ignores the construction line.
         /// </summary>
         /// <returns>the bounding cube of the base point</returns>
-        public override BoundingCube GetBoundingCube()
+        public override BoundingBox GetBoundingCube()
         {
-            return new BoundingCube(BasePoint);
+            return new BoundingBox(BasePoint);
         }
         /// <summary>
         /// Overrides <see cref="Line.GetExtent(double)"/>: in contrast to <see cref="GetBoundingCube"/>
@@ -146,9 +146,9 @@ namespace CADability.GeoObject
         /// </summary>
         /// <param name="precision"></param>
         /// <returns>the extent of the displayed segment</returns>
-        public override BoundingCube GetExtent(double precision)
+        public override BoundingBox GetExtent(double precision)
         {
-            BoundingCube res = BoundingCube.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingCube;
             res.MinMax(StartPoint);
             res.MinMax(EndPoint);
             return res;

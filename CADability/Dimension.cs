@@ -120,7 +120,7 @@ namespace CADability.GeoObject
         private GeoVector normal; // Normalenrichtung der Ebene, in der sich die Bemaßung befindet
 
         private Plane plane; // die Ebene, in der alle stattfindet, rekonstruierbar
-        private BoundingCube extent = BoundingCube.EmptyBoundingCube;
+        private BoundingBox extent = BoundingBox.EmptyBoundingCube;
 
         /// <summary>
         /// Die folgenden Daten für den Fall, dass der Text editiert wird
@@ -2257,7 +2257,7 @@ namespace CADability.GeoObject
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
         /// </summary>
         /// <returns></returns>
-        public override BoundingCube GetBoundingCube()
+        public override BoundingBox GetBoundingCube()
         {
             if (!extent.IsEmpty) return extent;
             GeoObjectList list = new GeoObjectList();
@@ -2270,7 +2270,7 @@ namespace CADability.GeoObject
             {
                 if (e is ThreadAbortException) throw (e);
             }
-            BoundingCube res = BoundingCube.EmptyBoundingCube;
+            BoundingBox res = BoundingBox.EmptyBoundingCube;
             for (int i = 0; i < list.Count; ++i)
             {
                 res.MinMax(list[i].GetBoundingCube());
@@ -2392,17 +2392,17 @@ namespace CADability.GeoObject
         /// </summary>
         /// <param name="precision"></param>
         /// <returns></returns>
-        public override BoundingCube GetExtent(double precision)
+        public override BoundingBox GetExtent(double precision)
         {
             return GetBoundingCube();
         }
         /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
+        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingBox, double)"/>
         /// </summary>
         /// <param name="cube"></param>
         /// <param name="precision"></param>
         /// <returns></returns>
-        public override bool HitTest(ref BoundingCube cube, double precision)
+        public override bool HitTest(ref BoundingBox cube, double precision)
         {
             GeoObjectList list = new GeoObjectList();
             try

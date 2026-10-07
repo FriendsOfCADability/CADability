@@ -194,7 +194,7 @@ namespace CADability
             if (NeedsRepaintEvent != null) NeedsRepaintEvent(this, new NeedsRepaintEventArg());
         }
 
-        void OnModelExtentChanged(BoundingCube newExtent)
+        void OnModelExtentChanged(BoundingBox newExtent)
         {   // der Grund: In ein Modell wird was großes eingefügt. Anschließend wird
             // die Traingulation aufgrund der Precision gemacht: Die kann ewig dauern, wenn hier
             // nicht ein passender Wert steht

@@ -1018,7 +1018,7 @@ namespace CADability
             Projection pr = this.projection;
             double factor, ddx, ddy;
             pr.GetPlacement(out factor, out ddx, out ddy);
-            BoundingCube bc = model.Extent;
+            BoundingBox bc = model.Extent;
             bc.MinMax(model.MinExtend);
             BoundingRect ext = BoundingRect.EmptyBoundingRect;
             ext.MinMax(pr.DrawingPlane.Project(new GeoPoint(bc.Xmin, bc.Ymin, bc.Zmin)));
@@ -1572,7 +1572,7 @@ namespace CADability
             get { return allowContextMenu; }
         }
 
-        void IActionInputView.SetAdditionalExtent(BoundingCube bc)
+        void IActionInputView.SetAdditionalExtent(BoundingBox bc)
         {
 
         }

@@ -128,7 +128,7 @@ namespace CADability.DXF
         {
             try
             {
-                BoundingCube ext = model.Extent;
+                BoundingBox ext = model.Extent;
                 if (!ext.IsEmpty)
                 {
                     doc.Header.ModelSpaceExtMin = new XYZ(ext.Xmin, ext.Ymin, ext.Zmin);
@@ -376,7 +376,7 @@ namespace CADability.DXF
                 else
                 {
                     face.GetTriangulation(triangulationPrecision, out GeoPoint[] pts, out GeoPoint2D[] uvPts,
-                        out int[] triIdx, out BoundingCube ext);
+                        out int[] triIdx, out BoundingBox ext);
                     var mesh = new ACadSharp.Entities.Mesh();
                     foreach (var pt in pts) mesh.Vertices.Add(ToXYZ(pt));
                     for (int i = 0; i + 2 < triIdx.Length; i += 3)
@@ -403,7 +403,7 @@ namespace CADability.DXF
                 else
                 {
                     face.GetTriangulation(triangulationPrecision, out GeoPoint[] pts, out GeoPoint2D[] uvPts,
-                        out int[] triIdx, out BoundingCube ext);
+                        out int[] triIdx, out BoundingBox ext);
                     List<short[]> idxList = new List<short[]>();
                     for (int i = 0; i + 2 < triIdx.Length; i += 3)
                         idxList.Add(new short[] {
@@ -446,7 +446,7 @@ namespace CADability.DXF
                 mesh[argb] = mc = (new List<XYZ>(), new List<short[]>());
             short offset = (short)(mc.Item1.Count + 1);
             face.GetTriangulation(triangulationPrecision, out GeoPoint[] pts, out GeoPoint2D[] uvPts,
-                out int[] triIdx, out BoundingCube ext);
+                out int[] triIdx, out BoundingBox ext);
             for (int i = 0; i + 2 < triIdx.Length; i += 3)
                 mc.Item2.Add(new short[] {
                     (short)(triIdx[i] + offset),

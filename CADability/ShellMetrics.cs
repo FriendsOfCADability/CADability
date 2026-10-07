@@ -34,15 +34,15 @@ namespace CADability.GeoObject
         /// </summary>
         public static double SizeOf(Shell shell)
         {
-            BoundingCube box = ExactExtentOf(shell);
+            BoundingBox box = ExactExtentOf(shell);
             double size = box.IsEmpty ? 1.0 : box.Size;
             return Math.Max(size, 1e-6);
         }
 
         /// <summary>The extent of the shell from vertices and edge curves only, see <see cref="SizeOf"/>.</summary>
-        private static BoundingCube ExactExtentOf(Shell shell)
+        private static BoundingBox ExactExtentOf(Shell shell)
         {
-            BoundingCube box = BoundingCube.EmptyBoundingCube;
+            BoundingBox box = BoundingBox.EmptyBoundingCube;
             foreach (Vertex vertex in shell.Vertices) box.MinMax(vertex.Position);
             foreach (Edge edge in shell.Edges) if (edge.Curve3D != null) box.MinMax(edge.Curve3D.GetExtent());
             return box;
@@ -219,7 +219,7 @@ namespace CADability.GeoObject
         /// </summary>
         public static double IntegratedVolume(Shell shell, double precision)
         {
-            BoundingCube box = ExactExtentOf(shell);
+            BoundingBox box = ExactExtentOf(shell);
             GeoPoint center = box.IsEmpty ? GeoPoint.Origin : box.GetCenter();
             double size = SizeOf(shell);
             double sum = 0.0;

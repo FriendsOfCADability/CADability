@@ -1027,13 +1027,13 @@ namespace CADability
             object o = Settings.GlobalSettings.GetValue("DefaultModelSize");
             if (o != null)
             {
-                if (o is BoundingCube) m.Extent = (BoundingCube)o;
-                else if (o is List<object> lo) m.Extent = new BoundingCube((double)lo[0], (double)lo[1], (double)lo[2], (double)lo[3], (double)lo[4], (double)lo[5]);
-                else m.Extent = new BoundingCube(0, 100, 0, 100, 0, 100);
+                if (o is BoundingBox) m.Extent = (BoundingBox)o;
+                else if (o is List<object> lo) m.Extent = new BoundingBox((double)lo[0], (double)lo[1], (double)lo[2], (double)lo[3], (double)lo[4], (double)lo[5]);
+                else m.Extent = new BoundingBox(0, 100, 0, 100, 0, 100);
             }
             else
             {
-                m.Extent = new BoundingCube(0, 100, 0, 100, 0, 100);
+                m.Extent = new BoundingBox(0, 100, 0, 100, 0, 100);
             }
             res.AddModel(m);
             res.SetActiveModel(0);
@@ -1251,6 +1251,9 @@ namespace CADability
             public override Type BindToType(string assemblyName, string typeName)
             {
                 System.Diagnostics.Trace.WriteLine("BindToType: " + assemblyName + ", " + typeName);
+                // Classes renamed since the file was written. The same table the json reader uses, so a rename
+                // is entered once and both formats can still be read.
+                typeName = RenamedTypes.Resolve(typeName);
                 // Diese Zeilen dienen dazu alte CONDOR Dateien lesbar zu machen.
                 // evtl. machen sie Schwierigkeiten, wenn Objekte von anderen Modulen
                 // deserialisiert werden sollen. Dann müsste man weiter unten es wieder 

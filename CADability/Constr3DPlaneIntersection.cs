@@ -84,7 +84,7 @@ namespace CADability.Actions
             Plane plane = pls.Plane;
             if (go is Solid)
             {
-                BoundingCube bc = go.GetBoundingCube();
+                BoundingBox bc = go.GetBoundingCube();
                 if (bc.Interferes(plane))
                 {
                     return (go as Solid).GetPlaneIntersection(pls);
@@ -92,7 +92,7 @@ namespace CADability.Actions
             }
             if (go is Shell)
             {
-                BoundingCube bc = go.GetBoundingCube();
+                BoundingBox bc = go.GetBoundingCube();
                 if (bc.Interferes(plane))
                 {
                     return (go as Shell).GetPlaneIntersection(pls);
@@ -100,7 +100,7 @@ namespace CADability.Actions
             }
             if (go is Face)
             {
-                BoundingCube bc = go.GetBoundingCube();
+                BoundingBox bc = go.GetBoundingCube();
                 if (bc.Interferes(plane))
                 {
                     return (go as Face).GetPlaneIntersection(pls);

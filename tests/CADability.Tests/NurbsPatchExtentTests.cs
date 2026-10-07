@@ -23,9 +23,9 @@ namespace CADability.Tests
                 for (int iv = 0; iv < ns.VKnotSpanCount; ++iv)
                 {
                     BoundingRect span = ns.GetKnotSpan(iu, iv);
-                    BoundingCube rough = ns.GetPatchExtent(iu, iv, true);
-                    BoundingCube tight = ns.GetPatchExtent(iu, iv, false);
-                    BoundingCube sampleBox = BoundingCube.EmptyBoundingCube;
+                    BoundingBox rough = ns.GetPatchExtent(iu, iv, true);
+                    BoundingBox tight = ns.GetPatchExtent(iu, iv, false);
+                    BoundingBox sampleBox = BoundingBox.EmptyBoundingCube;
                     double eps = Math.Max(rough.DiagonalLength, 1.0) * 1e-7;
                     for (int i = 0; i <= samples; ++i)
                     {
@@ -43,18 +43,18 @@ namespace CADability.Tests
                         }
                     }
                     // tight box is a subset of the rough box (Bézier hulls are contained in the pole hull)
-                    BoundingCube roughExp = rough;
+                    BoundingBox roughExp = rough;
                     roughExp.Expand(eps);
                     Assert.IsTrue(roughExp.Contains(tight),
                         name + ": tight box of span (" + iu + ", " + iv + ") exceeds the rough box");
                     // tightness: the tight box may exceed the sample box only by a small fraction of the diagonal
                     double allowed = Math.Max(sampleBox.DiagonalLength, eps) * tightness;
-                    BoundingCube sampleExp = sampleBox;
+                    BoundingBox sampleExp = sampleBox;
                     sampleExp.Expand(allowed);
                     Assert.IsTrue(sampleExp.Contains(tight),
                         name + ": tight box of span (" + iu + ", " + iv + ") is too loose: " + tight + " vs samples " + sampleBox);
                     // cached second call yields the same result
-                    BoundingCube again = ns.GetPatchExtent(iu, iv, false);
+                    BoundingBox again = ns.GetPatchExtent(iu, iv, false);
                     Assert.AreEqual(tight.Xmin, again.Xmin, name + ": cache returns different box");
                     Assert.AreEqual(tight.Zmax, again.Zmax, name + ": cache returns different box");
                 }
@@ -69,11 +69,11 @@ namespace CADability.Tests
         /// </summary>
         private static void CheckRect(NurbsSurface ns, BoundingRect rect, double tightness, string name)
         {
-            BoundingCube tight = ns.GetPatchExtent(rect, false);
-            BoundingCube rough = ns.GetPatchExtent(rect, true);
+            BoundingBox tight = ns.GetPatchExtent(rect, false);
+            BoundingBox rough = ns.GetPatchExtent(rect, true);
             double umin = ns.GetKnotSpan(0, 0).Left, umax = ns.GetKnotSpan(ns.UKnotSpanCount - 1, 0).Right;
             double vmin = ns.GetKnotSpan(0, 0).Bottom, vmax = ns.GetKnotSpan(0, ns.VKnotSpanCount - 1).Top;
-            BoundingCube sampleBox = BoundingCube.EmptyBoundingCube;
+            BoundingBox sampleBox = BoundingBox.EmptyBoundingCube;
             double eps = Math.Max(rough.DiagonalLength, 1.0) * 1e-7;
             const int samples = 20;
             for (int i = 0; i <= samples; ++i)
@@ -90,10 +90,10 @@ namespace CADability.Tests
                     Assert.IsTrue(rough.Contains(p, eps), name + ": rough rect box does not contain surface point at (" + u + ", " + v + ")");
                 }
             }
-            BoundingCube roughExp = rough;
+            BoundingBox roughExp = rough;
             roughExp.Expand(eps);
             Assert.IsTrue(roughExp.Contains(tight), name + ": tight rect box exceeds the rough rect box");
-            BoundingCube sampleExp = sampleBox;
+            BoundingBox sampleExp = sampleBox;
             sampleExp.Expand(Math.Max(sampleBox.DiagonalLength, eps) * tightness);
             Assert.IsTrue(sampleExp.Contains(tight), name + ": tight rect box too loose: " + tight + " vs samples " + sampleBox);
         }
@@ -120,15 +120,15 @@ namespace CADability.Tests
             Assert.AreEqual(1, ns.UKnotSpanCount);
             Assert.AreEqual(1, ns.VKnotSpanCount);
             CheckAllSpans(ns, 0.02, "BumpPatch");
-            BoundingCube rough = ns.GetPatchExtent(0, 0, true);
-            BoundingCube tight = ns.GetPatchExtent(0, 0, false);
+            BoundingBox rough = ns.GetPatchExtent(0, 0, true);
+            BoundingBox tight = ns.GetPatchExtent(0, 0, false);
             Assert.AreEqual(1.0, rough.Zmax, 1e-12, "rough box should be the pole hull");
             Assert.IsTrue(tight.Zmax >= 0.5625 - 1e-9, "tight box misses the inner maximum");
             Assert.IsTrue(tight.Zmax < 0.6, "tight box too loose at the inner maximum: " + tight.Zmax);
             // a rect strictly inside the single span exercises the sub rectangle Bézier extraction: it
             // contains the inner maximum at (0.5, 0.5), but not the flat border region
             CheckRect(ns, new BoundingRect(0.2, 0.3, 0.6, 0.7), 0.02, "BumpPatch inner rect");
-            BoundingCube inner = ns.GetPatchExtent(new BoundingRect(0.2, 0.3, 0.6, 0.7), false);
+            BoundingBox inner = ns.GetPatchExtent(new BoundingRect(0.2, 0.3, 0.6, 0.7), false);
             Assert.IsTrue(inner.Zmax >= 0.5625 - 1e-9, "sub rect box misses the inner maximum");
             Assert.IsTrue(inner.Zmin > 0.05, "sub rect box should not reach down to the flat border: " + inner.Zmin);
         }
@@ -155,8 +155,8 @@ namespace CADability.Tests
             NurbsSurface ns = new NurbsSurface(poles, weights,
                 new double[] { 0, 0, 0, 1, 1, 1 }, new double[] { 0, 0, 1, 1 }, 2, 1, false, false);
             CheckAllSpans(ns, 0.01, "RationalCylinderPatch");
-            BoundingCube rough = ns.GetPatchExtent(0, 0, true);
-            BoundingCube tight = ns.GetPatchExtent(0, 0, false);
+            BoundingBox rough = ns.GetPatchExtent(0, 0, true);
+            BoundingBox tight = ns.GetPatchExtent(0, 0, false);
             Assert.AreEqual(r / w1 * Math.Sin(am), rough.Ymax, 1e-9, "rough box should be the pole hull");
             Assert.IsTrue(tight.Ymax >= r - 1e-9, "tight box misses the arc maximum at 90°");
             Assert.IsTrue(tight.Ymax <= r + 0.005 * r, "tight box too loose at the arc maximum: " + tight.Ymax);

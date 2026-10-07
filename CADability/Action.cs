@@ -27,7 +27,7 @@ namespace CADability.Actions
         bool IsLayerVisible(Layer l);
         Layer[] GetVisibleLayers();
         bool AllowContextMenu { get; }
-        void SetAdditionalExtent(BoundingCube bc);
+        void SetAdditionalExtent(BoundingBox bc);
         void MakeEverythingTranparent(bool transparent);
     }
 

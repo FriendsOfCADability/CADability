@@ -662,7 +662,11 @@ namespace CADability
                 if (token != Tokenizer.etoken.colon) throw new ApplicationException("Syntax error in json file");
                 res[name] = GetValue(tk);
                 if (name == "$TypeIndex") typeindex = Convert.ToInt32(res[name]);
-                if (name == "$Type") typename = res[name] as string;
+                // Resolved here rather than in CreateDeserializer, because typeVersions is keyed with it
+                // two lines further down and FromStream looks that dictionary up by the name of the type it
+                // actually created. With the old name as the key that lookup misses and OnDeserialization
+                // silently stops being called for every renamed class.
+                if (name == "$Type") typename = RenamedTypes.Resolve(res[name] as string);
                 if (name == "$TypeVersion") typeversion = Convert.ToInt32(res[name]);
                 if (name == "$Assembly") assemblyName = res[name] as string;
                 token = tk.NextToken(out line, out start, out length);
@@ -797,7 +801,7 @@ namespace CADability
                     }
                     else
                     {
-                        Type tpe = Type.GetType(typename);
+                        Type tpe = Type.GetType(RenamedTypes.Resolve(typename));
                         if (tpe.IsEnum)
                         {
                             string[] names = Enum.GetNames(tpe);
@@ -1719,8 +1723,8 @@ namespace CADability
         {
             Type keyType = null, valType = null;
             string[] valTypes = null;
-            if (data.HasProperty("$KeyType")) keyType = Type.GetType(data.GetProperty<string>("$KeyType"));
-            if (data.HasProperty("$ValueType")) valType = Type.GetType(data.GetProperty<string>("$ValueType"));
+            if (data.HasProperty("$KeyType")) keyType = Type.GetType(RenamedTypes.Resolve(data.GetProperty<string>("$KeyType")));
+            if (data.HasProperty("$ValueType")) valType = Type.GetType(RenamedTypes.Resolve(data.GetProperty<string>("$ValueType")));
             if (data.HasProperty("$ValueTypes")) valTypes = data.GetProperty<string[]>("$ValueTypes");
             List<object> entries = data.GetProperty<List<object>>("$Entries");
             for (int i = 0; i < entries.Count; i++)
@@ -1729,7 +1733,7 @@ namespace CADability
                 object key = kv[0];
                 if (key == null) continue;
                 Type vt;
-                if (valTypes != null) vt = Type.GetType(valTypes[i]);
+                if (valTypes != null) vt = Type.GetType(RenamedTypes.Resolve(valTypes[i]));
                 else vt = valType;
                 object val = kv[1];
                 if (!key.GetType().IsSubclassOf(keyType)) key = Convert.ChangeType(key, keyType);
@@ -1748,7 +1752,7 @@ namespace CADability
                 }
                 this[key] = val;
             }
-            originalType = Type.GetType(data.GetProperty<string>("$OriginalType"));
+            originalType = Type.GetType(RenamedTypes.Resolve(data.GetProperty<string>("$OriginalType")));
         }
         object IJsonConvert.Convert()
         {

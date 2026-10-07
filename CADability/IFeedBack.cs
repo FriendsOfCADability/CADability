@@ -17,7 +17,7 @@
         /// </summary>
         /// <param name="paintTo3D">Where to paint to</param>
         void PaintTo3D(IPaintTo3D paintTo3D);
-        BoundingCube GetExtent();
+        BoundingBox GetExtent();
         /// <summary>
         /// Event raised by this object to indicate a change.
         /// </summary>

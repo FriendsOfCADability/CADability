@@ -304,7 +304,7 @@ namespace CADability
             //RectangleF paperrect = RectangleF.FromLTRB((float)ll.x, (float)ur.y, (float)ur.x, (float)ll.y);
             //e.Graphics.FillRectangle(Brushes.White, paperrect);
 
-            //BoundingCube bc = new BoundingCube(ll.x, ur.x, ll.y, ur.y, -1.0, 1.0);
+            //BoundingBox bc = new BoundingBox(ll.x, ur.x, ll.y, ur.y, -1.0, 1.0);
             //ipaintTo3D.SetProjection(new Projection(Projection.StandardProjection.FromTop), bc);
             //ipaintTo3D.UseZBuffer(false);
             //ipaintTo3D.SetColor(Color.White);
@@ -563,7 +563,7 @@ namespace CADability
             RectangleF paperrect = RectangleF.FromLTRB((float)ll.x, (float)ur.y, (float)ur.x, (float)ll.y);
             //e.Graphics.FillRectangle(Brushes.White, paperrect);
 
-            //BoundingCube bc = new BoundingCube(ll.x, ur.x, ll.y, ur.y, -1.0, 1.0);
+            //BoundingBox bc = new BoundingBox(ll.x, ur.x, ll.y, ur.y, -1.0, 1.0);
             //ipaintTo3D.SetProjection(new Projection(Projection.StandardProjection.FromTop), bc);
             ipaintTo3D.UseZBuffer(false);
             ipaintTo3D.SetColor(Color.White);

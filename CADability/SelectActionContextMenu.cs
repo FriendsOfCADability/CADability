@@ -206,7 +206,7 @@ namespace CADability
                         // in order to show an arrow on menu selection, we use the maximum extent of the selected face in direction of the plane
                         Face toGetExtent = fc.Clone() as Face;
                         toGetExtent.Modify(loopPlanes[i].CoordSys.GlobalToLocal);
-                        BoundingCube ext = toGetExtent.GetBoundingCube();
+                        BoundingBox ext = toGetExtent.GetBoundingCube();
                         GeoPoint zmax = loopPlanes[i].CoordSys.LocalToGlobal * new GeoPoint(0, 0, ext.Zmax);
                         GeoPoint zmin = loopPlanes[i].CoordSys.LocalToGlobal * new GeoPoint(0, 0, ext.Zmin);
                         Plane arrowPlane = new Plane(loopPlanes[i].Location, fc.Surface.GetNormal(fc.PositionOf(loopPlanes[i].Location)));
@@ -717,12 +717,12 @@ namespace CADability
             public Edge Edge { get; private set; }
             public EdgeInOctTree(Edge edge) { Edge = edge; }
 
-            public BoundingCube GetExtent(double precision)
+            public BoundingBox GetExtent(double precision)
             {
                 return Edge.Curve3D.GetExtent();
             }
 
-            public bool HitTest(ref BoundingCube cube, double precision)
+            public bool HitTest(ref BoundingBox cube, double precision)
             {
                 return Edge.Curve3D.HitTest(cube);
             }
@@ -1112,7 +1112,7 @@ namespace CADability
                 fc.ReverseOrientation();
             }
             ff.AddRange(connection.Select(fc => fc.Clone() as Face));
-            BoundingCube ext = BoundingCube.EmptyBoundingCube;
+            BoundingBox ext = BoundingBox.EmptyBoundingCube;
             ext.MinMax(ff);
             Shell.ConnectFaces(ff.ToArray(), Math.Max(Precision.eps, ext.Size * 1e-6));
             Shell feature = Shell.FromFaces(ff.ToArray());
@@ -1421,7 +1421,7 @@ namespace CADability
             {
                 List<Face> lconnected = new List<Face>(connected);
                 lconnected.Add(face);
-                BoundingCube ext = BoundingCube.EmptyBoundingCube;
+                BoundingBox ext = BoundingBox.EmptyBoundingCube;
                 foreach (Face fc in connected)
                 {
                     ext.MinMax(fc.GetExtent(0.0));

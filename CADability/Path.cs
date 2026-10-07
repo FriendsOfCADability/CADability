@@ -407,7 +407,7 @@ namespace CADability.GeoObject
 				GeoPoint lastEndPoint = BeginWith.EndPoint;
 				do
 				{
-					BoundingCube ext = new BoundingCube(lastEndPoint);
+					BoundingBox ext = new BoundingBox(lastEndPoint);
 					IGeoObject[] list = model.octTree.GetObjectsFromBox(ext);
 					ICurve found = null;
 					for (int i = 0; i < list.Length; ++i)
@@ -449,7 +449,7 @@ namespace CADability.GeoObject
 				lastEndPoint = BeginWith.StartPoint;
 				do
 				{
-					BoundingCube ext = new BoundingCube(lastEndPoint);
+					BoundingBox ext = new BoundingBox(lastEndPoint);
 					IGeoObject[] list = model.octTree.GetObjectsFromBox(ext);
 					ICurve found = null;
 					for (int i = 0; i < list.Length; ++i)
@@ -501,7 +501,7 @@ namespace CADability.GeoObject
 		}
 		//public static Path[] CreateFromCurves(ICurve[] curves)
 		//{
-		//    BoundingCube bc = BoundingCube.EmptyBoundingCube;
+		//    BoundingBox bc = BoundingBox.EmptyBoundingCube;
 		//    for (int i = 0; i < curves.Length; i++)
 		//    {
 		//        bc.MinMax(curves[i].GetExtent());
@@ -1302,9 +1302,9 @@ namespace CADability.GeoObject
 		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
 		/// </summary>
 		/// <returns></returns>
-		public override BoundingCube GetBoundingCube()
+		public override BoundingBox GetBoundingCube()
 		{
-			BoundingCube res = BoundingCube.EmptyBoundingCube;
+			BoundingBox res = BoundingBox.EmptyBoundingCube;
 			for (int i = 0; i < subCurves.Length; ++i)
 			{
 				res.MinMax(subCurves[i].GetBoundingCube());
@@ -1385,17 +1385,17 @@ namespace CADability.GeoObject
         /// </summary>
         /// <param name="precision"></param>
         /// <returns></returns>
-        public override BoundingCube GetExtent(double precision)
+        public override BoundingBox GetExtent(double precision)
 		{
 			return GetBoundingCube();
 		}
 		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
+		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingBox, double)"/>
 		/// </summary>
 		/// <param name="cube"></param>
 		/// <param name="precision"></param>
 		/// <returns></returns>
-		public override bool HitTest(ref BoundingCube cube, double precision)
+		public override bool HitTest(ref BoundingBox cube, double precision)
 		{
 			for (int i = 0; i < subCurves.Length; ++i)
 			{
@@ -2141,7 +2141,7 @@ namespace CADability.GeoObject
 			return position * Length;
 		}
 
-		BoundingCube ICurve.GetExtent()
+		BoundingBox ICurve.GetExtent()
 		{
 			return GetExtent(0.0);
 		}
@@ -2149,7 +2149,7 @@ namespace CADability.GeoObject
 		{
 			return false;
 		}
-		bool ICurve.HitTest(BoundingCube cube)
+		bool ICurve.HitTest(BoundingBox cube)
 		{
 			return HitTest(ref cube, 0.0);
 		}
@@ -2534,11 +2534,11 @@ namespace CADability.GeoObject
 		}
 		#region IOctTreeInsertable Members
 
-		BoundingCube IOctTreeInsertable.GetExtent(double precision)
+		BoundingBox IOctTreeInsertable.GetExtent(double precision)
 		{
 			if (infinite)
 			{
-				return BoundingCube.InfiniteBoundingCube;
+				return BoundingBox.InfiniteBoundingCube;
 			}
 			else
 			{
@@ -2546,7 +2546,7 @@ namespace CADability.GeoObject
 			}
 		}
 
-		bool IOctTreeInsertable.HitTest(ref BoundingCube cube, double precision)
+		bool IOctTreeInsertable.HitTest(ref BoundingBox cube, double precision)
 		{
 			for (int i = 0; i < subCurves.Length; ++i)
 			{

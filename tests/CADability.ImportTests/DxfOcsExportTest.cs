@@ -8,10 +8,10 @@ using CADability.GeoObject;
 namespace CADability.ImportTests
 {
     /// <summary>
-    /// Regression for issue #356: circles and arcs that were rotated (or flipped) out of the
-    /// XY plane came back from a DXF export at the wrong position. DXF reads ARC and CIRCLE
-    /// centers in the OCS that the entity normal spans, but the exporter wrote them in world
-    /// coordinates. A flip turns the normal into (0,0,-1), whose OCS X axis is (-1,0,0), so
+    /// Regression for issue #356: circles, arcs and texts that were rotated (or flipped) out of
+    /// the XY plane came back from a DXF export at the wrong position. DXF reads ARC and CIRCLE
+    /// centers and TEXT points in the OCS that the entity normal spans, but the exporter wrote
+    /// them in world coordinates. A flip turns the normal into (0,0,-1), whose OCS X axis is (-1,0,0), so
     /// the re-imported center ended up mirrored about the Y axis.
     /// </summary>
     [TestClass]
@@ -85,7 +85,99 @@ namespace CADability.ImportTests
             AssertSameArc(arc, ReimportSingle(Export(arc)));
         }
 
+        // TEXT points (groups 10 and 11) are OCS points as well. A text flipped about the X
+        // axis reads mirrored, which gives it the normal (0,0,-1).
+        [TestMethod]
+        public void export_dxf_flipped_text_keeps_position()
+        {
+            RequireGdi();
+            foreach (bool aligned in new[] { false, true })
+            {
+                Text text = MakeText("Flipped", new GeoPoint(10, 5, 2));
+                if (aligned)
+                {
+                    // non-default alignment: group 11 becomes the authoritative point
+                    text.LineAlignment = Text.LineAlignMode.Center;
+                    text.Alignment = Text.AlignMode.Center;
+                }
+                text.Modify(ModOp.Rotate(GeoPoint.Origin, GeoVector.XAxis, new SweepAngle(Math.PI)));
+                Assert.IsTrue((text.LineDirection ^ text.GlyphDirection).z < 0, "test setup: the flip must turn the normal down");
+
+                string file = Export(text);
+                DxfCenter written = ReadFirstCenter(file, "TEXT");
+                Assert.IsNotNull(written, "exported file must contain a TEXT entity");
+                Assert.AreEqual(-1.0, written.Nz, 1e-12, "normal");
+                GeoPoint p = text.Location; // (10,-5,-2)
+                Assert.AreEqual(-p.x, written.X, 1e-8, "OCS x of the insertion point");
+                Assert.AreEqual(p.y, written.Y, 1e-8, "OCS y of the insertion point");
+                Assert.AreEqual(-p.z, written.Z, 1e-8, "OCS z of the insertion point");
+
+                AssertSameText(text, ReimportSingle<Text>(file));
+            }
+        }
+
+        [TestMethod]
+        public void export_dxf_tilted_text_keeps_position()
+        {
+            RequireGdi();
+            Text text = MakeText("Tilted", new GeoPoint(-3, 8, 1));
+            text.Modify(ModOp.Rotate(new GeoPoint(2, 3, 4), new GeoVector(1, 1, 0.3), new SweepAngle(0.65)));
+            AssertSameText(text, ReimportSingle<Text>(Export(text)));
+        }
+
+        // A multi-line text goes out as MTEXT, whose insertion point is a world point and whose
+        // group 11 is the text direction as a world vector, not an OCS angle.
+        [TestMethod]
+        public void export_dxf_flipped_and_tilted_mtext_keep_position()
+        {
+            RequireGdi();
+            Text text = MakeText("first line\nsecond line", new GeoPoint(10, 5, 2));
+            text.Modify(ModOp.Rotate(GeoPoint.Origin, GeoVector.XAxis, new SweepAngle(Math.PI)));
+            string file = Export(text);
+            DxfCenter written = ReadFirstCenter(file, "MTEXT");
+            Assert.IsNotNull(written, "exported file must contain an MTEXT entity");
+            Assert.AreEqual(-1.0, written.Nz, 1e-12, "normal");
+            Assert.AreEqual(0.0, new GeoPoint(written.X, written.Y, written.Z) | text.Location, 1e-8,
+                "MTEXT insertion point is written in world coordinates");
+            GeoVector dir = text.LineDirection.Normalized;
+            Assert.AreEqual(0.0, (new GeoVector(written.DirX, written.DirY, written.DirZ) - dir).Length, 1e-8,
+                "MTEXT group 11 is the world text direction");
+            AssertSameText(text, ReimportSingle<Text>(file));
+
+            Text tilted = MakeText("first line\nsecond line", new GeoPoint(-3, 8, 1));
+            tilted.Modify(ModOp.Rotate(new GeoPoint(2, 3, 4), new GeoVector(1, 1, 0.3), new SweepAngle(0.65)));
+            AssertSameText(tilted, ReimportSingle<Text>(Export(tilted)));
+        }
+
         // --- helpers -------------------------------------------------------------------------
+
+        // Adding a Text to a model computes its extent through GDI, which only exists on Windows.
+        private static void RequireGdi()
+        {
+            if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+                Assert.Inconclusive("text needs GDI, which is only available on Windows");
+        }
+
+        private static Text MakeText(string value, GeoPoint location)
+        {
+            Text text = Text.Construct();
+            text.Font = "Arial";
+            text.TextString = value;
+            text.TextSize = 2.5;
+            text.Location = location;
+            text.LineDirection = new GeoVector(2.5, 0, 0);
+            text.GlyphDirection = new GeoVector(0, 2.5, 0);
+            return text;
+        }
+
+        private static void AssertSameText(Text original, Text back)
+        {
+            Assert.AreEqual(0.0, back.Location | original.Location, 1e-8, "re-imported text location");
+            Assert.AreEqual(0.0, (back.LineDirection.Normalized - original.LineDirection.Normalized).Length, 1e-8,
+                "re-imported line direction");
+            Assert.AreEqual(0.0, (back.GlyphDirection.Normalized - original.GlyphDirection.Normalized).Length, 1e-8,
+                "re-imported glyph direction");
+        }
 
         private static Ellipse MakeArc(GeoPoint center, double radius, double start, double sweep)
         {
@@ -103,14 +195,16 @@ namespace CADability.ImportTests
             return file;
         }
 
-        private static Ellipse ReimportSingle(string file)
+        private static Ellipse ReimportSingle(string file) => ReimportSingle<Ellipse>(file);
+
+        private static T ReimportSingle<T>(string file) where T : class, IGeoObject
         {
             Project project = Project.ReadFromFile(file, "dxf");
             Assert.IsNotNull(project);
             Model model = project.GetActiveModel();
             Assert.AreEqual(1, model.AllObjects.Count, "one entity expected after re-import");
-            Ellipse e = model.AllObjects[0] as Ellipse;
-            Assert.IsNotNull(e, "the entity must re-import as an Ellipse");
+            T e = model.AllObjects[0] as T;
+            Assert.IsNotNull(e, "the entity must re-import as " + typeof(T).Name);
             return e;
         }
 
@@ -126,10 +220,10 @@ namespace CADability.ImportTests
             Assert.AreEqual(0.0, o.PointAt(0.5) | b.PointAt(0.5), 1e-8, "re-imported arc midpoint");
         }
 
-        /// <summary>Group codes 10/20/30 and 230 of an entity as written to the file.</summary>
+        /// <summary>Group codes 10/20/30, 11/21/31 and 230 of an entity as written to the file.</summary>
         private sealed class DxfCenter
         {
-            public double X, Y, Z, Nz = 1.0;
+            public double X, Y, Z, DirX, DirY, DirZ, Nz = 1.0;
         }
 
         private static DxfCenter ReadFirstCenter(string file, string entityName)
@@ -149,6 +243,9 @@ namespace CADability.ImportTests
                         case "10": c.X = value; break;
                         case "20": c.Y = value; break;
                         case "30": c.Z = value; break;
+                        case "11": c.DirX = value; break;
+                        case "21": c.DirY = value; break;
+                        case "31": c.DirZ = value; break;
                         case "230": c.Nz = value; break;
                     }
                 }

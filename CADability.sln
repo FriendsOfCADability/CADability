@@ -15,6 +15,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{C605F551
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ACadSharp", "external\ACadSharp\src\ACadSharp\ACadSharp.csproj", "{CB24B9AC-5004-43B1-B98E-19EB37DC871E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CADability.ImportTests", "tests\CADability.ImportTests\CADability.ImportTests.csproj", "{732922C0-B210-A74F-75C1-3C113BAB0971}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -85,12 +87,25 @@ Global
 		{CB24B9AC-5004-43B1-B98E-19EB37DC871E}.RelWithDoc|Any CPU.Build.0 = Release|Any CPU
 		{CB24B9AC-5004-43B1-B98E-19EB37DC871E}.RelWithDoc|x64.ActiveCfg = Release|Any CPU
 		{CB24B9AC-5004-43B1-B98E-19EB37DC871E}.RelWithDoc|x64.Build.0 = Release|Any CPU
+		{732922C0-B210-A74F-75C1-3C113BAB0971}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{732922C0-B210-A74F-75C1-3C113BAB0971}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{732922C0-B210-A74F-75C1-3C113BAB0971}.Debug|x64.ActiveCfg = Debug|x64
+		{732922C0-B210-A74F-75C1-3C113BAB0971}.Debug|x64.Build.0 = Debug|x64
+		{732922C0-B210-A74F-75C1-3C113BAB0971}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{732922C0-B210-A74F-75C1-3C113BAB0971}.Release|Any CPU.Build.0 = Release|Any CPU
+		{732922C0-B210-A74F-75C1-3C113BAB0971}.Release|x64.ActiveCfg = Release|x64
+		{732922C0-B210-A74F-75C1-3C113BAB0971}.Release|x64.Build.0 = Release|x64
+		{732922C0-B210-A74F-75C1-3C113BAB0971}.RelWithDoc|Any CPU.ActiveCfg = Debug|Any CPU
+		{732922C0-B210-A74F-75C1-3C113BAB0971}.RelWithDoc|Any CPU.Build.0 = Debug|Any CPU
+		{732922C0-B210-A74F-75C1-3C113BAB0971}.RelWithDoc|x64.ActiveCfg = Debug|x64
+		{732922C0-B210-A74F-75C1-3C113BAB0971}.RelWithDoc|x64.Build.0 = Debug|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{D850552B-002C-4622-BD0D-9673C3BA21F1} = {C605F551-B2C6-4B2E-A294-12A7E2C2CEDD}
+		{732922C0-B210-A74F-75C1-3C113BAB0971} = {C605F551-B2C6-4B2E-A294-12A7E2C2CEDD}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A0488D96-CE5E-4E02-8E1A-0D54ECB5FF81}

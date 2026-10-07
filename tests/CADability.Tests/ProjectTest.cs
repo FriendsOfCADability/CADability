@@ -190,10 +190,10 @@ namespace CADability.Tests
         [DeploymentItem(@"Files/Dxf/BVH_Bona.dxf", nameof(import_dxf_BVH_Bona_succeeds))]
         public void import_dxf_BVH_Bona_succeeds()
         {
-            RequiresGdiText();
             // AC1024 DXF with 508 arcs, 34 LwPolylines, 41 lines, 11 splines, 3 MTexts.
             // Arc.StartAngle/EndAngle from ACadSharp are in radians; using Angle.Deg() on them
             // shrinks all angles by π/180 making arcs nearly invisible ("totally obscured").
+            // Nothing here checks the texts, so the test runs without GDI as well (the MTexts are left out there).
             var file = Path.Combine(this.TestContext.DeploymentDirectory, this.TestContext.TestName, "BVH_Bona.dxf");
             Assert.IsTrue(File.Exists(file));
 
@@ -202,16 +202,19 @@ namespace CADability.Tests
             var model = project.GetActiveModel();
             Assert.IsNotNull(model);
 
-            // Verify the 508 arcs are imported as arcs (Ellipse with IsCircle==false)
+            // Verify the 508 arcs are imported as arcs (Ellipse with IsArc). IsCircle only says that both
+            // radii are equal, which every circular arc has.
             var arcs = model.AllObjects.Cast<GeoObject.IGeoObject>()
                 .OfType<GeoObject.Ellipse>()
-                .Where(e => !e.IsCircle)
+                .Where(e => e.IsArc)
                 .ToList();
             Assert.AreEqual(508, arcs.Count);
 
-            // Verify that arcs have sensible sweep angles (not near-zero due to radian/degree confusion)
-            foreach (var arc in arcs)
-                Assert.IsTrue(arc.SweepParameter > 0.001, $"Arc sweep {arc.SweepParameter} is near zero — angle unit bug?");
+            // Verify that arcs have sensible sweep angles (not shrunk by pi/180 due to radian/degree confusion).
+            // A threshold per arc does not work here: the file has arcs with a radius of 23190 and a sweep of
+            // 4.4e-5 (a length of 1.02). The sweeps of all arcs in the file add up to 137.00246 radians.
+            double totalSweep = arcs.Sum(arc => Math.Abs(arc.SweepParameter));
+            Assert.AreEqual(137.0024625, totalSweep, 1e-6, "sum of the arc sweeps - angle unit bug?");
         }
 
         [TestMethod]
@@ -465,7 +468,7 @@ LWPOLYLINE
  20
 0.0
  42
-{bulge:F6}
+{bulge.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}
  10
 2.0
  20

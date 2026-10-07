@@ -615,12 +615,14 @@ namespace CADability.DXF
             // an automatic wrapping width has to go out as MTEXT, otherwise the line structure
             // is lost and the remaining lines end up merged into the first one.
             if (textString.IndexOf('\n') >= 0 || text.ColumnWidth > 0)
-                return BuildMText(text, textString, height, textStyle, hAlign, vAlign, normal, rotation);
+                return BuildMText(text, textString, height, textStyle, hAlign, vAlign, normal, lineDir);
 
             // Group 10 (InsertPoint) always holds the text anchor so viewers that ignore
             // group 11 still render text at the correct position.
             // For non-default alignment, group 11 (AlignmentPoint) is also set to the
             // same anchor — that is the convention real DXF writers use.
+            // Both points are read in the OCS that the normal spans, not in world coordinates.
+            XYZ anchor = WcsToOcs(text.Location, normal);
             var res = new ACadSharp.Entities.TextEntity
             {
                 Value = textString,
@@ -628,14 +630,14 @@ namespace CADability.DXF
                 Style = textStyle,
                 HorizontalAlignment = hAlign,
                 VerticalAlignment = vAlign,
-                InsertPoint = ToXYZ(text.Location),
+                InsertPoint = anchor,
                 Normal = ToXYZ(normal),
                 Rotation = rotation,
             };
             // Set group 11 whenever it is meaningful. Leaving it at its (0,0,0) default while
             // groups 72/73 say it is authoritative would place the text at the origin.
             if (!defaultAlign)
-                res.AlignmentPoint = ToXYZ(text.Location);
+                res.AlignmentPoint = anchor;
             return res;
         }
 
@@ -645,7 +647,7 @@ namespace CADability.DXF
         /// </summary>
         private ACadSharp.Entities.MText BuildMText(GeoObject.Text text, string textString, double height,
             ACadSharp.Tables.TextStyle textStyle, TextHorizontalAlignment hAlign,
-            TextVerticalAlignmentType vAlign, GeoVector normal, double rotation)
+            TextVerticalAlignmentType vAlign, GeoVector normal, GeoVector lineDir)
         {
             // MTEXT anchors the whole text block at one of nine attachment points, which is
             // exactly what CADability's Alignment/LineAlignment pair describes.
@@ -673,8 +675,11 @@ namespace CADability.DXF
                 AttachmentPoint = (AttachmentPointType)(row * 3 + column + 1),
             };
             // For MTEXT group 11 is the X-axis direction vector, not a point, and it is what
-            // carries the rotation (group 50 is not written for MTEXT).
-            res.AlignmentPoint = new XYZ(Math.Cos(rotation), Math.Sin(rotation), 0.0);
+            // carries the rotation (group 50 is not written for MTEXT). Unlike the TEXT
+            // rotation it is a world vector; building it from the OCS angle mirrors the text
+            // direction of every MTEXT whose normal is not (0,0,1). The insertion point of an
+            // MTEXT is a world point as well, so it needs no OCS conversion.
+            res.AlignmentPoint = ToXYZ(lineDir.Normalized);
             if (text.ColumnWidth > 0) res.RectangleWidth = text.ColumnWidth;
             if (text.LineSpacing > 0)
             {
@@ -817,7 +822,8 @@ namespace CADability.DXF
             };
         }
 
-        // ARC and CIRCLE centers are stored in OCS, unlike ELLIPSE centers (WCS).
+        // ARC and CIRCLE centers and TEXT points are stored in OCS, unlike ELLIPSE centers and
+        // the MTEXT insertion point (WCS).
         private static XYZ WcsToOcs(GeoPoint point, GeoVector normal)
         {
             GeoVector n = normal.Normalized;
@@ -838,8 +844,8 @@ namespace CADability.DXF
                 {
                     // Always keep the arc's own normal (never flip for CW arcs).
                     // CW arcs are represented as CCW by swapping start/end endpoints,
-                    // so all exported arcs use Normal=(0,0,1) and work in viewers that
-                    // don't implement the OCS transformation.
+                    // so an arc drawn in the XY plane keeps Normal=(0,0,1) and works in
+                    // viewers that don't implement the OCS transformation.
                     GeoVector normal = elli.Plane.Normal;
                     Plane dxfPlane = Import.Plane(ToXYZ(elli.Center), ToXYZ(normal));
                     GeoObject.Ellipse aligned = GeoObject.Ellipse.Construct();

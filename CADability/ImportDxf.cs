@@ -436,12 +436,17 @@ namespace CADability.DXF
         // Convert a 2D entity's position from OCS (Object Coordinate System) to WCS.
         // DXF stores ARC/CIRCLE centers, TEXT insert points, etc. in OCS when Normal ≠ (0,0,1).
         // The OCS axes are derived via the AutoCAD Arbitrary Axis Algorithm.
+        // All three axes have to be unit vectors: Wy × N and Wz × N are only of unit length
+        // for a normal of exactly ±Z or one lying in the XY plane, so without normalizing,
+        // circles and arcs on tilted planes came in at a scaled, wrong center.
         private static GeoPoint OcsToWcs(XYZ ocsPoint, XYZ normal)
         {
             GeoVector n = GeoVector(normal);
-            GeoVector ax = (Math.Abs(normal.X) < 1.0 / 64 && Math.Abs(normal.Y) < 1.0 / 64)
+            if (n.IsNullVector()) return GeoPoint(ocsPoint);
+            n = n.Normalized;
+            GeoVector ax = ((Math.Abs(n.x) < 1.0 / 64 && Math.Abs(n.y) < 1.0 / 64)
                 ? CADability.GeoVector.YAxis ^ n
-                : CADability.GeoVector.ZAxis ^ n;
+                : CADability.GeoVector.ZAxis ^ n).Normalized;
             GeoVector ay = n ^ ax;
             return new GeoPoint(
                 ocsPoint.X * ax.x + ocsPoint.Y * ay.x + ocsPoint.Z * n.x,
@@ -1417,7 +1422,7 @@ namespace CADability.DXF
                     };
                     if (content.Format?.TextStyle != null)
                         txt.Style = content.Format.TextStyle;
-                    var geo = CreateText(txt);
+                    var geo = CreateText(txt, pointsInWcs: true);
                     if (geo != null)
                     {
                         // cell texts inherit the table entity's attributes; without an explicit
@@ -1567,7 +1572,12 @@ namespace CADability.DXF
             return sb.ToString();
         }
 
-        private IGeoObject CreateText(ACadSharp.Entities.TextEntity txt)
+        /// <summary>
+        /// Creates a Text from a DXF TEXT. Its points (groups 10 and 11) are read in the OCS
+        /// that the normal spans; callers that build a TextEntity from points they already hold
+        /// in world coordinates (MTEXT, table cells, tolerances) pass <paramref name="pointsInWcs"/>.
+        /// </summary>
+        private IGeoObject CreateText(ACadSharp.Entities.TextEntity txt, bool pointsInWcs = false)
         {
             GeoObject.Text text = GeoObject.Text.Construct();
             string txtstring = processAcadString(txt.Value ?? "");
@@ -1610,7 +1620,9 @@ namespace CADability.DXF
             GeoVector2D dir2d = new GeoVector2D(a);
             GeoVector linedir = plane.ToGlobal(dir2d);
             GeoVector glyphdir = plane.ToGlobal(dir2d.ToLeft());
-            text.Location = GeoPoint(anchor);
+            // A TEXT that is mirrored or tilted out of the XY plane has a normal other than
+            // (0,0,1); taking its OCS point for a world point misplaces it.
+            text.Location = pointsInWcs ? GeoPoint(anchor) : OcsToWcs(anchor, txt.Normal);
             text.LineDirection = linedir;
             text.GlyphDirection = glyphdir;
             text.TextSize = h;
@@ -1744,6 +1756,14 @@ namespace CADability.DXF
                     vAlign = TextVerticalAlignmentType.Bottom; break;
             }
 
+            // Group 11 of an MTEXT is the text direction as a world vector; TEXT, which
+            // carries the rest, wants a rotation angle in the OCS. MText.Rotation would read
+            // the world X/Y components as that angle, which only holds for a normal of (0,0,1).
+            double rotation = mText.Rotation;
+            Plane ocsPlane = Plane(XYZ.Zero, mText.Normal);
+            GeoVector2D dir2d = ocsPlane.Project(GeoVector(mText.AlignmentPoint));
+            if (!dir2d.IsNullVector()) rotation = Math.Atan2(dir2d.y, dir2d.x);
+
             // A single Text object carries the whole (multi-line) content; it breaks the lines
             // itself at the column width, so editing the text or the width re-wraps correctly.
             var txt = new ACadSharp.Entities.TextEntity
@@ -1751,7 +1771,7 @@ namespace CADability.DXF
                 Value = string.Join("\n", lines, 0, numLines),
                 Height = mText.Height,
                 WidthFactor = 1.0,
-                Rotation = mText.Rotation,
+                Rotation = rotation,
                 Style = mText.Style,
                 InsertPoint = mText.InsertPoint,
                 // MTEXT anchors at its insertion point whatever the attachment point is;
@@ -1761,7 +1781,8 @@ namespace CADability.DXF
                 HorizontalAlignment = hAlign,
                 VerticalAlignment = vAlign,
             };
-            IGeoObject geo = CreateText(txt);
+            // Unlike TEXT, the MTEXT insertion point is a world point.
+            IGeoObject geo = CreateText(txt, pointsInWcs: true);
             if (geo is GeoObject.Text text)
             {
                 // Automatic word wrap at the MTEXT column width (DXF group code 41)
@@ -1797,7 +1818,7 @@ namespace CADability.DXF
                 Rotation = rotation,
                 Style = tolerance.Style?.Style,   // DimensionStyle.Style is the TextStyle
             };
-            return CreateText(txt);
+            return CreateText(txt, pointsInWcs: true);
         }
 
         private static string ExtractFcfText(string text)

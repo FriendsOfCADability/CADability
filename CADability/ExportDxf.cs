@@ -838,8 +838,8 @@ namespace CADability.DXF
                 {
                     // Always keep the arc's own normal (never flip for CW arcs).
                     // CW arcs are represented as CCW by swapping start/end endpoints,
-                    // so all exported arcs use Normal=(0,0,1) and work in viewers that
-                    // don't implement the OCS transformation.
+                    // so an arc drawn in the XY plane keeps Normal=(0,0,1) and works in
+                    // viewers that don't implement the OCS transformation.
                     GeoVector normal = elli.Plane.Normal;
                     Plane dxfPlane = Import.Plane(ToXYZ(elli.Center), ToXYZ(normal));
                     GeoObject.Ellipse aligned = GeoObject.Ellipse.Construct();

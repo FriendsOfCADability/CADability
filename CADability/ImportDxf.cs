@@ -436,12 +436,15 @@ namespace CADability.DXF
         // Convert a 2D entity's position from OCS (Object Coordinate System) to WCS.
         // DXF stores ARC/CIRCLE centers, TEXT insert points, etc. in OCS when Normal ≠ (0,0,1).
         // The OCS axes are derived via the AutoCAD Arbitrary Axis Algorithm.
+        // All three axes have to be unit vectors: Wy × N and Wz × N are only of unit length
+        // for a normal of exactly ±Z or one lying in the XY plane, so without normalizing,
+        // circles and arcs on tilted planes came in at a scaled, wrong center.
         private static GeoPoint OcsToWcs(XYZ ocsPoint, XYZ normal)
         {
-            GeoVector n = GeoVector(normal);
-            GeoVector ax = (Math.Abs(normal.X) < 1.0 / 64 && Math.Abs(normal.Y) < 1.0 / 64)
+            GeoVector n = GeoVector(normal).Normalized;
+            GeoVector ax = ((Math.Abs(n.x) < 1.0 / 64 && Math.Abs(n.y) < 1.0 / 64)
                 ? CADability.GeoVector.YAxis ^ n
-                : CADability.GeoVector.ZAxis ^ n;
+                : CADability.GeoVector.ZAxis ^ n).Normalized;
             GeoVector ay = n ^ ax;
             return new GeoPoint(
                 ocsPoint.X * ax.x + ocsPoint.Y * ay.x + ocsPoint.Z * n.x,

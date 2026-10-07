@@ -264,6 +264,7 @@ EOF
         }
 
         // --- helpers -------------------------------------------------------------------------
+
         private Model ImportDxf(string dxf)
         {
             string file = this.TestContext.TestName + ".dxf";

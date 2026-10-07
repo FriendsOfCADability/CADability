@@ -3634,8 +3634,10 @@ namespace CADability.GeoObject
                         double pos = Geometry.LinePar(toTest, dir, ip[i]);
                         if (pos > 0.0 && pos < 1.0 - Precision.eps)
                         {
-                            double d = fc.Distance(ip[i]);
-                            if (Math.Abs(d) > Precision.eps) ++n;
+                            // there was a check, whether we did hit the face itself, but this is wrong.
+                            ++n;
+                            //double d = fc.Distance(ip[i]);
+                            //if (Math.Abs(d) > Precision.eps) ++n;
                         }
                     }
                     if (n == 0)
@@ -5041,13 +5043,15 @@ namespace CADability.GeoObject
                     for (int j = i + 1; j < allEdges.Length; j++)
                     {
                         if (allEdges[j].SecondaryFace != null) continue; // ist schon verbunden
+
                         if (allEdges[i].OtherVertex(vtx) == allEdges[j].OtherVertex(vtx))
                         {
                             if (allEdges[i].Curve3D == null && allEdges[j].Curve3D == null) allEdges[j].PrimaryFace.ReplaceEdge(allEdges[j], allEdges[i]);
                             // else if (allEdges[i].Curve3D.SameGeometry(allEdges[j].Curve3D, precision)) // SameGeometry ist schlecht, Ellipse erwartet Ellipse als Partner, akzeptiert nicht BSpline
                             else if (allEdges[i].Curve3D != null && allEdges[j].Curve3D != null && allEdges[i].Curve3D.DistanceTo(allEdges[j].Curve3D.PointAt(0.5)) < precision)
                             {
-                                allEdges[j].PrimaryFace.ReplaceEdge(allEdges[j], allEdges[i]);
+                                // an edge which already connects two faces must not get a third one (non-manifold)
+                                if (allEdges[i].SecondaryFace == null) allEdges[j].PrimaryFace.ReplaceEdge(allEdges[j], allEdges[i]);
                             }
                             else
                             {

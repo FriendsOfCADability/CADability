@@ -1598,10 +1598,12 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 					{
 						Item item = definitions[roots[Item.ItemType.presentationLayerAssignment][i]];
 						object o = CreateEntity(item);
-						if (o is ValueTuple<Layer, GeoObjectList> lgPair)
+						// A boxed tuple has to be tested as ValueTuple<,>: naming the elements inside the
+						// pattern would make it a positional pattern and ask the type for Deconstruct.
+						if (o is ValueTuple<Layer, GeoObjectList> layerAndList)
 						{
-							Layer layer = lgPair.Item1;
-							GeoObjectList list = lgPair.Item2;
+							Layer layer = layerAndList.Item1;
+							GeoObjectList list = layerAndList.Item2;
 							for (int j = 0; j < list.Count; j++)
 							{
 								list[j].Layer = layer;

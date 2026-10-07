@@ -14835,6 +14835,62 @@ namespace CADability.GeoObject
             }
         }
 
+        /// <summary>
+        /// Modifies the provided points by adding multiples of the period (in u and/or v) so that the resulting
+        /// sequence is "compact": there are no jumps between consecutive points which are bigger than half of the
+        /// period. The order of the points is not changed, only periodic offsets are applied. Finally the whole
+        /// sequence is moved by a common multiple of the period to be as close as possible to the provided
+        /// <paramref name="bounds"/> (which may be empty, then no such move is performed).
+        /// </summary>
+        /// <param name="surface">the surface which defines the periodicity</param>
+        /// <param name="bounds">the domain the points should be close to, may be empty</param>
+        /// <param name="points">the points to modify (in place)</param>
+        internal static void UnwrapPeriodic(ISurface surface, BoundingRect bounds, GeoPoint2D[] points)
+        {
+            if (points == null || points.Length == 0) return;
+            if (!surface.IsUPeriodic && !surface.IsVPeriodic) return;
+            bool useBounds = !bounds.IsEmpty();
+            if (surface.IsUPeriodic && surface.UPeriod > 0.0)
+            {
+                double period = surface.UPeriod;
+                double min = points[0].x, max = points[0].x;
+                for (int i = 1; i < points.Length; i++)
+                {   // remove the jump to the previous point, which is always possible except for a jump of exactly half a period
+                    points[i].x -= Math.Round((points[i].x - points[i - 1].x) / period) * period;
+                    if (points[i].x < min) min = points[i].x;
+                    if (points[i].x > max) max = points[i].x;
+                }
+                if (useBounds)
+                {   // move the whole (now connected) sequence as close as possible to the bounds
+                    double um = (bounds.Left + bounds.Right) / 2;
+                    double d = -Math.Round(((min + max) / 2 - um) / period) * period;
+                    if (d != 0.0)
+                    {
+                        for (int i = 0; i < points.Length; i++) points[i].x += d;
+                    }
+                }
+            }
+            if (surface.IsVPeriodic && surface.VPeriod > 0.0)
+            {
+                double period = surface.VPeriod;
+                double min = points[0].y, max = points[0].y;
+                for (int i = 1; i < points.Length; i++)
+                {
+                    points[i].y -= Math.Round((points[i].y - points[i - 1].y) / period) * period;
+                    if (points[i].y < min) min = points[i].y;
+                    if (points[i].y > max) max = points[i].y;
+                }
+                if (useBounds)
+                {
+                    double vm = (bounds.Bottom + bounds.Top) / 2;
+                    double d = -Math.Round(((min + max) / 2 - vm) / period) * period;
+                    if (d != 0.0)
+                    {
+                        for (int i = 0; i < points.Length; i++) points[i].y += d;
+                    }
+                }
+            }
+        }
         internal static void AdjustPeriodic(ISurface surface, BoundingRect bounds, GeoPoint2D[] points)
         {
             if (surface.IsUPeriodic || surface.IsVPeriodic)

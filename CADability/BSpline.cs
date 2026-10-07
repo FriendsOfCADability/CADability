@@ -1522,6 +1522,7 @@ namespace CADability.GeoObject
         }
         internal void FromNurbs(Nurbs<GeoPoint, GeoPointPole> nbs, double startParam, double endParam)
         {
+            this.InvalidateSecondaryData();
             nubs3d = nbs;
             FromNurbs(Plane.XYPlane);
             this.startParam = startParam;
@@ -1529,6 +1530,7 @@ namespace CADability.GeoObject
         }
         internal void FromNurbs(Nurbs<GeoPointH, GeoPointHPole> nbs, double startParam, double endParam)
         {
+            this.InvalidateSecondaryData();
             nurbs3d = nbs;
             FromNurbs(Plane.XYPlane);
             this.startParam = startParam;
@@ -1536,6 +1538,7 @@ namespace CADability.GeoObject
         }
         private void FromNurbs(BSpline toCopy)
         {
+            this.InvalidateSecondaryData();
             if (toCopy.nubs3d != null) nubs3d = toCopy.nubs3d;
             if (toCopy.nurbs3d != null) nurbs3d = toCopy.nurbs3d;
             FromNurbs(Plane.XYPlane);
@@ -1802,6 +1805,7 @@ namespace CADability.GeoObject
             res.endParam = this.endParam;
             res.maxDegree = this.maxDegree;
             if (this.throughPoints3d != null) res.throughPoints3d = (GeoPoint[])this.throughPoints3d.Clone();
+            if (this.throughPointsParam != null) res.throughPointsParam = (double[])this.throughPointsParam.Clone();
             if (this.direction3D != null) res.direction3D = (GeoVector[])this.direction3D.Clone();
             res.CopyAttributes(this);
             --res.isChanging;
@@ -4093,6 +4097,13 @@ namespace CADability.GeoObject
             BoundingCube res = BoundingCube.EmptyBoundingCube;
             res.MinMax(PointAtParam(pmin));
             res.MinMax(PointAtParam(pmax));
+            if (!nurbsHelper) MakeNurbsHelper();
+            if (degree <= 3 && (nubs3d != null || (nubs2d != null && plane.HasValue)))
+            {   // non rational and degree <= 3: the extrema can be computed directly (quadratic formula)
+                // instead of the approximating bisection of TetraederHull.GetExtrema
+                AddSpanExtremaExact(pmin, pmax, ref res);
+                return res;
+            }
             foreach (GeoVector dir in GeoVector.MainAxis)
             {
                 double[] par = (this as ICurve).GetExtrema(dir);
@@ -4103,6 +4114,102 @@ namespace CADability.GeoObject
                 }
             }
             return res;
+        }
+        /// <summary>
+        /// Adds the extrema of the curve in the main axis directions on the knot interval [pmin, pmax] to res.
+        /// Only for non rational curves of degree &lt;= 3: on each knot span the curve is a single polynomial
+        /// segment, so the derivative of each coordinate is a polynomial of degree &lt;= 2 in the local Bézier
+        /// parameter, whose roots are found directly with the quadratic formula. In contrast to the
+        /// TetraederHull based ICurve.GetExtrema this is exact and complete (extrema without a sign change of
+        /// the derivative at the tetraeder base points cannot be missed) and needs no iteration.
+        /// </summary>
+        private void AddSpanExtremaExact(double pmin, double pmax, ref BoundingCube res)
+        {
+            for (int i = 0; i < knots.Length - 1; ++i)
+            {
+                if (knots[i + 1] <= pmin || knots[i] >= pmax) continue;
+                // knots inside the interval are candidates, too: at knots with reduced continuity an extremum
+                // does not need a vanishing derivative
+                if (knots[i] > pmin) res.MinMax(PointAtParam(knots[i]));
+                if (knots[i + 1] < pmax) res.MinMax(PointAtParam(knots[i + 1]));
+                if (degree < 2) continue; // linear segments have no inner extrema
+                GeoPoint[] bez; // the Bézier poles of this knot span
+                double k0, k1;
+                if (nubs3d != null)
+                {
+                    bez = nubs3d.GetSpanBezier(0.5 * (knots[i] + knots[i + 1]), out k0, out k1);
+                }
+                else
+                {
+                    GeoPoint2D[] bez2d = nubs2d.GetSpanBezier(0.5 * (knots[i] + knots[i + 1]), out k0, out k1);
+                    bez = new GeoPoint[bez2d.Length];
+                    for (int j = 0; j < bez.Length; ++j) bez[j] = plane.Value.ToGlobal(bez2d[j]);
+                }
+                for (int axis = 0; axis < 3; ++axis)
+                {
+                    // derivative of this coordinate in Bernstein form; the constant factor degree/(k1-k0)
+                    // is irrelevant for the roots
+                    double t1 = 0.0, t2 = 0.0;
+                    int cnt;
+                    if (degree == 3)
+                    {
+                        double d0 = Component(bez[1], axis) - Component(bez[0], axis);
+                        double d1 = Component(bez[2], axis) - Component(bez[1], axis);
+                        double d2 = Component(bez[3], axis) - Component(bez[2], axis);
+                        // d0*(1-t)² + 2*d1*t*(1-t) + d2*t² == 0 in monomial form:
+                        cnt = SolveQuadratic(d0 - 2 * d1 + d2, 2 * (d1 - d0), d0, out t1, out t2);
+                    }
+                    else
+                    {   // degree == 2: the derivative is linear
+                        double d0 = Component(bez[1], axis) - Component(bez[0], axis);
+                        double d1 = Component(bez[2], axis) - Component(bez[1], axis);
+                        t2 = 0.0;
+                        if (d0 == d1) cnt = 0; // constant derivative: no inner extremum
+                        else
+                        {
+                            t1 = d0 / (d0 - d1);
+                            cnt = 1;
+                        }
+                    }
+                    for (int k = 0; k < cnt; ++k)
+                    {
+                        double t = (k == 0) ? t1 : t2;
+                        if (t > 0.0 && t < 1.0)
+                        {
+                            double p = k0 + t * (k1 - k0);
+                            if (p > pmin && p < pmax) res.MinMax(PointAtParam(p));
+                        }
+                    }
+                }
+            }
+        }
+        private static double Component(GeoPoint p, int axis)
+        {
+            return (axis == 0) ? p.x : (axis == 1) ? p.y : p.z;
+        }
+        /// <summary>
+        /// Real roots of a*t² + b*t + c == 0. Numerically stable (the second root is computed as c/q to avoid
+        /// cancellation) and scale invariant (no absolute epsilon: a tiny leading coefficient simply produces
+        /// a root far outside any interval of interest). Returns the number of roots (0, 1 or 2).
+        /// </summary>
+        private static int SolveQuadratic(double a, double b, double c, out double t1, out double t2)
+        {
+            t1 = t2 = 0.0;
+            if (a == 0.0)
+            {
+                if (b == 0.0) return 0;
+                t1 = -c / b;
+                return 1;
+            }
+            double disc = b * b - 4.0 * a * c;
+            if (disc < 0.0) return 0;
+            double sq = Math.Sqrt(disc);
+            double q = (b >= 0.0) ? -0.5 * (b + sq) : -0.5 * (b - sq);
+            t1 = q / a;
+            if (q != 0.0) t2 = c / q;
+            else t2 = t1; // b == 0 && c == 0: double root at 0
+            if (t1 == t2) return 1;
+            return 2;
         }
 
         ExplicitPCurve3D IExplicitPCurve3D.GetExplicitPCurve3D()
@@ -4266,6 +4373,13 @@ namespace CADability.GeoObject
                 return bsp;
             }
 
+        }
+        /// <summary>
+        /// Implements <see cref="CADability.GeoObject.ICurve.PointAndDerivativesAt(double, int)"/>.
+        /// </summary>
+        public IReadOnlyList<GeoVector> PointAndDerivativesAt(double position, int grad)
+        {
+            return GeneralCurve.PointAndDerivativesAt(this, position, grad);
         }
 #if DEBUG
         internal Polyline DebugSegments

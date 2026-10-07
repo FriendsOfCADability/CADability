@@ -7,6 +7,7 @@ using Point = CADability.WebDrawing.Point;
 using System.Drawing;
 using Point = System.Drawing.Point;
 #endif
+using System.Collections.Generic;
 using System.Runtime.Serialization;
 using MathNet.Numerics.LinearAlgebra.Double;
 
@@ -736,6 +737,21 @@ namespace CADability.GeoObject
             deriv1 = endPoint - startPoint;
             deriv2 = GeoVector.NullVector;
             return true;
+        }
+        /// <summary>
+        /// Implements <see cref="CADability.GeoObject.ICurve.PointAndDerivativesAt(double, int)"/>: all derivatives
+        /// beyond the first one vanish.
+        /// </summary>
+        public IReadOnlyList<GeoVector> PointAndDerivativesAt(double position, int grad)
+        {
+            List<GeoVector> res = new List<GeoVector>();
+            if (grad >= 0) res.Add((startPoint + position * (endPoint - startPoint)).ToVector());
+            if (grad >= 1) res.Add(endPoint - startPoint);
+            for (int i = 0; i < grad - 1; i++)
+            {
+                res.Add(GeoVector.NullVector);
+            }
+            return res;
         }
         #endregion
 

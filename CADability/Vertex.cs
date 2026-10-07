@@ -111,6 +111,7 @@ namespace CADability
             internal set
             {
                 position = value; // take care when setting the position of an existing vertex!
+                uvposition.Clear();
             }
         }
         /// <summary>

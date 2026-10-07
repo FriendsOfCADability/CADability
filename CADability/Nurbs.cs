@@ -2996,6 +2996,119 @@ namespace CADability
 
 
 
+        /// <summary>
+        /// Returns the block of poles which influence the surface on the knot span containing (u, v).
+        /// The result contains (udegree+1)*(vdegree+1) poles, indexed as res[i + (udegree+1)*j] where i counts
+        /// in u and j in v direction. By the convex hull property the surface patch of this knot span is
+        /// contained in the convex hull of these poles (for rational surfaces: the hull of the dehomogenized
+        /// poles, provided all weights are positive).
+        /// </summary>
+        /// <param name="u">u parameter, determines the knot span (use the span midpoint to be unambiguous)</param>
+        /// <param name="v">v parameter, determines the knot span</param>
+        internal T[] GetSpanPoles(double u, double v)
+        {
+            int n = uknots.Length - udegree - 1;
+            int uspan = FindSpanU(n, u);
+            int m = vknots.Length - vdegree - 1;
+            int vspan = FindSpanV(m, v);
+            T[] res = new T[(udegree + 1) * (vdegree + 1)];
+            for (int j = 0; j <= vdegree; ++j)
+            {
+                for (int i = 0; i <= udegree; ++i)
+                {
+                    res[i + (udegree + 1) * j] = poles[ind(uspan - udegree + i, vspan - vdegree + j)];
+                }
+            }
+            return res;
+        }
+        /// <summary>
+        /// Evaluates the polar form (blossom) of the polynomial segment on knot span <paramref name="span"/>.
+        /// <paramref name="d"/> must contain the degree+1 poles influencing the span (it is modified in place),
+        /// <paramref name="t"/> the degree blossom arguments (order is irrelevant by symmetry). This is the
+        /// de Boor algorithm with a different parameter at each level. The denominators cannot vanish as long
+        /// as the span is not empty (knots[span] &lt; knots[span+1]).
+        /// </summary>
+        private T Blossom(T[] d, double[] t, double[] knots, int span, int degree)
+        {
+            for (int r = 1; r <= degree; ++r)
+            {
+                for (int i = degree; i >= r; --i)
+                {
+                    double alpha = (t[r - 1] - knots[i + span - degree]) / (knots[i + span - r + 1] - knots[i + span - degree]);
+                    d[i] = calc.Add(calc.Mul(1.0 - alpha, d[i - 1]), calc.Mul(alpha, d[i]));
+                }
+            }
+            return d[degree];
+        }
+        /// <summary>
+        /// Returns the Bézier control net of the surface restricted to [u0, u1] x [v0, v1], which must be
+        /// contained in a single knot span (there the surface is a single polynomial or rational segment).
+        /// Passing the boundaries of a knot span yields the Bézier net of the whole span. The net contains
+        /// (udegree+1)*(vdegree+1) poles, indexed as res[i + (udegree+1)*j], and describes the sub patch as a
+        /// tensor product Bézier surface over [u0, u1] x [v0, v1]. The Bézier poles are blossom values:
+        /// res[i,j] = blossom with u-arguments u0 ((udegree-i) times) and u1 (i times), v-arguments analogous.
+        /// The convex hull of the (dehomogenized) Bézier poles contains the sub patch and is tighter than the
+        /// hull of the b-spline poles of the span. u0 == u1 (or v0 == v1) is allowed: the net then degenerates
+        /// to the Bézier poles of the iso curve.
+        /// </summary>
+        internal T[] GetSubPatchBezier(double u0, double u1, double v0, double v1)
+        {
+            int n = uknots.Length - udegree - 1;
+            int uspan = FindSpanU(n, 0.5 * (u0 + u1));
+            int m = vknots.Length - vdegree - 1;
+            int vspan = FindSpanV(m, 0.5 * (v0 + v1));
+            T[] res = new T[(udegree + 1) * (vdegree + 1)];
+            // extract the Bézier poles in u direction for each v-row of the influencing block
+            double[] targs = new double[udegree];
+            T[] d = new T[udegree + 1];
+            for (int j = 0; j <= vdegree; ++j)
+            {
+                for (int i = 0; i <= udegree; ++i)
+                {
+                    for (int k = 0; k <= udegree; ++k) d[k] = poles[ind(uspan - udegree + k, vspan - vdegree + j)];
+                    for (int r = 0; r < udegree; ++r) targs[r] = (r < udegree - i) ? u0 : u1;
+                    res[i + (udegree + 1) * j] = Blossom(d, targs, uknots, uspan, udegree);
+                }
+            }
+            // the intermediate net is Bézier in u but still b-spline in v: extract in v direction per column
+            targs = new double[vdegree];
+            d = new T[vdegree + 1];
+            T[] col = new T[vdegree + 1];
+            for (int i = 0; i <= udegree; ++i)
+            {
+                for (int j = 0; j <= vdegree; ++j) col[j] = res[i + (udegree + 1) * j];
+                for (int j = 0; j <= vdegree; ++j)
+                {
+                    for (int k = 0; k <= vdegree; ++k) d[k] = col[k];
+                    for (int r = 0; r < vdegree; ++r) targs[r] = (r < vdegree - j) ? v0 : v1;
+                    res[i + (udegree + 1) * j] = Blossom(d, targs, vknots, vspan, vdegree);
+                }
+            }
+            return res;
+        }
+        /// <summary>
+        /// Curve version of <see cref="GetSubPatchBezier(double, double, double, double)"/>:
+        /// returns the udegree+1 Bézier poles of the single polynomial (or rational) segment on the knot span
+        /// containing u. The segment is a Bézier curve over [u0, u1], the boundaries of the knot span.
+        /// </summary>
+        internal T[] GetSpanBezier(double u, out double u0, out double u1)
+        {
+            int n = uknots.Length - udegree - 1;
+            int span = FindSpanU(n, u);
+            u0 = uknots[span];
+            u1 = uknots[span + 1];
+            T[] res = new T[udegree + 1];
+            double[] targs = new double[udegree];
+            T[] d = new T[udegree + 1];
+            for (int i = 0; i <= udegree; ++i)
+            {
+                for (int k = 0; k <= udegree; ++k) d[k] = poles[span - udegree + k];
+                for (int r = 0; r < udegree; ++r) targs[r] = (r < udegree - i) ? u0 : u1;
+                res[i] = Blossom(d, targs, uknots, span, udegree);
+            }
+            return res;
+        }
+
         /*+++++++++++++++++++++ Neue bzw. überarbeitete Methoden von Henning +++++++++++++++++++++++*/
 
 

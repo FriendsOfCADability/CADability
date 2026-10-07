@@ -7,6 +7,8 @@ using System.Drawing;
 using System.Runtime.Serialization;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.LinearAlgebra.Double;
+using MathNet.Numerics.Differentiation;
+using MathNet.Numerics.Optimization;
 
 namespace CADability.GeoObject
 {
@@ -735,7 +737,11 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public virtual bool SameGeometry(ICurve other, double precision)
         {
-            throw new NotImplementedException();
+            if (precision <= 0.0) precision = Precision.eps;
+            if (other.DistanceTo(StartPoint) > precision) { return false; }
+            if (other.DistanceTo(EndPoint) > precision) { return false; }
+            if (other.DistanceTo(PointAt(0.5)) > precision) { return false; }
+            return true;
         }
         /// <summary>
         /// Implements <see cref="CADability.GeoObject.ICurve.PositionAtLength (double)"/>
@@ -813,12 +819,12 @@ namespace CADability.GeoObject
             }
             else
             {
-                if (pos >= 0.0)
+                if (pos <= 1e-6)
                 {
                     GeoPoint pCurve = PointAt(pos);
                     return Math.Min(p | StartPoint, pCurve | p);
                 }
-                else if (pos < 1.0)
+                else if (pos >= 1.0 - 1e-6)
                 {
                     GeoPoint pCurve = PointAt(pos);
                     return Math.Min(p | EndPoint, pCurve | p);
@@ -836,9 +842,123 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public virtual bool TryPointDeriv2At(double position, out GeoPoint point, out GeoVector deriv, out GeoVector deriv2)
         {
-            point = GeoPoint.Origin;
-            deriv = deriv2 = GeoVector.NullVector;
-            return false;
+            // The general curve has no analytic second derivative: it is the central difference of DirectionAt.
+            // Near the ends the difference is moved inside the parameter range [0,1].
+            const double h = 1e-6;
+            point = PointAt(position);
+            deriv = DirectionAt(position);
+            double u = Math.Max(h, Math.Min(1.0 - h, position));
+            deriv2 = (1.0 / (2.0 * h)) * (DirectionAt(u + h) - DirectionAt(u - h));
+            return true;
+        }
+        /// <summary>
+        /// Implements <see cref="CADability.GeoObject.ICurve.PointAndDerivativesAt(double, int)"/>.
+        /// </summary>
+        public virtual IReadOnlyList<GeoVector> PointAndDerivativesAt(double position, int grad)
+        {
+            return PointAndDerivativesAt(this, position, grad);
+        }
+        /// <summary>
+        /// Helper for calculating higher derivatives of any curve: the point and the first two derivatives come from
+        /// <see cref="ICurve.TryPointDeriv2At"/> (or <see cref="ICurve.DirectionAt"/>), higher derivatives are
+        /// computed numerically. Curves which know their higher derivatives should implement them on their own.
+        /// </summary>
+        /// <param name="curve">The curve</param>
+        /// <param name="position">Where to calculate the derivatives</param>
+        /// <param name="grad">Number of derivatives</param>
+        /// <returns>element 0 is the point (as a vector), element i is the i-th derivative</returns>
+        public static IReadOnlyList<GeoVector> PointAndDerivativesAt(ICurve curve, double position, int grad)
+        {
+            List<GeoVector> result = new List<GeoVector>();
+            if (curve.TryPointDeriv2At(position, out GeoPoint point, out GeoVector deriv, out GeoVector deriv2))
+            {
+                if (grad >= 0) result.Add(point.ToVector());
+                if (grad >= 1) result.Add(deriv);
+                if (grad >= 2) result.Add(deriv2);
+                for (int i = 3; i <= grad; i++)
+                {
+                    var diff = new NumericalDerivative { StepType = StepType.Relative };
+                    GeoVector der = new GeoVector(diff.EvaluateDerivative(w => { curve.TryPointDeriv2At(w, out _, out _, out GeoVector d2); return d2.x; }, position, i - 2),
+                                                  diff.EvaluateDerivative(w => { curve.TryPointDeriv2At(w, out _, out _, out GeoVector d2); return d2.y; }, position, i - 2),
+                                                  diff.EvaluateDerivative(w => { curve.TryPointDeriv2At(w, out _, out _, out GeoVector d2); return d2.z; }, position, i - 2));
+                    result.Add(der);
+                }
+            }
+            else
+            {
+                result.Add(curve.PointAt(position).ToVector());
+                if (grad >= 1) result.Add(curve.DirectionAt(position));
+                for (int i = 2; i <= grad; i++)
+                {
+                    var diff = new NumericalDerivative { StepType = StepType.Relative };
+                    GeoVector der = new GeoVector(diff.EvaluateDerivative(w => curve.DirectionAt(w).x, position, i - 1),
+                                                  diff.EvaluateDerivative(w => curve.DirectionAt(w).y, position, i - 1),
+                                                  diff.EvaluateDerivative(w => curve.DirectionAt(w).z, position, i - 1));
+                    result.Add(der);
+                }
+            }
+            return result;
+        }
+        /// <summary>
+        /// Finds the parameter of the point on <paramref name="curve"/> closest to <paramref name="p"/> with a
+        /// Levenberg-Marquardt minimisation, starting at <paramref name="u"/>. The parameter stays within [0,1].
+        /// </summary>
+        /// <param name="curve">The curve</param>
+        /// <param name="p">The point to find the foot point for</param>
+        /// <param name="u">Start value, the result on success</param>
+        /// <returns>true, if the minimisation converged</returns>
+        public static bool PositionOf(ICurve curve, GeoPoint p, ref double u)
+        {
+            // Minimize |curve(u) - p|^2 using Levenberg-Marquardt.
+            // Residuals: r_i(u) = curve_i(u) - p_i  (i = 0,1,2 for x,y,z)
+            // Jacobian:  J[i,0] = d(curve_i)/du = DirectionAt(u)_i
+            try
+            {
+                var observedX = Vector<double>.Build.Dense(new[] { 0.0, 1.0, 2.0 });
+                var observedY = Vector<double>.Build.Dense(new[] { p.x, p.y, p.z });
+
+                double Coord(double x, double y, double z, int idx) => idx == 0 ? x : idx == 1 ? y : z;
+
+                Func<Vector<double>, double, double> scalarModel = (parameters, xi) =>
+                {
+                    double pu = Math.Max(0.0, Math.Min(1.0, parameters[0]));
+                    GeoPoint pt = curve.PointAt(pu);
+                    return Coord(pt.x, pt.y, pt.z, (int)Math.Round(xi));
+                };
+
+                Func<Vector<double>, double, Vector<double>> jacobian = (parameters, xi) =>
+                {
+                    double pu = Math.Max(0.0, Math.Min(1.0, parameters[0]));
+                    GeoVector dir = curve.DirectionAt(pu);
+                    return Vector<double>.Build.Dense(new[] { Coord(dir.x, dir.y, dir.z, (int)Math.Round(xi)) });
+                };
+
+                var objective = ObjectiveFunction.NonlinearModel(scalarModel, jacobian, observedX, observedY);
+                var initialGuess = Vector<double>.Build.Dense(new[] { u });
+                var lowerBound = Vector<double>.Build.Dense(new[] { 0.0 });
+                var upperBound = Vector<double>.Build.Dense(new[] { 1.0 });
+
+                var minimizer = new LevenbergMarquardtMinimizer(
+                    gradientTolerance: 1e-14,
+                    stepTolerance: 1e-14,
+                    functionTolerance: 1e-14,
+                    maximumIterations: 100);
+
+                var result = minimizer.FindMinimum(objective, initialGuess, lowerBound, upperBound);
+
+                if (result.ReasonForExit == ExitCondition.Converged ||
+                    result.ReasonForExit == ExitCondition.RelativeGradient ||
+                    result.ReasonForExit == ExitCondition.RelativePoints)
+                {
+                    u = Math.Max(0.0, Math.Min(1.0, result.MinimizingPoint[0]));
+                    return true;
+                }
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
         }
         #endregion
         /// <summary>
@@ -913,6 +1033,19 @@ namespace CADability.GeoObject
             res.surfaceCurve = surfaceCurve;
             res.surface = surface;
             return res;
+        }
+        /// <summary>
+        /// The parameter system of the surface has been changed by <paramref name="toNewSurface"/> (e.g. by
+        /// ISurface.ReverseOrientation): the 2d curve is adapted, so that the 3d curve stays the same.
+        /// </summary>
+        public void SurfaceModified(ModOp2D toNewSurface)
+        {
+            surfaceCurve = surfaceCurve.GetModified(toNewSurface);
+            InvalidateSecondaryData();
+        }
+        public ISurface Surface
+        {
+            get { return surface; }
         }
         public override IGeoObject Clone()
         {
@@ -1596,13 +1729,16 @@ namespace CADability.GeoObject
                             }
                             else
                             {
+                                // the triangle t1, t2, t4 is mapped onto (0,0,0), (1,0,0), (0,1,0): the inverse of the
+                                // matrix whose COLUMNS are the edge vectors, and t1 must go to the origin
                                 GeoVector v1 = t2 - t1;
                                 GeoVector v2 = t4 - t1;
                                 GeoVector v3 = v1 ^ v2;
-                                Matrix m = (Matrix)DenseMatrix.OfRowArrays(new double[][] { v1, v2, v3 }).Inverse();
-                                if (m != null)
+                                Matrix m = (Matrix)DenseMatrix.OfColumnArrays(new double[][] { v1, v2, v3 }).Inverse();
+                                if (m != null && m.IsValid())
                                 {
-                                    toUnit.SetData(m, t1);
+                                    GeoPoint trans = m * t1;
+                                    toUnit.SetData(m, new GeoPoint(-trans.x, -trans.y, -trans.z));
                                 }
                                 else
                                 {
@@ -1612,10 +1748,12 @@ namespace CADability.GeoObject
                         }
                         else
                         {
+                            // t1, t2, t3, t4 are mapped onto the origin and the three unit points: the inverse of the
+                            // matrix whose COLUMNS are the edge vectors (with rows it was a different mapping)
                             GeoVector v1 = t2 - t1;
                             GeoVector v2 = t3 - t1;
                             GeoVector v3 = t4 - t1;
-                            Matrix m = (Matrix)DenseMatrix.OfRowArrays(new double[][] { v1, v2, v3 }).Inverse();
+                            Matrix m = (Matrix)DenseMatrix.OfColumnArrays(new double[][] { v1, v2, v3 }).Inverse();
                             GeoPoint trans = m * t1;
                             toUnit.SetData(m, new GeoPoint(-trans.x, -trans.y, -trans.z));
                         }
@@ -1645,21 +1783,106 @@ namespace CADability.GeoObject
                 GeoPoint p = start + l * dir;
                 return (p.x + p.y < 1.0) && (p.x >= 0.0) && (p.x <= 1.0) && (p.y >= 0.0) && (p.y <= 1.0);
             }
+            /// <summary>
+            /// Tolerance for the segment tests against the unit tetrahedron and the unit triangle. Since these tests
+            /// are performed in the unit system, where the tetrahedron has the size 1, this is a relative tolerance.
+            /// The tetrahedron interference test is only a preselection for the following intersection calculations,
+            /// so false positives do no harm, whereas false negatives would make intersections disappear. This is why
+            /// the unit tetrahedron and the unit triangle are widened by this value in all directions.
+            /// </summary>
+            private const double unitEps = 1e-6;
+            /// <summary>
+            /// Clips the parameter interval [lmin, lmax] of a line segment against a single half space.
+            /// f0 and f1 are the values of the (linear) half space function at the start- and endpoint of the
+            /// segment, the inside of the half space is where this function is negative. The half space is widened
+            /// by <see cref="unitEps"/>. Returns false when the segment is completely outside of the half space,
+            /// otherwise lmin and lmax are narrowed down.
+            /// </summary>
+            private static bool ClipHalfSpace(double f0, double f1, ref double lmin, ref double lmax)
+            {
+                double d = f1 - f0;
+                if (Math.Abs(d) < 1e-13) return f0 <= unitEps; // parallel to the boundary plane: inside or outside as a whole
+                double l = (unitEps - f0) / d; // parameter where the widened boundary plane is crossed
+                if (d > 0.0)
+                {   // the function is growing, the inside is before l
+                    if (l < lmax) lmax = l;
+                }
+                else
+                {   // the function is falling, the inside is behind l
+                    if (l > lmin) lmin = l;
+                }
+                return lmin <= lmax;
+            }
+            /// <summary>
+            /// The tolerance <see cref="unitEps"/> expressed in the parameter of the segment from sp to ep, i.e. the
+            /// interval [-res, 1+res] describes the segment widened by unitEps at both ends.
+            /// </summary>
+            private static double ParameterEps(GeoPoint sp, GeoPoint ep)
+            {
+                double len = (ep - sp).Length;
+                if (len < unitEps) return 1.0; // degenerated to a point, the half spaces alone decide
+                return unitEps / len;
+            }
+            /// <summary>
+            /// Tests whether the line segment from sp to ep, which must already be given in the unit system of a
+            /// tetrahedron (i.e. transformed with <see cref="ToUnit"/>), intersects the unit tetrahedron. The unit
+            /// tetrahedron is spanned by the origin and the three unit vectors, i.e. it is the intersection of the
+            /// four half spaces x&gt;=0, y&gt;=0, z&gt;=0 and x+y+z&lt;=1, each widened by <see cref="unitEps"/>.
+            /// </summary>
+            internal static bool UnitTetraederInterferes(GeoPoint sp, GeoPoint ep)
+            {
+                double eps = ParameterEps(sp, ep);
+                double lmin = -eps, lmax = 1.0 + eps;
+                if (!ClipHalfSpace(-sp.x, -ep.x, ref lmin, ref lmax)) return false;
+                if (!ClipHalfSpace(-sp.y, -ep.y, ref lmin, ref lmax)) return false;
+                if (!ClipHalfSpace(-sp.z, -ep.z, ref lmin, ref lmax)) return false;
+                if (!ClipHalfSpace(sp.x + sp.y + sp.z - 1.0, ep.x + ep.y + ep.z - 1.0, ref lmin, ref lmax)) return false;
+                return true; // a non empty part of the segment remains inside
+            }
+            /// <summary>
+            /// Tests whether the line segment from sp to ep, which must already be given in the unit system of a
+            /// flat tetrahedron (i.e. transformed with <see cref="ToUnit"/>), intersects the unit triangle
+            /// (0,0,0), (1,0,0), (0,1,0) in the xy-plane, widened by <see cref="unitEps"/>.
+            /// </summary>
+            internal static bool UnitTriangleInterferes(GeoPoint sp, GeoPoint ep)
+            {
+                double eps = ParameterEps(sp, ep);
+                if (Math.Abs(sp.z) < unitEps && Math.Abs(ep.z) < unitEps)
+                {   // the segment lies in the plane of the triangle: clip it against the three half planes
+                    double lmin = -eps, lmax = 1.0 + eps;
+                    if (!ClipHalfSpace(-sp.x, -ep.x, ref lmin, ref lmax)) return false;
+                    if (!ClipHalfSpace(-sp.y, -ep.y, ref lmin, ref lmax)) return false;
+                    if (!ClipHalfSpace(sp.x + sp.y - 1.0, ep.x + ep.y - 1.0, ref lmin, ref lmax)) return false;
+                    return true;
+                }
+                // the segment must pierce the plane of the triangle inside the unit triangle
+                GeoVector dir = ep - sp;
+                if (Math.Abs(dir.z) < 1e-13) return false; // parallel to the plane, but not inside it
+                double l = -sp.z / dir.z;
+                if (l < -eps || l > 1.0 + eps) return false;
+                GeoPoint p = sp + l * dir;
+                return (p.x + p.y <= 1.0 + unitEps) && (p.x >= -unitEps) && (p.y >= -unitEps);
+            }
             public bool Interferes(CurveTetraeder t)
             {   // überschneiden sich zwei Tetraeder
-                // noch nicht berücksichtig: Tetraeder ist nur eine Linie
-                if (IsLinear)
-                {
-                    if (t.IsLinear)
-                    {   // zwei Linien
-                        double par1, par2;
-                        double d = Geometry.DistLLWrongPar2(t1, t2 - t1, t.t1, t.t2 - t.t1, out par1, out par2);
-                        return (d < Precision.eps && par1 >= 0.0 && par1 <= 1.0 && par2 >= 0.0 && par2 <= 1.0);
-                    }
-                    else
-                    {
-                        return t.Interferes(this); // da t nicht Linear werden wir nicht endlos rekursiv
-                    }
+                if (IsLinear && t.IsLinear)
+                {   // zwei Linien
+                    double par1, par2;
+                    double d = Geometry.DistLLWrongPar2(t1, t2 - t1, t.t1, t.t2 - t.t1, out par1, out par2);
+                    return (d < Precision.eps && par1 >= 0.0 && par1 <= 1.0 && par2 >= 0.0 && par2 <= 1.0);
+                }
+                if (IsLinear || t.IsLinear)
+                {   // exactly one of the two is degenerated to a line segment. Calling the test with exchanged
+                    // roles does not work here, because the unit system of a line is degenerate (it maps the line
+                    // onto the x-axis, the unit tetrahedron in that system has no relation to the line).
+                    // Instead the line segment is transformed into the unit system of the other tetrahedron and
+                    // clipped against the unit tetrahedron (or the unit triangle, if the other one is flat).
+                    CurveTetraeder line = IsLinear ? this : t;
+                    CurveTetraeder other = IsLinear ? t : this;
+                    GeoPoint sp = other.ToUnit * line.t1;
+                    GeoPoint ep = other.ToUnit * line.t2;
+                    if (other.IsFlat) return UnitTriangleInterferes(sp, ep);
+                    return UnitTetraederInterferes(sp, ep);
                 }
                 if (IsFlat && t.IsFlat)
                 {   // beide sind flach, aber nicht notwendig in einer Ebene
@@ -2431,7 +2654,11 @@ namespace CADability.GeoObject
                 AddAproximation(tetraederBase[i], tetraederBase[i + 1], tetraederParams[i], tetraederParams[i + 1], maxError, points);
             }
             Polyline res = Polyline.Construct();
-            res.SetPoints(points.ToArray(), false);
+            try
+            {
+                res.SetPoints(points.ToArray(), false);
+            }
+            catch (PolylineException) { }
             return res;
         }
 
@@ -2539,8 +2766,9 @@ namespace CADability.GeoObject
 
         private bool NewtonFindClosestPoint(ICurve curve1, double umin1, double umax1, ICurve curve2, double umin2, double umax2, out double par1, out double par2, out GeoPoint ip, out double dist)
         {
-            par1 = (umax1 + umax1) / 2.0;
-            par2 = (umax2 + umax2) / 2.0;
+            // start in the middle of both parameter intervals
+            par1 = (umin1 + umax1) / 2.0;
+            par2 = (umin2 + umax2) / 2.0;
             GeoPoint p1 = curve1.PointAt(par1);
             GeoPoint p2 = curve2.PointAt(par2);
             GeoVector dir1 = curve1.DirectionAt(par1);

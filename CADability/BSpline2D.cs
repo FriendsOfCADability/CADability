@@ -2962,6 +2962,110 @@ namespace CADability.Curve2D
             return bsp;
         }
         /// <summary>
+        /// Finds the foot point of <paramref name="p"/> on this spline between the two (knot) parameters without a
+        /// triangulation: Newton iterations on the squared distance, safeguarded by bisection of the interval.
+        /// </summary>
+        /// <param name="p">the point</param>
+        /// <param name="uMin">lower bound of the parameter interval</param>
+        /// <param name="uMax">upper bound of the parameter interval</param>
+        /// <param name="uFoot">the parameter of the foot point</param>
+        /// <param name="maxIter">maximum number of iterations</param>
+        /// <param name="tolU">tolerance of the parameter</param>
+        /// <param name="tolG">tolerance of the derivative of the squared distance</param>
+        /// <returns>true (the last iterate is returned when the iteration does not converge)</returns>
+        public bool TryFindFootPoint(GeoPoint2D p, double uMin, double uMax, out double uFoot, int maxIter = 20, double tolU = 1e-12, double tolG = 1e-12)
+        {
+            double u = 0.5 * (uMin + uMax);
+
+            double Phi(double uu)
+            {
+                GeoPoint2D cp = PointAtParam(uu);
+                GeoVector2D r = cp - p;
+                return 0.5 * (r.x * r.x + r.y * r.y);
+            }
+
+            double Grad(double uu)
+            {
+                GeoVector2D d1;
+                GeoPoint2D cp;
+                if (nubs != null)
+                {
+                    GeoPoint2D pnt, dir;
+                    nubs.CurveDeriv1(uu, out pnt, out dir);
+                    d1 = dir.ToVector();
+                    cp = pnt;
+                }
+                else
+                {
+                    GeoPoint2DH pnth, dirh;
+                    nurbs.CurveDeriv1(uu, out pnth, out dirh);
+                    d1 = dirh;
+                    cp = pnth;
+                }
+                GeoVector2D r = cp - p;
+                return r.x * d1.x + r.y * d1.y;
+            }
+
+            double Hess(double uu)
+            {
+                PointDirAt2(uu, out GeoPoint2D cp, out GeoVector2D d1, out GeoVector2D d2);
+                GeoVector2D r = cp - p;
+                return d1.x * d1.x + d1.y * d1.y + r.x * d2.x + r.y * d2.y;
+            }
+
+            for (int i = 0; i < maxIter; i++)
+            {
+                double g = Grad(u);
+                if (Math.Abs(g) < tolG)
+                {
+                    uFoot = u;
+                    return true;
+                }
+
+                double h = Hess(u);
+
+                double uNew;
+                if (Math.Abs(h) < 1e-18)
+                {
+                    // the second derivative is too small: use the middle of the (narrowed) interval
+                    uNew = 0.5 * (uMin + uMax);
+                }
+                else
+                {
+                    uNew = u - g / h;
+                }
+
+                // never leave the known interval
+                if (uNew <= uMin || uNew >= uMax || double.IsNaN(uNew))
+                {
+                    uNew = 0.5 * (uMin + uMax);
+                }
+
+                // narrow the interval by the sign of phi'(u)
+                if (g > 0.0)
+                    uMax = u;
+                else
+                    uMin = u;
+
+                if (Math.Abs(uNew - u) < tolU)
+                {
+                    uFoot = uNew;
+                    return true;
+                }
+
+                // only accept the step when phi decreases
+                if (Phi(uNew) > Phi(u))
+                {
+                    uNew = 0.5 * (uMin + uMax);
+                }
+
+                u = uNew;
+            }
+
+            uFoot = u;
+            return true;
+        }
+        /// <summary>
         /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.TryPointDeriv2At (double, out GeoPoint2D, out GeoVector2D, out GeoVector2D)"/>
         /// </summary>
         /// <param name="position"></param>

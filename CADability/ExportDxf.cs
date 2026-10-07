@@ -817,6 +817,19 @@ namespace CADability.DXF
             };
         }
 
+        // ARC and CIRCLE centers are stored in OCS, unlike ELLIPSE centers (WCS).
+        private static XYZ WcsToOcs(GeoPoint point, GeoVector normal)
+        {
+            GeoVector n = normal.Normalized;
+            GeoVector x = (Math.Abs(n.x) < 1.0 / 64 && Math.Abs(n.y) < 1.0 / 64)
+                ? GeoVector.YAxis ^ n
+                : GeoVector.ZAxis ^ n;
+            x.Norm();
+            GeoVector y = n ^ x;
+            return new XYZ(point.x * x.x + point.y * x.y + point.z * x.z,
+                point.x * y.x + point.y * y.y + point.z * y.z,
+                point.x * n.x + point.y * n.y + point.z * n.z);
+        }
         private Entity ExportEllipse(GeoObject.Ellipse elli)
         {
             if (elli.IsCircle)
@@ -845,7 +858,7 @@ namespace CADability.DXF
                     {
                         return new ACadSharp.Entities.Circle
                         {
-                            Center = ToXYZ(aligned.Center),
+                            Center = WcsToOcs(aligned.Center, normal),
                             Radius = aligned.Radius,
                             Normal = ToXYZ(normal)
                         };
@@ -854,7 +867,7 @@ namespace CADability.DXF
                     {
                         return new ACadSharp.Entities.Arc
                         {
-                            Center = ToXYZ(aligned.Center),
+                            Center = WcsToOcs(aligned.Center, normal),
                             Radius = aligned.Radius,
                             StartAngle = aligned.StartParameter,
                             EndAngle = aligned.StartParameter + aligned.SweepParameter,
@@ -866,7 +879,7 @@ namespace CADability.DXF
                 {
                     return new ACadSharp.Entities.Circle
                     {
-                        Center = ToXYZ(elli.Center),
+                        Center = WcsToOcs(elli.Center, elli.Plane.Normal),
                         Radius = elli.Radius,
                         Normal = ToXYZ(elli.Plane.Normal)
                     };

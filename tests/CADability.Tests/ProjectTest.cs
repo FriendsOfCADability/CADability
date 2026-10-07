@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 #if WINDOWS
 using System.Drawing;
 using CADability.Forms;
@@ -1086,6 +1086,37 @@ EOF
             //The real volumen should be around 553099.66263763292
             double rightVolume = 553099.66263763292;
             Debug.Assert((Math.Abs(vol - rightVolume) < Precision.eps));
+        }
+
+        [DataTestMethod]
+        [DataRow(false)]
+        [DataRow(true)]
+        public void flipped_circle_and_arc_preserve_world_coordinates(bool isArc)
+        {
+            GeoObject.Ellipse original = GeoObject.Ellipse.Construct();
+            original.SetCirclePlaneCenterRadius(Plane.XYPlane, new GeoPoint(17, 29, 0), 3);
+            if (isArc)
+            {
+                original.StartParameter = 0.3;
+                original.SweepParameter = 1.7;
+            }
+            original.Modify(ModOp.Rotate(GeoVector.ZAxis, SweepAngle.Deg(37)));
+            original.Modify(ModOp.Rotate(GeoVector.XAxis, SweepAngle.Deg(180)));
+            Project project = Project.CreateSimpleProject();
+            project.GetModel(0).Add(original);
+            string file = TestContext.TestName + ".dxf";
+            Assert.IsTrue(project.Export(file, "dxf"));
+            var restored = Project.ReadFromFile(file, "dxf").GetActiveModel().AllObjects[0] as GeoObject.Ellipse;
+            Assert.IsNotNull(restored);
+            Assert.AreEqual(0.0, original.Center | restored.Center, 1e-8, "world center");
+            Assert.AreEqual(original.Radius, restored.Radius, 1e-8, "radius");
+            Assert.AreEqual(isArc, restored.IsArc);
+            if (isArc)
+            {
+                Assert.AreEqual(0.0, original.StartPoint | restored.StartPoint, 1e-8, "start point");
+                Assert.AreEqual(0.0, original.EndPoint | restored.EndPoint, 1e-8, "end point");
+                Assert.AreEqual(0.0, ((GeoObject.ICurve)original).PointAt(0.5) | ((GeoObject.ICurve)restored).PointAt(0.5), 1e-8, "midpoint");
+            }
         }
     }
 }

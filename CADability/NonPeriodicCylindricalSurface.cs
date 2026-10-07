@@ -287,7 +287,7 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public override ICurve Make3dCurve(ICurve2D curve2d)
         {
-            if (curve2d is ProjectedCurve && (curve2d as ProjectedCurve).Surface == this)
+            if (ProjectedCurve.IsPlain(curve2d) && (curve2d as ProjectedCurve).Surface == this)
             {
                 return (curve2d as ProjectedCurve).Curve3D;
             }

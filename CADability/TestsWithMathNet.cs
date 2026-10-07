@@ -29,7 +29,7 @@ namespace CADability
         /// <returns></returns>
         public static bool PositionOfMN(ISurface surface, GeoPoint p3d, ref GeoPoint2D res, out double mindist)
         {
-            NewtonMinimizer nm = new NewtonMinimizer(1e-12, 30);
+            NewtonMinimizer nm = new NewtonMinimizer(1e-11, 30);
             IObjectiveFunction iof = ObjectiveFunction.GradientHessian(
                 new Func<Vector<double>, (double, Vector<double>, Matrix<double>)>(delegate (Vector<double> vd)
                 {
@@ -97,7 +97,14 @@ namespace CADability
                 NonlinearMinimizationResult mres = lm.FindMinimum(iom, new DenseVector(new double[] { res.x, res.y }));
                 res = new GeoPoint2D(mres.MinimizingPoint[0], mres.MinimizingPoint[1]);
                 mindist = (p3d.x - mres.MinimizedValues[0]) * (p3d.x - mres.MinimizedValues[0]) + (p3d.y - mres.MinimizedValues[1]) * (p3d.y - mres.MinimizedValues[1]) + (p3d.z - mres.MinimizedValues[2]) * (p3d.z - mres.MinimizedValues[2]);
-                return true;
+                if (mres.ReasonForExit == ExitCondition.RelativePoints || mres.ReasonForExit == ExitCondition.RelativeGradient || mres.ReasonForExit == ExitCondition.Converged)
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
             }
             catch
             {
@@ -106,6 +113,227 @@ namespace CADability
                 return false;
             }
         }
+        public static bool FindTangentialIntersectionPoint(GeoPoint planeLocation, GeoVector planeNormal, ISurface surface1, ISurface surface2, out GeoPoint2D uv1, out GeoPoint2D uv2,
+            GeoPoint2D? uv1s = null, GeoPoint2D? uv2s = null)
+        {
+            if (uv1s.HasValue && uv2s.HasValue)
+            {
+                uv1 = uv1s.Value;
+                uv2 = uv2s.Value;
+            }
+            else
+            {
+                uv1 = surface1.PositionOf(planeLocation);
+                uv2 = surface2.PositionOf(planeLocation);
+            }
+            // System.Diagnostics.Trace.WriteLine("ohne Jacobi");
+
+            var pHat = planeNormal.Normalized;
+
+            // Parametervektor p = [u1, v1, u2, v2]
+            var p0 = Vector<double>.Build.DenseOfArray(new[] { uv1.x, uv1.y, uv2.x, uv2.y });
+
+            // ---- Residuenfunktion r(p) (ignoriert observedX) ----
+            Func<Vector<double>, Vector<double>, Vector<double>> residual = (p, observedXdumy) =>
+            {
+                double u1 = p[0], v1 = p[1], u2 = p[2], v2 = p[3];
+                //System.Diagnostics.Trace.WriteLine($"uv: {u1}; {v1}; {u2}; {v2}");
+                surface1.DerivationAt(new GeoPoint2D(u1, v1), out var P1, out var Su1, out var Sv1);
+                surface2.DerivationAt(new GeoPoint2D(u2, v2), out var P2, out var Su2, out var Sv2);
+                // Residuenblöcke
+                var rp = P1 - P2;                          // 3
+                double rpi = pHat * (P1 - planeLocation);  // 1
+                var n1 = (Su1 ^ Sv1).Normalized;
+                var n2 = (Su2 ^ Sv2).Normalized;
+                var rn = n1 ^ n2;                           // 3  (parallel/antiparallel => 0)
+
+                // Gewichte (bei Bedarf anpassen/parametrisieren)
+                double wp = 1.0;   // Positionsfehler
+                double wpi = 2.0;  // Ebenenbedingung
+                double wn = 0.5;   // Normalenparallelität
+
+                return Vector<double>.Build.DenseOfArray(new double[] {
+                    Math.Sqrt(wp)*rp.x, Math.Sqrt(wp)*rp.y, Math.Sqrt(wp)*rp.z,
+                    Math.Sqrt(wpi)*rpi,
+                    Math.Sqrt(wn)*rn.x, Math.Sqrt(wn)*rn.y, Math.Sqrt(wn)*rn.z });
+            };
+
+            // Länge des Residuenvektors für observedY/weight bestimmen (hier 7)
+            int m = 7;
+
+            // ---- Dummy-Observations ----
+            // Variante A: Leerer X-Vektor (wenn deine MathNet-Version das akzeptiert)
+            // var observedX = Vector<double>.Build.Dense(0);
+
+            // Variante B (robust): Ein Dummy-X, das du in f(...) ignorierst
+            var observedX = Vector<double>.Build.Dense(m, 0.0);
+
+            // Zielwerte y = 0 (wir minimieren ||r(p)||^2)
+            var observedY = Vector<double>.Build.Dense(m, 0.0);
+
+            // (Optional) separater Weight-Vektor, falls du Gewichte NICHT in r eingearbeitet hast:
+            Vector<double> weight = null; // oder: DenseOfArray(new[]{ wp,wp,wp, wpi, wn,wn,wn });
+
+            // ObjectiveModel bauen
+            var model = ObjectiveFunction.NonlinearModel(residual, observedX, observedY, weight, accuracyOrder: 2);
+
+            var lm = new LevenbergMarquardtMinimizer();
+            SolverTrace.Record("MathNet.LM");
+            var result = lm.FindMinimum(model, p0);
+
+            // Akzeptanz prüfen (zusätzlich mit expliziten Toleranzen)
+            var r = residual(result.MinimizingPoint, observedX);
+            double rpNorm = Math.Sqrt(r[0] * r[0] + r[1] * r[1] + r[2] * r[2]);
+            double rpiAbs = Math.Abs(r[3]);
+            double rnNorm = Math.Sqrt(r[4] * r[4] + r[5] * r[5] + r[6] * r[6]);
+
+            // Toleranzen ggf. skalieren an deine Längeneinheit:
+            const double epsPos = 1e-3;
+            const double epsPlane = 1e-3;
+            const double epsNorm = 1e-3;
+
+            bool ok = (result.ReasonForExit == ExitCondition.Converged || result.ReasonForExit == ExitCondition.RelativePoints || result.ReasonForExit == ExitCondition.RelativeGradient)
+                      && rpNorm <= epsPos && rpiAbs <= epsPlane && rnNorm <= epsNorm;
+
+            if (!ok) return false;
+
+            uv1 = new GeoPoint2D(result.MinimizingPoint[0], result.MinimizingPoint[1]);
+            uv2 = new GeoPoint2D(result.MinimizingPoint[2], result.MinimizingPoint[3]);
+            return true;
+        }
+
+
+        public static bool FindTangentialIntersectionPointJ(GeoPoint planeLocation, GeoVector planeNormal, ISurface s1, ISurface s2, out GeoPoint2D uv1, out GeoPoint2D uv2)
+        {
+            uv1 = s1.PositionOf(planeLocation);
+            uv2 = s2.PositionOf(planeLocation);
+
+            var pHat = planeNormal.Normalized;
+            var p0 = Vector<double>.Build.DenseOfArray(new[] { uv1.x, uv1.y, uv2.x, uv2.y });
+            //System.Diagnostics.Trace.WriteLine("mit Jacobi");
+
+            // Gewichte (je nach Maßstab ggf. anpassen)
+            double wp = 1.0, wpi = 2.0, wn = 0.5;
+            double swp = Math.Sqrt(wp), swpi = Math.Sqrt(wpi), swn = Math.Sqrt(wn);
+
+            // Hilfsfunktion: Oberflächen & Ableitungen auswerten
+            void Eval(double u1, double v1, double u2, double v2,
+                      out GeoPoint P1, out GeoVector Su1, out GeoVector Sv1, out GeoVector Suu1, out GeoVector Svv1, out GeoVector Suv1,
+                      out GeoPoint P2, out GeoVector Su2, out GeoVector Sv2, out GeoVector Suu2, out GeoVector Svv2, out GeoVector Suv2,
+                      out GeoVector n1, out GeoVector n2, out GeoVector nh1, out GeoVector nh2,
+                      out double n1Norm, out double n2Norm)
+            {
+                s1.Derivation2At(new GeoPoint2D(u1, v1), out P1, out Su1, out Sv1, out Suu1, out Svv1, out Suv1);
+                s2.Derivation2At(new GeoPoint2D(u2, v2), out P2, out Su2, out Sv2, out Suu2, out Svv2, out Suv2);
+                n1 = Su1 ^ Sv1; n2 = Su2 ^ Sv2;
+                n1Norm = n1.Length; n2Norm = n2.Length;
+                nh1 = n1 / n1Norm; nh2 = n2 / n2Norm; // normalisierte Normalen
+            }
+
+            // Residuen-Vektor r(p)
+            Func<Vector<double>, Vector<double>, Vector<double>> function = (p, obsX) =>
+            {
+                double u1 = p[0], v1 = p[1], u2 = p[2], v2 = p[3];
+                //System.Diagnostics.Trace.WriteLine($"uv: {u1}; {v1}; {u2}; {v2}");
+
+                s1.DerivationAt(new GeoPoint2D(u1, v1), out var P1, out var Su1, out var Sv1);
+                s2.DerivationAt(new GeoPoint2D(u2, v2), out var P2, out var Su2, out var Sv2);
+                GeoVector n1 = Su1 ^ Sv1, n2 = Su2 ^ Sv2;
+                GeoVector nh1 = n1.Normalized, nh2 = n2.Normalized;
+                var rp = P1 - P2;                         // 3
+                double rpi = pHat * (P1 - planeLocation); // 1
+                var rn = nh1 ^ nh2;                       // 3
+
+                return Vector<double>.Build.DenseOfArray(new double[] {
+                    swp*rp.x, swp*rp.y, swp*rp.z,
+                    swpi*rpi,
+                    swn*rn.x, swn*rn.y, swn*rn.z });
+            };
+
+            // Jacobian J = ∂r/∂p  (7 x 4)
+            Func<Vector<double>, Vector<double>, Matrix<double>> derivatives = (p, obsX) =>
+            {
+                double u1 = p[0], v1 = p[1], u2 = p[2], v2 = p[3];
+
+                Eval(u1, v1, u2, v2,
+                     out var P1, out var Su1, out var Sv1, out var Suu1, out var Svv1, out var Suv1,
+                     out var P2, out var Su2, out var Sv2, out var Suu2, out var Svv2, out var Suv2,
+                     out var n1, out var n2, out var nh1, out var nh2,
+                     out var n1Norm, out var n2Norm);
+
+                var J = Matrix<double>.Build.Dense(7, 4);
+
+                // r_p (Zeilen 0..2): P1-P2
+                // ∂/∂u1,v1: +S1u, +S1v ; ∂/∂u2,v2: -S2u, -S2v
+                // Zeile 0 -> x, 1 -> y, 2 -> z
+                J[0, 0] = swp * Su1.x; J[0, 1] = swp * Sv1.x; J[0, 2] = -swp * Su2.x; J[0, 3] = -swp * Sv2.x;
+                J[1, 0] = swp * Su1.y; J[1, 1] = swp * Sv1.y; J[1, 2] = -swp * Su2.y; J[1, 3] = -swp * Sv2.y;
+                J[2, 0] = swp * Su1.z; J[2, 1] = swp * Sv1.z; J[2, 2] = -swp * Su2.z; J[2, 3] = -swp * Sv2.z;
+
+                // r_pi (Zeile 3): pHat·(P1-planeLocation)
+                J[3, 0] = swpi * pHat * (Su1);
+                J[3, 1] = swpi * pHat * (Sv1);
+                J[3, 2] = 0.0;
+                J[3, 3] = 0.0;
+
+                // r_n (Zeilen 4..6): nh1 x nh2
+                // dnh = (I - nh nh^T) * dn / ||n||
+                // dn1/du1 = Suu1 x Sv1 + Su1 x Suv1,  dn1/dv1 = Suv1 x Sv1 + Su1 x Svv1
+                // dn2/du2 = Suu2 x Sv2 + Su2 x Suv2,  dn2/dv2 = Suv2 x Sv2 + Su2 x Svv2
+                GeoVector Proj(GeoVector nh, GeoVector v) => v - (nh * v) * nh; // (I - nh nh^T) v
+
+                var dn1_du1 = Suu1 ^ Sv1 + Su1 ^ Suv1;
+                var dn1_dv1 = Suv1 ^ Sv1 + Su1 ^ Svv1;
+                var dn2_du2 = Suu2 ^ Sv2 + Su2 ^ Suv2;
+                var dn2_dv2 = Suv2 ^ Sv2 + Su2 ^ Svv2;
+
+                var dnh1_du1 = Proj(nh1, dn1_du1) / n1Norm;
+                var dnh1_dv1 = Proj(nh1, dn1_dv1) / n1Norm;
+                var dnh2_du2 = Proj(nh2, dn2_du2) / n2Norm;
+                var dnh2_dv2 = Proj(nh2, dn2_dv2) / n2Norm;
+
+                var drn_du1 = dnh1_du1 ^ nh2;
+                var drn_dv1 = dnh1_dv1 ^ nh2;
+                var drn_du2 = nh1 ^ dnh2_du2;
+                var drn_dv2 = nh1 ^ dnh2_dv2;
+
+                // in Zeilen 4..6 eintragen (x,y,z)
+                // Skalenfaktor swn nicht vergessen
+                J[4, 0] = swn * drn_du1.x; J[4, 1] = swn * drn_dv1.x; J[4, 2] = swn * drn_du2.x; J[4, 3] = swn * drn_dv2.x;
+                J[5, 0] = swn * drn_du1.y; J[5, 1] = swn * drn_dv1.y; J[5, 2] = swn * drn_du2.y; J[5, 3] = swn * drn_dv2.y;
+                J[6, 0] = swn * drn_du1.z; J[6, 1] = swn * drn_dv1.z; J[6, 2] = swn * drn_du2.z; J[6, 3] = swn * drn_dv2.z;
+
+                return J;
+            };
+
+            // Dummy-Observations (werden nicht benutzt, müssen aber die richtige Länge haben)
+            int m = 7;
+            var observedX = Vector<double>.Build.Dense(m, 0.0); // ignoriert
+            var observedY = Vector<double>.Build.Dense(m, 0.0); // Minimiert ||r||^2
+
+            var model = ObjectiveFunction.NonlinearModel(function, derivatives, observedX, observedY, weight: null);
+            var lm = new LevenbergMarquardtMinimizer();
+            SolverTrace.Record("MathNet.LM");
+            var result = lm.FindMinimum(model, p0);
+
+            // Erfolg prüfen (optionale Toleranzen)
+            var r = function(result.MinimizingPoint, observedX);
+            double rpNorm = Math.Sqrt(r[0] * r[0] + r[1] * r[1] + r[2] * r[2]);
+            double rpiAbs = Math.Abs(r[3]);
+            double rnNorm = Math.Sqrt(r[4] * r[4] + r[5] * r[5] + r[6] * r[6]);
+
+            const double epsPos = 1e-6, epsPlane = 1e-6, epsNorm = 1e-3;
+
+            bool ok = (result.ReasonForExit == ExitCondition.Converged)
+                      && rpNorm <= epsPos && rpiAbs <= epsPlane && rnNorm <= epsNorm;
+
+            if (!ok) { return false; }
+
+            uv1 = new GeoPoint2D(result.MinimizingPoint[0], result.MinimizingPoint[1]);
+            uv2 = new GeoPoint2D(result.MinimizingPoint[2], result.MinimizingPoint[3]);
+            return true;
+        }
+
         public static void Test()
         {
         }
@@ -173,10 +401,21 @@ namespace CADability
             try
             {
                 MinimizationResult mres = nm.FindMinimum(iof, new DenseVector(new double[] { uvOnSurface.x, uvOnSurface.y, uOnCurve }));
-                uvOnSurface = new GeoPoint2D(mres.MinimizingPoint[0], mres.MinimizingPoint[1]);
-                uOnCurve = mres.MinimizingPoint[2];
-                ip = lastIp;
-                return true;
+                if (mres.ReasonForExit == ExitCondition.Converged ||
+                    mres.ReasonForExit == ExitCondition.RelativeGradient ||
+                    mres.ReasonForExit == ExitCondition.RelativePoints ||
+                    mres.ReasonForExit == ExitCondition.BoundTolerance)
+                {
+                    uvOnSurface = new GeoPoint2D(mres.MinimizingPoint[0], mres.MinimizingPoint[1]);
+                    uOnCurve = mres.MinimizingPoint[2];
+                    ip = lastIp;
+                    return true;
+                }
+                else
+                {
+                    ip = GeoPoint.Origin;
+                    return false;
+                }
             }
             catch (Exception)
             {
@@ -315,7 +554,7 @@ namespace CADability
                     return new DenseVector(new double[] { p.x - c.x, p.y - c.y, p.z - c.z });
                 }),
                 new Func<Vector<double>, Vector<double>, Matrix<double>>(delegate (Vector<double> vd, Vector<double> ox) // derivatives
-                {   // these are the derivations for PointAt(uv)-p3d in x, y and z
+                {   // these are the derivatives for PointAt(uv)-p3d in x, y and z
                     GeoPoint2D uv = new GeoPoint2D(vd[0], vd[1]);
                     surface.DerivationAt(uv, out GeoPoint loc, out GeoVector du, out GeoVector dv);
                     double t = vd[2]; // parameter on curve
@@ -338,7 +577,148 @@ namespace CADability
                 uvOnSurface = new GeoPoint2D(mres.MinimizingPoint[0], mres.MinimizingPoint[1]);
                 uOnCurve = mres.MinimizingPoint[2];
                 ip = lastip;
-                return mres.ReasonForExit==ExitCondition.Converged;
+                return mres.ReasonForExit == ExitCondition.Converged;
+            }
+            catch
+            {
+                ip = lastip;
+                return false;
+            }
+        }
+
+
+        public static bool CurveSurfaceIntersectionLM_Tangential(ISurface surface, ICurve curve, ref GeoPoint2D uvOnSurface, ref double uOnCurve, out GeoPoint ip)
+        {
+            // 4 residuals: 3 for position difference, 1 for tangency constraint
+            Vector<double> observedX = new DenseVector(4);
+            Vector<double> observedY = new DenseVector(new double[] { 0, 0, 0, 0 });
+
+            GeoPoint lastip = GeoPoint.Origin;
+
+            // More iterations are often needed near tangency.
+            var lm = new LevenbergMarquardtMinimizer(maximumIterations: 25);
+
+            // Curve access (index: 0 point, 1 first deriv, 2 second deriv)
+            static void CurvePDT(ICurve c, double t, out GeoPoint P, out GeoVector Dt, out GeoVector Dtt)
+            {
+                var pd = c.PointAndDerivativesAt(t, 2);
+                GeoVector pv = pd[0];
+                GeoVector d1 = pd[1];
+                GeoVector d2 = pd[2];
+
+                P = new GeoPoint(pv.x, pv.y, pv.z);
+                Dt = d1;
+                Dtt = d2;
+            }
+
+            // Adaptive weight for tangency equation:
+            // - scaled by |Su x Sv| and |Ct| to avoid unit problems
+            // - increased when the positional residual is already small (near the intersection locus)
+            static double TangencyWeight(GeoVector r, GeoVector N, GeoVector Ct)
+            {
+                double rLen = r.Length;
+                double scale = (N.Length * (Ct.Length + 1e-30)) + 1e-30;
+                double w = 1.0 / scale;
+
+                // ramp up weight close to the intersection (important for tangency)
+                w *= 1.0 + (1.0 / (1e-6 + rLen));
+                return w;
+            }
+
+            IObjectiveModel iom = ObjectiveFunction.NonlinearModel(
+                // Function: residual vector (length 4)
+                new Func<Vector<double>, Vector<double>, Vector<double>>((vd, ox) =>
+                {
+                    double u = vd[0];
+                    double v = vd[1];
+                    double t = vd[2];
+
+                    // Surface derivatives up to second order
+                    surface.Derivation2At(
+                        new GeoPoint2D(u, v),
+                        out GeoPoint S,
+                        out GeoVector Su, out GeoVector Sv,
+                        out GeoVector Suu, out GeoVector Svv, out GeoVector Suv);
+
+                    // Curve point + first/second derivative
+                    CurvePDT(curve, t, out GeoPoint C, out GeoVector Ct, out GeoVector Ctt);
+
+                    // Positional residual r = S - C
+                    GeoVector r = S - C;
+
+                    // Tangency residual q = (Su x Sv) · Ct
+                    GeoVector N = Su ^ Sv;
+                    double q = N * Ct;
+
+                    double w = TangencyWeight(r, N, Ct);
+
+                    lastip = new GeoPoint(C, S);
+
+                    return new DenseVector(new double[] { r.x, r.y, r.z, w * q });
+                }),
+
+                // Derivatives: Jacobian matrix (4x3)
+                new Func<Vector<double>, Vector<double>, Matrix<double>>((vd, ox) =>
+                {
+                    double u = vd[0];
+                    double v = vd[1];
+                    double t = vd[2];
+
+                    surface.Derivation2At(
+                        new GeoPoint2D(u, v),
+                        out GeoPoint S,
+                        out GeoVector Su, out GeoVector Sv,
+                        out GeoVector Suu, out GeoVector Svv, out GeoVector Suv);
+
+                    CurvePDT(curve, t, out GeoPoint C, out GeoVector Ct, out GeoVector Ctt);
+
+                    GeoVector r = S - C;
+
+                    GeoVector N = Su ^ Sv;
+                    double w = TangencyWeight(r, N, Ct);
+
+                    // Jacobian: rows correspond to residual components
+                    // columns correspond to variables (u, v, t)
+                    var J = new DenseMatrix(4, 3);
+
+                    // r = S - C
+                    // dr/du = Su, dr/dv = Sv, dr/dt = -Ct
+                    J[0, 0] = Su.x; J[0, 1] = Sv.x; J[0, 2] = -Ct.x;
+                    J[1, 0] = Su.y; J[1, 1] = Sv.y; J[1, 2] = -Ct.y;
+                    J[2, 0] = Su.z; J[2, 1] = Sv.z; J[2, 2] = -Ct.z;
+
+                    // q = (Su x Sv) · Ct
+                    // N = Su x Sv
+                    // dN/du = Suu x Sv + Su x Suv
+                    // dN/dv = Suv x Sv + Su x Svv
+                    GeoVector Nu = Suu ^ Sv + Su ^ Suv;
+                    GeoVector Nv = Suv ^ Sv + Su ^ Svv;
+
+                    // dq/du = Nu · Ct
+                    // dq/dv = Nv · Ct
+                    // dq/dt = N  · Ctt
+                    double dqdu = Nu * Ct;
+                    double dqdv = Nv * Ct;
+                    double dqdt = N * Ctt;
+
+                    J[3, 0] = w * dqdu;
+                    J[3, 1] = w * dqdv;
+                    J[3, 2] = w * dqdt;
+
+                    return J;
+                }),
+                observedX, observedY);
+
+            try
+            {
+                var start = new DenseVector(new double[] { uvOnSurface.x, uvOnSurface.y, uOnCurve });
+                NonlinearMinimizationResult mres = lm.FindMinimum(iom, start);
+
+                uvOnSurface = new GeoPoint2D(mres.MinimizingPoint[0], mres.MinimizingPoint[1]);
+                uOnCurve = mres.MinimizingPoint[2];
+
+                ip = lastip;
+                return mres.ReasonForExit == ExitCondition.Converged || mres.ReasonForExit == ExitCondition.RelativePoints || mres.ReasonForExit == ExitCondition.RelativeGradient;
             }
             catch
             {
@@ -349,46 +729,10 @@ namespace CADability
 
         public static bool SurfacesIntersectionLM(ISurface surface1, ISurface surface2, ISurface surface3, ref GeoPoint2D uv1, ref GeoPoint2D uv2, ref GeoPoint2D uv3, ref GeoPoint ip)
         {
-            //Polynom implicitSurface1 = null, implicitSurface2 = null, implicitSurface3 = null;
-            //if (surface1 is ISurfaceImpl si1) implicitSurface1 = si1.GetImplicitPolynomial();
-            //if (surface2 is ISurfaceImpl si2) implicitSurface2 = si2.GetImplicitPolynomial();
-            //if (surface3 is ISurfaceImpl si3) implicitSurface3 = si3.GetImplicitPolynomial();
-            //List<ISurface> notimpl = new List<ISurface>();
-            //notimpl.Add(surface1); notimpl.Add(surface2); notimpl.Add(surface3);
-            //List<Polynom> polynoms = new List<Polynom>();
-            //List<GeoPoint2D> luv = new List<GeoPoint2D>(new GeoPoint2D[] { uv1, uv2, uv3 });
-            //if (implicitSurface3 != null)
-            //{
-            //    notimpl.RemoveAt(2);
-            //    luv.RemoveAt(2);
-            //    polynoms.Add(implicitSurface3);
-            //}
-            //if (implicitSurface2 != null)
-            //{
-            //    notimpl.RemoveAt(1);
-            //    luv.RemoveAt(1);
-            //    polynoms.Add(implicitSurface2);
-            //}
-            //if (implicitSurface1 != null)
-            //{
-            //    notimpl.RemoveAt(0);
-            //    luv.RemoveAt(0);
-            //    polynoms.Add(implicitSurface1);
-            //}
-            //if (polynoms.Count == 3)
-            //{
-            //    if (SurfacesIntersectionLM(polynoms[0], polynoms[1], polynoms[2], ref ip))
-            //    {
-            //        uv1 = surface1.PositionOf(ip);
-            //        uv2 = surface2.PositionOf(ip);
-            //        uv3 = surface3.PositionOf(ip);
-            //        return true;
-            //    }
-            //}
             Vector<double> observedX = new DenseVector(9); // there is no need to set values
             Vector<double> observedY = new DenseVector(new double[] { 0, 0, 0, 0, 0, 0, 0, 0, 0 }); // this is the data we want to achieve
             GeoPoint lastip = GeoPoint.Origin;
-            LevenbergMarquardtMinimizer lm = new LevenbergMarquardtMinimizer(maximumIterations: 10);
+            LevenbergMarquardtMinimizer lm = new LevenbergMarquardtMinimizer(maximumIterations: 20);
             IObjectiveModel iom = ObjectiveFunction.NonlinearModel(
                 new Func<Vector<double>, Vector<double>, Vector<double>>(delegate (Vector<double> vd, Vector<double> ox) // function
                 {
@@ -461,14 +805,16 @@ namespace CADability
                 }), observedX, observedY);
             try
             {
+                SolverTrace.Record("MathNet.LM");
                 NonlinearMinimizationResult mres = lm.FindMinimum(iom, new DenseVector(new double[] { uv1.x, uv1.y, uv2.x, uv2.y, uv3.x, uv3.y }));
-                if (mres.ReasonForExit == ExitCondition.Converged)
+                if (mres.ReasonForExit == ExitCondition.Converged || mres.ReasonForExit == ExitCondition.RelativeGradient || mres.ReasonForExit == ExitCondition.RelativePoints)
                 {
                     uv1 = new GeoPoint2D(mres.MinimizingPoint[0], mres.MinimizingPoint[1]);
                     uv2 = new GeoPoint2D(mres.MinimizingPoint[2], mres.MinimizingPoint[3]);
                     uv3 = new GeoPoint2D(mres.MinimizingPoint[4], mres.MinimizingPoint[5]);
                     GeoPoint p1 = surface1.PointAt(uv1);
                     ip = new GeoPoint(surface1.PointAt(uv1), surface2.PointAt(uv2), surface3.PointAt(uv3));
+                    // we could use the distances of the three points to decide whether the result is good
                     return true;
                 }
                 else

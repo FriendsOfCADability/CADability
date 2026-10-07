@@ -18,6 +18,8 @@ namespace CADability
         ICurve2D Curve2D2 { get; }
         void SwapSurfaces();
         IDualSurfaceCurve[] Split(double v);
+        void Trim(GeoPoint startPoint, GeoPoint endPoint);
+        void Reverse();
     }
 
 
@@ -137,6 +139,51 @@ namespace CADability
             {
                 return curve2D2;
             }
+        }
+        void IDualSurfaceCurve.Trim(GeoPoint startPoint, GeoPoint endPoint)
+        {
+            if (Precision.IsEqual(curve3D.StartPoint, startPoint) && Precision.IsEqual(curve3D.EndPoint, endPoint)) return;
+            if (Precision.IsEqual(curve3D.StartPoint, endPoint) && Precision.IsEqual(curve3D.EndPoint, startPoint))
+            {
+                curve3D.Reverse();
+                curve2D1.Reverse();
+                curve2D2.Reverse();
+            }
+            else
+            {
+                double startPar = curve3D.PositionOf(startPoint);
+                double endPar = curve3D.PositionOf(endPoint);
+                bool reverse = (endPar < startPar);
+                if (reverse)
+                {
+                    double t = startPar;
+                    startPar = endPar;
+                    endPar = t;
+                    GeoPoint tmp = startPoint;
+                    startPoint = endPoint;
+                    endPoint = tmp;
+                }
+                curve3D.Trim(startPar, endPar);
+                GeoPoint2D sp2d = surface1.PositionOf(startPoint);
+                GeoPoint2D ep2d = surface1.PositionOf(endPoint);
+                curve2D1 = curve2D1.Trim(curve2D1.PositionOf(sp2d), curve2D1.PositionOf(ep2d));
+                sp2d = surface2.PositionOf(startPoint);
+                ep2d = surface2.PositionOf(endPoint);
+                curve2D2 = curve2D2.Trim(curve2D2.PositionOf(sp2d), curve2D2.PositionOf(ep2d));
+                if (reverse)
+                {
+                    curve3D.Reverse();
+                    curve2D1.Reverse();
+                    curve2D2.Reverse();
+                }
+            }
+        }
+
+        public void Reverse()
+        {
+            curve3D.Reverse();
+            curve2D1.Reverse();
+            curve2D2.Reverse();
         }
     }
 
@@ -599,520 +646,5 @@ namespace CADability
             }
         }
         #endregion
-    }
-
-    /// <summary>
-    /// A 2d curve as a projection of a 3d curve onto a surface. Sometimes it is easier to calculate points in 3d than in 2d. Then we use this as a more
-    /// exact for of the curve than we get, when we approximate the curve in 2d.
-    /// </summary>
-    [Serializable()]
-    public class ProjectedCurve : GeneralCurve2D, ISerializable
-    {
-        private double startParam; // start parameter on the 3d curve, together wit endParam also specifies the orientation
-        private double endParam; // on the 3d curve
-        ICurve curve3D;
-        ISurface surface;
-        BoundingRect periodicDomain; // only for periodic domains: to which period the 3d points should be mapped
-        GeoPoint2D startPoint2d, endPoint2d;
-        bool startPointIsPole, endPointIsPole;
-#if DEBUG
-        static int debugCounter = 0;
-        private int debugCount; // to identify instance when debugging
-#endif
-
-        public ProjectedCurve(ICurve curve3D, ISurface surface, bool forward, BoundingRect domain, double precision = 0.0)
-        {
-#if DEBUG
-            debugCount = debugCounter++;
-#endif
-            this.curve3D = curve3D; // keep in mind, the curve is not cloned, curve3D should not be modified after this
-            this.surface = surface;
-            List<GeoPoint> lpoles = new List<GeoPoint>();
-            List<GeoPoint2D> lpoles2d = new List<GeoPoint2D>();
-            GeoPoint2D cnt2d = domain.GetCenter();
-            GeoPoint sp = curve3D.StartPoint;
-            GeoPoint ep = curve3D.EndPoint;
-            double[] us = surface.GetUSingularities();
-            double prec = precision;
-            if (prec == 0.0) prec = curve3D.Length * 1e-3; // changed to 1e-3, it is used to snap endpoints to poles
-            startPoint2d = surface.PositionOf(curve3D.StartPoint);
-            endPoint2d = surface.PositionOf(curve3D.EndPoint);
-            if ((surface.IsUPeriodic && Math.Abs(startPoint2d.x - endPoint2d.x) < surface.UPeriod * 1e-3) ||
-                (surface.IsVPeriodic && Math.Abs(startPoint2d.y - endPoint2d.y) < surface.VPeriod * 1e-3))
-            {   // adjust start and endpoint according to its neighbors
-                GeoPoint2D p2d = surface.PositionOf(curve3D.PointAt(0.1));
-                SurfaceHelper.AdjustPeriodic(surface, periodicDomain, ref p2d);
-                BoundingRect ext = new BoundingRect(p2d);
-                SurfaceHelper.AdjustPeriodic(surface, ext, ref startPoint2d);
-                p2d = surface.PositionOf(curve3D.PointAt(0.9));
-                SurfaceHelper.AdjustPeriodic(surface, periodicDomain, ref p2d);
-                ext.MinMax(p2d);
-                SurfaceHelper.AdjustPeriodic(surface, ext, ref endPoint2d);
-            }
-            periodicDomain = domain;
-            if (periodicDomain.IsEmpty() && (surface.IsUPeriodic || surface.IsVPeriodic))
-            {
-                // make a few points and assure that they don't jump over the periodic seam
-                // if the curve3d doesn't jump around wildly, this should work. Maybe use curve3D.GetSavePositions?
-                GeoPoint2D[] point2Ds = new GeoPoint2D[11];
-#if DEBUG
-                GeoPoint2D[] point2Dsdbg = new GeoPoint2D[11];
-#endif
-                for (int i = 0; i < 11; i++)
-                {
-                    point2Ds[i] = surface.PositionOf(curve3D.PointAt(i / 10.0));
-#if DEBUG
-                    //(surface as ISurfaceImpl).BoxedSurfaceEx.PositionOf(curve3D.PointAt(i / 10.0), out point2Dsdbg[i]);
-#endif
-                }
-                for (int i = 0; i < 10; i++)
-                {
-                    GeoVector2D offset = GeoVector2D.NullVector;
-                    if (surface.IsUPeriodic && Math.Abs(point2Ds[i + 1].x - point2Ds[i].x) > surface.UPeriod / 2.0)
-                    {
-                        if ((point2Ds[i + 1].x - point2Ds[i].x) < 0) offset.x = surface.UPeriod;
-                        else offset.x = -surface.UPeriod;
-                    }
-                    if (surface.IsVPeriodic && Math.Abs(point2Ds[i + 1].y - point2Ds[i].y) > surface.VPeriod / 2.0)
-                    {
-                        if ((point2Ds[i + 1].y - point2Ds[i].y) < 0) offset.y = surface.VPeriod;
-                        else offset.y = -surface.VPeriod;
-                    }
-                    point2Ds[i + 1] += offset;
-                }
-                for (int i = 0; i < 11; i++)
-                {
-                    periodicDomain.MinMax(point2Ds[i]);
-                }
-                startPoint2d = point2Ds[0];
-                endPoint2d = point2Ds[10];
-            }
-            if (!periodicDomain.IsEmpty() && (!surface.IsUPeriodic || periodicDomain.Width < surface.UPeriod * (1 - 1e-6)) && (!surface.IsVPeriodic || periodicDomain.Height < surface.VPeriod * (1 - 1e-6)))
-            {
-                SurfaceHelper.AdjustPeriodic(surface, periodicDomain, ref startPoint2d);
-                SurfaceHelper.AdjustPeriodic(surface, periodicDomain, ref endPoint2d);
-            }
-            startPointIsPole = endPointIsPole = false;
-            for (int i = 0; i < us.Length; i++)
-            {
-                GeoPoint pl = surface.PointAt(new GeoPoint2D(us[i], cnt2d.y));
-                if ((pl | sp) < prec)
-                {
-                    GeoPoint2D tmp = surface.PositionOf(curve3D.PointAt(0.1));
-                    startPoint2d = new GeoPoint2D(us[i], tmp.y);
-                    startPointIsPole = true;
-                }
-                if ((pl | ep) < prec)
-                {
-                    GeoPoint2D tmp = surface.PositionOf(curve3D.PointAt(0.9));
-                    endPoint2d = new GeoPoint2D(us[i], tmp.y);
-                    endPointIsPole = true;
-                }
-            }
-            double[] vs = surface.GetVSingularities();
-            for (int i = 0; i < vs.Length; i++)
-            {
-                GeoPoint pl = surface.PointAt(new GeoPoint2D(cnt2d.x, vs[i]));
-                if ((pl | sp) < prec*10)
-                {
-                    GeoPoint2D tmp = surface.PositionOf(curve3D.PointAt(0.1));
-                    startPoint2d = new GeoPoint2D(tmp.x, vs[i]);
-                    startPointIsPole = true;
-                }
-                if ((pl | ep) < prec*10)
-                {
-                    GeoPoint2D tmp = surface.PositionOf(curve3D.PointAt(0.9));
-                    endPoint2d = new GeoPoint2D(tmp.x, vs[i]);
-                    endPointIsPole = true;
-                }
-            }
-            if (forward)
-            {
-                startParam = 0.0;
-                endParam = 1.0;
-            }
-            else
-            {
-                startParam = 1.0;
-                endParam = 0.0;
-            }
-#if DEBUG
-            this.MakeTriangulation();
-#endif
-        }
-        public ProjectedCurve(ICurve curve3D, ISurface surface, double startParam, double endParam, BoundingRect domain)
-        {
-#if DEBUG
-            debugCount = debugCounter++;
-#endif
-            this.curve3D = curve3D;
-            this.surface = surface;
-            this.startParam = startParam;
-            this.endParam = endParam;
-            periodicDomain = domain;
-        }
-        internal override void GetTriangulationPoints(out GeoPoint2D[] interpol, out double[] interparam)
-        {
-            GetTriangulationBasis(out interpol, out _, out interparam);
-        }
-        protected override void GetTriangulationBasis(out GeoPoint2D[] points, out GeoVector2D[] directions, out double[] parameters)
-        {
-            double[] pars = curve3D.GetSavePositions();
-            List<double> positions = new List<double>();
-            for (int i = 0; i < pars.Length; i++)
-            {
-                double d = Get2dParameter(pars[i]);
-                if (d > 1e-6 && d < 1.0 - 1e-6) positions.Add(d); // nur innerhalb des Bereichs und 0 und 1 nicht doppelt
-            }
-            positions.Add(0.0);
-            positions.Add(1.0);
-            if (positions.Count < 3) positions.Add(0.5);
-            positions.Sort();
-            List<double> lparameters = new List<double>();
-            for (int i = 0; i < positions.Count; i++)
-            {
-                lparameters.Add(positions[i]);
-            }
-            List<GeoPoint2D> lpoints = new List<GeoPoint2D>();
-            List<GeoVector2D> ldirections = new List<GeoVector2D>();
-            for (int i = 0; i < positions.Count; i++)
-            {
-                GeoPoint2D p;
-                GeoVector2D v;
-                PointDirAt(positions[i], out p, out v);
-                lpoints.Add(p);
-                ldirections.Add(v);
-            }
-
-            bool check = true;
-            // the interpolation should be smooth. Max. bending between interpolation points 45°, which makes sure, the baseApproximation
-            // uses arcs, so that the start- and end-direction are correct
-            while (check && lpoints.Count < 100)
-            {
-                check = false;
-                for (int i = lpoints.Count - 1; i > 0; --i)
-                {
-                    if (Math.Abs(new SweepAngle(ldirections[i], ldirections[i - 1])) > Math.PI / 4)
-                    {
-                        double par = (positions[i] + positions[i - 1]) / 2.0;
-                        GeoPoint2D p = PointAt(par);
-                        GeoVector2D dir = DirectionAt(par);
-                        lpoints.Insert(i, p);
-                        ldirections.Insert(i, dir);
-                        positions.Insert(i, par);
-                        check = true;
-                    }
-                }
-            }
-            points = lpoints.ToArray();
-            directions = ldirections.ToArray();
-            parameters = positions.ToArray();
-            if (surface.IsUPeriodic)
-            {
-                for (int i = 1; i < points.Length; i++)
-                {
-                    if ((points[i].x - points[i - 1].x) > surface.UPeriod / 2.0) points[i].x -= surface.UPeriod;
-                    if ((points[i].x - points[i - 1].x) < -surface.UPeriod / 2.0) points[i].x += surface.UPeriod;
-                }
-            }
-            if (surface.IsVPeriodic)
-            {
-                for (int i = 1; i < points.Length; i++)
-                {
-                    if ((points[i].y - points[i - 1].y) > surface.VPeriod / 2.0) points[i].y -= surface.VPeriod;
-                    if ((points[i].y - points[i - 1].y) < -surface.VPeriod / 2.0) points[i].y += surface.VPeriod;
-                }
-            }
-            if (!periodicDomain.IsEmpty())
-            {
-                SurfaceHelper.AdjustPeriodic(surface, periodicDomain, points);
-            }
-        }
-#if DEBUG
-        public void DebugTest()
-        {
-            GeoPoint2D[] points;
-            GeoVector2D[] directions;
-            double[] parameters;
-            GetTriangulationBasis(out points, out directions, out parameters);
-            GeoPoint2D sp = this.StartPoint;
-            GeoPoint2D ep = this.EndPoint;
-        }
-#endif
-        public ICurve Curve3DFromParams
-        {
-            get
-            {
-                ICurve res;
-                res = curve3D.Clone();
-                if (IsReverse)
-                {
-                    res.Reverse();
-                    if (startParam == 0.0 && endParam == 1.0) return res;
-                    else
-                    {
-                        res.Trim(1 - startParam, 1 - endParam);
-                        return res;
-                    }
-                }
-                else
-                {
-                    if (startParam == 0.0 && endParam == 1.0) return res;
-                    else
-                    {
-                        res.Trim(startParam, endParam);
-                        return res;
-                    }
-                }
-            }
-        }
-        public ICurve Curve3D
-        {
-            get
-            {
-                return curve3D;
-            }
-        }
-        public ISurface Surface
-        {
-            get
-            {
-                return surface;
-            }
-        }
-        public bool IsReverse
-        {
-            get => endParam < startParam;
-            internal set
-            {
-                if (value != IsReverse)
-                {
-                    double tmp = startParam;
-                    startParam = endParam;
-                    endParam = tmp;
-                    base.ClearTriangulation();
-                }
-            }
-        }
-        #region ICurve2D Members
-        private double Get3dParameter(double par)
-        {
-            return startParam + par * (endParam - startParam);
-        }
-        private double Get2dParameter(double pos)
-        {
-            return (pos - startParam) / (endParam - startParam);
-        }
-        private void PointDirAt(double pos, out GeoPoint2D uv, out GeoVector2D dir)
-        {
-            // Projektion der 3d Richtung auf die Tangentialebene aufgespannt durch die beiden Richtungen
-            double par3d = Get3dParameter(pos);
-            uv = surface.PositionOf(curve3D.PointAt(par3d));
-            if (!periodicDomain.IsEmpty()) SurfaceHelper.AdjustPeriodic(surface, periodicDomain, ref uv);
-            if (par3d < 1e-6 && startPointIsPole) uv = startPoint2d;
-            if (par3d > 1 - 1e-6 && endPointIsPole) uv = endPoint2d;
-            if ((surface.IsUPeriodic && periodicDomain.Width > surface.UPeriod * (1 - 1e-6)) || (surface.IsVPeriodic && periodicDomain.Height > surface.VPeriod * (1 - 1e-6)))
-            {   // do not adjust when the domain is the full period and we are close to the start or endpoint. These have been adjusted correctly in the constructor
-                if (par3d < 1e-6) uv = startPoint2d;
-                else if (par3d > 1 - 1e-6) uv = endPoint2d;
-            }
-            GeoVector dir3d = curve3D.DirectionAt(par3d);
-            // Punkt auf der Fläche und Richtung im Raum:
-            // wie drückt sich diese Raumrichtung in diru und dirv aus
-            GeoPoint loc;
-            GeoVector diru, dirv;
-            surface.DerivationAt(uv, out loc, out diru, out dirv);
-            Matrix m = DenseMatrix.OfColumnArrays(diru, dirv, diru ^ dirv);
-            Vector b = new DenseVector(dir3d);
-            Vector s = (Vector)m.Solve(b);
-            if (s.IsValid())
-            {   // what about the length? Added the .Normalized, because in "HyperCube Evolution - Double Z motor 1.stp" the direction length is definitely wrong
-                dir = (endParam - startParam) * new GeoVector2D(s[0], s[1]).Normalized;
-            }
-            else
-            {
-                dir = GeoVector2D.NullVector;
-            }
-        }
-
-        internal void ReflectModification(ISurface surface, ICurve curve3d)
-        {   // a face has been modified, in 2d there are no changes, but the surface and the 3d curve must be adopted
-            this.surface = surface;
-            this.curve3D = curve3d;
-            // following was moved to Edge.ReflectModification()
-            //if (surface.UvChangesWithModification)
-            //{
-            //    startPoint2d = surface.PositionOf(curve3D.StartPoint);
-            //    endPoint2d = surface.PositionOf(curve3D.EndPoint);
-            //    ClearTriangulation();
-            //    if (surface is IRestrictedDomain rd) surface.GetNaturalBounds(out periodicDomain.Left, out periodicDomain.Right, out periodicDomain.Bottom, out periodicDomain.Top);
-            //}
-        }
-
-        public override GeoVector2D DirectionAt(double Position)
-        {
-            GeoPoint2D loc;
-            GeoVector2D res;
-            PointDirAt(Position, out loc, out res);
-            return res;
-        }
-        public override GeoPoint2D PointAt(double Position)
-        {
-            double par3d = Get3dParameter(Position);
-            GeoPoint2D res = surface.PositionOf(curve3D.PointAt(par3d));
-            if (par3d < 1e-6 && startPointIsPole) res = startPoint2d;
-            else if (par3d > 1 - 1e-6 && endPointIsPole) res = endPoint2d;
-            if (!periodicDomain.IsEmpty()) SurfaceHelper.AdjustPeriodic(surface, periodicDomain, ref res);
-            if ((surface.IsUPeriodic && periodicDomain.Width > surface.UPeriod * (1 - 1e-6)) || (surface.IsVPeriodic && periodicDomain.Height > surface.VPeriod * (1 - 1e-6)))
-            {   // do not adjust when the domain is the full period and we are close to the start or endpoint. These have been adjusted correctly in the constructor
-                if (par3d < 1e-6) res = startPoint2d;
-                else if (par3d > 1 - 1e-6) res = endPoint2d;
-            }
-            return res;
-        }
-        public override void Reverse()
-        {
-            double tmp = startParam;
-            startParam = endParam;
-            endParam = tmp;
-            base.ClearTriangulation();
-        }
-        public override ICurve2D Clone()
-        {
-            return new ProjectedCurve(curve3D, surface, startParam, endParam, periodicDomain);
-        }
-        public override void Copy(ICurve2D toCopyFrom)
-        {
-            ProjectedCurve pc = toCopyFrom as ProjectedCurve;
-            if (pc != null)
-            {
-                startParam = pc.startParam;
-                endParam = pc.endParam;
-                curve3D = pc.curve3D;
-                surface = pc.surface;
-            }
-        }
-        public override ICurve2D Trim(double StartPos, double EndPos)
-        {
-            if (StartPos < EndPos)
-            {
-                double sp3d = Get3dParameter(StartPos);
-                double ep3d = Get3dParameter(EndPos);
-                return new ProjectedCurve(curve3D, surface, sp3d, ep3d, periodicDomain);
-            }
-            else
-            {
-                // es geht bei einer geschlossenen Kurve über den Nahtpunkt
-                double sp3d = Get3dParameter(StartPos);
-                double ep3d = Get3dParameter(EndPos);
-                ICurve c3d = curve3D.Clone();
-                c3d.Trim(sp3d, ep3d);
-                return new ProjectedCurve(c3d, surface, 0, 1, periodicDomain);
-            }
-        }
-        public override ICurve2D[] Split(double Position)
-        {
-            double sp3d = Get3dParameter(Position);
-            if (Math.Abs(sp3d - startParam) < 1e-6 || Math.Abs(sp3d - endParam) < 1e-6) return new ICurve2D[] { Clone() };
-            return new ICurve2D[] {
-                new ProjectedCurve(curve3D, surface, startParam, sp3d, periodicDomain),
-                new ProjectedCurve(curve3D, surface, sp3d, endParam, periodicDomain) };
-        }
-        public override void Move(double x, double y)
-        {
-            bool ok = true; // move the domain by the period
-            if (surface.IsUPeriodic)
-            {
-                double dx = x / surface.UPeriod;
-                ok &= (Math.Abs(dx - Math.Round(dx)) < 1e-10);
-            }
-            else
-            {
-                ok &= x == 0.0;
-            }
-            if (surface.IsVPeriodic)
-            {
-                double dy = y / surface.VPeriod;
-                ok &= (Math.Abs(dy - Math.Round(dy)) < 1e-10);
-            }
-            else
-            {
-                ok &= y == 0.0;
-            }
-            if (ok)
-            {
-                GeoVector2D offset = new GeoVector2D(x, y);
-                periodicDomain.Move(offset);
-                startPoint2d += offset;
-                endPoint2d += offset;
-                base.ClearTriangulation();
-            }
-            else throw new ApplicationException("cannot move ProjectedCurve");
-        }
-        public override ICurve2D GetModified(ModOp2D m)
-        {
-            return base.GetModified(m);
-        }
-        #endregion
-        #region ISerializable Members
-        protected ProjectedCurve(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        {
-#if DEBUG
-            debugCount = debugCounter++;
-#endif
-            curve3D = info.GetValue("Curve3D", typeof(ICurve)) as ICurve;
-            surface = info.GetValue("Surface", typeof(ISurface)) as ISurface;
-            startParam = info.GetDouble("StartParam");
-            endParam = info.GetDouble("EndParam");
-            try
-            {
-                periodicDomain = (BoundingRect)info.GetValue("PeriodicDomain", typeof(BoundingRect));
-            }
-            catch (SerializationException)
-            {
-                periodicDomain = BoundingRect.EmptyBoundingRect;
-            }
-        }
-        /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
-        /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
-        public override void GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            base.GetObjectData(info, context);
-            info.AddValue("Curve3D", curve3D);
-            info.AddValue("Surface", surface);
-            info.AddValue("StartParam", startParam);
-            info.AddValue("EndParam", endParam);
-            info.AddValue("PeriodicDomain", periodicDomain);
-        }
-
-        public override bool TryPointDeriv2At(double position, out GeoPoint2D point, out GeoVector2D deriv, out GeoVector2D deriv2)
-        {
-            point = GeoPoint2D.Origin;
-            deriv = deriv2 = GeoVector2D.NullVector;
-            return false;
-        }
-
-        #endregion
-#if DEBUG
-        public Polyline DebugPolyLine
-        {
-            get
-            {
-                GeoPoint[] pnts = new GeoPoint[100];
-                for (int i = 0; i < pnts.Length; i++)
-                {
-                    pnts[i] = Plane.XYPlane.ToGlobal(PointAt(i / 99.0));
-
-                }
-                Polyline res = Polyline.Construct();
-                res.SetPoints(pnts, false);
-                return res;
-            }
-        }
-#endif
     }
 }

@@ -3071,8 +3071,6 @@ namespace CADability.GeoObject
                 // like in Solid or Block?
             }
         }
-#if DEBUG
-#endif
         public void FreeCachedMemory()
         {
             for (int i = 0; i < faces.Length; i++)
@@ -6050,7 +6048,7 @@ namespace CADability.GeoObject
                     }
                     if (edg.Curve3D is InterpolatedDualSurfaceCurve)
                     {
-                        (edg.Curve3D as InterpolatedDualSurfaceCurve).Repair(edg.PrimaryFace.Area.GetExtent(), edg.SecondaryFace.Area.GetExtent());
+                        (edg.Curve3D as InterpolatedDualSurfaceCurve).Repair();
                     }
                 }
             }
@@ -6110,7 +6108,6 @@ namespace CADability.GeoObject
                             {
                                 if (edge.Curve3D is InterpolatedDualSurfaceCurve)
                                 {
-                                    (edge.Curve3D as InterpolatedDualSurfaceCurve).CheckSurfaceParameters();
                                 }
                             }
 #endif
@@ -6153,7 +6150,7 @@ namespace CADability.GeoObject
                             }
                             foreach (Edge edge1 in combinedFace.Edges)
                             {
-                                edge1.UpdateInterpolatedDualSurfaceCurve();
+                                edge1.UpdateInterpolatedDualSurfaceCurve(edge1.PrimaryFace.Domain, edge1.SecondaryFace.Domain);
                             }
                             if (toRemove != null && toRemove.Count > 0)
                             {

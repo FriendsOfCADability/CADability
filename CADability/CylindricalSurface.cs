@@ -1841,7 +1841,9 @@ namespace CADability.GeoObject
             double u = Math.Atan2(c.y, c.x);
             if (u < 0.0) u += 2.0 * Math.PI;
             double v = c.z;
-            return new GeoPoint2D(u, v);
+            GeoPoint2D res = new GeoPoint2D(u, v);
+            AdjustToUsedArea(ref res); // must be adjusted to the domain
+            return res;
         }
         private GeoPoint2D PositionOfUnit(GeoPoint p)
         {
@@ -1884,7 +1886,7 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public override ISurface Clone()
         {
-            return new CylindricalSurface(toCylinder);
+            return new CylindricalSurface(toCylinder, usedArea); // the clone keeps the domain, PositionOf depends on it
         }
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Modify (ModOp)"/>
@@ -2080,7 +2082,7 @@ namespace CADability.GeoObject
                 {
                     double u = Math.Atan2(l.StartPoint.y, l.StartPoint.x);
                     if (u < 0.0) u += 2.0 * Math.PI;
-                    return new Line2D(new GeoPoint2D(u, l.StartPoint.z), new GeoPoint2D(u, l.EndPoint.z));
+                    return AdjustToUsedArea(new Line2D(new GeoPoint2D(u, l.StartPoint.z), new GeoPoint2D(u, l.EndPoint.z))); // must be adjusted to the domain
                 }
             }
             else if (crvunit is Ellipse)
@@ -2109,14 +2111,14 @@ namespace CADability.GeoObject
                         }
                         // Grenzfälle: ustart oder uend liegen auf 0.0 oder 2*pi
                         // dann weiß man nicht ob der Punkt zyklisch richtig ist
-                        return new Line2D(new GeoPoint2D(ustart, e.Center.z), new GeoPoint2D(uend, e.Center.z));
+                        return AdjustToUsedArea(new Line2D(new GeoPoint2D(ustart, e.Center.z), new GeoPoint2D(uend, e.Center.z))); // must be adjusted to the domain
                     }
                     else
                     {
                         if (forward)
-                            return new Line2D(new GeoPoint2D(0.0, e.Center.z), new GeoPoint2D(2.0 * Math.PI, e.Center.z));
+                            return AdjustToUsedArea(new Line2D(new GeoPoint2D(0.0, e.Center.z), new GeoPoint2D(2.0 * Math.PI, e.Center.z)));
                         else
-                            return new Line2D(new GeoPoint2D(2.0 * Math.PI, e.Center.z), new GeoPoint2D(0.0, e.Center.z));
+                            return AdjustToUsedArea(new Line2D(new GeoPoint2D(2.0 * Math.PI, e.Center.z), new GeoPoint2D(0.0, e.Center.z)));
                     }
                 }
                 else if (Math.Abs(e.Center.x) + Math.Abs(e.Center.y) < Precision.eps && Math.Abs(e.MinorRadius - 1) < Precision.eps)

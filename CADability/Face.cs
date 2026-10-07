@@ -1752,7 +1752,7 @@ namespace CADability.GeoObject
                             loopExt[i] = BoundingRect.EmptyBoundingRect;
                             for (int j = 0; j < loops[i].Count; j++)
                             {
-                                if (loops[i][j].curve2d is ProjectedCurve pc)
+                                if (loops[i][j].curve2d is ProjectedCurve pc && !pc.IsCurveOfIntersection)
                                 {
                                     loops[i][j].curve2d = surface.GetProjectedCurve(loops[i][j].curve, surfacePrecision);
                                     if (!loops[i][j].forward) loops[i][j].curve2d.Reverse();
@@ -2252,7 +2252,7 @@ namespace CADability.GeoObject
                                         if (!loops[i][j].forward)
                                         {
                                             crv3d.Reverse(); // crv3d was forward oriented, now it is oriented according to loop[i][j].forward again
-                                            if (crv2d is ProjectedCurve pc) pc.IsReverse = true; // mark this projected curve as reversed
+                                            if (crv2d is ProjectedCurve pc && !pc.IsCurveOfIntersection) pc.IsReverse = true; // mark this projected curve as reversed
                                         }
                                         crv2d.UserData["EdgeDescriptor"] = loops[i][j];
                                         crv2d.UserData["Curves3DIndex"] = crvs3d.Count - 1;
@@ -10145,7 +10145,7 @@ namespace CADability.GeoObject
             toReplace.Vertex1.RemoveEdge(toReplace);    // aus den Vertices entfernen, denn toreplace hat auch kein Face mehr
             toReplace.Vertex2.RemoveEdge(toReplace);
             vertices = null;
-            replaceWith.UpdateInterpolatedDualSurfaceCurve();
+            replaceWith.UpdateInterpolatedDualSurfaceCurve(replaceWith.PrimaryFace.Domain, replaceWith.SecondaryFace.Domain);
             for (int i = 0; i < outline.Length; ++i)
             {
                 if (outline[i] == toReplace)

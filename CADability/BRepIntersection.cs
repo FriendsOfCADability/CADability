@@ -1972,16 +1972,10 @@ namespace CADability
             foreach (Edge edg in shell1.Edges)
             {
                 base.AddObject(new BRepItem(this, edg));
-#if DEBUG
-                if (edg.Curve3D is InterpolatedDualSurfaceCurve) (edg.Curve3D as InterpolatedDualSurfaceCurve).CheckSurfaceParameters();
-#endif
             }
             foreach (Edge edg in shell2.Edges)
             {
                 base.AddObject(new BRepItem(this, edg));
-#if DEBUG
-                if (edg.Curve3D is InterpolatedDualSurfaceCurve) (edg.Curve3D as InterpolatedDualSurfaceCurve).CheckSurfaceParameters();
-#endif
             }
             foreach (Face fc in shell1.Faces)
             {
@@ -2039,16 +2033,6 @@ namespace CADability
             //        fce.ForceAreaRecal();
             //    }
             //}
-            foreach (Edge dbgedg in s1.Edges)
-            {
-                if (dbgedg.Curve3D is InterpolatedDualSurfaceCurve)
-                    (dbgedg.Curve3D as InterpolatedDualSurfaceCurve).CheckSurfaceParameters();
-            }
-            foreach (Edge dbgedg in s2.Edges)
-            {
-                if (dbgedg.Curve3D is InterpolatedDualSurfaceCurve)
-                    (dbgedg.Curve3D as InterpolatedDualSurfaceCurve).CheckSurfaceParameters();
-            }
             System.Diagnostics.Debug.Assert(s1.CheckConsistency());
             System.Diagnostics.Debug.Assert(s2.CheckConsistency());
 #endif
@@ -2066,16 +2050,6 @@ namespace CADability
 #if DEBUG
             System.Diagnostics.Debug.Assert(s1.CheckConsistency());
             System.Diagnostics.Debug.Assert(s2.CheckConsistency());
-            foreach (Edge dbgedg in s1.Edges)
-            {
-                if (dbgedg.Curve3D is InterpolatedDualSurfaceCurve)
-                    (dbgedg.Curve3D as InterpolatedDualSurfaceCurve).CheckSurfaceParameters();
-            }
-            foreach (Edge dbgedg in s2.Edges)
-            {
-                if (dbgedg.Curve3D is InterpolatedDualSurfaceCurve)
-                    (dbgedg.Curve3D as InterpolatedDualSurfaceCurve).CheckSurfaceParameters();
-            }
 #endif
             shell1 = s1.Clone() as Shell;   // hier wird gekloned, weil die Faces im Verlauf geändert werden und das Original
             shell2 = s2.Clone() as Shell;   // unverändert bleiben soll. ZUm Debuggen kann man das Klonen weglassen
@@ -2098,16 +2072,6 @@ namespace CADability
 #if DEBUG
             System.Diagnostics.Debug.Assert(shell1.CheckConsistency());
             System.Diagnostics.Debug.Assert(shell2.CheckConsistency());
-            foreach (Edge dbgedg in s1.Edges)
-            {
-                if (dbgedg.Curve3D is InterpolatedDualSurfaceCurve)
-                    (dbgedg.Curve3D as InterpolatedDualSurfaceCurve).CheckSurfaceParameters();
-            }
-            foreach (Edge dbgedg in s2.Edges)
-            {
-                if (dbgedg.Curve3D is InterpolatedDualSurfaceCurve)
-                    (dbgedg.Curve3D as InterpolatedDualSurfaceCurve).CheckSurfaceParameters();
-            }
             DebuggerContainer dcfcs = new CADability.DebuggerContainer();
             foreach (Face fce in shell1.Faces)
             {
@@ -2176,16 +2140,10 @@ namespace CADability
             foreach (Edge edg in shell1.Edges)
             {
                 base.AddObject(new BRepItem(this, edg));
-#if DEBUG
-                if (edg.Curve3D is InterpolatedDualSurfaceCurve) (edg.Curve3D as InterpolatedDualSurfaceCurve).CheckSurfaceParameters();
-#endif
             }
             foreach (Edge edg in shell2.Edges)
             {
                 base.AddObject(new BRepItem(this, edg));
-#if DEBUG
-                if (edg.Curve3D is InterpolatedDualSurfaceCurve) (edg.Curve3D as InterpolatedDualSurfaceCurve).CheckSurfaceParameters();
-#endif
             }
             foreach (Face fc in shell1.Faces)
             {
@@ -2923,16 +2881,10 @@ namespace CADability
             foreach (Edge edg in shell1.Edges)
             {
                 base.AddObject(new BRepItem(this, edg));
-#if DEBUG
-                if (edg.Curve3D is InterpolatedDualSurfaceCurve) (edg.Curve3D as InterpolatedDualSurfaceCurve).CheckSurfaceParameters();
-#endif
             }
             foreach (Edge edg in shell2.Edges)
             {
                 base.AddObject(new BRepItem(this, edg));
-#if DEBUG
-                if (edg.Curve3D is InterpolatedDualSurfaceCurve) (edg.Curve3D as InterpolatedDualSurfaceCurve).CheckSurfaceParameters();
-#endif
             }
             foreach (Face fc in shell1.Faces)
             {
@@ -5426,7 +5378,7 @@ namespace CADability
         //                        faceEdges.ExceptWith(hole); // we would not need that
         //                    }
         //                }
-        //                // Now all necessary loops are created. There is one or more outline (ccw) and zero or more holes
+                // Now all necessary loops are created. There is one or more outline (ccw) and zero or more holes
         //                // If we have more than one outline, we have to match the holes to their enclosing outline
         //                double[] areas = new double[loops.Count];
         //                Edge[][] edgeLoop = new Edge[loops.Count][];
@@ -6899,7 +6851,7 @@ namespace CADability
         //                            // deshalb hier mal mit BSplines annähern. Die Edge müsste ein Flag haben, mit dem man später wieder die InterpolatedDualSurfaceCurve machen kann
         //                            // wobei man die throughpoints des BSplines verwenden kann
         //                            clone.Curve3D = (clone.Curve3D as InterpolatedDualSurfaceCurve).ToBSpline(precision);
-        //                            clone.SetPrimary(dfk.face1, (edg.Curve2D(dfk.face1) as InterpolatedDualSurfaceCurve.ProjectedCurve).ToBSpline(precision), edg.Forward(dfk.face1));
+        //                            clone.SetPrimary(dfk.face1, (edg.Curve2D(dfk.face1) as ProjectedCurve).ToBSpline(precision), edg.Forward(dfk.face1));
         //                        }
         //                        else
         //                        {
@@ -6923,7 +6875,7 @@ namespace CADability
         //                        if (clone.Curve3D is InterpolatedDualSurfaceCurve)
         //                        {
         //                            clone.Curve3D = (clone.Curve3D as InterpolatedDualSurfaceCurve).ToBSpline(precision);
-        //                            clone.SetPrimary(dfk.face1, (edg.Curve2D(dfk.face2) as InterpolatedDualSurfaceCurve.ProjectedCurve).ToBSpline(precision).GetModified(mop21), edg.Forward(dfk.face2));
+        //                            clone.SetPrimary(dfk.face1, (edg.Curve2D(dfk.face2) as ProjectedCurve).ToBSpline(precision).GetModified(mop21), edg.Forward(dfk.face2));
         //                        }
         //                        else
         //                        {
@@ -7429,14 +7381,14 @@ namespace CADability
         //                    }
         //                    else
         //                    {
-        //                        if (edg.SecondaryCurve2D is InterpolatedDualSurfaceCurve.ProjectedCurve)
+        //                        if (edg.SecondaryCurve2D is ProjectedCurve)
         //                        {
-        //                            edg.Curve3D = (edg.SecondaryCurve2D as InterpolatedDualSurfaceCurve.ProjectedCurve).Curve3D;
+        //                            edg.Curve3D = (edg.SecondaryCurve2D as ProjectedCurve).Curve3D;
         //                            edg.PrimaryCurve2D = (edg.Curve3D as InterpolatedDualSurfaceCurve).CurveOnSurface1;
         //                        }
-        //                        else if (edg.PrimaryCurve2D is InterpolatedDualSurfaceCurve.ProjectedCurve)
+        //                        else if (edg.PrimaryCurve2D is ProjectedCurve)
         //                        {
-        //                            edg.Curve3D = (edg.PrimaryCurve2D as InterpolatedDualSurfaceCurve.ProjectedCurve).Curve3D;
+        //                            edg.Curve3D = (edg.PrimaryCurve2D as ProjectedCurve).Curve3D;
         //                            edg.SecondaryCurve2D = (edg.Curve3D as InterpolatedDualSurfaceCurve).CurveOnSurface2;
         //                        }
         //                    }
@@ -7450,7 +7402,6 @@ namespace CADability
         //                {
         //                    if (edg.Curve3D is InterpolatedDualSurfaceCurve)
         //                    {
-        //                        (edg.Curve3D as InterpolatedDualSurfaceCurve).CheckSurfaceParameters();
         //                    }
         //                }
         //            }
@@ -9316,12 +9267,12 @@ namespace CADability
                             // hier am Besten aus InterpolatedDualSurfaceCurve BSplines machen, sowohl in 2d, als auch in 3d und ganz am Ende
                             // wieder zu InterpolatedDualSurfaceCurve machen. GGf mit Flag, damit das klar ist
                             // Problme wäre die Genauigkeit, wenn beim BRepOperation.generateCycles die Richtung genommen wird...
-                            if (con1 is InterpolatedDualSurfaceCurve.ProjectedCurve && con2 is InterpolatedDualSurfaceCurve.ProjectedCurve &&
+                            if (con1 is ProjectedCurve pon1 && pon1.IsCurveOfIntersection && con2 is ProjectedCurve pon2 && pon2.IsCurveOfIntersection &&
                                 tr is InterpolatedDualSurfaceCurve)
                             {   // con1 und con2 müssen auf tr verweisen, sonst kann man das Face später nicht mit "ReverseOrientation" umdrehen. Dort wird nämlich die 
                                 // surface verändert, und die muss bei allen Kurven die selbe sein
-                                (con1 as InterpolatedDualSurfaceCurve.ProjectedCurve).SetCurve3d(tr as InterpolatedDualSurfaceCurve);
-                                (con2 as InterpolatedDualSurfaceCurve.ProjectedCurve).SetCurve3d(tr as InterpolatedDualSurfaceCurve);
+                                pon1.SetCurve3D(tr);
+                                pon2.SetCurve3D(tr);
                             }
                             // das Kreuzprodukt im Start (oder End oder Mittel) -Punkt hat die selbe Reichung wie die 3d Kurve: con1 umdrehen
                             // andere Richtung: con2 umdrehen
@@ -9475,9 +9426,9 @@ namespace CADability
 #if DEBUG
                             tr.UserData.Add("DebugIntersectionBy1", item.Key.face1.GetHashCode());
                             tr.UserData.Add("DebugIntersectionBy2", item.Key.face2.GetHashCode());
-                            if (con2 is InterpolatedDualSurfaceCurve.ProjectedCurve)
+                            if (con2 is ProjectedCurve pc2 && pc2.IsCurveOfIntersection)
                             {
-                                BSpline2D dbgbsp2d = (con2 as InterpolatedDualSurfaceCurve.ProjectedCurve).ToBspline(0.0);
+                                BSpline2D dbgbsp2d = pc2.ToBSpline(0.0);
                             }
 #endif
                             if (dirs1) // the trimming of BSplines is sometimes not very exact

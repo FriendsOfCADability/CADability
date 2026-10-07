@@ -127,6 +127,7 @@ namespace CADability.GeoObject
             double v = Math.Atan2(pu.z, a);
             if (u < 0.0) u += 2 * Math.PI;
             if (v < 0.0) v += 2 * Math.PI; // lets always result in [0..2*pi,0..2*pi], we need it for GetProjectedCurve, comparing with Vvsingularity
+            GeoPoint2D res;
             if (minorRadius > 1.0)
             {   // in this case the torus intersects itself and the result is ambiguous
                 // it could be (u,v)
@@ -142,14 +143,16 @@ namespace CADability.GeoObject
 
                 }
 #endif
-                if (dd1 < dd2) return new GeoPoint2D(u, v);
-                else return new GeoPoint2D(u + Math.PI, v2);
+                if (dd1 < dd2) res = new GeoPoint2D(u, v);
+                else res = new GeoPoint2D(u + Math.PI, v2);
             }
             else
             {
                 if (minorRadius < 0) v += Math.PI;
-                return new GeoPoint2D(u, v);
+                res = new GeoPoint2D(u, v);
             }
+            AdjustToUsedArea(ref res); // must be adjusted to the domain
+            return res;
         }
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetZMinMax (Projection, double, double, double, double, ref double, ref double)"/>
@@ -171,7 +174,9 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public override ISurface Clone()
         {
-            return new ToroidalSurface(toTorus, minorRadius);
+            ToroidalSurface res = new ToroidalSurface(toTorus, minorRadius);
+            res.usedArea = usedArea; // the clone keeps the domain, PositionOf depends on it
+            return res;
         }
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Modify (ModOp)"/>
@@ -2233,12 +2238,12 @@ namespace CADability.GeoObject
 #if DEBUG
                                 ICurve dbg = Make3dCurve(res);
 #endif
-                                return res;
+                                return AdjustToUsedArea(res); // must be adjusted to the domain
                             }
                             else
                             {
                                 Line2D res = new Line2D(new GeoPoint2D(uv.x, uv.y), new GeoPoint2D(uv.x - Math.Abs(e.SweepParameter), uv.y));
-                                return res;
+                                return AdjustToUsedArea(res); // must be adjusted to the domain
                             }
                         }
                         else
@@ -2252,7 +2257,7 @@ namespace CADability.GeoObject
                             {
                                 res = new Line2D(new GeoPoint2D(uv.x + Math.PI * 2.0, uv.y), new GeoPoint2D(uv.x, uv.y));
                             }
-                            return res;
+                            return AdjustToUsedArea(res); // must be adjusted to the domain
                         }
                     }
                 }
@@ -2284,12 +2289,12 @@ namespace CADability.GeoObject
                             {
                                 // beides gleiche Richtung
                                 Line2D res = new Line2D(new GeoPoint2D(uv.x, uv.y), new GeoPoint2D(uv.x, uv.y + Math.Abs(e.SweepParameter)));
-                                return res;
+                                return AdjustToUsedArea(res); // must be adjusted to the domain
                             }
                             else
                             {
                                 Line2D res = new Line2D(new GeoPoint2D(uv.x, uv.y), new GeoPoint2D(uv.x, uv.y - Math.Abs(e.SweepParameter)));
-                                return res;
+                                return AdjustToUsedArea(res); // must be adjusted to the domain
                             }
                         }
                         else
@@ -2303,7 +2308,7 @@ namespace CADability.GeoObject
                             {
                                 res = new Line2D(new GeoPoint2D(uv.x, uv.y + Math.PI * 2.0), new GeoPoint2D(uv.x, uv.y));
                             }
-                            return res;
+                            return AdjustToUsedArea(res); // must be adjusted to the domain
                         }
                     }
                 }

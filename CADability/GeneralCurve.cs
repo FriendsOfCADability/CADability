@@ -600,7 +600,7 @@ namespace CADability.GeoObject
                 double res;
                 try
                 {
-                    res = ArcLength.FromPoints(PointAt, 0.0, 1.0, GetBasePoints());
+                    res = ComputeLength();
                 }
                 catch (Exception)
                 {
@@ -611,6 +611,15 @@ namespace CADability.GeoObject
                 lengthValid = true;
                 return res;
             }
+        }
+        /// <summary>
+        /// Measures the arc length for <see cref="Length"/>, which caches the result: from <see cref="PointAt"/>, between the
+        /// positions <see cref="GetBasePoints"/> returns. A derived class whose PointAt is only an approximation can measure
+        /// with exact points instead.
+        /// </summary>
+        protected virtual double ComputeLength()
+        {
+            return ArcLength.FromPoints(PointAt, 0.0, 1.0, GetBasePoints());
         }
         /// <summary>
         /// Implements <see cref="CADability.GeoObject.ICurve.Split (double)"/>

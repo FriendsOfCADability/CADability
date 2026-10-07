@@ -212,13 +212,16 @@ namespace CADability.GeoObject
                                 res = r;
                             }
                         }
+                        AdjustToUsedArea(ref res); // must be adjusted to the domain
                         return res;
                     }
                 }
                 catch (PlaneException) { }
             }
             // on the axis (or the apex): any u, v as above
-            return new GeoPoint2D(0.0, (toUnit * p).z - voffset);
+            GeoPoint2D uv = new GeoPoint2D(0.0, (toUnit * p).z - voffset);
+            AdjustToUsedArea(ref uv); // must be adjusted to the domain
+            return uv;
 
             // this is the old implementation, which was bad for points outside the surface
             //GeoPoint pu = toUnit * p;
@@ -1382,7 +1385,7 @@ namespace CADability.GeoObject
                             }
                         }
                         res = new Line2D(sp, ep);
-                        return res;
+                        return AdjustToUsedArea(res); // must be adjusted to the domain
                     }
                 }
             }
@@ -1396,7 +1399,7 @@ namespace CADability.GeoObject
                     if (l.StartPoint.z + l.EndPoint.z < 0) u += Math.PI; // start- or endpoint could be 0, crossing z=0 is not allowed
                     if (u < 0.0) u += 2.0 * Math.PI;
                     res = new Line2D(new GeoPoint2D(u, l.StartPoint.z - voffset), new GeoPoint2D(u, l.EndPoint.z - voffset));
-                    return res;
+                    return AdjustToUsedArea(res); // must be adjusted to the domain
                 }
                 else
                 {
@@ -1408,7 +1411,7 @@ namespace CADability.GeoObject
                         GeoPoint2D p2 = PositionOf(curve.EndPoint);
                         SurfaceHelper.AdjustPeriodicStartPoint(this, p1, ref p2);
                         res = new Line2D(p1, p2);
-                        return res;
+                        return AdjustToUsedArea(res); // must be adjusted to the domain
                     }
                 }
             }
@@ -1451,7 +1454,7 @@ namespace CADability.GeoObject
                             ep.x += 2 * Math.PI; // noch nicht getestet
                         }
                         res = new Line2D(sp, ep);
-                        return res;
+                        return AdjustToUsedArea(res); // must be adjusted to the domain
 
                         //Unreachable code
                         /*
@@ -1469,7 +1472,7 @@ namespace CADability.GeoObject
                     // Grenzfälle: ustart oder uend liegen auf 0.0 oder 2*pi
                     // dann weiß man nicht ob der Punkt zyklisch richtig ist
                     res = new Line2D(new GeoPoint2D(ustart, e.Center.z), new GeoPoint2D(uend, e.Center.z));
-                    return res;
+                    return AdjustToUsedArea(res); // must be adjusted to the domain
                 }
                 else
                 {
@@ -1527,7 +1530,7 @@ namespace CADability.GeoObject
                         }
                         if (minDist < Precision.eps && res != null)
                         {
-                            return res;
+                            return AdjustToUsedArea(res); // must be adjusted to the domain
                         }
                     }
 

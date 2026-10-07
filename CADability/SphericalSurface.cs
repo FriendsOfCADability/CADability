@@ -469,7 +469,9 @@ namespace CADability.GeoObject
 		/// <returns></returns>
 		public override GeoPoint2D PositionOf(GeoPoint p)
 		{
-			return PositionOfUnit(toUnit * p);
+			GeoPoint2D res = PositionOfUnit(toUnit * p);
+			AdjustToUsedArea(ref res); // must be adjusted to the domain
+			return res;
 		}
 		/// <summary>
 		/// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetZMinMax (Projection, double, double, double, double, ref double, ref double)"/>

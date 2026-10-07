@@ -209,6 +209,7 @@ namespace CADability.GeoObject
                             GeoPoint2D inPlane = (PointAt(new GeoPoint2D(-sa1.Radian, vpar)) | p) < (PointAt(new GeoPoint2D(sa1.Radian, vpar)) | p)
                                 ? new GeoPoint2D(-sa1.Radian, vpar)
                                 : new GeoPoint2D(sa1.Radian, vpar);
+                            AdjustToUsedArea(ref inPlane); // must be adjusted to the domain
                             return inPlane;
                         }
                     }
@@ -249,6 +250,7 @@ namespace CADability.GeoObject
                 }
                 if (mindist < double.MaxValue)
                 {
+                    AdjustToUsedArea(ref res); // must be adjusted to the domain
                     return res;
                 }
                 return base.PositionOf(p); // we could do better here!
@@ -266,7 +268,9 @@ namespace CADability.GeoObject
             //{
             //    double d = (new GeoPoint2D(u + 2 * Math.PI, v) | dbg);
             //}
-            return new GeoPoint2D(u, v);
+            GeoPoint2D uv = new GeoPoint2D(u, v);
+            AdjustToUsedArea(ref uv); // must be adjusted to the domain
+            return uv;
         }
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.UDirection (GeoPoint2D)"/>
@@ -651,8 +655,11 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public override ISurface Clone()
         {
-            if (curveToRotate != null) return new SurfaceOfRevolution(curveToRotate, Location, Axis);
-            return new SurfaceOfRevolution(basisCurve2D.Clone(), toSurface, curveStartParameter, curveEndParameter, curveParameterOffset);
+            SurfaceOfRevolution res;
+            if (curveToRotate != null) res = new SurfaceOfRevolution(curveToRotate, Location, Axis);
+            else res = new SurfaceOfRevolution(basisCurve2D.Clone(), toSurface, curveStartParameter, curveEndParameter, curveParameterOffset);
+            res.usedArea = usedArea; // the clone keeps the domain, PositionOf depends on it
+            return res;
         }
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Modify (ModOp)"/>

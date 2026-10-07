@@ -30,6 +30,9 @@ namespace CADability
         {
             // when the bounding box was given a name that says what it is: it is a cuboid, not a cube
             { "CADability.BoundingCube", "CADability.BoundingBox" },
+            // when the two ProjectedCurve classes became one, as in ShapeIt: the 2d curves of an InterpolatedDualSurfaceCurve
+            // are ProjectedCurves which read the format of the nested class too
+            { "CADability.InterpolatedDualSurfaceCurve+ProjectedCurve", "CADability.ProjectedCurve" },
         };
 
         /// <summary>

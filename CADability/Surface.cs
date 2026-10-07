@@ -2227,6 +2227,31 @@ namespace CADability.GeoObject
         protected GeoPoint2D[] extrema; // Achtung, muss bei Modify auf null gesetzt werden
         internal BoxedSurface boxedSurface;
         internal BoundingRect usedArea = BoundingRect.EmptyBoundingRect;
+        /// <summary>
+        /// Puts <paramref name="uv"/> into the period of <see cref="usedArea"/>, the domain of this surface. On a periodic
+        /// surface <see cref="PositionOf"/> returns the uv value of a point in this period, as it does in ShapeIt, so that
+        /// curves on the surface, which no longer keep bounds of their own, come out where the face works. Nothing happens
+        /// when there is no domain or when it is unbounded in a periodic direction.
+        /// </summary>
+        protected void AdjustToUsedArea(ref GeoPoint2D uv)
+        {
+            if (usedArea.IsEmpty() || usedArea.IsInvalid()) return;
+            if (IsUPeriodic && (usedArea.Left == double.MinValue || usedArea.Right == double.MaxValue)) return;
+            if (IsVPeriodic && (usedArea.Bottom == double.MinValue || usedArea.Top == double.MaxValue)) return;
+            SurfaceHelper.AdjustPeriodic(this, usedArea, ref uv);
+        }
+        /// <summary>
+        /// Puts <paramref name="curve"/> into the period of <see cref="usedArea"/>, like <see cref="AdjustToUsedArea(ref GeoPoint2D)"/>
+        /// does with a point. Used by GetProjectedCurve for the curves it makes itself, so they agree with PositionOf.
+        /// </summary>
+        protected ICurve2D AdjustToUsedArea(ICurve2D curve)
+        {
+            if (curve == null || usedArea.IsEmpty() || usedArea.IsInvalid()) return curve;
+            if (IsUPeriodic && (usedArea.Left == double.MinValue || usedArea.Right == double.MaxValue)) return curve;
+            if (IsVPeriodic && (usedArea.Bottom == double.MinValue || usedArea.Top == double.MaxValue)) return curve;
+            SurfaceHelper.AdjustPeriodic(this, usedArea, curve);
+            return curve;
+        }
         internal BoxedSurfaceEx boxedSurfaceEx;
         internal virtual BoxedSurfaceEx BoxedSurfaceEx
         {
@@ -2583,30 +2608,10 @@ namespace CADability.GeoObject
                     return l;
                 }
             }
-            else if (curve2d is InterpolatedDualSurfaceCurve.ProjectedCurve)
-            {
-                InterpolatedDualSurfaceCurve.ProjectedCurve pc = curve2d as InterpolatedDualSurfaceCurve.ProjectedCurve;
-                if ((pc.IsOnSurface1 && pc.Curve3D.Surface1 == this) || (!pc.IsOnSurface1 && pc.Curve3D.Surface2 == this))
-                {
-                    // es kann sich nur um die ganze Curve3D handeln oder einen Teil davon
-                    double pos1 = pc.Curve3D.PositionOf(PointAt(pc.StartPoint));
-                    double pos2 = pc.Curve3D.PositionOf(PointAt(pc.EndPoint));
-                    if (pos1 >= 0.0 && pos1 <= 1.0 && pos2 >= 0.0 && pos2 <= 1.0)
-                    {
-                        bool reversed = false;
-                        if (pos2 < pos1)
-                        {
-                            reversed = true;
-                            double tmp = pos1;
-                            pos1 = pos2;
-                            pos2 = tmp;
-                        }
-                        ICurve res = pc.Curve3D.Clone() as ICurve;
-                        res.Trim(pos1, pos2);
-                        if (reversed) res.Reverse();
-                        return res;
-                    }
-                }
+            else if (curve2d is ProjectedCurve pc && pc.Surface == this)
+            {   // the curve knows its 3d curve and which part of it it runs along, no need to look for that part here
+                ICurve res = pc.Curve3DFromParams;
+                if (GetDistance(res.PointAt(0.5)) <= Precision.eps) return res; // otherwise the 3d curve is not on this surface
             }
             // kein else, sondern das folgende ist der Notfall, wenn sonst nichts greift
             {
@@ -2673,6 +2678,7 @@ namespace CADability.GeoObject
             GeoPoint2D res;
             if (BoxedSurfaceEx.PositionOf(p, out res))
             {
+                AdjustToUsedArea(ref res); // must be adjusted to the domain
                 return res;
             }
             else
@@ -2786,6 +2792,9 @@ namespace CADability.GeoObject
                         }
                     }
                 }
+                // The branch above works on the natural bounds, which for several surfaces are hard coded to
+                // [0,1]x[0,1] and know nothing about the domain, so the adjustment is needed here.
+                AdjustToUsedArea(ref res); // must be adjusted to the domain
                 return res;
             }
             // return new GeoPoint2D(Helper.PositionOf(p.ToCndHlp()));
@@ -3081,18 +3090,18 @@ namespace CADability.GeoObject
                 {
                     return (curve as InterpolatedDualSurfaceCurve).CurveOnSurface2;
                 }
-                // Test auf geometrische Gleichheit
-                ModOp2D firstToSecond;
-                if (this.SameGeometry(this.usedArea, (curve as InterpolatedDualSurfaceCurve).Surface1, ((curve as InterpolatedDualSurfaceCurve).Surface1 as ISurfaceImpl).usedArea, precision, out firstToSecond)) // oder besser geometrische Gleichheit prüfen
-                {
-                    if (firstToSecond.IsAlmostIdentity(precision)) return (curve as InterpolatedDualSurfaceCurve).CurveOnSurface1;
-                    else return (curve as InterpolatedDualSurfaceCurve).CurveOnSurface1.GetModified(firstToSecond); // ist die ModOp so richtigrum?
-                }
-                else if (this.SameGeometry(this.usedArea, (curve as InterpolatedDualSurfaceCurve).Surface2, ((curve as InterpolatedDualSurfaceCurve).Surface2 as ISurfaceImpl).usedArea, precision, out firstToSecond)) // oder besser geometrische Gleichheit prüfen
-                {
-                    if (firstToSecond.IsAlmostIdentity(precision)) return (curve as InterpolatedDualSurfaceCurve).CurveOnSurface2;
-                    else return (curve as InterpolatedDualSurfaceCurve).CurveOnSurface2.GetModified(firstToSecond); // ist die ModOp so richtigrum?
-                }
+                // there is a bug with SameGeometry and modifications. we use normal ProjectedCurve instead
+                //ModOp2D firstToSecond;
+                //if (this.SameGeometry(this.usedArea, (curve as InterpolatedDualSurfaceCurve).Surface1, ((curve as InterpolatedDualSurfaceCurve).Surface1 as ISurfaceImpl).usedArea, precision, out firstToSecond)) // oder besser geometrische Gleichheit prüfen
+                //{
+                //    if (firstToSecond.IsAlmostIdentity(precision)) return (curve as InterpolatedDualSurfaceCurve).CurveOnSurface1;
+                //    else if (!firstToSecond.IsNull) return (curve as InterpolatedDualSurfaceCurve).CurveOnSurface1.GetModified(firstToSecond); // ist die ModOp so richtigrum?
+                //}
+                //else if (this.SameGeometry(this.usedArea, (curve as InterpolatedDualSurfaceCurve).Surface2, ((curve as InterpolatedDualSurfaceCurve).Surface2 as ISurfaceImpl).usedArea, precision, out firstToSecond)) // oder besser geometrische Gleichheit prüfen
+                //{
+                //    if (firstToSecond.IsAlmostIdentity(precision)) return (curve as InterpolatedDualSurfaceCurve).CurveOnSurface2;
+                //    else if (!firstToSecond.IsNull) return (curve as InterpolatedDualSurfaceCurve).CurveOnSurface2.GetModified(firstToSecond); // ist die ModOp so richtigrum?
+                //}
             }
             if (!IsUPeriodic && !IsVPeriodic)
             {
@@ -3106,212 +3115,13 @@ namespace CADability.GeoObject
                     GetNaturalBounds(out double umin, out double umax, out double vmin, out double vmax);
                     if (umin > double.MinValue && umax < double.MaxValue && vmin > double.MinValue && vmax < double.MaxValue) restricted = new BoundingRect(umin, vmin, umax, vmax);
                 }
-                return new ProjectedCurve(curve, this, true, restricted, precision);
+                return new ProjectedCurve(curve, this, true, restricted);
             }
-            if (!usedArea.IsInfinite)
-                return new ProjectedCurve(curve, this, true, BoundingRect.EmptyBoundingRect, precision);
+            if (usedArea.IsInfinite)
+                return new ProjectedCurve(curve, this, true, BoundingRect.EmptyBoundingRect);
             else
-                return new ProjectedCurve(curve, this, true, usedArea, precision);
+                return new ProjectedCurve(curve, this, true, usedArea);
 
-            //Unreachable code
-            /*
-            int n = 16;
-            bool ok = false;
-            BSpline2D b2d = null;
-            List<GeoPoint> poles = new List<GeoPoint>();
-            List<GeoPoint2D> pole2d = new List<GeoPoint2D>();
-            GeoPoint2D cnt2d;
-            if (usedArea.IsInvalid())
-            {
-                GetNaturalBounds(out double umin, out double umax, out double vmin, out double vmax);
-                cnt2d = new GeoPoint2D((umin + umax) / 2.0, (vmin + vmax) / 2.0);
-            }
-            else cnt2d = usedArea.GetCenter();
-            double[] us = GetUSingularities();
-            for (int i = 0; i < us.Length; i++)
-            {
-                GeoPoint pl = PointAt(new GeoPoint2D(us[i], cnt2d.y));
-                poles.Add(pl);
-                pole2d.Add(new GeoPoint2D(us[i], double.NaN));
-            }
-            double[] vs = GetVSingularities();
-            for (int i = 0; i < vs.Length; i++)
-            {
-                GeoPoint pl = PointAt(new GeoPoint2D(cnt2d.x, vs[i]));
-                poles.Add(pl);
-                pole2d.Add(new GeoPoint2D(double.NaN, vs[i]));
-            }
-            double poleprec = curve.Length * 1e-3;
-            while (!ok)
-            {
-                GeoPoint2D[] through = new GeoPoint2D[n + 1];
-                GeoVector2D[] dirs = new GeoVector2D[n + 1];
-                for (int i = 0; i < n; ++i)
-                {
-                    GeoPoint pi = curve.PointAt((double)i / (double)n);
-                    bool closeToPole = false;
-                    GeoPoint2D polePosition = GeoPoint2D.Origin;
-                    for (int j = 0; j < poles.Count; j++)
-                    {
-                        if ((poles[j] | pi) < poleprec)
-                        {
-                            closeToPole = true;
-                            polePosition = pole2d[j];
-                            break;
-                        }
-                    }
-                    through[i] = PositionOf(pi);
-                    GeoVector dir3d = curve.DirectionAt((double)i / (double)n);
-                    try
-                    {
-                        dirs[i] = Geometry.Dir2D(UDirection(through[i]), VDirection(through[i]), dir3d);
-                    }
-                    catch (ModOpException)
-                    {
-                        dirs[i] = GeoVector2D.NullVector;
-                    }
-                    if (closeToPole)
-                    {
-                        if (!double.IsNaN(polePosition.x)) through[i].x = polePosition.x;
-                        if (!double.IsNaN(polePosition.y)) through[i].y = polePosition.y;
-                    }
-                }
-                through[n] = PositionOf(curve.EndPoint);
-                if (curve.IsClosed) through[n] = through[0];
-#if DEBUG
-                DebuggerContainer dcdirs = new DebuggerContainer();
-                GeoPoint[] p3d = new GeoPoint[through.Length];
-                GeoPoint[] op3d = new GeoPoint[through.Length];
-                for (int i = 0; i < p3d.Length; i++)
-                {
-                    op3d[i] = curve.PointAt((double)i / (double)n);
-                    p3d[i] = PointAt(through[i]);
-                }
-                Polyline dbgpl = Polyline.Construct();
-                if (!Precision.IsEqual(p3d))
-                {
-                    dbgpl.SetPoints(p3d, false);
-                    dcdirs.Add(dbgpl);
-                }
-                for (int i = 0; i < through.Length - 1; i++)
-                {
-                    if (!dirs[i].IsNullVector())
-                    {
-                        Line2D l2d = new Line2D(through[i], through[i] + 10 * dirs[i].Normalized);
-                        dcdirs.Add(l2d);
-                    }
-                }
-#endif
-                // if the 3d curve starts or ends at a pole (singularity) we must adapt the u or v value
-                us = GetUSingularities();
-                for (int i = 0; i < us.Length; i++)
-                {
-                    if (Math.Abs(through[0].x - us[i]) < 1e-5)
-                    {
-                        through[0].y = through[1].y;
-                    }
-                    if (Math.Abs(through[n].x - us[i]) < 1e-5)
-                    {
-                        through[n].y = through[n - 1].y;
-                    }
-                }
-                vs = GetVSingularities();
-                for (int i = 0; i < vs.Length; i++)
-                {
-                    if (Math.Abs(through[0].y - vs[i]) < 1e-5)
-                    {
-                        through[0].x = through[1].x;
-                    }
-                    if (Math.Abs(through[n].y - vs[i]) < 1e-5)
-                    {
-                        through[n].x = through[n - 1].x;
-                    }
-                }
-                if ((this as ISurface).IsUPeriodic)
-                {
-                    for (int i = 0; i < through.Length - 1; i++)
-                    {
-                        while (Math.Abs(through[i].x - through[i + 1].x) > Math.Abs(through[i].x - (through[i + 1].x - (this as ISurface).UPeriod)))
-                        {
-                            through[i + 1].x -= (this as ISurface).UPeriod;
-                        }
-                        while (Math.Abs(through[i].x - through[i + 1].x) > Math.Abs(through[i].x - (through[i + 1].x + (this as ISurface).UPeriod)))
-                        {
-                            through[i + 1].x += (this as ISurface).UPeriod;
-                        }
-                    }
-                }
-                if ((this as ISurface).IsVPeriodic)
-                {
-                    for (int i = 0; i < through.Length - 1; i++)
-                    {
-                        while (Math.Abs(through[i].y - through[i + 1].y) > Math.Abs(through[i].y - (through[i + 1].y - (this as ISurface).VPeriod)))
-                        {
-                            through[i + 1].y -= (this as ISurface).VPeriod;
-                        }
-                        while (Math.Abs(through[i].y - through[i + 1].y) > Math.Abs(through[i].y - (through[i + 1].y + (this as ISurface).VPeriod)))
-                        {
-                            through[i + 1].y += (this as ISurface).VPeriod;
-                        }
-                    }
-                }
-                BoundingRect text = new BoundingRect(through);
-                try
-                {
-                    b2d = new BSpline2D(through, 3, Precision.IsEqual(through[0], through[through.Length - 1])); //  curve.IsClosed);
-                }
-                catch (NurbsException)
-                {
-                    List<GeoPoint2D> cleanThroughPoints = new List<GeoPoint2D>();
-                    cleanThroughPoints.Add(through[0]);
-                    double len = 0.0;
-                    for (int i = 1; i < through.Length; i++) len += through[i] | through[i - 1];
-                    for (int i = 1; i < through.Length - 1; i++)
-                    {
-                        if ((through[i] | cleanThroughPoints[cleanThroughPoints.Count - 1]) > len * 1e-4) cleanThroughPoints.Add(through[i]);
-                    }
-                    if ((through[through.Length - 1] | cleanThroughPoints[cleanThroughPoints.Count - 1]) > len * 1e-4) cleanThroughPoints.Add(through[through.Length - 1]);
-                    else cleanThroughPoints[cleanThroughPoints.Count - 1] = through[through.Length - 1];
-                    b2d = new BSpline2D(cleanThroughPoints.ToArray(), 3, Precision.IsEqual(through[0], through[through.Length - 1])); //  curve.IsClosed);
-                }
-                ok = true;
-                for (int i = 0; i < n; ++i)
-                {
-                    if (precision > 0.0)
-                    {
-                        GeoPoint2D pb = b2d.PointAt((i + 0.5) / (double)n);
-                        GeoPoint2D po = PositionOf(curve.PointAt((i + 0.5) / (double)n));
-                        SurfaceHelper.AdjustPeriodic(this, text, ref po);
-                        if ((pb | po) > precision)
-                        {
-                            double d0 = b2d.Distance(po); // maybe curve and b2d are not running synchronously in their parameters, then this test may still verify precision
-                            if (d0 > precision)
-                            {
-                                ok = false;
-                                break;
-                            }
-                        }
-                    }
-                    if (!dirs[i].IsNullVector())
-                    {
-                        SweepAngle sw = new SweepAngle(through[i + 1] - through[i], dirs[i]);
-                        if (Math.Abs(sw.Radian) > 0.2) // about 10° deviation
-                        {   // this is the case e.g. a spiral winding on a cylindrical surface and all points are in a line, but actually on a different winding
-                            ok = false;
-                            break;
-                        }
-                    }
-                }
-                //if (ok)
-                //{   // maybe we need a criterion which says whether we accept self intersections or not
-                //    double[] si = b2d.GetSelfIntersections();
-                //    if (si.Length > 0) ok = false;
-                //}
-                n *= 2;
-                if (ok || n > 1024) break;
-            }
-            return b2d;
-            */
         }
         /// <summary>
         /// Implements <see cref="CADability.GeoObject.ISurface.Intersect (ICurve, BoundingRect, out GeoPoint[], out GeoPoint2D[], out double[])"/>

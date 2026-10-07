@@ -477,7 +477,7 @@ namespace CADability.GeoObject
                 // The DirectionAt of a projected curve (the plain one and the one of an intersection curve) comes from the
                 // 3d curve, normalized and in another parametrization - not the derivative of PointAt. A spline through its
                 // points has both.
-                if (segment is ProjectedCurve || segment is InterpolatedDualSurfaceCurve.ProjectedCurve)
+                if (segment is ProjectedCurve)
                 {
                     BSpline2D approx = BSpline2D.Approximate(segment.PointAt, 1e-7 * Math.Max(uvScale, 1e-12));
                     if (approx != null) segment = approx;

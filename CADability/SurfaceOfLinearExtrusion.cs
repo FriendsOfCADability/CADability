@@ -156,7 +156,9 @@ namespace CADability.GeoObject
                     //    throw new ApplicationException("error in SurfaceOfLinearExtrusion.PositionOf");
                     //}
 #endif
-                    return new GeoPoint2D(curveStartParameter + u * (curveEndParameter - curveStartParameter), v);
+                    GeoPoint2D res = new GeoPoint2D(curveStartParameter + u * (curveEndParameter - curveStartParameter), v);
+                    AdjustToUsedArea(ref res); // must be adjusted to the domain
+                    return res;
                 }
             }
             Plane pl = new Plane(basisCurve.StartPoint, direction);
@@ -164,7 +166,9 @@ namespace CADability.GeoObject
             double uu = projected.PositionOf(pl.Project(p)); // assuming the projected curve and the basisCurve have the same parameter space (which is true for NURBS)
             GeoPoint start = basisCurve.PointAt(uu);
             double vv = Geometry.LinePar(start, direction, p);
-            return new GeoPoint2D(uu, vv);
+            GeoPoint2D uvres = new GeoPoint2D(uu, vv);
+            AdjustToUsedArea(ref uvres); // must be adjusted to the domain
+            return uvres;
             // GeoPoint2D res = base.PositionOf(p);
             // return res;
         }

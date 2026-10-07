@@ -1084,8 +1084,12 @@ EOF
 
             //If this file is imported as mm instead of m the volume will be around 0.00055309963466116513
             //The real volumen should be around 553099.66263763292
+            // That is the volume of the triangulation, which is 0.1% larger than the exact volume and moves in the last digits
+            // whenever the 2d curves of the faces change slightly. So it is compared relatively, and the exact volume, integrated
+            // over the faces, is checked as well.
             double rightVolume = 553099.66263763292;
-            Debug.Assert((Math.Abs(vol - rightVolume) < Precision.eps));
+            Assert.AreEqual(rightVolume, vol, rightVolume * 1e-6);
+            Assert.AreEqual(552468.93243, CADability.GeoObject.ShellMetrics.IntegratedVolume(solid.Shells[0]), 552468.93243 * 1e-9);
         }
 
         [DataTestMethod]

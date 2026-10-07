@@ -2184,7 +2184,7 @@ namespace CADability.Curve2D
 		/// <returns></returns>
 		public virtual IGeoObject MakeGeoObject(Plane p)
 		{
-			BSpline2D bsp = ToBspline(0.0);
+			BSpline2D bsp = ToBSpline(0.0);
 			if (bsp == null)
 			{
 				Line ln = Line.TwoPoints(p.ToGlobal(StartPoint), p.ToGlobal(EndPoint));
@@ -2193,7 +2193,10 @@ namespace CADability.Curve2D
 			return bsp.MakeGeoObject(p);
 		}
 
-		protected BSpline2D ToBspline(double precision)
+		/// <summary>
+		/// A BSpline2D through the triangulation points of this curve, with the given precision.
+		/// </summary>
+		public BSpline2D ToBSpline(double precision)
 		{
 			if (interpol == null) MakeTriangulation();
 			double len = 0.0;

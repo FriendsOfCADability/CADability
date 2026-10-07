@@ -6,7 +6,9 @@ using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.LinearAlgebra.Double;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.Serialization;
+using static CADability.InterpolatedDualSurfaceCurve.SurfacePoint;
 
 namespace CADability
 {
@@ -27,10 +29,19 @@ namespace CADability
     /// Internal: ein Kante, gegeben durch zwei Oberflächen und ein Array von 3d/2d/2d Punkten
     /// </summary>
     [Serializable()]
-    public class InterpolatedDualSurfaceCurve : GeneralCurve, IDualSurfaceCurve, IJsonSerialize, IExportStep, IJsonSerializeDone, IDeserializationCallback, IOrientation
+    [JsonVersion(1)]
+    public class InterpolatedDualSurfaceCurve : GeneralCurve, IDualSurfaceCurve, IJsonSerialize, IExportStep, IJsonSerializeDone, IOrientation
     {
-        ISurface surface1;
+        ISurface surface1; // the two surfaces
         ISurface surface2;
+#if DEBUG
+        internal
+#endif
+        SurfacePoint[] basePoints; // some points, especially start and endpoint, of the curve, that have been calculated
+        bool isTangential = false; // we need a different point approximation for curves which describe the tangential intersection of two surfaces
+        BSpline approxBSpline; // BSpline for approximation
+        SortedList<double, SurfacePoint> hashedPositions; // already calculated points on the curve
+
         [Serializable()]
         [JsonVersion(serializeAsStruct = true, version = 1)]
         internal struct SurfacePoint : ISerializable, IJsonSerialize
@@ -45,23 +56,43 @@ namespace CADability
             public GeoPoint2D psurface1;
             public GeoPoint2D psurface2;
 
-            public GeoPoint2D PointOnSurface(ISurface surface, BoundingRect bounds)
+            static bool SnapToNearestPeriod(ref double curr, double prev, bool isPeriodic, double period)
             {
-                GeoPoint2D ps = surface.PositionOf(p3d);
-                if (surface.IsUPeriodic)
+                if (!isPeriodic || period <= 0) return false;
+
+                double delta = curr - prev;
+                double snappedDelta = period * Math.Round(delta / period);
+
+                if (snappedDelta != 0.0)
                 {
-                    double um = (bounds.Left + bounds.Right) / 2;
-                    while (Math.Abs(ps.x - um) > Math.Abs(ps.x - surface.UPeriod - um)) ps.x -= surface.UPeriod;
-                    while (Math.Abs(ps.x - um) > Math.Abs(ps.x + surface.UPeriod - um)) ps.x += surface.UPeriod;
+                    curr -= snappedDelta;
+                    return true;
                 }
-                if (surface.IsVPeriodic)
-                {
-                    double vm = (bounds.Bottom + bounds.Top) / 2;
-                    while (Math.Abs(ps.y - vm) > Math.Abs(ps.y - surface.VPeriod - vm)) ps.y -= surface.VPeriod;
-                    while (Math.Abs(ps.y - vm) > Math.Abs(ps.y + surface.VPeriod - vm)) ps.y += surface.VPeriod;
-                }
-                return ps;
+                return false;
             }
+            internal static bool FixSurfacePoint2D(ref GeoPoint2D curr, in GeoPoint2D prev, bool isUPeriodic, double uPeriod, bool isVPeriodic, double vPeriod)
+            {
+                bool changed = false;
+                changed |= SnapToNearestPeriod(ref curr.x, prev.x, isUPeriodic, uPeriod);
+                changed |= SnapToNearestPeriod(ref curr.y, prev.y, isVPeriodic, vPeriod);
+                return changed;
+            }
+
+            [Flags]
+            internal enum SurfaceFixFlags
+            {
+                None = 0,
+                Surface1 = 1,
+                Surface2 = 2
+            }
+            internal SurfaceFixFlags FixAgainstNeighbour(in SurfacePoint prev, ISurface s1, ISurface s2)
+            {
+                SurfaceFixFlags changed = SurfaceFixFlags.None;
+                if (FixSurfacePoint2D(ref psurface1, prev.psurface1, s1.IsUPeriodic, s1.UPeriod, s1.IsVPeriodic, s1.VPeriod)) changed |= SurfaceFixFlags.Surface1;
+                if (FixSurfacePoint2D(ref psurface2, prev.psurface2, s2.IsUPeriodic, s2.UPeriod, s2.IsVPeriodic, s2.VPeriod)) changed |= SurfaceFixFlags.Surface2;
+                return changed;
+            }
+
             #region ISerializable Members
             public SurfacePoint(SerializationInfo info, StreamingContext context)
             {
@@ -93,585 +124,88 @@ namespace CADability
 
             #endregion
         }
-        SurfacePoint[] basePoints; // definiert die Punkte von 0.0 bis 1.0. Mindestens 3 Werte, der Mittelpunkt muss auch bekannt sein, immer ungerade wg. Mittelpunkt
-        bool forwardOriented; // das Kreuzprodukt der beiden Normalenvektoren bildet die Richtung (oder Gegenrichtung) der Kurve
-        ExplicitPCurve3D approxPolynom; // polynom of degree 3 approximating segments between basePoints
-        Dictionary<double, SurfacePoint> hashedPositions;
 #if DEBUG
         static int idcnt = 0;
         int id;
 #endif
-        [Serializable()]
-        public class ProjectedCurve : GeneralCurve2D, ISerializable, IJsonSerialize
+        /// <summary>
+        /// The first or the second surface has been reparametrized in place by <paramref name="m"/>, see
+        /// <see cref="ISurface.ReverseOrientation"/>: the uv values stored for it follow.
+        /// </summary>
+        internal void SurfaceReparametrized(bool onSurface1, ModOp2D m)
         {
-            InterpolatedDualSurfaceCurve curve3d;
-            bool onSurface1;
-            bool reversed;
-            public ProjectedCurve(InterpolatedDualSurfaceCurve curve3d, bool onSurface1)
-            {
-                this.curve3d = curve3d;
-                this.onSurface1 = onSurface1;
-                reversed = false;
-                // base.MakeTringulation(); // zuerst mal zum Debuggen, später dynamisch
-                // nicht mehr, da ggf. noch periodisch verschoben wird
-            }
-            public ProjectedCurve(InterpolatedDualSurfaceCurve curve3d, ProjectedCurve toCloneFrom)
-            {
-                this.curve3d = curve3d;
-                this.onSurface1 = toCloneFrom.onSurface1;
-                reversed = toCloneFrom.reversed;
-            }
-            public ProjectedCurve(InterpolatedDualSurfaceCurve curve3d, bool onSurface1, bool reversed)
-            {
-                this.curve3d = curve3d;
-                this.onSurface1 = onSurface1;
-                this.reversed = reversed;
-            }
-            public new BSpline2D ToBspline(double precision)
-            {
-                BSpline2D res = base.ToBspline(0.0);
-                return res;
-            }
-            protected override void GetTriangulationBasis(out GeoPoint2D[] points, out GeoVector2D[] directions, out double[] parameters)
-            {
-                List<GeoPoint2D> lpoint = new List<GeoPoint2D>();
-                List<GeoVector2D> ldirections = new List<GeoVector2D>();
-                List<double> lparameters = new List<double>();
-                if (onSurface1)
-                {
-                    double par;
-                    for (int i = 0; i < curve3d.basePoints.Length; ++i)
-                    {
-                        int ii;
-                        if (reversed) ii = curve3d.basePoints.Length - i - 1;
-                        else ii = i;
-                        GeoPoint2D p = curve3d.basePoints[ii].psurface1;
-                        double pm = (double)i / (double)(curve3d.basePoints.Length - 1);
-                        if (reversed) par = 1.0 - pm;
-                        else par = pm;
-                        GeoVector dir = curve3d.DirectionAt(par);
-                        if (reversed) dir.Reverse();
-                        GeoVector u = curve3d.surface1.UDirection(p);
-                        GeoVector v = curve3d.surface1.VDirection(p);
-                        GeoVector n = u ^ v;
-                        Matrix m = DenseMatrix.OfColumnArrays(u, v, n);
-                        Vector s = (Vector)m.Solve(new DenseVector(dir));
-                        if (s.IsValid())
-                        {
-                            if (lpoint.Count > 0)
-                            {
-                                // bei periodischen darf der Abstand nicht zu groß werden
-                                if (curve3d.surface1.IsUPeriodic)
-                                {
-                                    while (p.x - lpoint[lpoint.Count - 1].x > curve3d.surface1.UPeriod / 2) p.x -= curve3d.surface1.UPeriod;
-                                    while (lpoint[lpoint.Count - 1].x - p.x > curve3d.surface1.UPeriod / 2) p.x += curve3d.surface1.UPeriod;
-                                }
-                                if (curve3d.surface1.IsVPeriodic)
-                                {
-                                    while (p.y - lpoint[lpoint.Count - 1].y > curve3d.surface1.VPeriod / 2) p.y -= curve3d.surface1.VPeriod;
-                                    while (lpoint[lpoint.Count - 1].y - p.y > curve3d.surface1.VPeriod / 2) p.y += curve3d.surface1.VPeriod;
-                                }
-                            }
-                            lpoint.Add(p);
-                            if (reversed) lparameters.Add(1.0 - par);
-                            else lparameters.Add(par);
-                            ldirections.Add(new GeoVector2D(s[0], s[1]));
-                        }
-                    }
-                }
-                else
-                {
-                    double par;
-                    for (int i = 0; i < curve3d.basePoints.Length; ++i)
-                    {
-                        int ii;
-                        if (reversed) ii = curve3d.basePoints.Length - i - 1;
-                        else ii = i;
-                        GeoPoint2D p = curve3d.basePoints[ii].psurface2;
-                        double pm = (double)i / (double)(curve3d.basePoints.Length - 1);
-                        if (reversed) par = 1.0 - pm;
-                        else par = pm;
-                        GeoVector dir = curve3d.DirectionAt(par);
-                        if (reversed) dir.Reverse();
-                        GeoVector u = curve3d.surface2.UDirection(p);
-                        GeoVector v = curve3d.surface2.VDirection(p);
-                        GeoVector n = u ^ v;
-                        Matrix m = DenseMatrix.OfColumnArrays(u, v, n);
-                        Vector s = (Vector)m.Solve(new DenseVector(dir));
-                        if (s.IsValid())
-                        {
-                            lpoint.Add(p);
-                            if (reversed) lparameters.Add(1.0 - par);
-                            else lparameters.Add(par);
-                            ldirections.Add(new GeoVector2D(s[0], s[1]));
-                        }
-                    }
-                }
-                points = lpoint.ToArray();
-                directions = ldirections.ToArray();
-                parameters = lparameters.ToArray();
-            }
-            public override GeoVector2D DirectionAt(double par)
-            {
-                GeoPoint2D uv1, uv2;
-                GeoPoint p;
-                if (reversed) par = 1.0 - par;
-                curve3d.ApproximatePosition(par, out uv1, out uv2, out p);
-                GeoVector dir = curve3d.surface1.GetNormal(uv1).Normalized ^ curve3d.surface2.GetNormal(uv2).Normalized;
-                if (dir.Length < 0.001)
-                {
-                    // an dieser Stelle sind beide Flächen tangential, das gibt keine gute Richtung!
-                    // das ist aber eine brutale Lösung, die sollte nur sehr selten vorkommen
-                    // Approximate darf man nicht aufrufen, da es wieder DirectionAt aufruft, wenn noch keine Triangulierung existiert
-                    if (HasTriangulation())
-                    {
-                        if (reversed) par = 1.0 - par; // ggf. wieder richtig stellen, Approximate dreht ja bereits um!
-                        GeoVector2D res = Approximate(true, 0.0).DirectionAt(par);
-                        // if (reversed) return -res;
-                        return res;
-                    }
-                    else
-                    {
-                        //GeoVector dir3d = curve3d.DirectionAt(par);
-                        //if (onSurface1)
-                        //{
-                        //    GeoVector diru = curve3d.surface1.UDirection(uv1);
-                        //    GeoVector dirv = curve3d.surface1.VDirection(uv1);
-                        //    GeoVector2D res = Geometry.Dir2D(diru, dirv, dir3d);
-                        //    return res; // Richtung hängt von reverse und curve3d.forwardOriented ab
-                        //}
-                        //else
-                        //{
-                        //    GeoVector diru = curve3d.surface2.UDirection(uv2);
-                        //    GeoVector dirv = curve3d.surface2.VDirection(uv2);
-                        //    GeoVector2D res = Geometry.Dir2D(diru, dirv, dir3d);
-                        //    return res; // Richtung hängt von reverse und curve3d.forwardOriented ab
-                        //}
-                    }
-                }
-                if (!curve3d.forwardOriented) dir.Reverse();
-                if (onSurface1)
-                {
-                    if (dir.Length < 0.001)
-                    {
-                        dir = curve3d.DirectionAt(par);
-                    }
-                    if (reversed) dir.Reverse();
-                    GeoVector u = curve3d.surface1.UDirection(uv1);
-                    GeoVector v = curve3d.surface1.VDirection(uv1);
-                    GeoVector n = u ^ v; // geändert, wird bei BRepIntersection12 so gebraucht
-                    Matrix m = DenseMatrix.OfColumnArrays(u, v, n);
-                    Vector s = (Vector)m.Solve(new DenseVector(dir));
-                    int ind = curve3d.SegmentOfParameter(par);
-                    double d = curve3d.basePoints[ind].psurface1 | curve3d.basePoints[ind + 1].psurface1; // Abstand der umgebenden Basispunkte
-                    double span = 1.0 / (curve3d.basePoints.Length - 1); // Parameterbereich zwischen zwei Basispunkten
-                    if (s.IsValid() && s[0] != 0.0 && s[1] != 0.0)
-                    {
-                        GeoVector dbg = s[0] * u + s[1] * v + s[2] * n;
-                        return d / span * (new GeoVector2D(s[0], s[1])).Normalized;
-                    }
-                    else
-                    {
-                        GeoVector2D res = curve3d.basePoints[ind + 1].psurface1 - curve3d.basePoints[ind].psurface1; // Abstand der umgebenden Basispunkte
-                        if (reversed) res = -res;
-                        return d / span * res.Normalized;
-                    }
-                }
-                else
-                {
-                    if (reversed) dir.Reverse();
-                    GeoVector u = curve3d.surface2.UDirection(uv2);
-                    GeoVector v = curve3d.surface2.VDirection(uv2);
-                    GeoVector n = u ^ v;
-                    Matrix m = DenseMatrix.OfColumnArrays(u, v, n);
-                    Vector s = (Vector)m.Solve(new DenseVector(dir));
-                    int ind = curve3d.SegmentOfParameter(par);
-                    double d = curve3d.basePoints[ind].psurface2 | curve3d.basePoints[ind + 1].psurface2; // Abstand der umgebenden Basispunkte
-                    double span = 1.0 / (curve3d.basePoints.Length - 1); // Parameterbereich zwischen zwei Basispunkten
-                    if (s.IsValid() && s[0] != 0.0 && s[1] != 0.0)
-                    {
-                        return d / span * (new GeoVector2D(s[0], s[1])).Normalized;
-                    }
-                    else
-                    {
-                        GeoVector2D res = curve3d.basePoints[ind + 1].psurface2 - curve3d.basePoints[ind].psurface2; // Abstand der umgebenden Basispunkte
-                        if (reversed) res = -res;
-                        return d / span * res.Normalized;
-                    }
-                }
-            }
-            public override GeoPoint2D PointAt(double par)
-            {
-                GeoPoint2D uv1, uv2;
-                GeoPoint p;
-                if (reversed) par = 1.0 - par;
-                curve3d.ApproximatePosition(par, out uv1, out uv2, out p);
-                if (onSurface1) return uv1;
-                else return uv2;
-            }
-            public override double PositionOf(GeoPoint2D p)
-            {   // in die 3d Situation übersetzen, demit die periodischen Flächen keine Probleme machen
-                GeoPoint p3d;
-                if (onSurface1) p3d = curve3d.surface1.PointAt(p);
-                else p3d = curve3d.surface2.PointAt(p);
-                double res = curve3d.PositionOf(p3d);
-                if (reversed) return 1 - res;
-                else return res;
-            }
-            public override GeoPoint2D StartPoint
-            {
-                get
-                {
-                    if (reversed)
-                    {
-                        if (onSurface1) return curve3d.basePoints[curve3d.basePoints.Length - 1].psurface1;
-                        else return curve3d.basePoints[curve3d.basePoints.Length - 1].psurface2;
-                    }
-                    else
-                    {
-                        if (onSurface1) return curve3d.basePoints[0].psurface1;
-                        else return curve3d.basePoints[0].psurface2;
-                    }
-                }
-                set
-                {   // das wird gebraucht, um kleine Lücken in einem Border zu schließen
-                    if (reversed)
-                    {
-                        if (onSurface1) curve3d.basePoints[curve3d.basePoints.Length - 1].psurface1 = value;
-                        else curve3d.basePoints[curve3d.basePoints.Length - 1].psurface2 = value;
-                    }
-                    else
-                    {
-                        if (onSurface1) curve3d.basePoints[0].psurface1 = value;
-                        else curve3d.basePoints[0].psurface2 = value;
-                    }
-                    base.StartPoint = value;
-                }
-            }
-            public override GeoPoint2D EndPoint
-            {
-                get
-                {
-                    if (reversed)
-                    {
-                        if (onSurface1) return curve3d.basePoints[0].psurface1;
-                        else return curve3d.basePoints[0].psurface2;
-                    }
-                    else
-                    {
-                        if (onSurface1) return curve3d.basePoints[curve3d.basePoints.Length - 1].psurface1;
-                        else return curve3d.basePoints[curve3d.basePoints.Length - 1].psurface2;
-                    }
-                }
-                set
-                {
-                    if (reversed)
-                    {
-                        if (onSurface1) curve3d.basePoints[0].psurface1 = value;
-                        else curve3d.basePoints[0].psurface2 = value;
-                    }
-                    else
-                    {
-                        if (onSurface1) curve3d.basePoints[curve3d.basePoints.Length - 1].psurface1 = value;
-                        else curve3d.basePoints[curve3d.basePoints.Length - 1].psurface2 = value;
-                    }
-                    base.EndPoint = value;
-                }
-            }
-            public override GeoVector2D StartDirection
-            {
-                get
-                {
-                    return DirectionAt(0.0);
-                }
-            }
-            public override GeoVector2D EndDirection
-            {
-                get
-                {
-                    return DirectionAt(1.0);
-                }
-            }
-            public override ICurve2D Trim(double StartPos, double EndPos)
-            {
-                double sp = StartPos;
-                double ep = EndPos;
-                InterpolatedDualSurfaceCurve clone = curve3d.Clone() as InterpolatedDualSurfaceCurve;
-                clone.Trim(sp, ep);
-                ProjectedCurve res = new ProjectedCurve(clone, onSurface1);
-                res.reversed = reversed;
-                res.ClearTriangulation();
-                return res;
-            }
-            public override void Reverse()
-            {
-                reversed = !reversed;
-                base.ClearTriangulation();
-            }
-            public override ICurve2D Clone()
-            {
-                ProjectedCurve res = new ProjectedCurve(curve3d.Clone() as InterpolatedDualSurfaceCurve, onSurface1);
-                res.reversed = reversed;
-                res.ClearTriangulation();
-                res.UserData.CloneFrom(UserData);
-                return res;
-            }
-            public override ICurve2D CloneReverse(bool reverse)
-            {
-                ProjectedCurve res = new ProjectedCurve(curve3d.Clone() as InterpolatedDualSurfaceCurve, onSurface1);
-                if (reverse) res.reversed = !reversed;
-                else res.reversed = reversed;
-                res.ClearTriangulation();
-                res.UserData.CloneFrom(UserData);
-                return res;
-            }
-            public override ICurve2D GetModified(ModOp2D m)
-            {
-                // das geht ja eigentlich nicht, denn diese Kurve ist ja gegeben durch die 3d Kurve, und kann nicht einfach woandershin verschoben werden
-                // ABER: nach einer Modifikation der Surface stimmen die basePoints der curve3d nicht mehr. Eigentlich müsste die curve3d das mitbekommen.
-                // Die Methode ISurface.ReverseOrientation() verändert nämlich die surface. Die curve3d hier upzudaten ist ein Trick, der zwar nicht schadet, es ist aber nicht
-                // die richtige Stelle es zu tun. Wir z.Z. nur bei Face.ReverseOrientation verwendet.
-                curve3d.ModifySurfacePoints(onSurface1, m);
-                ProjectedCurve res = new ProjectedCurve(curve3d, onSurface1);
-                // curve3d.PointAt(0.1111111);
-                // curve3d nicht clonen!!
-                // if (m.Determinant < 0) res.reversed = !reversed;
-                // else 
-                res.reversed = reversed;
-                res.ClearTriangulation();
-                res.UserData.CloneFrom(UserData);
-                return res;
-            }
-            public override bool IsClosed
-            {
-                get
-                {
-                    return false; // sollte nie geschlossen sein, oder?
-                }
-            }
-            public override void Move(double x, double y)
-            {
-                ISurface surface;
-                if (onSurface1) surface = curve3d.surface1;
-                else surface = curve3d.surface2;
-                if (x != 0 && surface.UPeriod != 0.0)
-                {
-                    if (Math.IEEERemainder(Math.Abs(x), surface.UPeriod) != 0.0) throw new ApplicationException("cannot move ProjectedCurve");
-                }
-                if (y != 0)
-                {
-                    if (Math.IEEERemainder(Math.Abs(y), surface.VPeriod) != 0.0) throw new ApplicationException("cannot move ProjectedCurve");
-                }
-                GeoVector2D diff = new GeoVector2D(x, y);
-                if (onSurface1)
-                {
-                    for (int i = 0; i < curve3d.basePoints.Length; i++)
-                    {
-                        curve3d.basePoints[i].psurface1 += diff;
-                    }
-                }
-                else
-                {
-                    for (int i = 0; i < curve3d.basePoints.Length; i++)
-                    {
-                        curve3d.basePoints[i].psurface2 += diff;
-                    }
-                }
-                curve3d.InvalidateSecondaryData();
-                base.ClearTriangulation();
-            }
-            #region ISerializable Members
-            protected ProjectedCurve(SerializationInfo info, StreamingContext context)
-                : base(info, context)
-            {
-                curve3d = info.GetValue("Curve3d", typeof(InterpolatedDualSurfaceCurve)) as InterpolatedDualSurfaceCurve;
-                onSurface1 = info.GetBoolean("OnSurface1");
-                reversed = info.GetBoolean("Reversed");
-            }
-            void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
-            {
-                base.GetObjectData(info, context);
-                info.AddValue("Curve3d", curve3d);
-                info.AddValue("OnSurface1", onSurface1);
-                info.AddValue("Reversed", reversed);
-            }
-            protected ProjectedCurve() { } // needed for IJsonSerialize
-            public void GetObjectData(IJsonWriteData data)
-            {
-                base.JSonGetObjectData(data);
-                data.AddProperty("Curve3d", curve3d);
-                data.AddProperty("OnSurface1", onSurface1);
-                data.AddProperty("Reversed", reversed);
-            }
-
-            public void SetObjectData(IJsonReadData data)
-            {
-                base.JSonSetObjectData(data);
-                curve3d = data.GetProperty<InterpolatedDualSurfaceCurve>("Curve3d");
-                onSurface1 = data.GetProperty<bool>("OnSurface1");
-                reversed = data.GetProperty<bool>("Reversed");
-            }
-
-            #endregion
-#if DEBUG
-            GeoObjectList Debug
-            {
-                get
-                {
-                    GeoPoint2D[] pnts = new GeoPoint2D[101];
-                    for (int i = 0; i < 101; ++i)
-                    {
-                        pnts[i] = PointAt(i / 100.0);
-                    }
-                    Polyline2D pl2d = new Polyline2D(pnts);
-                    return new GeoObjectList(pl2d.MakeGeoObject(Plane.XYPlane));
-                }
-            }
-#endif
-
-            public override void Copy(ICurve2D toCopyFrom)
-            {
-                ProjectedCurve pc = toCopyFrom as ProjectedCurve;
-                if (pc != null)
-                {
-                    curve3d = pc.curve3d;
-                    onSurface1 = pc.onSurface1;
-                    reversed = pc.reversed;
-                }
-            }
-
-            internal void ReplaceSurface(ISurface oldSurface, ISurface newSurface)
-            {
-                curve3d.ReplaceSurface(oldSurface, newSurface);
-            }
-            internal bool IsOnSurface1
-            {
-                get
-                {
-                    return onSurface1;
-                }
-                set
-                {
-                    onSurface1 = value;
-                }
-            }
-            internal bool IsReversed
-            {
-                get
-                {
-                    return reversed;
-                }
-            }
-            internal void SetCurve3d(InterpolatedDualSurfaceCurve c3d)
-            {
-                if ((c3d.StartPoint | curve3d.StartPoint) + (c3d.EndPoint | curve3d.EndPoint) > (c3d.StartPoint | curve3d.EndPoint) + (c3d.EndPoint | curve3d.StartPoint)) reversed = !reversed;
-                curve3d = c3d;
-                // es muss sich hier um eine geometrisch identische Kurve handeln (Richtung?)
-                ClearTriangulation();
-            }
-
-            public override bool TryPointDeriv2At(double position, out GeoPoint2D point, out GeoVector2D deriv, out GeoVector2D deriv2)
-            {
-                point = GeoPoint2D.Origin;
-                deriv = deriv2 = GeoVector2D.NullVector;
-                return false;
-            }
-
-            internal InterpolatedDualSurfaceCurve Curve3D
-            {
-                get
-                {
-                    return curve3d;
-                }
-            }
+            ModifySurfacePoints(onSurface1, m);
         }
-
         private void ModifySurfacePoints(bool onSurface1, ModOp2D m)
         {
+            DualSurfaceCurveDiagnostics.Count("IDSC.ModifySurfacePoints" + (m.Determinant < 0 ? ", orientation reversed" : ""));
             for (int i = 0; i < basePoints.Length; i++)
             {
                 if (onSurface1) basePoints[i].psurface1 = m * basePoints[i].psurface1;
                 else basePoints[i].psurface2 = m * basePoints[i].psurface2;
             }
-            if (m.Determinant < 0) forwardOriented = !forwardOriented; // die Orientierung der Fläche hat sich umgedreht, damit ist auch das Kreuzprodukt andersrum
             InvalidateSecondaryData();
-#if DEBUG
-            CheckSurfaceParameters();
-#endif
         }
 
         protected InterpolatedDualSurfaceCurve()
         {
-            hashedPositions = new Dictionary<double, SurfacePoint>();
+            hashedPositions = new SortedList<double, SurfacePoint>();
 #if DEBUG
             id = idcnt++;
 #endif
         }
-        internal InterpolatedDualSurfaceCurve(ISurface surface1, ISurface surface2, SurfacePoint[] basePoints, bool forwardOriented, ExplicitPCurve3D approxPolynom = null)
+        internal InterpolatedDualSurfaceCurve(ISurface surface1, ISurface surface2, SurfacePoint[] basePoints, bool isTangential = false)
             : this()
         {
-            // der 1. und der letzte Punkt müssen exakt sein, die anderen nur Näherungswerte, die aber eindeutig zur Fläche führen
-            this.surface1 = surface1;
-            this.surface2 = surface2;
-            this.basePoints = basePoints;
-            this.forwardOriented = forwardOriented;
-            this.approxPolynom = approxPolynom;
-            CheckSurfaceExtents();
-#if DEBUG
-            CheckSurfaceParameters();
-#endif
-        }
-        internal InterpolatedDualSurfaceCurve(ISurface surface1, ISurface surface2, SurfacePoint[] basePoints)
-            : this()
-        {
+            DualSurfaceCurveDiagnostics.ConstructionProbe probe = DualSurfaceCurveDiagnostics.BeginConstruction();
             // der 1. und der letzte Punkt müssen exakt sein, die anderen nur Näherungswerte, die aber eindeutig zur Fläche führen
             double dbg = basePoints[0].p3d | basePoints[basePoints.Length - 1].p3d;
             this.surface1 = surface1;
             this.surface2 = surface2;
             this.basePoints = basePoints;
-            // wierum orientiert?
-            // manchmal am Anfang oder Ende tangetial, deshalb besser in der mitte testen
-            int n = basePoints.Length / 2; // es müssen mindesten 3 sein
-            GeoVector v = surface1.GetNormal(basePoints[n].psurface1) ^ surface2.GetNormal(basePoints[n].psurface2);
-            GeoVector v0;
-            if (basePoints.Length == 2)
-                v0 = basePoints[1].p3d - basePoints[0].p3d;
-            else
-                v0 = basePoints[n + 1].p3d - basePoints[n - 1].p3d;
-            Angle a = new Angle(v, v0);
-            forwardOriented = (a.Radian < Math.PI / 2.0);
-            CheckSurfaceExtents();
-#if DEBUG
-            //GeoPoint[] pnts = new GeoPoint[501];
-            //for (int i = 0; i < 501; ++i)
-            //{
-            //    pnts[i] = this.PointAt(i / 500.0);
-            //}
-            //Polyline pl = Polyline.Construct();
-            //pl.SetPoints(pnts, false);
-#endif
-#if DEBUG
-            CheckSurfaceParameters();
-#endif
+            this.isTangential = isTangential;
+            if (basePoints.Length == 2) RefineBasePoints();
+            AnchorBasePoints();
+            BSpline toUpdateBasepoints = ApproxBSpline;
+            DualSurfaceCurveDiagnostics.EndConstruction(probe, this.surface1, this.surface2, this.basePoints, this.isTangential);
         }
-        public InterpolatedDualSurfaceCurve(ISurface surface1, BoundingRect bounds1, ISurface surface2, BoundingRect bounds2, GeoPoint startPoint, GeoPoint endPoint)
+        private void Init()
+        {
+            if (basePoints.Length == 2) RefineBasePoints();
+            AnchorBasePoints();
+            BSpline toUpdateBasepoints = ApproxBSpline;
+        }
+        /// <summary>
+        /// <see cref="Init"/> for a curve read from a file. The uv values stay in the periods they were written in and are
+        /// only made continuous: the 2d curves on the faces refer to these periods, see the periods a
+        /// <see cref="ProjectedCurve"/> of an intersection is moved by. Moving them to where PositionOf puts them now would
+        /// depend on the domain of the surface, which not every kind of surface writes (a cylinder writes none), and would
+        /// shift those 2d curves by a period.
+        /// </summary>
+        private void InitAfterReading()
+        {
+            if (basePoints.Length == 2) RefineBasePoints();
+            AnchorBasePoints(surface1, true, false);
+            AnchorBasePoints(surface2, false, false);
+            BSpline toUpdateBasepoints = ApproxBSpline;
+        }
+        /// <summary>
+        /// The intersection curve of two surfaces from <paramref name="startPoint"/> to <paramref name="endPoint"/>.
+        /// <paramref name="bounds1"/> and <paramref name="bounds2"/> are not used: the uv values follow from
+        /// <see cref="ISurface.PositionOf"/>, which honours the domain of each surface.
+        /// </summary>
+        public InterpolatedDualSurfaceCurve(ISurface surface1, BoundingRect bounds1, ISurface surface2, BoundingRect bounds2, GeoPoint startPoint, GeoPoint endPoint, bool isTangential = false)
             : this()
         {
-            // die Bounds dienen dazu bei periodischen Flächen die richtigen Parameterwerte zu finden
-            // diese Parameterbereiche sind wichtig, es darf also niemal PositionOf verwendet werden, sonst müssen wir
-            // bounds1 und bounds2 speichern, um in den richtigen Bereich zu kommen
+            DualSurfaceCurveDiagnostics.ConstructionProbe probe = DualSurfaceCurveDiagnostics.BeginConstruction();
             this.surface1 = surface1;
             this.surface2 = surface2;
+            this.isTangential = isTangential;
             List<SurfacePoint> points = new List<SurfacePoint>();
-            SurfacePoint sp = new SurfacePoint();
-            sp.p3d = startPoint;
-            sp.psurface1 = sp.PointOnSurface(surface1, bounds1);
-            sp.psurface2 = sp.PointOnSurface(surface2, bounds2);
+            SurfacePoint sp = new SurfacePoint(startPoint, surface1.PositionOf(startPoint), surface2.PositionOf(startPoint));
             points.Add(sp);
-            SurfacePoint ep = new SurfacePoint();
-            ep.p3d = endPoint;
-            ep.psurface1 = ep.PointOnSurface(surface1, bounds1);
-            ep.psurface2 = ep.PointOnSurface(surface2, bounds2);
+            SurfacePoint ep = new SurfacePoint(endPoint, surface1.PositionOf(endPoint), surface2.PositionOf(endPoint));
+            ep.FixAgainstNeighbour(sp, surface1, surface2);
             points.Add(ep);
             basePoints = points.ToArray();
             CheckPeriodic();
@@ -693,55 +227,63 @@ namespace CADability
                 GeoPoint2D uv1, uv2;
                 GeoPoint p;
                 ApproximatePosition((ind + 0.5) / (basePoints.Length - 1), out uv1, out uv2, out p);
-                //GeoPoint p = new GeoPoint(points[ind].p3d, points[ind + 1].p3d);
                 points.Insert(ind + 1, new SurfacePoint(p, uv1, uv2));
                 basePoints = points.ToArray(); // damit basePoints für die nächste Runde zu Verfügung steht
             }
-            // wierum orientiert?
-            // manchmal am Anfang oder Ende tangetial, deshalb besser in der mitte testen
-            int n = basePoints.Length / 2; // es müssen mindesten 3 sein
-            GeoVector v = surface1.GetNormal(basePoints[n].psurface1) ^ surface2.GetNormal(basePoints[n].psurface2);
-            GeoVector v0 = basePoints[n + 1].p3d - basePoints[n - 1].p3d;
-            Angle a = new Angle(v, v0);
-            forwardOriented = (a.Radian < Math.PI / 2.0);
+            AnchorBasePoints();
+            BSpline bsp = ApproxBSpline; // make sure it is created and the basepoints are refined
+            hashedPositions.Clear();
             CheckPeriodic();
-            CheckSurfaceExtents();
-#if DEBUG
-            CheckSurfaceParameters();
-#endif
+            DualSurfaceCurveDiagnostics.EndConstruction(probe, this.surface1, this.surface2, this.basePoints, this.isTangential);
         }
-        public InterpolatedDualSurfaceCurve(ISurface surface1, BoundingRect bounds1, ISurface surface2, BoundingRect bounds2, GeoPoint[] pts, List<GeoPoint2D> uvpts1 = null, List<GeoPoint2D> uvpts2 = null)
-        : this(surface1, bounds1, surface2, bounds2, new List<GeoPoint>(pts), uvpts1, uvpts2)
+        /// <summary>
+        /// The intersection curve of two surfaces through <paramref name="pts"/>, see the constructor with a list of points.
+        /// </summary>
+        public InterpolatedDualSurfaceCurve(ISurface surface1, BoundingRect bounds1, ISurface surface2, BoundingRect bounds2, GeoPoint[] pts, List<GeoPoint2D> uvpts1 = null, List<GeoPoint2D> uvpts2 = null, bool isTangential = false, BSpline approxBSpline = null)
+        : this(surface1, bounds1, surface2, bounds2, pts.ToList(), uvpts1, uvpts2, isTangential, approxBSpline)
         {
         }
-        public InterpolatedDualSurfaceCurve(ISurface surface1, BoundingRect bounds1, ISurface surface2, BoundingRect bounds2, List<GeoPoint> pts, List<GeoPoint2D> uvpts1 = null, List<GeoPoint2D> uvpts2 = null)
+        /// <summary>
+        /// The intersection curve of two surfaces through <paramref name="pts"/>, where the first and the last point must be
+        /// exact and the inner ones are refined onto both surfaces. <paramref name="uvpts1"/> and <paramref name="uvpts2"/>
+        /// may give the uv values of the points, otherwise they follow from <see cref="ISurface.PositionOf"/>, which honours
+        /// the domain of each surface. <paramref name="bounds1"/> and <paramref name="bounds2"/> are only used when there are
+        /// just two points on a periodic surface: as the range in which an intermediate point is searched.
+        /// </summary>
+        public InterpolatedDualSurfaceCurve(ISurface surface1, BoundingRect bounds1, ISurface surface2, BoundingRect bounds2, List<GeoPoint> pts, List<GeoPoint2D> uvpts1 = null, List<GeoPoint2D> uvpts2 = null, bool isTangential = false, BSpline approxBSpline = null)
             : this()
         {
-            // die Bounds dienen dazu bei periodischen Flächen die richtigen Parameterwerte zu finden
-            // diese Parameterbereiche sind wichtig, es darf also niemal PositionOf verwendet werden, sonst müssen wir
-            // bounds1 und bounds2 speichern, um in den richtigen Bereich zu kommen
+            DualSurfaceCurveDiagnostics.ConstructionProbe probe = DualSurfaceCurveDiagnostics.BeginConstruction();
             this.surface1 = surface1;
             this.surface2 = surface2;
+            this.isTangential = isTangential;
             List<SurfacePoint> points = new List<SurfacePoint>();
             for (int i = 0; i < pts.Count; ++i)
             {
                 SurfacePoint sp = new SurfacePoint();
                 sp.p3d = pts[i];
+                // without given uv values PositionOf, which honours the domain, and each point next to its predecessor
                 if (uvpts1 != null)
                     sp.psurface1 = uvpts1[i];
                 else
-                    sp.psurface1 = sp.PointOnSurface(surface1, bounds1);
+                {
+                    sp.psurface1 = surface1.PositionOf(sp.p3d);
+                    if (i > 0) SurfacePoint.FixSurfacePoint2D(ref sp.psurface1, points[i - 1].psurface1, surface1.IsUPeriodic, surface1.UPeriod, surface1.IsVPeriodic, surface1.VPeriod);
+                }
                 if (uvpts2 != null)
                     sp.psurface2 = uvpts2[i];
                 else
-                    sp.psurface2 = sp.PointOnSurface(surface2, bounds2);
+                {
+                    sp.psurface2 = surface2.PositionOf(sp.p3d);
+                    if (i > 0) SurfacePoint.FixSurfacePoint2D(ref sp.psurface2, points[i - 1].psurface2, surface2.IsUPeriodic, surface2.UPeriod, surface2.IsVPeriodic, surface2.VPeriod);
+                }
                 points.Add(sp);
             }
             if (points.Count == 2)
             {   // sometimes we have an ambiguous curve here: a half circle on a rotational surface, which could be either way around.
                 // since "ApproximatePosition" doesn't care about the u/v bounds, we try a different approach here: choose a fixed u or v curve
-                // in the bounds of such a surface and intersect with the other surface. The old approach was bad, more use of bounds1 and bounds2
-                // could help further
+                // in the bounds of such a surface and intersect with the other surface. bounds1 and bounds2 are the parameters of this
+                // constructor, the range in which the caller expects the curve
                 List<GeoPoint> intermediatePoints = new List<GeoPoint>();
                 if (surface1.IsUPeriodic && Math.Abs(points[0].psurface1.x - points[1].psurface1.x) > surface1.UPeriod / 3.0)
                 {   // the curve spans more than 1/3 of a total period
@@ -749,7 +291,7 @@ namespace CADability
                     surface2.Intersect(fixedCurve, bounds2, out GeoPoint[] ips, out GeoPoint2D[] uvOn2, out double[] uOnCurve3Ds);
                     intermediatePoints.AddRange(ips);
                 }
-                if (surface1.IsVPeriodic && Math.Abs(points[0].psurface1.y + points[1].psurface1.y) > surface1.VPeriod / 3.0)
+                if (surface1.IsVPeriodic && Math.Abs(points[0].psurface1.y - points[1].psurface1.y) > surface1.VPeriod / 3.0)
                 {   // the curve spans more than 1/3 of a total period
                     ICurve fixedCurve = surface1.FixedV((points[0].psurface1.y + points[1].psurface1.y) / 2.0, bounds1.Left, bounds1.Right);
                     surface2.Intersect(fixedCurve, bounds2, out GeoPoint[] ips, out GeoPoint2D[] uvOn2, out double[] uOnCurve3Ds);
@@ -761,7 +303,7 @@ namespace CADability
                     surface1.Intersect(fixedCurve, bounds1, out GeoPoint[] ips, out GeoPoint2D[] uvOn2, out double[] uOnCurve3Ds);
                     intermediatePoints.AddRange(ips);
                 }
-                if (surface2.IsVPeriodic && Math.Abs(points[0].psurface2.y + points[1].psurface2.y) > surface2.VPeriod / 3.0)
+                if (surface2.IsVPeriodic && Math.Abs(points[0].psurface2.y - points[1].psurface2.y) > surface2.VPeriod / 3.0)
                 {   // the curve spans more than 1/3 of a total period
                     ICurve fixedCurve = surface2.FixedV((points[0].psurface2.y + points[1].psurface2.y) / 2.0, bounds2.Left, bounds2.Right);
                     surface1.Intersect(fixedCurve, bounds1, out GeoPoint[] ips, out GeoPoint2D[] uvOn2, out double[] uOnCurve3Ds);
@@ -785,97 +327,24 @@ namespace CADability
                         SurfacePoint sp = new SurfacePoint();
                         sp.p3d = intermediatePoints[ind];
                         sp.psurface1 = surface1.PositionOf(sp.p3d);
-                        sp.psurface2 = surface1.PositionOf(sp.p3d);
-                        SurfaceHelper.AdjustPeriodic(surface1, bounds1, ref sp.psurface1);
-                        SurfaceHelper.AdjustPeriodic(surface2, bounds2, ref sp.psurface2);
-                        points.Insert(1, sp);
-                    }
-                }
-                /* old approach:
-                if (!(surface1 is PlaneSurface))
-                {
-                    ICurve fixedCurve;
-                    GeoPoint2D uv0 = points[0].psurface1;
-                    GeoPoint2D uv1 = points[1].psurface1;
-                    double du = Math.Abs(uv0.x - uv1.x);
-                    double dv = Math.Abs(uv0.y - uv1.y);
-                    if (du > dv) fixedCurve = surface1.FixedU((uv0.x + uv1.x) / 2.0, bounds1.Bottom, bounds1.Top);
-                    else fixedCurve = surface1.FixedV((uv0.y + uv1.y) / 2.0, bounds1.Left, bounds1.Right);
-                    surface2.Intersect(fixedCurve, bounds2, out GeoPoint[] ips, out GeoPoint2D[] uvOn2, out double[] uOnCurve3Ds);
-                    double mind = double.MaxValue;
-                    GeoPoint2D cnt = bounds1.GetCenter();
-                    int indFound = -1;
-                    for (int i = 0; i < ips.Length; i++)
-                    {   // find the best intersection point
-                        GeoPoint2D uv = surface1.PositionOf(ips[i]);
-                        double d = Math.Abs(uv.x - cnt.x) / bounds1.Width + Math.Abs(uv.y - cnt.y) / bounds1.Height;
-                        if (d < mind)
-                        {
-                            indFound = i;
-                            mind = d;
-                        }
-                    }
-                    if (indFound >= 0)
-                    {
-                        SurfacePoint sp = new SurfacePoint();
-                        sp.p3d = ips[indFound];
-                        sp.psurface1 = surface1.PositionOf(sp.p3d);
-                        sp.psurface2 = uvOn2[indFound];
-                        points.Insert(1, sp);
-                    }
-                }
-                else if (!(surface2 is PlaneSurface))
-                {
-                    ICurve fixedCurve;
-                    GeoPoint2D uv0 = points[0].psurface2;
-                    GeoPoint2D uv1 = points[1].psurface2;
-                    double du = Math.Abs(uv0.x - uv1.x);
-                    double dv = Math.Abs(uv0.y - uv1.y);
-                    if (du > dv) fixedCurve = surface2.FixedU((uv0.x + uv1.x) / 2.0, bounds2.Bottom, bounds2.Top);
-                    else fixedCurve = surface2.FixedV((uv0.y + uv1.y) / 2.0, bounds2.Left, bounds2.Right);
-                    surface1.Intersect(fixedCurve, bounds1, out GeoPoint[] ips, out GeoPoint2D[] uvOn1, out double[] uOnCurve3Ds);
-                    double mind = double.MaxValue;
-                    GeoPoint2D cnt = bounds2.GetCenter();
-                    int indFound = -1;
-                    for (int i = 0; i < ips.Length; i++)
-                    {   // find the best intersection point
-                        GeoPoint2D uv = surface2.PositionOf(ips[i]);
-                        double d = Math.Abs(uv.x - cnt.x) / bounds2.Width + Math.Abs(uv.y - cnt.y) / bounds2.Height;
-                        if (d < mind)
-                        {
-                            indFound = i;
-                            mind = d;
-                        }
-                    }
-                    if (indFound >= 0)
-                    {
-                        SurfacePoint sp = new SurfacePoint();
-                        sp.p3d = ips[indFound];
                         sp.psurface2 = surface2.PositionOf(sp.p3d);
-                        sp.psurface1 = uvOn1[indFound];
+                        sp.FixAgainstNeighbour(points[0], surface1, surface2);
                         points.Insert(1, sp);
                     }
-                } */
+                }
             }
             basePoints = points.ToArray();
-            // determin the orientation: sometimes both surfaces are tangential at the start or endpoint, so we use an intermedite point when available
-            int n = Math.Min(basePoints.Length / 2, basePoints.Length - 2);
-            GeoVector v = surface1.GetNormal(basePoints[n].psurface1) ^ surface2.GetNormal(basePoints[n].psurface2);
-            GeoVector v0;
-            if (n == 0) v0 = basePoints[n + 1].p3d - basePoints[n].p3d; // only two points
-            else v0 = basePoints[n + 1].p3d - basePoints[n - 1].p3d;
-            Angle a = new Angle(v, v0);
-            forwardOriented = (a.Radian < Math.PI / 2.0); // we need this value for ApproximatePosition
 
             // Recalculate the positions of the inner points, which are sometimes not precise
             for (int i = 1; i < basePoints.Length - 1; ++i)
             {
                 GeoPoint2D uv1, uv2; // do not pass out basePoints[i].psurface1 as parameter, since uv1 is manipulated several times inside ApproximatePosition
-                ApproximatePosition((double)i / (double)(basePoints.Length - 1), out uv1, out uv2, out basePoints[i].p3d, true);
+                ApproximatePosition((double)i / (double)(basePoints.Length - 1), out uv1, out uv2, out basePoints[i].p3d);
                 basePoints[i].psurface1 = uv1;
                 basePoints[i].psurface2 = uv2;
+                hashedPositions.Clear(); // die Werte hier sind unnütz, da die basePoints sich ja immer noch ändern
             }
-            AdjustPeriodic(bounds1, bounds2);
+            AnchorBasePoints();
 
             points.Clear();
             points.AddRange(basePoints); // damit die periodic Änderungen auch dort wirksam sind
@@ -896,14 +365,8 @@ namespace CADability
                 GeoPoint p;
                 ApproximatePosition((ind + 0.5) / (basePoints.Length - 1), out uv1, out uv2, out p);
                 hashedPositions.Clear(); // die Werte hier sind unnütz, da die basePoints sich ja immer noch ändern
-                approxPolynom = null;
-                //GeoPoint p = new GeoPoint(points[ind].p3d, points[ind + 1].p3d);
                 points.Insert(ind + 1, new SurfacePoint(p, uv1, uv2));
                 basePoints = points.ToArray(); // damit basePoints für die nächste Runde zu Verfügung steht
-                v = surface1.GetNormal(basePoints[ind + 1].psurface1) ^ surface2.GetNormal(basePoints[ind + 1].psurface2);
-                v0 = basePoints[ind + 2].p3d - basePoints[ind].p3d;
-                a = new Angle(v, v0);
-                forwardOriented = (a.Radian < Math.PI / 2.0); // recalculate, because for exactly half circles the first result is ambiguous
             }
             double baseLength = 0.0;
             double minLength = double.MaxValue;
@@ -946,165 +409,17 @@ namespace CADability
             }
             basePoints = points.ToArray();
 
-            InitApproxPolynom();
+            AnchorBasePoints();
+            this.approxBSpline = approxBSpline; // may be null, the it will be calculated in the next line
+            BSpline bsp = ApproxBSpline; // make sure it is created and the basepoints are refined
             CheckPeriodic(); // erst nach dieser Schleife, denn ApproximatePosition mach die uv-position evtl. falsch
-            // maybe we end up in the wron period
-            AdjustPeriodic(bounds1, bounds2);
-            CheckSurfaceExtents();
-#if DEBUG
-            GeoPoint2D[] dbgb1 = new GeoPoint2D[basePoints.Length];
-            GeoPoint2D[] dbgb2 = new GeoPoint2D[basePoints.Length];
-            for (int i = 0; i < basePoints.Length; i++)
-            {
-                dbgb1[i] = basePoints[i].psurface1;
-                dbgb2[i] = basePoints[i].psurface2;
-            }
-            Polyline2D pl2d1 = new Polyline2D(dbgb1);
-            Polyline2D pl2d2 = new Polyline2D(dbgb2);
-            CheckSurfaceParameters();
-#endif
+            AnchorBasePoints();
+
+            DualSurfaceCurveDiagnostics.EndConstruction(probe, this.surface1, this.surface2, this.basePoints, this.isTangential);
         }
-        private void InitApproxPolynom()
-        {   // The ExplicitPCurve3D (a polynom) approximates the intersection curve, passing throught the basepoints with the correct direction in the basepoints
-            GeoPoint[] epnts = new GeoPoint[basePoints.Length];
-            GeoVector[] edirs = new GeoVector[basePoints.Length];
-            BoundingRect ext1 = BoundingRect.EmptyBoundingRect;
-            BoundingRect ext2 = BoundingRect.EmptyBoundingRect;
-            for (int i = 0; i < basePoints.Length; i++)
-            {
-                epnts[i] = basePoints[i].p3d;
-                ext1.MinMax(basePoints[i].psurface1);
-                ext2.MinMax(basePoints[i].psurface2);
-            }
-            ext1.Inflate(ext1.Size * 0.1);
-            ext2.Inflate(ext2.Size * 0.1);
-            for (int i = 0; i < basePoints.Length; i++)
-            {
-                edirs[i] = surface1.GetNormal(basePoints[i].psurface1) ^ surface2.GetNormal(basePoints[i].psurface2);
-                if (forwardOriented)
-                    edirs[i] = surface1.GetNormal(basePoints[i].psurface1) ^ surface2.GetNormal(basePoints[i].psurface2);
-                else
-                    edirs[i] = -surface1.GetNormal(basePoints[i].psurface1) ^ surface2.GetNormal(basePoints[i].psurface2);
-                double l;
-                if (i == 0) l = epnts[1] | epnts[0];
-                else if (i == basePoints.Length - 1) l = epnts[basePoints.Length - 1] | epnts[basePoints.Length - 2];
-                else l = ((epnts[i] | epnts[i - 1]) + (epnts[i] | epnts[i + 1])) / 2.0;
-                if (Precision.IsNullVector(edirs[i]))
-                {   // this is a touching point. We assume, that touching points (if there are any) are always basepoints.
-                    // To get a good tangential direction of the curve in that point we construct a plane based by the normal vector and the connection to the next basepoint
-                    // this plane intersects the surfaces in a curve. We use the tangent verctor of this curve as the tangent vector 
-                    GeoVector dir, dir1 = GeoVector.NullVector, dir2 = GeoVector.NullVector;
-                    if (i == 0) dir = epnts[i + 1] - epnts[i];
-                    else if (i == basePoints.Length - 1) dir = epnts[i] - epnts[i - 1];
-                    else dir = (epnts[i + 1] - epnts[i - 1]);
-                    Plane pln = new Plane(epnts[i], surface1.GetNormal(basePoints[i].psurface1), dir);
-                    IDualSurfaceCurve[] dsc1 = surface1.GetPlaneIntersection(new PlaneSurface(pln), ext1.Left, ext1.Right, ext1.Bottom, ext1.Top, 0.0);
-                    pln = new Plane(epnts[i], surface2.GetNormal(basePoints[i].psurface2), dir); // this is almost the same plane as above
-                    IDualSurfaceCurve[] dsc2 = surface2.GetPlaneIntersection(new PlaneSurface(pln), ext2.Left, ext2.Right, ext2.Bottom, ext2.Top, 0.0);
-                    for (int j = 0; j < dsc1.Length; j++)
-                    {
-                        double pos = dsc1[j].Curve3D.PositionOf(epnts[i]);
-                        if (pos >= -1e-6 && pos <= 1 + 1e-6)
-                        {
-                            dir1 = dsc1[j].Curve3D.DirectionAt(pos);
-                            if (dir1 * dir < 0) dir1 = -dir1;
-                        }
-                    }
-                    for (int j = 0; j < dsc2.Length; j++)
-                    {
-                        double pos = dsc2[j].Curve3D.PositionOf(epnts[i]);
-                        if (pos >= -1e-6 && pos <= 1 + 1e-6)
-                        {
-                            dir2 = dsc2[j].Curve3D.DirectionAt(pos);
-                            if (dir2 * dir < 0) dir2 = -dir2;
-                        }
-                    }
-                    GeoVector dir12 = dir1 + dir2; // dir1 and dir2 should be very similar, if one of them is the nullvector, there is no problem
-                    if (!dir12.IsNullVector()) edirs[i] = dir12;
-                    else edirs[i] = dir;
-                }
-                edirs[i].Length = l * basePoints.Length;
-            }
-            approxPolynom = ExplicitPCurve3D.FromPointsDirections(epnts, edirs);
-        }
-        internal void CheckSurfaceExtents()
+        internal void Repair()
         {
-            if (surface1 is ISurfaceImpl simpl1)
-            {
-                if (simpl1.usedArea.IsEmpty() || simpl1.usedArea.IsInfinite)
-                {
-                    BoundingRect ext = BoundingRect.EmptyBoundingRect;
-                    for (int i = 0; i < basePoints.Length; i++)
-                    {
-                        ext.MinMax(basePoints[i].psurface1);
-                    }
-                    simpl1.usedArea = ext;
-                }
-            }
-            if (surface2 is ISurfaceImpl simpl2)
-            {
-                if (simpl2.usedArea.IsEmpty() || simpl2.usedArea.IsInfinite)
-                {
-                    BoundingRect ext = BoundingRect.EmptyBoundingRect;
-                    for (int i = 0; i < basePoints.Length; i++)
-                    {
-                        ext.MinMax(basePoints[i].psurface2);
-                    }
-                    simpl2.usedArea = ext;
-                }
-            }
-
-        }
-#if DEBUG
-        internal void CheckSurfaceParameters()
-        {   // check auf parameterfehler im 2d
-            if ((basePoints[basePoints.Length - 1].p3d | basePoints[basePoints.Length - 2].p3d) == 0.0 || (basePoints[0].p3d | basePoints[1].p3d) == 0.0)
-            {
-
-            }
-            double d = 0.0;
-            for (int i = 1; i < basePoints.Length; i++)
-            {
-                d += basePoints[i].psurface1 | basePoints[i - 1].psurface1;
-            }
-            d /= basePoints.Length - 1;
-            for (int i = 1; i < basePoints.Length; i++)
-            {
-                if ((basePoints[i].psurface1 | basePoints[i - 1].psurface1) > 5 * d)
-                {
-                }
-            }
-            for (int i = 1; i < basePoints.Length; i++)
-            {
-                d += basePoints[i].psurface2 | basePoints[i - 1].psurface2;
-            }
-            d /= basePoints.Length - 1;
-            for (int i = 1; i < basePoints.Length; i++)
-            {
-                if ((basePoints[i].psurface2 | basePoints[i - 1].psurface2) > 5 * d)
-                {
-                }
-            }
-            Surface2.GetNaturalBounds(out double umin, out double umax, out double vmin, out double vmax);
-            for (int i = 0; i < basePoints.Length; i++)
-            {
-                if ((surface1.PointAt(basePoints[i].psurface1) | basePoints[i].p3d) > 0.1)
-                {
-                    return;
-                }
-                if ((surface2.PointAt(basePoints[i].psurface2) | basePoints[i].p3d) > 0.1)
-                {
-                    return;
-                }
-                if (basePoints[i].psurface2.x < umin || basePoints[i].psurface2.x > umax)
-                {
-
-                }
-            }
-        }
-#endif
-        internal void Repair(BoundingRect bounds1, BoundingRect bounds2)
-        {
+            DualSurfaceCurveDiagnostics.Count("IDSC.Repair");
             BoundingBox ext = BoundingBox.EmptyBoundingCube;
             for (int i = 0; i < basePoints.Length; i++) ext.MinMax(basePoints[i].p3d);
             double eps = ext.Size * 1e-5;
@@ -1124,7 +439,8 @@ namespace CADability
             }
             if (needsRepair)
             {
-                RecalcSurfacePoints(bounds1, bounds2);
+                DualSurfaceCurveDiagnostics.Count("IDSC.Repair: needed a repair");
+                RecalcSurfacePoints();
             }
         }
         private void CheckPeriodic()
@@ -1134,94 +450,63 @@ namespace CADability
                 AdjustPeriodic(ref basePoints[i].psurface1, true, i - 1);
                 AdjustPeriodic(ref basePoints[i].psurface2, false, i - 1);
             }
-            //for (int i = 1; i < basePoints.Length; i++)
-            //{
-            //    double d = basePoints[i].psurface1 | basePoints[i - 1].psurface1;
-            //    if (surface1.IsUPeriodic)
-            //    {
-            //        GeoPoint2D uv1 = basePoints[i].psurface1;
-            //        uv1.x = uv1.x + surface1.UPeriod;
-            //        double d1 = uv1 | basePoints[i - 1].psurface1;
-            //        if (d1 < d)
-            //        {
-            //            d = d1;
-            //            basePoints[i].psurface1 = uv1;
-            //        }
-            //        uv1.x = basePoints[i].psurface1.x - surface1.UPeriod;
-            //        d1 = uv1 | basePoints[i - 1].psurface1;
-            //        if (d1 < d)
-            //        {
-            //            d = d1;
-            //            basePoints[i].psurface1 = uv1;
-            //        }
-            //    }
-            //    if (surface1.IsVPeriodic)
-            //    {
-            //        GeoPoint2D uv1 = basePoints[i].psurface1;
-            //        uv1.y = uv1.y + surface1.VPeriod;
-            //        double d1 = uv1 | basePoints[i - 1].psurface1;
-            //        if (d1 < d)
-            //        {
-            //            d = d1;
-            //            basePoints[i].psurface1 = uv1;
-            //        }
-            //        uv1.y = basePoints[i].psurface1.y - surface1.VPeriod;
-            //        d1 = uv1 | basePoints[i - 1].psurface1;
-            //        if (d1 < d)
-            //        {
-            //            d = d1;
-            //            basePoints[i].psurface1 = uv1;
-            //        }
-            //    }
-            //    d = basePoints[i].psurface2 | basePoints[i - 1].psurface2;
-            //    if (surface2.IsUPeriodic)
-            //    {
-            //        GeoPoint2D uv1 = basePoints[i].psurface2;
-            //        uv1.x = uv1.x + surface2.UPeriod;
-            //        double d1 = uv1 | basePoints[i - 1].psurface2;
-            //        if (d1 < d)
-            //        {
-            //            d = d1;
-            //            basePoints[i].psurface2 = uv1;
-            //        }
-            //        uv1.x = basePoints[i].psurface2.x - surface2.UPeriod;
-            //        d1 = uv1 | basePoints[i - 1].psurface2;
-            //        if (d1 < d)
-            //        {
-            //            d = d1;
-            //            basePoints[i].psurface2 = uv1;
-            //        }
-            //    }
-            //    if (surface2.IsVPeriodic)
-            //    {
-            //        GeoPoint2D uv1 = basePoints[i].psurface2;
-            //        uv1.y = uv1.y + surface2.VPeriod;
-            //        double d1 = uv1 | basePoints[i - 1].psurface2;
-            //        if (d1 < d)
-            //        {
-            //            d = d1;
-            //            basePoints[i].psurface2 = uv1;
-            //        }
-            //        uv1.y = basePoints[i].psurface2.y - surface2.VPeriod;
-            //        d1 = uv1 | basePoints[i - 1].psurface2;
-            //        if (d1 < d)
-            //        {
-            //            d = d1;
-            //            basePoints[i].psurface2 = uv1;
-            //        }
-            //    }
-            //}
         }
-        internal void AdjustPeriodic(BoundingRect bounds1, BoundingRect bounds2)
-        {   // we need to consider the whole curve, not just individual points, because the bounds may be too narrow and some points fall outside
-            // we expect that the 2d points are in a row and have no periodic jumps
-            GeoPoint2D[] p2d = new GeoPoint2D[basePoints.Length];
-            for (int i = 0; i < basePoints.Length; i++) p2d[i] = basePoints[i].psurface1;
-            SurfaceHelper.AdjustPeriodic(surface1, bounds1, p2d);
-            for (int i = 0; i < basePoints.Length; i++) basePoints[i].psurface1 = p2d[i];
-            for (int i = 0; i < basePoints.Length; i++) p2d[i] = basePoints[i].psurface2;
-            SurfaceHelper.AdjustPeriodic(surface2, bounds2, p2d);
-            for (int i = 0; i < basePoints.Length; i++) basePoints[i].psurface2 = p2d[i];
+        /// <summary>
+        /// Puts the uv values of the base points into their periods, without bounds: every point next to its
+        /// predecessor, so that they run on continuously, and the whole row by whole periods so that it starts where
+        /// PositionOf puts its first point - in the domain of the surface. The first point which is at a pole, where
+        /// PositionOf may return another parameter for the same point, does not decide; the next one does.
+        /// <para>
+        /// This used to be done with the bounds of the curve. Measured over the whole test suite before they were
+        /// dropped, both ways gave the same uv values at every base point of every curve, except for two closed curves
+        /// on cylinders without a domain, which the bounds had put a period or two outside of themselves.
+        /// </para>
+        /// </summary>
+        internal void AnchorBasePoints()
+        {
+            AnchorBasePoints(surface1, true);
+            AnchorBasePoints(surface2, false);
+        }
+        private void AnchorBasePoints(ISurface surface, bool onSurface1, bool toDomain = true)
+        {
+            if (!surface.IsUPeriodic && !surface.IsVPeriodic) return;
+            double uPeriod = surface.IsUPeriodic ? surface.UPeriod : 0.0, vPeriod = surface.IsVPeriodic ? surface.VPeriod : 0.0;
+            for (int i = 1; i < basePoints.Length; i++)
+            {
+                if (onSurface1) SurfacePoint.FixSurfacePoint2D(ref basePoints[i].psurface1, basePoints[i - 1].psurface1, surface.IsUPeriodic, uPeriod, surface.IsVPeriodic, vPeriod);
+                else SurfacePoint.FixSurfacePoint2D(ref basePoints[i].psurface2, basePoints[i - 1].psurface2, surface.IsUPeriodic, uPeriod, surface.IsVPeriodic, vPeriod);
+            }
+            if (!toDomain) return;
+            for (int i = 0; i < basePoints.Length; i++)
+            {
+                GeoPoint2D stored = onSurface1 ? basePoints[i].psurface1 : basePoints[i].psurface2;
+                GeoPoint2D reference = surface.PositionOf(basePoints[i].p3d);
+                double du = uPeriod > 0.0 ? uPeriod * Math.Round((reference.x - stored.x) / uPeriod) : 0.0;
+                double dv = vPeriod > 0.0 ? vPeriod * Math.Round((reference.y - stored.y) / vPeriod) : 0.0;
+                if (Math.Abs(reference.x - stored.x - du) > 1e-6 * Math.Max(1.0, uPeriod)) continue; // a pole or a stored value off the point
+                if (Math.Abs(reference.y - stored.y - dv) > 1e-6 * Math.Max(1.0, vPeriod)) continue;
+                if (du == 0.0 && dv == 0.0) return;
+                GeoVector2D shift = new GeoVector2D(du, dv);
+                for (int j = 0; j < basePoints.Length; j++)
+                {
+                    if (onSurface1) basePoints[j].psurface1 += shift;
+                    else basePoints[j].psurface2 += shift;
+                }
+                return;
+            }
+        }
+        /// <summary>
+        /// Moves <paramref name="uv1"/> and <paramref name="uv2"/>, the parameters of a point at <paramref name="position"/>,
+        /// by whole periods next to the base point nearest to that position. While the curve has no approximating spline
+        /// yet, base point i is at i/(n-1).
+        /// </summary>
+        private void AnchorToNearestBasePoint(double position, ref GeoPoint2D uv1, ref GeoPoint2D uv2)
+        {
+            int nearest;
+            if (approxBSpline == null) nearest = Math.Max(0, Math.Min(basePoints.Length - 1, (int)Math.Round(position * (basePoints.Length - 1))));
+            else nearest = NearestIndex(ChordFractions(), position);
+            SurfacePoint.FixSurfacePoint2D(ref uv1, basePoints[nearest].psurface1, surface1.IsUPeriodic, surface1.UPeriod, surface1.IsVPeriodic, surface1.VPeriod);
+            SurfacePoint.FixSurfacePoint2D(ref uv2, basePoints[nearest].psurface2, surface2.IsUPeriodic, surface2.UPeriod, surface2.IsVPeriodic, surface2.VPeriod);
         }
         private void AdjustPeriodic(ref SurfacePoint toAdjust, int ind)
         {
@@ -1257,94 +542,28 @@ namespace CADability
                 }
             }
         }
+        /// <summary>
+        /// The uv value on the first or on the second surface of the point at <paramref name="position"/>, in the periods of
+        /// the uv value stored at the base point next to that position. The 2d curves on the two surfaces run through these
+        /// values, see <see cref="CADability.ProjectedCurve.IsCurveOfIntersection"/>.
+        /// </summary>
+        internal GeoPoint2D UvInStoredPeriods(bool onSurface1, double position)
+        {
+            ISurface surface = onSurface1 ? surface1 : surface2;
+            GeoPoint2D uv = surface.PositionOf(PointAt(position));
+            SurfacePoint nearest = basePoints[NearestIndex(ChordFractions(), position)];
+            SurfacePoint.FixSurfacePoint2D(ref uv, onSurface1 ? nearest.psurface1 : nearest.psurface2, surface.IsUPeriodic, surface.UPeriod, surface.IsVPeriodic, surface.VPeriod);
+            return uv;
+        }
+        /// <summary>The uv value on the first or on the second surface stored at the start or at the end of this curve.</summary>
+        internal GeoPoint2D StoredUvAtEnd(bool onSurface1, bool atEnd)
+        {
+            SurfacePoint sp = basePoints[atEnd ? basePoints.Length - 1 : 0];
+            return onSurface1 ? sp.psurface1 : sp.psurface2;
+        }
         internal DualSurfaceCurve ToDualSurfaceCurve()
         {
-            return new DualSurfaceCurve(this, surface1, new ProjectedCurve(this, true), surface2, new ProjectedCurve(this, false));
-        }
-        private SurfacePoint GetPoint(GeoPoint fromHere)
-        {   // liefert einen Punkt möglichst nahe bei fromHere
-            GeoPoint2D uv1 = surface1.PositionOf(fromHere);
-            GeoPoint2D uv2 = surface2.PositionOf(fromHere);
-            GeoPoint p1 = surface1.PointAt(uv1);
-            GeoPoint p2 = surface2.PointAt(uv2);
-            while ((p1 | p2) > Precision.eps) // zu unsichere Bedingung, vor allem wenns tangential wird...
-            {
-                GeoVector normal = surface1.GetNormal(uv1) ^ surface2.GetNormal(uv2);
-                GeoPoint location = new GeoPoint(surface1.PointAt(uv1), surface1.PointAt(uv2));
-                Plane pln = new Plane(location, normal); // in dieser Ebene suchen wir jetzt den Schnittpunkt
-                // nach dem Tangentenverfahren, da wir ja schon ganz nah sind, oder?
-                // p1,du1,dv1 und p2,du2,dv2 sind die beiden Tangentialebenen, p3,du3,dv3 die senkerechte Ebene
-                // daraus ergeben sich 6 Gleichungen mit 6 unbekannten
-                // p1+u1*du1+v1*dv1 = p3+u3*du3+v3*dv3
-                // p2+u2*du2+v2*dv2 = p3+u3*du3+v3*dv3
-                // umgeformt: (u3 und v3 interessieren nicht, deshalb Vorzeichen egal
-                // u1*du1 + v1*dv1 + 0      + 0      - u3*du3 - v3*dv3 = p3-p1
-                // 0      + 0      + u2*du2 + v2*dv2 - u3*du3 - v3*dv3 = p3-p1
-                GeoVector du1 = surface1.UDirection(uv1);
-                GeoVector dv1 = surface1.VDirection(uv1);
-                GeoVector du2 = surface2.UDirection(uv2);
-                GeoVector dv2 = surface2.VDirection(uv2);
-                GeoVector du3 = pln.DirectionX;
-                GeoVector dv3 = pln.DirectionY;
-#if DEBUG
-                PlaneSurface pls1 = new PlaneSurface(new Plane(p1, du1, dv1));
-                SimpleShape ss1 = new SimpleShape(new BoundingRect(-1, -1, 1, 1));
-                Face fc1 = Face.MakeFace(pls1, ss1);
-                PlaneSurface pls2 = new PlaneSurface(new Plane(p2, du2, dv2));
-                SimpleShape ss2 = new SimpleShape(new BoundingRect(-1, -1, 1, 1));
-                Face fc2 = Face.MakeFace(pls2, ss2);
-                PlaneSurface pls3 = new PlaneSurface(new Plane(location, du3, dv3));
-                SimpleShape ss3 = new SimpleShape(new BoundingRect(-1, -1, 1, 1));
-                Face fc3 = Face.MakeFace(pls3, ss3);
-                DebuggerContainer dc = new DebuggerContainer();
-                dc.Add(fc1);
-                dc.Add(fc2);
-                dc.Add(fc3);
-#endif
-                Matrix m = DenseMatrix.OfArray(new double[,]
-                {
-                    {du1.x,dv1.x,0,0,du3.x,dv3.x},
-                    {du1.y,dv1.y,0,0,du3.y,dv3.y},
-                    {du1.z,dv1.z,0,0,du3.z,dv3.z},
-                    {0,0,du2.x,dv2.x,du3.x,dv3.x},
-                    {0,0,du2.y,dv2.y,du3.y,dv3.y},
-                    {0,0,du2.z,dv2.z,du3.z,dv3.z},
-                });
-                Matrix s = (Matrix)m.Solve(DenseMatrix.OfArray(new double[,] { { location.x - p1.x }, { location.y - p1.y }, { location.z - p1.z } ,
-                { location.x - p2.x }, { location.y - p2.y }, { location.z - p2.z } }));
-                uv1.x += s[0, 0];
-                uv1.y += s[1, 0];
-                uv2.x += s[2, 0];
-                uv2.y += s[3, 0];
-                p1 = surface1.PointAt(uv1);
-                p2 = surface2.PointAt(uv2);
-            }
-            return new SurfacePoint(new GeoPoint(p1, p2), uv1, uv2);
-        }
-        private SurfacePoint[] Interpolate(SurfacePoint sp1, SurfacePoint sp2)
-        {
-            double du1 = sp1.psurface1.x - sp2.psurface1.x;
-            double dv1 = sp1.psurface1.y - sp2.psurface1.y;
-            double du2 = sp1.psurface2.x - sp2.psurface2.x;
-            double dv2 = sp1.psurface2.y - sp2.psurface2.y;
-            // wir suchen die Fläche, in dessen u/v system die Linie am nächsten zu einer Achse ist
-            double f1, f2;
-            if (Math.Abs(du1) > Math.Abs(dv1)) f1 = Math.Abs(dv1) / Math.Abs(du1);
-            else f1 = Math.Abs(du1) / Math.Abs(dv1);
-            if (Math.Abs(du2) > Math.Abs(dv2)) f2 = Math.Abs(dv2) / Math.Abs(du2);
-            else f2 = Math.Abs(du2) / Math.Abs(dv2);
-            ISurface withCurve, opposite;
-            if (f1 < f2)
-            {   // erste Fläche ist besser
-                withCurve = surface1;
-                opposite = surface2;
-            }
-            else
-            {
-                withCurve = surface2;
-                opposite = surface1;
-            }
-            return null;
+            return new DualSurfaceCurve(this, surface1, new CADability.ProjectedCurve(this, true), surface2, new CADability.ProjectedCurve(this, false));
         }
         public ISurface Surface1
         {
@@ -1371,22 +590,22 @@ namespace CADability
         public ICurve2D CurveOnSurface1
         {
             get
-            {   // evtl Cache?
-                return new ProjectedCurve(this, true);
+            {
+                return new CADability.ProjectedCurve(this, true);
             }
         }
         public ICurve2D CurveOnSurface2
         {
             get
             {
-                return new ProjectedCurve(this, false);
+                return new CADability.ProjectedCurve(this, false);
             }
         }
         protected override void InvalidateSecondaryData()
         {
             base.InvalidateSecondaryData();
             hashedPositions.Clear();
-            approxPolynom = null;
+            approxBSpline = null;
         }
         internal void ReplaceSurface(ISurface oldSurface, ISurface newSurface)
         {   // die beiden surfaces müssen geometrisch identisch sein
@@ -1395,6 +614,7 @@ namespace CADability
         }
         internal void ReplaceSurface(ISurface oldSurface, ISurface newSurface, ModOp2D oldToNew)
         {   // die beiden surfaces müssen geometrisch identisch sein
+            DualSurfaceCurveDiagnostics.Count("IDSC.ReplaceSurface with ModOp2D");
             if (surface1 == oldSurface)
             {
                 surface1 = newSurface;
@@ -1420,25 +640,23 @@ namespace CADability
 
             }
         }
-        internal InterpolatedDualSurfaceCurve CloneTrimmed(double startPos, double endPos, ProjectedCurve c1, ProjectedCurve c2, out ICurve2D c1trimmed, out ICurve2D c2trimmed)
+        /// <summary>
+        /// A trimmed copy of this curve, for an edge split into parts, together with the curves on the two surfaces along
+        /// it, which stay in the periods and in the directions of <paramref name="c1"/> and <paramref name="c2"/>.
+        /// </summary>
+        internal InterpolatedDualSurfaceCurve CloneTrimmed(double startPos, double endPos, CADability.ProjectedCurve c1, CADability.ProjectedCurve c2, out ICurve2D c1trimmed, out ICurve2D c2trimmed)
         {
-            InterpolatedDualSurfaceCurve res = new InterpolatedDualSurfaceCurve(surface1, surface2, basePoints.Clone() as SurfacePoint[], forwardOriented);
+            // this used to pass forwardOriented, which bound to the parameter isTangential
+            InterpolatedDualSurfaceCurve res = new InterpolatedDualSurfaceCurve(surface1, surface2, basePoints.Clone() as SurfacePoint[], isTangential);
             res.Trim(startPos, endPos);
-            c1trimmed = new ProjectedCurve(res, c1);
-            c2trimmed = new ProjectedCurve(res, c2);
+            c1trimmed = c1.OnTrimmedCurve(res);
+            c2trimmed = c2.OnTrimmedCurve(res);
             return res;
         }
         public BSpline ToBSpline(double precision)
-        {
-            List<GeoPoint> throughPoints = new List<GeoPoint>();
-            for (int i = 0; i < basePoints.Length; i++)
-            {
-                throughPoints.Add(basePoints[i].p3d);
-            }
-            BSpline res = BSpline.Construct();
-            res.ThroughPoints(throughPoints.ToArray(), 3, false);
-            // hier noch Genauikeit überprüfen und throughpoints vermehren
-            return res;
+        {   // better than through the base points. A copy: the spline is shared with the clones of this curve, and the
+            // caller may modify what it gets - Edge.UpdateInterpolatedDualSurfaceCurve for instance makes it the curve of an edge.
+            return ApproxBSpline.Clone() as BSpline;
         }
         internal GeoPoint[] BasePoints
         {
@@ -1599,6 +817,16 @@ namespace CADability
                 return res;
             }
         }
+        public DebuggerContainer DebugFaces
+        {
+            get
+            {
+                DebuggerContainer res = new DebuggerContainer();
+                res.Add(Face.MakeFace(surface1, Domain1), System.Drawing.Color.MediumVioletRed);
+                res.Add(Face.MakeFace(surface2, Domain2), System.Drawing.Color.SeaShell);
+                return res;
+            }
+        }
 #endif
         #region IGeoObject override
         /// <summary>
@@ -1606,13 +834,8 @@ namespace CADability
         /// </summary>
         /// <returns></returns>
         public override BoundingBox GetBoundingCube()
-        {
-            BoundingBox res = new BoundingBox();
-            for (int i = 0; i < basePoints.Length; ++i)
-            {
-                res.MinMax(basePoints[i].p3d);
-            }
-            return res;
+        {   // not the base points: the curve bulges out between them. PointAt is the approximating spline, so its extent is exact
+            return ApproxBSpline.GetBoundingCube();
         }
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Modify (ModOp)"/>
@@ -1630,7 +853,6 @@ namespace CADability
                 basePoints[i].p3d = m * basePoints[i].p3d;
             }
             InvalidateSecondaryData();
-            if (approxPolynom != null) approxPolynom = approxPolynom.GetModified(m);
         }
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (double)"/>
@@ -1639,12 +861,7 @@ namespace CADability
         /// <returns></returns>
         public override BoundingBox GetExtent(double precision)
         {
-            BoundingBox res = BoundingBox.EmptyBoundingCube;
-            for (int i = 0; i < basePoints.Length; ++i)
-            {
-                res.MinMax(basePoints[i].p3d);
-            }
-            return res;
+            return ApproxBSpline.GetBoundingCube();
         }
         public BoundingRect GetBoundingRect(bool onSurface1)
         {
@@ -1665,38 +882,6 @@ namespace CADability
             }
             return res;
         }
-        //public override bool HitTest(ref BoundingBox cube, double precision)
-        //{   // soll in GeneralCurve mit TetraederHülle gemacht werden, vorläufig:
-        //    for (int i = 0; i < basePoints.Length - 1; ++i)
-        //    {
-        //        GeoPoint sp = basePoints[i].p3d;
-        //        GeoPoint ep = basePoints[i + 1].p3d;
-        //        if (cube.Interferes(ref sp, ref ep)) return true;
-        //    }
-        //    return false;
-        //}
-        //public override bool HitTest(Projection projection, BoundingRect rect, bool onlyInside)
-        //{   // sollte in GeneralCurve gelöst werden, hier erstmal:
-        //    if (onlyInside)
-        //    {
-        //        BoundingRect ext = BoundingRect.EmptyBoundingRect;
-        //        for (int i = 0; i < basePoints.Length; ++i)
-        //        {
-        //            ext.MinMax(projection.ProjectUnscaled(basePoints[i].p3d));
-        //        }
-        //        return ext <= rect;
-        //    }
-        //    else
-        //    {
-        //        ClipRect clr = new ClipRect(ref rect);
-        //        for (int i = 0; i < basePoints.Length - 1; ++i)
-        //        {
-        //            if (clr.LineHitTest(projection.ProjectUnscaled(basePoints[i].p3d), projection.ProjectUnscaled(basePoints[i + 1].p3d)))
-        //                return true;
-        //        }
-        //        return false;
-        //    }
-        //}
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Position (GeoPoint, GeoVector, double)"/>
         /// </summary>
@@ -1731,7 +916,6 @@ namespace CADability
         {
             InterpolatedDualSurfaceCurve other = ToCopyFrom as InterpolatedDualSurfaceCurve;
             basePoints = other.basePoints.Clone() as SurfacePoint[];
-            forwardOriented = other.forwardOriented;
             surface1 = other.surface1;
             surface2 = other.surface2;
             InvalidateSecondaryData();
@@ -1795,447 +979,230 @@ namespace CADability
                 InvalidateSecondaryData();
             }
         }
-        private int SegmentOfParameter(double par)
+        /// <summary>
+        /// Refines the collection of base points by adjusting their distribution to ensure a more uniform spacing.
+        /// </summary>
+        /// <remarks>This method iteratively evaluates the distances between consecutive base points and
+        /// adjusts the collection  by either adding or removing points based on their relative spacing. Points that are
+        /// too far apart will  have new points inserted between them, while points that are too close together will
+        /// have one of them removed.  The process continues until no further adjustments are needed.  This operation
+        /// invalidates any cached approximations or secondary data that depend on the base points.</remarks>
+        private void RefineBasePoints()
         {
-            int ind = (int)Math.Floor(par * (basePoints.Length - 1));
-            if (ind >= basePoints.Length - 1) ind = basePoints.Length - 2; // es muss immer ind und ind+1 gültig sein
-            if (ind < 0) ind = 0;
-            return ind;
+            bool changed = true;
+            while (changed)
+            {
+                changed = false;
+                double length = 0.0;
+                for (int i = 0; i < basePoints.Length - 1; i++)
+                {
+                    length += basePoints[i + 1].p3d | basePoints[i].p3d;
+                }
+                length /= (basePoints.Length - 1);
+                for (int i = 0; i < basePoints.Length - 1; i++)
+                {
+                    double d = basePoints[i + 1].p3d | basePoints[i].p3d;
+                    if (d > 1.5 * length || basePoints.Length == 2)
+                    {
+                        changed = true;
+                        approxBSpline = null;
+                        hashedPositions.Clear();
+                        ApproximatePosition((i + 0.5) / (basePoints.Length - 1), out GeoPoint2D uv1, out GeoPoint2D uv2, out GeoPoint p);
+                        List<SurfacePoint> bpl = new List<SurfacePoint>(basePoints);
+                        bpl.Insert(i + 1, new SurfacePoint(p, uv1, uv2));
+                        basePoints = bpl.ToArray();
+                        break; // nur einen Punkt pro Schleifendurchlauf einfügen
+                    }
+                    if (d < 0.5 * length && basePoints.Length > 2)
+                    {
+                        changed = true;
+                        approxBSpline = null;
+                        hashedPositions.Clear();
+                        List<SurfacePoint> bpl = new List<SurfacePoint>(basePoints);
+                        bpl.RemoveAt(i + 1);
+                        basePoints = bpl.ToArray();
+                        break; // nur einen Punkt pro Schleifendurchlauf entfernen
+                    }
+                }
+            }
+            InvalidateSecondaryData();
+        }
+
+        private BSpline ApproxBSpline
+        {
+            get
+            {
+                if (approxBSpline != null) return approxBSpline;
+                BSpline bsp = BSpline.Construct();
+                bsp.ThroughPoints(BasePoints, 3, false);
+                // BasePoints are unevenly distributed. The parameter of bsp is running much more evenly
+                // since the knots are calculated according to the chord length
+                // setting approxBSpline changes the "speed" of the parameter, makes it more even
+                approxBSpline = bsp;
+                hashedPositions.Clear(); // don't use hased positions, they are no more correct
+                Func<double, GeoPoint> curve = (pos) => // input parameter for BSpline.Approximate
+                {
+                    ApproximatePosition(pos, out GeoPoint2D uv1, out GeoPoint2D uv2, out GeoPoint p);
+                    return p;
+                };
+                approxBSpline = BSpline.Approximate(curve);
+                hashedPositions.Clear(); // don't use hashed positions, they are no more correct
+                return approxBSpline;
+            }
+        }
+
+        /// <summary>
+        /// The minimizer also reports success when it stalls somewhere without having found a common point of the two
+        /// surfaces and the plane. And near a node of the intersection it may converge to the other branch, whose tangent
+        /// crosses the plane at a large angle. <paramref name="planeFromSpline"/>: the plane is perpendicular to the
+        /// approximating spline, so its normal is a good estimate of the tangent. A plane perpendicular to a chord
+        /// between two base points is not, so the tangent is not checked then.
+        /// </summary>
+        private bool IsPlausibleIntersection(GeoPoint2D uv1, GeoPoint2D uv2, Plane plane, bool planeFromSpline)
+        {
+            GeoPoint p1 = surface1.PointAt(uv1), p2 = surface2.PointAt(uv2);
+            double tolerance = 100 * Precision.eps;
+            if ((p1 | p2) > tolerance) return false;
+            if (Math.Abs(plane.Distance(p1)) > tolerance) return false;
+            if (!planeFromSpline) return true;
+            GeoVector n1 = surface1.GetNormal(uv1), n2 = surface2.GetNormal(uv2);
+            if (n1.IsNullVector() || n2.IsNullVector()) return true;
+            GeoVector tangent = n1.Normalized ^ n2.Normalized;
+            if (tangent.Length < 1e-2) return true; // the surfaces (almost) touch here, n1 x n2 is no usable tangent
+            return Math.Abs(tangent.Normalized * plane.Normal.Normalized) >= Math.Cos(30.0 / 180.0 * Math.PI);
         }
         private void ApproximatePosition(double position, out GeoPoint2D uv1, out GeoPoint2D uv2, out GeoPoint p)
-        {
-            ApproximatePosition(position, out uv1, out uv2, out p, false);
-        }
-        private void ApproximatePosition(double position, out GeoPoint2D uv1, out GeoPoint2D uv2, out GeoPoint p, bool refineBasePoints)
         {
             lock (hashedPositions)
             {
                 // Zuerst nachsehen, ob der Punkt schon bekannt ist
-                SurfacePoint found;
-                // IGeoObject dbg = this.DebugBasePoints;
-                if (hashedPositions.TryGetValue(position, out found))
+                (bool hasLower, double lowerKey, SurfacePoint lowerValue, bool hasUpper, double upperKey, SurfacePoint upperValue, bool exact, int exactIndex) = hashedPositions.Neighbors(position);
+                if (exact)
                 {
+                    SurfacePoint found = hashedPositions.Values[exactIndex];
                     p = found.p3d;
                     uv1 = found.psurface1;
                     uv2 = found.psurface2;
+                    DualSurfaceCurveDiagnostics.RecordCacheHit();
                     return;
                 }
-                int ind = (int)Math.Floor(position * (basePoints.Length - 1));
-                // die mit basepoint übereinstimmenden Punkte nicht ins dictionary nehmen
-                if (ind > basePoints.Length - 1)
-                {
-                    uv1 = basePoints[basePoints.Length - 1].psurface1;
-                    uv2 = basePoints[basePoints.Length - 1].psurface2;
-                    p = basePoints[basePoints.Length - 1].p3d;
-                    return;
-                }
-                if (ind < 0)
-                {
-                    uv1 = basePoints[0].psurface1;
-                    uv2 = basePoints[0].psurface2;
-                    p = basePoints[0].p3d;
-                    return;
-                }
-                if (position * (basePoints.Length - 1) - ind == 0.0 && !refineBasePoints)
-                {   // Index genau getroffen
-                    uv1 = basePoints[ind].psurface1;
-                    uv2 = basePoints[ind].psurface2;
-                    p = basePoints[ind].p3d;
-                    return;
-                }
-                // Eine Ebene senkrecht zur Verbindung der beiden Basispunkte. Auf dieser und den beiden Flächen
-                // muss der Schnittpunkt liegen.
-                double d = position * (basePoints.Length - 1) - ind;
-                GeoPoint location;
-                if (d > 0.0 && ind < basePoints.Length - 1) location = basePoints[ind].p3d + d * (basePoints[ind + 1].p3d - basePoints[ind].p3d);
-                else location = basePoints[ind].p3d;
-                if (ind == basePoints.Length - 1)
-                {
-                    --ind; // wenns genau um den letzten Punkt geht, dann das vorletzte Intervall nehmen
-                    d = 1.0;
-                }
+                Plane normalPlane; // Plane normal tu the BSpline or segment-polyline at position
+                if (approxBSpline == null)
+                {   // in the constructor we need to calculate a few basepoints before we can build the BSpline
 
-                GeoVector normal = basePoints[ind + 1].p3d - basePoints[ind].p3d;
-                Plane pln = new Plane(location, normal);
-                // diese Ebene bleibt fix, es wird jetzt auf den beiden surfaces tangential fortgeschritten, bis
-                // ein Schnittpunkt gefunden ist
-                // Hier Sonderfälle abhandeln, nämlich eine der beiden Flächen ist eine Ebene, dann nur Schnitte mit Linie berechnen
-                // oder vielleicht auch, wenn es eine einfache Schnittkurve gibt
-                PlaneSurface pls = null;
-                ISurface other = null;
-                if (surface1 is PlaneSurface)
-                {
-                    pls = surface1 as PlaneSurface;
-                    other = surface2;
+                    int ind = (int)Math.Floor(position * (basePoints.Length - 1));
+                    if (ind < 0) ind = 0;
+                    if (ind > basePoints.Length - 1) ind = basePoints.Length - 1;
+                    double d = position * (basePoints.Length - 1) - ind;
+                    GeoPoint location;
+                    if (d > 0.0 && ind < basePoints.Length - 1) location = basePoints[ind].p3d + d * (basePoints[ind + 1].p3d - basePoints[ind].p3d);
+                    else location = basePoints[ind].p3d;
+                    if (ind == basePoints.Length - 1) --ind;
+                    GeoVector normal = basePoints[ind + 1].p3d - basePoints[ind].p3d;
+                    normalPlane = new Plane(location, normal);
                 }
-                else if (surface2 is PlaneSurface)
+                else
                 {
-                    pls = surface2 as PlaneSurface;
-                    other = surface1;
+                    GeoVector normal = (approxBSpline as ICurve).DirectionAt(position);
+                    normalPlane = new Plane((approxBSpline as ICurve).PointAt(position), normal);
                 }
-                //if (pls != null) // noch untersuchen, warum das am Ende manchmal fehlschlägt
-                //Unreachable code
-                /*if (false)
+                if (isTangential)
                 {
-                    GeoPoint loc;
-                    GeoVector dir;
-                    if (pln.Intersect(pls.Plane, out loc, out dir))
+                    GeoPoint2D uv1s, uv2s;
+                    if (hasLower && hasUpper)
                     {
-                        GeoPoint2D[] ips = other.GetLineIntersection(loc, dir);
-                        if (ips.Length > 0)
+                        double d1 = (position - lowerKey) / (upperKey - lowerKey);
+                        double d2 = (upperKey - position) / (upperKey - lowerKey);
+                        uv1s = new GeoPoint2D((1.0 - d1) * lowerValue.psurface1.x + d1 * upperValue.psurface1.x, (1.0 - d1) * lowerValue.psurface1.y + d1 * upperValue.psurface1.y);
+                        uv2s = new GeoPoint2D((1.0 - d1) * lowerValue.psurface2.x + d1 * upperValue.psurface2.x, (1.0 - d1) * lowerValue.psurface2.y + d1 * upperValue.psurface2.y);
+                    }
+                    else if (hasLower)
+                    {
+                        uv1s = lowerValue.psurface1;
+                        uv2s = lowerValue.psurface2;
+                    }
+                    else if (hasUpper)
+                    {
+                        uv1s = upperValue.psurface1;
+                        uv2s = upperValue.psurface2;
+                    }
+                    else
+                    {
+                        uv1s = surface1.PositionOf(normalPlane.Location);
+                        uv2s = surface2.PositionOf(normalPlane.Location);
+                    }
+
+                    if (BoxedSurfaceExtension.FindTangentialIntersectionPoint(normalPlane.Location, normalPlane.Normal, surface1, surface2, out uv1, out uv2, uv1s, uv2s))
+                    {
+                        // if (BoxedSurfaceExtension.FindTangentialIntersectionPointJ(normalPlane.Location, normalPlane.Normal, surface1, surface2, out uv1, out uv2))
+                        // FindTangentialIntersectionPointJ is maybe faster, but we will have to check its reliability
+                        p = new GeoPoint(surface1.PointAt(uv1), surface2.PointAt(uv2));
+                        SurfacePoint spt = new SurfacePoint(p, uv1, uv2);
+                        if (hasLower && hasUpper)
                         {
-                            GeoPoint pfound = other.PointAt(ips[0]);
-                            if (ips.Length > 1)
-                            {
-                                for (int i = 1; i < ips.Length; ++i)
-                                {   // bestes Ergebnis suchen
-                                    // Das Problem: bei einem großen aber dünnen Torus (oder torusähnlichen NURBS)
-                                    // liegen zwei Schnittpunkte eng beieinander. Mit einfachem Abstand von der 3d Linie
-                                    // wird hier u.U. der falsche gefunden. In diesem Fall ist es besser nach dem UV-System
-                                    // der anderen Fläche zu sortieren.
-                                    // Aber wie weiß man, welches Kriterium das richtige ist?
-                                    // Der Normalenvektor auf der anderen Fläche sollte so ähnlich sein wie bei den
-                                    // Nachbar-Basispunkten
-                                    GeoPoint pi = other.PointAt(ips[i]);
-                                    if ((pi | pfound) < (basePoints[ind].p3d | basePoints[ind + 1].p3d))
-                                    {   // die beiden zu untersuchenden Punkte sind näher beieinander als die beiden
-                                        // Basispunkte. Das ist ein schlechter Fall, z.B. der dünne Torus
-                                        // wie steht es mit dem uv System
-                                        GeoPoint2D uvstart, uvend;
-                                        if (other == surface1)
-                                        {
-                                            uvstart = basePoints[ind].psurface1;
-                                            uvend = basePoints[ind + 1].psurface1;
-                                        }
-                                        else
-                                        {
-                                            uvstart = basePoints[ind].psurface2;
-                                            uvend = basePoints[ind + 1].psurface2;
-                                        }
-                                        if ((ips[i] | ips[0]) < (uvstart | uvend))
-                                        {   // auch im uv System liegen die beiden Punkte zu eng beieinander
-                                            GeoVector middlenormal = other.GetNormal(uvstart) + other.GetNormal(uvend);
-                                            if (other.GetNormal(ips[i]) * middlenormal > other.GetNormal(ips[0]) * middlenormal)
-                                            {   // noch nicht getestet, verschiedene Richtung sollte <0 liefern, oder?
-                                                pfound = pi;
-                                                ips[0] = ips[i];
-                                            }
-                                        }
-                                        else
-                                        {   // im uv-System ist es eindeutig
-                                            if (Math.Abs(Geometry.DistPL(ips[i], uvstart, uvend)) < Math.Abs(Geometry.DistPL(ips[0], uvstart, uvend)))
-                                            {
-                                                // müsste man hier auch nocht testen ob die Punkte zwischen uvstart und uvend liegen?
-                                                pfound = pi;
-                                                ips[0] = ips[i];
-                                            }
-                                        }
-                                    }
-                                    else
-                                    {
-                                        if (Geometry.DistPL(pi, basePoints[ind].p3d, basePoints[ind + 1].p3d) < Geometry.DistPL(pfound, basePoints[ind].p3d, basePoints[ind + 1].p3d))
-                                        {
-                                            pfound = pi;
-                                            ips[0] = ips[i];
-                                        }
-                                    }
-                                }
-                            }
-                            if (other == surface1)
-                            {
-                                uv1 = ips[0];
-                                uv2 = pls.PositionOf(pfound);
-                                p = pfound;
-                            }
-                            else
-                            {
-                                uv2 = ips[0];
-                                uv1 = pls.PositionOf(pfound);
-                                p = pfound;
-                            }
-#if DEBUG
-                            {
-                                double dbgdist = basePoints[ind + 1].p3d | basePoints[ind].p3d;
-                                if ((p | basePoints[ind + 1].p3d) > dbgdist || (p | basePoints[ind].p3d) > dbgdist)
-                                {   // ein Punkte ist aus dem Ruder gelaufen: der Abstand des neuen Punktes zu einem seiner beiden 
-                                    // basePoint Nachbarn sollte nie größer sein als der Abstand der beiden basePoints
-                                }
-                            }
-                            if (hashedPositions.Count > 10000)
-                            {
-
-                            }
-#endif
-                            double ddist = basePoints[ind + 1].p3d | basePoints[ind].p3d;
-                            if ((p | basePoints[ind + 1].p3d) > ddist || (p | basePoints[ind].p3d) > ddist)
-                            {   // ein Punkte ist aus dem Ruder gelaufen: der Abstand des neuen Punktes zu einem seiner beiden 
-                                // basePoint Nachbarn sollte nie größer sein als der Abstand der beiden basePoints
-                            }
-                            else
-                            {
-                                SurfacePoint sp0 = new SurfacePoint(p, uv1, uv2);
-                                AdjustPeriodic(ref sp0, ind);
-                                uv1 = sp0.psurface1;
-                                uv2 = sp0.psurface2;
-                                hashedPositions[position] = sp0;
-                                return;
-                            }
+                            if (position - lowerKey < upperKey - position) spt.FixAgainstNeighbour(lowerValue, surface1, surface2);
+                            else spt.FixAgainstNeighbour(upperValue, surface1, surface2);
                         }
-                    }
-                }
-                */
-
-                if (surface1 is ISurfacePlaneIntersection && surface2 is ISurfacePlaneIntersection)
-                {   // Schnittpunkt der beiden einfachen Kurven, die die Ebene mit den surfaces schneidet
-                    // geht schneller als die Iteration
-                    if (approxPolynom == null) InitApproxPolynom();
-                    GeoPoint ppPolynom = GeoPoint.Invalid;
-                    if (approxPolynom != null)
-                    {
-                        GeoPoint pp = ppPolynom = approxPolynom.PointAt(position);
-                        pln = new Plane(pp, approxPolynom.DirectionAt(position));
-                    }
-
-                    // die folgende extentbestimmung könnte man rausnehmen
-                    BoundingRect ext1 = BoundingRect.EmptyBoundingRect;
-                    BoundingRect ext2 = BoundingRect.EmptyBoundingRect;
-                    for (int i = 0; i < basePoints.Length; i++)
-                    {
-                        ext1.MinMax(basePoints[i].psurface1);
-                        ext2.MinMax(basePoints[i].psurface2);
-                    }
-                    ICurve2D[] c2d1 = (surface1 as ISurfacePlaneIntersection).GetPlaneIntersection(pln, ext1.Left, ext1.Right, ext1.Bottom, ext1.Top);
-                    ICurve2D[] c2d2 = (surface2 as ISurfacePlaneIntersection).GetPlaneIntersection(pln, ext2.Left, ext2.Right, ext2.Bottom, ext2.Top);
-                    double md = double.MaxValue;
-                    GeoPoint pfound = GeoPoint.Origin;
-                    for (int i = 0; i < c2d1.Length; i++)
-                    {
-                        for (int j = 0; j < c2d2.Length; j++)
-                        {
-                            //TempTriangulatedCurve2D tt1 = new TempTriangulatedCurve2D(c2d1[i]);
-                            //TempTriangulatedCurve2D tt2 = new TempTriangulatedCurve2D(c2d2[j]);
-                            //GeoPoint2DWithParameter[] ips = tt1.Intersect(tt2);
-                            GeoPoint2DWithParameter[] ips = c2d1[i].Intersect(c2d2[j]);
-#if DEBUG
-                            DebuggerContainer dc = new DebuggerContainer();
-                            dc.Add(c2d1[i], System.Drawing.Color.Red, i);
-                            dc.Add(c2d2[j], System.Drawing.Color.Blue, j);
-#endif
-                            for (int k = 0; k < ips.Length; k++)
-                            {
-#if DEBUG
-                                dc.Add(ips[k].p, System.Drawing.Color.Black, k);
-#endif
-                                GeoPoint pp = pln.ToGlobal(ips[k].p);
-                                double dd = Geometry.DistPL(pp, basePoints[ind].p3d, basePoints[ind + 1].p3d);
-                                if (dd < md)
-                                {
-                                    md = dd;
-                                    pfound = pp;
-                                }
-                            }
-                        }
-                    }
-                    if (md < double.MaxValue && !ppPolynom.IsValid || (ppPolynom | pfound) < (basePoints[ind].p3d | basePoints[ind + 1].p3d))
-                    {
-                        uv1 = surface1.PositionOf(pfound);
-                        uv2 = surface2.PositionOf(pfound);
-                        SurfacePoint sp0 = new SurfacePoint(pfound, uv1, uv2);
-                        AdjustPeriodic(ref sp0, ind);
-                        uv1 = sp0.psurface1;
-                        uv2 = sp0.psurface2;
-                        hashedPositions[position] = sp0;
-                        p = pfound;
+                        else if (hasLower) spt.FixAgainstNeighbour(lowerValue, surface1, surface2);
+                        else if (hasUpper) spt.FixAgainstNeighbour(upperValue, surface1, surface2);
+                        else AnchorToNearestBasePoint(position, ref spt.psurface1, ref spt.psurface2);
+                        hashedPositions[position] = spt;
+                        uv1 = spt.psurface1;
+                        uv2 = spt.psurface2;
+                        if (DualSurfaceCurveDiagnostics.Enabled) DualSurfaceCurveDiagnostics.RecordRefinement("tangential solver", false,
+                            approxBSpline != null, isTangential, surface1, uv1, surface2, uv2, normalPlane, p);
                         return;
-
                     }
                 }
-                uv1 = basePoints[ind].psurface1 + d * (basePoints[ind + 1].psurface1 - basePoints[ind].psurface1);
-                uv2 = basePoints[ind].psurface2 + d * (basePoints[ind + 1].psurface2 - basePoints[ind].psurface2);
-                if (approxPolynom == null) InitApproxPolynom();
-                if (approxPolynom != null && basePoints.Length > 2)
+                else
                 {
-                    GeoPoint pp = approxPolynom.PointAt(position);
-                    uv1 = surface1.PositionOf(pp);
-                    AdjustPeriodic(ref uv1, true, ind);
-                    uv2 = surface2.PositionOf(pp);
-                    AdjustPeriodic(ref uv2, false, ind);
-                    pln = new Plane(pp, approxPolynom.DirectionAt(position));
-                }
-                // pln was calculated as a plane perpendicular to the chord between basePoints[ind] and basePoints[ind + 1] at the offset provided by the parameter
-                // there was an attempt to use a better plane by using the approximation polygon defined by the two basepoints and the directions at these points,
-                // there were some problems with this approach, now it seems to work
-                GeoPoint p1, p2;
-                GeoVector du1, dv1, du2, dv2, n1, n2;
-                //surface1.DerivationAt(uv1, out p1, out du1, out dv1);
-                //surface2.DerivationAt(uv2, out p2, out du2, out dv2);
-                n1 = surface1.GetNormal(uv1); // there is a problem with singularities (cone, sphere), but it seems GetNormal is working
-                n2 = surface2.GetNormal(uv2);
-                n1 = n1.Normalized;
-                n2 = n2.Normalized;
-                double sn1n2 = Math.Abs(Math.Sin((new SweepAngle(n1, n2)).Radian)); // bei gleicher Richtung, also tangential kleiner wert, bei senkrecht 1
-                p1 = surface1.PointAt(uv1);
-                p2 = surface2.PointAt(uv2);
-                double mindist = double.MaxValue;
-                d = (p1 | p2);
-                bool didntConvert = false;
-                int conversionCounter = 0;
-                // Ein großes Problem machen die tangentialen Flächen: dort werden nach dem folgenden Verfahren
-                // keine guten Schnittpunkte gefunden. Im tangentialen Fall müsste man mit PositionOf und PointAt
-                // und den jeweiligen Mittelpunkten arbeiten. Das konvergiert zwar langsamer, aber es sollte wenigsten konvergieren...
-                double prec = sn1n2 * Precision.eps;
-                while (d > prec && d < mindist) // zu unsichere Bedingung, vor allem wenns tangential wird...
-                {   // bricht auch ab, wenns nicht mehr konvergiert
-                    // dann könnte man anderes Verfahren nehmen: die Kurven auf der Ebene pln bstimmen und
-                    // die beiden Kurven schneiden
-                    mindist = d;
-                    // nach dem Tangentenverfahren, da wir ja schon ganz nah sind, oder?
-                    // p1,du1,dv1 und p2,du2,dv2 sind die beiden Tangentialebenen, p3,du3,dv3 die senkerechte Ebene
-                    // daraus ergeben sich 6 Gleichungen mit 6 unbekannten
-                    // p1+u1*du1+v1*dv1 = p3+u3*du3+v3*dv3
-                    // p2+u2*du2+v2*dv2 = p3+u3*du3+v3*dv3
-                    // umgeformt: (u3 und v3 interessieren nicht, deshalb Vorzeichen egal
-                    // u1*du1 + v1*dv1 + 0      + 0      - u3*du3 - v3*dv3 = p3-p1
-                    // 0      + 0      + u2*du2 + v2*dv2 - u3*du3 - v3*dv3 = p3-p1
-                    du1 = surface1.UDirection(uv1);
-                    dv1 = surface1.VDirection(uv1);
-                    du2 = surface2.UDirection(uv2);
-                    dv2 = surface2.VDirection(uv2);
-                    GeoVector du3 = pln.DirectionX;
-                    GeoVector dv3 = pln.DirectionY;
-#if DEBUG
-                    bool doit = false;
-                    if (doit)
+                    PlaneSurface ps = new PlaneSurface(normalPlane);
+                    p = normalPlane.Location;
+                    GeoPoint2D uvplane = GeoPoint2D.Origin;
+                    uv1 = surface1.PositionOf(normalPlane.Location);
+                    uv2 = surface2.PositionOf(normalPlane.Location);
+                    AnchorToNearestBasePoint(position, ref uv1, ref uv2);
+                    if (BoxedSurfaceExtension.SurfacesIntersectionLM(ps, surface1, surface2, ref uvplane, ref uv1, ref uv2, ref p)
+                        && IsPlausibleIntersection(uv1, uv2, normalPlane, approxBSpline != null))
                     {
-                        PlaneSurface pls1 = new PlaneSurface(new Plane(p1, du1, dv1));
-                        SimpleShape ss1 = new SimpleShape(new BoundingRect(-1, -1, 1, 1));
-                        Face fc1 = Face.MakeFace(pls1, ss1);
-                        PlaneSurface pls2 = new PlaneSurface(new Plane(p2, du2, dv2));
-                        SimpleShape ss2 = new SimpleShape(new BoundingRect(-1, -1, 1, 1));
-                        Face fc2 = Face.MakeFace(pls2, ss2);
-                        PlaneSurface pls3 = new PlaneSurface(new Plane(location, du3, dv3));
-                        SimpleShape ss3 = new SimpleShape(new BoundingRect(-1, -1, 1, 1));
-                        Face fc3 = Face.MakeFace(pls3, ss3);
-                        DebuggerContainer dc = new DebuggerContainer();
-                        fc1.ColorDef = new CADability.Attribute.ColorDef("clr1", System.Drawing.Color.Red);
-                        fc2.ColorDef = new CADability.Attribute.ColorDef("clr2", System.Drawing.Color.Green);
-                        fc3.ColorDef = new CADability.Attribute.ColorDef("clr3", System.Drawing.Color.Violet);
-                        dc.Add(fc1);
-                        dc.Add(fc2);
-                        dc.Add(fc3);
-                        Line dbgl = Line.Construct();
-                        dbgl.SetTwoPoints(p1, p2);
-                        dc.Add(dbgl);
-                        dbgl = Line.Construct();
-                        dbgl.SetTwoPoints(basePoints[ind].p3d, basePoints[ind + 1].p3d);
-                        dc.Add(dbgl);
-                    }
-#endif
-                    Matrix m = DenseMatrix.OfArray(new double[,]
-                    {
-                        {du1.x,dv1.x,0,0,du3.x,dv3.x},
-                        {du1.y,dv1.y,0,0,du3.y,dv3.y},
-                        {du1.z,dv1.z,0,0,du3.z,dv3.z},
-                        {0,0,du2.x,dv2.x,du3.x,dv3.x},
-                        {0,0,du2.y,dv2.y,du3.y,dv3.y},
-                        {0,0,du2.z,dv2.z,du3.z,dv3.z},
-                    });
-                    Matrix s = (Matrix)m.Solve(DenseMatrix.OfArray(new double[,] { { location.x - p1.x }, { location.y - p1.y }, { location.z - p1.z } ,
-                        { location.x - p2.x }, { location.y - p2.y }, { location.z - p2.z } }));
-                    if (s.IsValid())
-                    {
-                        GeoPoint2D uv1alt = uv1;
-                        GeoPoint2D uv2alt = uv2;
-                        GeoPoint p1alt = p1;
-                        GeoPoint p2alt = p2;
-                        uv1.x += s[0, 0];
-                        uv1.y += s[1, 0];
-                        uv2.x += s[2, 0];
-                        uv2.y += s[3, 0];
-                        p1 = surface1.PointAt(uv1);
-                        p2 = surface2.PointAt(uv2);
-                        double d1 = uv1 | uv1alt;
-                        double d2 = uv2 | uv2alt;
-                        double d3 = p1 | p1alt;
-                        double d4 = p2 | p2alt;
-                        d = p1 | p2;
-
-                        if (d > mindist || double.IsNaN(d))
-                        {   // es ist schlechter geworden
-                            conversionCounter += 1;
-                            if (conversionCounter < 5 && !double.IsNaN(d))
-                            {
-                                mindist = Geometry.NextDouble(d);
-                            }
-                            else
-                            {
-                                uv1 = uv1alt;
-                                uv2 = uv2alt;
-                                p1 = p1alt;
-                                p2 = p2alt;
-                                didntConvert = true;
-                            }
+                        SurfacePoint spt = new SurfacePoint(p, uv1, uv2);
+                        if (hasLower && hasUpper)
+                        {
+                            if (position - lowerKey < upperKey - position) spt.FixAgainstNeighbour(lowerValue, surface1, surface2);
+                            else spt.FixAgainstNeighbour(upperValue, surface1, surface2);
                         }
-                    }
-                    else didntConvert = true;
-                }
-                p = new GeoPoint(p1, p2);
-                if (didntConvert)
-                {   // möglicherweise tangentiale Berührung der beiden Flächen, versuchen mit pointAt, position of zu konvergieren
-                    if (approxPolynom != null && basePoints.Length > 2)
-                    {
-                        GeoPoint pp = approxPolynom.PointAt(position);
-                        uv1 = surface1.PositionOf(pp);
-                        AdjustPeriodic(ref uv1, true, ind);
-                        uv2 = surface2.PositionOf(pp);
-                        AdjustPeriodic(ref uv2, false, ind);
-                        p1 = surface1.PointAt(uv1);
-                        p2 = surface2.PointAt(uv2);
-                        p = new GeoPoint(p1, p2);
-                    }
-
-                    d = p1 | p2;
-                    double basedist = basePoints[ind + 1].p3d | basePoints[ind].p3d;
-                    while (d > Precision.eps)
-                    {
-                        GeoPoint cnt = new GeoPoint(p1, p2);
-                        GeoPoint2D uv1t = surface1.PositionOf(cnt);
-                        GeoPoint2D uv2t = surface2.PositionOf(cnt);
-                        GeoPoint p1t = surface1.PointAt(uv1t);
-                        GeoPoint p2t = surface2.PointAt(uv2t);
-                        double dt = p1t | p2t;
-                        if (dt < d)
-                        {   // ist allemal besser
-                            p1 = p1t;
-                            p2 = p2t;
-                            uv1 = uv1t;
-                            uv2 = uv2t;
-                        }
-                        if (dt > d * 0.75)
-                        {   // konvergiert nicht gescheit
-                            break;
-                        }
-                        d = dt;
-                        p = new GeoPoint(p1, p2);
-                        if ((p | basePoints[ind + 1].p3d) > basedist || (p | basePoints[ind].p3d) > basedist)
-                        {   // ein Punkte ist aus dem Ruder gelaufen: der Abstand des neuen Punktes zu einem seiner beiden 
-                            // basePoint Nachbarn sollte nie größer sein als der Abstand der beiden basePoints
-                            // hier einfach lineare Interpolation
-                            d = position * (basePoints.Length - 1) - ind;
-                            uv1 = basePoints[ind].psurface1 + d * (basePoints[ind + 1].psurface1 - basePoints[ind].psurface1);
-                            uv2 = basePoints[ind].psurface2 + d * (basePoints[ind + 1].psurface2 - basePoints[ind].psurface2);
-                            break;
-                        }
+                        else if (hasLower) spt.FixAgainstNeighbour(lowerValue, surface1, surface2);
+                        else if (hasUpper) spt.FixAgainstNeighbour(upperValue, surface1, surface2);
+                        else AnchorToNearestBasePoint(position, ref spt.psurface1, ref spt.psurface2);
+                        hashedPositions[position] = spt;
+                        uv1 = spt.psurface1;
+                        uv2 = spt.psurface2;
+                        if (DualSurfaceCurveDiagnostics.Enabled) DualSurfaceCurveDiagnostics.RecordRefinement("transversal solver (LM)", false,
+                            approxBSpline != null, isTangential, surface1, uv1, surface2, uv2, normalPlane, p);
+                        return;
                     }
                 }
-                CheckPeriodic(ref uv1, true, ind);
-                CheckPeriodic(ref uv2, false, ind);
-                // System.Diagnostics.Trace.WriteLine("Parameter, Punkt: " + position.ToString() + ", " + p.ToString());
-                SurfacePoint sp = new SurfacePoint(p, uv1, uv2);
-                AdjustPeriodic(ref sp, ind);
-                uv1 = sp.psurface1;
-                uv2 = sp.psurface2;
-                hashedPositions[position] = sp;
+                // we should not reach this point. It could be there is an inner point, which is tangential or the curve is tangential but isTangential is false
+                {
+                    p = normalPlane.Location;
+                    uv1 = surface1.PositionOf(normalPlane.Location);
+                    uv2 = surface2.PositionOf(normalPlane.Location);
+                    SurfacePoint spt = new SurfacePoint(p, uv1, uv2);
+                    if (hasLower && hasUpper)
+                    {
+                        if (position - lowerKey < upperKey - position) spt.FixAgainstNeighbour(lowerValue, surface1, surface2);
+                        else spt.FixAgainstNeighbour(upperValue, surface1, surface2);
+                    }
+                    else if (hasLower) spt.FixAgainstNeighbour(lowerValue, surface1, surface2);
+                    else if (hasUpper) spt.FixAgainstNeighbour(upperValue, surface1, surface2);
+                    else AnchorToNearestBasePoint(position, ref spt.psurface1, ref spt.psurface2);
+                    uv1 = spt.psurface1;
+                    uv2 = spt.psurface2;
+                    hashedPositions[position] = spt;
+                    if (DualSurfaceCurveDiagnostics.Enabled) DualSurfaceCurveDiagnostics.RecordRefinement(
+                        isTangential ? "fallback after the tangential solver failed" : "fallback after the transversal solver failed", true,
+                        approxBSpline != null, isTangential, surface1, uv1, surface2, uv2, normalPlane, p);
+                }
             }
         }
         internal BoundingRect Domain1
@@ -2262,231 +1229,146 @@ namespace CADability
                 return res;
             }
         }
-        private void CheckPeriodic(ref GeoPoint2D uv, bool onSurface1, int index)
-        {
-            // es wurde ein uv Wert auf einer Oberfläche gefunden
-            // wenn diese aber periodisch ist, dann sollte er in der Nähe
-            // der basepoint[ind] bzw. basepoint[ind+1] liegen
-            GeoPoint2D uv1, uv2;
-            double uperiod = 0.0;
-            double vperiod = 0.0;
-            ISurface surface;
-            if (onSurface1)
-            {
-                surface = surface1;
-                uv1 = basePoints[index].psurface1;
-                uv2 = basePoints[index + 1].psurface1;
-            }
-            else
-            {
-                surface = surface2;
-                uv1 = basePoints[index].psurface2;
-                uv2 = basePoints[index + 1].psurface2;
-            }
-            if (surface.IsUPeriodic) uperiod = surface.UPeriod;
-            if (surface.IsVPeriodic) vperiod = surface.UPeriod;
-            if (uperiod > 0.0)
-            {
-                double d0 = Math.Abs(uv.x - (uv1.x + uv2.x) / 2);
-                double d1 = Math.Abs(uv.x + uperiod - (uv1.x + uv2.x) / 2);
-                double d2 = Math.Abs(uv.x - uperiod - (uv1.x + uv2.x) / 2);
-                if (d1 < d0) uv.x += uperiod;
-                if (d2 < d0) uv.x -= uperiod;
-                // ansonsten bleibt er ja unverändert
-            }
-            if (vperiod > 0.0)
-            {
-                double d0 = Math.Abs(uv.y - (uv1.y + uv2.y) / 2);
-                double d1 = Math.Abs(uv.y + vperiod - (uv1.y + uv2.y) / 2);
-                double d2 = Math.Abs(uv.y - vperiod - (uv1.y + uv2.y) / 2);
-                if (d1 < d0) uv.y += vperiod;
-                if (d2 < d0) uv.y -= vperiod;
-            }
-        }
         public override GeoVector StartDirection
         {
             get
             {
-                GeoVector v = surface1.GetNormal(basePoints[0].psurface1) ^ surface2.GetNormal(basePoints[0].psurface2);
-                if (!forwardOriented) v.Reverse();
-                return v;
+                GeoVector adir = (ApproxBSpline as ICurve).StartDirection;
+                if (isTangential)
+                {
+                    return adir;
+                }
+                else
+                {
+                    GeoVector v = surface1.GetNormal(basePoints[0].psurface1) ^ surface2.GetNormal(basePoints[0].psurface2);
+                    if (v.Length < 1e-5) return adir; // if the two surfaces are tangential at the start point, then the cross product is zero and we take the direction of the approximating BSpline)
+                    if (v * adir < 0.0) v.Reverse(); // n1 x n2 is the tangent up to its sign, the spline tells which way the curve runs
+                    v.Length = adir.Length; // make the same lengt as the approximating BSpline would have. This is very close
+                    return v;
+                }
             }
         }
         public override GeoVector EndDirection
         {
             get
             {
-                GeoVector v = surface1.GetNormal(basePoints[basePoints.Length - 1].psurface1) ^ surface2.GetNormal(basePoints[basePoints.Length - 1].psurface2);
-                if (!forwardOriented) v.Reverse();
-                return v;
+                GeoVector adir = (ApproxBSpline as ICurve).EndDirection;
+                if (isTangential)
+                {
+                    return adir;
+                }
+                else
+                {
+                    GeoVector v = surface1.GetNormal(basePoints[basePoints.Length - 1].psurface1) ^ surface2.GetNormal(basePoints[basePoints.Length - 1].psurface2);
+                    if (v.Length < 1e-5) return adir; // if the two surfaces are tangential at the end point, then the cross product is zero and we take the direction of the approximating BSpline
+                    if (v * adir < 0.0) v.Reverse(); // n1 x n2 is the tangent up to its sign, the spline tells which way the curve runs
+                    v.Length = adir.Length; // make the same lengt as the approximating BSpline would have. This is very close to the factual length
+                    return v;
+                }
             }
         }
         public override GeoVector DirectionAt(double Position)
         {
-            GeoPoint2D uv1, uv2;
-            GeoPoint p;
-            ApproximatePosition(Position, out uv1, out uv2, out p);
-            GeoVector v = surface1.GetNormal(uv1) ^ surface2.GetNormal(uv2);
-            if (!forwardOriented) v.Reverse();
-            int ind = SegmentOfParameter(Position);
-            if (approxPolynom == null) InitApproxPolynom();
-            GeoVector v1 = approxPolynom.DirectionAt(Position);
-            if (v.Length > 1e-4)
-            {
-                v.Length = v1.Length;
-                return v;
-            }
-            else return v1; // the surfaces are tangential so we use the approximating polynom
-            //v.Length = v1.Length;
-            //double d = basePoints[ind].p3d | basePoints[ind + 1].p3d; // Abstand der umgebenden Basispunkte
-            //double span = 1.0 / (basePoints.Length - 1); // Parameterbereich zwischen zwei Basispunkten
-            //if (v.Length > 1e-4) // nicht tangentiale Flächen
-            //{
-            //    return v;
-            //}
-            //else
-            //{
-            //    return basePoints[ind + 1].p3d - basePoints[ind].p3d;
-            //}
-            //// die Länge muss der Änderung im Segment entsprechen, das ist wichtig für die Newtonverfahren
+            return (ApproxBSpline as ICurve).DirectionAt(Position);
         }
         public override GeoPoint PointAt(double Position)
         {
-            GeoPoint2D uv1, uv2;
-            GeoPoint p;
-#if DEBUG
-            // double oldLength = hashedPositionsLength();
-#endif
-            ApproximatePosition(Position, out uv1, out uv2, out p);
-#if DEBUG
-            //if (oldLength > 0.0 && hashedPositionsLength() / oldLength > 2)
-            //{   // something invalid happened
-
-            //}
-#endif
-            return p;
+            return (ApproxBSpline as ICurve).PointAt(Position);
         }
-#if DEBUG
-        double hashedPositionsLength()
-        {   // the length of the curve according to the util now calculated points
-            SortedDictionary<double, GeoPoint> sortedPoints = new SortedDictionary<double, GeoPoint>();
-            for (int i = 0; i < basePoints.Length; i++)
-            {
-                sortedPoints[(double)(i) / (double)(basePoints.Length - 1)] = basePoints[i].p3d;
-                lock (hashedPositions)
-                {
-                    foreach (KeyValuePair<double, SurfacePoint> item in hashedPositions)
-                    {
-                        sortedPoints[item.Key] = item.Value.p3d;
-                    }
-                }
-            }
-            GeoPoint lastPoint = GeoPoint.Invalid;
-            double res = 0.0;
-            foreach (GeoPoint item in sortedPoints.Values)
-            {
-                if (lastPoint.IsValid) res += item | lastPoint;
-                lastPoint = item;
-            }
-            return res;
-        }
-#endif
         public override double PositionAtLength(double position)
         {
-            throw new Exception("The method or operation is not implemented.");
+            return (ApproxBSpline as ICurve).PositionAtLength(position);
         }
         public override double PositionOf(GeoPoint p)
         {
             double ppos = TetraederHull.PositionOf(p);
-            if (approxPolynom == null) InitApproxPolynom();
-            double pos1 = approxPolynom.PositionOf(p, out double md);
+            double pos1 = (ApproxBSpline as ICurve).PositionOf(p);
 
             if ((pos1 != double.MaxValue) && (PointAt(pos1) | p) < (PointAt(ppos) | p))
                 return pos1;
 
             return ppos;
-
-            //Unreachable code
-            /* if (Math.Abs(pos1 - ppos) > 0.1 && md < Precision.eps)
-            { }
-            return ppos;
-            double res = -1.0;
-            double maxdist = double.MaxValue;
-            if (approxPolynom != null)
-            {
-                double pos = approxPolynom.PositionOf(p, out maxdist);
-                return pos;
-            }
-            for (int i = 0; i < basePoints.Length - 1; ++i)
-            {
-                GeoPoint dp = Geometry.DropPL(p, basePoints[i].p3d, basePoints[i + 1].p3d);
-                double pos = Geometry.LinePar(basePoints[i].p3d, basePoints[i + 1].p3d - basePoints[i].p3d, dp);
-                bool valid = (pos >= 0.0 && pos <= 1.0);
-                if (valid)
-                {
-                    double d = Geometry.DistPL(p, basePoints[i].p3d, basePoints[i + 1].p3d);
-                    if (d <= maxdist)
-                    {
-                        maxdist = d;
-                        res = i + pos;
-                    }
-                }
-            }
-            // if (res < 0.0) Wenn der punkt fast genau ein basepoint ist
-            // kann er trotzdem oben verworfen werden, deshalb hier noch der test auf alle Basepoints
-            // und Punkte, die nahe einem Basepoint liegen, aber im ungültigen Winkelbereich
-            // werden mit womöglich ganz anderen Linien in Verbindung gebracht
-            {   // keine passende Strecke gefunden
-                for (int i = 0; i < basePoints.Length; i++)
-                {
-                    double d = p | basePoints[i].p3d;
-                    if (d < maxdist)
-                    {
-                        maxdist = d;
-                        res = i;
-                    }
-                }
-            }
-            return res / (basePoints.Length - 1);*/
         }
         public override double PositionOf(GeoPoint p, double prefer)
         {
-            throw new Exception("The method or operation is not implemented.");
+            return (ApproxBSpline as ICurve).PositionOf(p, prefer);
         }
         public override double PositionOf(GeoPoint p, Plane pl)
-        {
-            throw new Exception("The method or operation is not implemented.");
+        {   // FindSnapPoint uses this
+            return (ApproxBSpline as ICurve).PositionOf(p, pl);
         }
-        // Length: GeneralCurve.Length measures the curve between the base points, which are the parameters
-        // returned by GetBasePoints. The sum of the distances of the base points, which was used here, is too
-        // short (0.65% for a bore of radius 5 through a tube of radius 30, divided into 8 edges)
+        /// <summary>
+        /// The length for <see cref="GeneralCurve.Length"/>, which caches it. <see cref="PointAt"/> evaluates the approximating
+        /// spline, so the length is measured with points which lie exactly on both surfaces: <see cref="ApproximatePosition"/>
+        /// moves the point of the spline onto both surfaces in its normal plane, so it has the parametrization of the spline,
+        /// and the base points are where <see cref="GetBasePoints"/> says. The sum of the distances of the base points, which
+        /// ShapeIt still uses, is too short (0.65% for a bore of radius 5 through a tube of radius 30).
+        /// </summary>
+        protected override double ComputeLength()
+        {
+            return ArcLength.FromPoints(position =>
+            {
+                ApproximatePosition(position, out GeoPoint2D _, out GeoPoint2D _, out GeoPoint p);
+                return p;
+            }, 0.0, 1.0, GetBasePoints(), 1e-9); // the points are refined to about 1e-10, a tighter tolerance only adds levels
+        }
+        /// <summary>
+        /// The positions of the base points on this curve. They come from the approximating spline, which is
+        /// parametrized by the chord length of the base points: base point i is in general not at i/(n-1).
+        /// </summary>
+        /// <summary>
+        /// The fractions of the length of the base polygon at the base points, 0 at the first and 1 at the last. The
+        /// approximating spline is parametrized by the chord length of the base points, so this estimates their
+        /// positions well enough to find the base point next to a position - without a PositionOf. For a closed curve
+        /// it tells the first base point from the last, which are the same point in space.
+        /// </summary>
+        internal double[] ChordFractions()
+        {
+            double[] res = new double[basePoints.Length];
+            for (int i = 1; i < res.Length; i++) res[i] = res[i - 1] + (basePoints[i].p3d | basePoints[i - 1].p3d);
+            double total = res[res.Length - 1];
+            for (int i = 1; i < res.Length; i++) res[i] = total > 0.0 ? res[i] / total : (double)i / (res.Length - 1);
+            res[res.Length - 1] = 1.0;
+            return res;
+        }
+        /// <summary>The index of the value in the ascending <paramref name="values"/> which is nearest to <paramref name="value"/>.</summary>
+        internal static int NearestIndex(double[] values, double value)
+        {
+            int index = Array.BinarySearch(values, value);
+            if (index >= 0) return index;
+            index = ~index; // the first value greater than value
+            if (index == 0) return 0;
+            if (index == values.Length) return values.Length - 1;
+            return value - values[index - 1] <= values[index] - value ? index - 1 : index;
+        }
+        private double[] BasePointPositions()
+        {
+            double[] res = new double[basePoints.Length];
+            for (int i = 1; i < basePoints.Length - 1; i++) res[i] = PositionOf(basePoints[i].p3d);
+            res[basePoints.Length - 1] = 1.0;
+            return res;
+        }
         public override ICurve[] Split(double Position)
         {
-            List<SurfacePoint> l1 = new List<SurfacePoint>();
-            List<SurfacePoint> l2 = new List<SurfacePoint>();
-            int ind = (int)Math.Floor(Position * (basePoints.Length - 1));
-            if (Position * (basePoints.Length - 1) - ind == 0.0)
-            {   // die Split-Position liegt genau auf einem basepoint
-                for (int i = 0; i < basePoints.Length; i++)
-                {
-                    if (i <= ind) l1.Add(basePoints[i]);
-                    if (i >= ind) l2.Add(basePoints[i]);
-                }
-            }
+            double[] positions = BasePointPositions();
+            SurfacePoint splitPoint;
+            int atBasePoint = Array.FindIndex(positions, pos => Math.Abs(pos - Position) < 1e-9);
+            if (atBasePoint >= 0) splitPoint = basePoints[atBasePoint]; // keep the exact point
             else
-            {   // es wird ein Zwischenpunkt eingefügt
-                GeoPoint2D uv1, uv2;
-                GeoPoint p;
-                ApproximatePosition(Position, out uv1, out uv2, out p);
-                SurfacePoint p1 = new SurfacePoint(p, uv1, uv2);
-                l2.Add(p1); // die 2. Liste fängt mit dem neuen Punkt an
-                for (int i = 0; i < basePoints.Length; i++)
-                {
-                    if (i <= ind) l1.Add(basePoints[i]);
-                    else l2.Add(basePoints[i]);
-                }
-                l1.Add(p1); // die 1. Liste hört mit dem neuen Punkt auf
+            {
+                ApproximatePosition(Position, out GeoPoint2D uv1, out GeoPoint2D uv2, out GeoPoint p);
+                splitPoint = new SurfacePoint(p, uv1, uv2);
             }
+            List<SurfacePoint> l1 = new List<SurfacePoint> { basePoints[0] };
+            List<SurfacePoint> l2 = new List<SurfacePoint>();
+            for (int i = 1; i < basePoints.Length - 1; i++)
+            {   // base points very close to the split position would make a tiny segment, they are left out (as in Trim)
+                if (positions[i] < Position - 1e-3) l1.Add(basePoints[i]);
+                else if (positions[i] > Position + 1e-3) l2.Add(basePoints[i]);
+            }
+            l2.Add(basePoints[basePoints.Length - 1]);
+            l1.Add(splitPoint);
+            l2.Insert(0, splitPoint);
             for (int i = l1.Count - 1; i > 0; --i)
             {
                 if ((l1[i].p3d | l1[i - 1].p3d) == 0.0) l1.RemoveAt(i);
@@ -2495,81 +1377,54 @@ namespace CADability
             {
                 if ((l2[i].p3d | l2[i - 1].p3d) == 0.0) l2.RemoveAt(i);
             }
-            InterpolatedDualSurfaceCurve dsc1 = new InterpolatedDualSurfaceCurve(surface1.Clone(), surface2.Clone(), l1.ToArray());
-            InterpolatedDualSurfaceCurve dsc2 = new InterpolatedDualSurfaceCurve(surface1.Clone(), surface2.Clone(), l2.ToArray());
+            InterpolatedDualSurfaceCurve dsc1 = new InterpolatedDualSurfaceCurve(surface1.Clone(), surface2.Clone(), l1.ToArray(), isTangential);
+            InterpolatedDualSurfaceCurve dsc2 = new InterpolatedDualSurfaceCurve(surface1.Clone(), surface2.Clone(), l2.ToArray(), isTangential);
             return new ICurve[] { dsc1, dsc2 };
         }
 
-        internal void RecalcSurfacePoints(BoundingRect bounds1, BoundingRect bounds2)
+        /// <summary>
+        /// Computes the uv values of the base points anew from their 3d points, e.g. after the domain of a surface was
+        /// set: PositionOf puts them into that domain.
+        /// </summary>
+        internal void RecalcSurfacePoints()
         {
+            DualSurfaceCurveDiagnostics.Count("IDSC.RecalcSurfacePoints");
             for (int i = 0; i < basePoints.Length; i++)
             {
                 basePoints[i].psurface1 = surface1.PositionOf(basePoints[i].p3d);
-                SurfaceHelper.AdjustPeriodic(surface1, bounds1, ref basePoints[i].psurface1);
                 basePoints[i].psurface2 = surface2.PositionOf(basePoints[i].p3d);
-                SurfaceHelper.AdjustPeriodic(surface2, bounds2, ref basePoints[i].psurface2);
             }
             InvalidateSecondaryData();
-            int n = basePoints.Length / 2; // es müssen mindesten 3 sein
-            GeoVector v = surface1.GetNormal(basePoints[n].psurface1) ^ surface2.GetNormal(basePoints[n].psurface2);
-            GeoVector v0 = basePoints[n + 1].p3d - basePoints[n - 1].p3d;
-            Angle a = new Angle(v, v0);
-            forwardOriented = (a.Radian < Math.PI / 2.0);
-            CheckPeriodic();
-#if DEBUG
-            CheckSurfaceParameters();
-#endif
+            AnchorBasePoints();
         }
 
         public override ICurve[] Split(double Position1, double Position2)
-        {
-            GeoPoint2D uv1, uv2;
-            GeoPoint p;
-            ApproximatePosition(Position1, out uv1, out uv2, out p);
+        {   // only for closed curves: one part from the smaller to the bigger position, the other one across the start point
+            if (Position2 < Position1) (Position1, Position2) = (Position2, Position1);
+            double[] positions = BasePointPositions();
+            ApproximatePosition(Position1, out GeoPoint2D uv1, out GeoPoint2D uv2, out GeoPoint p);
             SurfacePoint p1 = new SurfacePoint(p, uv1, uv2);
             ApproximatePosition(Position2, out uv1, out uv2, out p);
             SurfacePoint p2 = new SurfacePoint(p, uv1, uv2);
-            List<SurfacePoint> l1 = new List<SurfacePoint>();
-            List<SurfacePoint> l2 = new List<SurfacePoint>();
-            int i1, i2;
-            if (Position1 < Position2)
+            List<SurfacePoint> l1 = new List<SurfacePoint> { p1 };
+            List<SurfacePoint> l2 = new List<SurfacePoint> { p2 };
+            // the last base point of a closed curve is the first one again, so it is not used here
+            for (int i = 0; i < basePoints.Length - 1; i++)
             {
-                i1 = (int)Math.Ceiling(Position1 * (basePoints.Length - 1));
-                i2 = (int)Math.Ceiling(Position2 * (basePoints.Length - 1));
+                if (positions[i] > Position1 + 1e-3 && positions[i] < Position2 - 1e-3) l1.Add(basePoints[i]);
             }
-            else
+            for (int i = 0; i < basePoints.Length - 1; i++)
             {
-                i2 = (int)Math.Ceiling(Position1 * (basePoints.Length - 1));
-                i1 = (int)Math.Ceiling(Position2 * (basePoints.Length - 1));
+                if (positions[i] > Position2 + 1e-3) l2.Add(basePoints[i]);
             }
-            for (int i = i1; i < i2; ++i)
+            for (int i = 0; i < basePoints.Length - 1; i++)
             {
-                if (!Precision.IsEqual(basePoints[i].p3d, p1.p3d) && !Precision.IsEqual(basePoints[i].p3d, p2.p3d)) l1.Add(basePoints[i]);
+                if (positions[i] < Position1 - 1e-3) l2.Add(basePoints[i]);
             }
-            for (int i = i2; i < basePoints.Length; ++i)
-            {
-                if (!Precision.IsEqual(basePoints[i].p3d, p1.p3d) && !Precision.IsEqual(basePoints[i].p3d, p2.p3d)) l2.Add(basePoints[i]);
-            }
-            for (int i = 1; i < i1; ++i) // hier ist ja geschlossen, also ist der erste und der letzte Basepoint identisch
-            {
-                if (!Precision.IsEqual(basePoints[i].p3d, p1.p3d) && !Precision.IsEqual(basePoints[i].p3d, p2.p3d)) l2.Add(basePoints[i]);
-            }
-            if (Position1 < Position2)
-            {
-                l1.Insert(0, p1);
-                l1.Add(p2);
-                l2.Insert(0, p2);
-                l2.Add(p1);
-            }
-            else
-            {
-                l1.Insert(0, p2);
-                l1.Add(p1);
-                l2.Insert(0, p1);
-                l2.Add(p2);
-            }
-            InterpolatedDualSurfaceCurve dsc1 = new InterpolatedDualSurfaceCurve(surface1.Clone(), surface2.Clone(), l1.ToArray());
-            InterpolatedDualSurfaceCurve dsc2 = new InterpolatedDualSurfaceCurve(surface1.Clone(), surface2.Clone(), l2.ToArray());
+            l1.Add(p2);
+            l2.Add(p1);
+            InterpolatedDualSurfaceCurve dsc1 = new InterpolatedDualSurfaceCurve(surface1.Clone(), surface2.Clone(), l1.ToArray(), isTangential);
+            InterpolatedDualSurfaceCurve dsc2 = new InterpolatedDualSurfaceCurve(surface1.Clone(), surface2.Clone(), l2.ToArray(), isTangential);
             return new ICurve[] { dsc1, dsc2 };
         }
         public override bool IsClosed
@@ -2581,13 +1436,14 @@ namespace CADability
         }
         public override void Reverse()
         {
+            DualSurfaceCurveDiagnostics.Count("IDSC.Reverse");
             Array.Reverse(basePoints);
-            forwardOriented = !forwardOriented;
             InvalidateSecondaryData();
         }
         public override void Trim(double StartPos, double EndPos)
         {
-            // if (StartPos <= 0 && EndPos >= 1) return; ; // nichts zu tun
+            if (StartPos <= Precision.eps && EndPos >= 1 - Precision.eps) return; // trim from start to end, nothing to do
+            DualSurfaceCurveDiagnostics.Count("IDSC.Trim");
             List<SurfacePoint> spl = new List<SurfacePoint>();
             GeoPoint2D uv1, uv2;
             GeoPoint p;
@@ -2598,12 +1454,14 @@ namespace CADability
                 for (int i = 0; i < basePoints.Length; ++i)
                 {
                     double pos = (double)i / (double)(basePoints.Length - 1);
+                    pos = PositionOf(basePoints[i].p3d);
                     // keine fast identischen Punkte zufügen, die führen zu Nullvektoren in der Differenz
                     if (pos > StartPos + 1e-3) spl.Add(basePoints[i]);
                 }
                 for (int i = 1; i < basePoints.Length; ++i)
                 {
                     double pos = (double)i / (double)(basePoints.Length - 1);
+                    pos = PositionOf(basePoints[i].p3d);
                     // keine fast identischen Punkte zufügen, die führen zu Nullvektoren in der Differenz
                     if (pos < EndPos - 1e-3) spl.Add(basePoints[i]);
                     else break;
@@ -2614,6 +1472,7 @@ namespace CADability
                 for (int i = 0; i < basePoints.Length; ++i)
                 {
                     double pos = (double)i / (double)(basePoints.Length - 1);
+                    pos = PositionOf(basePoints[i].p3d);
                     // keine fast identischen Punkte zufügen, die führen zu Nullvektoren in der Differenz
                     if (pos > StartPos + 1e-3 && pos < EndPos - 1e-3) spl.Add(basePoints[i]);
                 }
@@ -2627,25 +1486,59 @@ namespace CADability
             ApproximatePosition(EndPos, out uv1, out uv2, out p);
             spl.Add(new SurfacePoint(p, uv1, uv2));
             basePoints = spl.ToArray();
+            MakeTrimmedPointsContinuous(spl.Count > 2 ? 1 : 0);
             InvalidateSecondaryData();
+            BSpline init = ApproxBSpline;
+        }
+        /// <summary>
+        /// The new end points of a trimmed curve come from <see cref="ApproximatePosition"/>, which takes their uv values from
+        /// PositionOf. A point on the seam of a periodic surface may then lie one period away from its neighbour, and the 2d
+        /// curves get a jump. So the uv values are made continuous, starting at the base point <paramref name="keep"/>, which
+        /// is one of the original base points and stays in its period.
+        /// </summary>
+        private void MakeTrimmedPointsContinuous(int keep)
+        {
+            double u1 = surface1.IsUPeriodic ? surface1.UPeriod : 0.0, v1 = surface1.IsVPeriodic ? surface1.VPeriod : 0.0;
+            double u2 = surface2.IsUPeriodic ? surface2.UPeriod : 0.0, v2 = surface2.IsVPeriodic ? surface2.VPeriod : 0.0;
+            for (int i = keep + 1; i < basePoints.Length; i++)
+            {
+                SurfacePoint.FixSurfacePoint2D(ref basePoints[i].psurface1, basePoints[i - 1].psurface1, surface1.IsUPeriodic, u1, surface1.IsVPeriodic, v1);
+                SurfacePoint.FixSurfacePoint2D(ref basePoints[i].psurface2, basePoints[i - 1].psurface2, surface2.IsUPeriodic, u2, surface2.IsVPeriodic, v2);
+            }
+            for (int i = keep - 1; i >= 0; i--)
+            {
+                SurfacePoint.FixSurfacePoint2D(ref basePoints[i].psurface1, basePoints[i + 1].psurface1, surface1.IsUPeriodic, u1, surface1.IsVPeriodic, v1);
+                SurfacePoint.FixSurfacePoint2D(ref basePoints[i].psurface2, basePoints[i + 1].psurface2, surface2.IsUPeriodic, u2, surface2.IsVPeriodic, v2);
+            }
         }
         public override IGeoObject Clone()
         {
-            // BRepIntersection createNewEdges erwartet, dass die surfaces erhalten bleiben, also nicht gecloned werden
-            // wenn das von anderer Seite anders erwartet wird, dann muss eine methode zum Austausch der Surfaces gemacht werden
-#if DEBUG
-            CheckSurfaceParameters();
-#endif
-            SurfacePoint[] spnts = new SurfacePoint[basePoints.Length];
-            for (int i = 0; i < basePoints.Length; i++)
-            {   // we need a deep copy, independant surface points
-                spnts[i] = new SurfacePoint(basePoints[i].p3d, basePoints[i].psurface1, basePoints[i].psurface2);
-            }
-            return new InterpolatedDualSurfaceCurve(surface1.Clone(), surface2.Clone(), spnts, forwardOriented, approxPolynom); // Clone introduced because of independant surfaces for BRep operations
-            // return new InterpolatedDualSurfaceCurve(surface1.Clone(), surface2.Clone(), basePoints.Clone() as SurfacePoint[], forwardOriented);
+            return new InterpolatedDualSurfaceCurve(this);
+        }
+        /// <summary>
+        /// The copy <see cref="Clone"/> makes: the same base points and flag, and the same approximating
+        /// spline, which is never modified in place, only replaced. The surfaces are cloned, because BRep operations
+        /// need independent surfaces.
+        /// <para>
+        /// Clone used to rebuild the curve with the constructor, which refined the inner base points again, filled
+        /// them up to nine and removed close ones. So a clone was a slightly different curve than its original, and
+        /// most constructions of this class are clones.
+        /// </para>
+        /// </summary>
+        private InterpolatedDualSurfaceCurve(InterpolatedDualSurfaceCurve toCopy)
+            : this()
+        {
+            DualSurfaceCurveDiagnostics.ConstructionProbe probe = DualSurfaceCurveDiagnostics.BeginConstruction();
+            surface1 = toCopy.surface1.Clone();
+            surface2 = toCopy.surface2.Clone();
+            basePoints = toCopy.basePoints.Clone() as SurfacePoint[];
+            isTangential = toCopy.isTangential;
+            approxBSpline = toCopy.approxBSpline;
+            DualSurfaceCurveDiagnostics.EndConstruction(probe, surface1, surface2, basePoints, isTangential);
         }
         internal void SetSurfaces(ISurface surface1, ISurface surface2, bool swapped)
         {
+            DualSurfaceCurveDiagnostics.Count("IDSC.SetSurfaces");
 #if DEBUG
             bool ok = swapped == surface1.SameGeometry(BoundingRect.UnitBoundingRect, this.surface2, BoundingRect.UnitBoundingRect, 1e-6, out ModOp2D dumy);
 #endif
@@ -2667,7 +1560,6 @@ namespace CADability
                     this.surface2 = surface2;
                     // if (swapped)
                     {
-                        forwardOriented = !forwardOriented; // falls die surfaces getauscht wurden
                         if (basePoints != null)
                         {
                             for (int i = 0; i < basePoints.Length; i++)
@@ -2691,7 +1583,7 @@ namespace CADability
             {
                 sp[i].p3d = m * sp[i].p3d;
             }
-            InterpolatedDualSurfaceCurve ipdsc = new InterpolatedDualSurfaceCurve(surface1.GetModified(m), surface2.GetModified(m), sp, forwardOriented);
+            InterpolatedDualSurfaceCurve ipdsc = new InterpolatedDualSurfaceCurve(surface1.GetModified(m), surface2.GetModified(m), sp, IsTangential);
             return ipdsc;
         }
         public override PlanarState GetPlanarState()
@@ -2707,7 +1599,6 @@ namespace CADability
             if (isLinear) return PlanarState.UnderDetermined;
             if (maxDist < Precision.eps) return PlanarState.Planar;
             return PlanarState.NonPlanar;
-            throw new Exception("The method or operation is not implemented.");
         }
         public override Plane GetPlane()
         {
@@ -2794,6 +1685,26 @@ namespace CADability
                 return CurveOnSurface2;
             }
         }
+
+        public bool IsTangential => isTangential;
+
+        /// <summary>
+        /// True when the two surfaces clearly intersect at every inner base point, i.e. the curve is certainly no
+        /// tangential intersection. The end points are not considered, a curve may end where the surfaces touch.
+        /// </summary>
+        private bool IsTransversalAtAllInnerPoints()
+        {
+            if (basePoints.Length < 3) return false;
+            for (int i = 1; i < basePoints.Length - 1; i++)
+            {
+                GeoVector n1 = surface1.GetNormal(basePoints[i].psurface1);
+                GeoVector n2 = surface2.GetNormal(basePoints[i].psurface2);
+                if (n1.IsNullVector() || n2.IsNullVector()) return false;
+                if ((n1.Normalized ^ n2.Normalized).Length < 1e-2) return false;
+            }
+            return true;
+        }
+
         ICurve2D IDualSurfaceCurve.GetCurveOnSurface(ISurface onThisSurface)
         {
             if (onThisSurface == surface1) return CurveOnSurface1;
@@ -2803,36 +1714,19 @@ namespace CADability
 
         void IDualSurfaceCurve.SwapSurfaces()
         {
-            ISurface tmp = surface1;
-            surface1 = surface2;
-            surface2 = tmp;
+            DualSurfaceCurveDiagnostics.Count("IDSC.SwapSurfaces");
+            (surface1, surface2) = (surface2, surface1);
             for (int i = 0; i < basePoints.Length; i++)
             {
                 GeoPoint2D t = basePoints[i].psurface1;
                 basePoints[i].psurface1 = basePoints[i].psurface2;
                 basePoints[i].psurface2 = t;
             }
-            forwardOriented = !forwardOriented;
             InvalidateSecondaryData();
-            //ICurve2D tc = CurveOnSurface1;
-            //CurveOnSurface1 ... werden ja jedesmal neu berechnet. oder
         }
 
         public override ICurve Approximate(bool linesOnly, double maxError)
         {
-#if DEBUG
-            if (maxError < 0)
-            {
-                // nur zum Polynomfunktionen Debuggen!
-                double[] knots = new double[basePoints.Length];
-                for (int i = 0; i < basePoints.Length; i++)
-                {
-                    knots[i] = (double)i / (basePoints.Length - 1);
-                }
-                ExplicitPCurve3D dbg = ExplicitPCurve3D.FromCurve(this, knots, 3, true);
-                return null;
-            }
-#endif
             if (linesOnly)
             {
                 return Curves.ApproximateLinear(this, maxError);
@@ -2855,10 +1749,13 @@ namespace CADability
         {
             if ((StartPoint | other.StartPoint) < precision && (EndPoint | other.EndPoint) < precision)
             {
-                // gleiche Richtung
+                // same direction
                 for (double par = 0.25; par < 1.0; par += 0.25)
                 {
-                    if ((PointAt(par) | other.PointAt(par)) > precision) return false;
+                    if ((PointAt(par) | other.PointAt(par)) > precision)
+                    {   // the curves may run with different "speed", so we need to test the distance (which is more expensive)
+                        if (other.DistanceTo(PointAt(par))>precision) return false;
+                    }
                 }
                 return true;
             }
@@ -2866,7 +1763,10 @@ namespace CADability
             {
                 for (double par = 0.25; par < 1.0; par += 0.25)
                 {
-                    if ((PointAt(par) | other.PointAt(1 - par)) > precision) return false;
+                    if ((PointAt(par) | other.PointAt(1 - par)) > precision) 
+                    {   // the curves may run with different "speed", so we need to test the distance (which is more expensive)
+                        if (other.DistanceTo(PointAt(par)) > precision) return false;
+                    }
                 }
                 return true;
             }
@@ -2889,20 +1789,33 @@ namespace CADability
             surface1 = info.GetValue("Surface1", typeof(ISurface)) as ISurface;
             surface2 = info.GetValue("Surface2", typeof(ISurface)) as ISurface;
             basePoints = info.GetValue("BasePoints", typeof(SurfacePoint[])) as SurfacePoint[];
-            hashedPositions = new Dictionary<double, SurfacePoint>();
-            try
-            {
-                forwardOriented = (bool)info.GetValue("ForwardOriented", typeof(bool));
-            }
-            catch (SerializationException)
-            {
-                forwardOriented = true; // fehlte früher mit subtilen Folgen
-            }
+            hashedPositions = new SortedList<double, SurfacePoint>();
+            // "ForwardOriented" is no longer read, see ForwardOrientedForOlderVersions
         }
 
-        internal void SurfacesSwapped()
+        /// <summary>
+        /// Older versions stored whether n1 x n2 runs along the curve ("ForwardOriented") and need it to read a file.
+        /// The curve no longer keeps it: <see cref="StartDirection"/> and <see cref="EndDirection"/> take the sign from
+        /// the approximating spline. So it is computed here the way those versions computed it, at an inner base point,
+        /// because the surfaces may touch at the ends. Only surface normals are used, no spline is built while writing.
+        /// </summary>
+        /// <summary>
+        /// Older versions read "Bounds1" and "Bounds2" and put the uv values into their periods with them. The curve has
+        /// no bounds any more, it writes what those versions took when there were none: the domain of the surface, and
+        /// where it has none, the extent of the uv values of the base points.
+        /// </summary>
+        private BoundingRect BoundsForOlderVersions(bool onSurface1)
         {
-            forwardOriented = !forwardOriented;
+            ISurface surface = onSurface1 ? surface1 : surface2;
+            if (surface is ISurfaceImpl simpl && !simpl.usedArea.IsEmpty() && !simpl.usedArea.IsInfinite) return simpl.usedArea;
+            return GetBoundingRect(onSurface1);
+        }
+        private bool ForwardOrientedForOlderVersions()
+        {
+            int n = Math.Min(basePoints.Length / 2, basePoints.Length - 2);
+            GeoVector v = surface1.GetNormal(basePoints[n].psurface1) ^ surface2.GetNormal(basePoints[n].psurface2);
+            GeoVector chord = n == 0 ? basePoints[1].p3d - basePoints[0].p3d : basePoints[n + 1].p3d - basePoints[n - 1].p3d;
+            return v * chord >= 0.0;
         }
 
         /// <summary>
@@ -2916,10 +1829,7 @@ namespace CADability
             info.AddValue("Surface1", surface1);
             info.AddValue("Surface2", surface2);
             info.AddValue("BasePoints", basePoints);
-            info.AddValue("ForwardOriented", forwardOriented);
-#if DEBUG
-            CheckSurfaceParameters();
-#endif
+            info.AddValue("ForwardOriented", ForwardOrientedForOlderVersions());
         }
         public override void GetObjectData(IJsonWriteData data)
         {
@@ -2927,7 +1837,10 @@ namespace CADability
             data.AddProperty("Surface1", surface1);
             data.AddProperty("Surface2", surface2);
             data.AddProperty("BasePoints", basePoints);
-            data.AddProperty("ForwardOriented", forwardOriented);
+            data.AddProperty("ForwardOriented", ForwardOrientedForOlderVersions());
+            data.AddProperty("IsTangential", isTangential);
+            data.AddProperty("Bounds1", BoundsForOlderVersions(true));
+            data.AddProperty("Bounds2", BoundsForOlderVersions(false));
         }
 
         public override void SetObjectData(IJsonReadData data)
@@ -2936,65 +1849,70 @@ namespace CADability
             surface1 = data.GetPropertyOrDefault<ISurface>("Surface1");
             surface2 = data.GetPropertyOrDefault<ISurface>("Surface2");
             basePoints = data.GetPropertyOrDefault<SurfacePoint[]>("BasePoints");
-            forwardOriented = (bool)data.GetProperty("ForwardOriented");
+            // "ForwardOriented" is no longer read, see ForwardOrientedForOlderVersions
+            if (data.Version >= 1)
+            {
+                isTangential = data.GetPropertyOrDefault<bool>("IsTangential");
+                // "Bounds1" and "Bounds2" are no longer read, see BoundsForOlderVersions
+            }
             data.RegisterForSerializationDoneCallback(this);
+        }
+        /// <summary>
+        /// A file may contain inner base points which are not on the surfaces, or whose uv values do not describe
+        /// them. UniteBug17 has such curves: they were written while CloneTrimmed handed a wrong isTangential, so their
+        /// points were computed by the solver for touching surfaces, which failed, and the unrefined points were
+        /// stored. Clone used to rebuild every curve and refined these points on the way. Clone copies now, so they
+        /// are refined here, once, when the file is read. The end points are left alone, they belong to vertices.
+        /// </summary>
+        private void RefineInconsistentInnerPoints()
+        {
+            BoundingBox ext = BoundingBox.EmptyBoundingCube;
+            for (int i = 0; i < basePoints.Length; i++) ext.MinMax(basePoints[i].p3d);
+            double tolerance = Math.Max(100 * Precision.eps, 1e-6 * ext.Size);
+            for (int i = 1; i < basePoints.Length - 1; i++)
+            {
+                if ((surface1.PointAt(basePoints[i].psurface1) | basePoints[i].p3d) <= tolerance
+                    && (surface2.PointAt(basePoints[i].psurface2) | basePoints[i].p3d) <= tolerance) continue;
+                DualSurfaceCurveDiagnostics.Count("IDSC read: an inner base point was not on the surfaces and is refined");
+                // without a spline the plane goes through the base point itself, perpendicular to the base polygon
+                approxBSpline = null;
+                ApproximatePosition((double)i / (basePoints.Length - 1), out GeoPoint2D uv1, out GeoPoint2D uv2, out basePoints[i].p3d);
+                basePoints[i].psurface1 = uv1;
+                basePoints[i].psurface2 = uv2;
+                hashedPositions.Clear();
+            }
         }
         void IJsonSerializeDone.SerializationDone(JsonSerialize jsonSerialize)
         {
-            if (surface1 is ISurfaceImpl simpl1)
+            if (jsonSerialize.GetTypeVersion(this.GetType()) < 1)
             {
-                if (simpl1.usedArea.IsEmpty() || simpl1.usedArea.IsInfinite)
+                // Parameter isTangential was introduced in version 1
+                // we have to determine it
+                isTangential = true;
+                for (int i = 1; i < basePoints.Length - 1; i++)
                 {
-                    BoundingRect ext = BoundingRect.EmptyBoundingRect;
-                    for (int i = 0; i < basePoints.Length; i++)
+                    GeoVector n1 = surface1.GetNormal(basePoints[i].psurface1).Normalized;
+                    GeoVector n2 = surface2.GetNormal(basePoints[i].psurface2).Normalized;
+                    if ((n1 ^ n2).Length > 1e-4)
                     {
-                        ext.MinMax(basePoints[i].psurface1);
-                    }
-                    simpl1.usedArea = ext;
-                }
-            }
-            if (surface2 is ISurfaceImpl simpl2)
-            {
-                if (simpl2.usedArea.IsEmpty() || simpl2.usedArea.IsInfinite)
-                {
-                    BoundingRect ext = BoundingRect.EmptyBoundingRect;
-                    for (int i = 0; i < basePoints.Length; i++)
-                    {
-                        ext.MinMax(basePoints[i].psurface2);
-                    }
-                    simpl2.usedArea = ext;
-                }
-            }
+                        isTangential = false;
+                        break;
 
-        }
-        void IDeserializationCallback.OnDeserialization(object sender)
-        {
-            if (surface1 is ISurfaceImpl simpl1)
-            {
-                if (simpl1.usedArea.IsEmpty() || simpl1.usedArea.IsInfinite)
-                {
-                    BoundingRect ext = BoundingRect.EmptyBoundingRect;
-                    for (int i = 0; i < basePoints.Length; i++)
-                    {
-                        ext.MinMax(basePoints[i].psurface1);
                     }
-                    simpl1.usedArea = ext;
                 }
             }
-            if (surface2 is ISurfaceImpl simpl2)
-            {
-                if (simpl2.usedArea.IsEmpty() || simpl2.usedArea.IsInfinite)
-                {
-                    BoundingRect ext = BoundingRect.EmptyBoundingRect;
-                    for (int i = 0; i < basePoints.Length; i++)
-                    {
-                        ext.MinMax(basePoints[i].psurface2);
-                    }
-                    simpl2.usedArea = ext;
-                }
-            }
+            jsonSerialize.InvokeSerializationDoneCallback(surface1);
+            jsonSerialize.InvokeSerializationDoneCallback(surface2);
+            // Files written while CloneTrimmed handed forwardOriented to the parameter isTangential may contain transversal
+            // curves marked as tangential. Their points would be computed with the solver for touching surfaces, which
+            // fails for them, so every point would silently remain unrefined.
+            if (isTangential && IsTransversalAtAllInnerPoints()) isTangential = false;
+            DualSurfaceCurveDiagnostics.ConstructionProbe probe = DualSurfaceCurveDiagnostics.BeginConstruction();
+            RefineInconsistentInnerPoints();
+            InitAfterReading();
+            DualSurfaceCurveDiagnostics.EndConstruction(probe, surface1, surface2, basePoints, isTangential,
+                "JSON deserialization, type version " + jsonSerialize.GetTypeVersion(this.GetType()).ToString());
         }
-
         int IExportStep.Export(ExportStep export, bool topLevel)
         {
             return (ToBSpline(export.Precision) as IExportStep).Export(export, topLevel);
@@ -3018,6 +1936,14 @@ namespace CADability
             ApproximatePosition(u, out uv1, out uv2, out p);
             GeoVector v = surface1.GetNormal(uv1).Normalized + surface2.GetNormal(uv2).Normalized;
             return v;
+        }
+
+        void IDualSurfaceCurve.Trim(GeoPoint startPoint, GeoPoint endPoint)
+        {
+            if (Precision.IsEqual(startPoint, StartPoint) && Precision.IsEqual(endPoint, EndPoint)) return;
+            double posSp = PositionOf(startPoint);
+            double posEp = PositionOf(endPoint);
+            Trim(posSp, posEp);
         }
 
         #endregion

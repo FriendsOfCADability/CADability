@@ -713,8 +713,9 @@ namespace CADability.GeoObject
         #endregion
 
         #region IJsonSerialize Members
-        public void GetObjectData(IJsonWriteData data)
+        public override void GetObjectData(IJsonWriteData data)
         {
+            base.GetObjectData(data);
             data.AddProperty("Plane", plane);
             data.AddProperty("Radius", radius);
             data.AddProperty("Pitch", pitch);
@@ -725,8 +726,9 @@ namespace CADability.GeoObject
             if (LineWidth != null) data.AddProperty("LineWidth", LineWidth);
             if (LinePattern != null) data.AddProperty("LinePattern", LinePattern);
         }
-        public void SetObjectData(IJsonReadData data)
+        public override void SetObjectData(IJsonReadData data)
         {
+            base.SetObjectData(data);
             plane = data.GetProperty<Plane>("Plane");
             radius = data.GetProperty<double>("Radius");
             pitch = data.GetProperty<double>("Pitch");

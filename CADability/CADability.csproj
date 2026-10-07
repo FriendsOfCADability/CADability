@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackageId>CADability</PackageId>
-    <Version>1.4.0</Version>
+    <Version>1.5.0</Version>
     <!-- Update this for each publish -->
     <Authors>FriendsOfCADability</Authors>
     <Description>CAD functionality for .NET</Description>

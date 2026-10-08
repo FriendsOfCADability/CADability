@@ -153,6 +153,11 @@ namespace CADability.Tests
         [DataRow("Segoe UI Variable Text")]
         [DataRow("Segoe UI Variable Display")]
         [DataRow("Segoe UI")]
+        // these contain Bezier segments whose control points coincide, which threw an IndexOutOfRangeException
+        [DataRow("Bahnschrift Condensed")]
+        [DataRow("Bahnschrift Light Condensed")]
+        [DataRow("Bahnschrift SemiLight Condensed")]
+        [DataRow("Gigi")] // installed with Microsoft Office
         public void AllGlyphsHaveTriangles(string fontName)
         {
             string notAvailable = CheckFontAvailable(fontName);

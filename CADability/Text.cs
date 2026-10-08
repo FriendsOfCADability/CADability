@@ -632,7 +632,14 @@ namespace CADability.GeoObject
                 width = 0.0;
                 try
                 {
-                    paths = GetOutline2D(font, fontStyle, c, out width);
+                    try
+                    {
+                        paths = GetOutline2D(font, fontStyle, c, out width);
+                    }
+                    catch (Exception ex) when (!(ex is ThreadAbortException))
+                    {   // a glyph whose outline cannot be read is left out, it must not take the whole text down
+                        paths = new Path2D[0];
+                    }
                     if (paintTo3D != null)
                     {
                         bool painted = false;

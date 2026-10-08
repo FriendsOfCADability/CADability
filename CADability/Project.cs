@@ -1,4 +1,4 @@
-﻿using CADability.Attribute;
+using CADability.Attribute;
 using CADability.GeoObject;
 using CADability.Shapes;
 using CADability.Substitutes;
@@ -1682,7 +1682,7 @@ namespace CADability
         }
         private static Project ImportDXF(string filename)
         {
-            CADability.DXF.Import import = new DXF.Import(filename);
+            CADability.DXF.Import import = new DXF.Import(filename, true);
             return import.Project;
         }
 
@@ -1690,9 +1690,7 @@ namespace CADability
         {
             try
             {
-                var reader = new DwgReader(filename, null);
-                var cadDoc = reader.Read();
-                CADability.DXF.Import import = new DXF.Import(cadDoc);
+                CADability.DXF.Import import = new DXF.Import(filename, false);
                 return import.Project;
             }
             catch (Exception ex)

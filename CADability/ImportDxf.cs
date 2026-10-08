@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -34,7 +34,7 @@ namespace CADability.DXF
         private Dictionary<string, ColorDef> layerColorTable;
         private Dictionary<string, Attribute.Layer> layerTable;
 
-        public Import(string fileName)
+        public Import(string fileName, bool dxfFile)
         {
             byte[] raw;
             using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
@@ -46,7 +46,10 @@ namespace CADability.DXF
             {
                 try
                 {
-                    doc = new DxfReader(stream).Read();
+                    ICadReader docReader = null;
+                    if (dxfFile) docReader = new DxfReader(stream);
+                    else docReader = new DwgReader(stream);
+                    doc = docReader.Read();
                 }
                 catch (Exception)
                 {

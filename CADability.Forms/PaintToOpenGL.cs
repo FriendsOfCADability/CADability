@@ -667,7 +667,12 @@ namespace CADability.Forms
 
         private void CheckError(bool dontDebug = false)
         {
-
+#if DEBUG_OPENGL
+            if (MainThread != Thread.CurrentThread)
+            {
+                MessageBox.Show("Different thread in OpenGL calls. Some OpenGL implementations only accepts single threaded applications");
+            }
+#endif
             int error = Gl.glGetError();
             if (error == 0) return;
             // für Hilgers Debug:
@@ -2124,18 +2129,8 @@ namespace CADability.Forms
         }
         #endregion
 
-        private static readonly object openGlLock = new();
         public static Bitmap PaintToBitmap(GeoObjectList list, GeoVector viewDirection, int width, int height, BoundingCube? extent = null)
         {
-        //    lock (openGlLock)
-        //    {
-        //        return PaintToBitmapCore(
-        //            list, viewDirection, width, height, extent);
-        //    }
-        //}
-
-        //private static Bitmap PaintToBitmapCore(GeoObjectList list, GeoVector viewDirection, int width, int height, BoundingCube? extent = null)
-        //{
             Bitmap bmp = new Bitmap(width, height);
             System.Drawing.Graphics gr = System.Drawing.Graphics.FromImage(bmp);
             IntPtr dc = gr.GetHdc();

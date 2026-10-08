@@ -106,7 +106,13 @@ namespace CADability.Tests
         private static string CheckFontAvailable(string fontName)
         {
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return "glyph outlines need GDI, which is only available on Windows";
-            if (!GeoObject.Text.FontFamilyNames.Contains(fontName.ToUpper())) return "font '" + fontName + "' is not installed";
+            if (!GeoObject.Text.FontFamilyNames.Contains(fontName.ToUpper()))
+            {
+                // name the installed families that start with the same word, which shows a misspelled or a wrong instance name
+                string firstWord = fontName.Split(' ')[0].ToUpper();
+                string[] similar = GeoObject.Text.FontFamilyNames.Where(n => n.StartsWith(firstWord)).OrderBy(n => n).ToArray();
+                return "font '" + fontName + "' is not installed" + (similar.Length > 0 ? ", installed are: " + string.Join(", ", similar) : "");
+            }
             return null;
         }
 
@@ -143,7 +149,9 @@ namespace CADability.Tests
         [DataRow("Calibri")]
         [DataRow("Bahnschrift")]
         [DataRow("Bahnschrift Light")]
-        [DataRow("Segoe UI Variable")]
+        // GDI knows the variable font of Windows 11 only by the names of its instances, there is no family "Segoe UI Variable"
+        [DataRow("Segoe UI Variable Text")]
+        [DataRow("Segoe UI Variable Display")]
         [DataRow("Segoe UI")]
         public void AllGlyphsHaveTriangles(string fontName)
         {

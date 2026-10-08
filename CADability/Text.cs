@@ -959,7 +959,7 @@ namespace CADability.GeoObject
         private LineAlignMode lineAlignment;
         // private IGeoObject[] cachedDisplayItems;
         private static HashSet<string> fontFamilyNames;
-        internal static HashSet<string> FontFamilyNames 
+        internal static HashSet<string> FontFamilyNames
         {
             get
             {

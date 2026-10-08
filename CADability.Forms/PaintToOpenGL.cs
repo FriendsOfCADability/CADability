@@ -2128,7 +2128,6 @@ namespace CADability.Forms
             }
         }
         #endregion
-
         public static Bitmap PaintToBitmap(GeoObjectList list, GeoVector viewDirection, int width, int height, BoundingCube? extent = null)
         {
             Bitmap bmp = new Bitmap(width, height);

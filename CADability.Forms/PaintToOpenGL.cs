@@ -212,11 +212,16 @@ namespace CADability.Forms
         }
         public PaintToOpenGL(double precision = 1e-6)
         {
-            try
-            {   // hier gab es noch keinen OpenGL Aufruf, einmal CheckError nullt diesen
-                CheckError(true);
-            }
-            catch { }
+            // having a CheckError here leads to an AccessViolationException,
+            // if two threads call PaintToBitmap at the same time
+            // 
+            //try
+            //{   // hier gab es noch keinen OpenGL Aufruf, einmal CheckError nullt diesen
+
+            //    CheckError(true);
+            //}
+            //catch { }
+
             if (MainThread == null) MainThread = Thread.CurrentThread;
             this.precision = precision;
             paintSurfaces = true;
@@ -662,12 +667,7 @@ namespace CADability.Forms
 
         private void CheckError(bool dontDebug = false)
         {
-#if DEBUG_OPENGL
-            if (MainThread != Thread.CurrentThread)
-            {
-                MessageBox.Show("Different thread in OpenGL calls. Some OpenGL implementations only accepts single threaded applications");
-            }
-#endif
+
             int error = Gl.glGetError();
             if (error == 0) return;
             // für Hilgers Debug:
@@ -2123,8 +2123,19 @@ namespace CADability.Forms
             }
         }
         #endregion
+
+        private static readonly object openGlLock = new();
         public static Bitmap PaintToBitmap(GeoObjectList list, GeoVector viewDirection, int width, int height, BoundingCube? extent = null)
         {
+        //    lock (openGlLock)
+        //    {
+        //        return PaintToBitmapCore(
+        //            list, viewDirection, width, height, extent);
+        //    }
+        //}
+
+        //private static Bitmap PaintToBitmapCore(GeoObjectList list, GeoVector viewDirection, int width, int height, BoundingCube? extent = null)
+        //{
             Bitmap bmp = new Bitmap(width, height);
             System.Drawing.Graphics gr = System.Drawing.Graphics.FromImage(bmp);
             IntPtr dc = gr.GetHdc();

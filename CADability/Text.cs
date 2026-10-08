@@ -1,4 +1,4 @@
-﻿using CADability.Actions;
+using CADability.Actions;
 using CADability.Attribute;
 using CADability.Curve2D;
 using CADability.Shapes;
@@ -959,19 +959,10 @@ namespace CADability.GeoObject
         private LineAlignMode lineAlignment;
         // private IGeoObject[] cachedDisplayItems;
         private static HashSet<string> fontFamilyNames;
-        internal static HashSet<string> FontFamilyNames
+        internal static HashSet<string> FontFamilyNames 
         {
             get
             {
-                if (fontFamilyNames == null)
-                {
-                    FontFamily[] ff = FontFamily.Families;
-                    fontFamilyNames = new HashSet<string>();
-                    for (int i = 0; i < ff.Length; i++)
-                    {
-                        fontFamilyNames.Add(ff[i].Name.ToUpper());
-                    }
-                }
                 return fontFamilyNames;
             }
         }
@@ -984,6 +975,18 @@ namespace CADability.GeoObject
             return new Text();
         }
         #endregion
+
+        // The CLR initializes the HashSet once, before any thread can read it.
+        static Text()
+        {
+            FontFamily[] ff = FontFamily.Families;
+            fontFamilyNames = new HashSet<string>();
+            for (int i = 0; i < ff.Length; i++)
+            {
+                fontFamilyNames.Add(ff[i].Name.ToUpper());
+            }
+        }
+
         protected Text()
         {
             displayAsPath = Settings.GlobalSettings.GetIntValue("Font.DisplayMode", 1) == 1; // müsste nur einmal geladen werden, macht aber direkt bei der static Deklaration Probleme

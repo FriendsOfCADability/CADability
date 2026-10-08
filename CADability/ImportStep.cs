@@ -1,4 +1,4 @@
-﻿using CADability.Attribute;
+using CADability.Attribute;
 using CADability.Curve2D;
 using CADability.GeoObject;
 using MathNet.Numerics.LinearAlgebra.Double;
@@ -726,7 +726,6 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 			{
 				return new Item(type, val);
 			}
-			public static Dictionary<string, ItemType> TypeOfName = new Dictionary<string, ItemType>();
 
 			public bool IsEntity
 			{
@@ -736,7 +735,9 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 				}
 			}
 
-			public static void Init()
+			// The CLR initializes the lookup once, before any thread can read it.
+			private static readonly Dictionary<string, ItemType> TypeOfName = new Dictionary<string, ItemType>();
+			static Item()
 			{
 				TypeOfName["PRODUCT"] = ItemType.product;
 				TypeOfName["APPLICATION_CONTEXT"] = ItemType.applicationContext;
@@ -1244,7 +1245,6 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 			// ATTREZZATURA + GIRANTE.stp, AL_1180775_AL_1180775.stp, SSSS4912PCAM.stp
 
 			// Assembly2.step doesn't work correctly with both methods!
-			Item.Init();
 		}
 
 		private void MakeRelations(List<int> cdsr)

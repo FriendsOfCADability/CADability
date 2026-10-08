@@ -169,12 +169,16 @@ namespace CADability.Tests
 
         /// <summary>
         /// Survey over all installed fonts: writes the glyphs without triangles to the test output, does not fail.
-        /// Takes a few minutes, therefore ignored by default.
+        /// Takes a few minutes, therefore it only runs when it is started under the debugger (Debug Test in Visual Studio)
+        /// or with the environment variable CADABILITY_FONT_SURVEY set, e.g.
+        /// <c>dotnet test --filter Name=ReportGlyphsWithoutTrianglesForAllInstalledFonts -e CADABILITY_FONT_SURVEY=1</c>.
+        /// An [Ignore] attribute cannot be overridden in the test explorer, so the test could not be run at all.
         /// </summary>
         [TestMethod]
-        [Ignore("survey over all installed fonts, run manually")]
         public void ReportGlyphsWithoutTrianglesForAllInstalledFonts()
         {
+            if (!System.Diagnostics.Debugger.IsAttached && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CADABILITY_FONT_SURVEY")))
+                Assert.Inconclusive("survey over all installed fonts, takes a few minutes: start it with Debug Test or set CADABILITY_FONT_SURVEY=1");
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) Assert.Inconclusive("glyph outlines need GDI, which is only available on Windows");
             int fontsWithProblems = 0;
             foreach (FontFamily ff in FontFamily.Families)

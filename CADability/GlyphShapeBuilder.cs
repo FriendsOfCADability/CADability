@@ -52,15 +52,20 @@ namespace CADability.GeoObject
                     multiplicities[1] = 4;
                     GeoPoint2D[] pp = new GeoPoint2D[4];
                     points.CopyTo(i, pp, 0, 4);
+                    // Some fonts (e.g. Gigi and the condensed instances of Bahnschrift) contain Bezier segments whose
+                    // control points all coincide. Such a segment has no length, its approximation is an empty Path2D,
+                    // and a Path2D cannot be made of an empty one. Start and end point are the same, so leaving it out
+                    // keeps the outline connected.
+                    if (Precision.IsEqual(pp[0], pp[1]) && Precision.IsEqual(pp[0], pp[2]) && Precision.IsEqual(pp[0], pp[3])) continue;
                     BSpline2D bsp = new BSpline2D(pp, null, knots, multiplicities, 3, false, 0.0, 1.0);
                     // addto.Add(bsp);
                     switch (fontPrecision)
                     {
                         case 0: // grob
-                            addto.Add(bsp.Approximate(true, 0.2));
+                            AddApproximation(addto, bsp.Approximate(true, 0.2));
                             break;
                         case 1: // mittel
-                            addto.Add(bsp.Approximate(true, 0.05));
+                            AddApproximation(addto, bsp.Approximate(true, 0.05));
                             break;
                         case 2:
                             // addto.Add(bsp.Approximate(true, 0.005));
@@ -85,6 +90,16 @@ namespace CADability.GeoObject
                 catch (Polyline2DException) { } // nur zwei identische Punkte
             }
             points.RemoveRange(0, points.Count - 1); // den letzten als ersten drinlassen
+        }
+
+        /// <summary>
+        /// Adds the approximation of a Bezier segment, unless it is empty (a segment that is too short to be approximated).
+        /// </summary>
+        private static void AddApproximation(List<ICurve2D> addto, ICurve2D approximation)
+        {
+            if (approximation == null) return;
+            if (approximation is Path2D p2d && p2d.SubCurvesCount == 0) return;
+            addto.Add(approximation);
         }
 
         /// <summary>

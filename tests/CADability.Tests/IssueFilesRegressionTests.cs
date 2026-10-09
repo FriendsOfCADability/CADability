@@ -117,5 +117,54 @@ namespace CADability.Tests
             Assert.IsTrue(triangulate.Wait(20000), "the triangulation did not return (infinite loop, issue #347)");
             Assert.IsTrue(triangles > 0, "the face is triangulated");
         }
+
+        /// <summary>
+        /// Issue #168: subtracting a small cut (10 planar faces) from a rectangular tube with rounded edges, 2861 long, returned
+        /// an empty result, as did the reverse difference and the intersection. The cut has faces 2.5e-3 away from faces of the
+        /// tube, which the precision derived from the size of the tube swallowed, and its bottom lies 1e-7 to 3e-7 above the
+        /// bottom of the tube, where the rounded edge is tangent. The file contains only these two solids of the reporter's model.
+        /// Scaled by 10, the intersection points of the cut's edges with the rounded face fell within the 2d tolerance of its border.
+        /// </summary>
+        [DataTestMethod]
+        [DataRow(1.0)]
+        [DataRow(10.0)]
+        public void a_small_cut_can_be_subtracted_from_a_long_profile(double scale)
+        {
+            string file = TestFile("CDB", "issue168.cdb.json");
+            Assert.IsTrue(File.Exists(file), $"test file not found: {file}");
+            Project project = null;
+            try
+            {
+                project = Project.ReadFromFile(file, "cdb");
+            }
+            catch (TypeInitializationException e) when (e.GetBaseException() is PlatformNotSupportedException)
+            {
+                Assert.Inconclusive("reading a project needs System.Drawing printing, which is only available on Windows");
+            }
+            Assert.IsNotNull(project);
+            List<Solid> solids = project.GetActiveModel().AllObjects.OfType<Solid>().ToList();
+            Solid main = solids.Single(s => s.Name == "main53335");
+            Solid cut = solids.Single(s => s.Name == "cut53335");
+            main.Modify(ModOp.Scale(scale));
+            cut.Modify(ModOp.Scale(scale));
+            double prec = 1e-3 * scale, tolerance = 0.02 * scale * scale * scale;
+            double vMain = main.Volume(prec), vCut = cut.Volume(prec);
+            // the volumes are computed from triangulations, for the long tube this is only exact to about 1e-6 of its volume
+            double tubeTolerance = Math.Max(tolerance, 1e-6 * vMain);
+            Solid Single(Solid[] result, string what)
+            {
+                Assert.IsNotNull(result, what);
+                Assert.AreEqual(1, result.Length, what + ": number of solids");
+                Assert.AreEqual(0, result[0].Shells[0].OpenEdges.Length, what + ": open edges");
+                foreach (Face face in result[0].Shells[0].Faces) Assert.IsTrue(face.CheckConsistency(), what + ": inconsistent face");
+                return result[0];
+            }
+            // the walls of the tube cover 96.4732 of the profile of the cut, over the 30.0046 the cut reaches into the tube
+            double common = Single(Solid.Intersect(cut, main), "cut * main").Volume(prec);
+            Assert.AreEqual(2894.64 * scale * scale * scale, common, tolerance, "cut * main");
+            Assert.AreEqual(common, Single(Solid.Intersect(main, cut), "main * cut").Volume(prec), tolerance, "main * cut");
+            Assert.AreEqual(vCut - common, Single(Solid.Subtract(cut, main), "cut - main").Volume(prec), tolerance, "cut - main");
+            Assert.AreEqual(vMain - common, Single(Solid.Subtract(main, cut), "main - cut").Volume(prec), tubeTolerance, "main - cut");
+        }
     }
 }

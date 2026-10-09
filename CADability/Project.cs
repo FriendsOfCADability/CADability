@@ -1624,7 +1624,7 @@ namespace CADability
         /// </summary>
         /// <param name="stream">The Stream containing JSON serialized project data</param>
         /// <returns>The deserialized Project or null if deserialization fails</returns>
-        public static Project ReadFromJson(Stream stream, IJsonProgess progress = null)
+        public static Project ReadFromJson(Stream stream, IJsonProgress progress = null)
         {
             // Create a new JsonSerialize instance to handle deserialization
             JsonSerialize js = new JsonSerialize();
@@ -2687,7 +2687,7 @@ namespace CADability
         /// <summary>
         /// It shows the progress bar during reading/writting a drawing file.
         /// </summary>
-        private class UIProgessBar : DXF.IDxfProgress, IJsonProgess
+        private class UIProgessBar : DXF.IDxfProgress, IJsonProgress
         {
             string _text = null; //Text in the progress bar.
             double _increment = 1; //Increment value of the progress bar for each executed step. When all steps are completed it is 100.

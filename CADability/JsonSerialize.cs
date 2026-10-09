@@ -88,7 +88,7 @@ namespace CADability
     /// <summary>
     /// Interface to feedback the reading/writing progress.
     /// </summary>
-    public interface IJsonProgess
+    public interface IJsonProgress
     {
         void SetStepIncrement(double increment);
         void DoStep(int doneSteps = 1);
@@ -504,7 +504,7 @@ namespace CADability
 
         }
 
-        IJsonProgess progress; //To keep track of the reading/writing progress.
+        IJsonProgress progress; //To keep track of the reading/writing progress.
         // for serialization:
         Queue<object> queue;
         int objectCount;
@@ -689,7 +689,7 @@ namespace CADability
             else res.Version = typeversion;
             return res;
         }
-        public object FromStream(Stream stream, IJsonProgess progress = null)
+        public object FromStream(Stream stream, IJsonProgress progress = null)
         {
             this.progress = progress;
             SetProgressStepIncrement(35);
@@ -1119,7 +1119,7 @@ namespace CADability
             return entities[(int)index];
         }
 
-        public bool ToStream(Stream stream, object toSerialize, bool closeStream = true, IJsonProgess progress = null)
+        public bool ToStream(Stream stream, object toSerialize, bool closeStream = true, IJsonProgress progress = null)
         {
             this.progress = progress;
             verbose = Settings.GlobalSettings.GetBoolValue("Json.Verbose", false);

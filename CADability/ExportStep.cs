@@ -208,6 +208,85 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
             int n = (normal.Normalized as IExportStep).Export(this, false);
             return WriteDefinition("AXIS1_PLACEMENT('',#" + nl.ToString() + ",#" + n.ToString() + ")");
         }
+        /// <summary>
+        /// Writes the geometry of <paramref name="curve"/> (not as a top level object) and returns its entity number.
+        /// A curve that cannot write itself, e.g. a <see cref="GeoObject.Path"/> or a curve that is only defined numerically,
+        /// is written as a B_SPLINE_CURVE_WITH_KNOTS, which approximates it within <see cref="Precision"/>, see <see cref="ToBSpline"/>.
+        /// </summary>
+        internal int WriteCurve(ICurve curve)
+        {
+            if (curve is IExportStep exportable) return exportable.Export(this, false);
+            BSpline bsp = ToBSpline(curve, Precision);
+            if (bsp != null) return (bsp as IExportStep).Export(this, false);
+            return (Line.TwoPoints(curve.StartPoint, curve.EndPoint) as IExportStep).Export(this, false); // a degenerate curve
+        }
+        /// <summary>
+        /// Approximates <paramref name="curve"/> by a single cubic BSpline with the maximum deviation <paramref name="precision"/>.
+        /// The segments of a <see cref="GeoObject.Path"/> are approximated one by one and joined with knots of multiplicity 3 (the degree),
+        /// so the BSpline passes through all vertices of the path and keeps its corners, and a segment which is a line is
+        /// reproduced exactly. A single BSpline is used rather than a COMPOSITE_CURVE, because an EDGE_CURVE needs a single
+        /// curve geometry, and BSplines are supported by STEP readers far more widely than composite curves.
+        /// Returns null, if the curve cannot be approximated (e.g. it has no length).
+        /// </summary>
+        internal static BSpline ToBSpline(ICurve curve, double precision)
+        {
+            const int degree = 3;
+            List<ICurve> segments = new List<ICurve>();
+            void Flatten(ICurve c)
+            {
+                if (c is GeoObject.Path path) foreach (ICurve sub in path.Curves) Flatten(sub);
+                else if (c is Polyline polyline)
+                {   // a polyline has corners, which a single cubic piece cannot follow
+                    GeoPoint[] v = polyline.Vertices;
+                    for (int i = 0; i < v.Length - 1; i++) Flatten(Line.TwoPoints(v[i], v[i + 1]));
+                    if (polyline.IsClosed) Flatten(Line.TwoPoints(v[v.Length - 1], v[0]));
+                }
+                else if (c.Length > CADability.Precision.eps) segments.Add(c); // omit degenerate segments, the neighbours touch each other
+            }
+            Flatten(curve);
+            List<BSpline> pieces = new List<BSpline>();
+            foreach (ICurve segment in segments)
+            {
+                BSpline piece = BSpline.Approximate(segment.PointAt, precision);
+                if (piece == null || piece.Degree != degree || piece.HasWeights) { pieces = null; break; }
+                pieces.Add(piece);
+            }
+            if (pieces == null || pieces.Count == 0)
+            {   // a degenerate curve or a segment, which cannot be approximated: approximate the curve as a whole
+                return BSpline.Approximate(curve.PointAt, precision);
+            }
+            if (pieces.Count == 1) return pieces[0];
+            // Concatenate the clamped pieces: the last pole of a piece and the first pole of the next one coincide, so it is
+            // used only once. The knots of a piece are mapped to an interval as long as the segment, so that the parameter
+            // runs roughly proportional to the arc length.
+            List<GeoPoint> poles = new List<GeoPoint>();
+            List<double> knots = new List<double>();
+            List<int> multiplicities = new List<int>();
+            double offset = 0.0;
+            for (int i = 0; i < pieces.Count; i++)
+            {
+                double[] kn = pieces[i].Knots;
+                int[] mu = pieces[i].Multiplicities;
+                double factor = segments[i].Length / (kn[kn.Length - 1] - kn[0]);
+                for (int j = 0; j < kn.Length - 1; j++)
+                {
+                    if (j == 0 && i > 0) multiplicities[multiplicities.Count - 1] = degree; // the joint, the knot is already there
+                    else
+                    {
+                        knots.Add(offset + (kn[j] - kn[0]) * factor);
+                        multiplicities.Add(mu[j]);
+                    }
+                }
+                offset += segments[i].Length;
+                knots.Add(offset);
+                multiplicities.Add(mu[mu.Length - 1]);
+                GeoPoint[] pl = pieces[i].Poles;
+                for (int j = i == 0 ? 0 : 1; j < pl.Length; j++) poles.Add(pl[j]);
+            }
+            BSpline res = BSpline.Construct();
+            res.SetData(degree, poles.ToArray(), null, knots.ToArray(), multiplicities.ToArray(), false);
+            return res;
+        }
 
         internal string ToString(int[] ints, bool makeReference)
         {

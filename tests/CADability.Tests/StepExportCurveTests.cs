@@ -225,7 +225,10 @@ namespace CADability.Tests
             Assert.IsTrue(File.Exists(stp));
             Project project = Project.ReadFromFile(stp, "stp");
             List<Face> faces = project.GetActiveModel().AllObjects.SelectMany(Faces).ToList();
-            Assert.IsTrue(faces.Count > 0);
+            // the CLOSED_SHELL of the file contains a single face; the import used to close it with a coincident second face
+            // with the same orientation, which was inconsistent
+            Assert.AreEqual(1, faces.Count, "the single face of the file");
+            Assert.IsTrue(faces[0].CheckConsistency());
             Assert.IsTrue(faces.All(face => face.AllEdges.Length == 1 && face.AllEdges[0].Curve3D is BSpline), "a disc bounded by a single closed BSpline");
             double area = Area(faces);
 
@@ -237,6 +240,7 @@ namespace CADability.Tests
             Project read = Project.ReadFromFile(file, "stp");
             List<Face> readFaces = read.GetActiveModel().AllObjects.SelectMany(Faces).ToList();
             Assert.AreEqual(faces.Count, readFaces.Count);
+            Assert.IsTrue(readFaces.All(face => face.CheckConsistency()));
             Assert.AreEqual(area, Area(readFaces), area * 1e-6);
         }
     }

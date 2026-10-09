@@ -5,6 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Linq;
+using System.Threading;
 
 namespace CADability.Forms
 {
@@ -59,22 +61,9 @@ namespace CADability.Forms
         Graphics oldGraphics;
         bool thinLinesOnly;
         private static HashSet<string> fontFamilyNames;
-        internal static HashSet<string> FontFamilyNames
-        {
-            get
-            {
-                if (fontFamilyNames == null)
-                {
-                    FontFamily[] ff = FontFamily.Families;
-                    fontFamilyNames = new HashSet<string>();
-                    for (int i = 0; i < ff.Length; i++)
-                    {
-                        fontFamilyNames.Add(ff[i].Name.ToUpper());
-                    }
-                }
-                return fontFamilyNames;
-            }
-        }
+        internal static HashSet<string> FontFamilyNames =>
+            LazyInitializer.EnsureInitialized(ref fontFamilyNames, () =>
+                new HashSet<string>(FontFamily.Families.Select(f => f.Name.ToUpper())));
 
         public PaintToGDI(Projection projection, Graphics graphics)
             : this()

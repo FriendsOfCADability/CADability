@@ -157,10 +157,14 @@ namespace CADability
             if (normal.IsNullVector()) throw new PlaneException(PlaneException.tExceptionType.ConstructorFailed);
             try
             {
-                if (normal.x == 0 && normal.y == 0)
-                {   // two very common cases
-                    if (normal.z > 0) coordSys = new CoordSys(location, GeoVector.XAxis, GeoVector.YAxis);
-                    else coordSys = new CoordSys(location, GeoVector.YAxis, GeoVector.XAxis);
+                double tolerance = 1e-8 * normal.Length;
+                if (Math.Abs(normal.x) <= tolerance && Math.Abs(normal.y) <= tolerance)
+                {   // two very common cases: normal is +Z or -Z, maybe with some rounding errors (issue #204). The x-axis is then X
+                    // (for +Z) or Y (for -Z), projected onto the plane, so that the normal stays exactly as provided.
+                    GeoVector n = normal.Normalized;
+                    GeoVector dirx = n.z > 0 ? GeoVector.XAxis : GeoVector.YAxis;
+                    dirx = dirx - (dirx * n) * n;
+                    coordSys = new CoordSys(location, dirx, n ^ dirx);
                 }
                 else
                 {
@@ -210,6 +214,8 @@ namespace CADability
         /// <summary>
         /// Finds a plane that best fits through the given points. Calculates also the maximum distance
         /// of the points from that plane. If <paramref name="MaxDistance"/> is 0.0 or small, the points are coplanar.
+        /// The normal of the plane points to positive z. If it is (almost) perpendicular to the z-axis, it points to positive y,
+        /// and if it is (almost) the x-axis, it points to positive x. Points in the XY plane yield a plane with the normal +Z.
         /// </summary>
         /// <param name="Points">points to build the plane from</param>
         /// <param name="MaxDistance">maximum distance of the points from the plane</param>
@@ -224,88 +230,84 @@ namespace CADability
                 return Plane.XYPlane; // there is no "invalid plane"
             }
 
-            Matrix A = new DenseMatrix(points.Length, 3);
-            Vector B = new DenseVector(points.Length);
+            // The plane is fitted relative to the centroid of the points (orthogonal least squares: the normal is the eigenvector
+            // of the smallest eigenvalue of the covariance matrix), so the result does not depend on where the points are. The
+            // previous fit of a*x + b*y + c*z + 1 = 0 to the absolute coordinates cannot describe a plane through the origin, so
+            // the points had to be moved first, which decided the orientation of the normal (always -Z for points with z = 0,
+            // issue #204), and far away from the origin its normal equations looked rank deficient, so planar points were
+            // reported as linear (issue #147).
+            GeoPoint centroid = new GeoPoint(points);
+            double xx = 0.0, xy = 0.0, xz = 0.0, yy = 0.0, yz = 0.0, zz = 0.0;
+            double maxCoordinate = 0.0;
             for (int i = 0; i < points.Length; i++)
             {
-                A[i, 0] = points[i].x; // move the points to (x,y,z)>(1,1,1)
-                A[i, 1] = points[i].y;
-                A[i, 2] = points[i].z;
-                B[i] = -1;
+                GeoVector r = points[i] - centroid;
+                xx += r.x * r.x;
+                xy += r.x * r.y;
+                xz += r.x * r.z;
+                yy += r.y * r.y;
+                yz += r.y * r.z;
+                zz += r.z * r.z;
+                maxCoordinate = Math.Max(maxCoordinate, Math.Max(Math.Abs(points[i].x), Math.Max(Math.Abs(points[i].y), Math.Abs(points[i].z))));
             }
-            GeoVector translation = GeoVector.NullVector;
-            Matrix AAT = (Matrix)(A.Transpose().Multiply(A));
-            if (AAT.Rank() < 3)
-            {   // this might be the case when the optimal plane geos through the origin
-                // then we need to move the point cloud
-                // a goo direction seems to be the axis direction where the extent is smallest
-                BoundingCube ext = new BoundingCube(points.ToArray());
-                int ind;
-                if (ext.XDiff < ext.YDiff && ext.XDiff < ext.ZDiff) ind = 0;
-                else if (ext.YDiff < ext.XDiff && ext.YDiff < ext.ZDiff) ind = 1;
-                else ind = 2;
-                double sz = ext.Size;
-                // Moving along an axis which lies in the plane leaves the plane where it is, and the rank stays too
-                // small. With x and y extents equal, the choice above is z, which is exactly that for a plane like
-                // x = -y. The points were then reported as linear, and a planar BSpline projected its poles onto an
-                // arbitrary plane through its chord. So the other axes are tried as well: points are only linear if
-                // no translation helps.
-                bool found = false;
-                foreach (int axis in new[] { ind, (ind + 1) % 3, (ind + 2) % 3 })
-                {
-                    Matrix moved = (Matrix)A.Clone();
-                    for (int i = 0; i < points.Length; i++)
-                    {
-                        moved[i, axis] += sz;
-                    }
-                    Matrix movedAAT = (Matrix)(moved.Transpose().Multiply(moved));
-                    if (movedAAT.Rank() == 3)
-                    {
-                        translation[axis] += sz;
-                        A = moved;
-                        AAT = movedAAT;
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found)
-                {
-                    isLinear = true;
-                    return Plane.XYPlane;
-                }
-            }
-            Vector res = (Vector)AAT.Solve(A.Transpose().Multiply(B));
-            if (res.IsValid())
+            double size = new BoundingCube(points).Size;
+            if (!(size > 0.0)) // all points are identical (or invalid)
             {
-                //double err = 0.0;
-                //if (translation.IsNullVector())
-                //{
-                //    for (int i = 0; i < points.Length; i++)
-                //    {
-                //        err += sqr(res[0] * points[i].x + res[1] * points[i].y + res[2] * points[i].z + 1);
-                //    }
-                //}
-                //else
-                //{
-                //    for (int i = 0; i < points.Length; i++)
-                //    {
-                //        err += sqr(res[0] * (points[i].x + translation.x) + res[1] * (points[i].y + translation.y) + res[2] * (points[i].z + translation.z) + 1);
-                //    }
-                //}
-                //maxDistance = Math.Sqrt(err);
-                double l = -1.0 / (res[0] * res[0] + res[1] * res[1] + res[2] * res[2]);
-                GeoPoint axisLocation = new GeoPoint(l * res[0], l * res[1], l * res[2]);
-                Plane plane = new Plane(axisLocation - translation, (new GeoVector(res[0], res[1], res[2])).Normalized);
-                maxDistance = 0.0;
-                for (int i = 0; i < points.Length; i++)
-                {
-                    double d = Math.Abs(plane.Distance(points[i]));
-                    if (d > maxDistance) maxDistance = d;
-                }
-                return plane;
+                isLinear = true;
+                return Plane.XYPlane;
             }
-            isLinear = true;
-            return Plane.XYPlane;
+            Matrix<double> covariance = DenseMatrix.OfArray(new double[,] { { xx, xy, xz }, { xy, yy, yz }, { xz, yz, zz } });
+            Evd<double> evd = covariance.Evd(Symmetricity.Symmetric);
+            int smallest = 0, largest = 0;
+            for (int i = 1; i < 3; i++)
+            {
+                if (evd.EigenValues[i].Real < evd.EigenValues[smallest].Real) smallest = i;
+                if (evd.EigenValues[i].Real > evd.EigenValues[largest].Real) largest = i;
+            }
+            GeoVector mainDirection = new GeoVector(evd.EigenVectors[0, largest], evd.EigenVectors[1, largest], evd.EigenVectors[2, largest]);
+            GeoVector normal = new GeoVector(evd.EigenVectors[0, smallest], evd.EigenVectors[1, smallest], evd.EigenVectors[2, smallest]);
+            if (smallest == largest || !mainDirection.IsValid() || !normal.IsValid() || mainDirection.IsNullVector() || normal.IsNullVector())
+            {   // only with invalid coordinates
+                isLinear = true;
+                return Plane.XYPlane;
+            }
+            mainDirection.Norm();
+            normal.Norm();
+            // The points are linear, if they are all close to the line through the centroid in the main direction. Callers like
+            // BSpline.GetPlanarState accept a plane when MaxDistance < Precision.eps, so points within Precision.eps of a line do
+            // not define a plane: the normal would only reflect noise, and e.g. a straight spline with tiny deviations would no
+            // longer share a plane with a neighbouring arc. For small point sets the tolerance is limited to a fraction of their
+            // extent, so that small planar curves stay planar, and it is never below the rounding of the coordinates.
+            double lineDistance = 0.0;
+            for (int i = 0; i < points.Length; i++)
+            {
+                GeoVector r = points[i] - centroid;
+                lineDistance = Math.Max(lineDistance, (r - (r * mainDirection) * mainDirection).Length);
+            }
+            double linearTolerance = Math.Max(Math.Min(Precision.eps, 1e-3 * size), 1e-10 * size + 1e-14 * maxCoordinate);
+            if (lineDistance <= linearTolerance)
+            {
+                isLinear = true;
+                return Plane.XYPlane;
+            }
+            // The points do not tell to which side the normal points. To make the result predictable, the normal is oriented so
+            // that its z component is positive. If z is (almost) 0, y must be positive, and if y is (almost) 0 too, x must be.
+            // Points in the XY plane therefore give the normal +Z and the x-axis +X (see the constructor Plane(GeoPoint, GeoVector)).
+            const double orientationTolerance = 1e-8;
+            double decisive;
+            if (Math.Abs(normal.z) > orientationTolerance) decisive = normal.z;
+            else if (Math.Abs(normal.y) > orientationTolerance) decisive = normal.y;
+            else decisive = normal.x;
+            if (decisive < 0.0) normal = -normal;
+            // the location is the foot of the perpendicular from the origin, as before
+            Plane plane = new Plane(GeoPoint.Origin + ((centroid - GeoPoint.Origin) * normal) * normal, normal);
+            maxDistance = 0.0;
+            for (int i = 0; i < points.Length; i++)
+            {
+                double d = Math.Abs(plane.Distance(points[i]));
+                if (d > maxDistance) maxDistance = d;
+            }
+            return plane;
         }
         private static double sqr(double d) { return d * d; }
         public static Plane FromPointsOld(GeoPoint[] Points, out double MaxDistance, out bool isLinear)

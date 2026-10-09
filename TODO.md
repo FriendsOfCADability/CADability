@@ -15,6 +15,11 @@ Fixed during this triage (#369): #251 (dead `objectPointSav` code removed
 from ToolsRoundIn) and #294 (README links and the repository website now
 point to friendsofcadability.github.io).
 
+Fixed in the follow-up pull request: #347 (`NurbsSurface.GetPars` no longer
+loops forever on tiny domains), #287 (hatch polyline boundaries are always
+closed on DXF import), #204 and #147 (`Plane.FromPoints` fits relative to the
+centroid and orients the normal by a fixed rule).
+
 Closed as not reproducible: #265 (the STEP round trip gives an identical solid
 on master and on the commit from the time of the report, 0fb61554).
 
@@ -66,33 +71,14 @@ Each of these was reproduced, or confirmed by reading the code, on `17f949e`.
   file as a test case under `tests/CADability.Tests/Files` and debug
   `BRepOperation`.
 
-- [ ] **#347 NurbsSurface.GetSimpleSurface infinite loop.** A synthetic
-  tiny-span NURBS with a singularity at umax hangs in `GetCanonicalForm` and
-  `GetSimpleSurface`. The fix 9316bd2c on branch
-  `347-nurbssurfacegetsimplesurface-infinite-loop` solves it, but it is not
-  merged. It also rewrites the line endings of the whole file. Re-apply it as
-  a clean patch, add a regression test and open a PR.
 - [ ] **#66 STEP export fails for `Path` edge curves.** `Path` does not
   implement `IExportStep`, and `Edge.cs` (`IExportStep.Export`) casts without a
   null check, so the export throws `NullReferenceException`. Ruled surfaces no
   longer create `Path` edges, but older files and other code paths still can.
-- [ ] **#204 Plane.FromPoints returns a -Z normal for planar curves.** All
-  random point sets at z=0, and all planar splines, get normal (0,0,-1).
-  `CompoundShape.CreateFromList` plus a DXF export then writes arcs with
-  extrusion -Z. Make the orientation of the normal deterministic, and use a
-  tolerance in the "normal ≈ ±Z" check of the `Plane` constructor.
-- [ ] **#147 A spline is not rendered correctly.** This is a geometry bug,
-  not an OpenGL one. A closed planar BSpline far from the origin (x ≈ 1e5)
-  becomes `UnderDetermined`, because `Plane.FromPoints` fits uncentred
-  coordinates, so the curve is projected onto a line. Subtract the centroid
-  before the fit. This is related to #204.
 - [ ] **#194 Circular hole UnsplittedOutline lost.** `Border.Reduce` assigns
   `Segments`, and the setter clears `UnsplittedOutline`, so every circle hole
   from `CompoundShape.CreateFromList` comes back with
   `UnsplittedOutline == null`.
-- [ ] **#287 DXF hatch boundary not closed.** `ImportDxf.ConvertPolylineBoundary`
-  drops the closing edge when group 73 is 0. A 10×10 square hatch then imports
-  as a triangle with area 50. Hatch boundary polylines are always closed.
 - [ ] **#293 Block colour not rendered.** ByBlock children and layer-0
   children of an INSERT come in black instead of taking the colour and layer
   of the insert. Resolve them against the INSERT, for example by using

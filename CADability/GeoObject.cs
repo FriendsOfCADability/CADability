@@ -1849,7 +1849,7 @@ namespace CADability.GeoObject
         /// so that setting <see cref="ColorDef.CDfromParent"/> on an object that already belongs to a
         /// block has the same effect as adding the object to the block with that color.
         /// </summary>
-        protected ColorDef ColorDefForOwner(ColorDef colorDef)
+        private protected ColorDef ColorDefForOwner(ColorDef colorDef)
         {
             if (colorDef != null && colorDef.Source == ColorDef.ColorSource.fromParent && owner is Block block)
                 return block.GetCDfromParent();

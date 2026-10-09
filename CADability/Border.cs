@@ -1073,9 +1073,14 @@ namespace CADability.Shapes
 				}
 			}
 			bool wasClosed = isClosed;
+			ICurve2D unsplittedOutline = UnsplittedOutline;
 			Segments = red.ToArray();
 			if (wasClosed) forceClosed();
 			Recalc(out _);
+			// Reduce only approximates and fuses the segments within prec, the closed border still describes the
+			// same curve. So the unsplitted original curve (e.g. the circle of a hole) remains valid, while the
+			// setter of Segments has reset it (issue #194).
+			if (wasClosed) UnsplittedOutline = unsplittedOutline;
 		}
 		internal bool ReduceDeadEnd()
 		{
@@ -1138,7 +1143,9 @@ namespace CADability.Shapes
 					}
 				}
 			}
-			Segments = red.ToArray();
+			// segments are only ever removed. If none was removed, the border is unchanged and must keep its
+			// UnsplittedOutline, which the setter of Segments would reset (issue #194)
+			if (red.Count < segment.Length) Segments = red.ToArray();
 			if (segment.Length == 0)
 			{
 				area = 0.0;

@@ -1,4 +1,4 @@
-﻿using CADability.Actions;
+using CADability.Actions;
 using CADability.Attribute;
 using CADability.Curve2D;
 using CADability.Shapes;
@@ -15,6 +15,7 @@ using System.Collections.Generic;
 //#endif
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading;
 
@@ -632,7 +633,14 @@ namespace CADability.GeoObject
                 width = 0.0;
                 try
                 {
-                    paths = GetOutline2D(font, fontStyle, c, out width);
+                    try
+                    {
+                        paths = GetOutline2D(font, fontStyle, c, out width);
+                    }
+                    catch (Exception ex) when (!(ex is ThreadAbortException))
+                    {   // a glyph whose outline cannot be read is left out, it must not take the whole text down
+                        paths = new Path2D[0];
+                    }
                     if (paintTo3D != null)
                     {
                         bool painted = false;
@@ -952,22 +960,10 @@ namespace CADability.GeoObject
         private LineAlignMode lineAlignment;
         // private IGeoObject[] cachedDisplayItems;
         private static HashSet<string> fontFamilyNames;
-        internal static HashSet<string> FontFamilyNames
-        {
-            get
-            {
-                if (fontFamilyNames == null)
-                {
-                    FontFamily[] ff = FontFamily.Families;
-                    fontFamilyNames = new HashSet<string>();
-                    for (int i = 0; i < ff.Length; i++)
-                    {
-                        fontFamilyNames.Add(ff[i].Name.ToUpper());
-                    }
-                }
-                return fontFamilyNames;
-            }
-        }
+        internal static HashSet<string> FontFamilyNames =>
+            LazyInitializer.EnsureInitialized(ref fontFamilyNames, () =>
+                new HashSet<string>(FontFamily.Families.Select(f => f.Name.ToUpper())));
+
         #region polymorph construction
         public delegate Text ConstructionDelegate();
         public static ConstructionDelegate Constructor;
@@ -977,6 +973,7 @@ namespace CADability.GeoObject
             return new Text();
         }
         #endregion
+
         protected Text()
         {
             displayAsPath = Settings.GlobalSettings.GetIntValue("Font.DisplayMode", 1) == 1; // müsste nur einmal geladen werden, macht aber direkt bei der static Deklaration Probleme

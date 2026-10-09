@@ -13,6 +13,7 @@ using CADability.GeoObject;
 using CADability.Shapes;
 using CADability.Curve2D;
 using CADability.Attribute;
+using PlaneSurface = CADability.GeoObject.PlaneSurface;
 #if WEBASSEMBLY
 using CADability.WebDrawing;
 using Point = CADability.WebDrawing.Point;

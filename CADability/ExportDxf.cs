@@ -15,6 +15,7 @@ using System.Drawing;
 using System.Linq;
 using System.IO;
 using Color = System.Drawing.Color;
+using PlaneSurface = CADability.GeoObject.PlaneSurface;
 
 namespace CADability.DXF
 {
@@ -222,7 +223,17 @@ namespace CADability.DXF
                         }
                     }
                     if (extData.Records.Count > 0)
-                        entity.ExtendedData.Add(appId, extData);
+                    {
+                        // Several UserData entries may carry XData of the same application, e.g. an
+                        // "ACAD" entry from an ACadSharp import next to an "ACAD:ACAD" entry from an
+                        // older netDxf import, or "CADABILITY" next to plain values that were already
+                        // written to that application. An entity holds only one XData group per
+                        // application, so the records are merged as netDxf did.
+                        if (entity.ExtendedData.TryGet(appId, out ExtendedData existing))
+                            existing.Records.AddRange(extData.Records);
+                        else
+                            entity.ExtendedData.Add(appId, extData);
+                    }
                 }
                 else if (de.Value != null && !(de.Value is UserInterface.StringProperty))
                 {
@@ -281,8 +292,8 @@ namespace CADability.DXF
 
         private AppId GetOrCreateAppId(string name)
         {
-            foreach (AppId existing in doc.AppIds)
-                if (existing.Name == name) return existing;
+            // AppId names are case-insensitive in DXF, like the AppIds table itself
+            if (doc.AppIds.TryGetValue(name, out AppId existing)) return existing;
             AppId appId = new AppId(name);
             doc.AppIds.Add(appId);
             return appId;

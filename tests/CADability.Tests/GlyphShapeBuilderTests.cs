@@ -64,6 +64,30 @@ namespace CADability.Tests
         }
 
         [TestMethod]
+        public void PathDataToPath2D_BezierWithCoincidingControlPoints_IsLeftOut()
+        {
+            // Gigi and the condensed instances of Bahnschrift contain Bezier segments whose four control points
+            // coincide. Their approximation is an empty path, which made PathDataToPath2D throw an
+            // IndexOutOfRangeException, so every text in these fonts failed.
+            // A unit square (GDI+ coordinates, y downwards) with such a segment at its upper right corner:
+            PointF[] points =
+            {
+                new PointF(0f, 1f), new PointF(1f, 1f), new PointF(1f, 0f),
+                new PointF(1f, 0f), new PointF(1f, 0f), new PointF(1f, 0f),
+                new PointF(0f, 0f)
+            };
+            byte[] types = { Start, Line, Line, 3, 3, 3, Line | Close };
+            foreach (int fontPrecision in new int[] { 0, 1, 2 })
+            {
+                Path2D[] paths = GlyphShapeBuilder.PathDataToPath2D(points, types, fontPrecision);
+                Assert.AreEqual(1, paths.Length, "precision " + fontPrecision);
+                Assert.IsTrue(paths[0].IsClosed, "precision " + fontPrecision);
+                GlyphShapeBuilder.ShapeResult res = GlyphShapeBuilder.MakeShape(paths);
+                Assert.AreEqual(1.0, res.Shape.Area, 1e-6, "precision " + fontPrecision);
+            }
+        }
+
+        [TestMethod]
         public void MakeShape_SquareWithHole_IsOneShapeWithOneHole()
         {
             // the orientation of the contours does not matter (as it never did): outer counterclockwise, hole counterclockwise as well

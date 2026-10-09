@@ -40,6 +40,14 @@ namespace CADability.DXF
         /// the block.
         /// </summary>
         private int blockDefinitionDepth;
+        /// <summary>
+        /// Stand-ins for the linetype and lineweight of block contents that are only known when the
+        /// block is placed: ByBlock, and ByLayer on layer "0". CADability has nothing like
+        /// <see cref="ColorDef.CDfromParent"/> for these, so they are not part of the project's lists
+        /// and are replaced in every placed copy of the block, see <see cref="ResolveLayerZero(GeoObject.Block, Entity)"/>.
+        /// </summary>
+        private readonly LinePattern byLayerPattern = new LinePattern("ByLayer"), byBlockPattern = new LinePattern("ByBlock");
+        private readonly LineWidth byLayerWidth = new LineWidth("ByLayer", 0.0), byBlockWidth = new LineWidth("ByBlock", 0.0);
 
         public Import(string fileName)
         {
@@ -600,14 +608,43 @@ namespace CADability.DXF
             if (entity.Layer != null && layerTable.TryGetValue(entity.Layer.Name, out Attribute.Layer layer))
                 go.Layer = layer;
             if (go is ILinePattern lp && entity.LineType != null)
-                lp.LinePattern = project.LinePatternList.Find(entity.LineType.Name);
+                lp.LinePattern = FindLinePattern(entity.LineType.Name, entity.Layer);
             if (go is ILineWidth ld)
+                ld.LineWidth = FindLineWidth(entity.LineWeight, entity.Layer);
+        }
+
+        private static bool IsLayerZero(ACadSharp.Tables.Layer layer) => layer != null && layer.Name == "0";
+
+        /// <summary>
+        /// The line pattern for a linetype on the given layer: ByLayer is the linetype of the layer.
+        /// Inside a block definition ByBlock, and ByLayer on layer "0", depend on the placing entity
+        /// and give a stand-in.
+        /// </summary>
+        private LinePattern FindLinePattern(string lineTypeName, ACadSharp.Tables.Layer layer)
+        {
+            bool byLayer = string.Equals(lineTypeName, LineType.ByLayerName, StringComparison.OrdinalIgnoreCase);
+            if (blockDefinitionDepth > 0)
             {
-                LineWeightType lw = entity.LineWeight;
-                if (lw == LineWeightType.ByLayer && entity.Layer != null) lw = entity.Layer.LineWeight;
-                if ((int)lw < 0) lw = LineWeightType.W0;
-                ld.LineWidth = project.LineWidthList.CreateOrFind("DXF_" + lw.ToString(), ((int)lw) / 100.0);
+                if (string.Equals(lineTypeName, LineType.ByBlockName, StringComparison.OrdinalIgnoreCase)) return byBlockPattern;
+                if (byLayer && IsLayerZero(layer)) return byLayerPattern;
             }
+            if (byLayer && layer?.LineType != null) lineTypeName = layer.LineType.Name;
+            return project.LinePatternList.Find(lineTypeName);
+        }
+
+        /// <summary>
+        /// The line width for a lineweight on the given layer, like <see cref="FindLinePattern"/>.
+        /// </summary>
+        private LineWidth FindLineWidth(LineWeightType lw, ACadSharp.Tables.Layer layer)
+        {
+            if (blockDefinitionDepth > 0)
+            {
+                if (lw == LineWeightType.ByBlock) return byBlockWidth;
+                if (lw == LineWeightType.ByLayer && IsLayerZero(layer)) return byLayerWidth;
+            }
+            if (lw == LineWeightType.ByLayer && layer != null) lw = layer.LineWeight;
+            if ((int)lw < 0) lw = LineWeightType.W0;
+            return project.LineWidthList.CreateOrFind("DXF_" + lw.ToString(), ((int)lw) / 100.0);
         }
 
         private void SetUserData(IGeoObject go, Entity entity)
@@ -662,28 +699,51 @@ namespace CADability.DXF
         /// definition is converted once and cached, so its layer-0 children carry layer "0" and
         /// the "0:ByLayer" color; this moves them, including those of nested blocks, to the layer
         /// of <paramref name="placing"/> on the clone that belongs to this placement.
+        /// The stand-ins for linetype and lineweight (ByLayer on layer "0" and ByBlock) are replaced
+        /// with the values of that layer and of <paramref name="placing"/>. While
+        /// <paramref name="placing"/> is itself part of a block definition, these values may be
+        /// stand-ins again, which the placement of the enclosing block resolves.
         /// </summary>
         private void ResolveLayerZero(GeoObject.Block placed, Entity placing)
         {
-            if (placing.Layer == null || !layerTable.TryGetValue(placing.Layer.Name, out Attribute.Layer target)) return;
-            if (!layerTable.TryGetValue("0", out Attribute.Layer layerZero) || target == layerZero) return;
-            layerColorTable.TryGetValue("0", out ColorDef byLayerZero);
-            layerColorTable.TryGetValue(placing.Layer.Name, out ColorDef byLayerTarget);
-            ResolveLayerZero(placed, layerZero, target, byLayerZero, byLayerTarget);
-        }
-
-        private static void ResolveLayerZero(GeoObject.Block block, Attribute.Layer layerZero, Attribute.Layer target, ColorDef byLayerZero, ColorDef byLayerTarget)
-        {
-            for (int i = 0; i < block.Count; i++)
+            Attribute.Layer layerZero = null, target = null;
+            ColorDef byLayerZero = null, byLayerTarget = null;
+            if (placing.Layer != null && layerTable.TryGetValue(placing.Layer.Name, out target)
+                && layerTable.TryGetValue("0", out layerZero) && target != layerZero)
             {
-                IGeoObject child = block.Item(i);
-                if (child.Layer == layerZero)
+                layerColorTable.TryGetValue("0", out byLayerZero);
+                layerColorTable.TryGetValue(placing.Layer.Name, out byLayerTarget);
+            }
+            else target = null; // the contents on layer "0" stay there
+            LinePattern patternByLayer = FindLinePattern(LineType.ByLayerName, placing.Layer);
+            LinePattern patternByBlock = FindLinePattern(placing.LineType?.Name ?? LineType.ByLayerName, placing.Layer);
+            LineWidth widthByLayer = FindLineWidth(LineWeightType.ByLayer, placing.Layer);
+            LineWidth widthByBlock = FindLineWidth(placing.LineWeight, placing.Layer);
+            Resolve(placed);
+
+            void Resolve(GeoObject.Block block)
+            {
+                for (int i = 0; i < block.Count; i++)
                 {
-                    child.Layer = target;
-                    if (child is IColorDef cd && byLayerZero != null && byLayerTarget != null && cd.ColorDef == byLayerZero)
-                        cd.ColorDef = byLayerTarget;
+                    IGeoObject child = block.Item(i);
+                    if (target != null && child.Layer == layerZero)
+                    {
+                        child.Layer = target;
+                        if (child is IColorDef cd && byLayerZero != null && byLayerTarget != null && cd.ColorDef == byLayerZero)
+                            cd.ColorDef = byLayerTarget;
+                    }
+                    if (child is ILinePattern lp)
+                    {
+                        if (lp.LinePattern == byLayerPattern) lp.LinePattern = patternByLayer;
+                        else if (lp.LinePattern == byBlockPattern) lp.LinePattern = patternByBlock;
+                    }
+                    if (child is ILineWidth lw)
+                    {
+                        if (lw.LineWidth == byLayerWidth) lw.LineWidth = widthByLayer;
+                        else if (lw.LineWidth == byBlockWidth) lw.LineWidth = widthByBlock;
+                    }
+                    if (child is GeoObject.Block nested) Resolve(nested);
                 }
-                if (child is GeoObject.Block nested) ResolveLayerZero(nested, layerZero, target, byLayerZero, byLayerTarget);
             }
         }
 

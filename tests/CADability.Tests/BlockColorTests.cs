@@ -132,6 +132,108 @@ namespace CADability.Tests
         }
 
         [TestMethod]
+        public void DxfBlockContentsTakeLinetypeAndLineweightOfTheInsert()
+        {
+            CadDocument doc = new CadDocument();
+            AcadLayer layerZero = doc.Layers["0"];
+            LineType dashed = MakeLineType(doc, "DASHED", 0.5, -0.25);
+            LineType center = MakeLineType(doc, "CENTER", 1.25, -0.25, 0.25, -0.25);
+            LineType hidden = MakeLineType(doc, "HIDDEN", 0.25, -0.125);
+            AcadLayer rebars = new AcadLayer("rebars") { Color = new AcadColor(1), LineType = dashed, LineWeight = LineWeightType.W50 };
+            AcadLayer walls = new AcadLayer("walls") { Color = new AcadColor(4) };
+            AcadLayer green = new AcadLayer("green") { Color = new AcadColor(3), LineType = hidden, LineWeight = LineWeightType.W13 };
+            doc.Layers.Add(rebars);
+            doc.Layers.Add(walls);
+            doc.Layers.Add(green);
+
+            BlockRecord block = new BlockRecord("rebar");
+            block.Entities.Add(MakeLine(doc, LayerZeroByLayerY, layerZero, LineType.ByLayerName, LineWeightType.ByLayer));
+            block.Entities.Add(MakeLine(doc, ByBlockY, layerZero, LineType.ByBlockName, LineWeightType.ByBlock));
+            block.Entities.Add(MakeLine(doc, OwnLayerY, green, LineType.ByLayerName, LineWeightType.ByLayer));
+            block.Entities.Add(MakeLine(doc, ExplicitY, layerZero, "HIDDEN", LineWeightType.W100));
+            doc.BlockRecords.Add(block);
+
+            doc.Entities.Add(new AcadInsert(block) { Layer = rebars });
+            doc.Entities.Add(new AcadInsert(block) { Layer = walls, LineType = center, LineWeight = LineWeightType.W35, InsertPoint = new CSMath.XYZ(100, 0, 0) });
+            doc.Entities.Add(new AcadInsert(block) { Layer = layerZero, LineType = center, LineWeight = LineWeightType.W35, InsertPoint = new CSMath.XYZ(200, 0, 0) });
+
+            Project project = ImportProject(doc);
+            List<Block> blocks = project.GetActiveModel().AllObjects.OfType<Block>().ToList();
+            Assert.AreEqual(3, blocks.Count);
+            Block onRebars = blocks.Single(b => b.Layer.Name == "rebars");
+            Block onWalls = blocks.Single(b => b.Layer.Name == "walls");
+            Block onZero = blocks.Single(b => b.Layer.Name == "0");
+
+            AssertLineStyle(LineAt(onRebars, LayerZeroByLayerY), "DASHED", 0.5, "layer 0, ByLayer: the INSERT's layer");
+            AssertLineStyle(LineAt(onRebars, ByBlockY), "DASHED", 0.5, "ByBlock: the INSERT, which is ByLayer itself");
+            AssertLineStyle(LineAt(onRebars, OwnLayerY), "HIDDEN", 0.13, "own layer, ByLayer: that layer");
+            AssertLineStyle(LineAt(onRebars, ExplicitY), "HIDDEN", 1.0, "explicit values stay");
+
+            AssertLineStyle(LineAt(onWalls, LayerZeroByLayerY), "Continuous", 0.0, "layer 0, ByLayer: the INSERT's layer, not the INSERT");
+            AssertLineStyle(LineAt(onWalls, ByBlockY), "CENTER", 0.35, "ByBlock: the INSERT");
+            AssertLineStyle(LineAt(onWalls, OwnLayerY), "HIDDEN", 0.13);
+            AssertLineStyle(LineAt(onWalls, ExplicitY), "HIDDEN", 1.0);
+
+            AssertLineStyle(LineAt(onZero, LayerZeroByLayerY), "Continuous", 0.0, "layer 0, ByLayer, INSERT on layer 0: layer 0");
+            AssertLineStyle(LineAt(onZero, ByBlockY), "CENTER", 0.35, "ByBlock: the INSERT on layer 0");
+
+            AssertOnlyProjectLineStyles(project);
+        }
+
+        [TestMethod]
+        public void DxfNestedBlockContentsTakeLinetypeAndLineweightOfTheOutermostInsert()
+        {
+            CadDocument doc = new CadDocument();
+            AcadLayer layerZero = doc.Layers["0"];
+            LineType dashed = MakeLineType(doc, "DASHED", 0.5, -0.25);
+            LineType center = MakeLineType(doc, "CENTER", 1.25, -0.25, 0.25, -0.25);
+            LineType hidden = MakeLineType(doc, "HIDDEN", 0.25, -0.125);
+            AcadLayer rebars = new AcadLayer("rebars") { Color = new AcadColor(1), LineType = dashed, LineWeight = LineWeightType.W50 };
+            AcadLayer green = new AcadLayer("green") { Color = new AcadColor(3), LineType = hidden, LineWeight = LineWeightType.W13 };
+            doc.Layers.Add(rebars);
+            doc.Layers.Add(green);
+
+            BlockRecord inner = new BlockRecord("inner");
+            inner.Entities.Add(MakeLine(doc, LayerZeroByLayerY, layerZero, LineType.ByLayerName, LineWeightType.ByLayer));
+            inner.Entities.Add(MakeLine(doc, ByBlockY, layerZero, LineType.ByBlockName, LineWeightType.ByBlock));
+            // ByBlock on a layer of its own: still the values of the placing INSERT
+            inner.Entities.Add(MakeLine(doc, OwnLayerY, green, LineType.ByBlockName, LineWeightType.ByBlock));
+            doc.BlockRecords.Add(inner);
+
+            BlockRecord outer = new BlockRecord("outer");
+            // nested on layer 0 and ByBlock: everything comes from the outer INSERT
+            outer.Entities.Add(new AcadInsert(inner) { Layer = layerZero, LineType = doc.LineTypes[LineType.ByBlockName], LineWeight = LineWeightType.ByBlock });
+            // nested on its own layer with explicit values: those win over the outer INSERT
+            outer.Entities.Add(new AcadInsert(inner) { Layer = green, LineType = center, LineWeight = LineWeightType.W35, InsertPoint = new CSMath.XYZ(100, 0, 0) });
+            // nested on layer 0 and ByLayer: the layer of the outer INSERT
+            outer.Entities.Add(new AcadInsert(inner) { Layer = layerZero, InsertPoint = new CSMath.XYZ(200, 0, 0) });
+            doc.BlockRecords.Add(outer);
+
+            doc.Entities.Add(new AcadInsert(outer) { Layer = rebars, LineType = center, LineWeight = LineWeightType.W70 });
+
+            Project project = ImportProject(doc);
+            Block placed = project.GetActiveModel().AllObjects.OfType<Block>().Single();
+            Assert.AreEqual(3, placed.Count);
+            Block nestedByBlock = (Block)placed.Item(0);
+            Block nestedExplicit = (Block)placed.Item(1);
+            Block nestedByLayer = (Block)placed.Item(2);
+
+            AssertLineStyle(LineAt(nestedByBlock, LayerZeroByLayerY), "DASHED", 0.5, "layer 0, ByLayer: layer of the outer INSERT");
+            AssertLineStyle(LineAt(nestedByBlock, ByBlockY), "CENTER", 0.7, "ByBlock in a ByBlock INSERT: the outer INSERT");
+            AssertLineStyle(LineAt(nestedByBlock, OwnLayerY), "CENTER", 0.7);
+
+            AssertLineStyle(LineAt(nestedExplicit, LayerZeroByLayerY), "HIDDEN", 0.13, "layer 0, ByLayer: layer of the nested INSERT");
+            AssertLineStyle(LineAt(nestedExplicit, ByBlockY), "CENTER", 0.35, "ByBlock: the nested INSERT");
+            AssertLineStyle(LineAt(nestedExplicit, OwnLayerY), "CENTER", 0.35);
+
+            AssertLineStyle(LineAt(nestedByLayer, LayerZeroByLayerY), "DASHED", 0.5);
+            AssertLineStyle(LineAt(nestedByLayer, ByBlockY), "DASHED", 0.5, "ByBlock in a ByLayer INSERT on layer 0: layer of the outer INSERT");
+            AssertLineStyle(LineAt(nestedByLayer, OwnLayerY), "DASHED", 0.5);
+
+            AssertOnlyProjectLineStyles(project);
+        }
+
+        [TestMethod]
         public void BlockColorStillReachesChildrenFromParentAfterSavingAsCdb()
         {
             CadDocument doc = new CadDocument();
@@ -216,6 +318,46 @@ namespace CADability.Tests
             return new AcadLine(new CSMath.XYZ(0, y, 0), new CSMath.XYZ(10, y, 0)) { Layer = layer, Color = color };
         }
 
+        private static AcadLine MakeLine(CadDocument doc, double y, AcadLayer layer, string lineType, LineWeightType lineWeight)
+        {
+            AcadLine line = MakeLine(y, layer, AcadColor.ByLayer);
+            line.LineType = doc.LineTypes[lineType];
+            line.LineWeight = lineWeight;
+            return line;
+        }
+
+        private static LineType MakeLineType(CadDocument doc, string name, params double[] dashes)
+        {
+            LineType lineType = new LineType(name);
+            foreach (double dash in dashes) lineType.AddSegment(new LineType.Segment { Length = dash });
+            doc.LineTypes.Add(lineType);
+            return lineType;
+        }
+
+        private static void AssertLineStyle(Line line, string linePattern, double lineWidth, string message = "")
+        {
+            Assert.IsNotNull(line.LinePattern, message);
+            Assert.AreEqual(linePattern, line.LinePattern.Name, message);
+            Assert.IsNotNull(line.LineWidth, message);
+            Assert.AreEqual(lineWidth, line.LineWidth.Width, 1e-9, message);
+        }
+
+        /// <summary>
+        /// Every line pattern and line width in the model must be one of the project's lists, so
+        /// nothing that stood for "ByLayer" or "ByBlock" during the import is left over.
+        /// </summary>
+        private static void AssertOnlyProjectLineStyles(Project project)
+        {
+            foreach (Block block in project.GetActiveModel().AllObjects.OfType<Block>())
+            {
+                foreach (Line line in AllLines(block))
+                {
+                    Assert.IsTrue(project.LinePatternList.FindIndex(line.LinePattern) >= 0, "line pattern not in the project: " + line.LinePattern.Name);
+                    Assert.IsTrue(project.LineWidthList.FindIndex(line.LineWidth) >= 0, "line width not in the project: " + line.LineWidth.Name);
+                }
+            }
+        }
+
         private static Line MakeFromParentLine(double y)
         {
             Line line = Line.Construct();
@@ -226,11 +368,16 @@ namespace CADability.Tests
 
         private Model Import(CadDocument doc)
         {
+            return ImportProject(doc).GetActiveModel();
+        }
+
+        private Project ImportProject(CadDocument doc)
+        {
             string file = TestContext.TestName + ".dxf";
             DxfWriter.Write(file, doc);
             Project project = Project.ReadFromFile(file, "dxf");
             Assert.IsNotNull(project);
-            return project.GetActiveModel();
+            return project;
         }
 
         private static Line LineAt(Block block, double y)

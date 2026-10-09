@@ -3089,7 +3089,7 @@ namespace CADability.GeoObject
             {
                 using (ChangingAttribute.Create(this, colorDef))
                 {
-                    colorDef = value;
+                    colorDef = ColorDefForOwner(value);
                     if (faces != null)
                     {
                         // alle Faces auf die selbe Farbe setzen, denn die Faces
@@ -3097,7 +3097,7 @@ namespace CADability.GeoObject
                         // haben, dann wäre die Farbe des Shells bedeutungslos
                         for (int i = 0; i < faces.Length; ++i)
                         {
-                            faces[i].ColorDef = value;
+                            faces[i].ColorDef = colorDef;
                         }
                     }
                 }
@@ -3510,6 +3510,10 @@ namespace CADability.GeoObject
             if (surface != null)
             {
                 // there is a common surface to all open edges
+                // A new face on this surface (with the same orientation) can only fill a hole between the faces of the edges.
+                // If the loop is the outline of these faces (e.g. a single open face, declared as a closed shell), the new face
+                // would cover them with the wrong orientation, and the result would be no solid. Leave such a loop open.
+                if (IsOutlineOnSurface(sortedEdges, surface)) return null;
                 sortedEdges.Reverse();
                 Face newFace = Face.Construct();
                 newFace.Surface = surface.Clone();
@@ -3667,6 +3671,38 @@ namespace CADability.GeoObject
 
             // if nothing works: "ear clipping" and adding ruled surfaces
             return null;
+        }
+        /// <summary>
+        /// Checks the orientation of the closed loop <paramref name="sortedEdges"/> on <paramref name="surface"/>, the common surface
+        /// of the faces of the edges: returns true, if the loop runs counterclockwise in the parameter space of the surface, as the
+        /// edges run on their faces, i.e. the faces are inside the loop and the loop is their outline, not a hole between them.
+        /// Returns false, if the loop is clockwise or its orientation cannot be determined, because the 2d curves do not form a
+        /// closed loop (e.g. across the seam of a periodic surface).
+        /// </summary>
+        private static bool IsOutlineOnSurface(List<Edge> sortedEdges, ISurface surface)
+        {
+            ICurve2D[] loop = new ICurve2D[sortedEdges.Count];
+            BoundingRect extent = BoundingRect.EmptyBoundingRect;
+            for (int i = 0; i < sortedEdges.Count; i++)
+            {
+                Edge edge = sortedEdges[i];
+                ICurve2D c2d;
+                if (edge.PrimaryFace.Surface == surface) c2d = edge.Curve2D(edge.PrimaryFace);
+                else
+                {
+                    c2d = surface.GetProjectedCurve(edge.Curve3D, 0.0);
+                    if (c2d != null && !edge.Forward(edge.PrimaryFace)) c2d.Reverse();
+                }
+                if (c2d == null) return false;
+                loop[i] = c2d;
+                extent.MinMax(c2d.GetExtent());
+            }
+            double gap = extent.Size * 1e-6;
+            for (int i = 0; i < loop.Length; i++)
+            {
+                if ((loop[i].EndPoint | loop[(i + 1) % loop.Length].StartPoint) > gap) return false;
+            }
+            return Border.SignedArea(loop) > 0.0;
         }
         public void ReverseOrientation()
         {

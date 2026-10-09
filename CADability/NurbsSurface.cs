@@ -2279,7 +2279,10 @@ namespace CADability.GeoObject
                     dst[1] = sph.PositionOf(PointAt(src[1]));
                     dst[2] = sph.PositionOf(PointAt(src[2]));
                     reparametrisation = ModOp2D.Fit(src, dst, true);
-                    if (reparametrisation.Determinant == 0.0)
+                    // A row of collapsed poles (the pole of the NURBS sphere) is an ordinary point of sph when the
+                    // axes differ, so two corners get the same sphere parameters up to rounding. The determinant
+                    // is then 1e-16 or 1e-22 rather than exactly 0.0, so test the triangle of the sphere parameters.
+                    if (IsDegenerateTriangle(dst))
                     {
                         double umin1 = umin + 0.25 * (umax - umin);
                         double umax1 = umin + 0.75 * (umax - umin);
@@ -2678,6 +2681,20 @@ namespace CADability.GeoObject
             }
 #endif
             return true;
+        }
+        /// <summary>
+        /// True when the three points are (almost) collinear or coincide, i.e. when a 2D modification fitted to map
+        /// three non-degenerate points onto them is singular. The area is compared with the square of the longest side,
+        /// so the test does not depend on the scale of the points, unlike a fixed bound for the determinant of the fit,
+        /// which also scales with the knot spans of the source parameters. Rounding errors leave about 1e-16, real
+        /// triangles, even thin slivers, are orders of magnitude above the bound.
+        /// </summary>
+        private static bool IsDegenerateTriangle(GeoPoint2D[] p)
+        {
+            GeoVector2D d1 = p[1] - p[0];
+            GeoVector2D d2 = p[2] - p[0];
+            double longest = Math.Max(Math.Max(d1.Length, d2.Length), (p[2] - p[1]).Length);
+            return Math.Abs(d1.x * d2.y - d1.y * d2.x) <= 1e-12 * longest * longest;
         }
         /// <summary>
         /// Returns <paramref name="numRes"/> almost evenly spaced parameters in [min, max], avoiding the singularities

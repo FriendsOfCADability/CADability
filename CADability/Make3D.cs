@@ -3091,7 +3091,7 @@ namespace CADability.GeoObject
         }
         static public Solid[] ImportSTL(string fileName)
         {
-            using (BinaryReader reader = new BinaryReader(File.Open(fileName, FileMode.Open)))
+            using (BinaryReader reader = new BinaryReader(File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.Read)))
             {
                 byte[] head = reader.ReadBytes(5);
                 if (head[0] == (byte)('s')

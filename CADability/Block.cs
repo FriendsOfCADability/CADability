@@ -373,6 +373,7 @@ namespace CADability.GeoObject
         /// <param name="lists"></param>
         public override void PaintTo3DList(IPaintTo3D paintTo3D, ICategorizedDislayLists lists)
         {
+            SyncCDfromParent();
             lock (this)
             {
                 for (int i = 0; i < containedObjects.Count; ++i)
@@ -410,6 +411,7 @@ namespace CADability.GeoObject
             // (wg. der verschiedenen Layer)
             // wird allerdings beim aktiven Objekt aufgerufen
             if (OnPaintTo3D != null && OnPaintTo3D(this, paintTo3D)) return;
+            SyncCDfromParent();
             // lock (this) das lock ausgeschaltet, sollte das nicht bei den einzelnen Objekten, vor allem Faces, genügen?
             // 
             {
@@ -425,6 +427,7 @@ namespace CADability.GeoObject
         /// <param name="precision"></param>
         public override void PrepareDisplayList(double precision)
         {
+            SyncCDfromParent();
             // lock (this)
             {
                 foreach (IGeoObjectImpl go in containedObjects)
@@ -701,22 +704,27 @@ namespace CADability.GeoObject
             {
                 if (colorDef != value)
                 {
-                    if (colorDef != null) colorDef.ColorDidChangeEvent -= new AttributeChangeDelegate(colorDef_ColorDidChange);
                     SetColorDef(ref colorDef, value);
                     if (colorDef != null)
                     {
                         if (CDfromParent != null) CDfromParent.Color = colorDef.Color;
-                        colorDef.ColorDidChangeEvent += new AttributeChangeDelegate(colorDef_ColorDidChange);
                     }
                     else
                         if (CDfromParent != null) CDfromParent.Color = ColorDef.CDfromParent.Color;
+                    UpdateColorSubscription();
                     if (isTmpContainer) PropagateAttributes();
                 }
             }
         }
         void IColorDef.SetTopLevel(ColorDef newValue)
         {
+            // Like the ColorDef setter, but without change events. The children with CDfromParent
+            // show the color of CDfromParent, so it must follow the new color here as well;
+            // otherwise a cloned Block (Clone uses CopyAttributes, which ends up here) shows
+            // those children in the default color black instead of its own color.
             colorDef = newValue;
+            if (CDfromParent != null) CDfromParent.Color = colorDef != null ? colorDef.Color : ColorDef.CDfromParent.Color;
+            UpdateColorSubscription();
         }
         void IColorDef.SetTopLevel(ColorDef newValue, bool overwriteChildNullColor)
         {
@@ -742,6 +750,7 @@ namespace CADability.GeoObject
         protected Block(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
+            CDfromParent = ColorDef.CDfromParent.Clone();
             try
             {
                 colorDef = (ColorDef)info.GetValue("ColorDef", typeof(ColorDef));
@@ -787,6 +796,7 @@ namespace CADability.GeoObject
                     containedObjects[i].DidChangeEvent += new ChangeDelegate(OnDidChange);
                     containedObjects[i].Owner = this;
                 }
+                ConnectChildrenFromParent();
             }
         }
         #endregion
@@ -833,7 +843,86 @@ namespace CADability.GeoObject
                         containedObjects[i].DidChangeEvent += new ChangeDelegate(OnDidChange);
                         containedObjects[i].Owner = this;
                     }
+                    ConnectChildrenFromParent();
                 }
+            }
+        }
+        /// <summary>
+        /// After reading: the color of the block was set without its setter, so CDfromParent does
+        /// not know it yet, and the children with CDfromParent got their own copy of the
+        /// CDfromParent that was written. Connect both again, so that these children show the
+        /// color of this block and follow its changes, as they did before saving.
+        /// </summary>
+        private void ConnectChildrenFromParent()
+        {
+            (this as IColorDef).SetTopLevel(colorDef);
+            for (int i = 0; i < containedObjects.Count; ++i)
+            {
+                if (containedObjects[i] is IColorDef cd && cd.ColorDef != null && cd.ColorDef != CDfromParent
+                    && cd.ColorDef.Source == ColorDef.ColorSource.fromParent)
+                    cd.SetTopLevel(CDfromParent);
+            }
+        }
+        /// <summary>
+        /// The ColorDef whose ColorDidChangeEvent this block is subscribed to, so that the children with
+        /// CDfromParent follow when the color of that ColorDef is changed. The ColorDefs of the ColorList live as
+        /// long as the project, and the subscription keeps the block alive, so a block only subscribes while it
+        /// belongs to a Model (directly or through other blocks). Otherwise every temporary clone, e.g. for the
+        /// feedback while dragging, would stay in memory as long as the project.
+        /// </summary>
+        private ColorDef subscribedColorDef;
+        private bool IsInModel()
+        {
+            IGeoObjectOwner o = Owner;
+            while (o is IGeoObject go) o = go.Owner;
+            return o is Model;
+        }
+        private void UpdateColorSubscription()
+        {
+            ColorDef wanted = IsInModel() ? colorDef : null;
+            if (wanted == subscribedColorDef) return;
+            if (subscribedColorDef != null) subscribedColorDef.ColorDidChangeEvent -= new AttributeChangeDelegate(colorDef_ColorDidChange);
+            subscribedColorDef = wanted;
+            if (subscribedColorDef != null)
+            {
+                subscribedColorDef.ColorDidChangeEvent += new AttributeChangeDelegate(colorDef_ColorDidChange);
+                // the color may have changed while the block was not subscribed
+                if (CDfromParent != null && CDfromParent.Color != subscribedColorDef.Color) CDfromParent.Color = subscribedColorDef.Color;
+            }
+        }
+        /// <summary>
+        /// A block that does not belong to a model is not subscribed to the change event of its color (see
+        /// <see cref="subscribedColorDef"/>), so the color of CDfromParent is brought up to date before painting.
+        /// </summary>
+        private void SyncCDfromParent()
+        {
+            if (CDfromParent == null) return;
+            System.Drawing.Color color = colorDef != null ? colorDef.Color : ColorDef.CDfromParent.Color;
+            if (CDfromParent.Color != color) CDfromParent.Color = color;
+        }
+        private void UpdateColorSubscriptions()
+        {
+            UpdateColorSubscription();
+            if (containedObjects == null) return;
+            for (int i = 0; i < containedObjects.Count; ++i)
+            {
+                if (containedObjects[i] is Block nested) nested.UpdateColorSubscriptions();
+            }
+        }
+        /// <summary>
+        /// Overrides <see cref="IGeoObjectImpl.Owner"/>: when the block is added to or removed from a model, it and its
+        /// nested blocks subscribe to or unsubscribe from the change event of their color, see <see cref="subscribedColorDef"/>.
+        /// </summary>
+        public override IGeoObjectOwner Owner
+        {
+            get
+            {
+                return base.Owner;
+            }
+            set
+            {
+                base.Owner = value;
+                UpdateColorSubscriptions();
             }
         }
         private void colorDef_ColorDidChange(object sender, ChangeEventArgs eventArguments)

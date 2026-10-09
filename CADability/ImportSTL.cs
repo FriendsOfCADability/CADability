@@ -57,7 +57,7 @@ namespace CADability
             }
             else
             {
-                br = new BinaryReader(File.Open(fileName, FileMode.Open));
+                br = new BinaryReader(File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.Read));
                 br.ReadBytes(80);
                 uint nrtr = br.ReadUInt32();
             }

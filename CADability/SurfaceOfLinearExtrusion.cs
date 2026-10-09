@@ -791,7 +791,7 @@ namespace CADability.GeoObject
 
         int IExportStep.Export(ExportStep export, bool topLevel)
         {
-            int ns = (basisCurve as IExportStep).Export(export, false);
+            int ns = export.WriteCurve(basisCurve);
             int nd = (direction.Normalized as IExportStep).Export(export, false);
             int nv = export.WriteDefinition("VECTOR( '', #" + nd.ToString() + ", " + export.ToString(direction.Length) + ")");
             return export.WriteDefinition("SURFACE_OF_LINEAR_EXTRUSION('',#" + ns.ToString() + ",#" + nv.ToString() + ")");

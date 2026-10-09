@@ -1542,7 +1542,7 @@ namespace CADability
                 //FileName = dlg.FileName;
             }
             Project res = null;
-            using (FileStream stream = File.Open(FileName, FileMode.Open, System.IO.FileAccess.Read))
+            using (FileStream stream = File.Open(FileName, FileMode.Open, System.IO.FileAccess.Read, FileShare.Read))
             {
                 int firstByte = stream.ReadByte();
                 stream.Seek(0, SeekOrigin.Begin);
@@ -1653,7 +1653,7 @@ namespace CADability
         private static Project ReadConvertedFile(string FileName, bool useProgress)
         {
             Project res = null;
-            FileStream stream = File.Open(FileName, FileMode.Open);
+            FileStream stream = File.Open(FileName, FileMode.Open, FileAccess.Read, FileShare.Read);
             useProgress = useProgress && !Settings.GlobalSettings.GetBoolValue("DontUse.WindowsForms", false);
             //ProgressFeedBack pf = null;
             //if (useProgress)
@@ -2131,7 +2131,7 @@ namespace CADability
         }
         public static object DeserializeObject(string fileName)
         {
-            Stream stream = File.Open(fileName, System.IO.FileMode.Open);
+            Stream stream = File.Open(fileName, System.IO.FileMode.Open, FileAccess.Read, FileShare.Read);
             BinaryFormatter formatter = new BinaryFormatter();
             object res = formatter.Deserialize(stream);
             stream.Close();

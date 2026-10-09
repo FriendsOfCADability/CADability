@@ -8275,7 +8275,7 @@ namespace CADability.GeoObject
                     }
                     else
                     {   // Face ist nicht Teil einer Shell oder eines Solid
-                        colorDef = value;
+                        colorDef = ColorDefForOwner(value);
                     }
                 }
             }
@@ -11142,10 +11142,11 @@ namespace CADability.GeoObject
             SurfaceHelper.AdjustPeriodic(surface, Area.GetExtent(), res);
             return res;
         }
-        private int StepBound(ExportStep export, Edge[] edges)
+        private int StepBound(ExportStep export, Edge[] edges, bool outer)
         {
             // #65=EDGE_LOOP('',(#66,#67,#68,#69)) ;
             // #70=FACE_OUTER_BOUND('',#65,.T.);
+            // ISO 10303-42 allows at most one FACE_OUTER_BOUND per face: the outline. The holes are written as FACE_BOUND.
             StringBuilder edgloop = new StringBuilder();
             HashSet<Edge> seamsSeen = new HashSet<Edge>();
             for (int i = 0; i < edges.Length; i++)
@@ -11163,7 +11164,7 @@ namespace CADability.GeoObject
                 else edgloop.Append(",#" + nr.ToString());
             }
             int nel = export.WriteDefinition("EDGE_LOOP('',(" + edgloop.ToString() + "))");
-            return export.WriteDefinition("FACE_OUTER_BOUND('',#" + nel.ToString() + ",.T.)");
+            return export.WriteDefinition((outer ? "FACE_OUTER_BOUND('',#" : "FACE_BOUND('',#") + nel.ToString() + ",.T.)");
         }
         int IExportStep.Export(ExportStep export, bool topLevel)
         {
@@ -11182,11 +11183,11 @@ namespace CADability.GeoObject
                 if (ip != null) iv = ip.IntegerValue;
 #endif
                 StringBuilder boundList = new StringBuilder();
-                int outlnr = StepBound(export, outline);
+                int outlnr = StepBound(export, outline, true);
                 boundList.Append("#" + outlnr.ToString());
                 for (int i = 0; i < holes.Length; i++)
                 {
-                    int holenr = StepBound(export, holes[i]);
+                    int holenr = StepBound(export, holes[i], false);
                     boundList.Append(",#" + holenr.ToString());
                 }
                 int surfacenr = (Surface as IExportStep).Export(export, topLevel);

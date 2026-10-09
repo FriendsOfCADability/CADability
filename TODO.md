@@ -17,16 +17,14 @@ on master and on the commit from the time of the report, 0fb61554).
 Closed as stale: #185 (designer exception from the net48 era; CADability.Forms
 targets net8.0-windows since 517d643f, untested in the designer).
 
+Closed as not planned: #192 (the DebuggerVisualizers project was removed in
+d3db7052; a rewrite is not planned, prototype on branch `ShapeItProgress`).
+
 ## Could not be verified / unsure
 
 These need someone with the original files, Windows/Visual Studio, or a
 maintainer decision.
 
-- [ ] **#192 Fix Visualizer for Visual Studio > 17.6.** The warning is gone
-  because d3db7052 removed the CADability.DebuggerVisualizers project. The
-  visualizers themselves don't work in current Visual Studio. A prototype
-  exists on branch `ShapeItProgress` (76e05ff0). Decide whether to close the
-  issue as not planned or keep it open for the rewrite.
 - [ ] **#294 GitHub documentation links broken.** `README.md` still links to
   `https://sofagh.github.io/CADability/...`. github.io could not be reached
   from the sandbox, so neither the old URLs nor a FriendsOfCADability Pages

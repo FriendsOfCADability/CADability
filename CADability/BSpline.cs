@@ -77,6 +77,7 @@ namespace CADability.GeoObject
         private BoundingCube extent;
         private double length = double.MinValue; // cached arc length, see ICurve.Length
         private TetraederHull tetraederHull;
+        private BSpline2D inOwnPlane; // see ICurve.PositionOf(GeoPoint)
         private GeoPoint[] approximation; // Interpolation mit der Genauigkeit der Auflösung
         private double approxPrecision; // Genauigkeit zu approximation
         private readonly object lockApproximationRecalc = new object();
@@ -693,6 +694,7 @@ namespace CADability.GeoObject
                 extent = BoundingCube.EmptyBoundingCube;
                 length = double.MinValue;
                 tetraederHull = null;
+                inOwnPlane = null;
                 extrema = null;
             }
         }
@@ -2309,6 +2311,10 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// The derivative at the start. Where it vanishes (coinciding first poles) it says nothing about the direction,
+        /// and the unit vector of the tangent there is returned instead, like <see cref="BSpline2D.StartDirection"/>.
+        /// </summary>
         GeoVector ICurve.StartDirection
         {
             get
@@ -2316,9 +2322,13 @@ namespace CADability.GeoObject
                 GeoPoint p;
                 GeoVector v;
                 PointDirAtParam(startParam, out p, out v);
-                return v;
+                return v.Length > NegligibleDerivative() ? v : TangentInside(startParam + 1e-8 * (endParam - startParam), v);
             }
         }
+        /// <summary>
+        /// The derivative at the end. Where it vanishes (coinciding last poles) it says nothing about the direction,
+        /// and the unit vector of the tangent there is returned instead, like <see cref="BSpline2D.EndDirection"/>.
+        /// </summary>
         GeoVector ICurve.EndDirection
         {
             get
@@ -2326,8 +2336,24 @@ namespace CADability.GeoObject
                 GeoPoint p;
                 GeoVector v;
                 PointDirAtParam(endParam, out p, out v);
-                return v;
+                return v.Length > NegligibleDerivative() ? v : TangentInside(endParam - 1e-8 * (endParam - startParam), v);
             }
+        }
+        /// <summary>
+        /// The length below which a first derivative counts as vanished, see <see cref="BSpline2D"/>.
+        /// </summary>
+        private double NegligibleDerivative()
+        {
+            return 1e-9 * CADability.GeoPoint.Distance(poles) / (endParam - startParam);
+        }
+        /// <summary>
+        /// The unit vector of the derivative at <paramref name="par"/>, close to an end point where the derivative
+        /// vanishes, or <paramref name="fallback"/>, when that vanishes as well.
+        /// </summary>
+        private GeoVector TangentInside(double par, GeoVector fallback)
+        {
+            PointDirAtParam(par, out _, out GeoVector v);
+            return v.IsNullVector() ? fallback : v.Normalized;
         }
         GeoVector ICurve.DirectionAt(double Position)
         {
@@ -2339,6 +2365,42 @@ namespace CADability.GeoObject
         GeoPoint ICurve.PointAt(double Position)
         {
             return PointAtParam(startParam + Position * (endParam - startParam));
+        }
+        /// <summary>
+        /// Improves a position of the point of the curve closest to <paramref name="p"/> with a few Newton steps. A step
+        /// is only taken when it brings the point closer, so the result is never worse than <paramref name="position"/>.
+        /// </summary>
+        private double RefinePosition(GeoPoint p, double position)
+        {
+            double par = startParam + position * (endParam - startParam);
+            PointDirAtParam(par, out GeoPoint point, out GeoVector deriv);
+            double dist = point | p;
+            for (int i = 0; i < 8 && dist > 0.0; i++)
+            {
+                double d2 = deriv * deriv;
+                if (d2 == 0.0) break;
+                double next = Math.Max(startParam, Math.Min(endParam, par + ((p - point) * deriv) / d2));
+                PointDirAtParam(next, out GeoPoint nextPoint, out GeoVector nextDeriv);
+                double nextDist = nextPoint | p;
+                if (nextDist >= dist) break;
+                par = next;
+                point = nextPoint;
+                deriv = nextDeriv;
+                dist = nextDist;
+            }
+            return (par - startParam) / (endParam - startParam);
+        }
+        /// <summary>
+        /// Whether two consecutive poles coincide, which makes the derivative vanish where the curve passes through
+        /// them, see <see cref="ICurve.PositionOf(GeoPoint)"/>.
+        /// </summary>
+        private bool HasCoincidingPoles()
+        {
+            for (int i = 1; i < poles.Length; i++)
+            {
+                if ((poles[i] | poles[i - 1]) < Precision.eps) return true;
+            }
+            return false;
         }
         double ICurve.PositionOf(GeoPoint p, Plane pl)
         {
@@ -2435,8 +2497,33 @@ namespace CADability.GeoObject
         }
         double ICurve.PositionOf(GeoPoint p)
         {
+            if (HasCoincidingPoles() && (this as ICurve).GetPlanarState() == PlanarState.Planar)
+            {
+                // The tetrahedron hull relies on the tangents at its base points and may fail where the derivative
+                // vanishes (coinciding poles, issue 173). The projection of a planar spline to its plane has the same
+                // parametrization (see GetProjectedCurve), the point of the curve closest to p is the one closest to
+                // the projection of p, and BSpline2D handles these points.
+                Plane pl = (this as ICurve).GetPlane();
+                BSpline2D c2d = inOwnPlane;
+                if (c2d == null) inOwnPlane = c2d = (this as ICurve).GetProjectedCurve(pl) as BSpline2D;
+                if (c2d != null)
+                {
+                    double pos = c2d.PositionOf(pl.Project(p));
+                    if (!double.IsNaN(pos) && pos != double.MaxValue) return RefinePosition(p, pos);
+                }
+            }
             double tpos = TetraederHull.PositionOf(p);
-            if (tpos != double.MaxValue) return tpos;
+            if (tpos != double.MaxValue)
+            {
+                // The hull relies on the tangents at its base points. Where the derivative vanishes (coinciding poles)
+                // it may return a position far off. A point of the curve that is closer to p shows that, the search
+                // below then has to find it.
+                if (interpol == null) MakeInterpol();
+                double found = (this as ICurve).PointAt(tpos) | p;
+                bool plausible = true;
+                for (int i = 0; i < interpol.Length && plausible; i++) plausible = (interpol[i] | p) >= found - Precision.eps;
+                if (plausible) return tpos;
+            }
             if (this.IsSingular)
             {
                 return Geometry.LinePar(poles[0], poles[poles.Length - 1], p);

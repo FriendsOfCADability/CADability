@@ -198,6 +198,9 @@ namespace CADability.Tests
             BSpline2D c2d = (BSpline2D)(CornerSpline(2, 2, false) as ICurve).GetProjectedCurve(Plane.XYPlane);
             Assert.IsTrue(Precision.SameDirection(c2d.StartDirection, GeoVector2D.XAxis, false), $"start direction {c2d.StartDirection}");
             Assert.IsTrue(Precision.SameDirection(c2d.EndDirection, -GeoVector2D.YAxis, false), $"end direction {c2d.EndDirection}");
+            ICurve curve = CornerSpline(2, 2, false);
+            Assert.IsTrue(Precision.SameDirection(curve.StartDirection, GeoVector.XAxis, false), $"3d start direction {curve.StartDirection}");
+            Assert.IsTrue(Precision.SameDirection(curve.EndDirection, -GeoVector.YAxis, false), $"3d end direction {curve.EndDirection}");
         }
 
         [TestMethod]
@@ -223,22 +226,66 @@ namespace CADability.Tests
         }
 
         [TestMethod]
-        [DataRow(2, 2, false)]
-        [DataRow(3, 3, false)]
-        public void DxfImportKeepsTheSpline(int degree, int polesPerCorner, bool useRectangle)
+        [DataRow(2, 2, 5)]
+        [DataRow(3, 3, 5)]
+        [DataRow(3, 2, 0)]
+        public void DxfImportSplitsAtTheCorners(int degree, int polesPerCorner, int expectedLines)
         {
-            BSpline bsp = CornerSpline(degree, polesPerCorner, useRectangle);
+            // with real corners the spline is split there into exact pieces, here all of them straight; without, it stays
+            // one spline
+            BSpline bsp = CornerSpline(degree, polesPerCorner, false);
             Project project = Project.CreateSimpleProject();
             project.GetActiveModel().Add(bsp);
-            string fileName = System.IO.Path.Combine(TestContext.TestRunDirectory ?? System.IO.Path.GetTempPath(), $"coinciding_poles_{degree}.dxf");
+            string fileName = System.IO.Path.Combine(TestContext.TestRunDirectory ?? System.IO.Path.GetTempPath(), $"coinciding_poles_{degree}_{polesPerCorner}.dxf");
             new CADability.DXF.Export().WriteToFile(project, fileName);
             GeoObjectList imported = new CADability.DXF.Import(fileName).Project.GetActiveModel().AllObjects;
             Assert.AreEqual(1, imported.Count);
-            Assert.IsInstanceOfType(imported[0], typeof(BSpline), "the spline must not be replaced by a polyline");
+            if (expectedLines == 0) Assert.IsInstanceOfType(imported[0], typeof(BSpline));
+            else
+            {
+                CADability.GeoObject.Path path = (CADability.GeoObject.Path)imported[0];
+                Assert.AreEqual(expectedLines, path.Curves.Count(c => c is Line), "straight pieces");
+                Assert.IsTrue(path.IsClosed);
+            }
+            // the same curve, no approximation
             ICurve curve = (ICurve)imported[0];
             double maxDeviation = 0.0;
-            for (int i = 0; i <= 1000; i++) maxDeviation = Math.Max(maxDeviation, curve.PointAt(i / 1000.0) | (bsp as ICurve).PointAt(i / 1000.0));
-            Assert.IsTrue(maxDeviation < 1e-6, $"the imported spline deviates by {maxDeviation}");
+            for (int i = 0; i <= 1000; i++)
+            {
+                maxDeviation = Math.Max(maxDeviation, curve.DistanceTo((bsp as ICurve).PointAt(i / 1000.0)));
+                maxDeviation = Math.Max(maxDeviation, (bsp as ICurve).DistanceTo(curve.PointAt(i / 1000.0)));
+            }
+            Assert.IsTrue(maxDeviation < 1e-6, $"the imported curve deviates by {maxDeviation}");
+        }
+
+        [TestMethod]
+        public void ExtrudeSplineWithCoincidingEndPoles()
+        {
+            // the derivative vanishes at both ends, the projection of the curve onto the extruded surface used to fail
+            BSpline bsp = CornerSpline(3, 2, false);
+            IGeoObject extruded = Make3D.Extrude(bsp, new GeoVector(0, 0, 10), null);
+            Assert.IsNotNull(extruded);
+            Face face = extruded as Face ?? ((Shell)extruded).Faces[0];
+            // one of its edges is the spline
+            bool found = face.AllEdges.Any(e => Enumerable.Range(0, 101).All(i => e.Curve3D.DistanceTo((bsp as ICurve).PointAt(i / 100.0)) < 1e-6));
+            Assert.IsTrue(found, "the spline is no edge of the extruded face");
+        }
+
+        [TestMethod]
+        public void FaceFromAClosedSplineKeepsTheSpline()
+        {
+            // Border.Reduce used to approximate the spline with the maximum gap, Precision.eps for Face.MakeFace, into
+            // thousands of arcs
+            GeoPoint[] points = Enumerable.Range(0, 12).Select(i => new GeoPoint(50 * Math.Cos(i * Math.PI / 6), 30 * Math.Sin(i * Math.PI / 6), 0)).ToArray();
+            BSpline bsp = BSpline.Construct();
+            bsp.ThroughPoints(points.Concat(new[] { points[0] }).ToArray(), 3, false);
+            Face face = Face.MakeFace(new GeoObjectList(bsp));
+            Assert.IsNotNull(face);
+            Assert.IsTrue(face.AllEdges.Length <= 2, $"{face.AllEdges.Length} edges");
+            GeoPoint2D[] exact = Sample(bsp, Plane.XYPlane, 8000);
+            double polygonArea = 0.0;
+            for (int i = 1; i < exact.Length; i++) polygonArea += (exact[i - 1].x * exact[i].y - exact[i].x * exact[i - 1].y) / 2.0;
+            Assert.AreEqual(Math.Abs(polygonArea), face.Area.Area, 1e-3, "Area");
         }
 
         [TestMethod]
@@ -350,15 +397,62 @@ namespace CADability.Tests
             new GeoPoint2D(101.07046962338, -179.5312829491934) };
 
         [TestMethod]
-        [DeploymentItem(@"Files/Dxf/issue173.dxf", nameof(Issue173File))]
-        public void Issue173File()
+        public void FaceFromEllipsesKeepsThem()
         {
+            // a full ellipse, and half an ellipse closed by a line
+            Ellipse full = Ellipse.Construct();
+            full.SetEllipseCenterAxis(new GeoPoint(10, 20, 0), new GeoVector(40, 0, 0), new GeoVector(0, 25, 0));
+            Face face = Face.MakeFace(new GeoObjectList(full));
+            Assert.IsNotNull(face);
+            Assert.IsTrue(face.AllEdges.Length <= 2, $"{face.AllEdges.Length} edges");
+            Assert.AreEqual(Math.PI * 40 * 25, face.Area.Area, 1e-6 * Math.PI * 40 * 25, "full ellipse");
+
+            Ellipse half = Ellipse.Construct();
+            half.SetEllipseArcCenterAxis(new GeoPoint(10, 20, 0), new GeoVector(40, 0, 0), new GeoVector(0, 25, 0), 0.0, Math.PI);
+            Line diameter = Line.TwoPoints(half.EndPoint, half.StartPoint);
+            face = Face.MakeFace(new GeoObjectList(half, diameter));
+            Assert.IsNotNull(face);
+            Assert.IsTrue(face.AllEdges.Length <= 3, $"{face.AllEdges.Length} edges");
+            Assert.AreEqual(Math.PI * 40 * 25 / 2, face.Area.Area, 1e-6 * Math.PI * 40 * 25, "half ellipse");
+        }
+
+        /// <summary>
+        /// Reads the first SPLINE of a DXF file directly from its group codes, without the import, which splits the
+        /// spline at its corners.
+        /// </summary>
+        private static BSpline ReadSpline(string file)
+        {
+            string[] lines = System.IO.File.ReadAllLines(file);
+            int degree = 0;
+            List<double> knots = new List<double>();
+            List<GeoPoint> poles = new List<GeoPoint>();
+            double x = 0.0, y = 0.0;
+            int i = 0;
+            while (!(lines[i].Trim() == "0" && lines[i + 1].Trim() == "SPLINE")) i += 2;
+            for (i += 2; i < lines.Length - 1 && lines[i].Trim() != "0"; i += 2)
+            {
+                double value() => double.Parse(lines[i + 1].Trim(), System.Globalization.CultureInfo.InvariantCulture);
+                switch (lines[i].Trim())
+                {
+                    case "71": degree = (int)value(); break;
+                    case "40": knots.Add(value()); break;
+                    case "10": x = value(); break;
+                    case "20": y = value(); break;
+                    case "30": poles.Add(new GeoPoint(x, y, value())); break;
+                }
+            }
+            BSpline bsp = BSpline.Construct();
+            Assert.IsTrue(bsp.SetData(degree, poles.ToArray(), null, knots.ToArray(), null, false));
+            return bsp;
+        }
+
+        [TestMethod]
+        [DeploymentItem(@"Files/Dxf/issue173.dxf", nameof(Issue173Spline))]
+        public void Issue173Spline()
+        {
+            // the spline itself, as one BSpline, with its corners where the derivative vanishes on one side only
             string file = System.IO.Path.Combine(TestContext.DeploymentDirectory, TestContext.TestName, "issue173.dxf");
-            Assert.IsTrue(System.IO.File.Exists(file));
-            GeoObjectList imported = new CADability.DXF.Import(file).Project.GetActiveModel().AllObjects;
-            Assert.AreEqual(1, imported.Count);
-            Assert.IsInstanceOfType(imported[0], typeof(BSpline), "the spline must not be replaced by a polyline");
-            ICurve curve = (ICurve)imported[0];
+            ICurve curve = ReadSpline(file);
             ICurve2D c2d = curve.GetProjectedCurve(Plane.XYPlane);
             ICurve2D reversed = c2d.CloneReverse(true);
             foreach (GeoPoint2D p in issue173KnotPoints)
@@ -367,8 +461,15 @@ namespace CADability.Tests
                 Assert.IsTrue(c2d.MinDistance(p) < 1e-6, $"the projected spline misses {p}");
                 Assert.IsTrue(reversed.MinDistance(p) < 1e-6, $"the reversed projected spline misses {p}");
             }
+            // points on the curve, also right behind the corners, where the derivative vanishes on one side only
+            double maxDistance = 0.0;
+            List<double> positions = new List<double>();
+            for (int i = 0; i <= 27 * 40; i++) positions.Add(i / (27.0 * 40));
+            for (int k = 0; k <= 27; k++) foreach (double offset in new[] { -0.1, -0.01, -0.001, 0.001, 0.01, 0.1 }) positions.Add((k + offset) / 27.0);
+            foreach (double position in positions.Where(t => t >= 0.0 && t <= 1.0)) maxDistance = Math.Max(maxDistance, curve.DistanceTo(curve.PointAt(position)));
+            Assert.IsTrue(maxDistance < 1e-6, $"DistanceTo of points on the spline is up to {maxDistance}");
             // from the independent evaluation, a polygon of 10800 points
-            Assert.AreEqual(4326.3974, new SimpleShape(new Border(c2d)).Area, 1e-3, "Area");
+            Assert.AreEqual(4326.3974, new SimpleShape(new Border(c2d.Clone())).Area, 1e-3, "Area");
             Assert.AreEqual(579.2681, curve.Length, 1e-3, "Length");
 
             // the display of the spline
@@ -386,6 +487,38 @@ namespace CADability.Tests
                 bool startAndEnd = Math.Min(selfIntersections[i], selfIntersections[i + 1]) < 1e-6 && Math.Max(selfIntersections[i], selfIntersections[i + 1]) > 1 - 1e-6;
                 Assert.IsTrue(startAndEnd, $"self intersection reported at {selfIntersections[i]}, {selfIntersections[i + 1]}");
             }
+        }
+
+        [TestMethod]
+        [DeploymentItem(@"Files/Dxf/issue173.dxf", nameof(Issue173Import))]
+        public void Issue173Import()
+        {
+            // the import splits the spline at its 26 inner corners, the straight Bézier segments become lines
+            string file = System.IO.Path.Combine(TestContext.DeploymentDirectory, TestContext.TestName, "issue173.dxf");
+            Project project = new CADability.DXF.Import(file).Project;
+            GeoObjectList imported = project.GetActiveModel().AllObjects;
+            Assert.AreEqual(1, imported.Count);
+            CADability.GeoObject.Path path = (CADability.GeoObject.Path)imported[0];
+            Assert.AreEqual(27, path.CurveCount);
+            Assert.AreEqual(7, path.Curves.Count(c => c is Line), "straight pieces");
+            Assert.IsTrue(path.IsClosed);
+            ICurve original = ReadSpline(file);
+            foreach (GeoPoint2D p in issue173KnotPoints) Assert.IsTrue((path as ICurve).DistanceTo(new GeoPoint(p.x, p.y, 0.0)) < 1e-6, $"the path misses {p}");
+            double maxDeviation = 0.0;
+            for (int i = 0; i <= 2000; i++) maxDeviation = Math.Max(maxDeviation, original.DistanceTo((path as ICurve).PointAt(i / 2000.0)));
+            Assert.IsTrue(maxDeviation < 1e-6, $"the path deviates by {maxDeviation}");
+            Assert.AreEqual(579.2681, path.Length, 1e-3, "Length");
+
+            // what is done with such a contour
+            Shell side = (Shell)Make3D.Extrude(path.Clone(), new GeoVector(0, 0, 10), project);
+            Assert.AreEqual(27, side.Faces.Length, "extruded faces");
+            Assert.IsInstanceOfType(Make3D.Rotate(path.Clone(), new Axis(GeoPoint.Origin, GeoVector.YAxis), SweepAngle.Full, 0, project), typeof(Solid), "rotated");
+            Face face = Face.MakeFace(new GeoObjectList(path.Clone()));
+            Assert.IsNotNull(face);
+            Assert.IsTrue(face.AllEdges.Length <= 27, $"{face.AllEdges.Length} edges");
+            Assert.AreEqual(4326.3974, face.Area.Area, 1e-3, "face area");
+            Solid solid = (Solid)Make3D.Extrude(face, new GeoVector(0, 0, 10), project);
+            Assert.AreEqual(43263.974, solid.Volume(0.001), 1e-2, "volume");
         }
     }
 }

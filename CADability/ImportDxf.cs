@@ -757,39 +757,83 @@ namespace CADability.DXF
                 BSpline bsp = BSpline.Construct();
                 if (bsp.SetData(degree, poles, weights, kn, null, spline.IsPeriodic))
                 {
-                    List<int> splitKnots = new List<int>();
-                    for (int i = degree + 1; i < kn.Length - degree - 1; i++)
-                    {
-                        if (kn[i] == kn[i - 1])
-                        {
-                            bool sameKnot = true;
-                            for (int j = 0; j < degree; j++)
-                                if (kn[i - 1] != kn[i + j]) sameKnot = false;
-                            if (sameKnot) splitKnots.Add(i - 1);
-                        }
-                    }
-                    if (splitKnots.Count > 0)
+                    // Split the spline at its corners into exact pieces: where the multiplicity of a knot leaves the
+                    // curve only continuous (or not even that), and where the derivative vanishes, typically because
+                    // poles coincide (issue 173). A face extruded or rotated from the spline would otherwise have a
+                    // kink inside, and many algorithms need a surface or curve that is smooth inside. Pieces that are
+                    // straight become lines.
+                    List<double> splitParameters = CornerParameters(bsp);
+                    if (splitParameters.Count > 0)
                     {
                         List<ICurve> parts = new List<ICurve>();
-                        BSpline part = bsp.TrimParam(kn[0], kn[splitKnots[0]]);
-                        if (CADability.GeoPoint.Distance(part.Poles) > Precision.eps && (part as ICurve).Length > Precision.eps) parts.Add(part);
-                        for (int i = 1; i < splitKnots.Count; i++)
+                        double[] bounds = new double[splitParameters.Count + 2];
+                        bounds[0] = (bsp as ICurve).PositionToParameter(0.0);
+                        splitParameters.CopyTo(bounds, 1);
+                        bounds[bounds.Length - 1] = (bsp as ICurve).PositionToParameter(1.0);
+                        for (int i = 0; i < bounds.Length - 1; i++)
                         {
-                            part = bsp.TrimParam(kn[splitKnots[i - 1]], kn[splitKnots[i]]);
-                            if (CADability.GeoPoint.Distance(part.Poles) > Precision.eps && (part as ICurve).Length > Precision.eps) parts.Add(part);
+                            BSpline part = bsp.TrimParam(bounds[i], bounds[i + 1]);
+                            if (part == null || CADability.GeoPoint.Distance(part.Poles) <= Precision.eps || (part as ICurve).Length <= Precision.eps) continue;
+                            parts.Add(StraightPieceAsLine(part) ?? (ICurve)part);
                         }
-                        part = bsp.TrimParam(kn[splitKnots[splitKnots.Count - 1]], kn[kn.Length - 1]);
-                        if (CADability.GeoPoint.Distance(part.Poles) > Precision.eps && (part as ICurve).Length > Precision.eps) parts.Add(part);
-                        GeoObject.Path path = GeoObject.Path.Construct();
-                        path.Set(parts.ToArray());
-                        return path;
+                        if (parts.Count == 1) return parts[0] as IGeoObject;
+                        if (parts.Count > 1)
+                        {
+                            GeoObject.Path path = GeoObject.Path.Construct();
+                            path.Set(parts.ToArray());
+                            return path;
+                        }
                     }
-                    // Coinciding poles (a corner of the curve) used to make this a polyline, because the spline was
-                    // displayed wrongly. That was ICurve.GetProjectedCurve, which is fixed now (issue 173).
                     return bsp;
                 }
             }
             return null;
+        }
+
+        /// <summary>
+        /// The parameters of the inner knots of <paramref name="bsp"/> where the curve may have a corner: knots with a
+        /// multiplicity of at least the degree, and knots where the first derivative vanishes.
+        /// </summary>
+        private static List<double> CornerParameters(BSpline bsp)
+        {
+            List<double> res = new List<double>();
+            double[] knots = bsp.Knots;
+            int[] multiplicities = bsp.Multiplicities;
+            ICurve curve = bsp;
+            double startParameter = curve.PositionToParameter(0.0);
+            double endParameter = curve.PositionToParameter(1.0);
+            double polygonLength = CADability.GeoPoint.Distance(bsp.Poles);
+            for (int i = 0; i < knots.Length; i++)
+            {
+                if (knots[i] <= startParameter || knots[i] >= endParameter) continue;
+                if (multiplicities[i] >= bsp.Degree) res.Add(knots[i]);
+                else if (curve.DirectionAt(curve.ParameterToPosition(knots[i])).Length <= 1e-9 * polygonLength) res.Add(knots[i]);
+            }
+            return res;
+        }
+
+        /// <summary>
+        /// A line, if <paramref name="part"/> is a straight piece: all poles on the line through the first and the last
+        /// one, in this order. A spline only moves back and forth along its line when its poles do (variation
+        /// diminishing property), so then it is exactly this line. Otherwise null.
+        /// </summary>
+        private static GeoObject.Line StraightPieceAsLine(BSpline part)
+        {
+            GeoPoint[] poles = part.Poles;
+            GeoPoint sp = poles[0], ep = poles[poles.Length - 1];
+            GeoVector dir = ep - sp;
+            if (dir.Length <= Precision.eps) return null;
+            double last = 0.0;
+            for (int i = 0; i < poles.Length; i++)
+            {
+                if (Geometry.DistPL(poles[i], sp, dir) > Precision.eps) return null;
+                double position = (poles[i] - sp) * dir / (dir * dir);
+                if (position < last - 1e-9) return null;
+                last = position;
+            }
+            GeoObject.Line line = GeoObject.Line.Construct();
+            line.SetTwoPoints(sp, ep);
+            return line;
         }
 
         private IGeoObject CreateFace(ACadSharp.Entities.Face3D face)

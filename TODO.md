@@ -49,12 +49,12 @@ maintainer decision.
   Fixes exist on the unmerged branch `claude/ecstatic-fermat-uml5l3`
   (311598c3, 3bc72921, e8199e3b). Review and merge that branch, then answer
   and close.
-- [ ] **#251 ToolsRoundIn.OnDone — objectPointSav is never assigned.**
-  8e15ccc7 silenced the warning with an initializer, but the field is still
-  always the origin, and the `roundRad == 0.0` branch in `OnDone` trims at
-  the wrong point. Remove that branch, or store the real corner point. If the
-  maintainers think silencing the warning is enough, close the issue
-  referencing 8e15ccc7.
+- [x] **#251 ToolsRoundIn.OnDone — objectPointSav is never assigned.**
+  Fixed on branch `claude/gracious-sagan-pi9nj1`. The field and the
+  unreachable `roundRad == 0.0` branch were removed: `RoundRadius()` rejects
+  radii <= `Precision.eps`, the default radius is ViewWidth/40, and
+  `ShowRound` never produces an arc for radius 0. Close the issue once this
+  is merged.
 
 ## Confirmed — still present on master
 

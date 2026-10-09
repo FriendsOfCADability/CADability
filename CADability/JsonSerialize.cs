@@ -131,10 +131,14 @@ namespace CADability
             StreamReader sr;
             string currentline;
             int actind;
-            public Tokenizer(Stream stream)
+            int prevactind;
+            IJsonProgress progress; //To keep track of the reading of the file.
+            public Tokenizer(Stream stream, IJsonProgress progress)
             {
+                this.progress = progress;
                 sr = new StreamReader(stream);
                 currentline = sr.ReadToEnd().Trim();
+                SetProgressStepIncrement(15.0 / currentline.Length);
                 actind = 0;
             }
 
@@ -146,6 +150,7 @@ namespace CADability
             }
             public etoken NextToken(out string line, out int start, out int length)
             {
+                DoProgressStep(); //It should be at the end, but it doesn't matter so much, I loose only to feedback the last token read. I put it here because there are many return and I don't want to call it in different places or refactor all the code.
                 line = null;
                 start = length = 0;
                 if (actind >= currentline.Length)
@@ -271,6 +276,25 @@ namespace CADability
                         return etoken.colon;
                 }
                 return etoken.error;
+            }
+
+            private void SetProgressStepIncrement(double increment)
+            {
+                if (progress != null) progress.SetStepIncrement(increment);
+            }
+
+            private void DoProgressStep()
+            {
+                if (progress != null)
+                {
+                    int diff = actind - prevactind;
+                    if (diff > 0)
+                    {
+                        //I report each new token. Who implements IJsonProgress can decide to ingore most of them or not.
+                        progress.DoStep(diff);
+                        prevactind = actind;
+                    }
+                }
             }
 
             #region IDisposable Support
@@ -663,19 +687,16 @@ namespace CADability
         public object FromStream(Stream stream, IJsonProgress progress)
         {
             this.progress = progress;
-            SetProgressStepIncrement(35);
-            tk = new Tokenizer(stream);
+            tk = new Tokenizer(stream, progress);
             string line;
             int start, length;
             createEntity = new List<EntityCreationDelegate>();
             typeVersions = new Dictionary<string, int>();
             typeIndexToVersion = new Dictionary<int, int>();
             Tokenizer.etoken token = tk.NextToken(out line, out start, out length);
-            DoProgressStep();
             if (token == Tokenizer.etoken.beginObject)
             {
                 JsonDict allObjects = GetObject(tk);
-                DoProgressStep(); //Here the file is complety read.
                 if (!allObjects.ContainsKey("CADability")) return null;
                 JsonDict cdb = allObjects["CADability"] as JsonDict;
                 if (cdb != null)
@@ -701,7 +722,7 @@ namespace CADability
                         DoProgressStep();
                     }
                     IJsonSerializeDone item = SerializationDoneCallback.FirstOrDefault();
-                    SetProgressStepIncrement(25.0 / SerializationDoneCallback.Count);
+                    SetProgressStepIncrement(80.0 / SerializationDoneCallback.Count);
                     while (item != null)
                     {
                         SerializationDoneCallback.Remove(item);

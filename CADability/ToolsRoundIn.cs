@@ -12,7 +12,6 @@ namespace CADability.Actions
 	{
 		private GeoPoint objectPoint; // der (evtl. mittlere) Pickpunkt zum Runden
 		private GeoPoint objectPoint1; // der Pickpunkt der ersten Curve
-		private GeoPoint objectPointSav = new GeoPoint(0, 0, 0); // der  Pickpunkt zum Runden als Merker für onDone
 		private ICurve iCurve1; // lokales Element
 		private ICurve iCurve2; // lokales Element
 		private ICurve iCurveComposedSplit; // lokales Element
@@ -475,24 +474,6 @@ namespace CADability.Actions
 					//}
 					//else
 					{
-						if (roundRad == 0.0)
-						{
-
-							if (iCurve1.PositionOf(objectPointSav) > 0.5)
-								iCurve1.Trim(0.0, iCurve1.PositionOf(objectPointSav));
-							else
-							{
-								iCurve1.Trim(iCurve1.PositionOf(objectPointSav), 1.0);
-								if (Frame.GetBooleanSetting("Construct.MakePath", true)) iCurve1.Reverse();
-							}
-							if (iCurve2.PositionOf(objectPointSav) > 0.5)
-							{
-								iCurve2.Trim(0.0, iCurve2.PositionOf(objectPointSav));
-								if (Frame.GetBooleanSetting("Construct.MakePath", true)) iCurve2.Reverse();
-							}
-							else iCurve2.Trim(iCurve2.PositionOf(objectPointSav), 1.0);
-						}
-						else
 						{
 
 							if (iCurve1.PositionOf(arc.StartPoint) > iCurve1.PositionOf(arc.Center))
@@ -533,19 +514,6 @@ namespace CADability.Actions
 							else doIt = false;
 							//iCurve1.Trim(0.0,iCurve1.PositionOf(arc.StartPoint));
 							//iCurve2.Trim(iCurve2.PositionOf(arc.EndPoint),1.0);
-							//if (iCurve1.PositionOf(objectPointSav) > 0.5)
-							//    iCurve1.Trim(0.0,iCurve1.PositionOf(arc.StartPoint));
-							//else
-							//{
-							//    iCurve1.Trim(iCurve1.PositionOf(arc.StartPoint),1.0);
-							//    if (Frame.GetBooleanSetting("Construct.MakePath",true)) iCurve1.Reverse();
-							//}
-							//if (iCurve2.PositionOf(objectPointSav) > 0.5)
-							//{
-							//    iCurve2.Trim(0.0,iCurve2.PositionOf(arc.EndPoint));
-							//    if (Frame.GetBooleanSetting("Construct.MakePath",true)) iCurve2.Reverse();
-							//}
-							//else iCurve2.Trim(iCurve2.PositionOf(arc.EndPoint),1.0);
 						}
 					}
 					if (doIt)

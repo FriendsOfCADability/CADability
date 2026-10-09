@@ -1176,8 +1176,9 @@ namespace CADability.GeoObject
             GetNaturalBounds(out umin, out umax, out vmin, out vmax);
             double[] us = GetUSingularities();
             double[] vs = GetVSingularities();
-            double[] upars = GetPars(umin, umax, IsUPeriodic, us, 5);
-            double[] vpars = GetPars(vmin, vmax, IsVPeriodic, vs, 5);
+            double[] upars = GetPars(umin, umax, IsUPeriodic, us, 5, out bool uok);
+            double[] vpars = GetPars(vmin, vmax, IsVPeriodic, vs, 5, out bool vok);
+            if (!uok || !vok) return null; // no regular sample grid available
             // upars, vpars describe an almost evenly spaced 5x5 grid while singularities and seams (of closed surface) are avoided
             // now lets see, whether in the middle we have a line or circular arc
 
@@ -1409,8 +1410,9 @@ namespace CADability.GeoObject
             // fixedu, fixedv Ebenen finden
             double[] us = GetUSingularities();
             double[] vs = GetVSingularities();
-            double[] upars = GetPars(umin, umax, IsUPeriodic, us, 3);
-            double[] vpars = GetPars(vmin, vmax, IsVPeriodic, vs, 3);
+            double[] upars = GetPars(umin, umax, IsUPeriodic, us, 3, out bool uok);
+            double[] vpars = GetPars(vmin, vmax, IsVPeriodic, vs, 3, out bool vok);
+            if (!uok || !vok) return null; // no regular sample grid available
             int numLines = 0;
             int numCircles = 0;
             List<ICurve> curves = new List<ICurve>();
@@ -2136,8 +2138,10 @@ namespace CADability.GeoObject
                 double[] vs = GetVSingularities();
                 GeoPoint[,] points = new GeoPoint[3, 3];
                 GeoVector[,] normals = new GeoVector[3, 3];
-                double[] upars = GetPars(umin, umax, IsUPeriodic, us, 3);
-                double[] vpars = GetPars(vmin, vmax, IsVPeriodic, vs, 3);
+                double[] upars = GetPars(umin, umax, IsUPeriodic, us, 3, out bool uok);
+                double[] vpars = GetPars(vmin, vmax, IsVPeriodic, vs, 3, out bool vok);
+                // the cylinder/cone test below uses the same parameters, so there is nothing left to test
+                if (!uok || !vok) return false;
                 GeoPoint[] cnt = new GeoPoint[6];
                 double[] rad = new double[6];
                 bool ok = true;
@@ -2297,8 +2301,9 @@ namespace CADability.GeoObject
                 double[] vs = GetVSingularities();
                 GeoPoint[,] points = new GeoPoint[3, 3];
                 GeoVector[,] normals = new GeoVector[3, 3];
-                double[] upars = GetPars(umin, umax, IsUPeriodic, us, 3);
-                double[] vpars = GetPars(vmin, vmax, IsVPeriodic, vs, 3);
+                double[] upars = GetPars(umin, umax, IsUPeriodic, us, 3, out bool uok);
+                double[] vpars = GetPars(vmin, vmax, IsVPeriodic, vs, 3, out bool vok);
+                if (!uok || !vok) return false; // no regular sample grid available
                 ICurve[] ucurves = new ICurve[3];
                 ICurve[] vcurves = new ICurve[3];
                 int numcurves = 0;
@@ -2674,9 +2679,14 @@ namespace CADability.GeoObject
 #endif
             return true;
         }
-        private double[] GetPars(double min, double max, bool isClosed, double[] singularities, int numRes)
+        /// <summary>
+        /// Returns <paramref name="numRes"/> almost evenly spaced parameters in [min, max], avoiding the singularities
+        /// and, for closed surfaces, the seam. <paramref name="ok"/> is false when not enough parameters could be found
+        /// (e.g. when the whole domain is within the tolerance of a singularity); in that case the returned array is shorter.
+        /// </summary>
+        private double[] GetPars(double min, double max, bool isClosed, double[] singularities, int numRes, out bool ok)
         {
-            double[] res = new double[numRes];
+            List<double> res = new List<double>(numRes);
             double d;
             if (isClosed)
             {
@@ -2686,27 +2696,30 @@ namespace CADability.GeoObject
             {
                 d = (max - min) / (numRes - 1);
             }
+            // the tolerance must be relative to the domain size: with a fixed tolerance a tiny domain lies completely
+            // within the tolerance of a singularity and no parameter would ever be accepted
+            double tolerance = Math.Max(1e-8, (max - min) * 1e-7);
+            // limit the number of trials, so that we never loop forever (see issue #347)
+            int maxIterations = numRes * 100;
             double par = min;
-            int ind = 0;
-            while (ind < numRes)
+            for (int iteration = 0; res.Count < numRes && iteration < maxIterations; iteration++)
             {
                 bool singular = false;
                 for (int i = 0; i < singularities.Length; i++)
                 {
-                    if (Math.Abs(par - singularities[i]) < 1e-6)
+                    if (Math.Abs(par - singularities[i]) < tolerance)
                     {
                         singular = true;
                         break;
                     }
                 }
-                if (isClosed && Math.Abs(par - max) < 1e-6)
+                if (isClosed && Math.Abs(par - max) < tolerance)
                 {   // bei geschlossen nicht den Endpunkt nehmen
                     singular = true;
                 }
-                if (!singular)
+                if (!singular && !res.Contains(par))
                 {
-                    res[ind] = par;
-                    ind++;
+                    res.Add(par);
                 }
                 par += d;
                 if (par > max)
@@ -2715,8 +2728,9 @@ namespace CADability.GeoObject
                     par += d / Math.E; // inkommensurabel, man kommt nicht auf die gleichen Punkte und ungefähr um die Hälfte versetzt
                 }
             }
-            Array.Sort(res);
-            return res;
+            ok = res.Count == numRes;
+            res.Sort();
+            return res.ToArray();
         }
         private bool TestCircle(GeoPoint p1, GeoVector v1, GeoPoint p2, GeoVector v2, GeoPoint p3, GeoVector v3, out Plane plane, out double radius)
         {

@@ -1525,9 +1525,16 @@ namespace CADability
                 {
                     outStream.Write(flt.ToString("G9", NumberFormatInfo.InvariantInfo));
                 }
+                else if (value is char chr)
+                {
+                    //A char is primitive but no number: written as is, e.g. the '{' of an XData
+                    //control string, it makes the file invalid JSON. It goes out as a one
+                    //character string and comes back as one.
+                    WriteString(chr.ToString());
+                }
                 else
                 {
-                    outStream.Write(value); // Boolean, (S)Byte, (U)IntNn
+                    outStream.Write(value); // (S)Byte, (U)IntNn
                 }
             }
             else if (value is string)

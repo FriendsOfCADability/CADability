@@ -80,6 +80,11 @@ namespace CADability.DXF
                 case XDataCode.Int32:
                     if (value is double d32) return (int)d32;
                     break;
+                case XDataCode.LayerName:
+                case XDataCode.DatabaseHandle:
+                    // ACadSharp gives both as the handle of the referenced object
+                    if (value is double handle) return (ulong)handle;
+                    break;
                 case XDataCode.ControlString:
                     if (value is string s && s.Length == 1) return s[0];
                     break;

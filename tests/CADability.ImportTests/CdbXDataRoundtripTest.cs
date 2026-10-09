@@ -29,6 +29,24 @@ namespace CADability.ImportTests
             AssertSameXData(AnnotativeXData(), back);
         }
 
+        // JSON reads every number as double. The values must come back with the types the
+        // import gives them, not only with the same numbers.
+        [TestMethod]
+        public void cdb_keeps_xdata_value_types()
+        {
+            ExtendedEntityData xData = new ExtendedEntityData { ApplicationName = "ACAD" };
+            xData.Data.Add(new KeyValuePair<XDataCode, object>(XDataCode.Int32, 70000));
+            xData.Data.Add(new KeyValuePair<XDataCode, object>(XDataCode.Real, 2.5));
+            xData.Data.Add(new KeyValuePair<XDataCode, object>(XDataCode.DatabaseHandle, (ulong)0x2708));
+            xData.Data.Add(new KeyValuePair<XDataCode, object>(XDataCode.LayerName, (ulong)0x10));
+            Line line = MakeLine();
+            line.UserData.Add("ACAD", xData);
+
+            ExtendedEntityData back = XDataOf(JsonRoundtrip(line), "ACAD");
+
+            AssertSameXData(xData, back);
+        }
+
         // The whole way a drawing takes: imported from DXF, saved as cdb, opened again and
         // exported to DXF. The XData at the end must be the XData from the first import.
         [TestMethod]

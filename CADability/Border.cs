@@ -979,6 +979,7 @@ namespace CADability.Shapes
 		}
 		public void ChangeCyclicalStart(int newStartIndex)
 		{
+			ICurve2D unsplittedOutline = UnsplittedOutline;
 			ICurve2D[] newsegment = new ICurve2D[segment.Length];
 			Array.Copy(segment, newStartIndex, newsegment, 0, segment.Length - newStartIndex);
 			Array.Copy(segment, 0, newsegment, segment.Length - newStartIndex, newStartIndex);
@@ -990,6 +991,8 @@ namespace CADability.Shapes
 			}
 			bool reversed;
 			Recalc(out reversed);
+			// only the start moved, the border is still the same closed curve
+			KeepUnsplittedOutline(unsplittedOutline);
 		}
 		public Border Clone()
 		{
@@ -998,7 +1001,21 @@ namespace CADability.Shapes
 			{
 				cloned[i] = segment[i].Clone();
 			}
-			return new Border(cloned);
+			Border res = new Border(cloned);
+			res.KeepUnsplittedOutline(UnsplittedOutline?.Clone());
+			return res;
+		}
+		/// <summary>
+		/// Sets <see cref="UnsplittedOutline"/> after an operation that kept the geometry of this border, because the
+		/// setter of <see cref="Segments"/> resets it (issue #194). The curve is turned to run like the segments:
+		/// <see cref="Recalc"/> may have reversed them, and <see cref="GetModified"/> reverses them for a reflection,
+		/// while a modified BSpline2D keeps its direction and a modified Circle2D always runs counterclockwise.
+		/// </summary>
+		private void KeepUnsplittedOutline(ICurve2D outline)
+		{
+			if (outline == null) return;
+			if (Math.Sign(outline.GetArea()) != Math.Sign(RecalcArea())) outline.Reverse();
+			UnsplittedOutline = outline;
 		}
 		public ICurve2D[] GetClonedSegments()
 		{
@@ -3448,7 +3465,13 @@ namespace CADability.Shapes
 					segs[i].Reverse();
 				}
 			}
-			return new Border(segs.ToArray(), isClosed);
+			Border res = new Border(segs.ToArray(), isClosed);
+			// the modified border is the modified single curve, unless the modification degenerates it
+			if (UnsplittedOutline != null && segs.Count == segment.Length && m.Determinant != 0.0)
+			{
+				res.KeepUnsplittedOutline(UnsplittedOutline.GetModified(m));
+			}
+			return res;
 		}
 		public ICurve2D[] GetPart(double startParam, double endParam, bool forward)
 		{
@@ -4048,6 +4071,7 @@ namespace CADability.Shapes
 			{
 				segment[i].Move(dx, dy);
 			}
+			UnsplittedOutline?.Move(dx, dy);
 			bool reversed;
 			Recalc(out reversed);
 		}

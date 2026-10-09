@@ -134,16 +134,8 @@ namespace CADability
             public Tokenizer(Stream stream)
             {
                 sr = new StreamReader(stream);
-                currentline = sr.ReadLine().Trim();
+                currentline = sr.ReadToEnd().Trim();
                 actind = 0;
-            }
-
-            public bool EndOfFile
-            {
-                get
-                {
-                    return sr.EndOfStream;
-                }
             }
 
             private bool EqualsAt(string value, StringComparison cmp = StringComparison.Ordinal)
@@ -156,20 +148,16 @@ namespace CADability
             {
                 line = null;
                 start = length = 0;
-                while (actind >= currentline.Length)
+                if (actind >= currentline.Length)
                 {
-                    if (sr.EndOfStream) return etoken.eof;
-                    currentline = sr.ReadLine().Trim();
-                    actind = 0;
+                    return etoken.eof;
                 }
                 while (char.IsWhiteSpace(currentline[actind]))
                 {   // skip whitespace
                     ++actind;
                     if (actind >= currentline.Length)
                     {
-                        if (sr.EndOfStream) return etoken.eof;
-                        currentline = sr.ReadLine().Trim();
-                        actind = 0;
+                        return etoken.eof;
                     }
                 }
                 switch (currentline[actind])
@@ -178,27 +166,6 @@ namespace CADability
                         {   // return string in quotes
                             int ind = currentline.IndexOf('"', actind + 1);
                             while (ind >= 0 && ind < currentline.Length - 1 && currentline[ind - 1] == '\\') ind = currentline.IndexOf('"', ind + 1); // skip \" in a string
-                            if (ind < 0)
-                            {   // string spans multiple lines
-                                string res = currentline.Substring(actind);
-                                while (ind < 0)
-                                {
-                                    if (sr.EndOfStream) return etoken.eof;
-                                    currentline = sr.ReadLine().Trim();
-                                    ind = currentline.IndexOf('\'');
-                                    while (ind >= 0 && ind < currentline.Length - 1 && currentline[ind - 1] == '\\') ind = currentline.IndexOf('"', ind + 1); // skip \" in a string
-                                    if (ind >= 0)
-                                    {
-                                        res += currentline.Substring(0, ind + 1);
-                                        actind = ind + 1;
-                                        line = res;
-                                        start = 1;
-                                        length = res.Length - 2;
-                                        return etoken.delimited;
-                                    }
-                                    else res += currentline;
-                                }
-                            }
                             start = actind + 1;
                             length = ind - start + 1 - 1;
                             line = currentline;

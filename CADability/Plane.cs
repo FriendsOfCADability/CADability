@@ -273,15 +273,19 @@ namespace CADability
             }
             mainDirection.Norm();
             normal.Norm();
-            // The points are linear, if they are all close to the line through the centroid in the main direction. The tolerance
-            // is relative to the extent of the points, plus a few units of rounding of their coordinates.
+            // The points are linear, if they are all close to the line through the centroid in the main direction. Callers like
+            // BSpline.GetPlanarState accept a plane when MaxDistance < Precision.eps, so points within Precision.eps of a line do
+            // not define a plane: the normal would only reflect noise, and e.g. a straight spline with tiny deviations would no
+            // longer share a plane with a neighbouring arc. For small point sets the tolerance is limited to a fraction of their
+            // extent, so that small planar curves stay planar, and it is never below the rounding of the coordinates.
             double lineDistance = 0.0;
             for (int i = 0; i < points.Length; i++)
             {
                 GeoVector r = points[i] - centroid;
                 lineDistance = Math.Max(lineDistance, (r - (r * mainDirection) * mainDirection).Length);
             }
-            if (lineDistance <= 1e-10 * size + 1e-14 * maxCoordinate)
+            double linearTolerance = Math.Max(Math.Min(Precision.eps, 1e-3 * size), 1e-10 * size + 1e-14 * maxCoordinate);
+            if (lineDistance <= linearTolerance)
             {
                 isLinear = true;
                 return Plane.XYPlane;

@@ -211,5 +211,34 @@ namespace CADability.Tests
             Assert.AreEqual(1.0, plane.Normal.z, 1e-12, "normal " + plane.Normal.ToString());
             Assert.AreEqual(1.0, plane.DirectionX.x, 1e-9, "x-axis " + plane.DirectionX.ToString());
         }
+
+        /// <summary>
+        /// A straight spline whose inner poles deviate from the line by less than Precision.eps does not define a plane: it
+        /// must stay UnderDetermined, so that it still shares a plane with a neighbouring arc. A fit that only looked at the
+        /// rounding of the coordinates reported such splines as planar, with a normal that only reflected the deviations.
+        /// </summary>
+        [TestMethod]
+        public void an_almost_straight_spline_still_shares_a_plane_with_an_arc()
+        {
+            foreach (double offset in new[] { 0.0, 1000.0, 100000.0 })
+            {
+                foreach (double deviation in new[] { 0.0, 1e-10, 1e-7, 5e-7 })
+                {
+                    GeoPoint[] poles = { new GeoPoint(offset, 0, 0), new GeoPoint(offset + 33, 0.7 * deviation, 0.3 * deviation),
+                        new GeoPoint(offset + 66, -0.4 * deviation, 0.9 * deviation), new GeoPoint(offset + 100, 0, 0) };
+                    BSpline bsp = BSpline.Construct();
+                    Assert.IsTrue(bsp.SetData(3, poles, null, new double[] { 0, 1 }, new int[] { 4, 4 }, false));
+                    Assert.AreEqual(PlanarState.UnderDetermined, (bsp as ICurve).GetPlanarState(), "offset " + offset + ", deviation " + deviation);
+                    Ellipse arc = Ellipse.Construct();
+                    arc.SetArcPlaneCenterRadiusAngles(Plane.XYPlane, new GeoPoint(offset + 100, 50, 0), 50, -Math.PI / 2, Math.PI / 2);
+                    Assert.IsTrue(Curves.GetCommonPlane(bsp, arc, out Plane common), "offset " + offset + ", deviation " + deviation);
+                    Assert.AreEqual(1.0, Math.Abs(common.Normal.z), 1e-6, "offset " + offset + ", deviation " + deviation);
+                }
+            }
+            // a small curve that is clearly bent stays planar, even if it is bent by less than Precision.eps
+            GeoPoint[] small = { new GeoPoint(0, 0, 0), new GeoPoint(1e-4, 5e-7, 0), new GeoPoint(2e-4, 0, 0) };
+            Plane.FromPoints(small, out _, out bool smallIsLinear);
+            Assert.IsFalse(smallIsLinear, "a small bent curve is not linear");
+        }
     }
 }

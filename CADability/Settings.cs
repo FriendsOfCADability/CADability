@@ -216,7 +216,7 @@ namespace CADability
             Stream stream = null;
             try
             {
-                stream = File.Open(FileName, FileMode.Open);
+                stream = File.Open(FileName, FileMode.Open, FileAccess.Read, FileShare.Read);
                 JsonSerialize jsonSerialize = new JsonSerialize();
                 if (globalSettings != null) globalSettings.Dispose();
                 GlobalSettings = (Settings)jsonSerialize.FromStream(stream);

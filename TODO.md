@@ -20,6 +20,15 @@ loops forever on tiny domains), #287 (hatch polyline boundaries are always
 closed on DXF import), #204 and #147 (`Plane.FromPoints` fits relative to the
 centroid and orients the normal by a fixed rule).
 
+Fixed in the next pull request: #194 (`Border.UnsplittedOutline` survives
+`CompoundShape.CreateFromList`), #293 (DXF block contents on layer 0 or
+ByBlock take the layer and colour of the INSERT; `CDfromParent` children keep
+the block colour after cloning and loading) and #66 (STEP export writes a
+`Path` edge curve, or any curve without its own STEP entity, as a B-spline).
+The reporters' files are now regression test data. Follow-up found while
+fixing #66: for a `CLOSED_SHELL` with a single open face, `Shell.CloseEdgeLoop`
+adds a coincident face with the same normal (ImportStep repair heuristic).
+
 Closed as not reproducible: #265 (the STEP round trip gives an identical solid
 on master and on the commit from the time of the report, 0fb61554).
 
@@ -71,18 +80,6 @@ Each of these was reproduced, or confirmed by reading the code, on `17f949e`.
   file as a test case under `tests/CADability.Tests/Files` and debug
   `BRepOperation`.
 
-- [ ] **#66 STEP export fails for `Path` edge curves.** `Path` does not
-  implement `IExportStep`, and `Edge.cs` (`IExportStep.Export`) casts without a
-  null check, so the export throws `NullReferenceException`. Ruled surfaces no
-  longer create `Path` edges, but older files and other code paths still can.
-- [ ] **#194 Circular hole UnsplittedOutline lost.** `Border.Reduce` assigns
-  `Segments`, and the setter clears `UnsplittedOutline`, so every circle hole
-  from `CompoundShape.CreateFromList` comes back with
-  `UnsplittedOutline == null`.
-- [ ] **#293 Block colour not rendered.** ByBlock children and layer-0
-  children of an INSERT come in black instead of taking the colour and layer
-  of the insert. Resolve them against the INSERT, for example by using
-  `ColorDef.CDfromParent`.
 - [ ] **#249 Path colour changes when approximated.** `Path.Approximate`
   creates child curves with the default black colour, and `CopyAttributes`
   overwrites only null child colours, so the colour is lost.

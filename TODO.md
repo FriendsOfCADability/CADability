@@ -11,21 +11,14 @@ Closed during this triage, because they were already solved on master:
   and 9573342d.
 - #295 Make3D.MakePipe with a straight path: fixed in #307 (a75ce094).
 
+Closed as not reproducible: #265 (the STEP round trip gives an identical solid
+on master and on the commit from the time of the report, 0fb61554).
+
 ## Could not be verified / unsure
 
 These need someone with the original files, Windows/Visual Studio, or a
 maintainer decision.
 
-- [ ] **#168 Solid.Subtract returns null on large objects.** The `Bug.zip`
-  model could not be downloaded and no matching test file exists, and no
-  commit references the issue. Get the model, then run `Solid.Subtract` on
-  master at the original scale and at a smaller scale.
-- [ ] **#265 Exporting and importing STEP files loses data.** Does not
-  reproduce: the issue's code gives the same solid (14 faces, volume
-  7188520.7) after both STEP round trips, on master and on the commit from the
-  time of the report (0fb61554). Ask the reporter which viewer showed the
-  corruption. Possible lead: `Face.StepBound` writes hole loops as
-  `FACE_OUTER_BOUND` instead of `FACE_BOUND`.
 - [ ] **#185 Exception during design of CadCanvas control.** Happens only in
   the Visual Studio designer. CADability.Forms moved to net8.0-windows (#333),
   which probably removes the `Bitmap` type mismatch behind the
@@ -71,6 +64,20 @@ maintainer decision.
 ## Confirmed — still present on master
 
 Each of these was reproduced, or confirmed by reading the code, on `17f949e`.
+
+- [ ] **#168 Solid.Subtract returns null on large objects.** Reproduced with
+  the reporter's `Bug.zip` (`project.json`, solids `main53335` and
+  `cut53335`). Both inputs are closed and consistent: `main` has 82 faces
+  (72 cylindrical, 10 planar), `cut` is a 10-face box, and they overlap.
+  `Subtract(cut, main)`, `Subtract(main, cut)` and `Intersect(cut, main)` all
+  return an empty array, and a debug build fires `Debug.Assert(fc.CheckConsistency())`
+  in `BRepOperation.Result()` (`BRepIntersection.cs`). The size is not the
+  cause: the result is the same after moving the pair to the origin and after
+  scaling by 0.1 or 10. Subtracting a simple box from either solid works. The
+  likely trigger is near-coincident faces: the cut's faces lie about 3e-7 to
+  2.5e-3 from main's faces (x 500.9975 vs 501, z 941.9999997 vs 942). Add the
+  file as a test case under `tests/CADability.Tests/Files` and debug
+  `BRepOperation`.
 
 - [ ] **#347 NurbsSurface.GetSimpleSurface infinite loop.** A synthetic
   tiny-span NURBS with a singularity at umax hangs in `GetCanonicalForm` and

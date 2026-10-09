@@ -1060,12 +1060,15 @@ namespace CADability.DXF
             for (int i = 0; i < n; i++)
             {
                 int next = (i + 1) % n;
-                if (!pl.IsClosed && next == 0) break;
 
                 XYZ v0 = verts[i];
                 XYZ v1 = verts[next];
                 GeoPoint p0 = plane.ToGlobal(new GeoPoint2D(v0.X, v0.Y));
                 GeoPoint p1 = plane.ToGlobal(new GeoPoint2D(v1.X, v1.Y));
+                // A hatch boundary loop is closed by definition, so the closing edge is added even
+                // when the "is closed" flag (group code 73) is not set. It is only skipped when the
+                // last vertex already repeats the first one, because it would have zero length.
+                if (next == 0 && Precision.IsEqual(p0, p1)) break;
 
                 double bulge = (bulgesArr != null && i < bulgesArr.Length) ? bulgesArr[i] : v0.Z;
 

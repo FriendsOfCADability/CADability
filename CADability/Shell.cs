@@ -183,7 +183,8 @@ namespace CADability.GeoObject
         {
             NonPeriodicFaces = 0x1,
             FacesCombined = 0x2,
-            EdgesCombined = 0x4
+            EdgesCombined = 0x4,
+            HasHoles = 0x8,
         }
         public ShellFlags State;
         private GeoObjectList featureAxis;
@@ -284,12 +285,40 @@ namespace CADability.GeoObject
         }
         public double Volume(double precision)
         {
+            return SignedVolume(Faces, precision);
+        }
+        /// <summary>
+        /// Computes the signed volume enclosed by the provided faces. The faces must form a closed shell, otherwise the
+        /// result is meaningless. The sign follows the orientation: faces with outward pointing normals (a hull) enclose a
+        /// positive volume, faces with inward pointing normals (a hole or cavity) enclose a negative volume.
+        /// </summary>
+        /// <param name="shellFaces">The faces of a closed shell</param>
+        /// <param name="precision">The precision of the triangulation</param>
+        /// <returns>The signed enclosed volume</returns>
+        public static double SignedVolume(IEnumerable<Face> shellFaces, double precision)
+            => SignedVolume(shellFaces, precision, GeoPoint.Origin);
+
+        /// <summary>
+        /// <see cref="SignedVolume(IEnumerable{Face}, double)"/> with the tetrahedra spanned from <paramref name="reference"/>
+        /// instead of from the origin. For a closed shell the result does not depend on the reference point, but the
+        /// contribution of a single face does - so whoever sums faces from different sources must use the same
+        /// reference point for all of them. A reference near the shell also keeps the per face contributions small.
+        /// </summary>
+        public static double SignedVolume(IEnumerable<Face> shellFaces, double precision, GeoPoint reference)
+        {
             double sum = 0.0;
             double corr = 0.0;
-            foreach (Face fc in Faces)
+            GeoVector shift = reference.ToVector();
+            foreach (Face fc in shellFaces)
             {
-                fc.GetTriangulation(precision, out GeoPoint[] trianglePoint, out GeoPoint2D[] triangleUVPoint, out int[] triangleIndex, out BoundingCube triangleExtent);
+                fc.GetTriangulation(precision, out GeoPoint[] meshPoint, out GeoPoint2D[] triangleUVPoint, out int[] triangleIndex, out BoundingCube triangleExtent);
                 if (triangleIndex == null) continue;
+                GeoPoint[] trianglePoint = meshPoint;
+                if (!shift.IsNullVector())
+                {   // never shift the mesh of the face in place, it is cached there
+                    trianglePoint = new GeoPoint[meshPoint.Length];
+                    for (int i = 0; i < meshPoint.Length; i++) trianglePoint[i] = meshPoint[i] - shift;
+                }
                 // tried to use normals for correction, but the distance from plane had better results
                 //GeoVector[] triangleNormals = new GeoVector[triangleUVPoint.Length];
                 //for (int i = 0; i < triangleUVPoint.Length; i++)
@@ -298,7 +327,7 @@ namespace CADability.GeoObject
                 //}
                 for (int i = 0; i < triangleIndex.Length; i += 3)
                 {
-                    // use the signed volume of the tetrahedron from the origin to the triangle
+                    // use the signed volume of the tetrahedron from the origin to the triangle 
                     sum += trianglePoint[triangleIndex[i]].x * trianglePoint[triangleIndex[i + 1]].y * trianglePoint[triangleIndex[i + 2]].z -
                            trianglePoint[triangleIndex[i]].x * trianglePoint[triangleIndex[i + 1]].z * trianglePoint[triangleIndex[i + 2]].y -
                            trianglePoint[triangleIndex[i]].y * trianglePoint[triangleIndex[i + 1]].x * trianglePoint[triangleIndex[i + 2]].z +
@@ -306,11 +335,12 @@ namespace CADability.GeoObject
                            trianglePoint[triangleIndex[i]].z * trianglePoint[triangleIndex[i + 1]].x * trianglePoint[triangleIndex[i + 2]].y -
                            trianglePoint[triangleIndex[i]].z * trianglePoint[triangleIndex[i + 1]].y * trianglePoint[triangleIndex[i + 2]].x;
                     // if the triangle is not planar (a point in the middle has some distance to the triangle) then we use a correction value
-                    // which was experimentally set to 3/4 of the "thick triangle". The calculation can certainly be made easier
+                    // which was experimentally set to 3/4 of the "thick triangle". The calculation can certainly be made easier 
                     try
                     {
                         Plane pln = new Plane(trianglePoint[triangleIndex[i]], trianglePoint[triangleIndex[i + 1]] - trianglePoint[triangleIndex[i]], trianglePoint[triangleIndex[i + 2]] - trianglePoint[triangleIndex[i]]);
-                        double d = pln.Distance(fc.Surface.PointAt(new GeoPoint2D(triangleUVPoint[triangleIndex[i]], triangleUVPoint[triangleIndex[i + 1]], triangleUVPoint[triangleIndex[i + 2]])));
+                        // the plane is spanned by the shifted points, so the surface point must be shifted as well
+                        double d = pln.Distance(fc.Surface.PointAt(new GeoPoint2D(triangleUVPoint[triangleIndex[i]], triangleUVPoint[triangleIndex[i + 1]], triangleUVPoint[triangleIndex[i + 2]])) - shift);
                         GeoVector cp = (trianglePoint[triangleIndex[i + 1]] - trianglePoint[triangleIndex[i]]) ^ (trianglePoint[triangleIndex[i + 2]] - trianglePoint[triangleIndex[i]]);
                         double a = cp.Length / 2.0; // area of the triangle
                         corr += a * d * 3 / 4; // 3/4 is a good value for spheres and cylinders
@@ -319,6 +349,172 @@ namespace CADability.GeoObject
                 }
             }
             return sum / 6 + corr;
+        }
+
+        /// <summary>
+        /// Computes volume, center of gravity and inertia tensor of the solid enclosed by this shell in a single pass over
+        /// the triangulation. Like <see cref="Volume(double)"/> this requires a closed shell with outward oriented faces,
+        /// otherwise the results are meaningless.
+        /// <para>
+        /// All moments are calculated as surface integrals over the triangles (divergence theorem), the same principle
+        /// <see cref="Volume(double)"/> uses. The integrands are polynomials of degree 3 at most, so a 4 point quadrature rule
+        /// which is exact for cubic polynomials makes the values exact for the triangulated body. The deviation of the curved
+        /// surface from its triangles is handled by the same correction as in <see cref="Volume(double)"/>: the material
+        /// between the triangle and the surface (volume 3/4*area*sag) is added as an additional lump, which sits above the
+        /// centroid of the triangle at 2/5 of the sag.
+        /// </para>
+        /// <para>
+        /// A homogeneous material with density 1 is assumed, i.e. the mass is the volume. Multiply the tensor by the density
+        /// to get the physical inertia tensor.
+        /// </para>
+        /// </summary>
+        /// <param name="precision">The precision of the triangulation</param>
+        /// <param name="volume">The enclosed volume</param>
+        /// <param name="centerOfGravity">The center of gravity</param>
+        /// <param name="inertiaTensor">The symmetric 3x3 inertia tensor with respect to the center of gravity</param>
+        public void GetMassProperties(double precision, out double volume, out GeoPoint centerOfGravity, out double[,] inertiaTensor)
+        {
+            // 4 point quadrature rule for a triangle: the centroid with weight -27/48 and the three points with barycentric
+            // coordinates (0.6, 0.2, 0.2) with weight 25/48 each. This rule is exact for polynomials up to degree 3.
+            double[] qweight = new double[] { -27.0 / 48.0, 25.0 / 48.0, 25.0 / 48.0, 25.0 / 48.0 };
+            GeoPoint[] qpoint = new GeoPoint[4];
+
+            double vol = 0.0; // integral of 1
+            double mx = 0.0, my = 0.0, mz = 0.0; // first moments, integral of x, y, z
+            double pxx = 0.0, pyy = 0.0, pzz = 0.0, pxy = 0.0, pyz = 0.0, pzx = 0.0; // second moments, integral of x*x, ..., x*y, ...
+
+            foreach (Face fc in Faces)
+            {
+                fc.GetTriangulation(precision, out GeoPoint[] trianglePoint, out GeoPoint2D[] triangleUVPoint, out int[] triangleIndex, out BoundingCube triangleExtent);
+                if (triangleIndex == null) continue;
+                for (int i = 0; i < triangleIndex.Length; i += 3)
+                {
+                    GeoPoint p0 = trianglePoint[triangleIndex[i]];
+                    GeoPoint p1 = trianglePoint[triangleIndex[i + 1]];
+                    GeoPoint p2 = trianglePoint[triangleIndex[i + 2]];
+                    GeoVector d1 = p1 - p0, d2 = p2 - p0;
+                    GeoVector n = 0.5 * (d1 ^ d2); // vector area: the length is the area, the direction is the outward normal
+                    qpoint[0] = new GeoPoint(p0, p1, p2); // the centroid of the triangle
+                    qpoint[1] = p0 + 0.2 * d1 + 0.2 * d2;
+                    qpoint[2] = p0 + 0.6 * d1 + 0.2 * d2;
+                    qpoint[3] = p0 + 0.2 * d1 + 0.6 * d2;
+                    // mean values of the integrands over the triangle
+                    double mex = 0.0, mey = 0.0, mez = 0.0; // x, y, z
+                    double mexx = 0.0, meyy = 0.0, mezz = 0.0; // x², y², z²
+                    double mexxx = 0.0, meyyy = 0.0, mezzz = 0.0; // x³, y³, z³
+                    double mexxy = 0.0, meyyz = 0.0, mezzx = 0.0; // x²y, y²z, z²x
+                    for (int k = 0; k < 4; k++)
+                    {
+                        double w = qweight[k], x = qpoint[k].x, y = qpoint[k].y, z = qpoint[k].z;
+                        mex += w * x; mey += w * y; mez += w * z;
+                        mexx += w * x * x; meyy += w * y * y; mezz += w * z * z;
+                        mexxx += w * x * x * x; meyyy += w * y * y * y; mezzz += w * z * z * z;
+                        mexxy += w * x * x * y; meyyz += w * y * y * z; mezzx += w * z * z * x;
+                    }
+                    // Divergence theorem: the integral of f over the volume is the surface integral of F*n with div(F) == f.
+                    // Over a flat triangle this is the (constant) vector area times the mean value of the integrand.
+                    vol += (n.x * mex + n.y * mey + n.z * mez) / 3.0; // F = P/3
+                    mx += n.x * mexx / 2.0; // F = (x²/2, 0, 0)
+                    my += n.y * meyy / 2.0;
+                    mz += n.z * mezz / 2.0;
+                    pxx += n.x * mexxx / 3.0; // F = (x³/3, 0, 0)
+                    pyy += n.y * meyyy / 3.0;
+                    pzz += n.z * mezzz / 3.0;
+                    pxy += n.x * mexxy / 2.0; // F = (x²y/2, 0, 0)
+                    pyz += n.y * meyyz / 2.0;
+                    pzx += n.z * mezzx / 2.0;
+                    // The same correction as in Volume: the material between the flat triangle and the curved surface. Its
+                    // volume is 3/4*area*sag and its center of gravity is above the centroid of the triangle at 2/5 of the sag
+                    // (both values follow from a quadratic sag which vanishes at the vertices). It is small enough to be
+                    // treated as a point mass for the moments.
+                    try
+                    {
+                        Plane pln = new Plane(p0, d1, d2);
+                        double sag = pln.Distance(fc.Surface.PointAt(new GeoPoint2D(triangleUVPoint[triangleIndex[i]], triangleUVPoint[triangleIndex[i + 1]], triangleUVPoint[triangleIndex[i + 2]])));
+                        double dv = n.Length * sag * 3 / 4;
+                        GeoPoint cg = qpoint[0] + (0.4 * sag) * pln.Normal;
+                        vol += dv;
+                        mx += dv * cg.x; my += dv * cg.y; mz += dv * cg.z;
+                        pxx += dv * cg.x * cg.x; pyy += dv * cg.y * cg.y; pzz += dv * cg.z * cg.z;
+                        pxy += dv * cg.x * cg.y; pyz += dv * cg.y * cg.z; pzx += dv * cg.z * cg.x;
+                    }
+                    catch (PlaneException) { }
+                }
+            }
+            volume = vol;
+            inertiaTensor = new double[3, 3];
+            if (vol == 0.0)
+            {   // not a closed shell or a degenerate body, there is no center of gravity
+                centerOfGravity = GeoPoint.Origin;
+                return;
+            }
+            centerOfGravity = new GeoPoint(mx / vol, my / vol, mz / vol);
+            // move the second moments to the center of gravity (parallel axis theorem)
+            double cx = centerOfGravity.x, cy = centerOfGravity.y, cz = centerOfGravity.z;
+            double sxx = pxx - vol * cx * cx;
+            double syy = pyy - vol * cy * cy;
+            double szz = pzz - vol * cz * cz;
+            double sxy = pxy - vol * cx * cy;
+            double syz = pyz - vol * cy * cz;
+            double szx = pzx - vol * cz * cx;
+            inertiaTensor[0, 0] = syy + szz;
+            inertiaTensor[1, 1] = szz + sxx;
+            inertiaTensor[2, 2] = sxx + syy;
+            inertiaTensor[0, 1] = inertiaTensor[1, 0] = -sxy;
+            inertiaTensor[1, 2] = inertiaTensor[2, 1] = -syz;
+            inertiaTensor[2, 0] = inertiaTensor[0, 2] = -szx;
+        }
+
+        /// <summary>
+        /// Returns the center of gravity (centroid) of the solid enclosed by this shell, assuming a homogeneous material.
+        /// The calculation is based on a triangulation with the provided <paramref name="precision"/>, see
+        /// <see cref="GetMassProperties(double, out double, out GeoPoint, out double[,])"/>.
+        /// </summary>
+        /// <param name="precision">The precision of the triangulation</param>
+        /// <returns>The center of gravity</returns>
+        public GeoPoint Centroid(double precision)
+        {
+            GetMassProperties(precision, out double volume, out GeoPoint centerOfGravity, out double[,] inertiaTensor);
+            return centerOfGravity;
+        }
+
+        /// <summary>
+        /// Returns the inertia tensor of the solid enclosed by this shell with respect to its center of gravity, assuming a
+        /// homogeneous material of density 1 (i.e. the mass is the volume). The diagonal contains the moments of inertia
+        /// Ixx, Iyy, Izz, the off diagonal elements are the (negated) products of inertia. The calculation is based on a
+        /// triangulation with the provided <paramref name="precision"/>, see
+        /// <see cref="GetMassProperties(double, out double, out GeoPoint, out double[,])"/>.
+        /// </summary>
+        /// <param name="precision">The precision of the triangulation</param>
+        /// <returns>The symmetric 3x3 inertia tensor</returns>
+        public double[,] InertiaTensor(double precision)
+        {
+            GetMassProperties(precision, out double volume, out GeoPoint centerOfGravity, out double[,] inertiaTensor);
+            return inertiaTensor;
+        }
+
+        /// <summary>
+        /// Returns the inertia tensor of the solid enclosed by this shell with respect to the provided
+        /// <paramref name="referencePoint"/>, assuming a homogeneous material of density 1 (i.e. the mass is the volume).
+        /// </summary>
+        /// <param name="precision">The precision of the triangulation</param>
+        /// <param name="referencePoint">The point the tensor refers to</param>
+        /// <returns>The symmetric 3x3 inertia tensor</returns>
+        public double[,] InertiaTensor(double precision, GeoPoint referencePoint)
+        {
+            GetMassProperties(precision, out double volume, out GeoPoint centerOfGravity, out double[,] inertiaTensor);
+            GeoVector r = referencePoint - centerOfGravity;
+            // parallel axis theorem (Steiner)
+            inertiaTensor[0, 0] += volume * (r.y * r.y + r.z * r.z);
+            inertiaTensor[1, 1] += volume * (r.z * r.z + r.x * r.x);
+            inertiaTensor[2, 2] += volume * (r.x * r.x + r.y * r.y);
+            inertiaTensor[0, 1] -= volume * r.x * r.y;
+            inertiaTensor[1, 0] = inertiaTensor[0, 1];
+            inertiaTensor[1, 2] -= volume * r.y * r.z;
+            inertiaTensor[2, 1] = inertiaTensor[1, 2];
+            inertiaTensor[2, 0] -= volume * r.z * r.x;
+            inertiaTensor[0, 2] = inertiaTensor[2, 0];
+            return inertiaTensor;
         }
 
         internal List<ParametricProperty> ParametricProperties { get { return parametricProperties; } }
@@ -853,6 +1049,141 @@ namespace CADability.GeoObject
                 res.AddRange(fc.GetLineIntersection(location, direction));
             }
             return res.ToArray();
+        }
+        /// <summary>
+        /// Returns the connected components of the faces of this shell: two faces belong to the same component when there is
+        /// a path from one to the other via common edges. For a closed shell each component is itself a closed shell, i.e. the
+        /// outer hull or one of the holes (see <see cref="GetHullAndHoles"/>). This is a purely topological operation, it makes
+        /// no assumption about orientation or closedness and can also be used on open shells.
+        /// </summary>
+        /// <returns>The connected components, each face of this shell is contained in exactly one of them</returns>
+        /// <summary>
+        /// Adds the faces of a cavity to this shell. The faces must form a closed shell inside of this shell, oriented
+        /// towards the cavity (i.e. reversed with respect to a solid of the shape of the cavity).
+        /// </summary>
+        public void AddInnerHole(Face[] faces)
+        {
+            Face[] newFaces = new Face[this.faces.Length + faces.Length];
+            this.faces.CopyTo(newFaces, 0);
+            faces.CopyTo(newFaces, this.faces.Length);
+            SetFaces(newFaces);
+            State |= ShellFlags.HasHoles;
+        }
+        public List<HashSet<Face>> GetConnectedFaceSets()
+        {
+            List<HashSet<Face>> res = new List<HashSet<Face>>();
+            HashSet<Face> availableFaces = new HashSet<Face>(faces); // faces not yet assigned to a component
+            Queue<Face> toCheck = new Queue<Face>();
+            while (availableFaces.Any())
+            {
+                HashSet<Face> currentSet = new HashSet<Face>(); // each component needs its own set
+                Face startWith = availableFaces.First();
+                availableFaces.Remove(startWith);
+                toCheck.Enqueue(startWith);
+                while (toCheck.Any())
+                {
+                    Face fc = toCheck.Dequeue();
+                    currentSet.Add(fc);
+                    foreach (Edge ed in fc.Edges)
+                    {
+                        // Remove returns true only for faces of this shell which have not been visited yet
+                        if (availableFaces.Remove(ed.PrimaryFace)) toCheck.Enqueue(ed.PrimaryFace);
+                        if (ed.SecondaryFace != null && availableFaces.Remove(ed.SecondaryFace)) toCheck.Enqueue(ed.SecondaryFace);
+                    }
+                }
+                res.Add(currentSet);
+            }
+            return res;
+        }
+        /// <summary>
+        /// Returns the outer hull and the holes (cavities) of this shell as sets of faces. If there are no holes, the hull
+        /// contains all faces and holes is empty.
+        /// The connected components are provided by <see cref="GetConnectedFaceSets"/>, the hull is identified by the enclosed
+        /// volume: the normals of a hole point into the cavity, so a hole encloses a negative volume, and since the holes are
+        /// located inside the hull, the hull is the component with the greatest absolute volume. It is the only component with a
+        /// positive volume, unless the shell is inverted, as it is used as an intermediate result of union and difference: then
+        /// all signs are reversed and the hull is the only component with a negative volume.
+        /// The shell must be closed, otherwise the volumes and hence the result are meaningless.
+        /// </summary>
+        /// <returns>The faces of the outer hull and the faces of each hole</returns>
+        public (HashSet<Face> hull, HashSet<Face>[] holes) GetHullAndHoles()
+        {
+            List<HashSet<Face>> parts = GetConnectedFaceSets();
+            if (parts.Count == 0) return (new HashSet<Face>(), Array.Empty<HashSet<Face>>()); // an empty shell
+            if (parts.Count == 1) return (parts[0], Array.Empty<HashSet<Face>>()); // no holes, no need to compute the volume
+            // only the sign of the volume is relevant here, and short edges are resolved more precisely anyhow
+            double precision = GetBoundingCube().Size * 1e-4;
+            int hullIndex = 0;
+            double maxVolume = 0.0; // the holes are enclosed by the hull, so the hull has the greatest absolute volume
+            for (int i = 0; i < parts.Count; i++)
+            {
+                double volume = Math.Abs(SignedVolume(parts[i], precision));
+                if (volume > maxVolume)
+                {
+                    maxVolume = volume;
+                    hullIndex = i;
+                }
+            }
+            HashSet<Face> hull = parts[hullIndex];
+            parts.RemoveAt(hullIndex);
+            return (hull, parts.ToArray());
+        }
+        /// <summary>
+        /// The genus of this closed shell from the Euler-Poincare formula V - E + F - H = 2 - 2*G (H: the number of holes in
+        /// the faces). A shell without through holes has genus 0, a tube has genus 1, and every cut-out in the wall of a tube
+        /// adds 1. The shell must consist of a single connected component.
+        /// </summary>
+        public int Genus
+        {
+            get
+            {
+                int v = Vertices.Length;
+                int e = Edges.Where(e => e.Curve3D != null).Count();
+                int f = faces.Length; int l = 0;
+                foreach (Face fc in faces) l += fc.HoleCount;
+                int ch = v - e + f - l;
+                return 1 - ch / 2;
+            }
+        }
+        /// <summary>
+        /// Determines the orientation of this closed shell with a ray from a point of a face along its normal: the last
+        /// intersection of the ray with the shell is where the ray leaves the enclosed volume, and the orientation of the face
+        /// there tells whether the normals point outward. Faces where the ray hits an edge or touches a face are skipped.
+        /// </summary>
+        public bool IsOutwardOriented()
+        {
+            int boundaryCaseResult = 0; // in case all faces are tangential or through an edge, we return true, because this is the most common case for shells
+            foreach (Face fc in faces)
+            {
+                SimpleShape ss = fc.Area;
+                GeoPoint2D c = ss.GetSomeInnerPoint();
+                GeoPoint pc = fc.Surface.PointAt(c);
+                GeoVector nc = fc.Surface.GetNormal(c).Normalized;
+                List<(double par, bool outward)> ip = GetOrientedLineIntersection(pc, nc, out bool isBoundaryCase);
+                if (ip.Count == 0) continue; // there should always be an intersection at the point pc itself
+                ip.Sort((a, b) => a.par.CompareTo(b.par));
+                if (ip.Last().outward) boundaryCaseResult++; else boundaryCaseResult--; // if there are only boundary cases, we use this result
+                // the orientation of the intersections must alternate between inward and outward. if there are two subsequent intersections
+                // with the same orientation, then we are in a boundary case
+                for (int i = 1; i < ip.Count; i++) if (ip[i - 1].outward == ip[i].outward) isBoundaryCase = true;
+                if (isBoundaryCase) continue; // tangential or through edge
+                // the orientation of the last intersection is the orientation of the shell
+                return ip.Last().outward;
+            }
+            return boundaryCaseResult > 0;
+        }
+        public List<(double, bool)> GetOrientedLineIntersection(GeoPoint location, GeoVector direction, out bool isBoundaryCase)
+        {
+            isBoundaryCase = false;
+            List<(double, bool)> res = new List<(double, bool)>();
+            foreach (Face fc in faces)
+            {
+                List<(double, bool)> faceIntersections = fc.GetOrientedLineIntersection(location, direction, out bool bc);
+                res.AddRange(faceIntersections);
+                isBoundaryCase |= bc;
+                isBoundaryCase |= faceIntersections.Any(f => Math.Abs(f.Item1) < 1e-5); // an intersection was at the startpoint
+            }
+            return res;
         }
         /// <summary>
         /// Sets the faces of a shell. The faces must all be connected to form a single shell, they may have free edges.

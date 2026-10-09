@@ -632,6 +632,7 @@ namespace CADability.Curve2D
 			interparam = null;
 			tringulation = null;
 			baseApproximation = null;
+			lengthValid = false;
 		}
 		protected bool HasTriangulation()
 		{
@@ -951,12 +952,37 @@ namespace CADability.Curve2D
 			deriv3 = GeoVector2D.NullVector;
 			return false;
 		}
+		private double length; // cached, because it takes many points of the curve
+		private bool lengthValid;
+		/// <summary>
+		/// The arc length of the curve, from its points. Derived classes, which know a closed form or the derivative,
+		/// should override this. The length used to be taken from an approximation by arcs, which is short by up
+		/// to some tenths of a percent (e.g. a sine curve, the unrolled miter cut of a tube).
+		/// </summary>
 		public virtual double Length
 		{
 			get
 			{
-				if (baseApproximation == null) baseApproximation = Approximate(false, 0.0); // Annäherung mit Bögen unter Auswertung der Tangenten
-				return baseApproximation.Length;
+				if (lengthValid) return length;
+				double res;
+				try
+				{
+					// the triangulation points are where the curve may have a kink or an inflection point
+					GetTriangulationBasis(out _, out _, out double[] parameters);
+					res = ArcLength.FromPoints(t => { GeoPoint2D p = PointAt(t); return new GeoPoint(p.x, p.y, 0.0); }, 0.0, 1.0, parameters);
+				}
+				catch (Exception)
+				{
+					res = double.NaN;
+				}
+				if (double.IsNaN(res) || double.IsInfinity(res))
+				{   // a curve with undefined points
+					if (baseApproximation == null) baseApproximation = Approximate(false, 0.0); // Annäherung mit Bögen unter Auswertung der Tangenten
+					return baseApproximation.Length;
+				}
+				length = res;
+				lengthValid = true;
+				return res;
 			}
 		}
 

@@ -14,17 +14,14 @@ Closed during this triage, because they were already solved on master:
 Closed as not reproducible: #265 (the STEP round trip gives an identical solid
 on master and on the commit from the time of the report, 0fb61554).
 
+Closed as stale: #185 (designer exception from the net48 era; CADability.Forms
+targets net8.0-windows since 517d643f, untested in the designer).
+
 ## Could not be verified / unsure
 
 These need someone with the original files, Windows/Visual Studio, or a
 maintainer decision.
 
-- [ ] **#185 Exception during design of CadCanvas control.** Happens only in
-  the Visual Studio designer. CADability.Forms moved to net8.0-windows (#333),
-  which probably removes the `Bitmap` type mismatch behind the
-  `MissingMethodException`. Retest in the designer on Windows. Independently,
-  `CadCanvas.Dispose(bool)` should do its OpenGL and view work only when
-  `disposing` is true.
 - [ ] **#192 Fix Visualizer for Visual Studio > 17.6.** The warning is gone
   because d3db7052 removed the CADability.DebuggerVisualizers project. The
   visualizers themselves don't work in current Visual Studio. A prototype

@@ -15,6 +15,7 @@ using System.Drawing;
 using System.Linq;
 using System.IO;
 using Color = System.Drawing.Color;
+using PlaneSurface = CADability.GeoObject.PlaneSurface;
 
 namespace CADability.DXF
 {

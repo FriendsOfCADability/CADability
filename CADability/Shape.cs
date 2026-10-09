@@ -2106,7 +2106,8 @@ namespace CADability.Shapes
 
             foreach (IGeoObject go in TheObjects)
             {	// TODO: Blöcke auflösen!!!
-                ICurve cv = go as ICurve;
+                // a face needs edges that are smooth inside, so splines are split at their corners
+                ICurve cv = (keepExactCurves ? Make3D.SplitSplinesAtCorners(go) : go) as ICurve;
                 if (cv != null)
                 {
                     curvesal.Add(cv);

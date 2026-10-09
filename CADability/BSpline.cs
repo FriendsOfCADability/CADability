@@ -3158,6 +3158,74 @@ namespace CADability.GeoObject
         {
             return (this as ICurve).GetPlane();
         }
+        /// <summary>
+        /// The parameters of the inner knots where the curve may have a corner: knots with a multiplicity of at least the
+        /// degree, which leaves the curve only continuous, and knots where the first derivative vanishes, typically
+        /// because poles coincide (issue 173).
+        /// </summary>
+        internal List<double> CornerParameters()
+        {
+            List<double> res = new List<double>();
+            double negligible = NegligibleDerivative();
+            for (int i = 0; i < knots.Length; i++)
+            {
+                if (knots[i] <= startParam || knots[i] >= endParam) continue;
+                if (multiplicities[i] >= degree) res.Add(knots[i]);
+                else
+                {
+                    PointDirAtParam(knots[i], out _, out GeoVector dir);
+                    if (dir.Length <= negligible) res.Add(knots[i]);
+                }
+            }
+            return res;
+        }
+        /// <summary>
+        /// This curve split at its corners (see <see cref="CornerParameters"/>) into exact pieces, which are smooth
+        /// inside. Pieces that are straight are lines. A surface made from a curve, e.g. by extruding or rotating it,
+        /// needs this: a kink inside a face makes its normal undefined there. Without corners the result is this curve
+        /// alone.
+        /// </summary>
+        internal ICurve[] SplitAtCorners()
+        {
+            List<double> corners = CornerParameters();
+            if (corners.Count == 0) return new ICurve[] { this };
+            List<ICurve> parts = new List<ICurve>();
+            List<double> bounds = new List<double> { startParam };
+            bounds.AddRange(corners);
+            bounds.Add(endParam);
+            for (int i = 0; i < bounds.Count - 1; i++)
+            {
+                BSpline part = TrimParam(bounds[i], bounds[i + 1]);
+                if (part == null || GeoPoint.Distance(part.Poles) <= Precision.eps || (part as ICurve).Length <= Precision.eps) continue;
+                ICurve piece = (ICurve)StraightPieceAsLine(part) ?? part;
+                (piece as IGeoObject).CopyAttributes(this);
+                parts.Add(piece);
+            }
+            return parts.Count > 0 ? parts.ToArray() : new ICurve[] { this };
+        }
+        /// <summary>
+        /// A line, if <paramref name="part"/> is a straight piece: all poles on the line through the first and the last
+        /// one, in this order. A spline only moves back and forth along its line when its poles do (variation
+        /// diminishing property), so then it is exactly this line. Otherwise null.
+        /// </summary>
+        private static Line StraightPieceAsLine(BSpline part)
+        {
+            GeoPoint[] partPoles = part.Poles;
+            GeoPoint sp = partPoles[0], ep = partPoles[partPoles.Length - 1];
+            GeoVector dir = ep - sp;
+            if (dir.Length <= Precision.eps) return null;
+            double last = 0.0;
+            for (int i = 0; i < partPoles.Length; i++)
+            {
+                if (Geometry.DistPL(partPoles[i], sp, dir) > Precision.eps) return null;
+                double position = (partPoles[i] - sp) * dir / (dir * dir);
+                if (position < last - 1e-9) return null;
+                last = position;
+            }
+            Line line = Line.Construct();
+            line.SetTwoPoints(sp, ep);
+            return line;
+        }
         public BSpline TrimParam(double spar, double epar)
         {
             BSpline clone = BSpline.Construct();

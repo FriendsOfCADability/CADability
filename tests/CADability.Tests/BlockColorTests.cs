@@ -349,6 +349,63 @@ namespace CADability.Tests
         }
 
         /// <summary>
+        /// A block subscribes to the change event of its color only while it belongs to a model. The ColorDefs of the
+        /// ColorList live as long as the project, so a subscription of every clone kept all temporary clones (e.g. the
+        /// feedback while dragging) in memory: 20000 clones of a block with 50 lines held 437 MB.
+        /// </summary>
+        [TestMethod]
+        public void TemporaryClonesOfABlockCanBeCollected()
+        {
+            Project project = Project.CreateSimpleProject();
+            ColorDef red = project.ColorList.CreateOrFind("red", Red);
+            Block block = Block.Construct();
+            block.Add(MakeFromParentLine(ByBlockY));
+            block.ColorDef = red;
+            project.GetActiveModel().Add(block);
+
+            WeakReference clone = CloneAndForget(block);
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            Assert.IsFalse(clone.IsAlive, "a clone that does not belong to a model must not be kept alive by its color");
+            GC.KeepAlive(red);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static WeakReference CloneAndForget(Block block)
+        {
+            return new WeakReference(block.Clone());
+        }
+
+        /// <summary>
+        /// Blocks in a model, also nested ones, follow when the color of their ColorDef is changed, and a clone that is
+        /// added to the model later shows the current color.
+        /// </summary>
+        [TestMethod]
+        public void BlocksInAModelFollowAChangeOfTheirColor()
+        {
+            Project project = Project.CreateSimpleProject();
+            Model model = project.GetActiveModel();
+            ColorDef red = project.ColorList.CreateOrFind("red", Red);
+            Block block = Block.Construct();
+            block.Add(MakeFromParentLine(ByBlockY));
+            block.ColorDef = red;
+            model.Add(block);
+            Block outer = Block.Construct();
+            outer.ColorDef = red;
+            Block nested = (Block)block.Clone();
+            outer.Add(nested);
+            model.Add(outer);
+            Block detached = (Block)block.Clone();
+
+            red.Color = Blue;
+            Assert.AreEqual(Blue.ToArgb(), (block.Item(0) as IColorDef).ColorDef.Color.ToArgb(), "block in the model");
+            Assert.AreEqual(Blue.ToArgb(), (nested.Item(0) as IColorDef).ColorDef.Color.ToArgb(), "nested block in the model");
+            model.Add(detached);
+            Assert.AreEqual(Blue.ToArgb(), (detached.Item(0) as IColorDef).ColorDef.Color.ToArgb(), "clone added later");
+        }
+
+        /// <summary>
         /// A child that is set to <see cref="ColorDef.CDfromParent"/> after it was added must show
         /// the block's color just like one that was added with it, whatever kind of object it is.
         /// </summary>

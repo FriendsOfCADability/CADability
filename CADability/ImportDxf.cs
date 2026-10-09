@@ -34,6 +34,12 @@ namespace CADability.DXF
         private Dictionary<string, GeoObject.Block> blockTable;
         private Dictionary<string, ColorDef> layerColorTable;
         private Dictionary<string, Attribute.Layer> layerTable;
+        /// <summary>
+        /// Greater than zero while the entities of a block definition are converted. A ByBlock
+        /// color only has a meaning there: it is the color of the INSERT (or DIMENSION) that places
+        /// the block.
+        /// </summary>
+        private int blockDefinitionDepth;
 
         public Import(string fileName)
         {
@@ -583,7 +589,14 @@ namespace CADability.DXF
 
         private void SetAttributes(IGeoObject go, Entity entity)
         {
-            if (go is IColorDef cd) cd.ColorDef = FindOrCreateColor(entity.Color, entity.Layer);
+            if (go is IColorDef cd)
+            {
+                // Inside a block definition ByBlock means "the color of the placing INSERT".
+                // CADability expresses exactly that with CDfromParent: the child then shows the
+                // color of the Block it belongs to, and the Block gets the INSERT's color.
+                if (entity.Color.IsByBlock && blockDefinitionDepth > 0) cd.ColorDef = ColorDef.CDfromParent;
+                else cd.ColorDef = FindOrCreateColor(entity.Color, entity.Layer);
+            }
             if (entity.Layer != null && layerTable.TryGetValue(entity.Layer.Name, out Attribute.Layer layer))
                 go.Layer = layer;
             if (go is ILinePattern lp && entity.LineType != null)
@@ -626,13 +639,52 @@ namespace CADability.DXF
                 found.Name = blockRec.Name;
                 found.RefPoint = GeoPoint(blockRec.BlockEntity?.BasePoint ?? XYZ.Zero);
                 blockTable[key] = found; // register before filling (prevents infinite recursion)
-                foreach (Entity ent in blockRec.Entities)
+                ++blockDefinitionDepth;
+                try
                 {
-                    IGeoObject go = GeoObjectFromEntity(ent);
-                    if (go != null) found.Add(go);
+                    foreach (Entity ent in blockRec.Entities)
+                    {
+                        IGeoObject go = GeoObjectFromEntity(ent);
+                        if (go != null) found.Add(go);
+                    }
+                }
+                finally
+                {
+                    --blockDefinitionDepth;
                 }
             }
             return found;
+        }
+
+        /// <summary>
+        /// Entities on layer "0" inside a block definition are drawn on the layer of the entity
+        /// that places the block, and with that layer's color when they are ByLayer. The block
+        /// definition is converted once and cached, so its layer-0 children carry layer "0" and
+        /// the "0:ByLayer" color; this moves them, including those of nested blocks, to the layer
+        /// of <paramref name="placing"/> on the clone that belongs to this placement.
+        /// </summary>
+        private void ResolveLayerZero(GeoObject.Block placed, Entity placing)
+        {
+            if (placing.Layer == null || !layerTable.TryGetValue(placing.Layer.Name, out Attribute.Layer target)) return;
+            if (!layerTable.TryGetValue("0", out Attribute.Layer layerZero) || target == layerZero) return;
+            layerColorTable.TryGetValue("0", out ColorDef byLayerZero);
+            layerColorTable.TryGetValue(placing.Layer.Name, out ColorDef byLayerTarget);
+            ResolveLayerZero(placed, layerZero, target, byLayerZero, byLayerTarget);
+        }
+
+        private static void ResolveLayerZero(GeoObject.Block block, Attribute.Layer layerZero, Attribute.Layer target, ColorDef byLayerZero, ColorDef byLayerTarget)
+        {
+            for (int i = 0; i < block.Count; i++)
+            {
+                IGeoObject child = block.Item(i);
+                if (child.Layer == layerZero)
+                {
+                    child.Layer = target;
+                    if (child is IColorDef cd && byLayerZero != null && byLayerTarget != null && cd.ColorDef == byLayerZero)
+                        cd.ColorDef = byLayerTarget;
+                }
+                if (child is GeoObject.Block nested) ResolveLayerZero(nested, layerZero, target, byLayerZero, byLayerTarget);
+            }
         }
 
         private IGeoObject CreateLine(ACadSharp.Entities.Line line)
@@ -1182,6 +1234,7 @@ namespace CADability.DXF
                     ModOp.Scale(insert.XScale, insert.YScale, insert.ZScale) *
                     ModOp.Translate(CADability.GeoPoint.Origin - block.RefPoint);
                 res.Modify(transform);
+                ResolveLayerZero((GeoObject.Block)res, insert);
                 return res;
             }
             return null;
@@ -1658,7 +1711,12 @@ namespace CADability.DXF
             if (dimension.Block != null)
             {
                 GeoObject.Block block = FindBlock(dimension.Block);
-                if (block != null) return block.Clone();
+                if (block != null)
+                {
+                    GeoObject.Block res = (GeoObject.Block)block.Clone();
+                    ResolveLayerZero(res, dimension);
+                    return res;
+                }
             }
             return null;
         }

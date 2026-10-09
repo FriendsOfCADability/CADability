@@ -716,7 +716,14 @@ namespace CADability.GeoObject
         }
         void IColorDef.SetTopLevel(ColorDef newValue)
         {
+            // Like the ColorDef setter, but without change events. The children with CDfromParent
+            // show the color of CDfromParent, so it must follow the new color here as well;
+            // otherwise a cloned Block (Clone uses CopyAttributes, which ends up here) shows
+            // those children in the default color black instead of its own color.
+            if (colorDef != null) colorDef.ColorDidChangeEvent -= new AttributeChangeDelegate(colorDef_ColorDidChange);
             colorDef = newValue;
+            if (colorDef != null) colorDef.ColorDidChangeEvent += new AttributeChangeDelegate(colorDef_ColorDidChange);
+            if (CDfromParent != null) CDfromParent.Color = colorDef != null ? colorDef.Color : ColorDef.CDfromParent.Color;
         }
         void IColorDef.SetTopLevel(ColorDef newValue, bool overwriteChildNullColor)
         {
@@ -742,6 +749,7 @@ namespace CADability.GeoObject
         protected Block(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
+            CDfromParent = ColorDef.CDfromParent.Clone();
             try
             {
                 colorDef = (ColorDef)info.GetValue("ColorDef", typeof(ColorDef));
@@ -787,6 +795,7 @@ namespace CADability.GeoObject
                     containedObjects[i].DidChangeEvent += new ChangeDelegate(OnDidChange);
                     containedObjects[i].Owner = this;
                 }
+                ConnectChildrenFromParent();
             }
         }
         #endregion
@@ -833,7 +842,24 @@ namespace CADability.GeoObject
                         containedObjects[i].DidChangeEvent += new ChangeDelegate(OnDidChange);
                         containedObjects[i].Owner = this;
                     }
+                    ConnectChildrenFromParent();
                 }
+            }
+        }
+        /// <summary>
+        /// After reading: the color of the block was set without its setter, so CDfromParent does
+        /// not know it yet, and the children with CDfromParent got their own copy of the
+        /// CDfromParent that was written. Connect both again, so that these children show the
+        /// color of this block and follow its changes, as they did before saving.
+        /// </summary>
+        private void ConnectChildrenFromParent()
+        {
+            (this as IColorDef).SetTopLevel(colorDef);
+            for (int i = 0; i < containedObjects.Count; ++i)
+            {
+                if (containedObjects[i] is IColorDef cd && cd.ColorDef != null && cd.ColorDef != CDfromParent
+                    && cd.ColorDef.Source == ColorDef.ColorSource.fromParent)
+                    cd.SetTopLevel(CDfromParent);
             }
         }
         private void colorDef_ColorDidChange(object sender, ChangeEventArgs eventArguments)

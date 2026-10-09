@@ -8275,7 +8275,7 @@ namespace CADability.GeoObject
                     }
                     else
                     {   // Face ist nicht Teil einer Shell oder eines Solid
-                        colorDef = value;
+                        colorDef = ColorDefForOwner(value);
                     }
                 }
             }

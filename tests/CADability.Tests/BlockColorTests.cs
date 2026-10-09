@@ -275,6 +275,52 @@ namespace CADability.Tests
         }
 
         /// <summary>
+        /// A child that is set to <see cref="ColorDef.CDfromParent"/> after it was added must show
+        /// the block's color just like one that was added with it, whatever kind of object it is.
+        /// </summary>
+        [TestMethod]
+        public void ChildSetToFromParentInsideABlockShowsTheBlockColor()
+        {
+            Block block = Block.Construct();
+            block.ColorDef = new ColorDef("red", Red);
+            ColorDef green = new ColorDef("green", Green);
+
+            Line line = Line.Construct();
+            line.SetTwoPoints(new GeoPoint(0, 0, 0), new GeoPoint(10, 0, 0));
+            Ellipse circle = Ellipse.Construct();
+            circle.SetCirclePlaneCenterRadius(Plane.XYPlane, new GeoPoint(5, 15, 0), 3);
+            BSpline spline = BSpline.Construct();
+            spline.ThroughPoints(new[] { new GeoPoint(0, 20, 0), new GeoPoint(5, 25, 0), new GeoPoint(10, 20, 0) }, 3, false);
+            Line first = Line.Construct();
+            first.SetTwoPoints(new GeoPoint(0, 30, 0), new GeoPoint(10, 30, 0));
+            Line second = Line.Construct();
+            second.SetTwoPoints(new GeoPoint(10, 30, 0), new GeoPoint(10, 40, 0));
+            GeoObject.Path path = GeoObject.Path.Construct();
+            path.Set(new GeoObjectList(first, second), false, 1e-6);
+            Face face = Face.MakeFace(new GeoPoint(0, 50, 0), new GeoPoint(10, 50, 0), new GeoPoint(10, 60, 0));
+            IGeoObject[] children = { line, circle, spline, path, face };
+
+            foreach (IGeoObject child in children)
+            {
+                ((IColorDef)child).ColorDef = green;
+                block.Add(child);
+                ((IColorDef)child).ColorDef = ColorDef.CDfromParent;
+            }
+
+            List<(Color color, GeoPoint[] points)> painted = RecordPaint(block);
+            Assert.IsTrue(painted.Count >= 4, "test setup");
+            Assert.IsTrue(painted.All(c => c.color.ToArgb() == Red.ToArgb()), "painted: " + string.Join(", ", painted.Select(c => c.color).Distinct()));
+            Assert.AreEqual(Red.ToArgb(), face.ColorDef.Color.ToArgb(), "face");
+
+            block.ColorDef = new ColorDef("blue", Blue);
+            Assert.IsTrue(RecordPaint(block).All(c => c.color.ToArgb() == Blue.ToArgb()), "the children follow the block's color");
+            Assert.AreEqual(Blue.ToArgb(), face.ColorDef.Color.ToArgb(), "face");
+
+            // the static CDfromParent itself must stay untouched
+            Assert.AreEqual(Color.FromArgb(0, 0, 0).ToArgb(), ColorDef.CDfromParent.Color.ToArgb());
+        }
+
+        /// <summary>
         /// The reporter's project (issue #293). Its blocks were imported from DXF by an older
         /// CADability: the block is on layer "rebars" (red), its lines on layer "0" with the color
         /// "0:ByLayer" (black), which is why they are drawn black. The file cannot tell that the
@@ -456,7 +502,7 @@ namespace CADability.Tests
             public bool PaintEdges => true;
             public bool PaintSurfaceEdges { get; set; }
             public bool UseLineWidth { get; set; }
-            public double Precision { get; set; }
+            public double Precision { get; set; } = 0.01;
             public double PixelToWorld => 1.0;
             public bool SelectMode { get; set; }
             public Color SelectColor { get; set; }

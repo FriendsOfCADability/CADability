@@ -3089,7 +3089,7 @@ namespace CADability.GeoObject
             {
                 using (ChangingAttribute.Create(this, colorDef))
                 {
-                    colorDef = value;
+                    colorDef = ColorDefForOwner(value);
                     if (faces != null)
                     {
                         // alle Faces auf die selbe Farbe setzen, denn die Faces
@@ -3097,7 +3097,7 @@ namespace CADability.GeoObject
                         // haben, dann wäre die Farbe des Shells bedeutungslos
                         for (int i = 0; i < faces.Length; ++i)
                         {
-                            faces[i].ColorDef = value;
+                            faces[i].ColorDef = colorDef;
                         }
                     }
                 }

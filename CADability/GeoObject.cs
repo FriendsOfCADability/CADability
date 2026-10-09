@@ -1842,6 +1842,20 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
+        /// The color an object has to keep when <paramref name="colorDef"/> is set: a color "from
+        /// parent", typically <see cref="ColorDef.CDfromParent"/>, becomes the CDfromParent of the
+        /// <see cref="Block"/> that owns this object, which carries the color of that block. Any
+        /// other color is returned unchanged. The <see cref="IColorDef.ColorDef"/> setters use this,
+        /// so that setting <see cref="ColorDef.CDfromParent"/> on an object that already belongs to a
+        /// block has the same effect as adding the object to the block with that color.
+        /// </summary>
+        protected ColorDef ColorDefForOwner(ColorDef colorDef)
+        {
+            if (colorDef != null && colorDef.Source == ColorDef.ColorSource.fromParent && owner is Block block)
+                return block.GetCDfromParent();
+            return colorDef;
+        }
+        /// <summary>
         /// Fully implements <see cref="ILayer.Layer"/>. Stores the layer in a private member.
         /// Setting raises the <see cref="WillChangeEvent"/> and <see cref="DidChangeEvent"/>.
         /// </summary>

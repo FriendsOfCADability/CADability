@@ -131,6 +131,12 @@ Each of these was reproduced, or confirmed by reading the code, on `17f949e`.
   Solid.
 - [ ] `Border.UnsplittedOutline` is not serialized and is lost on save/load.
 - [ ] `ImportSTL.Read` never disposes its readers.
+- [ ] CADability has no "floating" layer 0 in blocks. The DXF import
+  resolves block contents on layer 0 to the layer of the INSERT (#293), so
+  they are displayed and hidden like in AutoCAD, but the information is lost:
+  moving the block to another layer later leaves those contents on the old
+  layer, and the DXF export writes them on that layer instead of layer 0. A
+  complete solution needs a "layer from parent" counterpart to `CDfromParent`.
 - [ ] DXF hatch line styles are not told apart by dash pattern, pattern hatch
   lines keep the style's lineweight (no ByBlock), and a top-level ByBlock
   linetype still maps to the solid "ByBlock" pattern.

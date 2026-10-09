@@ -34,8 +34,9 @@ namespace CADability.DXF
         private Dictionary<string, ColorDef> layerColorTable;
         private Dictionary<string, Attribute.Layer> layerTable;
 
-        public Import(string fileName, bool dxfFile)
+        public Import(string fileName)
         {
+            ACadVersion version = GetDrawingVersion(fileName, out bool isDwg);
             byte[] raw;
             using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
@@ -46,13 +47,14 @@ namespace CADability.DXF
             {
                 try
                 {
-                    ICadReader docReader = null;
-                    if (dxfFile) docReader = new DxfReader(stream);
-                    else docReader = new DwgReader(stream);
-                    doc = docReader.Read();
+                    using (ICadReader reader = isDwg ? new DwgReader(stream) : new DxfReader(stream))
+                    {
+                        doc = reader.Read();
+                    }
                 }
                 catch (Exception)
                 {
+                    if (isDwg) throw; // the OBJECTS fallback below only makes sense for DXF
                     // The OBJECTS section is the last DXF section and contains non-geometric
                     // data (dictionaries, layouts, xrecords). Geometry lives in HEADERS,
                     // TABLES, BLOCKS, and ENTITIES — all read before OBJECTS.
@@ -109,11 +111,6 @@ namespace CADability.DXF
                 if (match) return i;
             }
             return -1;
-        }
-
-        internal Import(CadDocument document)
-        {
-            doc = document;
         }
 
         // The drawing versions ACadSharp can read. DXF reaches back to R11/R12, DWG to R13;

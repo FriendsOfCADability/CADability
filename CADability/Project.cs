@@ -1682,7 +1682,7 @@ namespace CADability
         }
         private static Project ImportDXF(string filename)
         {
-            CADability.DXF.Import import = new DXF.Import(filename, true);
+            CADability.DXF.Import import = new DXF.Import(filename);
             return import.Project;
         }
 
@@ -1690,7 +1690,7 @@ namespace CADability
         {
             try
             {
-                CADability.DXF.Import import = new DXF.Import(filename, false);
+                CADability.DXF.Import import = new DXF.Import(filename);
                 return import.Project;
             }
             catch (Exception ex)

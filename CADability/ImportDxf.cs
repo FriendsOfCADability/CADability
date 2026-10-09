@@ -738,14 +738,12 @@ namespace CADability.DXF
             }
             else
             {
-                bool forcePolyline2D = false;
                 GeoPoint[] poles = new GeoPoint[spline.ControlPoints.Count];
                 double[] weights = new double[spline.ControlPoints.Count];
                 for (int i = 0; i < poles.Length; i++)
                 {
                     poles[i] = GeoPoint(spline.ControlPoints[i]);
                     weights[i] = (spline.Weights != null && i < spline.Weights.Count) ? spline.Weights[i] : 1.0;
-                    if (i > 0 && (poles[i] | poles[i - 1]) < Precision.eps) forcePolyline2D = true;
                 }
                 double[] kn = new double[spline.Knots.Count];
                 for (int i = 0; i < kn.Length; i++) kn[i] = spline.Knots[i];
@@ -786,42 +784,12 @@ namespace CADability.DXF
                         path.Set(parts.ToArray());
                         return path;
                     }
-                    if (forcePolyline2D)
-                    {
-                        ICurve curve = (ICurve)bsp;
-                        double maxError = Settings.GlobalSettings.GetDoubleValue("Approximate.Precision", 0.01);
-                        ICurve approxCurve = curve.Approximate(true, maxError);
-                        int usedCurves;
-                        if (approxCurve is GeoObject.Line || (approxCurve.SubCurves != null && approxCurve.SubCurves.Length == 1 && approxCurve.SubCurves[0] is GeoObject.Line))
-                            usedCurves = 2;
-                        else
-                            usedCurves = approxCurve.SubCurves?.Length ?? 2;
-                        return CreateSplineAsPolyline(bsp, usedCurves);
-                    }
+                    // Coinciding poles (a corner of the curve) used to make this a polyline, because the spline was
+                    // displayed wrongly. That was ICurve.GetProjectedCurve, which is fixed now (issue 173).
                     return bsp;
                 }
             }
             return null;
-        }
-
-        private IGeoObject CreateSplineAsPolyline(BSpline bsp, int segments)
-        {
-            // Approximate the spline as a polyline (fallback for degenerate splines)
-            List<GeoObject.Line> lines = new List<GeoObject.Line>();
-            for (int i = 0; i < segments; i++)
-            {
-                double t0 = (double)i / segments;
-                double t1 = (double)(i + 1) / segments;
-                GeoPoint p0 = ((ICurve)bsp).PointAt(t0);
-                GeoPoint p1 = ((ICurve)bsp).PointAt(t1);
-                GeoObject.Line l = GeoObject.Line.Construct();
-                l.StartPoint = p0;
-                l.EndPoint = p1;
-                lines.Add(l);
-            }
-            GeoObject.Path path = GeoObject.Path.Construct();
-            path.Set(new GeoObjectList(lines.Cast<IGeoObject>().ToList()), false, 1e-6);
-            return path.CurveCount > 0 ? (IGeoObject)path : null;
         }
 
         private IGeoObject CreateFace(ACadSharp.Entities.Face3D face)

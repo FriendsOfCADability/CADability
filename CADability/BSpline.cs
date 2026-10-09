@@ -3226,21 +3226,23 @@ namespace CADability.GeoObject
             if (poles == null || poles.Length == 0) return null;
             GeoPoint2D[] poles2d = new GeoPoint2D[poles.Length];
             for (int i = 0; i < poles.Length; ++i) poles2d[i] = p.Project(poles[i]);
-            // gehe hier zunächst mal davon aus, dass der 2d BSpline mit den selben Parametern
-            // gemacht wird wie der 3d BSpline, lediglich die Punkte werden in die Ebene projiziert.
-            // Stimmt das?
-            // Ja, das scheint zu stimmen, steht jedenfalls so im NURBS Buch für affine Transformationen
-            // zumindest, wenn keine identischen poles entstehen. Dann benimmt sich der 2d BSpline nämlich blöde, DirectionAt kann 0 werden
-            bool identicalPoles = false;
+            // A parallel projection is an affine map, and a NURBS curve is invariant under affine maps (The NURBS
+            // Book): the 2d spline with the projected poles and the same weights and knots IS the projected curve,
+            // even with the same parametrization. That still holds where poles coincide after the projection (or
+            // already did before). The derivative vanishes there, which BSpline2D takes care of. These splines
+            // used to be replaced by a spline through some points of the curve, which can be far off: at a corner
+            // modelled by coinciding poles it rounds the corner and overshoots next to it (issue 173).
+            // Only when all poles coincide the projection is a single point, there is nothing to make a spline from.
+            bool allPolesIdentical = true;
             for (int i = 0; i < poles.Length - 1; i++)
             {
-                if (Precision.IsEqual(poles2d[i], poles2d[i + 1]))
+                if (!Precision.IsEqual(poles2d[i], poles2d[i + 1]))
                 {
-                    identicalPoles = true;
+                    allPolesIdentical = false;
                     break;
                 }
             }
-            if (!identicalPoles)
+            if (!allPolesIdentical)
             {
                 BSpline2D bsp2d = new BSpline2D(poles2d, weights, knots, multiplicities, degree, false, startParam, endParam);
                 // closed auf false gesetzt, damit nicht initperiodic drankommt

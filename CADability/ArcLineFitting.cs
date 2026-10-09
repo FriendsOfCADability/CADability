@@ -292,10 +292,11 @@ namespace CADability
             GeoVector2D startDir = newStartDir;
             GeoVector2D endDir = curve.DirectionAt(endPar);
             startDir.Norm();
-            while (endDir.Length < 1e-10)
+            // The derivative vanishes where a spline passes through coinciding poles. The tangent there is the
+            // direction from inside of the segment. Moving endPar instead would leave a piece of the curve out.
+            for (double offset = 1e-8; endDir.Length < 1e-10 && offset < endPar - startPar; offset *= 10)
             {
-                endPar -= 1e-2;
-                endDir = curve.DirectionAt(endPar);
+                endDir = curve.DirectionAt(endPar - offset);
             }
             endDir.Norm();
 

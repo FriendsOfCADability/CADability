@@ -25,9 +25,16 @@ Fixed in the next pull request: #194 (`Border.UnsplittedOutline` survives
 ByBlock take the layer and colour of the INSERT; `CDfromParent` children keep
 the block colour after cloning and loading) and #66 (STEP export writes a
 `Path` edge curve, or any curve without its own STEP entity, as a B-spline).
-The reporters' files are now regression test data. Follow-up found while
-fixing #66: for a `CLOSED_SHELL` with a single open face, `Shell.CloseEdgeLoop`
-adds a coincident face with the same normal (ImportStep repair heuristic).
+The reporters' files are now regression test data. The same pull request
+also fixes the problems found on the way: holes are exported as `FACE_BOUND`,
+paths of lines and arcs are exported as exact rational B-splines,
+`Shell.CloseEdgeLoop` no longer covers a face by a coincident face, DXF block
+contents also take linetype and lineweight of the INSERT, hatches and solids
+take the colour of their entity, `CDfromParent` works for objects that are
+already in a block, files that are only read are opened with `FileShare.Read`,
+a degenerate sphere fit in `NurbsSurface.GetSimpleSurface` is detected, and
+`Border.UnsplittedOutline` survives `ChangeCyclicalStart`, `Clone`,
+`GetModified` and `Move`.
 
 Closed as not reproducible: #265 (the STEP round trip gives an identical solid
 on master and on the commit from the time of the report, 0fb61554).
@@ -101,6 +108,32 @@ Each of these was reproduced, or confirmed by reading the code, on `17f949e`.
 - [ ] **#303 Model.Add() silently drops invalid GeoObjects.** The
   `HasValidData()` check in `Model.Add(IGeoObject)` is unchanged, and the
   other overloads still don't check. This needs a design decision.
+
+## Found while fixing (not yet addressed)
+
+- [ ] `tests/CADability.Tests/Files/CDB/Volumes.cdb.json` cannot be read by
+  the JSON reader of this repository: it stores `SphericalSurface`,
+  `LayerList` and others in `IJsonSerialize` form (`$TypeVersion` 0), probably
+  written by ShapeIt, but here these classes only implement `ISerializable`.
+  `VolumesMatchAnalytic` and `IntegratedVolumeMatchesAnalyticOnEveryMesh` end
+  in a `NullReferenceException` in `JsonSerialize.SerializationInfoFromJsonData`
+  whenever the file is actually read.
+- [ ] `ModOp2D.IsIsogonal` mixes matrix indices in its second check and is
+  false even for the identity, so `Circle2D`/`Arc2D.GetModified` turn circles
+  into `Ellipse2D` under uniform scaling. `Circle2D.GetModified` also drops the
+  orientation of the circle.
+- [ ] The sphere and torus branches of `NurbsSurface.GetSimpleSurface` fit an
+  affine reparametrisation, which cannot follow the rational parametrisation;
+  the 3D error can reach the radius. The torus fit has no degeneracy check.
+- [ ] `Shell.OpenEdgesExceptPoles` treats every open edge whose start and end
+  vertex coincide as a pole, including a closed B-spline edge, so a STEP
+  `CLOSED_SHELL` with a single open face (issue66_fma_02.stp) still becomes a
+  Solid.
+- [ ] `Border.UnsplittedOutline` is not serialized and is lost on save/load.
+- [ ] `ImportSTL.Read` never disposes its readers.
+- [ ] DXF hatch line styles are not told apart by dash pattern, pattern hatch
+  lines keep the style's lineweight (no ByBlock), and a top-level ByBlock
+  linetype still maps to the solid "ByBlock" pattern.
 
 ## Documentation
 

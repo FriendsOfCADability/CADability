@@ -116,23 +116,73 @@ namespace CADability.Tests
             Assert.AreEqual(path.Length, written.Length, 1e-4, "length of the exported path");
         }
 
+        /// <summary>
+        /// The vertices of the path are poles of the BSpline with <paramref name="joints"/> knots of full multiplicity, so the
+        /// corners are kept, and the first segment, a line on the x-axis, is reproduced exactly.
+        /// </summary>
+        private static void AssertCornersAreKept(BSpline bsp, int joints)
+        {
+            foreach (GeoPoint corner in new GeoPoint[] { new GeoPoint(0, 0, 0), new GeoPoint(100, 0, 0), new GeoPoint(100, 60, 0), new GeoPoint(0, 60, 0) })
+            {
+                Assert.IsTrue(bsp.Poles.Any(pole => (pole | corner) < 1e-10), $"no pole at the corner {corner}");
+            }
+            Assert.AreEqual(joints, bsp.Multiplicities.Skip(1).Take(bsp.Multiplicities.Length - 2).Count(m => m == bsp.Degree), "number of joints");
+            // a line is reproduced exactly: the poles of the first segment lie on the x-axis
+            foreach (GeoPoint pole in bsp.Poles.TakeWhile(pole => (pole | new GeoPoint(100, 0, 0)) > 1e-10)) Assert.AreEqual(0.0, pole.y, 1e-12);
+        }
+
         [TestMethod]
-        public void a_path_is_approximated_by_a_bspline_with_corners()
+        public void a_path_of_lines_and_arcs_is_converted_to_an_exact_bspline_with_corners()
         {
             FaceWithPathEdge(out GeoObject.Path path);
+            BSpline bsp = ExportStep.ToBSpline(path, 1e-6);
+            Assert.AreEqual(2, bsp.Degree);
+            Assert.IsTrue(bsp.HasWeights, "the semicircle needs a rational BSpline");
+            Assert.AreEqual(0.0, MaxDistance(bsp, path), 1e-9);
+            Assert.AreEqual(0.0, MaxDistance(path, bsp), 2e-6); // limited by the precision of BSpline.PositionOf
+            // the line, two quarter circles and the line: three joints and no other inner knot
+            Assert.AreEqual(5, bsp.Multiplicities.Length);
+            AssertCornersAreKept(bsp, 3);
+        }
+
+        [TestMethod]
+        public void a_path_with_a_spline_is_approximated_by_a_bspline_with_corners()
+        {
+            FaceWithPathEdge(out GeoObject.Path path);
+            // the semicircle replaced by a spline through points of it: there is no exact representation, so the path is approximated
+            ICurve[] curves = path.Curves;
+            BSpline spline = BSpline.Construct();
+            spline.ThroughPoints(new GeoPoint[] { new GeoPoint(100, 0, 0), new GeoPoint(130, 30, 0), new GeoPoint(100, 60, 0) }, 3, false);
+            path = GeoObject.Path.Construct();
+            Assert.IsTrue(path.Set(new ICurve[] { curves[0].Clone(), spline, curves[2].Clone() }));
             BSpline bsp = ExportStep.ToBSpline(path, 1e-6);
             Assert.AreEqual(3, bsp.Degree);
             Assert.IsFalse(bsp.HasWeights);
             Assert.AreEqual(0.0, MaxDistance(path, bsp), 2e-6);
             Assert.AreEqual(0.0, MaxDistance(bsp, path), 2e-6);
-            // the vertices of the path are poles of the BSpline with knots of full multiplicity, so the corners are kept
-            foreach (GeoPoint corner in new GeoPoint[] { new GeoPoint(0, 0, 0), new GeoPoint(100, 0, 0), new GeoPoint(100, 60, 0), new GeoPoint(0, 60, 0) })
-            {
-                Assert.IsTrue(bsp.Poles.Any(pole => (pole | corner) < 1e-10), $"no pole at the corner {corner}");
-            }
-            Assert.AreEqual(2, bsp.Multiplicities.Count(m => m == 3), "the two joints of the three segments");
-            // a line is reproduced exactly: the poles of the first segment lie on the x-axis
-            foreach (GeoPoint pole in bsp.Poles.TakeWhile(pole => (pole | new GeoPoint(100, 0, 0)) > 1e-10)) Assert.AreEqual(0.0, pole.y, 1e-12);
+            AssertCornersAreKept(bsp, 2);
+        }
+
+        [TestMethod]
+        public void a_path_of_lines_and_arcs_survives_a_step_round_trip_exactly()
+        {
+            Face face = FaceWithPathEdge(out GeoObject.Path path);
+            Project project = Project.CreateSimpleProject();
+            project.GetActiveModel().Add(face);
+            string file = TempFile("issue66_exact_path_edge");
+            new ExportStep().WriteToFile(file, project);
+            AssertStepFileIsComplete(file);
+            StringAssert.Contains(File.ReadAllText(file), "RATIONAL_B_SPLINE_CURVE");
+
+            Project read = Project.ReadFromFile(file, "stp");
+            List<Face> faces = read.GetActiveModel().AllObjects.SelectMany(Faces).ToList();
+            Assert.AreEqual(1, faces.Count);
+            ICurve written = faces[0].AllEdges.Select(edge => edge.Curve3D).OrderBy(curve => MaxDistance(curve, path)).First();
+            // the curve read back lies on the path and has the same ends
+            Assert.AreEqual(0.0, MaxDistance(written, path), 1e-9, "deviation of the exported path");
+            Assert.AreEqual(0.0, Math.Min(written.StartPoint | path.StartPoint, written.StartPoint | path.EndPoint), 1e-9);
+            Assert.AreEqual(0.0, Math.Min(written.EndPoint | path.StartPoint, written.EndPoint | path.EndPoint), 1e-9);
+            Assert.AreEqual(path.Length, written.Length, 1e-6, "length of the exported path");
         }
 
         [TestMethod]

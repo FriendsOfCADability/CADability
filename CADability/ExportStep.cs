@@ -211,7 +211,8 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
         /// <summary>
         /// Writes the geometry of <paramref name="curve"/> (not as a top level object) and returns its entity number.
         /// A curve that cannot write itself, e.g. a <see cref="GeoObject.Path"/> or a curve that is only defined numerically,
-        /// is written as a B_SPLINE_CURVE_WITH_KNOTS, which approximates it within <see cref="Precision"/>, see <see cref="ToBSpline"/>.
+        /// is written as a B_SPLINE_CURVE_WITH_KNOTS, which represents lines and arcs exactly and approximates other curves
+        /// within <see cref="Precision"/>, see <see cref="ToBSpline"/>.
         /// </summary>
         internal int WriteCurve(ICurve curve)
         {
@@ -221,8 +222,10 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
             return (Line.TwoPoints(curve.StartPoint, curve.EndPoint) as IExportStep).Export(this, false); // a degenerate curve
         }
         /// <summary>
-        /// Approximates <paramref name="curve"/> by a single cubic BSpline with the maximum deviation <paramref name="precision"/>.
-        /// The segments of a <see cref="GeoObject.Path"/> are approximated one by one and joined with knots of multiplicity 3 (the degree),
+        /// Converts <paramref name="curve"/> into a single BSpline. If the curve consists of lines and circular or elliptical arcs
+        /// only (e.g. a <see cref="GeoObject.Path"/> of such segments), the result is an exact rational quadratic BSpline, see
+        /// <see cref="ExactBSpline"/>. Otherwise the curve is approximated by a cubic BSpline with the maximum deviation <paramref name="precision"/>:
+        /// the segments of a <see cref="GeoObject.Path"/> are approximated one by one and joined with knots of multiplicity 3 (the degree),
         /// so the BSpline passes through all vertices of the path and keeps its corners, and a segment which is a line is
         /// reproduced exactly. A single BSpline is used rather than a COMPOSITE_CURVE, because an EDGE_CURVE needs a single
         /// curve geometry, and BSplines are supported by STEP readers far more widely than composite curves.
@@ -244,6 +247,8 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
                 else if (c.Length > CADability.Precision.eps) segments.Add(c); // omit degenerate segments, the neighbours touch each other
             }
             Flatten(curve);
+            BSpline exact = ExactBSpline(segments);
+            if (exact != null) return exact;
             List<BSpline> pieces = new List<BSpline>();
             foreach (ICurve segment in segments)
             {
@@ -285,6 +290,68 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
             }
             BSpline res = BSpline.Construct();
             res.SetData(degree, poles.ToArray(), null, knots.ToArray(), multiplicities.ToArray(), false);
+            return res;
+        }
+        /// <summary>
+        /// Joins <paramref name="segments"/> into a single quadratic BSpline, which represents them exactly, if they are all
+        /// lines or circular or elliptical arcs (<see cref="Ellipse"/>). An arc is split into pieces of at most 90 degrees, each
+        /// of which is a rational quadratic piece (the standard conic representation, the middle weight is the cosine of half the
+        /// sweep of the piece); a line is a quadratic piece with its middle pole in the middle of the line. The pieces are joined
+        /// with knots of multiplicity 2 (the degree), so the BSpline passes through the vertices and keeps the corners. The knot
+        /// spans are the lengths of the pieces. The result has weights only if there is an arc.
+        /// Returns null, if there is a segment of another type.
+        /// </summary>
+        private static BSpline ExactBSpline(List<ICurve> segments)
+        {
+            if (segments.Count == 0) return null;
+            foreach (ICurve segment in segments)
+            {
+                if (!(segment is Line) && !(segment is Ellipse)) return null;
+            }
+            List<GeoPoint> poles = new List<GeoPoint>();
+            List<double> weights = new List<double>();
+            List<double> knots = new List<double>() { 0.0 };
+            List<int> multiplicities = new List<int>() { 3 };
+            bool rational = false;
+            void AddPiece(GeoPoint start, GeoPoint middle, double weight, GeoPoint end, double span)
+            {   // the start of a piece is the end of the previous piece
+                if (poles.Count == 0)
+                {
+                    poles.Add(start);
+                    weights.Add(1.0);
+                }
+                poles.Add(middle);
+                weights.Add(weight);
+                poles.Add(end);
+                weights.Add(1.0);
+                knots.Add(knots[knots.Count - 1] + span);
+                multiplicities.Add(2);
+            }
+            foreach (ICurve segment in segments)
+            {
+                if (segment is Line line)
+                {
+                    AddPiece(line.StartPoint, new GeoPoint(line.StartPoint, line.EndPoint), 1.0, line.EndPoint, line.Length);
+                }
+                else if (segment is Ellipse elli)
+                {
+                    int n = Math.Max(1, (int)Math.Ceiling(Math.Abs(elli.SweepParameter) / (Math.PI / 2.0) - 1e-9));
+                    double step = elli.SweepParameter / n;
+                    double w = Math.Cos(step / 2.0);
+                    rational = true;
+                    for (int i = 0; i < n; i++)
+                    {   // the middle pole is the intersection of the tangents at both ends of the piece
+                        double mp = elli.StartParameter + (i + 0.5) * step;
+                        GeoPoint middle = elli.Center + (Math.Cos(mp) / w) * elli.MajorAxis + (Math.Sin(mp) / w) * elli.MinorAxis;
+                        GeoPoint start = i == 0 ? elli.StartPoint : elli.PointAt(i / (double)n);
+                        GeoPoint end = i == n - 1 ? elli.EndPoint : elli.PointAt((i + 1) / (double)n);
+                        AddPiece(start, middle, w, end, elli.Length / n);
+                    }
+                }
+            }
+            multiplicities[multiplicities.Count - 1] = 3;
+            BSpline res = BSpline.Construct();
+            if (!res.SetData(2, poles.ToArray(), rational ? weights.ToArray() : null, knots.ToArray(), multiplicities.ToArray(), false)) return null;
             return res;
         }
 

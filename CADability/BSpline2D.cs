@@ -2267,7 +2267,18 @@ namespace CADability.Curve2D
         }
         public override double[] GetSelfIntersections()
         {
-            return base.GetSelfIntersections();
+            double[] found = base.GetSelfIntersections();
+            // Where the derivative vanishes, the triangulation has two base points very close to each other (see
+            // GetTriangulationBasis). The segments on either side of them meet at that point, which the base class
+            // reports as a self intersection with (almost) the same position twice. That is no self intersection.
+            List<double> res = new List<double>(found.Length);
+            for (int i = 0; i < found.Length - 1; i += 2)
+            {
+                if (Math.Abs(found[i] - found[i + 1]) < 1e-6) continue;
+                res.Add(found[i]);
+                res.Add(found[i + 1]);
+            }
+            return res.ToArray();
         }
         private void AddApproximateArc(double spar, double epar, double precision, List<ICurve2D> parts)
         {

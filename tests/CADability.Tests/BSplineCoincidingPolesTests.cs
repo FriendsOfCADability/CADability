@@ -1,7 +1,9 @@
 using CADability.Curve2D;
 using CADability.GeoObject;
+using CADability.Shapes;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace CADability.Tests
 {
@@ -33,7 +35,11 @@ namespace CADability.Tests
         /// </summary>
         private static BSpline CornerSpline(int degree, int polesPerCorner, bool useRectangle)
         {
-            GeoPoint[] corners = useRectangle ? rectangle : pentagon;
+            return CornerSpline(useRectangle ? rectangle : pentagon, degree, polesPerCorner);
+        }
+
+        private static BSpline CornerSpline(GeoPoint[] corners, int degree, int polesPerCorner)
+        {
             List<GeoPoint> poles = new List<GeoPoint>();
             for (int i = 0; i < corners.Length; i++)
             {
@@ -227,6 +233,80 @@ namespace CADability.Tests
             double maxDeviation = 0.0;
             for (int i = 0; i <= 1000; i++) maxDeviation = Math.Max(maxDeviation, curve.PointAt(i / 1000.0) | (bsp as ICurve).PointAt(i / 1000.0));
             Assert.IsTrue(maxDeviation < 1e-6, $"the imported spline deviates by {maxDeviation}");
+        }
+
+        [TestMethod]
+        [DataRow(2, 2, false)]
+        [DataRow(3, 3, false)]
+        [DataRow(3, 2, false)]
+        [DataRow(2, 2, true)]
+        public void NoSelfIntersectionsAtTheCorners(int degree, int polesPerCorner, bool useRectangle)
+        {
+            // the two base points the triangulation puts next to a corner must not look like a self intersection
+            ICurve2D c2d = (CornerSpline(degree, polesPerCorner, useRectangle) as ICurve).GetProjectedCurve(Plane.XYPlane);
+            double[] selfIntersections = c2d.GetSelfIntersections();
+            for (int i = 0; i < selfIntersections.Length - 1; i += 2)
+            {
+                // a closed curve may report its start and end point
+                bool startAndEnd = Math.Min(selfIntersections[i], selfIntersections[i + 1]) < 1e-6 && Math.Max(selfIntersections[i], selfIntersections[i + 1]) > 1 - 1e-6;
+                Assert.IsTrue(startAndEnd, $"self intersection reported at {selfIntersections[i]}, {selfIntersections[i + 1]}");
+            }
+        }
+
+        [TestMethod]
+        [DataRow(2, 2, false)]
+        [DataRow(3, 3, false)]
+        [DataRow(2, 2, true)]
+        public void ShapesFromTheCurve(int degree, int polesPerCorner, bool useRectangle)
+        {
+            // the same operations on a dense polygon of the curve are the reference
+            ICurve curve = CornerSpline(degree, polesPerCorner, useRectangle);
+            ICurve2D c2d = curve.GetProjectedCurve(Plane.XYPlane);
+            GeoPoint2D[] exact = Sample(curve, Plane.XYPlane, 8000);
+            Border polygon = new Border(exact.Take(exact.Length - 1).ToArray());
+            Border border = new Border(c2d);
+            SimpleShape shape = new SimpleShape(border);
+            SimpleShape reference = new SimpleShape(polygon);
+            Assert.AreEqual(reference.Area, shape.Area, 1e-3, "Area");
+
+            Random rnd = new Random(173);
+            for (int i = 0; i < 300; i++)
+            {
+                GeoPoint2D p = new GeoPoint2D(-10 + 120 * rnd.NextDouble(), -10 + 100 * rnd.NextDouble());
+                if (DistanceToPolyline(exact, p) < 0.05) continue; // too close to decide against a polygon
+                Assert.AreEqual(polygon.GetPosition(p), border.GetPosition(p), $"position of {p}");
+            }
+
+            // a circle around a corner, one on the inside of the curve and one crossing a side
+            foreach (GeoPoint2D center in new[] { new GeoPoint2D(100, 0), new GeoPoint2D(0, 50), new GeoPoint2D(60, 0) })
+            {
+                SimpleShape circle = new SimpleShape(Border.MakeCircle(center, 10));
+                Assert.AreEqual(SimpleShape.Unite(reference, circle).Area, SimpleShape.Unite(shape, circle).Area, 1e-2, $"Unite at {center}");
+                Assert.AreEqual(SimpleShape.Subtract(reference, circle).Area, SimpleShape.Subtract(shape, circle).Area, 1e-2, $"Subtract at {center}");
+                Assert.AreEqual(SimpleShape.Intersect(reference, circle).Area, SimpleShape.Intersect(shape, circle).Area, 1e-2, $"Intersect at {center}");
+            }
+        }
+
+        [TestMethod]
+        [DataRow(2, 2)]
+        [DataRow(3, 3)]
+        [DataRow(3, 2)]
+        public void NonPlanarSplineWithCorners(int degree, int polesPerCorner)
+        {
+            // not planar, so this neither goes through GetProjectedCurve nor ArcLineFitting2D
+            GeoPoint[] corners = {
+                new GeoPoint(0, 0, 0), new GeoPoint(100, 0, 20), new GeoPoint(100, 50, 0), new GeoPoint(50, 80, 30), new GeoPoint(0, 50, -10) };
+            ICurve curve = CornerSpline(corners, degree, polesPerCorner);
+            Assert.AreEqual(PlanarState.NonPlanar, curve.GetPlanarState());
+            foreach (bool linesOnly in new[] { true, false })
+            {
+                const double precision = 0.01;
+                ICurve approx = curve.Approximate(linesOnly, precision);
+                double maxDeviation = 0.0;
+                for (int i = 0; i <= 2000; i++) maxDeviation = Math.Max(maxDeviation, approx.DistanceTo(curve.PointAt(i / 2000.0)));
+                TestContext.WriteLine($"degree {degree}, {polesPerCorner} poles per corner, linesOnly {linesOnly}: deviation {maxDeviation}");
+                Assert.IsTrue(maxDeviation < 1.5 * precision, $"the approximation (linesOnly {linesOnly}) deviates by {maxDeviation}");
+            }
         }
     }
 }

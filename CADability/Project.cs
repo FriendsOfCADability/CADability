@@ -284,7 +284,6 @@ namespace CADability
         private Hashtable attributeLists;
         private FilterList filterList;
         private string fileName;
-        private bool openedAsJson = false;
         private UndoRedoSystem undoRedoSystem;
         private GeoObjectList symbolList;
         private NamedValuesProperty namedValues;
@@ -1104,32 +1103,18 @@ namespace CADability
         /// <returns>true, if successful, false if the user pressed escape in the SaveFileDialog</returns>
         public virtual bool WriteToFile(string FileName)
         {
-            // Für die ThumbNail Ansicht braucht man IExtractImage
-            bool writeAsJson = openedAsJson;
-            if (Settings.GlobalSettings.GetBoolValue("SaveMode.SaveAsJson", false)) writeAsJson = true;
-            writeAsJson = true;
             if (FileName == null || FileName.Length == 0)
             {
                 int filterIndex = 0;
-                if (Frame.UIService.ShowSaveFileDlg("Project.WriteToFile", StringTable.GetString("MenuId.File.Save.As"), StringTable.GetString("File.CADability.Filter.json"), ref filterIndex, ref FileName) == Substitutes.DialogResult.OK)
-                {
-                    writeAsJson = true; // the json Format is the only format we accept , no more writing in binary ISerializable format
-                }
-                else return false;
+                if (Frame.UIService.ShowSaveFileDlg("Project.WriteToFile", StringTable.GetString("MenuId.File.Save.As"), StringTable.GetString("File.CADability.Filter.json"), ref filterIndex, ref FileName) != Substitutes.DialogResult.OK)
+                    return false;
             }
             if (FileName != null && FileName.Length > 0)
             {
                 fileName = FileName;
                 Stream stream = File.Open(FileName, FileMode.Create);
-                if (writeAsJson)
-                {
-                    JsonSerialize js = new JsonSerialize();
-                    js.ToStream(stream, this);
-                }
-                else
-                {
-                    WriteToStream(stream);
-                }
+                JsonSerialize js = new JsonSerialize();
+                js.ToStream(stream, this);
                 stream.Close();
                 isModified = false;
             }
@@ -1549,80 +1534,53 @@ namespace CADability
                 if (firstByte == 123)
                 {
                     res = ReadFromJson(stream);
-                    if (res != null)
+                }
+                else
+                {
+                    try
                     {
-                        res.fileName = FileName;
-                        res.openedAsJson = true;
+                        res = ReadFromStream(stream);
+                    }
+                    catch (ProjectOldVersionException)
+                    {
                         stream.Close();
-                        return res;
+                        stream.Dispose();
+                        if (cdbFixFw2 == null)
+                        {
+                            Assembly ThisAssembly = Assembly.GetExecutingAssembly();
+                            int lastSlash = ThisAssembly.Location.LastIndexOf('\\');
+                            if (lastSlash >= 0)
+                            {
+                                string path = ThisAssembly.Location.Substring(0, lastSlash);
+                                lastSlash = path.LastIndexOf('\\');
+                                //if (lastSlash >= 0) // das geht noch ein level zurück, wir erwarten die Anwendung im selben Verzeichnis wie CADability 
+                                //{
+                                //    path = path.Substring(0, lastSlash);
+                                //}
+                                string[] files = Directory.GetFiles(path, "cdbFixFw2.exe", SearchOption.AllDirectories);
+                                if (files.Length > 0)
+                                {
+                                    cdbFixFw2 = files[0];
+                                }
+                            }
+                        }
+                        if (cdbFixFw2 != null)
+                        {
+                            Process process = Process.Start(cdbFixFw2, "\"" + FileName + "\"");
+                            if (process != null)
+                            {
+                                process.WaitForExit();
+                                if (process.ExitCode == 0) // d.h. OK
+                                {
+                                    res = ReadConvertedFile(FileName, useProgress);
+                                }
+                            }
+                        }
                     }
                 }
-                //Form.ActiveForm.Update();
-                //ReadProgress progress = new ReadProgress(stream);
-                //ProgressFeedBack pf = null;
-                //if (useProgress)
-                //{
-                //    pf = new ProgressFeedBack();
-                //    pf.Title = StringTable.GetFormattedString("ReadFile.Progress", FileName);
-                //    pf.StreamPosition(50, stream);
-                //    pf.Float(100);
-                //}
-                //ReadProgress.ShowProgressDelegate showProgressDelegate = new ReadProgress.ShowProgressDelegate(progress.ShowProgress);
-                // ReadProgress funktioniert noch nicht perfekt. 
-                try
+                if (res != null)
                 {
-                    //if (pf != null) pf.Start();
-                    //showProgressDelegate.BeginInvoke(null,null);
-                    res = ReadFromStream(stream);
-                    if (res == null)
-                    {
-                        stream.Close();
-
-                        return null;
-                    }
                     res.fileName = FileName;
-                }
-                catch (ProjectOldVersionException)
-                {
-                    stream.Close();
-                    stream.Dispose();
-                    if (cdbFixFw2 == null)
-                    {
-                        Assembly ThisAssembly = Assembly.GetExecutingAssembly();
-                        int lastSlash = ThisAssembly.Location.LastIndexOf('\\');
-                        if (lastSlash >= 0)
-                        {
-                            string path = ThisAssembly.Location.Substring(0, lastSlash);
-                            lastSlash = path.LastIndexOf('\\');
-                            //if (lastSlash >= 0) // das geht noch ein level zurück, wir erwarten die Anwendung im selben Verzeichnis wie CADability 
-                            //{
-                            //    path = path.Substring(0, lastSlash);
-                            //}
-                            string[] files = Directory.GetFiles(path, "cdbFixFw2.exe", SearchOption.AllDirectories);
-                            if (files.Length > 0)
-                            {
-                                cdbFixFw2 = files[0];
-                            }
-                        }
-                    }
-                    if (cdbFixFw2 != null)
-                    {
-                        Process process = Process.Start(cdbFixFw2, "\"" + FileName + "\"");
-                        if (process != null)
-                        {
-                            process.WaitForExit();
-                            if (process.ExitCode == 0) // d.h. OK
-                            {
-                                return ReadConvertedFile(FileName, useProgress);
-                            }
-                        }
-                    }
-                }
-                finally
-                {
-                    //if (pf != null) pf.Stop();
-                    //progress.Finished();
-                    stream.Close();
                 }
                 return res;
             }

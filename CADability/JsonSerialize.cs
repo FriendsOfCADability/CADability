@@ -1,4 +1,4 @@
-﻿using CADability.GeoObject;
+using CADability.GeoObject;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -84,6 +84,15 @@ namespace CADability
         void AddValues(params object[] value);
         void AddHashTable(string v, Hashtable attributeLists);
         void RegisterForSerializationDoneCallback(IJsonSerializeDone toCall);
+    }
+    /// <summary>
+    /// Interface to feedback the reading/writing progress.
+    /// </summary>
+    public interface IJsonProgess
+    {
+        void SetStepIncrement(double increment);
+        void DoStep(int doneSteps = 1);
+        void SetCompleted();
     }
     public class JsonSerialize : IJsonWriteData
     {
@@ -495,6 +504,7 @@ namespace CADability
 
         }
 
+        IJsonProgess progress; //To keep track of the reading/writing progress.
         // for serialization:
         Queue<object> queue;
         int objectCount;
@@ -679,8 +689,10 @@ namespace CADability
             else res.Version = typeversion;
             return res;
         }
-        public object FromStream(Stream stream)
+        public object FromStream(Stream stream, IJsonProgess progress = null)
         {
+            this.progress = progress;
+            SetProgressStepIncrement(35);
             tk = new Tokenizer(stream);
             string line;
             int start, length;
@@ -688,9 +700,11 @@ namespace CADability
             typeVersions = new Dictionary<string, int>();
             typeIndexToVersion = new Dictionary<int, int>();
             Tokenizer.etoken token = tk.NextToken(out line, out start, out length);
+            DoProgressStep();
             if (token == Tokenizer.etoken.beginObject)
             {
                 JsonDict allObjects = GetObject(tk);
+                DoProgressStep(); //Here the file is complety read.
                 if (!allObjects.ContainsKey("CADability")) return null;
                 JsonDict cdb = allObjects["CADability"] as JsonDict;
                 if (cdb != null)
@@ -708,17 +722,21 @@ namespace CADability
                     }
 #endif
                     CreateEntities(entities);
+                    SetProgressStepIncrement(5.0 / entities.Count);
                     for (int i = 0; i < entities.Count; i++)
                     {
                         if (entities[i] != null && !(entities[i] is JsonDict) && !(entities[i] is JsonArray) && entities[i] is IDeserializationCallback && typeVersions.TryGetValue(entities[i].GetType().FullName, out int typeVersion))
                             if (typeVersion == -1) (entities[i] as IDeserializationCallback).OnDeserialization(this);
+                        DoProgressStep();
                     }
                     IJsonSerializeDone item = SerializationDoneCallback.FirstOrDefault();
+                    SetProgressStepIncrement(25.0 / SerializationDoneCallback.Count);
                     while (item != null)
                     {
                         SerializationDoneCallback.Remove(item);
                         item.SerializationDone(this);
                         item = SerializationDoneCallback.FirstOrDefault();
+                        DoProgressStep();
                     }
                     //foreach (IJsonSerializeDone item in SerializationDoneCallback)
                     //{
@@ -1101,8 +1119,9 @@ namespace CADability
             return entities[(int)index];
         }
 
-        public bool ToStream(Stream stream, object toSerialize, bool closeStream = true)
+        public bool ToStream(Stream stream, object toSerialize, bool closeStream = true, IJsonProgess progress = null)
         {
+            this.progress = progress;
             verbose = Settings.GlobalSettings.GetBoolValue("Json.Verbose", false);
 #if DEBUG
             verbose = true;
@@ -1139,7 +1158,9 @@ namespace CADability
                     Seperator();
                     // outStream.Write("\n"); // only very small difference in size, but much better readable
                 }
-                WriteObject(queue.Dequeue());
+                object obj = queue.Dequeue();
+                if (obj is IGeoObject) DoProgressStep();
+                WriteObject(obj);
                 ++objectCount;
             }
             EndArray();
@@ -1620,6 +1641,15 @@ namespace CADability
                 stream.Close();
                 return res;
             }
+        }
+        private void SetProgressStepIncrement(double increment)
+        {
+            if (progress != null) progress.SetStepIncrement(increment);
+        }
+
+        private void DoProgressStep(int doneSteps = 1)
+        {
+            if (progress != null) progress.DoStep(doneSteps);
         }
 
         #region IJsonWriteData implementation

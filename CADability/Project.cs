@@ -1111,14 +1111,45 @@ namespace CADability
             }
             if (FileName != null && FileName.Length > 0)
             {
+                UIProgessBar progress = new UIProgessBar("saving cdb file");
+                int geoObjCount = CountGeoOjects(GetActiveModel()); //Count the IGeoObjects in the drawing.
+                progress.SetStepIncrement(100.0 / geoObjCount); //Progress bar show the sawing of the IGeoObjects.
                 fileName = FileName;
                 Stream stream = File.Open(FileName, FileMode.Create);
                 JsonSerialize js = new JsonSerialize();
-                js.ToStream(stream, this);
+                js.ToStream(stream, this, false, progress);
                 stream.Close();
                 isModified = false;
+                progress.SetCompleted();
             }
             return true;
+        }
+
+        private int CountGeoOjects(IEnumerable geoObjects)
+        {
+            int count = 0;
+            foreach (IGeoObject geo in geoObjects)
+            {
+                if (geo is Block bl)
+                {
+                    count += CountGeoOjects(bl.Children);
+                }
+                else if (geo is Solid so)
+                {
+                    count += CountGeoOjects(so.Shells);
+                }
+                else if (geo is Shell sh)
+                {
+                    count += CountGeoOjects(sh.Faces);
+                    foreach (Edge e in sh.Edges)
+                    {
+                        if (e.Curve3D != null)
+                            count++;
+                    }
+                }
+                count++;
+            }
+            return count;
         }
 
         public bool WriteToFileWithoutUserData(string fileName)
@@ -1529,11 +1560,12 @@ namespace CADability
             Project res = null;
             using (FileStream stream = File.Open(FileName, FileMode.Open, System.IO.FileAccess.Read))
             {
+                UIProgessBar progress = useProgress ? new UIProgessBar("reading cdb file") : null;
                 int firstByte = stream.ReadByte();
                 stream.Seek(0, SeekOrigin.Begin);
                 if (firstByte == 123)
                 {
-                    res = ReadFromJson(stream);
+                    res = ReadFromJson(stream, progress);
                 }
                 else
                 {
@@ -1582,6 +1614,7 @@ namespace CADability
                 {
                     res.fileName = FileName;
                 }
+                if (progress != null) progress.SetCompleted();
                 return res;
             }
         }
@@ -1591,13 +1624,13 @@ namespace CADability
         /// </summary>
         /// <param name="stream">The Stream containing JSON serialized project data</param>
         /// <returns>The deserialized Project or null if deserialization fails</returns>
-        public static Project ReadFromJson(Stream stream)
+        public static Project ReadFromJson(Stream stream, IJsonProgess progress = null)
         {
             // Create a new JsonSerialize instance to handle deserialization
             JsonSerialize js = new JsonSerialize();
 
             // Attempt to deserialize the stream into a Project object
-            if (!(js.FromStream(stream) is Project res))
+            if (!(js.FromStream(stream, progress) is Project res))
                 return null;
 
             // Update all attribute lists to ensure they are synchronized with the project's attributes
@@ -2654,7 +2687,7 @@ namespace CADability
         /// <summary>
         /// It shows the progress bar during reading/writting a drawing file.
         /// </summary>
-        private class UIProgessBar : DXF.IDxfProgress
+        private class UIProgessBar : DXF.IDxfProgress, IJsonProgess
         {
             string _text = null; //Text in the progress bar.
             double _increment = 1; //Increment value of the progress bar for each executed step. When all steps are completed it is 100.

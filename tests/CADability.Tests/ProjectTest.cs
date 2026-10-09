@@ -1107,7 +1107,7 @@ EOF
             original.Modify(ModOp.Rotate(GeoVector.XAxis, SweepAngle.Deg(180)));
             Project project = Project.CreateSimpleProject();
             project.GetModel(0).Add(original);
-            string file = TestContext.TestName + "_" +  isArc.ToString() + ".dxf";
+            string file = TestContext.TestName + "_" + isArc.ToString() + ".dxf";
             Assert.IsTrue(project.Export(file, "dxf"));
             var restored = Project.ReadFromFile(file, "dxf").GetActiveModel().AllObjects[0] as GeoObject.Ellipse;
             Assert.IsNotNull(restored);

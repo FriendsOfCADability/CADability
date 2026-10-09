@@ -15,6 +15,7 @@ using System.Collections.Generic;
 //#endif
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading;
 
@@ -959,13 +960,10 @@ namespace CADability.GeoObject
         private LineAlignMode lineAlignment;
         // private IGeoObject[] cachedDisplayItems;
         private static HashSet<string> fontFamilyNames;
-        internal static HashSet<string> FontFamilyNames
-        {
-            get
-            {
-                return fontFamilyNames;
-            }
-        }
+        internal static HashSet<string> FontFamilyNames =>
+            LazyInitializer.EnsureInitialized(ref fontFamilyNames, () =>
+                new HashSet<string>(FontFamily.Families.Select(f => f.Name.ToUpper())));
+
         #region polymorph construction
         public delegate Text ConstructionDelegate();
         public static ConstructionDelegate Constructor;
@@ -975,17 +973,6 @@ namespace CADability.GeoObject
             return new Text();
         }
         #endregion
-
-        // The CLR initializes the HashSet once, before any thread can read it.
-        static Text()
-        {
-            FontFamily[] ff = FontFamily.Families;
-            fontFamilyNames = new HashSet<string>();
-            for (int i = 0; i < ff.Length; i++)
-            {
-                fontFamilyNames.Add(ff[i].Name.ToUpper());
-            }
-        }
 
         protected Text()
         {

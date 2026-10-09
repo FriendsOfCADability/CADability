@@ -11,6 +11,10 @@ Closed during this triage, because they were already solved on master:
   and 9573342d.
 - #295 Make3D.MakePipe with a straight path: fixed in #307 (a75ce094).
 
+Fixed during this triage (#369): #251 (dead `objectPointSav` code removed
+from ToolsRoundIn) and #294 (README links and the repository website now
+point to friendsofcadability.github.io).
+
 Closed as not reproducible: #265 (the STEP round trip gives an identical solid
 on master and on the commit from the time of the report, 0fb61554).
 
@@ -25,14 +29,6 @@ d3db7052; a rewrite is not planned, prototype on branch `ShapeItProgress`).
 These need someone with the original files, Windows/Visual Studio, or a
 maintainer decision.
 
-- [x] **#294 GitHub documentation links broken.** The README links now
-  point to `https://friendsofcadability.github.io/CADability/`, where
-  `.github/workflows/pages.yml` deploys `docs/`. Still to do by hand: the
-  repository "Website" setting still points to `sofagh.github.io`. The
-  documentation itself is stale: `docs/CADabilityDoc` was last generated on
-  2021-05-31 and `docs/index.md` is the unchanged Jekyll template. Consider
-  running docfx (`CADability/docfx.json`, `CADability.Forms/docfx.json`) in
-  the Pages workflow instead of committing generated HTML.
 - [ ] **#297 CADability WPF integration issue.** This is a usage question.
   The control is `CadControl` in namespace `CADability.Forms` (assembly
   CADability.Forms.dll), not `CADControl` in `CADability`. Draft answer: use
@@ -52,13 +48,6 @@ maintainer decision.
   Fixes exist on the unmerged branch `claude/ecstatic-fermat-uml5l3`
   (311598c3, 3bc72921, e8199e3b). Review and merge that branch, then answer
   and close.
-- [x] **#251 ToolsRoundIn.OnDone — objectPointSav is never assigned.**
-  Fixed on branch `claude/gracious-sagan-pi9nj1`. The field and the
-  unreachable `roundRad == 0.0` branch were removed: `RoundRadius()` rejects
-  radii <= `Precision.eps`, the default radius is ViewWidth/40, and
-  `ShowRound` never produces an arc for radius 0. Close the issue once this
-  is merged.
-
 ## Confirmed — still present on master
 
 Each of these was reproduced, or confirmed by reading the code, on `17f949e`.
@@ -129,6 +118,14 @@ Each of these was reproduced, or confirmed by reading the code, on `17f949e`.
 - [ ] **#303 Model.Add() silently drops invalid GeoObjects.** The
   `HasValidData()` check in `Model.Add(IGeoObject)` is unchanged, and the
   other overloads still don't check. This needs a design decision.
+
+## Documentation
+
+- [ ] The generated documentation is stale: `docs/CADabilityDoc` was last
+  generated on 2021-05-31 and `docs/index.md` is the unchanged Jekyll
+  template. Consider running docfx (`CADability/docfx.json`,
+  `CADability.Forms/docfx.json`) in the Pages workflow instead of committing
+  generated HTML.
 
 ## Open discussions / feature requests (no action from triage)
 

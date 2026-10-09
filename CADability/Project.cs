@@ -1682,7 +1682,7 @@ namespace CADability
         }
         private static Project ImportDXF(string filename)
         {
-            CADability.DXF.Import import = new DXF.Import(filename);
+            CADability.DXF.Import import = new DXF.Import(filename, new UIProgessBar("import dxf"));
             return import.Project;
         }
 
@@ -1690,7 +1690,7 @@ namespace CADability
         {
             try
             {
-                CADability.DXF.Import import = new DXF.Import(filename);
+                CADability.DXF.Import import = new DXF.Import(filename, new UIProgessBar("import dwg"));
                 return import.Project;
             }
             catch (Exception ex)
@@ -2692,5 +2692,48 @@ namespace CADability
         }
 
         #endregion
+
+        /// <summary>
+        /// It shows the progress bar during reading/writting a drawing file.
+        /// </summary>
+        private class UIProgessBar : DXF.IDxfProgress
+        {
+            string _text = null; //Text in the progress bar.
+            double _increment = 1; //Increment value of the progress bar for each executed step. When all steps are completed it is 100.
+            double _offset = 0; //Progress bar offset value >=0 <100. Used if reading/writting is done in more than one phase.
+            int _step = 0; //Current step value.
+            double _currentPercentualPosition = 0; //Current position of the progress bar.
+
+
+            public UIProgessBar(string text)
+            {
+                _text = text;
+    }
+
+            public void SetStepIncrement(double increment)
+            {
+                _step = 0;
+                _increment = increment;
+                _offset = _currentPercentualPosition;
+}
+
+            public void DoStep(int doneSteps = 1)
+            {
+                _step += doneSteps;
+                double percentual = Math.Round(_offset + _increment * _step, 1);
+                if (percentual > _currentPercentualPosition) //Without this import will be slower.
+                {
+                    FrameImpl.MainFrame?.UIService.ShowProgressBar(true, percentual, _text);
+                    //Debug.WriteLine($"ProgressStatus={percentual}");
+                }
+                _currentPercentualPosition = percentual;
+            }
+
+            public void SetCompleted()
+            {
+                FrameImpl.MainFrame?.UIService.ShowProgressBar(false);
+                //Debug.WriteLine($"ProgressStatus=completed");
+            }
+        }
     }
 }

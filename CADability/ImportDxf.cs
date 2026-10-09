@@ -33,9 +33,12 @@ namespace CADability.DXF
         private Dictionary<string, GeoObject.Block> blockTable;
         private Dictionary<string, ColorDef> layerColorTable;
         private Dictionary<string, Attribute.Layer> layerTable;
+        private IDxfProgress progress;
 
-        public Import(string fileName)
+        public Import(string fileName, IDxfProgress progress = null)
         {
+            this.progress = progress;
+            SetProgressStepIncrement(30);
             ACadVersion version = GetDrawingVersion(fileName, out bool isDwg);
             byte[] raw;
             using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
@@ -43,6 +46,7 @@ namespace CADability.DXF
                 raw = new byte[fs.Length];
                 fs.Read(raw, 0, raw.Length);
             }
+            DoProgressStep();
             using (var stream = new MemoryStream(raw))
             {
                 try
@@ -64,6 +68,22 @@ namespace CADability.DXF
                     if (doc == null) throw; // OBJECTS was not the problem — re-throw
                 }
             }
+            DoProgressStep();
+        }
+
+        private void SetProgressStepIncrement(double increment)
+        {
+            if (progress != null) progress.SetStepIncrement(increment);
+        }
+
+        private void DoProgressStep(int doneSteps = 1)
+        {
+            if (progress != null) progress.DoStep(doneSteps);
+        }
+
+        private void SetProcessCompleted()
+        {
+            if (progress != null) progress.SetCompleted();
         }
 
         // Retries reading by presenting the file content only up to (but not including)
@@ -303,9 +323,11 @@ namespace CADability.DXF
             if (doc.BlockRecords.TryGetValue("*Model_Space", out BlockRecord modelSpace)
                 && modelSpace.Entities.Count > 0)
             {
+                SetProgressStepIncrement(20.0 / modelSpace.Entities.Count);
                 foreach (Entity item in modelSpace.Entities)
                 {
                     ConvertAndAdd(item, model, ref converted, ref empty, ref failed);
+                    DoProgressStep();
                 }
             }
             else
@@ -313,6 +335,7 @@ namespace CADability.DXF
                 // Fallback for non-standard R12 files: *Model_Space absent or empty.
                 // doc.Entities is ACadSharp's flat view of all drawing entities; take only
                 // those whose owner is a space block (or unowned, which is model-space in R12).
+                SetProgressStepIncrement(20.0 / doc.Entities.Count);
                 foreach (var obj in doc.Entities)
                 {
                     if (!(obj is Entity item)) continue;
@@ -320,6 +343,7 @@ namespace CADability.DXF
                     if (ownerName != null && !ownerName.StartsWith("*"))
                         continue;
                     ConvertAndAdd(item, model, ref converted, ref empty, ref failed);
+                    DoProgressStep();
                 }
             }
             System.Diagnostics.Trace.WriteLine("dxf: *Model_Space: " + converted + " entities imported, " + empty + " without geometry, " + failed + " failed");
@@ -329,10 +353,12 @@ namespace CADability.DXF
         private void FillPaperSpace(Model model)
         {
             if (!doc.BlockRecords.TryGetValue("*Paper_Space", out BlockRecord paperSpace)) return;
+            SetProgressStepIncrement(20.0 / paperSpace.Entities.Count);
             int converted = 0, empty = 0, failed = 0;
             foreach (Entity item in paperSpace.Entities)
             {
                 ConvertAndAdd(item, model, ref converted, ref empty, ref failed);
+                DoProgressStep();
             }
             if (converted + empty + failed > 0)
                 System.Diagnostics.Trace.WriteLine("dxf: *Paper_Space: " + converted + " entities imported, " + empty + " without geometry, " + failed + " failed");
@@ -384,6 +410,7 @@ namespace CADability.DXF
                 }
             }
             doc = null;
+            SetProcessCompleted();
             return project;
         }
 
@@ -1983,4 +2010,14 @@ namespace CADability.DXF
             catch { return null; }
         }
     }
+
+    /// <summary>
+    /// Interface to feedback the import progress.
+    /// </summary>
+    public interface IDxfProgress
+    {
+        void SetStepIncrement(double increment);
+        void DoStep(int doneSteps = 1);
+        void SetCompleted();
+}
 }

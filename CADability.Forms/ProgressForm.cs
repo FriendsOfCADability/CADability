@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -53,11 +53,13 @@ namespace CADability.Forms
                 // show it
                 Init(title);
                 this.Show();
+                Cursor.Current = Cursors.WaitCursor;
                 //Application.DoEvents();
             }
             else if (!show && Visible)
             {
                 this.Hide();
+                Cursor.Current = Cursors.Default;
                 //Application.DoEvents();
             }
             if (show)

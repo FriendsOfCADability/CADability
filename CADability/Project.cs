@@ -1117,7 +1117,7 @@ namespace CADability
                 fileName = FileName;
                 Stream stream = File.Open(FileName, FileMode.Create);
                 JsonSerialize js = new JsonSerialize();
-                js.ToStream(stream, this, false, progress);
+                js.ToStream(stream, this, progress, false);
                 stream.Close();
                 isModified = false;
                 progress.SetCompleted();

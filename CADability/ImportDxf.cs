@@ -35,7 +35,11 @@ namespace CADability.DXF
         private Dictionary<string, Attribute.Layer> layerTable;
         private IDxfProgress progress;
 
-        public Import(string fileName, IDxfProgress progress = null)
+        public Import(string fileName)
+            : this(fileName, null)
+        {
+        }
+        public Import(string fileName, IDxfProgress progress)
         {
             this.progress = progress;
             SetProgressStepIncrement(30);

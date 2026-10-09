@@ -689,7 +689,11 @@ namespace CADability
             else res.Version = typeversion;
             return res;
         }
-        public object FromStream(Stream stream, IJsonProgress progress = null)
+        public object FromStream(Stream stream)
+        {
+            return FromStream(stream, null);
+        }
+        public object FromStream(Stream stream, IJsonProgress progress)
         {
             this.progress = progress;
             SetProgressStepIncrement(35);
@@ -1119,7 +1123,11 @@ namespace CADability
             return entities[(int)index];
         }
 
-        public bool ToStream(Stream stream, object toSerialize, bool closeStream = true, IJsonProgress progress = null)
+        public bool ToStream(Stream stream, object toSerialize, bool closeStream = true)
+        {
+            return ToStream(stream, toSerialize, null, closeStream);
+        }
+        public bool ToStream(Stream stream, object toSerialize, IJsonProgress progress, bool closeStream = true)
         {
             this.progress = progress;
             verbose = Settings.GlobalSettings.GetBoolValue("Json.Verbose", false);

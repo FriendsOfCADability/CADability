@@ -25,11 +25,14 @@ d3db7052; a rewrite is not planned, prototype on branch `ShapeItProgress`).
 These need someone with the original files, Windows/Visual Studio, or a
 maintainer decision.
 
-- [ ] **#294 GitHub documentation links broken.** `README.md` still links to
-  `https://sofagh.github.io/CADability/...`. github.io could not be reached
-  from the sandbox, so neither the old URLs nor a FriendsOfCADability Pages
-  site could be checked. Point the links at the current Pages site, or enable
-  Pages for `docs/`.
+- [x] **#294 GitHub documentation links broken.** The README links now
+  point to `https://friendsofcadability.github.io/CADability/`, where
+  `.github/workflows/pages.yml` deploys `docs/`. Still to do by hand: the
+  repository "Website" setting still points to `sofagh.github.io`. The
+  documentation itself is stale: `docs/CADabilityDoc` was last generated on
+  2021-05-31 and `docs/index.md` is the unchanged Jekyll template. Consider
+  running docfx (`CADability/docfx.json`, `CADability.Forms/docfx.json`) in
+  the Pages workflow instead of committing generated HTML.
 - [ ] **#297 CADability WPF integration issue.** This is a usage question.
   The control is `CadControl` in namespace `CADability.Forms` (assembly
   CADability.Forms.dll), not `CADControl` in `CADability`. Draft answer: use

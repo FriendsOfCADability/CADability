@@ -73,20 +73,6 @@ maintainer decision.
 
 Each of these was reproduced, or confirmed by reading the code, on `17f949e`.
 
-- [ ] **#168 Solid.Subtract returns null on large objects.** Reproduced with
-  the reporter's `Bug.zip` (`project.json`, solids `main53335` and
-  `cut53335`). Both inputs are closed and consistent: `main` has 82 faces
-  (72 cylindrical, 10 planar), `cut` is a 10-face box, and they overlap.
-  `Subtract(cut, main)`, `Subtract(main, cut)` and `Intersect(cut, main)` all
-  return an empty array, and a debug build fires `Debug.Assert(fc.CheckConsistency())`
-  in `BRepOperation.Result()` (`BRepIntersection.cs`). The size is not the
-  cause: the result is the same after moving the pair to the origin and after
-  scaling by 0.1 or 10. Subtracting a simple box from either solid works. The
-  likely trigger is near-coincident faces: the cut's faces lie about 3e-7 to
-  2.5e-3 from main's faces (x 500.9975 vs 501, z 941.9999997 vs 942). Add the
-  file as a test case under `tests/CADability.Tests/Files` and debug
-  `BRepOperation`.
-
 - [ ] **#249 Path colour changes when approximated.** `Path.Approximate`
   creates child curves with the default black colour, and `CopyAttributes`
   overwrites only null child colours, so the colour is lost.
@@ -110,6 +96,14 @@ Each of these was reproduced, or confirmed by reading the code, on `17f949e`.
   other overloads still don't check. This needs a design decision.
 
 ## Found while fixing (not yet addressed)
+
+- [ ] Boolean operations still fail in some near-coincident configurations
+  (a sweep of 267 box/cylinder/sphere/fillet configurations for #168: 71
+  remain wrong, 2 crash with a stack overflow or a timeout, all unchanged by
+  the fix). Examples: a box bottom 3e-7 below the tangent plane of a rounded
+  edge, gaps of about 1e-5 (between `Precision.eps` and the BRep precision),
+  touching boxes (`Intersect` throws), and tools 1e6 times smaller than the
+  other solid.
 
 - [ ] `tests/CADability.Tests/Files/CDB/Volumes.cdb.json` cannot be read by
   the JSON reader of this repository: it stores `SphericalSurface`,

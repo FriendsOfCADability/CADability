@@ -506,7 +506,7 @@ namespace CADability.DXF
             {
                 if (project.HatchStyleList[i] is HatchStyleSolid hss)
                 {
-                    if (hss.Color.Color.ToArgb() == clr.ToArgb()) return hss;
+                    if (hss.Color != null && hss.Color.Color.ToArgb() == clr.ToArgb()) return hss;
                 }
             }
             HatchStyleSolid nhss = new HatchStyleSolid();
@@ -516,17 +516,39 @@ namespace CADability.DXF
             return nhss;
         }
 
+        /// <summary>
+        /// A solid hatch style without a color of its own. A <see cref="GeoObject.Hatch"/> with such a
+        /// style is filled with its own <see cref="GeoObject.Hatch.ColorDef"/>, which
+        /// <see cref="SetAttributes"/> sets from the entity like the color of every other entity, with
+        /// ByLayer, ByBlock and the handling of layer "0" in blocks.
+        /// </summary>
+        private HatchStyleSolid FindOrCreateSolidHatchStyle()
+        {
+            for (int i = 0; i < project.HatchStyleList.Count; i++)
+            {
+                if (project.HatchStyleList[i] is HatchStyleSolid hss && hss.Color == null) return hss;
+            }
+            HatchStyleSolid nhss = new HatchStyleSolid();
+            nhss.Name = NewName("Solid", project.HatchStyleList);
+            project.HatchStyleList.Add(nhss);
+            return nhss;
+        }
+
+        /// <summary>
+        /// A line hatch style without a color of its own, see <see cref="FindOrCreateSolidHatchStyle()"/>.
+        /// </summary>
         private HatchStyleLines FindOrCreateHatchStyleLines(Entity entity, double lineAngle, double lineDistance, double[] dashes)
         {
-            Color layerColor = Color.White;
-            if (entity.Layer != null) layerColor = AcadColorToDrawing(entity.Layer.Color);
-            if (layerColor.ToArgb() == Color.White.ToArgb()) layerColor = Color.Black;
+            LineWeightType lw = entity.LineWeight;
+            if (lw == LineWeightType.ByLayer && entity.Layer != null) lw = entity.Layer.LineWeight;
+            if ((int)lw < 0) lw = LineWeightType.W0;
+            LineWidth lineWidth = project.LineWidthList.CreateOrFind("DXF_" + lw.ToString(), ((int)lw) / 100.0);
 
             for (int i = 0; i < project.HatchStyleList.Count; i++)
             {
                 if (project.HatchStyleList[i] is HatchStyleLines hsl)
                 {
-                    if (hsl.ColorDef.Color.ToArgb() == layerColor.ToArgb() &&
+                    if (hsl.ColorDef == null && hsl.LineWidth == lineWidth &&
                         hsl.LineAngle == lineAngle && hsl.LineDistance == lineDistance) return hsl;
                 }
             }
@@ -535,12 +557,7 @@ namespace CADability.DXF
             nhsl.Name = name;
             nhsl.LineAngle = lineAngle;
             nhsl.LineDistance = lineDistance;
-            nhsl.ColorDef = project.ColorList.CreateOrFind(layerColor.ToString(), layerColor);
-
-            LineWeightType lw = entity.LineWeight;
-            if (lw == LineWeightType.ByLayer && entity.Layer != null) lw = entity.Layer.LineWeight;
-            if ((int)lw < 0) lw = LineWeightType.W0;
-            nhsl.LineWidth = project.LineWidthList.CreateOrFind("DXF_" + lw.ToString(), ((int)lw) / 100.0);
+            nhsl.LineWidth = lineWidth;
             nhsl.LinePattern = FindOrcreateLinePattern(dashes);
             project.HatchStyleList.Add(nhsl);
             return nhsl;
@@ -604,6 +621,19 @@ namespace CADability.DXF
                 // color of the Block it belongs to, and the Block gets the INSERT's color.
                 if (entity.Color.IsByBlock && blockDefinitionDepth > 0) cd.ColorDef = ColorDef.CDfromParent;
                 else cd.ColorDef = FindOrCreateColor(entity.Color, entity.Layer);
+            }
+            // An entity that the import turns into a Block of several parts (a pattern hatch with
+            // several lines, a 3DFACE that is not flat, a mesh, an MLINE, a LEADER, a TABLE) leaves
+            // parts without a color of their own. Those parts show the color of the entity, which
+            // the Block carries, and follow it when it is resolved later (ByBlock, layer "0" in a
+            // block). A Hatch is left out: its contents are generated from its style and take the
+            // color of the Hatch there.
+            if (go is GeoObject.Block parts && !(go is GeoObject.Hatch))
+            {
+                for (int i = 0; i < parts.Count; i++)
+                {
+                    if (parts.Item(i) is IColorDef part && part.ColorDef == null) part.ColorDef = ColorDef.CDfromParent;
+                }
             }
             if (entity.Layer != null && layerTable.TryGetValue(entity.Layer.Name, out Attribute.Layer layer))
                 go.Layer = layer;
@@ -1126,9 +1156,7 @@ namespace CADability.DXF
 
             if (hatch.IsSolid)
             {
-                Color layerColor = hatch.Layer != null ? AcadColorToDrawing(hatch.Layer.Color) : Color.Black;
-                if (layerColor.ToArgb() == Color.White.ToArgb()) layerColor = Color.Black;
-                res.HatchStyle = FindOrCreateSolidHatchStyle(layerColor);
+                res.HatchStyle = FindOrCreateSolidHatchStyle();
                 return res;
             }
             else
@@ -1148,7 +1176,7 @@ namespace CADability.DXF
                         list.Add(res);
                     }
                 }
-                if (list.Count == 0) { res.HatchStyle = FindOrCreateSolidHatchStyle(Color.Black); return res; }
+                if (list.Count == 0) { res.HatchStyle = FindOrCreateSolidHatchStyle(); return res; }
                 if (list.Count > 1)
                 {
                     GeoObject.Block block = GeoObject.Block.Construct();
@@ -1247,14 +1275,13 @@ namespace CADability.DXF
                 new XY(solid.FirstCorner.X, solid.FirstCorner.Y),
                 new XY(solid.SecondCorner.X, solid.SecondCorner.Y),
                 new XY(solid.FourthCorner.X, solid.FourthCorner.Y),
-                new XY(solid.ThirdCorner.X, solid.ThirdCorner.Y),
-                AcadColorToDrawing(solid.Color));
+                new XY(solid.ThirdCorner.X, solid.ThirdCorner.Y));
         }
 
 
-        private IGeoObject BuildSolidHatch(Plane ocs, XY c1, XY c2, XY c3, XY c4, Color color)
+        private IGeoObject BuildSolidHatch(Plane ocs, XY c1, XY c2, XY c3, XY c4)
         {
-            HatchStyleSolid hst = FindOrCreateSolidHatchStyle(color.ToArgb() == Color.White.ToArgb() ? Color.Black : color);
+            HatchStyleSolid hst = FindOrCreateSolidHatchStyle();
             // Convert OCS corners to WCS, then remove duplicates.
             List<GeoPoint> points = new List<GeoPoint>();
             points.Add(ocs.ToGlobal(new GeoPoint2D(c1.X, c1.Y)));

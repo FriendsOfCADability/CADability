@@ -234,6 +234,80 @@ namespace CADability.Tests
         }
 
         [TestMethod]
+        public void DxfFilledAndCompositeBlockContentsTakeTheInsertColor()
+        {
+            CadDocument doc = new CadDocument();
+            AcadLayer layerZero = doc.Layers["0"];
+            AcadLayer rebars = new AcadLayer("rebars") { Color = new AcadColor(1) };
+            doc.Layers.Add(rebars);
+
+            // every kind of content in a band of its own: y from 20*i to 20*i+10
+            BlockRecord block = new BlockRecord("filled");
+            block.Entities.Add(MakeSolidHatch(0, AcadColor.ByBlock));
+            block.Entities.Add(MakeSolidHatch(20, AcadColor.ByLayer));
+            ACadSharp.Entities.Hatch pattern = MakeSolidHatch(40, AcadColor.ByBlock);
+            pattern.IsSolid = false;
+            pattern.Pattern = new ACadSharp.Entities.HatchPattern("ANSI31");
+            // two pattern lines: CADability makes a Block of two Hatches
+            pattern.Pattern.Lines.Add(new ACadSharp.Entities.HatchPattern.Line { Angle = Math.PI / 4, Offset = new CSMath.XY(-2, 2) });
+            pattern.Pattern.Lines.Add(new ACadSharp.Entities.HatchPattern.Line { Angle = 3 * Math.PI / 4, Offset = new CSMath.XY(-2, -2) });
+            block.Entities.Add(pattern);
+            block.Entities.Add(MakeSolid(60, AcadColor.ByBlock));
+            block.Entities.Add(MakeSolid(80, AcadColor.ByLayer));
+            // a 3DFACE that is not flat becomes a Block of two faces
+            block.Entities.Add(new ACadSharp.Entities.Face3D
+            {
+                FirstCorner = new CSMath.XYZ(0, 100, 0),
+                SecondCorner = new CSMath.XYZ(10, 100, 0),
+                ThirdCorner = new CSMath.XYZ(10, 110, 5),
+                FourthCorner = new CSMath.XYZ(0, 110, 0),
+                Layer = layerZero,
+                Color = AcadColor.ByBlock
+            });
+            doc.BlockRecords.Add(block);
+            doc.Entities.Add(new AcadInsert(block) { Layer = rebars, Color = new AcadColor(2) });
+
+            Block placed = Import(doc).AllObjects.OfType<Block>().Single();
+            Assert.AreEqual(6, placed.Count);
+            Assert.AreEqual(2, placed.Children.OfType<Block>().Count(b => !(b is GeoObject.Hatch)), "test setup: pattern HATCH and 3DFACE as Blocks");
+            Assert.AreEqual(Yellow.ToArgb(), PaintedColorIn(placed, 0).ToArgb(), "solid HATCH, ByBlock: color of the INSERT");
+            Assert.AreEqual(Red.ToArgb(), PaintedColorIn(placed, 20).ToArgb(), "solid HATCH, layer 0 and ByLayer: color of the INSERT's layer");
+            Assert.AreEqual(Yellow.ToArgb(), PaintedColorIn(placed, 40).ToArgb(), "pattern HATCH, ByBlock");
+            Assert.AreEqual(Yellow.ToArgb(), PaintedColorIn(placed, 60).ToArgb(), "SOLID, ByBlock");
+            Assert.AreEqual(Red.ToArgb(), PaintedColorIn(placed, 80).ToArgb(), "SOLID, layer 0 and ByLayer");
+            Assert.AreEqual(Yellow.ToArgb(), PaintedColorIn(placed, 100).ToArgb(), "3DFACE split into two faces, ByBlock");
+
+            // and they follow the color of the block
+            placed.ColorDef = new ColorDef("blue", Blue);
+            Assert.AreEqual(Blue.ToArgb(), PaintedColorIn(placed, 0).ToArgb());
+            Assert.AreEqual(Blue.ToArgb(), PaintedColorIn(placed, 40).ToArgb());
+            Assert.AreEqual(Blue.ToArgb(), PaintedColorIn(placed, 100).ToArgb());
+        }
+
+        [TestMethod]
+        public void DxfHatchOutsideBlocksTakesItsOwnColor()
+        {
+            CadDocument doc = new CadDocument();
+            AcadLayer rebars = new AcadLayer("rebars") { Color = new AcadColor(1) };
+            doc.Layers.Add(rebars);
+            ACadSharp.Entities.Hatch byLayer = MakeSolidHatch(0, AcadColor.ByLayer);
+            byLayer.Layer = rebars;
+            doc.Entities.Add(byLayer);
+            ACadSharp.Entities.Hatch blue = MakeSolidHatch(20, new AcadColor(5));
+            blue.Layer = rebars;
+            doc.Entities.Add(blue);
+            ACadSharp.Entities.Solid solid = MakeSolid(40, AcadColor.ByLayer);
+            solid.Layer = rebars;
+            doc.Entities.Add(solid);
+
+            List<IGeoObject> imported = Import(doc).AllObjects.ToList();
+            Assert.AreEqual(3, imported.Count);
+            Assert.AreEqual(Red.ToArgb(), PaintedColorIn(imported[0], 0).ToArgb(), "ByLayer: color of the layer");
+            Assert.AreEqual(Blue.ToArgb(), PaintedColorIn(imported[1], 20).ToArgb(), "explicit color, not the color of the layer");
+            Assert.AreEqual(Red.ToArgb(), PaintedColorIn(imported[2], 40).ToArgb(), "SOLID, ByLayer: color of the layer");
+        }
+
+        [TestMethod]
         public void BlockColorStillReachesChildrenFromParentAfterSavingAsCdb()
         {
             CadDocument doc = new CadDocument();
@@ -380,6 +454,43 @@ namespace CADability.Tests
             return lineType;
         }
 
+        private static CSMath.XYZ[] Square(double y)
+        {
+            return new[] { new CSMath.XYZ(0, y, 0), new CSMath.XYZ(10, y, 0), new CSMath.XYZ(10, y + 10, 0), new CSMath.XYZ(0, y + 10, 0) };
+        }
+
+        private static ACadSharp.Entities.Hatch MakeSolidHatch(double y, AcadColor color)
+        {
+            ACadSharp.Entities.Hatch hatch = new ACadSharp.Entities.Hatch { IsSolid = true, Color = color };
+            hatch.Paths.Add(new ACadSharp.Entities.Hatch.BoundaryPath(new ACadSharp.Entities.Hatch.BoundaryPath.Edge[]
+            {
+                new ACadSharp.Entities.Hatch.BoundaryPath.Polyline(Square(y), true)
+            }));
+            return hatch;
+        }
+
+        private static ACadSharp.Entities.Solid MakeSolid(double y, AcadColor color)
+        {
+            CSMath.XYZ[] c = Square(y);
+            // a SOLID is drawn first, second, fourth, third corner
+            return new ACadSharp.Entities.Solid { FirstCorner = c[0], SecondCorner = c[1], ThirdCorner = c[3], FourthCorner = c[2], Color = color };
+        }
+
+        /// <summary>
+        /// The single color in which everything of <paramref name="go"/> within the band from
+        /// <paramref name="y"/> to <paramref name="y"/>+10 is painted, lines and faces alike.
+        /// </summary>
+        private static Color PaintedColorIn(IGeoObject go, double y)
+        {
+            RecordingPaintTo3D paintTo3D = new RecordingPaintTo3D();
+            go.PaintTo3D(paintTo3D);
+            List<Color> colors = paintTo3D.Polylines.Concat(paintTo3D.Triangles)
+                .Where(p => p.points.All(pt => pt.y > y - 1e-6 && pt.y < y + 10 + 1e-6))
+                .Select(p => p.color).Distinct().ToList();
+            Assert.AreEqual(1, colors.Count, "colors painted at y=" + y + ": " + string.Join(", ", colors));
+            return colors[0];
+        }
+
         private static void AssertLineStyle(Line line, string linePattern, double lineWidth, string message = "")
         {
             Assert.IsNotNull(line.LinePattern, message);
@@ -493,9 +604,11 @@ namespace CADability.Tests
         {
             private Color current = Color.Empty;
             public List<(Color color, GeoPoint[] points)> Polylines { get; } = new List<(Color, GeoPoint[])>();
+            public List<(Color color, GeoPoint[] points)> Triangles { get; } = new List<(Color, GeoPoint[])>();
 
             public void SetColor(Color color, int lockColor = 0) { current = color; }
             public void Polyline(GeoPoint[] points) { Polylines.Add((current, points)); }
+            public void Triangle(GeoPoint[] vertex, GeoVector[] normals, int[] indextriples) { Triangles.Add((current, vertex)); }
 
             #region unused IPaintTo3D members
             public bool PaintSurfaces => true;
@@ -520,7 +633,6 @@ namespace CADability.Tests
             public void SetLinePattern(LinePattern pattern) { }
             public void FilledPolyline(GeoPoint[] points) { }
             public void Points(GeoPoint[] points, float size, PointSymbol pointSymbol) { }
-            public void Triangle(GeoPoint[] vertex, GeoVector[] normals, int[] indextriples) { }
             public void PrepareText(string fontName, string textString, FontStyle fontStyle) { }
             public void PreparePointSymbol(PointSymbol pointSymbol) { }
             public void PrepareIcon(Bitmap icon) { }

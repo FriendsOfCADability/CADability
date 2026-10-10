@@ -3076,7 +3076,7 @@ namespace CADability.GeoObject
         public static Face MakeFace(GeoObjectList list)
         {
             list.DecomposeAll();
-            CompoundShape cs = CompoundShape.CreateFromList(list, Precision.eps, out Plane commonplane);
+            CompoundShape cs = CompoundShape.CreateFromList(list, Precision.eps, out Plane commonplane, false, true);
             if (cs != null)
             {
                 if (cs.SimpleShapes.Length == 1 && cs.SimpleShapes[0].Area > Precision.eps)
@@ -3369,7 +3369,7 @@ namespace CADability.GeoObject
         public static Face MakePlanarFace(IGeoObject[] bounds)
         {
             Plane pln;
-            CompoundShape cs = CompoundShape.CreateFromList(new GeoObjectList(bounds), Precision.eps, out pln);
+            CompoundShape cs = CompoundShape.CreateFromList(new GeoObjectList(bounds), Precision.eps, out pln, false, true);
             if (cs == null || cs.SimpleShapes.Length != 1) return null;
             PlaneSurface ps = new PlaneSurface(pln);
             return MakeFace(ps, cs.SimpleShapes[0]);

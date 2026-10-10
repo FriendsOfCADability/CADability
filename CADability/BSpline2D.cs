@@ -61,6 +61,8 @@ namespace CADability.Curve2D
         // Length integrates the curve, which is far too expensive to repeat.
         // Negative means "not computed yet"; InvalidateCache resets it.
         private double length = -1.0;
+        private double polygonLength = -1.0; // the length of the control polygon, see NegligibleDerivative
+        private List<double> cornerKnots; // see CornerKnots
         // The parameters at which the interpolating constructor passes through its points, kept so that
         // the overload taking a throughpointsparam array can hand them back. Null otherwise.
         private double[] interpolationParameters;
@@ -488,6 +490,8 @@ namespace CADability.Curve2D
         private void Init()
         {
             length = -1.0; // poles, knots or the parameter range may have changed
+            polygonLength = -1.0;
+            cornerKnots = null;
             cumulativeLength = null;
             try
             {
@@ -651,6 +655,7 @@ namespace CADability.Curve2D
                 this.endParam = ep;
                 length = -1.0; // a different parameter range is a different length
                 cumulativeLength = null;
+                cornerKnots = null;
             }
         }
 
@@ -1391,17 +1396,101 @@ namespace CADability.Curve2D
             res.Add(tknots[tknots.Length - 1]);
             return res.ToArray();
         }
+        /// <summary>
+        /// The length below which a first derivative counts as vanished. Coinciding poles make the derivative
+        /// exactly zero where the curve passes through them: a doubled pole of a degree 2 spline, a tripled pole
+        /// of a degree 3 spline. That is a common way to model a corner, and the projection of a 3d spline creates
+        /// such poles as well, wherever two of its poles only differ in the direction of the projection.
+        /// </summary>
+        private double NegligibleDerivative()
+        {
+            if (polygonLength < 0.0)
+            {
+                double sum = 0.0;
+                for (int i = 1; i < poles.Length; i++) sum += poles[i] | poles[i - 1];
+                polygonLength = sum;
+            }
+            return 1e-9 * polygonLength / (endParam - startParam);
+        }
+        /// <summary>
+        /// The parameter offset from a point with a vanishing derivative at which the derivative is evaluated
+        /// instead. There the derivative is tiny but has the direction of the tangent on that side, which is the
+        /// limit the tangent approaches at the point itself.
+        /// </summary>
+        private double SingularOffset => (endParam - startParam) * 1e-8;
+        /// <summary>
+        /// The inner knots where the first derivative vanishes, at least on one side (see
+        /// <see cref="NegligibleDerivative"/>). On one side only is possible where the multiplicity of the knot leaves
+        /// the curve only continuous, not its tangent, e.g. between two Bézier segments of which only one starts with
+        /// coinciding poles. The derivative at the knot itself is the one of a single side there.
+        /// </summary>
+        private List<double> CornerKnots()
+        {
+            if (cornerKnots != null) return cornerKnots;
+            List<double> res = new List<double>();
+            double negligible = NegligibleDerivative();
+            // close to a side where the derivative vanishes, the derivative is about SingularOffset (1e-8) times
+            // smaller than elsewhere, so this threshold is far from both
+            double vanishingSide = 1e5 * negligible;
+            for (int i = 0; i < knots.Length; i++)
+            {
+                if (knots[i] <= startParam || knots[i] >= endParam) continue;
+                PointDerAt(knots[i], out _, out GeoVector2D dir);
+                if (dir.Length <= negligible) res.Add(knots[i]);
+                else if (multiplicities[i] >= degree)
+                {
+                    PointDerAt(knots[i] - SingularOffset, out _, out GeoVector2D dirBefore);
+                    PointDerAt(knots[i] + SingularOffset, out _, out GeoVector2D dirAfter);
+                    if (dirBefore.Length <= vanishingSide || dirAfter.Length <= vanishingSide) res.Add(knots[i]);
+                }
+            }
+            cornerKnots = res;
+            return res;
+        }
         protected override void GetTriangulationBasis(out GeoPoint2D[] points, out GeoVector2D[] directions, out double[] parameters)
         {
             double[] tknots = GetTriangulationKnots();
-            points = new GeoPoint2D[tknots.Length];
-            directions = new GeoVector2D[tknots.Length];
-            parameters = new double[tknots.Length];
+            double negligible = NegligibleDerivative();
+            List<double> corners = CornerKnots();
+            List<GeoPoint2D> lpoints = new List<GeoPoint2D>(tknots.Length);
+            List<GeoVector2D> ldirections = new List<GeoVector2D>(tknots.Length);
+            List<double> lparameters = new List<double>(tknots.Length);
+            void add(double u, GeoPoint2D point, GeoVector2D dir)
+            {
+                lpoints.Add(point);
+                ldirections.Add(dir);
+                lparameters.Add((u - startParam) / (endParam - startParam));
+            }
             for (int i = 0; i < tknots.Length; i++)
             {
-                PointDerAt(tknots[i], out points[i], out directions[i]);
-                parameters[i] = (tknots[i] - startParam) / (endParam - startParam);
+                PointDerAt(tknots[i], out GeoPoint2D point, out GeoVector2D dir);
+                bool isEnd = i == 0 || i == tknots.Length - 1;
+                if (isEnd ? dir.Length > negligible : !corners.Contains(tknots[i]))
+                {
+                    add(tknots[i], point, dir);
+                    continue;
+                }
+                // The derivative vanishes here, at least on one side. The triangles of the triangulation need the
+                // tangent though. It is the limit of the direction from either side, and at a corner the two sides
+                // differ. A base point has only one direction, so an inner point like this is replaced by two base
+                // points very close to it, each with the tangent of its own side. The end points keep their position
+                // and get the tangent from the inside of the curve.
+                double before = tknots[i] - SingularOffset;
+                double after = tknots[i] + SingularOffset;
+                PointDerAt(before, out GeoPoint2D pointBefore, out GeoVector2D dirBefore);
+                PointDerAt(after, out GeoPoint2D pointAfter, out GeoVector2D dirAfter);
+                if (i == 0 && !dirAfter.IsNullVector()) add(tknots[i], point, dirAfter);
+                else if (i == tknots.Length - 1 && !dirBefore.IsNullVector()) add(tknots[i], point, dirBefore);
+                else if (!isEnd && !dirBefore.IsNullVector() && !dirAfter.IsNullVector())
+                {
+                    add(before, pointBefore, dirBefore);
+                    add(after, pointAfter, dirAfter);
+                }
+                else add(tknots[i], point, dir); // a whole span collapsed to a point, no tangent to be found here
             }
+            points = lpoints.ToArray();
+            directions = ldirections.ToArray();
+            parameters = lparameters.ToArray();
         }
         internal override void GetTriangulationPoints(out GeoPoint2D[] points, out double[] parameters)
         {
@@ -2156,18 +2245,34 @@ namespace CADability.Curve2D
             // nicht normiert! wenn es wo normiert gebraucht wird, dann dort extra normieren!
             return (endParam - startParam) * res;
         }
+        /// <summary>
+        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.StartDirection"/>. Usually the derivative at the
+        /// start. Where that vanishes (coinciding first poles, see <see cref="NegligibleDerivative"/>) it says
+        /// nothing about the direction, and the unit vector of the tangent there is returned instead.
+        /// </summary>
         public override GeoVector2D StartDirection
         {
             get
             {
-                return DirectionAt(0.0);
+                GeoVector2D res = DirectionAt(0.0);
+                if (res.Length > (endParam - startParam) * NegligibleDerivative()) return res;
+                GeoVector2D tangent = DirectionAtParam(startParam + SingularOffset);
+                return tangent.IsNullVector() ? res : tangent;
             }
         }
+        /// <summary>
+        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.EndDirection"/>. Usually the derivative at the
+        /// end. Where that vanishes (coinciding last poles, see <see cref="NegligibleDerivative"/>) it says
+        /// nothing about the direction, and the unit vector of the tangent there is returned instead.
+        /// </summary>
         public override GeoVector2D EndDirection
         {
             get
             {
-                return DirectionAt(1.0);
+                GeoVector2D res = DirectionAt(1.0);
+                if (res.Length > (endParam - startParam) * NegligibleDerivative()) return res;
+                GeoVector2D tangent = DirectionAtParam(endParam - SingularOffset);
+                return tangent.IsNullVector() ? res : tangent;
             }
         }
         public override GeoVector2D MiddleDirection
@@ -2177,9 +2282,43 @@ namespace CADability.Curve2D
                 return DirectionAt(0.5);
             }
         }
+        /// <summary>
+        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.MinDistance(GeoPoint2D)"/>. The base class looks for
+        /// perpendicular foot points. A corner where the derivative vanishes (see <see cref="CornerKnots"/>) has none
+        /// for the points in front of it, the corner itself is the closest point there. And a point right at the
+        /// corner is on the border of every test the search makes. So the corners are taken into account as well,
+        /// they are points of the curve and can never make the distance too small.
+        /// </summary>
+        public override double MinDistance(GeoPoint2D p)
+        {
+            double res = base.MinDistance(p);
+            foreach (double u in CornerKnots())
+            {
+                res = Math.Min(res, PointAtParam(u) | p);
+            }
+            return res;
+        }
         public override double[] GetSelfIntersections()
         {
-            return base.GetSelfIntersections();
+            double[] found = base.GetSelfIntersections();
+            // At a corner the triangulation has two base points very close to each other (see GetTriangulationBasis).
+            // The segments on either side of them meet at the corner, which the base class may report as a self
+            // intersection at two almost equal positions. A real self intersection needs a loop between the two
+            // positions, while here the curve does not leave the point.
+            List<double> res = new List<double>(found.Length);
+            for (int i = 0; i < found.Length - 1; i += 2)
+            {
+                GeoPoint2D ip = PointAt(found[i]);
+                bool loop = (PointAt(found[i + 1]) | ip) > Precision.eps; // not even the same point
+                for (int k = 1; k < 8 && !loop; k++)
+                {
+                    loop = (PointAt(found[i] + (found[i + 1] - found[i]) * k / 8.0) | ip) > Precision.eps;
+                }
+                if (!loop) continue;
+                res.Add(found[i]);
+                res.Add(found[i + 1]);
+            }
+            return res.ToArray();
         }
         private void AddApproximateArc(double spar, double epar, double precision, List<ICurve2D> parts)
         {
@@ -2358,7 +2497,20 @@ namespace CADability.Curve2D
         /// <returns></returns>
         public override GeoPoint2DWithParameter[] Intersect(ICurve2D IntersectWith)
         {
-            return base.Intersect(IntersectWith);
+            GeoPoint2DWithParameter[] found = base.Intersect(IntersectWith);
+            // An intersection point at a base point of the triangulation (a knot, or the two base points around a
+            // point where the derivative vanishes) is found from the segments on either side. That is the same
+            // intersection, with the same position on both curves, and is reported once.
+            // Of these the more precise one is kept, the segment on one side may have found it less precisely.
+            double error(GeoPoint2DWithParameter ip) => PointAt(ip.par1) | IntersectWith.PointAt(ip.par2);
+            List<GeoPoint2DWithParameter> res = new List<GeoPoint2DWithParameter>(found.Length);
+            foreach (GeoPoint2DWithParameter candidate in found)
+            {
+                int duplicate = res.FindIndex(other => Math.Abs(other.par1 - candidate.par1) < 1e-6 && Math.Abs(other.par2 - candidate.par2) < 1e-6);
+                if (duplicate < 0) res.Add(candidate);
+                else if (error(candidate) < error(res[duplicate])) res[duplicate] = candidate;
+            }
+            return res.ToArray();
         }
         private void Intersect(BSpline2D b2d, GeoPoint2D sp1, double spar1, GeoVector2D sdir1, GeoPoint2D ep1, double epar1, GeoVector2D edir1, GeoPoint2D tri1, GeoPoint2D sp2, double spar2, GeoVector2D sdir2, GeoPoint2D ep2, double epar2, GeoVector2D edir2, GeoPoint2D tri2, SortedDictionary<double, GeoPoint2DWithParameter> list)
         {   // zwei Abschnitte von zwei BSplines schneiden, es ist schon getestet dass die Dreiecke sich schneiden
@@ -3145,6 +3297,9 @@ namespace CADability.Curve2D
             }
             if (scale <= 0.0) return res.ToArray(); // a straight line has no inflection point
             double noise = scale * 1e-8;
+            // At a corner the curvature numerator may change its sign as well. That is no inflection point, and as a
+            // base point of the triangulation it would have no direction or the one of a single side.
+            List<double> singularPositions = CornerKnots().ConvertAll(u => (u - startParam) / (endParam - startParam));
 
             for (int i = 1; i < grid.Count; i++)
             {
@@ -3155,9 +3310,10 @@ namespace CADability.Curve2D
                     double root = MathNet.Numerics.RootFinding.Brent.FindRoot(f, grid[i - 1], grid[i],
                         Math.Max(Math.Abs(startParam), Math.Abs(endParam)) * 1e-9, 100);
                     double step = Math.Max(1e-12, (grid[i] - grid[i - 1]) * 1e-3);
-                    if (f(root - step) * f(root + step) < 0)
-                    {   // PointAt and the result of this method use a position normalized to 0...1
-                        res.Add((root - startParam) / (endParam - startParam));
+                    double position = (root - startParam) / (endParam - startParam); // PointAt and the result of this method use a position normalized to 0...1
+                    if (f(root - step) * f(root + step) < 0 && !singularPositions.Exists(s => Math.Abs(s - position) < 1e-6))
+                    {
+                        res.Add(position);
                     }
                 }
                 catch (Exception e)

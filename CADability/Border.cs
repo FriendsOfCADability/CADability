@@ -1032,11 +1032,18 @@ namespace CADability.Shapes
 			double prec = (Extent.Width + Extent.Height) * 1e-8;
 			Reduce(prec);
 		}
-		internal void Reduce(double prec)
+		/// <summary>
+		/// Approximates the segments by lines and arcs, fuses what can be fused and removes segments shorter than
+		/// <paramref name="prec"/>. With <paramref name="keepExactCurves"/> splines and ellipses are kept as they are:
+		/// a face needs its exact outline, and approximating with prec, which is the maximum gap between the
+		/// segments and often tiny, turns a single spline into thousands of arcs (issue 173).
+		/// </summary>
+		internal void Reduce(double prec, bool keepExactCurves = false)
 		{
 			List<ICurve2D> red = new List<ICurve2D>(segment);
 			for (int i = red.Count - 1; i >= 0; --i)
 			{
+				if (keepExactCurves && (red[i] is BSpline2D || red[i] is Ellipse2D)) continue;
 				if (!(red[i] is Line2D) && !(red[i] is Arc2D) && !(red[i] is Circle2D))
 				{
 					ICurve2D app = red[i].Approximate(false, prec); // in Linien und Bögen annähern. Das könnte man noch über einen 2. Parameter steuern

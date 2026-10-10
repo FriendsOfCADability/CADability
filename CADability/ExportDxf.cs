@@ -1105,7 +1105,25 @@ namespace CADability.DXF
 
             var spline = new ACadSharp.Entities.Spline();
             spline.Degree = bspline.Degree;
-            spline.IsClosed = bspline.IsClosed;
+            // The flags are what follows from the curve: closed when it ends where it starts, planar (with the normal of
+            // its plane) or even linear, rational with weights. What the writing program merely declared, e.g. periodic
+            // for a spline with clamped knots, is not part of the curve and cannot be written back (issue 173).
+            ICurve curve = bspline;
+            spline.IsClosed = bspline.IsClosed || Precision.IsEqual(curve.StartPoint, curve.EndPoint);
+            if (bspline.HasWeights) spline.Flags |= SplineFlags.Rational;
+            switch (curve.GetPlanarState())
+            {
+                case PlanarState.Planar:
+                    spline.Flags |= SplineFlags.Planar;
+                    GeoVector normal = curve.GetPlane().Normal;
+                    // the sign is arbitrary, prefer the one pointing to positive z (then y, then x)
+                    if (normal.z < 0 || (normal.z == 0 && (normal.y < 0 || (normal.y == 0 && normal.x < 0)))) normal = -normal;
+                    spline.Normal = ToXYZ(normal);
+                    break;
+                case PlanarState.UnderDetermined: // all poles on a line
+                    spline.Flags |= SplineFlags.Planar | SplineFlags.Linear;
+                    break;
+            }
             foreach (var pt in poles) spline.ControlPoints.Add(pt);
             foreach (var k in knots) spline.Knots.Add(k);
             if (bspline.HasWeights)

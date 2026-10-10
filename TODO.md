@@ -14,6 +14,11 @@ Closed during this triage, because they were already solved on master:
 Closed as answered: #297 (WPF hosting of `CadControl`) and #165 (OctTree
 `GetObjectsCloseTo` is not a distance query).
 
+Fixed by porting branch `claude/ecstatic-fermat-uml5l3`: #167 (a DXF
+DIMENSION without its block is drawn instead of dropped; CADability
+dimensions are exported as DIMENSION entities; optional import as
+CADability `Dimension` objects).
+
 Fixed during this triage (#369): #251 (dead `objectPointSav` code removed
 from ToolsRoundIn) and #294 (README links and the repository website now
 point to friendsofcadability.github.io).
@@ -53,12 +58,6 @@ d3db7052; a rewrite is not planned, prototype on branch `ShapeItProgress`).
 These need someone with the original files, Windows/Visual Studio, or a
 maintainer decision.
 
-- [ ] **#167 Dimensions not shown in view.** Answered on the issue (DXF
-  dimensions are imported as their anonymous block; colours fixed in #372).
-  Still open: a DIMENSION without its block (DXF R12, some exporters) is
-  dropped silently. A fix that regenerates missing blocks exists on the
-  unmerged branch `claude/ecstatic-fermat-uml5l3` (311598c3, together with
-  3bc72921 and e8199e3b): review, port and close the issue.
 - [ ] **#249 Path colour changes when approximated.** `Path.Approximate`
   creates child curves with the default black colour, and `CopyAttributes`
   overwrites only null child colours, so the colour is lost.

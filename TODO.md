@@ -1,7 +1,8 @@
 # Issue triage — open items
 
 Result of going through all open issues on 2026-10-09 against master
-`17f949e`. Issue #173 was skipped because it is already being worked on.
+`17f949e`. Issue #173 was skipped because it was already being worked on; it
+is fixed in #374, see below.
 
 Closed during this triage, because they were already solved on master:
 
@@ -35,6 +36,15 @@ already in a block, files that are only read are opened with `FileShare.Read`,
 a degenerate sphere fit in `NurbsSurface.GetSimpleSurface` is detected, and
 `Border.UnsplittedOutline` survives `ChangeCyclicalStart`, `Clone`,
 `GetModified` and `Move`.
+
+Fixed in #374: #173 (splines with coinciding poles, the usual way to model a
+corner). `BSpline.GetProjectedCurve` returns the exact projection instead of a
+spline through some points that rounded the corners, `BSpline2D` handles
+points where the derivative vanishes, and the DXF import keeps such a spline
+as one `BSpline` instead of a polyline, so the export writes it back with the
+same poles and knots. Extrude, Rotate, MakePipe and faces made from curves
+split the spline at its corners, and these faces keep splines and ellipses
+exact instead of approximating them by thousands of arcs.
 
 Closed as not reproducible: #265 (the STEP round trip gives an identical solid
 on master and on the commit from the time of the report, 0fb61554).
@@ -131,6 +141,24 @@ Each of these was reproduced, or confirmed by reading the code, on `17f949e`.
   moving the block to another layer later leaves those contents on the old
   layer, and the DXF export writes them on that layer instead of layer 0. A
   complete solution needs a "layer from parent" counterpart to `CDfromParent`.
+- [ ] #377: `TetraederHull.PositionOf` returns positions far off (41.7 instead
+  of 0) right behind corners of a non-planar spline whose derivative vanishes
+  on one side. `BSpline.PositionOf` drops such a result since #374, the hull
+  itself is not fixed; `Issue173SplineNotPlanar` is the test case.
+- [ ] A DXF SPLINE comes back without the periodic flag when its knots are
+  clamped (the issue 173 file has flags 11, the export writes 9), and with the
+  default knot and control point tolerances (42, 43). Neither follows from the
+  curve, and `BSpline` has no place to keep them.
+- [ ] `BSpline.IsClosed` means periodic, so a closed spline with clamped knots
+  (start point equal to end point) counts as open.
+- [ ] The contour hatch (`HatchStyleContour`) loses inner rings when the
+  outline keeps an exact `BSpline2D` (5 instead of 8 rings in a test), which is
+  why hatching still approximates splines in `Border.Reduce`.
+- [ ] `Make3D.MakeRevolution` only works in DEBUG builds and throws
+  `NotImplementedException` otherwise, but `Constr3DPathRotate` calls it.
+- [ ] `Make3D.MakeRuledShell`/`MakeRuledSolid` pair the curves of the two paths
+  by index and do not split splines at their corners, so a ruled face can get a
+  kink inside.
 - [ ] DXF hatch line styles are not told apart by dash pattern, pattern hatch
   lines keep the style's lineweight (no ByBlock), and a top-level ByBlock
   linetype still maps to the solid "ByBlock" pattern.

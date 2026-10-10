@@ -96,10 +96,12 @@ All issues that could not be verified at first have since been checked.
   `VolumesMatchAnalytic` and `IntegratedVolumeMatchesAnalyticOnEveryMesh` end
   in a `NullReferenceException` in `JsonSerialize.SerializationInfoFromJsonData`
   whenever the file is actually read.
-- [ ] `ModOp2D.IsIsogonal` mixes matrix indices in its second check and is
-  false even for the identity, so `Circle2D`/`Arc2D.GetModified` turn circles
-  into `Ellipse2D` under uniform scaling. `Circle2D.GetModified` also drops the
-  orientation of the circle.
+- [ ] `Ellipse2D.GetModified` builds a counter-clockwise ellipse from the
+  principal axes of the image, so a clockwise ellipse is reversed and, under a
+  shear, the start point moves to the end of the new major axis.
+  `Circle2D.GetModified` had the same problem and keeps start point and
+  direction now (see `IsogonalModOpTests`); `EllipseArc2D.GetModified` was not
+  checked.
 - [ ] The sphere and torus branches of `NurbsSurface.GetSimpleSurface` fit an
   affine reparametrisation, which cannot follow the rational parametrisation;
   the 3D error can reach the radius. The torus fit has no degeneracy check.

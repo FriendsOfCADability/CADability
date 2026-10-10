@@ -213,10 +213,21 @@ namespace CADability
         {
             get
             {
-                if (!Precision.IsPerpendicular(new GeoVector2D(Matrix00, Matrix10), new GeoVector2D(Matrix01, Matrix11), false)) return false;
-                if (!Precision.IsPerpendicular(new GeoVector2D(Matrix00 + Matrix10, Matrix01 + Matrix11), new GeoVector2D(Matrix00 - Matrix10, -Matrix01 + Matrix11), false)) return false;
-                return true;
+                // the images of the x- and y-axis (the columns) must be perpendicular and of equal, non zero length
+                return AreSimilarColumns(Matrix00, Matrix10, 0.0, Matrix01, Matrix11, 0.0);
             }
+        }
+        /// <summary>
+        /// True, if the two vectors (x0,y0,z0) and (x1,y1,z1) are perpendicular and have the same, non zero length
+        /// (within the angular precision <see cref="Precision.epsa"/>)
+        /// </summary>
+        internal static bool AreSimilarColumns(double x0, double y0, double z0, double x1, double y1, double z1)
+        {
+            double l0 = x0 * x0 + y0 * y0 + z0 * z0;
+            double l1 = x1 * x1 + y1 * y1 + z1 * z1;
+            if (l0 == 0.0 || l1 == 0.0) return false;
+            if (Math.Abs(x0 * x1 + y0 * y1 + z0 * z1) / Math.Sqrt(l0 * l1) > Precision.epsa) return false;
+            return Math.Abs(l0 - l1) / (l0 + l1) <= Precision.epsa;
         }
         /// <summary>
         /// Creates a modification which is the identity
@@ -1864,9 +1875,10 @@ namespace CADability
         {
             get
             {
-                if (!Precision.IsPerpendicular(new GeoVector(Matrix00, Matrix10, Matrix20), new GeoVector(Matrix01, Matrix11, Matrix21), false)) return false;
-                if (!Precision.IsPerpendicular(new GeoVector(Matrix00, Matrix10, Matrix20), new GeoVector(Matrix02, Matrix12, Matrix22), false)) return false;
-                if (!Precision.IsPerpendicular(new GeoVector(Matrix02, Matrix12, Matrix22), new GeoVector(Matrix01, Matrix11, Matrix21), false)) return false;
+                // the images of the x-, y- and z-axis (the columns) must be pairwise perpendicular and of equal, non zero length
+                if (!ModOp2D.AreSimilarColumns(Matrix00, Matrix10, Matrix20, Matrix01, Matrix11, Matrix21)) return false;
+                if (!ModOp2D.AreSimilarColumns(Matrix00, Matrix10, Matrix20, Matrix02, Matrix12, Matrix22)) return false;
+                if (!ModOp2D.AreSimilarColumns(Matrix01, Matrix11, Matrix21, Matrix02, Matrix12, Matrix22)) return false;
                 return true;
             }
         }

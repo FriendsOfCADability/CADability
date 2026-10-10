@@ -34,7 +34,9 @@ Fixed later: #308 (`ActionFeedBack.Repaint` paints the feedback once per view
 call into one display list), #253 (opt-in `CapturesMouse` on
 `BooleanInput` and `MultipleChoiceInput`; new public API, so the next release
 is a minor one), #254 (`MultipleChoiceInput.SetChoices`, also new public API),
-#249 (an approximated curve keeps its colour).
+#249 (an approximated curve keeps its colour), #65 (changing the colour or
+another attribute of an edge is reported by its solid, shell or face, so the
+view is repainted and the change can be undone).
 
 Fixed in the next pull request: #194 (`Border.UnsplittedOutline` survives
 `CompoundShape.CreateFromList`), #293 (DXF block contents on layer 0 or
@@ -66,10 +68,6 @@ d3db7052; a rewrite is not planned, prototype on branch `ShapeItProgress`).
 Each of these was reproduced, or confirmed by reading the code, on `17f949e`.
 All issues that could not be verified at first have since been checked.
 
-- [ ] **#65 Edge colour not changed.** Changing an edge curve's colour is not
-  forwarded to the solid, so the view is not refreshed. `Edge.PaintTo3D` also
-  always paints black (8994f99d). Decide whether edge colours should be
-  editable at all.
 - [ ] **#303 Model.Add() silently drops invalid GeoObjects.** The
   `HasValidData()` check in `Model.Add(IGeoObject)` is unchanged, and the
   other overloads still don't check. This needs a design decision.

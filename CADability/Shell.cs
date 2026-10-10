@@ -7570,21 +7570,22 @@ namespace CADability.GeoObject
                 {
                     IGeoObjectOwner owner = shell.Owner;
                     Solid newSolid = null;
-                    if (shell.OpenEdges.Length > 0)
+                    // one undo step: closing the open edges gives the edge curves of the new faces the edge style, which the model hears of
+                    using (frame.Project.Undo.UndoFrame)
                     {
-                        if (shell.CloseOpenEdges())
+                        if (shell.OpenEdges.Length > 0)
+                        {
+                            if (shell.CloseOpenEdges())
+                            {
+                                newSolid = Solid.MakeSolid(shell);
+                            }
+                        }
+                        else
                         {
                             newSolid = Solid.MakeSolid(shell);
                         }
-                    }
-                    else
-                    {
-                        newSolid = Solid.MakeSolid(shell);
-                    }
-                    // ActiveFrame.Frame;
-                    if (newSolid != null)
-                    {
-                        using (frame.Project.Undo.UndoFrame)
+                        // ActiveFrame.Frame;
+                        if (newSolid != null)
                         {
                             owner.Remove(shell);
                             shell.Owner = newSolid; // unfortunately owner.Remove(shell) sets the shell.owner to null

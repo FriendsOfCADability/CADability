@@ -215,14 +215,46 @@ namespace CADability.Curve2D
         }
         public override ICurve2D GetModified(ModOp2D m)
         {
+            // the modified curve must start at the modified start point and run in the same direction as the modified circle:
+            // a reflection reverses the orientation, and a circle, which always starts at angle 0, becomes a full arc,
+            // when the start point is moved to a different angle
             if (m.IsIsogonal)
             {
-                return new Circle2D(m * Center, m.Factor * Radius);
+                bool ccw = counterClock == (m.Determinant > 0.0);
+                GeoVector2D toStart = m * (radius * GeoVector2D.XAxis);
+                double r = m.Factor * radius;
+                if (toStart.x > 0.0 && Math.Abs(toStart.y) < Precision.epsa * r) return new Circle2D(m * center, ccw ? r : -r);
+                return new Arc2D(m * center, r, toStart.Angle, ccw ? SweepAngle.Full : SweepAngle.FullReverse);
             }
             else
             {
-                return new Ellipse2D(m * Center, m * Radius * GeoVector2D.XAxis, m * Radius * GeoVector2D.YAxis);
+                return ModifiedArc(m, center, radius, 0.0, counterClock ? 2.0 * Math.PI : -2.0 * Math.PI, true);
             }
+        }
+        /// <summary>
+        /// Returns the image of the arc with the provided <paramref name="center"/>, <paramref name="radius"/>, start angle and sweep
+        /// under the modification <paramref name="m"/>, which is not isogonal. The result has the same start point, direction and
+        /// parametrisation as the modified arc. A full circle (<paramref name="isCircle"/>) becomes an <see cref="Ellipse2D"/>, when
+        /// its start point is mapped to the end of the major axis, where an ellipse starts, and a full <see cref="EllipseArc2D"/> otherwise.
+        /// </summary>
+        internal static Ellipse2D ModifiedArc(ModOp2D m, GeoPoint2D center, double radius, double start, double sweep, bool isCircle)
+        {
+            GeoPoint2D c = m * center;
+            GeoVector2D xAxis = m * (radius * GeoVector2D.XAxis);
+            GeoVector2D yAxis = m * (radius * GeoVector2D.YAxis);
+            // right handed axes, so that the orientation only depends on the sign of the sweep (or counterClock)
+            Geometry.PrincipalAxis(c, xAxis, yAxis, out GeoVector2D majorAxis, out GeoVector2D minorAxis, out GeoPoint2D left, out GeoPoint2D right, out GeoPoint2D bottom, out GeoPoint2D top, true);
+            // m maps the point of the circle at angle a to c + cos(a)*xAxis + sin(a)*yAxis, which is the point of the ellipse
+            // at the parameter a0 + a, or a0 - a when m reverses the orientation, where a0 is the parameter of c + xAxis
+            double a0 = Math.Atan2(xAxis * minorAxis / (minorAxis * minorAxis), xAxis * majorAxis / (majorAxis * majorAxis));
+            double sign = m.Determinant > 0.0 ? 1.0 : -1.0;
+            double startPar = a0 + sign * start;
+            startPar -= 2.0 * Math.PI * Math.Floor(startPar / (2.0 * Math.PI)); // in [0, 2*pi)
+            if (isCircle && (startPar < Precision.epsa || startPar > 2.0 * Math.PI - Precision.epsa))
+            {
+                return new Ellipse2D(c, majorAxis, minorAxis, sign * sweep > 0.0, left, right, bottom, top);
+            }
+            return new EllipseArc2D(c, majorAxis, minorAxis, startPar, sign * sweep, left, right, bottom, top);
         }
         /// <summary>
         /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.TangentPoints (GeoPoint2D, GeoPoint2D)"/>

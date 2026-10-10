@@ -791,42 +791,7 @@ namespace CADability.Curve2D
             }
             else
             {
-                //double sw = sweep;
-                //if (m.Determinant < 0.0) sw = -sw;
-                GeoVector2D majorAxis;
-                GeoVector2D minorAxis;
-                GeoPoint2D left, right, bottom, top;
-                bool cc = sweep > 0.0;
-                if (m.Determinant < 0.0)
-                {
-                    cc = !cc;
-                }
-                majorAxis = m * (Radius * GeoVector2D.XAxis);
-                minorAxis = m * (Radius * GeoVector2D.YAxis);
-                if (Math.Abs(majorAxis.Length - minorAxis.Length) < (majorAxis.Length + minorAxis.Length) * 1e-6)
-                {
-                    return new Arc2D(m * Center, Math.Abs(m.Factor * Radius), m * StartPoint, m * EndPoint, cc);
-                }
-                Geometry.PrincipalAxis(m * Center, m * (Radius * GeoVector2D.XAxis), m * (Radius * GeoVector2D.YAxis), out majorAxis, out minorAxis, out left, out right, out bottom, out top, false);
-                double a1 = GeoVector2D.Area(m * (Radius * GeoVector2D.XAxis), m * (Radius * GeoVector2D.YAxis));
-                double a2 = GeoVector2D.Area(majorAxis, minorAxis);
-                // geändert wg. Fehler in IsIsogonal Fall, noch nicht getestet
-                EllipseArc2D res = EllipseArc2D.Create(m * Center, majorAxis, minorAxis, m * StartPoint, m * EndPoint, cc);
-                double rpos = res.PositionOf(m*this.PointAt(0.5));
-                if (rpos < 0 || rpos>1) 
-                {
-                    res = EllipseArc2D.Create(m * Center, majorAxis, minorAxis, m * StartPoint, m * EndPoint, !cc);
-                }
-                return res;
-
-                //if (m.Determinant < 0.0)
-                //{
-                //    return new EllipseArc2D(m * Center, m * (Radius * GeoVector2D.XAxis), m * (Radius * GeoVector2D.YAxis), start + sweep, sw, left, right, bottom, top);
-                //}
-                //else
-                //{
-                //    return new EllipseArc2D(m * Center, m * (Radius * GeoVector2D.XAxis), m * (Radius * GeoVector2D.YAxis), start, sw, left, right, bottom, top);
-                //}
+                return ModifiedArc(m, Center, Radius, start.Radian, sweep, false);
             }
         }
         /// <summary>

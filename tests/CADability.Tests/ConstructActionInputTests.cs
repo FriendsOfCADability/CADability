@@ -64,5 +64,44 @@ namespace CADability.Tests
             boolean.Selected(null);
             Assert.AreEqual(2, action.CurrentIndex, "BooleanInput");
         }
+
+        /// <summary>
+        /// Issue #254: the choices of a MultipleChoiceInput can be replaced while the action runs. The selected entry is kept
+        /// if it is still offered, otherwise the first choice is selected and reported through SetChoiceEvent.
+        /// </summary>
+        [TestMethod]
+        public void the_choices_can_be_replaced_while_the_action_runs()
+        {
+            TestAction action = new TestAction();
+            ConstructAction.MultipleChoiceInput mode = new ConstructAction.MultipleChoiceInput("Test.Mode", new string[] { "a", "b", "c" }, 1);
+            action.SetInput(mode);
+            MultipleChoiceProperty property = (MultipleChoiceProperty)Build(action, mode);
+            List<int> reported = new List<int>();
+            mode.SetChoiceEvent += val => reported.Add(val);
+
+            mode.SetChoices(new string[] { "b", "c" }); // "b" is still offered
+            Assert.AreEqual(0, mode.Choice, "the index of b in the new choices");
+            CollectionAssert.AreEqual(new string[] { "b", "c" }, property.Choices);
+            Assert.AreEqual("b", property.Value);
+            Assert.AreEqual(0, reported.Count, "the selection did not change");
+
+            mode.SetChoices(new string[] { "x", "y" }); // "b" is gone
+            Assert.AreEqual(0, mode.Choice);
+            Assert.AreEqual("x", property.Value);
+            CollectionAssert.AreEqual(new int[] { 0 }, reported, "the new selection is reported");
+        }
+
+        [TestMethod]
+        public void the_choices_can_be_replaced_before_the_property_is_built()
+        {
+            TestAction action = new TestAction();
+            ConstructAction.MultipleChoiceInput mode = new ConstructAction.MultipleChoiceInput("Test.Mode", new string[] { "a", "b", "c" }, 2);
+            action.SetInput(mode);
+            mode.SetChoices(new string[] { "c", "d" });
+            MultipleChoiceProperty property = (MultipleChoiceProperty)Build(action, mode);
+            CollectionAssert.AreEqual(new string[] { "c", "d" }, property.Choices);
+            Assert.AreEqual("c", property.Value);
+            Assert.ThrowsException<ArgumentException>(() => mode.SetChoices(new string[0]));
+        }
     }
 }

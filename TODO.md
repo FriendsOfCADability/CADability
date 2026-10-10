@@ -33,7 +33,7 @@ centroid and orients the normal by a fixed rule).
 Fixed later: #308 (`ActionFeedBack.Repaint` paints the feedback once per view
 call into one display list), #253 (opt-in `CapturesMouse` on
 `BooleanInput` and `MultipleChoiceInput`; new public API, so the next release
-is a minor one).
+is a minor one), #254 (`MultipleChoiceInput.SetChoices`, also new public API).
 
 Fixed in the next pull request: #194 (`Border.UnsplittedOutline` survives
 `CompoundShape.CreateFromList`), #293 (DXF block contents on layer 0 or
@@ -72,9 +72,6 @@ All issues that could not be verified at first have since been checked.
   forwarded to the solid, so the view is not refreshed. `Edge.PaintTo3D` also
   always paints black (8994f99d). Decide whether edge colours should be
   editable at all.
-- [ ] **#254 MultipleChoiceInput with variable choices.** Not implemented
-  yet. Needs new public API (`SetChoices` or a virtual property factory), which
-  means a minor version bump.
 - [ ] **#303 Model.Add() silently drops invalid GeoObjects.** The
   `HasValidData()` check in `Model.Add(IGeoObject)` is unchanged, and the
   other overloads still don't check. This needs a design decision.

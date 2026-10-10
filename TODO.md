@@ -122,6 +122,13 @@ All issues that could not be verified at first have since been checked.
   lines keep the style's lineweight (no ByBlock), and a top-level ByBlock
   linetype still maps to the solid "ByBlock" pattern.
 
+- [ ] The settings `DxfDwg.Format` (DWG/DXF/DXB) and `DxfDwg.Text`
+  (Fit/Original) are shown in the control center but read nowhere. Related:
+  `Project.Export` with the format "dwg" or "dxb" writes nothing and still
+  returns true. Either implement them (ACadSharp can write DWG) or remove
+  them from `Settings.cs` and the string tables, and let `Project.Export`
+  report unsupported formats.
+
 ## Documentation
 
 - [ ] The generated documentation is stale: `docs/CADabilityDoc` was last

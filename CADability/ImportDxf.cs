@@ -645,6 +645,9 @@ namespace CADability.DXF
 
         private static bool IsLayerZero(ACadSharp.Tables.Layer layer) => layer != null && layer.Name == "0";
 
+        private static bool IsDefpointsLayer(ACadSharp.Tables.Layer layer) => layer != null
+            && string.Equals(layer.Name, ACadSharp.Tables.Layer.DefpointsName, StringComparison.OrdinalIgnoreCase);
+
         /// <summary>
         /// The line pattern for a linetype on the given layer: ByLayer is the linetype of the layer.
         /// Inside a block definition ByBlock, and ByLayer on layer "0", depend on the placing entity
@@ -696,10 +699,17 @@ namespace CADability.DXF
 
         }
 
-        private GeoObject.Block FindBlock(BlockRecord blockRec)
+        /// <summary>
+        /// The converted contents of a block definition, cached per block record. With
+        /// <paramref name="dimensionBlock"/> the block is the picture of a DIMENSION, and its
+        /// entities on the non-plotting layer DEFPOINTS (the definition points) are left out;
+        /// such a block is cached separately, so an INSERT of the same record still gets them.
+        /// </summary>
+        private GeoObject.Block FindBlock(BlockRecord blockRec, bool dimensionBlock = false)
         {
             if (blockRec == null) return null;
             string key = blockRec.Handle.ToString("X");
+            if (dimensionBlock) key += ":DIMENSION";
             if (!blockTable.TryGetValue(key, out GeoObject.Block found))
             {
                 found = GeoObject.Block.Construct();
@@ -711,8 +721,20 @@ namespace CADability.DXF
                 {
                     foreach (Entity ent in blockRec.Entities)
                     {
-                        IGeoObject go = GeoObjectFromEntity(ent);
-                        if (go != null) found.Add(go);
+                        if (dimensionBlock && IsDefpointsLayer(ent.Layer)) continue;
+                        try
+                        {
+                            IGeoObject go = GeoObjectFromEntity(ent);
+                            if (go != null) found.Add(go);
+                        }
+                        catch (Exception ex)
+                        {
+                            // One unreadable entity must not cost the whole block, the same choice
+                            // ConvertAndAdd makes for the model space. Letting the exception through
+                            // also left the half filled block in the cache for the next INSERT.
+                            System.Diagnostics.Trace.WriteLine("dxf: skipped " + ent.GetType().Name + " (handle "
+                                + ent.Handle.ToString("X") + ") in block '" + blockRec.Name + "': " + ex.Message);
+                        }
                     }
                 }
                 finally
@@ -1793,19 +1815,61 @@ namespace CADability.DXF
             return text;
         }
 
+        /// <summary>
+        /// Imports a DIMENSION as the anonymous block AutoCAD keeps with it, which holds the
+        /// picture it drew: dimension line, extension lines, arrows and the measurement text.
+        /// Like the block of an INSERT, its contents on layer "0" and ByBlock take the attributes
+        /// of the DIMENSION. A DIMENSION without that block (DXF R12 and several third party
+        /// writers leave it out) is drawn by ACadSharp from its definition points and style.
+        /// The data that makes the block a dimension is kept in UserData, see
+        /// <see cref="SetDimensionUserData"/>.
+        /// </summary>
         private IGeoObject CreateDimension(ACadSharp.Entities.Dimension dimension)
         {
-            if (dimension.Block != null)
+            BlockRecord blockRec = dimension.Block;
+            if (blockRec == null || blockRec.Entities.Count == 0)
             {
-                GeoObject.Block block = FindBlock(dimension.Block);
-                if (block != null)
+                try
                 {
-                    GeoObject.Block res = (GeoObject.Block)block.Clone();
-                    ResolveLayerZero(res, dimension);
-                    return res;
+                    dimension.UpdateBlock();
+                    blockRec = dimension.Block;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.WriteLine("dxf: dimension " + dimension.Handle.ToString("X")
+                        + " has no block and could not be regenerated: " + ex.Message);
+                    return null;
                 }
             }
-            return null;
+            GeoObject.Block block = FindBlock(blockRec, true);
+            if (block == null || block.Count == 0) return null;
+            GeoObject.Block res = (GeoObject.Block)block.Clone();
+            ResolveLayerZero(res, dimension);
+            SetDimensionUserData(res, dimension);
+            return res;
+        }
+
+        /// <summary>
+        /// Keeps what makes an imported block a dimension: the DXF dimension type under the key
+        /// "CADability.DxfDimension", the measured value ("CADability.DxfDimension.Measurement"),
+        /// the text override ("CADability.DxfDimension.Text") and the name of the dimension
+        /// style ("CADability.DxfDimension.Style"). An application can tell imported dimensions
+        /// from ordinary blocks by the first key.
+        /// </summary>
+        private static void SetDimensionUserData(IGeoObject go, ACadSharp.Entities.Dimension dimension)
+        {
+            go.UserData.Add("CADability.DxfDimension", dimension.GetType().Name);
+            try
+            {
+                double measurement = dimension.Measurement;
+                if (!double.IsNaN(measurement) && !double.IsInfinity(measurement))
+                    go.UserData.Add("CADability.DxfDimension.Measurement", measurement);
+            }
+            catch (Exception) { /* a degenerate dimension has no measurement */ }
+            if (!string.IsNullOrEmpty(dimension.Text))
+                go.UserData.Add("CADability.DxfDimension.Text", dimension.Text);
+            if (dimension.Style != null)
+                go.UserData.Add("CADability.DxfDimension.Style", dimension.Style.Name);
         }
 
         private string StripMTextFormatCodes(string value)

@@ -55,10 +55,10 @@ targets net8.0-windows since 517d643f, untested in the designer).
 Closed as not planned: #192 (the DebuggerVisualizers project was removed in
 d3db7052; a rewrite is not planned, prototype on branch `ShapeItProgress`).
 
-## Could not be verified / unsure
+## Confirmed — still present on master
 
-These need someone with the original files, Windows/Visual Studio, or a
-maintainer decision.
+Each of these was reproduced, or confirmed by reading the code, on `17f949e`.
+All issues that could not be verified at first have since been checked.
 
 - [ ] **#249 Path colour changes when approximated.** `Path.Approximate`
   creates child curves with the default black colour, and `CopyAttributes`

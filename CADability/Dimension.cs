@@ -2157,6 +2157,7 @@ namespace CADability.GeoObject
                     points[i] = m * points[i];
                 }
                 dimLineRef = m * dimLineRef;
+                dimLineDirection = m * dimLineDirection; // a direction in the plane, it turns with it
                 plane.Modify(m);
                 normal = m * normal;
             }

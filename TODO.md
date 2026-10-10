@@ -33,7 +33,8 @@ centroid and orients the normal by a fixed rule).
 Fixed later: #308 (`ActionFeedBack.Repaint` paints the feedback once per view
 call into one display list), #253 (opt-in `CapturesMouse` on
 `BooleanInput` and `MultipleChoiceInput`; new public API, so the next release
-is a minor one), #254 (`MultipleChoiceInput.SetChoices`, also new public API).
+is a minor one), #254 (`MultipleChoiceInput.SetChoices`, also new public API),
+#249 (an approximated curve keeps its colour).
 
 Fixed in the next pull request: #194 (`Border.UnsplittedOutline` survives
 `CompoundShape.CreateFromList`), #293 (DXF block contents on layer 0 or
@@ -65,9 +66,6 @@ d3db7052; a rewrite is not planned, prototype on branch `ShapeItProgress`).
 Each of these was reproduced, or confirmed by reading the code, on `17f949e`.
 All issues that could not be verified at first have since been checked.
 
-- [ ] **#249 Path colour changes when approximated.** `Path.Approximate`
-  creates child curves with the default black colour, and `CopyAttributes`
-  overwrites only null child colours, so the colour is lost.
 - [ ] **#65 Edge colour not changed.** Changing an edge curve's colour is not
   forwarded to the solid, so the view is not refreshed. `Edge.PaintTo3D` also
   always paints black (8994f99d). Decide whether edge colours should be

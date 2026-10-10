@@ -836,12 +836,34 @@ namespace CADability.DXF
                 case GeoObject.Dimension.EDimType.DimAngle:
                     {
                         if (dim.PointCount < 3) return null;
-                        var angular = new ACadSharp.Entities.DimensionAngular3Pt();
-                        angular.AngleVertex = ToXYZ(dim.GetPoint(0));
-                        angular.FirstPoint = ToXYZ(dim.GetPoint(1));
-                        angular.SecondPoint = ToXYZ(dim.GetPoint(2));
-                        angular.DefinitionPoint = ToXYZ(dim.DimLineRef); // the dimension arc runs through it
-                        entity = angular;
+                        GeoPoint center = dim.GetPoint(0);
+                        // A dimension whose style writes the angle as the length of the arc is
+                        // an arc length dimension. DXF has ARC_DIMENSION for it from AutoCAD
+                        // 2010 on; older targets get the angular dimension, whose text carries
+                        // the length anyway, because the text is written out below.
+                        if (dim.DimensionStyle.AngleText == CADability.Attribute.DimensionStyle.EAngleText.ArcLength
+                            && doc.Header.Version >= ACadVersion.AC1024)
+                        {
+                            GeoVector leg1 = dim.GetPoint(1) - center;
+                            GeoVector leg2 = dim.GetPoint(2) - center;
+                            var arc = new ACadSharp.Entities.DimensionArc();
+                            arc.Center = ToXYZ(center);
+                            arc.FirstPoint = ToXYZ(dim.GetPoint(1));
+                            arc.SecondPoint = ToXYZ(dim.GetPoint(2));
+                            arc.DefinitionPoint = ToXYZ(dim.DimLineRef);
+                            arc.StartAngle = Math.Atan2(leg1 * ocsY, leg1 * ocsX);
+                            arc.EndAngle = Math.Atan2(leg2 * ocsY, leg2 * ocsX);
+                            entity = arc;
+                        }
+                        else
+                        {
+                            var angular = new ACadSharp.Entities.DimensionAngular3Pt();
+                            angular.AngleVertex = ToXYZ(center);
+                            angular.FirstPoint = ToXYZ(dim.GetPoint(1));
+                            angular.SecondPoint = ToXYZ(dim.GetPoint(2));
+                            angular.DefinitionPoint = ToXYZ(dim.DimLineRef); // the dimension arc runs through it
+                            entity = angular;
+                        }
                     }
                     break;
                 case GeoObject.Dimension.EDimType.DimRadius:
@@ -886,7 +908,14 @@ namespace CADability.DXF
             // The text CADability shows wins over what the reader would compute from its own
             // dimension style: the number on the drawing must not change on the way. Prefix
             // and postfix are part of it.
-            string text = dim.GetPrefix(0) + dim.GetDimText(0) + dim.GetPostfix(0);
+            string prefix = dim.GetPrefix(0) ?? "";
+            // The import puts the arc symbol of an arc length dimension into the prefix. An
+            // ARC_DIMENSION draws it itself (DIMARCSYM), and a file before AutoCAD 2007 is written
+            // in a code page that does not have it, where it would arrive as '?'.
+            if ((entity is ACadSharp.Entities.DimensionArc || doc.Header.Version < ACadVersion.AC1021)
+                && prefix.StartsWith(DXF.Import.ArcLengthSymbol, StringComparison.Ordinal))
+                prefix = prefix.Substring(DXF.Import.ArcLengthSymbol.Length);
+            string text = prefix + dim.GetDimText(0) + dim.GetPostfix(0);
             if (!string.IsNullOrEmpty(text)) entity.Text = text;
             try
             {

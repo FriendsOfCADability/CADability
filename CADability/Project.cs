@@ -1170,6 +1170,21 @@ namespace CADability
             }
         }
         /// <summary>
+        /// The DXF version <see cref="Export"/> writes: AutoCAD 2000 (AC1015) by default, the
+        /// widest readership. The setting "DxfExport.Version" takes an ACadVersion name from
+        /// AC1012 to AC1032, for instance "AC1024" for AutoCAD 2010, the first version whose DXF
+        /// knows the arc length dimension (ARC_DIMENSION).
+        /// </summary>
+        private static ACadVersion DxfExportVersion()
+        {
+            string name = Settings.GlobalSettings.GetStringValue("DxfExport.Version", "AC1015");
+            if (Enum.TryParse(name, true, out ACadVersion version) && Enum.IsDefined(typeof(ACadVersion), version)
+                && version >= ACadVersion.AC1012 && version <= ACadVersion.AC1032)
+                return version;
+            Trace.WriteLine("dxf: setting DxfExport.Version \"" + name + "\" is not a version that can be written, using AC1015");
+            return ACadVersion.AC1015;
+        }
+        /// <summary>
         /// Export the project in one of the following formats:
         /// dxf, dwg, iges, step, vrml, stl, sat and xt (sat and xt must be licensed seperately) 
         /// </summary>
@@ -1185,7 +1200,7 @@ namespace CADability
                 case "html":
                     return true;
                 case "dxf":
-                    CADability.DXF.Export export = new DXF.Export(ACadVersion.AC1015);
+                    CADability.DXF.Export export = new DXF.Export(DxfExportVersion());
                     export.WriteToFile(this, fileName);
                     return true;
                 case "dwg":

@@ -1171,6 +1171,174 @@ AcDb3PointAngularDimension
             }
         }
 
+        // --- arc length dimensions, angle format and DXF version ------------------------------
+
+        // A quarter circle of radius 20 around the origin, measured as an arc length
+        private const string ArcDimension = @"  0
+DIMENSION
+  8
+Dimensions
+100
+AcDbEntity
+100
+AcDbDimension
+  2
+*D1
+  3
+LOGICAL
+ 70
+37
+ 10
+17.68
+ 20
+17.68
+ 30
+0.0
+100
+AcDbArcDimension
+ 13
+20.0
+ 23
+0.0
+ 33
+0.0
+ 14
+0.0
+ 24
+20.0
+ 34
+0.0
+ 15
+0.0
+ 25
+0.0
+ 35
+0.0
+";
+
+        /// <summary>
+        /// An arc length dimension is an angular dimension whose text is the length of the arc,
+        /// which is CADability's fifth way of writing an angle. Here a quarter circle of radius
+        /// 20 around the origin, so the arc measures 20·π/2.
+        /// </summary>
+        [TestMethod]
+        public void import_dxf_arc_length_dimension_measures_the_arc()
+        {
+            Dimension dim = SingleDimensionObject(ImportAsDimensions(StyledPrologue + ArcDimension + Epilogue));
+
+            Assert.AreEqual(Dimension.EDimType.DimAngle, dim.DimType, "it is an angular dimension");
+            Assert.AreEqual(DimensionStyle.EAngleText.ArcLength, dim.DimensionStyle.AngleText,
+                "whose text is the length of the arc");
+            Assert.AreEqual(0.0, dim.GetPoint(0) | new GeoPoint(0, 0, 0), 1e-8, "the center of the arc");
+            Assert.AreEqual(20.0, (dim.GetPoint(1) - dim.GetPoint(0)).Length, 1e-8,
+                "the legs keep the radius of the arc, the length is read off it");
+
+            dim.GetBoundingCube(); // establishes the plane GetDimText measures in
+            double arcLength = 20.0 * Math.PI / 2.0;
+            Assert.AreEqual(arcLength, double.Parse(dim.GetDimText(0), CultureInfo.InvariantCulture), 1e-3);
+            Assert.AreEqual("\u2312", dim.GetPrefix(0), "AutoCAD marks an arc length with its own symbol");
+        }
+
+        /// <summary>
+        /// An arc length dimension needs a style of its own, even when it names the same
+        /// DIMSTYLE as a linear dimension.
+        /// </summary>
+        [TestMethod]
+        public void import_dxf_arc_length_dimension_does_not_share_the_style_of_a_linear_one()
+        {
+            Model model = ImportAsDimensions(StyledPrologue + LinearDimension + ArcDimension + Epilogue);
+            Dimension[] dims = model.AllObjects.OfType<Dimension>().ToArray();
+            Assert.AreEqual(2, dims.Length);
+            Dimension linear = dims.Single(d => d.DimType == Dimension.EDimType.DimPoints);
+            Dimension arc = dims.Single(d => d.DimType == Dimension.EDimType.DimAngle);
+            Assert.AreNotSame(linear.DimensionStyle, arc.DimensionStyle);
+            Assert.AreEqual("", linear.DimensionStyle.TextPrefix, "the arc symbol stays with the arc length");
+        }
+
+        /// <summary>
+        /// DIMAUNIT picks how an angle is written. All four AutoCAD ways have a counterpart.
+        /// </summary>
+        [TestMethod]
+        public void import_dxf_dimension_translates_the_angle_format()
+        {
+            // DIMAUNIT (group code 275) 1 is degrees, minutes and seconds
+            string prologue = StyledPrologue.Replace("271\n3\n", "271\n3\n275\n1\n");
+            Assert.AreNotEqual(StyledPrologue, prologue, "DIMAUNIT should be set");
+            Dimension dim = SingleDimensionObject(ImportAsDimensions(prologue + LinearDimension + Epilogue));
+
+            Assert.AreEqual(DimensionStyle.EAngleText.DegreeMinuteSecond, dim.DimensionStyle.AngleText);
+        }
+
+        /// <summary>
+        /// DXF has ARC_DIMENSION only from AutoCAD 2010 on, so an arc length dimension survives
+        /// the round trip in full only for that target, which the setting "DxfExport.Version"
+        /// selects.
+        /// </summary>
+        [TestMethod]
+        public void arc_length_dimension_survives_import_export_import()
+        {
+            Model imported = ImportAsDimensions(StyledPrologue + ArcDimension + Epilogue);
+            Dimension before = SingleDimensionObject(imported);
+            Project project = Project.CreateSimpleProject();
+            foreach (IGeoObject go in imported.AllObjects) project.GetActiveModel().Add(go.Clone());
+
+            ACadSharp.CadDocument doc = WithSetting("DxfExport.Version", "AC1024", () => ExportAndRead(project));
+            Assert.AreEqual(ACadSharp.ACadVersion.AC1024, doc.Header.Version);
+            ACadSharp.Entities.DimensionArc written = doc.Entities.OfType<ACadSharp.Entities.DimensionArc>().Single();
+            Assert.AreEqual(0.0, Distance(written.Center, new GeoPoint(0, 0, 0)), 1e-8);
+            Assert.AreEqual(0.0, written.StartAngle, 1e-8);
+            Assert.AreEqual(Math.PI / 2, written.EndAngle, 1e-8);
+            Assert.IsFalse(written.Text.StartsWith("\u2312"), "ARC_DIMENSION draws the arc symbol itself");
+
+            Dimension after = WithSetting("DxfImport.DimensionsAsDimension", true,
+                () => SingleDimensionObject(ImportDxf(File.ReadAllText(this.TestContext.TestName + ".dxf")).GetActiveModel()));
+            Assert.AreEqual(Dimension.EDimType.DimAngle, after.DimType);
+            Assert.AreEqual(DimensionStyle.EAngleText.ArcLength, after.DimensionStyle.AngleText,
+                "it should still be an arc length dimension");
+            Assert.AreEqual(0.0, before.GetPoint(0) | after.GetPoint(0), 1e-6, "the center of the arc");
+            Assert.AreEqual((before.GetPoint(1) - before.GetPoint(0)).Length,
+                (after.GetPoint(1) - after.GetPoint(0)).Length, 1e-6, "the radius the length is read off");
+        }
+
+        /// <summary>
+        /// An AutoCAD 2000 file, which is what the export writes by default, has no entity for
+        /// it. The angular dimension it becomes still carries the length as its text. The arc
+        /// symbol is left out: the file is written in a code page that does not have it, and
+        /// it would arrive as '?'.
+        /// </summary>
+        [TestMethod]
+        public void arc_length_dimension_keeps_its_number_on_an_older_target()
+        {
+            Model imported = ImportAsDimensions(StyledPrologue + ArcDimension + Epilogue);
+            Dimension before = SingleDimensionObject(imported);
+            before.GetBoundingCube();
+            string expected = before.GetDimText(0);
+            Project project = Project.CreateSimpleProject();
+            foreach (IGeoObject go in imported.AllObjects) project.GetActiveModel().Add(go.Clone());
+
+            ACadSharp.CadDocument doc = ExportAndRead(project);
+            Assert.AreEqual(ACadSharp.ACadVersion.AC1015, doc.Header.Version, "AutoCAD 2000 by default");
+            Assert.AreEqual(0, doc.Entities.OfType<ACadSharp.Entities.DimensionArc>().Count());
+            ACadSharp.Entities.DimensionAngular3Pt angular = doc.Entities.OfType<ACadSharp.Entities.DimensionAngular3Pt>().Single();
+            Assert.AreEqual(expected, angular.Text,
+                "the length has to survive as the text; the arc symbol is not in the code page of the file");
+        }
+
+        /// <summary>
+        /// A value of "DxfExport.Version" that cannot be written falls back to AutoCAD 2000.
+        /// </summary>
+        [TestMethod]
+        public void export_dxf_version_setting_falls_back_to_autocad_2000()
+        {
+            Project project = MakeProjectWithDimension(new GeoPoint(0, 0, 0), new GeoPoint(100, 0, 0));
+            foreach (string value in new[] { "AC1009", "nonsense", "AC1032" })
+            {
+                ACadSharp.CadDocument doc = WithSetting("DxfExport.Version", value, () => ExportAndRead(project));
+                Assert.AreEqual(value == "AC1032" ? ACadSharp.ACadVersion.AC1032 : ACadSharp.ACadVersion.AC1015,
+                    doc.Header.Version, value);
+            }
+        }
+
         // --- helpers -------------------------------------------------------------------------
 
         private Project ImportProjectAsDimensions(string dxf)

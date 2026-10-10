@@ -103,6 +103,13 @@ All issues that could not be verified at first have since been checked.
   `CLOSED_SHELL` with a single open face (issue66_fma_02.stp) still becomes a
   Solid.
 - [ ] `Border.UnsplittedOutline` is not serialized and is lost on save/load.
+- [ ] The triangulation of a ruled surface between two splines
+  (`Make3D.MakeRuledShell`) overestimates its area by up to 3.7 % at a
+  precision of a thousandth of its size: long thin triangles along the rulings
+  overlap their neighbours while their edges stay within the deflection.
+  `Triangulation.FlipToDelaunay` leaves them, because a ruling is exact and the
+  other diagonal is not. A criterion for how well the triangles cover the
+  surface, rather than how far their edges are from it, would catch them.
 - [ ] `ImportSTL.Read` never disposes its readers.
 - [ ] CADability has no "floating" layer 0 in blocks. The DXF import
   resolves block contents on layer 0 to the layer of the INSERT (#293), so

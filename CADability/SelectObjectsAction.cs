@@ -2363,7 +2363,7 @@ namespace CADability.Actions
 						ICurve app = (sel[i] as ICurve).Approximate(Frame.GetIntSetting("Approximate.Mode", 0) == 0, Frame.GetDoubleSetting("Approximate.Precision", 0.01));
 						addTo.Remove(sel[i]);
 						IGeoObject go = app;
-						go.CopyAttributes(sel[i]);
+						Curves.CopyAttributesToApproximation(go, sel[i]);
 						addTo.Add(go);
 						newSelectedObjects.Add(go);
 					}

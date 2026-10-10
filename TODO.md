@@ -11,6 +11,9 @@ Closed during this triage, because they were already solved on master:
   and 9573342d.
 - #295 Make3D.MakePipe with a straight path: fixed in #307 (a75ce094).
 
+Closed as answered: #297 (WPF hosting of `CadControl`) and #165 (OctTree
+`GetObjectsCloseTo` is not a distance query).
+
 Fixed during this triage (#369): #251 (dead `objectPointSav` code removed
 from ToolsRoundIn) and #294 (README links and the repository website now
 point to friendsofcadability.github.io).
@@ -50,29 +53,12 @@ d3db7052; a rewrite is not planned, prototype on branch `ShapeItProgress`).
 These need someone with the original files, Windows/Visual Studio, or a
 maintainer decision.
 
-- [ ] **#297 CADability WPF integration issue.** This is a usage question.
-  The control is `CadControl` in namespace `CADability.Forms` (assembly
-  CADability.Forms.dll), not `CADControl` in `CADability`. Draft answer: use
-  `xmlns:cad="clr-namespace:CADability.Forms;assembly=CADability.Forms"`,
-  target `net8.0-windows` with `UseWPF` and `UseWindowsForms`, and host the
-  control in a `WindowsFormsHost`. Post the answer and close; optionally add a
-  WPF hosting note to the README.
-- [ ] **#165 OctTree not returning all close objects.** Works as designed:
-  on master `GetObjectsCloseTo(e1)` still does not return e2, which is 9e-5
-  away from e1, even after #326. `GetObjectsCloseTo` returns objects that share
-  an octree leaf with the given object, so it is not a distance query. Use
-  `GetObjectsFromBox` with an expanded cube, as dsn27 already answered. Answer
-  stefan-tb's question and close as answered.
-- [ ] **#167 Dimensions not shown in view.** Partly a question. A DIMENSION
-  is imported as its anonymous block (lines, arrows, text). A DIMENSION
-  without a block is dropped silently, and ByBlock colours come in black.
-  Fixes exist on the unmerged branch `claude/ecstatic-fermat-uml5l3`
-  (311598c3, 3bc72921, e8199e3b). Review and merge that branch, then answer
-  and close.
-## Confirmed — still present on master
-
-Each of these was reproduced, or confirmed by reading the code, on `17f949e`.
-
+- [ ] **#167 Dimensions not shown in view.** Answered on the issue (DXF
+  dimensions are imported as their anonymous block; colours fixed in #372).
+  Still open: a DIMENSION without its block (DXF R12, some exporters) is
+  dropped silently. A fix that regenerates missing blocks exists on the
+  unmerged branch `claude/ecstatic-fermat-uml5l3` (311598c3, together with
+  3bc72921 and e8199e3b): review, port and close the issue.
 - [ ] **#249 Path colour changes when approximated.** `Path.Approximate`
   creates child curves with the default black colour, and `CopyAttributes`
   overwrites only null child colours, so the colour is lost.

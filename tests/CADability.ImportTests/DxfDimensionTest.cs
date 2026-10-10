@@ -14,11 +14,14 @@ namespace CADability.ImportTests
     /// every DIMENSION, because that block holds the picture AutoCAD drew. The block's contents
     /// are mostly ByBlock on layer 0 and have to take the DIMENSION's attributes, a dimension
     /// without a block must not vanish, and the data that makes the block a dimension has to
-    /// survive in UserData. The export writes CADability's <see cref="Dimension"/> as a DXF
-    /// DIMENSION, and with the setting "DxfImport.DimensionsAsDimension" the import builds such
-    /// a <see cref="Dimension"/> from a DIMENSION.
+    /// survive in UserData. The export writes CADability's <see cref="Dimension"/> as an INSERT
+    /// of the picture CADability drew, or with the setting "DxfDwg.ExportDimension" set to
+    /// "As Dimension" as a DXF DIMENSION. With "DxfDwg.ImportDimension" set to "As Dimension" the
+    /// import builds such a <see cref="Dimension"/> from a DIMENSION.
+    /// The tests change these global settings, so they must not run alongside each other.
     /// </summary>
     [TestClass]
+    [DoNotParallelize]
     public class DxfDimensionTest
     {
         public TestContext TestContext { get; set; }
@@ -427,7 +430,106 @@ Dimensions
             return block;
         }
 
-        // --- export: CADability's Dimension as a DXF DIMENSION --------------------------------
+        // --- export: CADability's Dimension as a block, the default ---------------------------
+
+        /// <summary>
+        /// By default ("DxfDwg.ExportDimension" is "As Block") a dimension is written as the
+        /// picture CADability drew, in an ordinary named block placed by an INSERT, and there is
+        /// no DIMENSION in the file. Reading it back gives the same geometry.
+        /// </summary>
+        [TestMethod]
+        public void export_dimension_writes_a_block_by_default()
+        {
+            Project project = MakeProjectWithDimension(new GeoPoint(0, 0, 0), new GeoPoint(100, 0, 0));
+            Dimension dim = (Dimension)project.GetActiveModel()[0];
+            GeoObjectList drawn = dim.Decompose(); // the picture the export writes
+            Assert.IsTrue(drawn.Count > 0, "test setup: CADability draws the dimension");
+
+            ACadSharp.CadDocument doc = WithChoice("DxfDwg.ExportDimension", 0, () => ExportAndRead(project));
+            Assert.AreEqual(0, doc.Entities.OfType<ACadSharp.Entities.Dimension>().Count(), "no DIMENSION");
+            ACadSharp.Entities.Insert insert = doc.Entities.OfType<ACadSharp.Entities.Insert>().Single();
+            Assert.IsFalse(insert.Block.IsAnonymous, "an ordinary block, not a *D block");
+            Assert.IsFalse(insert.Block.Name.StartsWith("*"), "an ordinary block name, not " + insert.Block.Name);
+            Assert.AreEqual(drawn.Count, insert.Block.Entities.Count, "one entity for each object CADability drew");
+
+            Model reimported = WithChoice("DxfDwg.ImportDimension", 0,
+                () => Project.ReadFromFile(this.TestContext.TestName + ".dxf", "dxf").GetActiveModel());
+            Assert.AreEqual(1, reimported.Count, "the dimension comes back as one object");
+            Block block = reimported[0] as Block;
+            Assert.IsNotNull(block, "the INSERT becomes a block, not a " + reimported[0].GetType().Name);
+            Assert.AreEqual(drawn.Count, block.Count, "with the same number of parts");
+            for (int i = 0; i < drawn.Count; i++)
+            {
+                Assert.AreEqual(drawn[i].GetType(), block.Child(i).GetType(), "part " + i);
+                BoundingCube expected = drawn[i].GetBoundingCube();
+                BoundingCube actual = block.Child(i).GetBoundingCube();
+                Assert.AreEqual(0.0, new GeoPoint(expected.Xmin, expected.Ymin, expected.Zmin)
+                    | new GeoPoint(actual.Xmin, actual.Ymin, actual.Zmin), 1e-6, "part " + i + ": the same place");
+                Assert.AreEqual(0.0, new GeoPoint(expected.Xmax, expected.Ymax, expected.Zmax)
+                    | new GeoPoint(actual.Xmax, actual.Ymax, actual.Zmax), 1e-6, "part " + i + ": the same size");
+            }
+        }
+
+        /// <summary>
+        /// A chain dimension, which "As Dimension" splits into one DIMENSION per section, stays
+        /// in one piece as a block.
+        /// </summary>
+        [TestMethod]
+        public void export_dimension_chain_writes_one_block_by_default()
+        {
+            Project project = MakeProjectWithDimension(
+                new GeoPoint(0, 0, 0), new GeoPoint(40, 0, 0), new GeoPoint(100, 0, 0));
+            ACadSharp.CadDocument doc = WithChoice("DxfDwg.ExportDimension", 0, () => ExportAndRead(project));
+
+            Assert.AreEqual(0, doc.Entities.OfType<ACadSharp.Entities.Dimension>().Count(), "no DIMENSION");
+            ACadSharp.Entities.Insert insert = doc.Entities.OfType<ACadSharp.Entities.Insert>().Single();
+            Assert.IsTrue(insert.Block.Entities.Count > 0, "the block holds what CADability drew");
+        }
+
+        /// <summary>
+        /// The name of the block must not collide with a block of the same name in the project,
+        /// for instance one that a previous export made from a dimension, read back from that file.
+        /// </summary>
+        [TestMethod]
+        public void export_dimension_block_name_does_not_collide()
+        {
+            Project project = Project.CreateSimpleProject();
+            Block earlier = Block.Construct();
+            earlier.Name = "AnonymousBlock1";
+            earlier.Add(Line.TwoPoints(new GeoPoint(0, -50, 0), new GeoPoint(10, -50, 0)));
+            project.GetActiveModel().Add(earlier);
+            Dimension dim = Dimension.Construct();
+            dim.DimType = Dimension.EDimType.DimPoints;
+            dim.DimensionStyle = project.DimensionStyleList.Current;
+            dim.Normal = GeoVector.ZAxis;
+            dim.DimLineRef = new GeoPoint(0, 20, 0);
+            dim.DimLineDirection = GeoVector.XAxis;
+            dim.AddPoint(new GeoPoint(0, 0, 0));
+            dim.AddPoint(new GeoPoint(100, 0, 0));
+            project.GetActiveModel().Add(dim);
+
+            ACadSharp.CadDocument doc = WithChoice("DxfDwg.ExportDimension", 0, () => ExportAndRead(project));
+            ACadSharp.Entities.Insert[] inserts = doc.Entities.OfType<ACadSharp.Entities.Insert>().ToArray();
+            Assert.AreEqual(2, inserts.Length, "the block and the dimension, each in a block of its own");
+            Assert.AreEqual(2, inserts.Select(i => i.Block.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+                "two different block names");
+        }
+
+        // --- export: CADability's Dimension as a DXF DIMENSION ("As Dimension") ---------------
+
+        /// <summary>
+        /// With "DxfDwg.ExportDimension" set to "As Dimension" the file holds a DIMENSION and no
+        /// INSERT.
+        /// </summary>
+        [TestMethod]
+        public void export_dimension_setting_as_dimension_writes_a_dxf_dimension()
+        {
+            Project project = MakeProjectWithDimension(new GeoPoint(0, 0, 0), new GeoPoint(100, 0, 0));
+            ACadSharp.CadDocument doc = WithChoice("DxfDwg.ExportDimension", 1, () => ExportAndRead(project));
+
+            Assert.AreEqual(1, doc.Entities.OfType<ACadSharp.Entities.DimensionLinear>().Count());
+            Assert.AreEqual(0, doc.Entities.OfType<ACadSharp.Entities.Insert>().Count(), "no INSERT");
+        }
 
         /// <summary>
         /// A dimension drawn in CADability used to be dropped on export, there was no case for
@@ -439,7 +541,7 @@ Dimensions
         {
             Project project = MakeProjectWithDimension(new GeoPoint(0, 0, 0), new GeoPoint(100, 0, 0));
             Dimension dim = (Dimension)project.GetActiveModel()[0];
-            ACadSharp.CadDocument doc = ExportAndRead(project);
+            ACadSharp.CadDocument doc = ExportAndReadAsDimensions(project);
 
             ACadSharp.Entities.DimensionLinear linear = doc.Entities.OfType<ACadSharp.Entities.DimensionLinear>().Single();
             Assert.AreEqual(0.0, Distance(linear.FirstPoint, new GeoPoint(0, 0, 0)), 1e-8, "group 13");
@@ -476,7 +578,7 @@ Dimensions
         {
             Project project = MakeProjectWithDimension(
                 new GeoPoint(0, 0, 0), new GeoPoint(40, 0, 0), new GeoPoint(100, 0, 0));
-            ACadSharp.CadDocument doc = ExportAndRead(project);
+            ACadSharp.CadDocument doc = ExportAndReadAsDimensions(project);
 
             double[] measured = doc.Entities.OfType<ACadSharp.Entities.DimensionLinear>()
                 .Select(d => d.Measurement).OrderBy(d => d).ToArray();
@@ -494,7 +596,7 @@ Dimensions
         {
             Project project = Project.CreateSimpleProject();
             project.GetActiveModel().Add(MakeCircleDimension(project, Dimension.EDimType.DimRadius));
-            ACadSharp.CadDocument doc = ExportAndRead(project);
+            ACadSharp.CadDocument doc = ExportAndReadAsDimensions(project);
 
             ACadSharp.Entities.DimensionRadius radial = doc.Entities.OfType<ACadSharp.Entities.DimensionRadius>().Single();
             Assert.AreEqual(0.0, Distance(radial.DefinitionPoint, new GeoPoint(10, 10, 0)), 1e-8, "the center");
@@ -513,7 +615,7 @@ Dimensions
         {
             Project project = Project.CreateSimpleProject();
             project.GetActiveModel().Add(MakeCircleDimension(project, Dimension.EDimType.DimDiameter));
-            ACadSharp.CadDocument doc = ExportAndRead(project);
+            ACadSharp.CadDocument doc = ExportAndReadAsDimensions(project);
 
             ACadSharp.Entities.DimensionDiameter diametric = doc.Entities.OfType<ACadSharp.Entities.DimensionDiameter>().Single();
             Assert.AreEqual(0.0, Distance(diametric.AngleVertex, new GeoPoint(35, 10, 0)), 1e-8, "the text side");
@@ -538,7 +640,7 @@ Dimensions
             dim.AddPoint(new GeoPoint(0, 10, 0));
             dim.DimLineRef = new GeoPoint(14.14, 14.14, 0);
             project.GetActiveModel().Add(dim);
-            ACadSharp.CadDocument doc = ExportAndRead(project);
+            ACadSharp.CadDocument doc = ExportAndReadAsDimensions(project);
 
             ACadSharp.Entities.DimensionAngular3Pt angular = doc.Entities.OfType<ACadSharp.Entities.DimensionAngular3Pt>().Single();
             Assert.AreEqual(0.0, Distance(angular.AngleVertex, new GeoPoint(0, 0, 0)), 1e-8);
@@ -559,7 +661,7 @@ Dimensions
             Dimension dim = (Dimension)project.GetActiveModel()[0];
             ModOp tilt = ModOp.Rotate(new GeoPoint(5, 5, 5), new GeoVector(1, 1, 0.3), new SweepAngle(0.65));
             dim.Modify(tilt);
-            ACadSharp.CadDocument doc = ExportAndRead(project);
+            ACadSharp.CadDocument doc = ExportAndReadAsDimensions(project);
 
             ACadSharp.Entities.DimensionLinear linear = doc.Entities.OfType<ACadSharp.Entities.DimensionLinear>().Single();
             Assert.AreEqual(0.0, Distance(linear.FirstPoint, tilt * new GeoPoint(0, 0, 0)), 1e-8, "group 13 is a world point");
@@ -585,7 +687,7 @@ Dimensions
 
         /// <summary>
         /// A coordinate dimension has no DXF entity that carries its meaning; it keeps its
-        /// picture as a block instead of getting lost.
+        /// picture as a block instead of getting lost, also with "As Dimension".
         /// </summary>
         [TestMethod]
         public void export_coordinate_dimension_keeps_its_picture_as_a_block()
@@ -601,7 +703,7 @@ Dimensions
             dim.AddPoint(new GeoPoint(40, 10, 0));
             dim.AddPoint(new GeoPoint(100, 30, 0));
             project.GetActiveModel().Add(dim);
-            ACadSharp.CadDocument doc = ExportAndRead(project);
+            ACadSharp.CadDocument doc = ExportAndReadAsDimensions(project);
 
             Assert.AreEqual(0, doc.Entities.OfType<ACadSharp.Entities.Dimension>().Count());
             ACadSharp.Entities.Insert insert = doc.Entities.OfType<ACadSharp.Entities.Insert>().Single();
@@ -633,7 +735,7 @@ Dimensions
         {
             RequireGdi();
             Project project = MakeProjectWithDimension(new GeoPoint(0, 0, 0), new GeoPoint(100, 0, 0));
-            Model reimported = ExportAndImport(project);
+            Model reimported = WithChoice("DxfDwg.ExportDimension", 1, () => ExportAndImport(project));
 
             Block block = SingleDimensionBlock(reimported);
             Assert.AreEqual("DimensionLinear", block.UserData["CADability.DxfDimension"],
@@ -643,7 +745,7 @@ Dimensions
             Assert.IsTrue(block.Children.Count > 0, "the picture should travel in the anonymous block");
         }
 
-        // --- import as CADability's own Dimension (setting DxfImport.DimensionsAsDimension) ----
+        // --- import as CADability's own Dimension (DxfDwg.ImportDimension "As Dimension") -----
 
         // Header, the red layer "Dimensions" and a dimension style "LOGICAL" with values that are
         // nothing like CADability's defaults, so a translation is visible in the assertions:
@@ -1114,14 +1216,15 @@ AcDb3PointAngularDimension
         }
 
         /// <summary>
-        /// Without the setting nothing changes: the dimension stays the picture AutoCAD drew.
+        /// With "As Block", the default, the dimension stays the picture AutoCAD drew.
         /// </summary>
         [TestMethod]
         public void import_dxf_dimension_stays_a_block_unless_asked()
         {
-            Model model = ImportDxf(StyledPrologue + LinearDimension + Epilogue).GetActiveModel();
+            Model model = WithChoice("DxfDwg.ImportDimension", 0,
+                () => ImportDxf(StyledPrologue + LinearDimension + Epilogue).GetActiveModel());
             Assert.AreEqual(1, model.Count);
-            Assert.IsInstanceOfType(model[0], typeof(Block), "the setting is off by default");
+            Assert.IsInstanceOfType(model[0], typeof(Block), "a block, not a CADability dimension");
         }
 
         /// <summary>
@@ -1135,8 +1238,7 @@ AcDb3PointAngularDimension
 
             Project project = Project.CreateSimpleProject();
             foreach (IGeoObject go in imported.AllObjects) project.GetActiveModel().Add(go.Clone());
-            Dimension after = WithSetting("DxfImport.DimensionsAsDimension", true,
-                () => SingleDimensionObject(ExportAndImport(project)));
+            Dimension after = SingleDimensionObject(ExportAndImportAsDimensions(project));
 
             Assert.AreEqual(before.DimType, after.DimType);
             Assert.AreEqual(0.0, before.GetPoint(0) | after.GetPoint(0), 1e-6, "first measured point");
@@ -1161,8 +1263,7 @@ AcDb3PointAngularDimension
             {
                 Project project = Project.CreateSimpleProject();
                 project.GetActiveModel().Add(MakeCircleDimension(project, type));
-                Dimension after = WithSetting("DxfImport.DimensionsAsDimension", true,
-                    () => SingleDimensionObject(ExportAndImport(project)));
+                Dimension after = SingleDimensionObject(ExportAndImportAsDimensions(project));
 
                 Assert.AreEqual(type, after.DimType);
                 Assert.AreEqual(0.0, after.GetPoint(0) | new GeoPoint(10, 10, 0), 1e-6, type + ": the center");
@@ -1271,7 +1372,7 @@ AcDbArcDimension
 
         /// <summary>
         /// DXF has ARC_DIMENSION only from AutoCAD 2010 on, so an arc length dimension survives
-        /// the round trip in full only for that target, which the setting "DxfExport.Version"
+        /// the round trip in full only for that target, which the setting "DxfDwg.Version"
         /// selects.
         /// </summary>
         [TestMethod]
@@ -1282,7 +1383,7 @@ AcDbArcDimension
             Project project = Project.CreateSimpleProject();
             foreach (IGeoObject go in imported.AllObjects) project.GetActiveModel().Add(go.Clone());
 
-            ACadSharp.CadDocument doc = WithSetting("DxfExport.Version", "AC1024", () => ExportAndRead(project));
+            ACadSharp.CadDocument doc = WithChoice("DxfDwg.Version", 10, () => ExportAndReadAsDimensions(project)); // 2010
             Assert.AreEqual(ACadSharp.ACadVersion.AC1024, doc.Header.Version);
             ACadSharp.Entities.DimensionArc written = doc.Entities.OfType<ACadSharp.Entities.DimensionArc>().Single();
             Assert.AreEqual(0.0, Distance(written.Center, new GeoPoint(0, 0, 0)), 1e-8);
@@ -1290,8 +1391,7 @@ AcDbArcDimension
             Assert.AreEqual(Math.PI / 2, written.EndAngle, 1e-8);
             Assert.IsFalse(written.Text.StartsWith("\u2312"), "ARC_DIMENSION draws the arc symbol itself");
 
-            Dimension after = WithSetting("DxfImport.DimensionsAsDimension", true,
-                () => SingleDimensionObject(ImportDxf(File.ReadAllText(this.TestContext.TestName + ".dxf")).GetActiveModel()));
+            Dimension after = SingleDimensionObject(ImportAsDimensions(File.ReadAllText(this.TestContext.TestName + ".dxf")));
             Assert.AreEqual(Dimension.EDimType.DimAngle, after.DimType);
             Assert.AreEqual(DimensionStyle.EAngleText.ArcLength, after.DimensionStyle.AngleText,
                 "it should still be an arc length dimension");
@@ -1316,7 +1416,7 @@ AcDbArcDimension
             Project project = Project.CreateSimpleProject();
             foreach (IGeoObject go in imported.AllObjects) project.GetActiveModel().Add(go.Clone());
 
-            ACadSharp.CadDocument doc = ExportAndRead(project);
+            ACadSharp.CadDocument doc = ExportAndReadAsDimensions(project);
             Assert.AreEqual(ACadSharp.ACadVersion.AC1015, doc.Header.Version, "AutoCAD 2000 by default");
             Assert.AreEqual(0, doc.Entities.OfType<ACadSharp.Entities.DimensionArc>().Count());
             ACadSharp.Entities.DimensionAngular3Pt angular = doc.Entities.OfType<ACadSharp.Entities.DimensionAngular3Pt>().Single();
@@ -1325,17 +1425,47 @@ AcDbArcDimension
         }
 
         /// <summary>
-        /// A value of "DxfExport.Version" that cannot be written falls back to AutoCAD 2000.
+        /// The choices of "DxfDwg.Version" (DXF/DWG Version in the export settings) and the
+        /// $ACADVER each of them writes. New versions are appended to the list, so that a
+        /// selection stored by an earlier release keeps its meaning.
+        /// </summary>
+        [TestMethod]
+        public void export_dxf_version_setting_selects_the_version()
+        {
+            string[] choices = CADability.UserInterface.StringTable.GetSplittedStrings("DxfDwg.Version.Values");
+            CollectionAssert.AreEqual(
+                new[] { "2.5", "2.6", "9", "10", "11/12", "13", "14", "2000", "2004", "2007", "2010", "2013", "2018" },
+                choices, "the choices of the setting");
+
+            Project project = MakeProjectWithDimension(new GeoPoint(0, 0, 0), new GeoPoint(100, 0, 0));
+            var expected = new (int selection, ACadSharp.ACadVersion version)[]
+            {
+                (5, ACadSharp.ACadVersion.AC1012), (6, ACadSharp.ACadVersion.AC1014), (7, ACadSharp.ACadVersion.AC1015),
+                (8, ACadSharp.ACadVersion.AC1018), (9, ACadSharp.ACadVersion.AC1021), (10, ACadSharp.ACadVersion.AC1024),
+                (11, ACadSharp.ACadVersion.AC1027), (12, ACadSharp.ACadVersion.AC1032),
+            };
+            foreach (var (selection, version) in expected)
+            {
+                string label = choices[selection] + " (selection " + selection + ")";
+                ACadSharp.CadDocument doc = WithChoice("DxfDwg.Version", selection, () => ExportAndRead(project));
+                Assert.AreEqual(version, doc.Header.Version, label);
+                string written = File.ReadAllText(this.TestContext.TestName + ".dxf").Replace("\r\n", "\n");
+                StringAssert.Contains(written, "$ACADVER\n  1\n" + version + "\n", label + ": the header variable in the file");
+            }
+        }
+
+        /// <summary>
+        /// The versions before AutoCAD 13 are in the list of the setting, but ACadSharp cannot
+        /// write them. They, and a selection outside the list, fall back to AutoCAD 2000.
         /// </summary>
         [TestMethod]
         public void export_dxf_version_setting_falls_back_to_autocad_2000()
         {
             Project project = MakeProjectWithDimension(new GeoPoint(0, 0, 0), new GeoPoint(100, 0, 0));
-            foreach (string value in new[] { "AC1009", "nonsense", "AC1032" })
+            foreach (int selection in new[] { 0, 1, 2, 3, 4, 13, -1 })
             {
-                ACadSharp.CadDocument doc = WithSetting("DxfExport.Version", value, () => ExportAndRead(project));
-                Assert.AreEqual(value == "AC1032" ? ACadSharp.ACadVersion.AC1032 : ACadSharp.ACadVersion.AC1015,
-                    doc.Header.Version, value);
+                ACadSharp.CadDocument doc = WithChoice("DxfDwg.Version", selection, () => ExportAndRead(project));
+                Assert.AreEqual(ACadSharp.ACadVersion.AC1015, doc.Header.Version, "selection " + selection);
             }
         }
 
@@ -1343,23 +1473,43 @@ AcDbArcDimension
 
         private Project ImportProjectAsDimensions(string dxf)
         {
-            return WithSetting("DxfImport.DimensionsAsDimension", true, () => ImportDxf(dxf));
+            return WithChoice("DxfDwg.ImportDimension", 1, () => ImportDxf(dxf)); // "As Dimension"
         }
 
         private Model ImportAsDimensions(string dxf) => ImportProjectAsDimensions(dxf).GetActiveModel();
 
-        /// <summary>
-        /// Runs <paramref name="action"/> with a global setting changed, and restores the setting
-        /// afterwards.
-        /// </summary>
-        private static T WithSetting<T>(string name, object value, Func<T> action)
+        /// <summary>Exports with "DxfDwg.ExportDimension" set to "As Dimension".</summary>
+        private ACadSharp.CadDocument ExportAndReadAsDimensions(Project project)
         {
-            object old = Settings.GlobalSettings.ContainsSetting(name) ? Settings.GlobalSettings.GetValue(name) : null;
-            Settings.GlobalSettings.SetValue(name, value);
+            return WithChoice("DxfDwg.ExportDimension", 1, () => ExportAndRead(project));
+        }
+
+        /// <summary>
+        /// Exports and imports with "DxfDwg.ExportDimension" and "DxfDwg.ImportDimension" both
+        /// set to "As Dimension".
+        /// </summary>
+        private Model ExportAndImportAsDimensions(Project project)
+        {
+            return WithChoice("DxfDwg.ExportDimension", 1,
+                () => WithChoice("DxfDwg.ImportDimension", 1, () => ExportAndImport(project)));
+        }
+
+        /// <summary>
+        /// Runs <paramref name="action"/> with the global multiple choice setting
+        /// <paramref name="name"/> set to <paramref name="selection"/>, and restores the previous
+        /// selection afterwards. <see cref="Settings.SetValue(string, object)"/> changes a
+        /// <see cref="MultipleChoiceSetting"/> in place, so it is the selection that has to be
+        /// kept, not the object.
+        /// </summary>
+        private static T WithChoice<T>(string name, int selection, Func<T> action)
+        {
+            bool existed = Settings.GlobalSettings.ContainsSetting(name);
+            int old = Settings.GlobalSettings.GetIntValue(name, 0);
+            Settings.GlobalSettings.SetValue(name, selection);
             try { return action(); }
             finally
             {
-                if (old != null) Settings.GlobalSettings.SetValue(name, old);
+                if (existed) Settings.GlobalSettings.SetValue(name, old);
                 else Settings.GlobalSettings.RemoveSetting(name);
             }
         }

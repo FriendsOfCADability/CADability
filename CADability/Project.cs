@@ -1170,18 +1170,41 @@ namespace CADability
             }
         }
         /// <summary>
-        /// The DXF version <see cref="Export"/> writes: AutoCAD 2000 (AC1015) by default, the
-        /// widest readership. The setting "DxfExport.Version" takes an ACadVersion name from
-        /// AC1012 to AC1032, for instance "AC1024" for AutoCAD 2010, the first version whose DXF
-        /// knows the arc length dimension (ARC_DIMENSION).
+        /// The DXF versions behind the choices of the setting "DxfDwg.Version", in the order of
+        /// "DxfDwg.Version.Values" in the string tables: 2.5, 2.6, 9, 10, 11/12, 13, 14, 2000,
+        /// 2004, 2007, 2010, 2013, 2018. ACadSharp cannot write the versions before AutoCAD 13,
+        /// they are <see cref="ACadVersion.Unknown"/> here. New versions are appended to the end
+        /// of the list, so that a stored selection keeps its meaning.
+        /// </summary>
+        private static readonly ACadVersion[] dxfDwgVersions = new ACadVersion[]
+        {
+            ACadVersion.Unknown, // 2.5
+            ACadVersion.Unknown, // 2.6
+            ACadVersion.Unknown, // 9
+            ACadVersion.Unknown, // 10
+            ACadVersion.Unknown, // 11/12
+            ACadVersion.AC1012,  // 13
+            ACadVersion.AC1014,  // 14
+            ACadVersion.AC1015,  // 2000
+            ACadVersion.AC1018,  // 2004
+            ACadVersion.AC1021,  // 2007
+            ACadVersion.AC1024,  // 2010
+            ACadVersion.AC1027,  // 2013
+            ACadVersion.AC1032,  // 2018
+        };
+        /// <summary>
+        /// The DXF version <see cref="Export"/> writes, from the setting "DxfDwg.Version" (DXF/DWG
+        /// Version in the export settings of the control center). Its default is AutoCAD 2000
+        /// (AC1015), the widest readership. AutoCAD 2010 (AC1024) is the first version whose DXF
+        /// knows the arc length dimension (ARC_DIMENSION). A choice ACadSharp cannot write falls
+        /// back to AutoCAD 2000.
         /// </summary>
         private static ACadVersion DxfExportVersion()
         {
-            string name = Settings.GlobalSettings.GetStringValue("DxfExport.Version", "AC1015");
-            if (Enum.TryParse(name, true, out ACadVersion version) && Enum.IsDefined(typeof(ACadVersion), version)
-                && version >= ACadVersion.AC1012 && version <= ACadVersion.AC1032)
-                return version;
-            Trace.WriteLine("dxf: setting DxfExport.Version \"" + name + "\" is not a version that can be written, using AC1015");
+            int selection = Settings.GlobalSettings.GetIntValue("DxfDwg.Version", 7);
+            if (selection >= 0 && selection < dxfDwgVersions.Length && dxfDwgVersions[selection] != ACadVersion.Unknown)
+                return dxfDwgVersions[selection];
+            Trace.WriteLine("dxf: setting DxfDwg.Version (selection " + selection.ToString() + ") is not a version that can be written, using AC1015");
             return ACadVersion.AC1015;
         }
         /// <summary>

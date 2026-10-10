@@ -16,8 +16,10 @@ Closed as answered: #297 (WPF hosting of `CadControl`) and #165 (OctTree
 
 Fixed by porting branch `claude/ecstatic-fermat-uml5l3`: #167 (a DXF
 DIMENSION without its block is drawn instead of dropped; CADability
-dimensions are exported as DIMENSION entities; optional import as
-CADability `Dimension` objects).
+dimensions are exported, as a block by default or as DIMENSION entities;
+optional import as CADability `Dimension` objects; both chosen by the
+existing settings `DxfDwg.ExportDimension` and `DxfDwg.ImportDimension`, and
+the DXF version by `DxfDwg.Version`).
 
 Fixed during this triage (#369): #251 (dead `objectPointSav` code removed
 from ToolsRoundIn) and #294 (README links and the repository website now

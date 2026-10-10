@@ -49,8 +49,9 @@ namespace CADability.DXF
         private readonly LinePattern byLayerPattern = new LinePattern("ByLayer"), byBlockPattern = new LinePattern("ByBlock");
         private readonly LineWidth byLayerWidth = new LineWidth("ByLayer", 0.0), byBlockWidth = new LineWidth("ByBlock", 0.0);
         /// <summary>
-        /// Read from the setting "DxfImport.DimensionsAsDimension". Off by default: a DIMENSION
-        /// then keeps the picture AutoCAD drew. On, it is rebuilt as CADability's own
+        /// Read from the setting "DxfDwg.ImportDimension" (Import Dimension in the export settings
+        /// of the control center): 0, "As Block", is the default, and a DIMENSION then keeps the
+        /// picture AutoCAD drew. With 1, "As Dimension", it is rebuilt as CADability's own
         /// <see cref="GeoObject.Dimension"/>, which can be measured and edited but is redrawn by
         /// CADability's style engine and will not match the original line for line.
         /// </summary>
@@ -378,7 +379,7 @@ namespace CADability.DXF
             layerColorTable = new Dictionary<string, ColorDef>();
             layerTable = new Dictionary<string, Attribute.Layer>();
             importedDimensionStyles = new List<(Attribute.DimensionStyle, Attribute.DimensionStyle)>();
-            dimensionsAsDimension = Settings.GlobalSettings.GetBoolValue("DxfImport.DimensionsAsDimension", false);
+            dimensionsAsDimension = Settings.GlobalSettings.GetIntValue("DxfDwg.ImportDimension", 0) == 1;
             foreach (var item in doc.Layers)
             {
                 Attribute.Layer layer = project.LayerList.CreateOrFind(item.Name);
@@ -1845,7 +1846,7 @@ namespace CADability.DXF
         /// writers leave it out) is drawn by ACadSharp from its definition points and style.
         /// The data that makes the block a dimension is kept in UserData, see
         /// <see cref="SetDimensionUserData"/>.
-        /// With the setting "DxfImport.DimensionsAsDimension" the DIMENSION becomes a
+        /// With the setting "DxfDwg.ImportDimension" set to "As Dimension" the DIMENSION becomes a
         /// <see cref="GeoObject.Dimension"/> instead, where its definition points allow that.
         /// </summary>
         private IGeoObject CreateDimension(ACadSharp.Entities.Dimension dimension)

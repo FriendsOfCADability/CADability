@@ -28,6 +28,13 @@ namespace CADability.DXF
         private Dictionary<CADability.Attribute.DimensionStyle, ACadSharp.Tables.DimensionStyle> createdDimensionStyles;
         private HashSet<string> createdBlockNames;
         private int anonymousBlockCounter = 0;
+        /// <summary>
+        /// Read from the setting "DxfDwg.ExportDimension" (Export Dimension in the export settings
+        /// of the control center) when the export is created: 1, "As Dimension", writes DXF
+        /// DIMENSION entities. 0, "As Block", is the default and writes the picture CADability
+        /// drew as an INSERT of an ordinary block, see <see cref="ExportDimension"/>.
+        /// </summary>
+        private readonly bool dimensionsAsDimension;
         private double triangulationPrecision = 0.1;
 
         public Export(ACadVersion version = ACadVersion.AC1015)
@@ -40,6 +47,7 @@ namespace CADability.DXF
             createdTextStyles = new Dictionary<string, ACadSharp.Tables.TextStyle>();
             createdDimensionStyles = new Dictionary<CADability.Attribute.DimensionStyle, ACadSharp.Tables.DimensionStyle>();
             createdBlockNames = new HashSet<string>();
+            dimensionsAsDimension = Settings.GlobalSettings.GetIntValue("DxfDwg.ExportDimension", 0) == 1;
             if (version <= ACadVersion.AC1015)
                 RemovePostR2000Objects();
         }
@@ -734,53 +742,60 @@ namespace CADability.DXF
         }
 
         /// <summary>
-        /// Writes a CADability dimension as a real DXF DIMENSION rather than as loose lines.
-        /// The definition points and the dimension style go into the entity, and the picture
-        /// CADability drew goes into the anonymous block that every DIMENSION carries. A reader
-        /// that shows the block sees what the user saw, one that regenerates still has a
-        /// dimension it can measure.
+        /// Writes a CADability dimension. By default (setting "DxfDwg.ExportDimension" is
+        /// "As Block") the picture CADability drew becomes an ordinary, named block placed by an
+        /// INSERT: every reader shows exactly what the user saw, and reading the file back gives
+        /// the same geometry, but the dimension is no longer a dimension.
+        /// With "As Dimension" it becomes a real DXF DIMENSION: the definition points and the
+        /// dimension style go into the entity, and the picture CADability drew goes into the
+        /// anonymous block that every DIMENSION carries. A reader that shows the block sees what
+        /// the user saw, one that regenerates still has a dimension it can measure.
         /// Dimensions over more than two points become a chain of DXF dimensions, one per
         /// measured section, because DXF has no multi point dimension. Labels and coordinate
-        /// dimensions have no DXF counterpart and keep their drawing as a block.
+        /// dimensions have no DXF counterpart and keep their drawing as a block in either case.
         /// </summary>
         private Entity[] ExportDimension(GeoObject.Dimension dim)
         {
             if (dim.DimensionStyle == null) return null;
             List<Entity> result = new List<Entity>();
-            try
+            if (dimensionsAsDimension)
             {
-                if (dim.DimType == GeoObject.Dimension.EDimType.DimPoints && dim.PointCount > 2)
+                try
                 {
-                    // Drawing the dimension establishes its plane, which GetDimText in
-                    // MakeSectionDimension measures in.
-                    dim.GetList();
-                    for (int i = 0; i < dim.PointCount - 1; i++)
+                    if (dim.DimType == GeoObject.Dimension.EDimType.DimPoints && dim.PointCount > 2)
                     {
-                        Entity e = ExportSingleDimension(MakeSectionDimension(dim, i));
+                        // Drawing the dimension establishes its plane, which GetDimText in
+                        // MakeSectionDimension measures in.
+                        dim.GetList();
+                        for (int i = 0; i < dim.PointCount - 1; i++)
+                        {
+                            Entity e = ExportSingleDimension(MakeSectionDimension(dim, i));
+                            if (e != null) result.Add(e);
+                        }
+                    }
+                    else
+                    {
+                        Entity e = ExportSingleDimension(dim);
                         if (e != null) result.Add(e);
                     }
                 }
-                else
+                catch (Exception ex)
                 {
-                    Entity e = ExportSingleDimension(dim);
-                    if (e != null) result.Add(e);
+                    System.Diagnostics.Trace.WriteLine("dxf: dimension not written as DIMENSION ("
+                        + ex.Message + "), falling back to a block");
+                    // the blocks of the sections already written would stay in the file unreferenced
+                    foreach (Entity e in result)
+                    {
+                        if (e is ACadSharp.Entities.Dimension written && written.Block != null)
+                            doc.BlockRecords.Remove(written.Block.Name);
+                    }
+                    result.Clear();
                 }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Trace.WriteLine("dxf: dimension not written as DIMENSION ("
-                    + ex.Message + "), falling back to a block");
-                // the blocks of the sections already written would stay in the file unreferenced
-                foreach (Entity e in result)
-                {
-                    if (e is ACadSharp.Entities.Dimension written && written.Block != null)
-                        doc.BlockRecords.Remove(written.Block.Name);
-                }
-                result.Clear();
             }
             if (result.Count == 0)
             {
-                // GetList does not throw, but the conversion of what it drew may
+                // "As Block", or a dimension that has no DXF DIMENSION or could not be written as
+                // one. GetList does not throw, but the conversion of what it drew may.
                 try
                 {
                     BlockRecord blockRec = MakeDimensionBlock(dim.GetList(), false);
@@ -1042,7 +1057,7 @@ namespace CADability.DXF
                 if (ents != null) entities.AddRange(ents);
             }
             string name = blk.Name;
-            if (name == null || createdBlockNames.Contains(name) || !IsValidBlockName(name))
+            if (name == null || createdBlockNames.Contains(name) || !IsValidBlockName(name) || doc.BlockRecords.Contains(name))
                 name = GetNextAnonymousBlockName();
             createdBlockNames.Add(name);
             var blockRec = new BlockRecord(name);
@@ -1358,6 +1373,16 @@ namespace CADability.DXF
             return true;
         }
 
-        private string GetNextAnonymousBlockName() => "AnonymousBlock" + (++anonymousBlockCounter);
+        /// <summary>
+        /// A name for a block that has none of its own. It must not be taken yet: a block that
+        /// a previous export named this way comes back with that name when the file is read.
+        /// </summary>
+        private string GetNextAnonymousBlockName()
+        {
+            string name;
+            do name = "AnonymousBlock" + (++anonymousBlockCounter);
+            while (createdBlockNames.Contains(name) || doc.BlockRecords.Contains(name));
+            return name;
+        }
     }
 }

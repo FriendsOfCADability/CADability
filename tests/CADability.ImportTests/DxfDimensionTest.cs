@@ -15,7 +15,8 @@ namespace CADability.ImportTests
     /// are mostly ByBlock on layer 0 and have to take the DIMENSION's attributes, a dimension
     /// without a block must not vanish, and the data that makes the block a dimension has to
     /// survive in UserData. The export writes CADability's <see cref="Dimension"/> as a DXF
-    /// DIMENSION.
+    /// DIMENSION, and with the setting "DxfImport.DimensionsAsDimension" the import builds such
+    /// a <see cref="Dimension"/> from a DIMENSION.
     /// </summary>
     [TestClass]
     public class DxfDimensionTest
@@ -642,7 +643,566 @@ Dimensions
             Assert.IsTrue(block.Children.Count > 0, "the picture should travel in the anonymous block");
         }
 
+        // --- import as CADability's own Dimension (setting DxfImport.DimensionsAsDimension) ----
+
+        // Header, the red layer "Dimensions" and a dimension style "LOGICAL" with values that are
+        // nothing like CADability's defaults, so a translation is visible in the assertions:
+        // DIMSCALE 2, DIMASZ 1.5, DIMEXO 0.5, DIMEXE 1.25, DIMTXT 3.5, DIMDEC 3.
+        private const string StyledPrologue = @"  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1015
+  0
+ENDSEC
+  0
+SECTION
+  2
+TABLES
+  0
+TABLE
+  2
+LAYER
+  0
+LAYER
+  2
+Dimensions
+ 70
+0
+ 62
+1
+  6
+CONTINUOUS
+  0
+ENDTAB
+  0
+TABLE
+  2
+DIMSTYLE
+  0
+DIMSTYLE
+100
+AcDbSymbolTableRecord
+100
+AcDbDimStyleTableRecord
+  2
+LOGICAL
+ 70
+0
+ 40
+2.0
+ 41
+1.5
+ 42
+0.5
+ 44
+1.25
+140
+3.5
+271
+3
+  0
+ENDTAB
+  0
+TABLE
+  2
+APPID
+  0
+APPID
+  2
+ACAD
+ 70
+0
+  0
+ENDTAB
+  0
+ENDSEC
+  0
+SECTION
+  2
+BLOCKS
+  0
+BLOCK
+  8
+0
+  2
+*D1
+ 70
+1
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  3
+*D1
+  1
+
+  0
+LINE
+  8
+0
+ 62
+0
+ 10
+0.0
+ 20
+20.0
+ 30
+0.0
+ 11
+100.0
+ 21
+20.0
+ 31
+0.0
+  0
+ENDBLK
+  8
+0
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+";
+
+        // A linear (rotated) dimension over (0,0) - (100,0), dimension line at y = 20
+        private const string LinearDimension = @"  0
+DIMENSION
+  8
+Dimensions
+100
+AcDbEntity
+100
+AcDbDimension
+  2
+*D1
+  3
+LOGICAL
+ 70
+32
+ 10
+100.0
+ 20
+20.0
+ 30
+0.0
+100
+AcDbAlignedDimension
+ 13
+0.0
+ 23
+0.0
+ 33
+0.0
+ 14
+100.0
+ 24
+0.0
+ 34
+0.0
+100
+AcDbRotatedDimension
+ 50
+0.0
+";
+
+        /// <summary>
+        /// With the setting on, a linear dimension is no longer a picture but a dimension:
+        /// measured points, dimension line and a text CADability computes itself.
+        /// </summary>
+        [TestMethod]
+        public void import_dxf_linear_dimension_as_a_dimension_object()
+        {
+            Dimension dim = SingleDimensionObject(ImportAsDimensions(StyledPrologue + LinearDimension + Epilogue));
+
+            Assert.AreEqual(Dimension.EDimType.DimPoints, dim.DimType);
+            Assert.AreEqual(2, dim.PointCount, "the two measured points");
+            Assert.AreEqual(0.0, dim.GetPoint(0) | new GeoPoint(0, 0, 0), 1e-8);
+            Assert.AreEqual(0.0, dim.GetPoint(1) | new GeoPoint(100, 0, 0), 1e-8);
+            Assert.AreEqual(0.0, dim.DimLineRef | new GeoPoint(100, 20, 0), 1e-8, "the dimension line");
+            Assert.AreEqual(0.0, new SweepAngle(dim.DimLineDirection, GeoVector.XAxis).Radian, 1e-8,
+                "rotation 0 means the dimension runs along the x axis");
+            Assert.AreEqual("Dimensions", dim.Layer?.Name);
+            Assert.AreEqual("DimensionLinear", dim.UserData["CADability.DxfDimension"]);
+            dim.GetBoundingCube(); // establishes the plane GetDimText measures in
+            Assert.AreEqual("100", dim.GetDimText(0), "the text is measured, not copied");
+        }
+
+        /// <summary>
+        /// The DIMSTYLE variables have to arrive, otherwise the rebuilt dimension is drawn with
+        /// CADability's defaults. DIMSCALE (40) is applied to the sizes rather than kept.
+        /// </summary>
+        [TestMethod]
+        public void import_dxf_dimension_translates_the_dimension_style()
+        {
+            Project project = ImportProjectAsDimensions(StyledPrologue + LinearDimension + Epilogue);
+            Dimension dim = SingleDimensionObject(project.GetActiveModel());
+            CADability.Attribute.DimensionStyle style = dim.DimensionStyle;
+
+            Assert.IsNotNull(style, "a rebuilt dimension needs a style to draw with");
+            Assert.AreEqual("LOGICAL", style.Name, "the style should keep the name from the file");
+            Assert.AreSame(style, project.DimensionStyleList.Find("LOGICAL"), "the style is part of the project");
+            Assert.AreEqual(7.0, style.TextSize, 1e-8, "DIMTXT 3.5 times DIMSCALE 2");
+            Assert.AreEqual(3.0, style.SymbolSize, 1e-8, "DIMASZ 1.5 times DIMSCALE 2");
+            Assert.AreEqual(1.0, style.ExtLineOffset, 1e-8, "DIMEXO 0.5 times DIMSCALE 2");
+            Assert.AreEqual(2.5, style.ExtLineExtension, 1e-8, "DIMEXE 1.25 times DIMSCALE 2");
+            Assert.AreEqual(0.001, style.Round, 1e-12, "DIMDEC 3 rounds to a thousandth");
+            Assert.AreEqual(System.Drawing.Color.Red.ToArgb(), style.DimLineColor.Color.ToArgb(),
+                "DIMCLRD ByBlock is the color of the DIMENSION, here that of its red layer");
+        }
+
+        /// <summary>
+        /// A DIMENSION that uses "Standard" gets the Standard style of the file, not CADability's
+        /// own default style, which may carry the same name.
+        /// </summary>
+        [TestMethod]
+        public void import_dxf_dimension_uses_the_standard_style_of_the_file()
+        {
+            string standard = LinearDimension.Replace("  3\nLOGICAL\n", "");
+            Assert.AreNotEqual(LinearDimension, standard, "the style reference should be removed");
+            Project project = ImportProjectAsDimensions(StyledPrologue + standard + Epilogue);
+            Dimension dim = SingleDimensionObject(project.GetActiveModel());
+
+            Assert.AreEqual(0.18, dim.DimensionStyle.TextSize, 1e-8, "DIMTXT of AutoCAD's Standard style");
+            Assert.AreEqual(0.18, dim.DimensionStyle.SymbolSize, 1e-8, "DIMASZ of AutoCAD's Standard style");
+        }
+
+        /// <summary>
+        /// Dimensions with the same style share one CADability style, also after the first of
+        /// them has been drawn (which gives a style its fill hatch style).
+        /// </summary>
+        [TestMethod]
+        public void import_dxf_dimensions_with_the_same_style_share_it()
+        {
+            Project project = ImportProjectAsDimensions(StyledPrologue + LinearDimension + LinearDimension + Epilogue);
+            Dimension[] dims = project.GetActiveModel().AllObjects.OfType<Dimension>().ToArray();
+            Assert.AreEqual(2, dims.Length);
+            Assert.AreSame(dims[0].DimensionStyle, dims[1].DimensionStyle);
+            Assert.AreEqual(1, Enumerable.Range(0, project.DimensionStyleList.Count)
+                .Count(i => project.DimensionStyleList[i].Name.StartsWith("LOGICAL")), "one style for both");
+        }
+
+        /// <summary>
+        /// Almost every dimension in a real drawing overrides something of the style it names.
+        /// An override has to reach the dimension it belongs to without changing its neighbours,
+        /// so it gets a style of its own.
+        /// </summary>
+        [TestMethod]
+        public void import_dxf_dimension_style_override_does_not_leak()
+        {
+            // The second dimension overrides DIMTXT (group code 140) to 9.0 through XData.
+            string overridden = LinearDimension + @"1001
+ACAD
+1000
+DSTYLE
+1002
+{
+1070
+140
+1040
+9.0
+1002
+}
+";
+            Model model = ImportAsDimensions(StyledPrologue + LinearDimension + overridden + Epilogue);
+            Dimension[] dims = model.AllObjects.OfType<Dimension>().ToArray();
+            Assert.AreEqual(2, dims.Length, "both dimensions should be rebuilt");
+
+            double[] sizes = dims.Select(d => d.DimensionStyle.TextSize).OrderBy(t => t).ToArray();
+            Assert.AreEqual(7.0, sizes[0], 1e-8, "the plain dimension keeps DIMTXT 3.5 times DIMSCALE 2");
+            Assert.AreEqual(18.0, sizes[1], 1e-8, "the overridden one gets 9.0 times DIMSCALE 2");
+            Assert.AreNotSame(dims[0].DimensionStyle, dims[1].DimensionStyle,
+                "an override must not be written into the style its neighbours use");
+        }
+
+        /// <summary>
+        /// DXF puts a radial dimension's center in group 10 and the point on the circle in
+        /// group 15.
+        /// </summary>
+        [TestMethod]
+        public void import_dxf_radial_dimension_as_a_dimension_object()
+        {
+            Dimension dim = SingleDimensionObject(ImportAsDimensions(StyledPrologue + @"  0
+DIMENSION
+  8
+Dimensions
+100
+AcDbEntity
+100
+AcDbDimension
+  2
+*D1
+  3
+LOGICAL
+ 70
+36
+ 10
+10.0
+ 20
+10.0
+ 30
+0.0
+100
+AcDbRadialDimension
+ 15
+35.0
+ 25
+10.0
+ 35
+0.0
+ 40
+5.0
+" + Epilogue));
+
+            Assert.AreEqual(Dimension.EDimType.DimRadius, dim.DimType);
+            Assert.AreEqual(0.0, dim.GetPoint(0) | new GeoPoint(10, 10, 0), 1e-8, "group 10 is the center");
+            Assert.AreEqual(25.0, dim.Radius, 1e-8, "the distance to the point on the circle");
+            Assert.AreEqual(0.0, dim.DimLineRef | new GeoPoint(40, 10, 0), 1e-8, "the leader runs 5 beyond the circle");
+            Assert.AreEqual("25", dim.GetDimText(0));
+        }
+
+        /// <summary>
+        /// A diameter dimension names the two ends of the diameter; the center is their middle,
+        /// and the text is on the side of group 15.
+        /// </summary>
+        [TestMethod]
+        public void import_dxf_diameter_dimension_as_a_dimension_object()
+        {
+            Dimension dim = SingleDimensionObject(ImportAsDimensions(StyledPrologue + @"  0
+DIMENSION
+  8
+Dimensions
+100
+AcDbEntity
+100
+AcDbDimension
+  2
+*D1
+  3
+LOGICAL
+ 70
+35
+ 10
+30.0
+ 20
+10.0
+ 30
+0.0
+100
+AcDbDiametricDimension
+ 15
+-10.0
+ 25
+10.0
+ 35
+0.0
+ 40
+0.0
+" + Epilogue));
+
+            Assert.AreEqual(Dimension.EDimType.DimDiameter, dim.DimType);
+            Assert.AreEqual(0.0, dim.GetPoint(0) | new GeoPoint(10, 10, 0), 1e-8, "the middle of the two ends");
+            Assert.AreEqual(20.0, dim.Radius, 1e-8);
+            Assert.IsTrue(dim.DimLineRef.x < 10.0, "the dimension line points to group 15");
+            Assert.AreEqual("40", dim.GetDimText(0), "a diameter dimension shows twice the radius");
+        }
+
+        /// <summary>
+        /// An angular dimension names a vertex and two rays, and says which of the four sectors
+        /// it means by the point the dimension arc runs through. Here that point is in the lower
+        /// right quadrant, so the measured angle is the 270° one, not the 90° one.
+        /// </summary>
+        [TestMethod]
+        public void import_dxf_angular_dimension_takes_the_sector_the_arc_point_names()
+        {
+            Dimension dim = SingleDimensionObject(ImportAsDimensions(StyledPrologue + @"  0
+DIMENSION
+  8
+Dimensions
+100
+AcDbEntity
+100
+AcDbDimension
+  2
+*D1
+  3
+LOGICAL
+ 70
+37
+ 10
+7.07
+ 20
+-7.07
+ 30
+0.0
+100
+AcDb3PointAngularDimension
+ 13
+10.0
+ 23
+0.0
+ 33
+0.0
+ 14
+0.0
+ 24
+10.0
+ 34
+0.0
+ 15
+0.0
+ 25
+0.0
+ 35
+0.0
+" + Epilogue));
+
+            Assert.AreEqual(Dimension.EDimType.DimAngle, dim.DimType);
+            Assert.AreEqual(3, dim.PointCount, "center and one point on each leg");
+            Assert.AreEqual(0.0, dim.GetPoint(0) | new GeoPoint(0, 0, 0), 1e-8, "group 15 is the vertex");
+            dim.GetBoundingCube(); // establishes the plane GetDimText measures in
+            // Counterclockwise from the y leg to the x leg is 270°, and the arc point at -45°
+            // lies on that side; the other way round it would read 90°.
+            StringAssert.StartsWith(dim.GetDimText(0), "270", "the sector the dimension arc runs through");
+        }
+
+        /// <summary>
+        /// A dimension whose definition points describe nothing that can be drawn keeps the
+        /// picture instead of becoming an invisible object. Here an aligned dimension measuring
+        /// along its own normal: there is no plane to draw it in.
+        /// </summary>
+        [TestMethod]
+        public void import_dxf_degenerate_dimension_keeps_its_block()
+        {
+            // drop the rotated subclass to make it an aligned dimension, and put the second
+            // measured point straight above the first, along the normal
+            string degenerate = LinearDimension
+                .Replace("100\nAcDbRotatedDimension\n 50\n0.0\n", "")
+                .Replace(" 14\n100.0", " 14\n0.0")
+                .Replace(" 34\n0.0", " 34\n100.0");
+            Assert.AreNotEqual(LinearDimension, degenerate, "the fixture should have been changed");
+            Model model = ImportAsDimensions(StyledPrologue + degenerate + Epilogue);
+
+            Assert.AreEqual(1, model.Count, "it must not get lost");
+            Assert.IsInstanceOfType(model[0], typeof(Block), "what cannot be rebuilt keeps the picture AutoCAD drew");
+        }
+
+        /// <summary>
+        /// Group 1 overrides the measured text. "&lt;&gt;" inside it stands for the measurement,
+        /// which CADability has no placeholder for: the text around it becomes prefix and
+        /// postfix so the number keeps being measured.
+        /// </summary>
+        [TestMethod]
+        public void import_dxf_dimension_text_override_keeps_the_measurement()
+        {
+            string withText = LinearDimension.Replace("100\nAcDbAlignedDimension",
+                "  1\nca. <> mm\n100\nAcDbAlignedDimension");
+            Assert.AreNotEqual(LinearDimension, withText, "the text override should be inserted");
+            Dimension dim = SingleDimensionObject(ImportAsDimensions(StyledPrologue + withText + Epilogue));
+
+            dim.GetBoundingCube();
+            Assert.AreEqual("ca. ", dim.GetPrefix(0));
+            Assert.AreEqual("100", dim.GetDimText(0), "the value keeps being measured");
+            Assert.AreEqual(" mm", dim.GetPostfix(0));
+        }
+
+        /// <summary>
+        /// Without the setting nothing changes: the dimension stays the picture AutoCAD drew.
+        /// </summary>
+        [TestMethod]
+        public void import_dxf_dimension_stays_a_block_unless_asked()
+        {
+            Model model = ImportDxf(StyledPrologue + LinearDimension + Epilogue).GetActiveModel();
+            Assert.AreEqual(1, model.Count);
+            Assert.IsInstanceOfType(model[0], typeof(Block), "the setting is off by default");
+        }
+
+        /// <summary>
+        /// Import and export have to agree on which definition point means what.
+        /// </summary>
+        [TestMethod]
+        public void dimension_survives_import_export_import()
+        {
+            Model imported = ImportAsDimensions(StyledPrologue + LinearDimension + Epilogue);
+            Dimension before = SingleDimensionObject(imported);
+
+            Project project = Project.CreateSimpleProject();
+            foreach (IGeoObject go in imported.AllObjects) project.GetActiveModel().Add(go.Clone());
+            Dimension after = WithSetting("DxfImport.DimensionsAsDimension", true,
+                () => SingleDimensionObject(ExportAndImport(project)));
+
+            Assert.AreEqual(before.DimType, after.DimType);
+            Assert.AreEqual(0.0, before.GetPoint(0) | after.GetPoint(0), 1e-6, "first measured point");
+            Assert.AreEqual(0.0, before.GetPoint(1) | after.GetPoint(1), 1e-6, "second measured point");
+            Assert.AreEqual(0.0, before.DimLineRef | after.DimLineRef, 1e-6, "the dimension line");
+            Assert.AreEqual(0.0, new SweepAngle(before.DimLineDirection, after.DimLineDirection).Radian, 1e-6,
+                "and its direction");
+            Assert.AreEqual(before.DimensionStyle.TextSize, after.DimensionStyle.TextSize, 1e-8);
+            before.GetBoundingCube();
+            after.GetBoundingCube();
+            Assert.AreEqual(before.GetDimText(0), after.GetDimText(0), "the measured text");
+        }
+
+        /// <summary>
+        /// The same for a radius and a diameter, where the two definition points are not
+        /// interchangeable.
+        /// </summary>
+        [TestMethod]
+        public void circle_dimensions_survive_export_import()
+        {
+            foreach (Dimension.EDimType type in new[] { Dimension.EDimType.DimRadius, Dimension.EDimType.DimDiameter })
+            {
+                Project project = Project.CreateSimpleProject();
+                project.GetActiveModel().Add(MakeCircleDimension(project, type));
+                Dimension after = WithSetting("DxfImport.DimensionsAsDimension", true,
+                    () => SingleDimensionObject(ExportAndImport(project)));
+
+                Assert.AreEqual(type, after.DimType);
+                Assert.AreEqual(0.0, after.GetPoint(0) | new GeoPoint(10, 10, 0), 1e-6, type + ": the center");
+                Assert.AreEqual(25.0, after.Radius, 1e-6, type + ": the radius");
+                Assert.AreEqual(0.0, after.DimLineRef | new GeoPoint(45, 10, 0), 1e-6, type + ": the end of the dimension line");
+            }
+        }
+
         // --- helpers -------------------------------------------------------------------------
+
+        private Project ImportProjectAsDimensions(string dxf)
+        {
+            return WithSetting("DxfImport.DimensionsAsDimension", true, () => ImportDxf(dxf));
+        }
+
+        private Model ImportAsDimensions(string dxf) => ImportProjectAsDimensions(dxf).GetActiveModel();
+
+        /// <summary>
+        /// Runs <paramref name="action"/> with a global setting changed, and restores the setting
+        /// afterwards.
+        /// </summary>
+        private static T WithSetting<T>(string name, object value, Func<T> action)
+        {
+            object old = Settings.GlobalSettings.ContainsSetting(name) ? Settings.GlobalSettings.GetValue(name) : null;
+            Settings.GlobalSettings.SetValue(name, value);
+            try { return action(); }
+            finally
+            {
+                if (old != null) Settings.GlobalSettings.SetValue(name, old);
+                else Settings.GlobalSettings.RemoveSetting(name);
+            }
+        }
+
+        private static Dimension SingleDimensionObject(Model model)
+        {
+            Assert.AreEqual(1, model.Count, "the DIMENSION should import as one object");
+            Dimension dim = model[0] as Dimension;
+            Assert.IsNotNull(dim, "with the setting on it should be a Dimension, not a " + model[0].GetType().Name);
+            return dim;
+        }
 
         private static Project MakeProjectWithDimension(params GeoPoint[] points)
         {

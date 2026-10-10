@@ -2274,7 +2274,17 @@ namespace CADability.GeoObject
             BoundingCube res = BoundingCube.EmptyBoundingCube;
             for (int i = 0; i < list.Count; ++i)
             {
-                res.MinMax(list[i].GetBoundingCube());
+                // A part that cannot say how big it is (a text whose font cannot be measured, for
+                // instance) is left out. Letting the exception through cost the whole dimension
+                // the moment it was added to a model.
+                try
+                {
+                    res.MinMax(list[i].GetBoundingCube());
+                }
+                catch (Exception e)
+                {
+                    if (e is ThreadAbortException) throw;
+                }
             }
             return res;
         }

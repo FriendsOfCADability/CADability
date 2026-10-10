@@ -11,6 +11,16 @@ Closed during this triage, because they were already solved on master:
   and 9573342d.
 - #295 Make3D.MakePipe with a straight path: fixed in #307 (a75ce094).
 
+Closed as answered: #297 (WPF hosting of `CadControl`) and #165 (OctTree
+`GetObjectsCloseTo` is not a distance query).
+
+Fixed by porting branch `claude/ecstatic-fermat-uml5l3`: #167 (a DXF
+DIMENSION without its block is drawn instead of dropped; CADability
+dimensions are exported, as a block by default or as DIMENSION entities;
+optional import as CADability `Dimension` objects; both chosen by the
+existing settings `DxfDwg.ExportDimension` and `DxfDwg.ImportDimension`, and
+the DXF version by `DxfDwg.Version`).
+
 Fixed during this triage (#369): #251 (dead `objectPointSav` code removed
 from ToolsRoundIn) and #294 (README links and the repository website now
 point to friendsofcadability.github.io).
@@ -45,33 +55,10 @@ targets net8.0-windows since 517d643f, untested in the designer).
 Closed as not planned: #192 (the DebuggerVisualizers project was removed in
 d3db7052; a rewrite is not planned, prototype on branch `ShapeItProgress`).
 
-## Could not be verified / unsure
-
-These need someone with the original files, Windows/Visual Studio, or a
-maintainer decision.
-
-- [ ] **#297 CADability WPF integration issue.** This is a usage question.
-  The control is `CadControl` in namespace `CADability.Forms` (assembly
-  CADability.Forms.dll), not `CADControl` in `CADability`. Draft answer: use
-  `xmlns:cad="clr-namespace:CADability.Forms;assembly=CADability.Forms"`,
-  target `net8.0-windows` with `UseWPF` and `UseWindowsForms`, and host the
-  control in a `WindowsFormsHost`. Post the answer and close; optionally add a
-  WPF hosting note to the README.
-- [ ] **#165 OctTree not returning all close objects.** Works as designed:
-  on master `GetObjectsCloseTo(e1)` still does not return e2, which is 9e-5
-  away from e1, even after #326. `GetObjectsCloseTo` returns objects that share
-  an octree leaf with the given object, so it is not a distance query. Use
-  `GetObjectsFromBox` with an expanded cube, as dsn27 already answered. Answer
-  stefan-tb's question and close as answered.
-- [ ] **#167 Dimensions not shown in view.** Partly a question. A DIMENSION
-  is imported as its anonymous block (lines, arrows, text). A DIMENSION
-  without a block is dropped silently, and ByBlock colours come in black.
-  Fixes exist on the unmerged branch `claude/ecstatic-fermat-uml5l3`
-  (311598c3, 3bc72921, e8199e3b). Review and merge that branch, then answer
-  and close.
 ## Confirmed — still present on master
 
 Each of these was reproduced, or confirmed by reading the code, on `17f949e`.
+All issues that could not be verified at first have since been checked.
 
 - [ ] **#249 Path colour changes when approximated.** `Path.Approximate`
   creates child curves with the default black colour, and `CopyAttributes`
@@ -134,6 +121,13 @@ Each of these was reproduced, or confirmed by reading the code, on `17f949e`.
 - [ ] DXF hatch line styles are not told apart by dash pattern, pattern hatch
   lines keep the style's lineweight (no ByBlock), and a top-level ByBlock
   linetype still maps to the solid "ByBlock" pattern.
+
+- [ ] The settings `DxfDwg.Format` (DWG/DXF/DXB) and `DxfDwg.Text`
+  (Fit/Original) are shown in the control center but read nowhere. Related:
+  `Project.Export` with the format "dwg" or "dxb" writes nothing and still
+  returns true. Either implement them (ACadSharp can write DWG) or remove
+  them from `Settings.cs` and the string tables, and let `Project.Export`
+  report unsupported formats.
 
 ## Documentation
 

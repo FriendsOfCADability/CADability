@@ -121,6 +121,12 @@ All issues that could not be verified at first have since been checked.
 - [ ] DXF hatch line styles are not told apart by dash pattern, pattern hatch
   lines keep the style's lineweight (no ByBlock), and a top-level ByBlock
   linetype still maps to the solid "ByBlock" pattern.
+- [ ] The triangulation of a face on a `SurfaceOfRevolution` overestimates its
+  area, the more the larger the angle: a spline rotated by half a turn gives
+  951.5 instead of 946.4 (integral of the surface derivatives and Pappus's
+  theorem agree), by three quarters of a turn 1451.9 instead of 1419.6. Found with
+  `MakeRevolutionTests.Spline`, which therefore checks the points of the
+  triangulation instead of the area.
 
 - [ ] The settings `DxfDwg.Format` (DWG/DXF/DXB) and `DxfDwg.Text`
   (Fit/Original) are shown in the control center but read nowhere. Related:

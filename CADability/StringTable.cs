@@ -71,7 +71,7 @@ namespace CADability.UserInterface
                 {
                     try
                     {
-                        FileStream stream = File.Open(filename, FileMode.Open);
+                        FileStream stream = File.Open(filename, FileMode.Open, FileAccess.Read, FileShare.Read);
                         XmlDocument doc = new XmlDocument();
                         doc.Load(stream);
                         AddStrings(doc);

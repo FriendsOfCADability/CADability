@@ -3927,7 +3927,7 @@ namespace CADability.GeoObject
             {
                 using (ChangingAttribute.Create(this, colorDef))
                 {
-                    colorDef = value;
+                    colorDef = ColorDefForOwner(value);
                 }
             }
         }

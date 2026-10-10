@@ -1520,6 +1520,7 @@ namespace CADability
                         // Beim Aufteilen der kanten dürfen die Endpunkte allerdings nicht mit verwendet werden
                         continue;
                     }
+                    SnapTangentialIntersection(ef.edge, ef.face, ref ip[i], ref uvOnFace[i], ref uOnCurve3D[i], ref position[i]);
                     if (multipleFaces != null)
                     {   // in multiple face mode we do not want the vertics of the edge to intersect a face, which is connected to this vertex
                         // this would leed to many intersection points which are not required
@@ -1603,6 +1604,72 @@ namespace CADability
                     if (operation == Operation.testonly) return; // ein Schnittpunkt reicht hier
                 }
             }
+        }
+        /// <summary>
+        /// An edge, which grazes the surface of a face, has an ill-conditioned intersection point with it: when the edge enters a cylinder
+        /// of radius r at a depth d near a tangent line, the intersection point moves by sqrt(2*r*d) along the surface, i.e. by 1.3e-3 for
+        /// d == 3e-7 and r == 3. The intersection of the two surfaces (e.g. the tangent line of a rounded edge and a plane, which is the same
+        /// as the tangent plane within the precision) does not pass through such a point, so the intersection edge is missing (issue #168).
+        /// This happens, when a face of the edge overlaps (lies in) the face of the other shell, which is the tangential neighbour of the face:
+        /// then the edge can only touch the face on the border between the face and that neighbour. In the same way an edge, which ends
+        /// in a vertex of a face overlapping the face, can only touch the face in that vertex.
+        /// If the edge runs within precision on the surface from the intersection point to such a border or vertex, the intersection
+        /// point is moved there. Returns true, if the point has been moved.
+        /// </summary>
+        private bool SnapTangentialIntersection(Edge edge, Face face, ref GeoPoint ip, ref GeoPoint2D uv, ref double u, ref Border.Position position)
+        {
+            ICurve crv = edge.Curve3D;
+            if (crv == null || u <= 1e-6 || u >= 1 - 1e-6) return false; // only inner points of the edge
+            // faces of the other shell, which overlap the faces of the edge, and those, which overlap the face
+            HashSet<Face> overlappingEdge = new HashSet<Face>();
+            if (faceToOverlappingFaces.TryGetValue(edge.PrimaryFace, out HashSet<Face> ovl)) overlappingEdge.UnionWith(ovl);
+            if (edge.SecondaryFace != null && faceToOverlappingFaces.TryGetValue(edge.SecondaryFace, out ovl)) overlappingEdge.UnionWith(ovl);
+            if (!faceToOverlappingFaces.TryGetValue(face, out HashSet<Face> overlappingFace)) overlappingFace = new HashSet<Face>();
+            if (overlappingEdge.Count == 0 && overlappingFace.Count == 0) return false;
+            GeoVector dir = crv.DirectionAt(u);
+            GeoVector n = face.Surface.GetNormal(uv);
+            if (Precision.IsNullVector(dir) || Precision.IsNullVector(n)) return false;
+            if (Math.Abs(dir.Normalized * n.Normalized) > 0.1) return false; // a transversal intersection is well defined
+            GeoPoint ipc = ip;
+            double uc = u;
+            double bestU = double.NaN, bestDist = double.MaxValue;
+            bool bestOnBorder = false;
+            void Consider(double uq, bool onBorder)
+            {
+                if (Math.Abs(uq - uc) >= bestDist || (crv.PointAt(uq) | ipc) < precision) return;
+                for (int k = 1; k < 8; k++)
+                {   // between the intersection point and the candidate the edge must stay on the surface (within precision)
+                    if (face.Surface.GetDistance(crv.PointAt(uc + (uq - uc) * k / 8.0)) > precision) return;
+                }
+                bestU = uq;
+                bestDist = Math.Abs(uq - uc);
+                bestOnBorder = onBorder;
+            }
+            foreach (Edge border in face.AllEdges)
+            {   // the edge lies in a face, which overlaps the neighbour of the face at this border: it can only touch the face at this border
+                if (border.Curve3D == null || !overlappingEdge.Contains(border.OtherFace(face))) continue;
+                double pb = border.Curve3D.PositionOf(ip);
+                if (pb < 0.0 || pb > 1.0) continue;
+                GeoPoint onBorder = border.Curve3D.PointAt(pb);
+                double uq = crv.PositionOf(onBorder);
+                if (uq < 0.0 || uq > 1.0) continue;
+                if ((crv.PointAt(uq) | onBorder) < precision) Consider(uq, true);
+            }
+            foreach (Vertex vtx in new Vertex[] { edge.Vertex1, edge.Vertex2 })
+            {   // the edge ends in a vertex of a face, which overlaps the face: it can only touch the face at this vertex
+                if (!vtx.InvolvedFaces.Overlaps(overlappingFace)) continue;
+                double uq = (crv.StartPoint | vtx.Position) < (crv.EndPoint | vtx.Position) ? 0.0 : 1.0;
+                GeoPoint2D puv = face.Surface.PositionOf(crv.PointAt(uq));
+                SurfaceHelper.AdjustPeriodic(face.Surface, face.Domain, ref puv);
+                if (face.Surface.GetDistance(crv.PointAt(uq)) < precision && face.Contains(ref puv, true)) Consider(uq, false);
+            }
+            if (double.IsNaN(bestU)) return false;
+            u = bestU;
+            ip = crv.PointAt(u);
+            uv = face.Surface.PositionOf(ip);
+            SurfaceHelper.AdjustPeriodic(face.Surface, face.Domain, ref uv);
+            position = bestOnBorder ? Border.Position.OnCurve : face.Area.GetPosition(uv, precision);
+            return true;
         }
         /// <summary>
         /// Combine all vertices of both shells and the intersection vertices
@@ -2171,7 +2238,9 @@ namespace CADability
             double extsize = ext.Size;
             ext.Expand(extsize * 1e-3);
             ext = ext.Modify(new GeoVector(extsize * 1e-4, extsize * 1e-4, extsize * 1e-4));
-            Initialize(ext, extsize * 1e-6); // der OctTree
+            // The precision is relative to the smaller of the two shells, not to the extent of both: a precision derived from a big shell
+            // (e.g. a long profile) would swallow the features of a small one (e.g. faces 2.5e-3 apart in issue #168)
+            Initialize(ext, Math.Min(ext1.Size, ext2.Size) * 1e-6); // der OctTree
                                              // put all edges and faces into the octtree
             foreach (Edge edg in shell1.Edges)
             {

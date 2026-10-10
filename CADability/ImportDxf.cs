@@ -34,6 +34,20 @@ namespace CADability.DXF
         private Dictionary<string, GeoObject.Block> blockTable;
         private Dictionary<string, ColorDef> layerColorTable;
         private Dictionary<string, Attribute.Layer> layerTable;
+        /// <summary>
+        /// Greater than zero while the entities of a block definition are converted. A ByBlock
+        /// color only has a meaning there: it is the color of the INSERT (or DIMENSION) that places
+        /// the block.
+        /// </summary>
+        private int blockDefinitionDepth;
+        /// <summary>
+        /// Stand-ins for the linetype and lineweight of block contents that are only known when the
+        /// block is placed: ByBlock, and ByLayer on layer "0". CADability has nothing like
+        /// <see cref="ColorDef.CDfromParent"/> for these, so they are not part of the project's lists
+        /// and are replaced in every placed copy of the block, see <see cref="ResolveLayerZero(GeoObject.Block, Entity)"/>.
+        /// </summary>
+        private readonly LinePattern byLayerPattern = new LinePattern("ByLayer"), byBlockPattern = new LinePattern("ByBlock");
+        private readonly LineWidth byLayerWidth = new LineWidth("ByLayer", 0.0), byBlockWidth = new LineWidth("ByBlock", 0.0);
 
         public Import(string fileName)
         {
@@ -492,7 +506,7 @@ namespace CADability.DXF
             {
                 if (project.HatchStyleList[i] is HatchStyleSolid hss)
                 {
-                    if (hss.Color.Color.ToArgb() == clr.ToArgb()) return hss;
+                    if (hss.Color != null && hss.Color.Color.ToArgb() == clr.ToArgb()) return hss;
                 }
             }
             HatchStyleSolid nhss = new HatchStyleSolid();
@@ -502,17 +516,39 @@ namespace CADability.DXF
             return nhss;
         }
 
+        /// <summary>
+        /// A solid hatch style without a color of its own. A <see cref="GeoObject.Hatch"/> with such a
+        /// style is filled with its own <see cref="GeoObject.Hatch.ColorDef"/>, which
+        /// <see cref="SetAttributes"/> sets from the entity like the color of every other entity, with
+        /// ByLayer, ByBlock and the handling of layer "0" in blocks.
+        /// </summary>
+        private HatchStyleSolid FindOrCreateSolidHatchStyle()
+        {
+            for (int i = 0; i < project.HatchStyleList.Count; i++)
+            {
+                if (project.HatchStyleList[i] is HatchStyleSolid hss && hss.Color == null) return hss;
+            }
+            HatchStyleSolid nhss = new HatchStyleSolid();
+            nhss.Name = NewName("Solid", project.HatchStyleList);
+            project.HatchStyleList.Add(nhss);
+            return nhss;
+        }
+
+        /// <summary>
+        /// A line hatch style without a color of its own, see <see cref="FindOrCreateSolidHatchStyle()"/>.
+        /// </summary>
         private HatchStyleLines FindOrCreateHatchStyleLines(Entity entity, double lineAngle, double lineDistance, double[] dashes)
         {
-            Color layerColor = Color.White;
-            if (entity.Layer != null) layerColor = AcadColorToDrawing(entity.Layer.Color);
-            if (layerColor.ToArgb() == Color.White.ToArgb()) layerColor = Color.Black;
+            LineWeightType lw = entity.LineWeight;
+            if (lw == LineWeightType.ByLayer && entity.Layer != null) lw = entity.Layer.LineWeight;
+            if ((int)lw < 0) lw = LineWeightType.W0;
+            LineWidth lineWidth = project.LineWidthList.CreateOrFind("DXF_" + lw.ToString(), ((int)lw) / 100.0);
 
             for (int i = 0; i < project.HatchStyleList.Count; i++)
             {
                 if (project.HatchStyleList[i] is HatchStyleLines hsl)
                 {
-                    if (hsl.ColorDef.Color.ToArgb() == layerColor.ToArgb() &&
+                    if (hsl.ColorDef == null && hsl.LineWidth == lineWidth &&
                         hsl.LineAngle == lineAngle && hsl.LineDistance == lineDistance) return hsl;
                 }
             }
@@ -521,12 +557,7 @@ namespace CADability.DXF
             nhsl.Name = name;
             nhsl.LineAngle = lineAngle;
             nhsl.LineDistance = lineDistance;
-            nhsl.ColorDef = project.ColorList.CreateOrFind(layerColor.ToString(), layerColor);
-
-            LineWeightType lw = entity.LineWeight;
-            if (lw == LineWeightType.ByLayer && entity.Layer != null) lw = entity.Layer.LineWeight;
-            if ((int)lw < 0) lw = LineWeightType.W0;
-            nhsl.LineWidth = project.LineWidthList.CreateOrFind("DXF_" + lw.ToString(), ((int)lw) / 100.0);
+            nhsl.LineWidth = lineWidth;
             nhsl.LinePattern = FindOrcreateLinePattern(dashes);
             project.HatchStyleList.Add(nhsl);
             return nhsl;
@@ -583,18 +614,67 @@ namespace CADability.DXF
 
         private void SetAttributes(IGeoObject go, Entity entity)
         {
-            if (go is IColorDef cd) cd.ColorDef = FindOrCreateColor(entity.Color, entity.Layer);
+            if (go is IColorDef cd)
+            {
+                // Inside a block definition ByBlock means "the color of the placing INSERT".
+                // CADability expresses exactly that with CDfromParent: the child then shows the
+                // color of the Block it belongs to, and the Block gets the INSERT's color.
+                if (entity.Color.IsByBlock && blockDefinitionDepth > 0) cd.ColorDef = ColorDef.CDfromParent;
+                else cd.ColorDef = FindOrCreateColor(entity.Color, entity.Layer);
+            }
+            // An entity that the import turns into a Block of several parts (a pattern hatch with
+            // several lines, a 3DFACE that is not flat, a mesh, an MLINE, a LEADER, a TABLE) leaves
+            // parts without a color of their own. Those parts show the color of the entity, which
+            // the Block carries, and follow it when it is resolved later (ByBlock, layer "0" in a
+            // block). A Hatch is left out: its contents are generated from its style and take the
+            // color of the Hatch there.
+            if (go is GeoObject.Block parts && !(go is GeoObject.Hatch))
+            {
+                for (int i = 0; i < parts.Count; i++)
+                {
+                    if (parts.Item(i) is IColorDef part && part.ColorDef == null) part.ColorDef = ColorDef.CDfromParent;
+                }
+            }
             if (entity.Layer != null && layerTable.TryGetValue(entity.Layer.Name, out Attribute.Layer layer))
                 go.Layer = layer;
             if (go is ILinePattern lp && entity.LineType != null)
-                lp.LinePattern = project.LinePatternList.Find(entity.LineType.Name);
+                lp.LinePattern = FindLinePattern(entity.LineType.Name, entity.Layer);
             if (go is ILineWidth ld)
+                ld.LineWidth = FindLineWidth(entity.LineWeight, entity.Layer);
+        }
+
+        private static bool IsLayerZero(ACadSharp.Tables.Layer layer) => layer != null && layer.Name == "0";
+
+        /// <summary>
+        /// The line pattern for a linetype on the given layer: ByLayer is the linetype of the layer.
+        /// Inside a block definition ByBlock, and ByLayer on layer "0", depend on the placing entity
+        /// and give a stand-in.
+        /// </summary>
+        private LinePattern FindLinePattern(string lineTypeName, ACadSharp.Tables.Layer layer)
+        {
+            bool byLayer = string.Equals(lineTypeName, LineType.ByLayerName, StringComparison.OrdinalIgnoreCase);
+            if (blockDefinitionDepth > 0)
             {
-                LineWeightType lw = entity.LineWeight;
-                if (lw == LineWeightType.ByLayer && entity.Layer != null) lw = entity.Layer.LineWeight;
-                if ((int)lw < 0) lw = LineWeightType.W0;
-                ld.LineWidth = project.LineWidthList.CreateOrFind("DXF_" + lw.ToString(), ((int)lw) / 100.0);
+                if (string.Equals(lineTypeName, LineType.ByBlockName, StringComparison.OrdinalIgnoreCase)) return byBlockPattern;
+                if (byLayer && IsLayerZero(layer)) return byLayerPattern;
             }
+            if (byLayer && layer?.LineType != null) lineTypeName = layer.LineType.Name;
+            return project.LinePatternList.Find(lineTypeName);
+        }
+
+        /// <summary>
+        /// The line width for a lineweight on the given layer, like <see cref="FindLinePattern"/>.
+        /// </summary>
+        private LineWidth FindLineWidth(LineWeightType lw, ACadSharp.Tables.Layer layer)
+        {
+            if (blockDefinitionDepth > 0)
+            {
+                if (lw == LineWeightType.ByBlock) return byBlockWidth;
+                if (lw == LineWeightType.ByLayer && IsLayerZero(layer)) return byLayerWidth;
+            }
+            if (lw == LineWeightType.ByLayer && layer != null) lw = layer.LineWeight;
+            if ((int)lw < 0) lw = LineWeightType.W0;
+            return project.LineWidthList.CreateOrFind("DXF_" + lw.ToString(), ((int)lw) / 100.0);
         }
 
         private void SetUserData(IGeoObject go, Entity entity)
@@ -626,13 +706,75 @@ namespace CADability.DXF
                 found.Name = blockRec.Name;
                 found.RefPoint = GeoPoint(blockRec.BlockEntity?.BasePoint ?? XYZ.Zero);
                 blockTable[key] = found; // register before filling (prevents infinite recursion)
-                foreach (Entity ent in blockRec.Entities)
+                ++blockDefinitionDepth;
+                try
                 {
-                    IGeoObject go = GeoObjectFromEntity(ent);
-                    if (go != null) found.Add(go);
+                    foreach (Entity ent in blockRec.Entities)
+                    {
+                        IGeoObject go = GeoObjectFromEntity(ent);
+                        if (go != null) found.Add(go);
+                    }
+                }
+                finally
+                {
+                    --blockDefinitionDepth;
                 }
             }
             return found;
+        }
+
+        /// <summary>
+        /// Entities on layer "0" inside a block definition are drawn on the layer of the entity
+        /// that places the block, and with that layer's color when they are ByLayer. The block
+        /// definition is converted once and cached, so its layer-0 children carry layer "0" and
+        /// the "0:ByLayer" color; this moves them, including those of nested blocks, to the layer
+        /// of <paramref name="placing"/> on the clone that belongs to this placement.
+        /// The stand-ins for linetype and lineweight (ByLayer on layer "0" and ByBlock) are replaced
+        /// with the values of that layer and of <paramref name="placing"/>. While
+        /// <paramref name="placing"/> is itself part of a block definition, these values may be
+        /// stand-ins again, which the placement of the enclosing block resolves.
+        /// </summary>
+        private void ResolveLayerZero(GeoObject.Block placed, Entity placing)
+        {
+            Attribute.Layer layerZero = null, target = null;
+            ColorDef byLayerZero = null, byLayerTarget = null;
+            if (placing.Layer != null && layerTable.TryGetValue(placing.Layer.Name, out target)
+                && layerTable.TryGetValue("0", out layerZero) && target != layerZero)
+            {
+                layerColorTable.TryGetValue("0", out byLayerZero);
+                layerColorTable.TryGetValue(placing.Layer.Name, out byLayerTarget);
+            }
+            else target = null; // the contents on layer "0" stay there
+            LinePattern patternByLayer = FindLinePattern(LineType.ByLayerName, placing.Layer);
+            LinePattern patternByBlock = FindLinePattern(placing.LineType?.Name ?? LineType.ByLayerName, placing.Layer);
+            LineWidth widthByLayer = FindLineWidth(LineWeightType.ByLayer, placing.Layer);
+            LineWidth widthByBlock = FindLineWidth(placing.LineWeight, placing.Layer);
+            Resolve(placed);
+
+            void Resolve(GeoObject.Block block)
+            {
+                for (int i = 0; i < block.Count; i++)
+                {
+                    IGeoObject child = block.Item(i);
+                    if (target != null && child.Layer == layerZero)
+                    {
+                        child.Layer = target;
+                        if (child is IColorDef cd && byLayerZero != null && byLayerTarget != null && cd.ColorDef == byLayerZero)
+                            cd.ColorDef = byLayerTarget;
+                    }
+                    if (child is ILinePattern lp)
+                    {
+                        if (lp.LinePattern == byLayerPattern) lp.LinePattern = patternByLayer;
+                        else if (lp.LinePattern == byBlockPattern) lp.LinePattern = patternByBlock;
+                    }
+                    if (child is ILineWidth lw)
+                    {
+                        if (lw.LineWidth == byLayerWidth) lw.LineWidth = widthByLayer;
+                        else if (lw.LineWidth == byBlockWidth) lw.LineWidth = widthByBlock;
+                    }
+                    if (child is GeoObject.Block nested) Resolve(nested);
+                }
+            }
         }
 
         private IGeoObject CreateLine(ACadSharp.Entities.Line line)
@@ -982,9 +1124,7 @@ namespace CADability.DXF
 
             if (hatch.IsSolid)
             {
-                Color layerColor = hatch.Layer != null ? AcadColorToDrawing(hatch.Layer.Color) : Color.Black;
-                if (layerColor.ToArgb() == Color.White.ToArgb()) layerColor = Color.Black;
-                res.HatchStyle = FindOrCreateSolidHatchStyle(layerColor);
+                res.HatchStyle = FindOrCreateSolidHatchStyle();
                 return res;
             }
             else
@@ -1004,7 +1144,7 @@ namespace CADability.DXF
                         list.Add(res);
                     }
                 }
-                if (list.Count == 0) { res.HatchStyle = FindOrCreateSolidHatchStyle(Color.Black); return res; }
+                if (list.Count == 0) { res.HatchStyle = FindOrCreateSolidHatchStyle(); return res; }
                 if (list.Count > 1)
                 {
                     GeoObject.Block block = GeoObject.Block.Construct();
@@ -1103,14 +1243,13 @@ namespace CADability.DXF
                 new XY(solid.FirstCorner.X, solid.FirstCorner.Y),
                 new XY(solid.SecondCorner.X, solid.SecondCorner.Y),
                 new XY(solid.FourthCorner.X, solid.FourthCorner.Y),
-                new XY(solid.ThirdCorner.X, solid.ThirdCorner.Y),
-                AcadColorToDrawing(solid.Color));
+                new XY(solid.ThirdCorner.X, solid.ThirdCorner.Y));
         }
 
 
-        private IGeoObject BuildSolidHatch(Plane ocs, XY c1, XY c2, XY c3, XY c4, Color color)
+        private IGeoObject BuildSolidHatch(Plane ocs, XY c1, XY c2, XY c3, XY c4)
         {
-            HatchStyleSolid hst = FindOrCreateSolidHatchStyle(color.ToArgb() == Color.White.ToArgb() ? Color.Black : color);
+            HatchStyleSolid hst = FindOrCreateSolidHatchStyle();
             // Convert OCS corners to WCS, then remove duplicates.
             List<GeoPoint> points = new List<GeoPoint>();
             points.Add(ocs.ToGlobal(new GeoPoint2D(c1.X, c1.Y)));
@@ -1150,6 +1289,7 @@ namespace CADability.DXF
                     ModOp.Scale(insert.XScale, insert.YScale, insert.ZScale) *
                     ModOp.Translate(CADability.GeoPoint.Origin - block.RefPoint);
                 res.Modify(transform);
+                ResolveLayerZero((GeoObject.Block)res, insert);
                 return res;
             }
             return null;
@@ -1626,7 +1766,12 @@ namespace CADability.DXF
             if (dimension.Block != null)
             {
                 GeoObject.Block block = FindBlock(dimension.Block);
-                if (block != null) return block.Clone();
+                if (block != null)
+                {
+                    GeoObject.Block res = (GeoObject.Block)block.Clone();
+                    ResolveLayerZero(res, dimension);
+                    return res;
+                }
             }
             return null;
         }

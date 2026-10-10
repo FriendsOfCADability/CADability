@@ -3660,7 +3660,7 @@ namespace CADability
                 // #64=EDGE_CURVE('',#44,#58,#63,.F.) ;
                 int nv1 = (Vertex1 as IExportStep).Export(export, false);
                 int nv2 = (Vertex2 as IExportStep).Export(export, false);
-                int cn = (curve3d as IExportStep).Export(export, false);
+                int cn = export.WriteCurve(curve3d); // a Path or another curve without a STEP entity is written as a BSpline
                 ec = export.WriteDefinition("EDGE_CURVE('',#" + nv1.ToString() + ",#" + nv2.ToString() + ",#" + cn.ToString() + ",.T.)");
                 export.EdgeToDefInd[this] = ec;
             }

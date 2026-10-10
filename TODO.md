@@ -30,6 +30,9 @@ loops forever on tiny domains), #287 (hatch polyline boundaries are always
 closed on DXF import), #204 and #147 (`Plane.FromPoints` fits relative to the
 centroid and orients the normal by a fixed rule).
 
+Fixed later: #308 (`ActionFeedBack.Repaint` paints the feedback once per view
+call into one display list).
+
 Fixed in the next pull request: #194 (`Border.UnsplittedOutline` survives
 `CompoundShape.CreateFromList`), #293 (DXF block contents on layer 0 or
 ByBlock take the layer and colour of the INSERT; `CDfromParent` children keep
@@ -67,10 +70,6 @@ All issues that could not be verified at first have since been checked.
   forwarded to the solid, so the view is not refreshed. `Edge.PaintTo3D` also
   always paints black (8994f99d). Decide whether edge colours should be
   editable at all.
-- [ ] **#308 ActionFeedBack generates too many OpenGL lists.** Still one
-  list per object per repaint, an unused `foreach (IView vw in
-  frame.AllViews)` loop, and the unconditional "Delete List" `Debug.WriteLine`
-  in `PaintToOpenGL.cs`.
 - [ ] **#253 MultipleChoiceInput & mouse move events.**
   `MultipleChoiceInput.BuildShowProperty` (and `BooleanInput`) does not
   subscribe `PropertyEntryChangedStateEvent`, so selecting it doesn't change

@@ -3656,6 +3656,13 @@ namespace CADability.Actions
 					return forwardMouseInputTo;
 				}
 			}
+			/// <summary>
+			/// If true, selecting this input in the property grid makes it the current input of the action, like a
+			/// selected <see cref="DoubleInput"/> or <see cref="GeoPointInput"/>: mouse moves in the view then go to
+			/// this input, which ignores them or passes them on to <see cref="ForwardMouseInputTo"/>. If false (the
+			/// default), the input that was current before keeps receiving the mouse input while this one is selected.
+			/// </summary>
+			public bool CapturesMouse { get; set; }
 			void IInputObject.Init(ConstructAction a)
 			{
 				base.Init(a);
@@ -3680,7 +3687,12 @@ namespace CADability.Actions
 				booleanProperty.BooleanValue = boolval;
 				booleanProperty.GetBooleanEvent += new CADability.UserInterface.BooleanProperty.GetBooleanDelegate(PropertyOnGetBoolean);
 				booleanProperty.SetBooleanEvent += new CADability.UserInterface.BooleanProperty.SetBooleanDelegate(PropertyOnSetBoolean);
+				booleanProperty.PropertyEntryChangedStateEvent += new PropertyEntryChangedStateDelegate(OnPropertyStateChanged);
 				return booleanProperty;
+			}
+			private void OnPropertyStateChanged(IPropertyEntry sender, StateChangedArgs args)
+			{
+				if (CapturesMouse) constructAction.ShowPropertyStateChanged(sender, args);
 			}
 			void IInputObject.OnMouse(MouseEventArgs e, MouseState mouseState, IView vw)
 			{
@@ -3906,6 +3918,13 @@ namespace CADability.Actions
 					return forwardMouseInputTo;
 				}
 			}
+			/// <summary>
+			/// If true, selecting this input in the property grid makes it the current input of the action, like a
+			/// selected <see cref="DoubleInput"/> or <see cref="GeoPointInput"/>: mouse moves in the view then go to
+			/// this input, which ignores them or passes them on to <see cref="ForwardMouseInputTo"/>. If false (the
+			/// default), the input that was current before keeps receiving the mouse input while this one is selected.
+			/// </summary>
+			public bool CapturesMouse { get; set; }
 			void IInputObject.Init(ConstructAction a)
 			{
 				base.Init(a);
@@ -3935,7 +3954,12 @@ namespace CADability.Actions
 				// multipleChoiceProperty.OnGetChoice += new Condor.UserInterface.multipleChoiceProperty.GetBooleanDelegate(PropertyOnGetChoice);
 				// multipleChoiceProperty.OnSetBoolean += new Condor.UserInterface.BooleanProperty.SetBooleanDelegate(PropertyOnSetBoolean);
 				multipleChoiceProperty.ReadOnly = ReadOnly;
+				multipleChoiceProperty.PropertyEntryChangedStateEvent += new PropertyEntryChangedStateDelegate(OnPropertyStateChanged);
 				return multipleChoiceProperty;
+			}
+			private void OnPropertyStateChanged(IPropertyEntry sender, StateChangedArgs args)
+			{
+				if (CapturesMouse) constructAction.ShowPropertyStateChanged(sender, args);
 			}
 			void IInputObject.OnMouse(MouseEventArgs e, MouseState mouseState, IView vw)
 			{

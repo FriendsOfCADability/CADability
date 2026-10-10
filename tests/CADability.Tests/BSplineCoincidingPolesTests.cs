@@ -567,5 +567,34 @@ namespace CADability.Tests
             // the spline in the model is not changed by these operations
             AssertSameSpline(original, spline, GeoVector.NullVector);
         }
+
+        [TestMethod]
+        [DeploymentItem(@"Files/Dxf/issue173.dxf", nameof(Issue173SplineNotPlanar))]
+        public void Issue173SplineNotPlanar()
+        {
+            // The spline of the issue bent out of its plane, with the same corners. A planar spline gets its positions
+            // from the projection to its plane, this one from the tetrahedron hull, which returns positions far off
+            // right behind some of the corners (41.7 at 3 of these points). BSpline.PositionOf does not use such a
+            // result when a point of the curve contradicts it.
+            string file = System.IO.Path.Combine(TestContext.DeploymentDirectory, TestContext.TestName, "issue173.dxf");
+            BSpline flat = ReadSpline(file);
+            GeoPoint[] poles = flat.Poles.Select(p => new GeoPoint(p.x, p.y, 0.002 * (p.x - 60) * (p.x - 60) + 0.001 * p.y * p.y)).ToArray();
+            BSpline bent = BSpline.Construct();
+            Assert.IsTrue(bent.SetData(flat.Degree, poles, null, flat.Knots, flat.Multiplicities, false));
+            ICurve curve = bent;
+            Assert.AreEqual(PlanarState.NonPlanar, curve.GetPlanarState());
+
+            List<double> positions = new List<double>();
+            for (int i = 0; i <= 27 * 40; i++) positions.Add(i / (27.0 * 40));
+            for (int k = 0; k <= 27; k++) foreach (double offset in new[] { -0.1, -0.01, -0.001, 0.001, 0.01, 0.1 }) positions.Add((k + offset) / 27.0);
+            double maxDistance = 0.0;
+            foreach (double position in positions.Where(t => t >= 0.0 && t <= 1.0)) maxDistance = Math.Max(maxDistance, curve.DistanceTo(curve.PointAt(position)));
+            Assert.IsTrue(maxDistance < 1e-6, $"DistanceTo of points on the spline is up to {maxDistance}");
+
+            Plane plane = new Plane(new GeoPoint(0, -100, 0), GeoVector.YAxis);
+            double[] intersections = curve.GetPlaneIntersection(plane);
+            Assert.AreEqual(4, intersections.Length, "intersections with the plane y = -100");
+            foreach (double position in intersections) Assert.AreEqual(-100.0, curve.PointAt(position).y, 1e-6);
+        }
     }
 }

@@ -128,10 +128,6 @@ All issues that could not be verified at first have since been checked.
   moving the block to another layer later leaves those contents on the old
   layer, and the DXF export writes them on that layer instead of layer 0. A
   complete solution needs a "layer from parent" counterpart to `CDfromParent`.
-- [ ] #377: `TetraederHull.PositionOf` returns positions far off (41.7 instead
-  of 0) right behind corners of a non-planar spline whose derivative vanishes
-  on one side. `BSpline.PositionOf` drops such a result since #374, the hull
-  itself is not fixed; `Issue173SplineNotPlanar` is the test case.
 - [ ] A DXF SPLINE comes back without the periodic flag when its knots are
   clamped (the issue 173 file has flags 11, the export writes 9), and with the
   default knot and control point tolerances (42, 43). Neither follows from the

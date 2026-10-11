@@ -568,14 +568,52 @@ namespace CADability.Tests
             AssertSameSpline(original, spline, GeoVector.NullVector);
         }
 
+        /// <summary>
+        /// Issue #377 with a small spline: two cubic Bézier segments in 3D, joined by a corner where the derivative vanishes
+        /// on the left side (coinciding poles before the knot), on both sides, or on the right side. Points on the curve
+        /// must be found exactly, and for points next to the curve PositionOf must find the closest point.
+        /// </summary>
+        [TestMethod]
+        [DataRow(true, false)]
+        [DataRow(true, true)]
+        [DataRow(false, true)]
+        public void PositionOfNextToACornerOfANonPlanarSpline(bool vanishesBefore, bool vanishesAfter)
+        {
+            GeoPoint corner = new GeoPoint(10, 0, 3);
+            GeoPoint[] poles =
+            {
+                new GeoPoint(0, 0, 0), new GeoPoint(3, 4, 1), vanishesBefore ? corner : new GeoPoint(7, 4, 2), corner,
+                vanishesAfter ? corner : new GeoPoint(12, -3, 5), new GeoPoint(15, -6, 4), new GeoPoint(20, -5, 0)
+            };
+            BSpline bsp = BSpline.Construct();
+            Assert.IsTrue(bsp.SetData(3, poles, null, new double[] { 0, 1, 2 }, new int[] { 4, 3, 4 }, false));
+            ICurve curve = bsp;
+            Assert.AreEqual(PlanarState.NonPlanar, curve.GetPlanarState());
+            List<double> positions = new List<double>();
+            for (int i = 0; i <= 200; i++) positions.Add(i / 200.0);
+            foreach (double offset in new[] { 1e-1, 1e-2, 1e-3, 1e-4, 1e-6 }) { positions.Add(0.5 - offset); positions.Add(0.5 + offset); }
+            foreach (double t in positions)
+            {
+                GeoPoint onCurve = curve.PointAt(t);
+                Assert.IsTrue(curve.DistanceTo(onCurve) < 1e-6, $"the point at {t} is {curve.DistanceTo(onCurve)} away from the curve");
+                // a point next to the curve: the closest point must be at least as close as every point of a dense sampling
+                GeoPoint next = onCurve + new GeoVector(0.01, 0.02, -0.015);
+                double found = curve.PointAt(curve.PositionOf(next)) | next;
+                double sampled = double.MaxValue;
+                for (int i = 0; i <= 20000; i++) sampled = Math.Min(sampled, curve.PointAt(i / 20000.0) | next);
+                Assert.IsTrue(found <= sampled + 1e-6, $"PositionOf next to the point at {t}: {found} instead of {sampled}");
+            }
+        }
+
         [TestMethod]
         [DeploymentItem(@"Files/Dxf/issue173.dxf", nameof(Issue173SplineNotPlanar))]
         public void Issue173SplineNotPlanar()
         {
             // The spline of the issue bent out of its plane, with the same corners. A planar spline gets its positions
-            // from the projection to its plane, this one from the tetrahedron hull, which returns positions far off
-            // right behind some of the corners (41.7 at 3 of these points). BSpline.PositionOf does not use such a
-            // result when a point of the curve contradicts it.
+            // from the projection to its plane, this one from the tetrahedron hull, which returned positions far off
+            // right behind some of the corners (41.7 at 3 of these points, issue #377): the Newton step of
+            // FindClosestPoint reached the end of the segment, where the derivative vanishes, divided by 0 and returned
+            // NaN, so the segment containing the point was ignored.
             string file = System.IO.Path.Combine(TestContext.DeploymentDirectory, TestContext.TestName, "issue173.dxf");
             BSpline flat = ReadSpline(file);
             GeoPoint[] poles = flat.Poles.Select(p => new GeoPoint(p.x, p.y, 0.002 * (p.x - 60) * (p.x - 60) + 0.001 * p.y * p.y)).ToArray();

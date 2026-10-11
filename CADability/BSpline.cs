@@ -2513,17 +2513,7 @@ namespace CADability.GeoObject
                 }
             }
             double tpos = TetraederHull.PositionOf(p);
-            if (tpos != double.MaxValue)
-            {
-                // The hull relies on the tangents at its base points. Where the derivative vanishes (coinciding poles)
-                // it may return a position far off. A point of the curve that is closer to p shows that, the search
-                // below then has to find it.
-                if (interpol == null) MakeInterpol();
-                double found = (this as ICurve).PointAt(tpos) | p;
-                bool plausible = true;
-                for (int i = 0; i < interpol.Length && plausible; i++) plausible = (interpol[i] | p) >= found - Precision.eps;
-                if (plausible) return tpos;
-            }
+            if (tpos != double.MaxValue) return tpos;
             if (this.IsSingular)
             {
                 return Geometry.LinePar(poles[0], poles[poles.Length - 1], p);

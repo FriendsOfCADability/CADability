@@ -2608,6 +2608,9 @@ namespace CADability.GeoObject
                 dbg.Add(Line.TwoPoints(theCurve.PointAt(umin), theCurve.PointAt(umax)));
 #endif
                 double d = (dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
+                // the derivative vanishes where coinciding poles model a corner, and the Newton step would divide by 0
+                // and make everything NaN, so that this segment, which may contain the point, would be ignored
+                if (!(d > 0.0)) return GoldenSectionClosestPoint(p, umin, umax, out pfound, out u);
                 double lambda = -((pfound.x - p.x) * dir.x + (pfound.y - p.y) * dir.y + (pfound.z - p.z) * dir.z) / d;
                 u += lambda;
                 if (u < umin)
@@ -2642,6 +2645,47 @@ namespace CADability.GeoObject
             return dist;
         }
 
+        /// <summary>
+        /// The distance from <paramref name="p"/> to the closest point of the curve between <paramref name="umin"/> and
+        /// <paramref name="umax"/>, found by a golden section search, which needs no derivative.
+        /// </summary>
+        private double GoldenSectionClosestPoint(GeoPoint p, double umin, double umax, out GeoPoint pfound, out double u)
+        {
+            const double invPhi = 0.6180339887498949;
+            double a = umin, b = umax;
+            double c = b - invPhi * (b - a), e = a + invPhi * (b - a);
+            double dc = theCurve.PointAt(c) | p, de = theCurve.PointAt(e) | p;
+            while (b - a > (umax - umin) * 1e-14)
+            {
+                if (dc < de)
+                {
+                    b = e; e = c; de = dc;
+                    c = b - invPhi * (b - a);
+                    dc = theCurve.PointAt(c) | p;
+                }
+                else
+                {
+                    a = c; c = e; dc = de;
+                    e = a + invPhi * (b - a);
+                    de = theCurve.PointAt(e) | p;
+                }
+            }
+            u = (a + b) / 2.0;
+            pfound = theCurve.PointAt(u);
+            double dist = pfound | p;
+            // the minimum may be at an end of the interval
+            foreach (double end in new[] { umin, umax })
+            {
+                GeoPoint pe = theCurve.PointAt(end);
+                if ((pe | p) < dist)
+                {
+                    dist = pe | p;
+                    pfound = pe;
+                    u = end;
+                }
+            }
+            return dist;
+        }
         internal double GetLength()
         {
             double length = 0.0;

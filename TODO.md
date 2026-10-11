@@ -44,8 +44,9 @@ objects).
 Fixed from the list below: `ImportSTL.Read` closes the file,
 `Border.UnsplittedOutline` is saved, an empty `Polyline` can be cloned, moved,
 reversed and saved (the JSON reader accepts a property written as null), an
-arc without sweep can be approximated, and `Project.Export` returns whether it
-wrote the file.
+arc without sweep can be approximated, `Project.Export` returns whether it
+wrote the file, and `Shell.OpenEdgesExceptPoles` no longer takes a closed
+curve for a pole (a STEP `CLOSED_SHELL` with a single disc became a solid).
 
 Fixed in the next pull request: #194 (`Border.UnsplittedOutline` survives
 `CompoundShape.CreateFromList`), #293 (DXF block contents on layer 0 or
@@ -87,7 +88,10 @@ None left: all of them have been fixed.
   the fix). Examples: a box bottom 3e-7 below the tangent plane of a rounded
   edge, gaps of about 1e-5 (between `Precision.eps` and the BRep precision),
   touching boxes (`Intersect` throws), and tools 1e6 times smaller than the
-  other solid.
+  other solid. Two more found while checking the pole fix, both on master
+  too: a box minus a sphere of radius 4 centred on its top face throws, and
+  the union of two spheres of radius 5 whose centres are 6 apart does not
+  return within a minute.
 
 - [ ] `tests/CADability.Tests/Files/CDB/Volumes.cdb.json` cannot be read by
   the JSON reader of this repository: it stores `SphericalSurface`,
@@ -103,10 +107,6 @@ None left: all of them have been fixed.
 - [ ] The sphere and torus branches of `NurbsSurface.GetSimpleSurface` fit an
   affine reparametrisation, which cannot follow the rational parametrisation;
   the 3D error can reach the radius. The torus fit has no degeneracy check.
-- [ ] `Shell.OpenEdgesExceptPoles` treats every open edge whose start and end
-  vertex coincide as a pole, including a closed B-spline edge, so a STEP
-  `CLOSED_SHELL` with a single open face (issue66_fma_02.stp) still becomes a
-  Solid.
 - [ ] CADability has no "floating" layer 0 in blocks. The DXF import
   resolves block contents on layer 0 to the layer of the INSERT (#293), so
   they are displayed and hidden like in AutoCAD, but the information is lost:

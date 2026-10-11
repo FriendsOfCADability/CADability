@@ -84,6 +84,14 @@ and runs docfx on them, under the old paths `/CADabilityDoc` and
 repository, and `docs/index.html` is a start page instead of the Jekyll
 template.
 
+A `PrecisionOverride` applies only to the thread that creates it.
+`Border.Clip` overrides `Precision.eps` for every call, and every other thread
+computed with that precision in the meantime, e.g. in the parallel STEP import
+and in parallel tests. `Precision.eps` and `Precision.epsa` are properties now
+instead of fields: source code compiles unchanged, but binaries compiled
+against 1.5.0 or earlier that read them have to be recompiled (release notes
+of 1.6.0).
+
 Fixed in the next pull request: #194 (`Border.UnsplittedOutline` survives
 `CompoundShape.CreateFromList`), #293 (DXF block contents on layer 0 or
 ByBlock take the layer and colour of the INSERT; `CDfromParent` children keep
@@ -132,13 +140,6 @@ None left: all of them have been fixed.
   large, while both differences are exact. In the union, the hole edges of the merged faces
   have `Path2D` curves, and these faces triangulate to a slightly smaller area
   than the same faces in the differences; not yet investigated further.
-
-- [ ] `Border.Clip` sets the global `Precision.eps` through `PrecisionOverride`
-  while it runs, so every other thread computes with that precision in the
-  meantime. Boolean operations and imports running in parallel (the parallel
-  STEP import, the tests) are affected: `a_small_cut_can_be_subtracted_from_a_long_profile`
-  and `an_almost_straight_spline_still_shares_a_plane_with_an_arc` failed once
-  in a full test run and passed when run alone or again.
 
 - [ ] `tests/CADability.Tests/Files/CDB/Volumes.cdb.json` cannot be read by
   the JSON reader of this repository: it stores `SphericalSurface`,

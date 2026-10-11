@@ -89,5 +89,55 @@ namespace CADability.Tests
                 }
             }
         }
+
+        private static IEnumerable<(string name, ICurve2D curve)> Ellipses()
+        {
+            Ellipse2D ellipse = new Ellipse2D(new GeoPoint2D(1, 2), new GeoVector2D(3, 1), new GeoVector2D(-0.5, 1.5));
+            yield return ("ellipse", ellipse);
+            Ellipse2D clockwise = (Ellipse2D)ellipse.Clone();
+            clockwise.Reverse();
+            yield return ("clockwise ellipse", clockwise);
+            // the axes are a left handed system
+            Ellipse2D leftHanded = new Ellipse2D(new GeoPoint2D(1, 2), new GeoVector2D(3, 1), new GeoVector2D(0.5, -1.5));
+            yield return ("left handed ellipse", leftHanded);
+            yield return ("arc", ellipse.Trim(0.1, 0.45));
+            yield return ("clockwise arc", clockwise.Trim(0.1, 0.45));
+            yield return ("arc over 0", ellipse.Trim(0.8, 0.2));
+            yield return ("full arc", ellipse.Trim(0.0, 1.0));
+            yield return ("left handed arc", leftHanded.Trim(0.1, 0.45));
+        }
+
+        /// <summary>
+        /// Ellipse2D.GetModified built a counter-clockwise ellipse from the principal axes of the image, so it reversed a
+        /// clockwise ellipse and moved the start point to the end of the new major axis under a shear or a rotation.
+        /// EllipseArc2D.GetModified found the start and end parameter from the modified start and end points, which loses
+        /// the parametrisation. Ellipse2D.PositionOf ignored that PointAt runs the other way round when the axes are a left
+        /// handed system.
+        /// </summary>
+        [TestMethod]
+        public void ModifiedEllipsesAndArcs()
+        {
+            foreach ((string mName, ModOp2D m, bool _) in Modifications())
+            {
+                foreach ((string cName, ICurve2D curve) in Ellipses())
+                {
+                    ICurve2D modified = curve.GetModified(m);
+                    for (int i = 0; i <= 20; i++)
+                    {
+                        double t = i / 20.0;
+                        GeoPoint2D expected = m * curve.PointAt(t);
+                        Assert.IsTrue((modified.PointAt(t) | expected) < 1e-9, $"{cName}, {mName}: point at {t} is {modified.PointAt(t)} instead of {expected}");
+                        if (i > 0 && i < 20)
+                        {
+                            Assert.AreEqual(t, curve.PositionOf(curve.PointAt(t)), 1e-9, $"{cName}: position of the point at {t}");
+                            Assert.AreEqual(t, modified.PositionOf(expected), 1e-9, $"{cName}, {mName}: position of the point at {t}");
+                        }
+                    }
+                    // a full ellipse may become a full EllipseArc2D, when its start point is no longer at the end of the major axis
+                    if (curve is EllipseArc2D) Assert.IsTrue(modified is EllipseArc2D, $"{cName}, {mName}: {modified.GetType().Name}");
+                    else Assert.IsTrue(modified is Ellipse2D && modified.IsClosed, $"{cName}, {mName}: {modified.GetType().Name}");
+                }
+            }
+        }
     }
 }

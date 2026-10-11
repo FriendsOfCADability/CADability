@@ -233,8 +233,9 @@ namespace CADability.Curve2D
         }
         /// <summary>
         /// Returns the image of the arc with the provided <paramref name="center"/>, <paramref name="radius"/>, start angle and sweep
-        /// under the modification <paramref name="m"/>, which is not isogonal. The result has the same start point, direction and
-        /// parametrisation as the modified arc. A full circle (<paramref name="isCircle"/>) becomes an <see cref="Ellipse2D"/>, when
+        /// under the modification <paramref name="m"/>, which must not be singular. The result has the same start point, direction
+        /// and parametrisation as the modified arc. Circles and arcs use it when <paramref name="m"/> is not isogonal, ellipses
+        /// and elliptical arcs, which are images of the unit circle, for every modification. A full circle (<paramref name="isCircle"/>) becomes an <see cref="Ellipse2D"/>, when
         /// its start point is mapped to the end of the major axis, where an ellipse starts, and a full <see cref="EllipseArc2D"/> otherwise.
         /// </summary>
         internal static Ellipse2D ModifiedArc(ModOp2D m, GeoPoint2D center, double radius, double start, double sweep, bool isCircle)

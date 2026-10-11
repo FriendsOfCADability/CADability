@@ -28,14 +28,14 @@ namespace CADability.Tests
         /// Checks the operations of <paramref name="a"/> and <paramref name="b"/>, which touch but have no common volume. A union
         /// is only checked where the solids touch in a face: where they touch in an edge or a point, there is no manifold union.
         /// </summary>
-        private static void AssertTouching(Func<Solid> a, Func<Solid> b, bool faceContact)
+        private static void AssertTouching(Func<Solid> a, Func<Solid> b, bool faceContact, double relativeTolerance = 1e-6)
         {
             double va = a().Volume(1e-3), vb = b().Volume(1e-3);
             Solid[] intersection = Solid.Intersect(a(), b());
             Assert.AreEqual(0, intersection.Length, "a * b is empty");
-            Assert.AreEqual(va, Volume(Solid.Subtract(a(), b()), "a - b"), va * 1e-6, "a - b");
-            Assert.AreEqual(vb, Volume(Solid.Subtract(b(), a()), "b - a"), vb * 1e-6, "b - a");
-            if (faceContact) Assert.AreEqual(va + vb, Volume(new[] { Solid.Unite(a(), b()) }, "a + b"), (va + vb) * 1e-6, "a + b");
+            Assert.AreEqual(va, Volume(Solid.Subtract(a(), b()), "a - b"), va * relativeTolerance, "a - b");
+            Assert.AreEqual(vb, Volume(Solid.Subtract(b(), a()), "b - a"), vb * relativeTolerance, "b - a");
+            if (faceContact) Assert.AreEqual(va + vb, Volume(new[] { Solid.Unite(a(), b()) }, "a + b"), (va + vb) * relativeTolerance, "a + b");
         }
 
         [DataTestMethod]
@@ -65,6 +65,49 @@ namespace CADability.Tests
         public void a_sphere_on_a_box()
         {
             AssertTouching(() => Box(0, 0, 0, 10, 10, 10), () => Make3D.MakeSphere(new GeoPoint(5, 5, 15), 5), false);
+        }
+
+        /// <summary>
+        /// The bottom circle of the cylinder touches the four sides of the top face of the box, which leaves four corners of the top
+        /// face. The search for the loops of the trimmed face always went on along the circle, which made a hole touching the outline,
+        /// and the union lost the cylinder.
+        /// </summary>
+        [DataTestMethod]
+        [DataRow(5.0, DisplayName = "the circle touches the sides of the face")]
+        [DataRow(2.0, DisplayName = "the circle inside the face")]
+        public void a_cylinder_standing_on_a_box(double radius)
+        {
+            AssertTouching(() => Box(0, 0, 0, 10, 10, 10), () => Make3D.MakeCylinder(new GeoPoint(5, 5, 10), radius * GeoVector.XAxis, 10 * GeoVector.ZAxis), true, 1e-4);
+        }
+
+        /// <summary>
+        /// The cylinder touches the top face of the box in a line, where the surfaces are tangent. That line became an intersection
+        /// edge, which split the top face, and only one half of it was kept: the differences were empty.
+        /// </summary>
+        [DataTestMethod]
+        [DataRow(0.0, 10.0, DisplayName = "as long as the box")]
+        [DataRow(-5.0, 20.0, DisplayName = "longer than the box")]
+        [DataRow(2.0, 6.0, DisplayName = "shorter than the box")]
+        public void a_cylinder_lying_on_a_box(double x, double length)
+        {
+            AssertTouching(() => Box(0, 0, 0, 10, 10, 10), () => Make3D.MakeCylinder(new GeoPoint(x, 5, 15), 5 * GeoVector.ZAxis, length * GeoVector.XAxis), false, 1e-4);
+        }
+
+        /// <summary>
+        /// A cylinder inside a box, touching its sides in lines. The difference box - cylinder would be a box with a cavity, which a
+        /// Solid cannot have, and is not checked.
+        /// </summary>
+        [DataTestMethod]
+        [DataRow(3.0, 3.0, DisplayName = "touching the bottom")]
+        [DataRow(5.0, 5.0, DisplayName = "touching four sides")]
+        public void a_cylinder_inside_a_box_touching_its_sides(double z, double radius)
+        {
+            Solid A() => Box(0, 0, 0, 10, 10, 10);
+            Solid B() => Make3D.MakeCylinder(new GeoPoint(2, 5, z), radius * GeoVector.ZAxis, 6 * GeoVector.XAxis);
+            double vb = B().Volume(1e-3);
+            Assert.AreEqual(vb, Volume(Solid.Intersect(A(), B()), "a * b"), vb * 1e-4, "a * b");
+            Assert.AreEqual(1000, Volume(new[] { Solid.Unite(A(), B()) }, "a + b"), 1e-6, "a + b");
+            Assert.AreEqual(0, Solid.Subtract(B(), A()).Length, "b - a");
         }
 
         /// <summary>

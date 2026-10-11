@@ -4891,6 +4891,21 @@ namespace CADability
             return res.ToArray();
         }
 
+        /// <summary>
+        /// The angle in (0, 2pi] by which the direction back along <paramref name="incoming"/> has to be turned clockwise to the direction
+        /// of <paramref name="outgoing"/>, which starts where <paramref name="incoming"/> ends. The smallest angle is the sharpest turn to
+        /// the left. Short chords are used instead of the tangents, so that curves which are tangent in the vertex are told apart by
+        /// their curvature.
+        /// </summary>
+        private static double ClockwiseTurn(ICurve2D incoming, ICurve2D outgoing)
+        {
+            GeoVector2D back = incoming.PointAt(1.0 - 1e-3) - incoming.EndPoint;
+            GeoVector2D forward = outgoing.PointAt(1e-3) - outgoing.StartPoint;
+            double a = Math.Atan2(back.y, back.x) - Math.Atan2(forward.y, forward.x);
+            while (a <= 0.0) a += 2.0 * Math.PI;
+            while (a > 2.0 * Math.PI) a -= 2.0 * Math.PI;
+            return a;
+        }
         private List<Edge> FindLoop(Edge edg, Vertex startVertex, Face onThisFace, HashSet<Edge> intersectionEdges, HashSet<Edge> originalEdges)
         {
             List<Edge> res = new List<Edge>();
@@ -4966,9 +4981,27 @@ namespace CADability
                 }
                 else if (connected.Count == 1)
                 {   // there is exactely one intersection edge starting at endVertex: use this edges
-                    res.Add(connected[0]);
+                    Edge next = connected[0];
+                    List<Edge> outlineHere = endVertex.ConditionalEdges(e => originalEdges.Contains(e) && e.Curve3D != null && e.StartVertex(onThisFace) == endVertex);
+                    if (outlineHere.Count > 0 && intersectionEdges.Contains(res[res.Count - 1]))
+                    {   // the intersection curve comes in and goes on, and an edge of the face starts here: the intersection curve touches
+                        // the outline in this vertex, e.g. the circle of a cylinder standing on a square face, which touches its sides.
+                        // The face is to the left of its edges, so the edge which turns most to the left closes the smallest loop.
+                        ICurve2D incoming = res[res.Count - 1].Curve2D(onThisFace);
+                        double best = ClockwiseTurn(incoming, next.Curve2D(onThisFace));
+                        foreach (Edge e in outlineHere)
+                        {
+                            double turn = ClockwiseTurn(incoming, e.Curve2D(onThisFace));
+                            if (turn < best)
+                            {
+                                best = turn;
+                                next = e;
+                            }
+                        }
+                    }
+                    res.Add(next);
                     usedVertices.Add(endVertex);
-                    endVertex = connected[0].EndVertex(onThisFace);
+                    endVertex = next.EndVertex(onThisFace);
                     continue;
                 }
                 bool intersectionEdgeEndHere = false;
@@ -9196,6 +9229,42 @@ namespace CADability
                 }
             }
         }
+        /// <summary>
+        /// The surfaces of the two faces are tangential along the intersection curve <paramref name="curve"/>. Returns true, when they
+        /// only touch there: the surface of <paramref name="face1"/> stays on one side of the surface of <paramref name="face2"/> on both
+        /// sides of the curve, like a cylinder lying on a plane. Such a curve is no intersection edge: it would split the face of the plane
+        /// into two parts, and only the part on one side would be kept. A curve along an existing edge of either face, e.g. where a face
+        /// is tangent to a rounded edge, is not checked.
+        /// </summary>
+        private bool TouchesWithoutCrossing(Face face1, Face face2, ICurve curve)
+        {
+            GeoPoint m = curve.PointAt(0.5);
+            double tangentialPrecision = (face1.GetExtent(0.0).Size + face2.GetExtent(0.0).Size) * Precision.eps;
+            foreach (Edge edg in face1.AllEdges.Concat(face2.AllEdges))
+            {
+                if (edg.Curve3D == null || edg.Curve3D.DistanceTo(m) >= tangentialPrecision) continue;
+                // a seam between two parts of the same surface, e.g. of the two halves of a cylinder, is no edge of the shape
+                if (edg.PrimaryFace != null && edg.SecondaryFace != null &&
+                    edg.PrimaryFace.Surface.SameGeometry(edg.PrimaryFace.Domain, edg.SecondaryFace.Surface, edg.SecondaryFace.Domain, precision, out ModOp2D _)) continue;
+                return false;
+            }
+            GeoVector side = face1.Surface.GetNormal(face1.Surface.PositionOf(m)) ^ curve.DirectionAt(0.5);
+            if (Precision.IsNullVector(side)) return false;
+            side = (1e-2 * Math.Min(face1.GetExtent(0.0).Size, face2.GetExtent(0.0).Size)) * side.Normalized;
+            int sign = 0;
+            foreach (GeoVector offset in new GeoVector[] { side, -side })
+            {   // a point of the surface of face1 beside the curve and its signed distance from the surface of face2
+                GeoPoint p = face1.Surface.PointAt(face1.Surface.PositionOf(m + offset));
+                GeoPoint2D uv2 = face2.Surface.PositionOf(p);
+                GeoVector n2 = face2.Surface.GetNormal(uv2);
+                if (Precision.IsNullVector(n2)) return false;
+                double d = (p - face2.Surface.PointAt(uv2)) * n2.Normalized;
+                if (Math.Abs(d) < precision) return false; // too close to decide
+                if (sign == 0) sign = Math.Sign(d);
+                else if (Math.Sign(d) != sign) return false; // the surfaces cross each other
+            }
+            return true;
+        }
         private void createNewEdges()
         {
             overlappingEdges = new Dictionary<DoubleFaceKey, HashSet<Edge>>();
@@ -9477,6 +9546,7 @@ namespace CADability
                                 if (normalsCrossedMiddle.Length < Precision.eps)
                                 {
                                     // it is also tangential at the midpoint of the intersection curve
+                                    if (TouchesWithoutCrossing(item.Key.face1, item.Key.face2, tr)) continue;
                                     // we now use the uv points in the surfaces and slowly walk from the uv point in the direction of the center of the domain
                                     // (2d extent), until we find a point, where the normals are not parallel any more.
                                     GeoPoint2D uvf1 = item.Key.face1.Surface.PositionOf(m);

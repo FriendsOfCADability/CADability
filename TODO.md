@@ -69,7 +69,13 @@ project), the lines are as far apart as the perpendicular part of the pattern
 offset, and in a block they take the lineweight of the INSERT for ByBlock and
 of its layer for ByLayer on layer "0". The linetype ByBlock outside of blocks
 is "Continuous", and the project gets no line patterns "ByLayer" and
-"ByBlock".
+"ByBlock". A cylinder standing on a box, its bottom circle touching the sides
+of the top face, is no longer lost in the union: where an intersection curve
+touches the outline of a face, the loop takes the edge that turns most to the
+left, and the top face is split into its four corners instead of getting a
+hole that touches the outline. A cylinder lying on a box no longer has empty
+differences: a tangential intersection curve along which the surfaces only
+touch, without crossing, is no intersection edge.
 
 Fixed in the next pull request: #194 (`Border.UnsplittedOutline` survives
 `CompoundShape.CreateFromList`), #293 (DXF block contents on layer 0 or
@@ -110,18 +116,22 @@ None left: all of them have been fixed.
   remain wrong, 2 crash with a stack overflow or a timeout, all unchanged by
   the fix). Examples: a box bottom 3e-7 below the tangent plane of a rounded
   edge, gaps of about 1e-5 (between `Precision.eps` and the BRep precision),
-  and tools 1e6 times smaller than the other solid. Touching solids: a
-  cylinder standing on a box (its bottom disc inside the top face of the box)
-  is lost in the union, the result is the box alone; the common disc is cut
-  out of the top face, but its circle is not connected to the side of the
-  cylinder, because the circle edge of the cylinder still belongs to the disc
-  as well. A cylinder lying on a box (touching in a line) gives empty
-  differences. Solids touching only in an edge or a point have no union
-  (`Solid.Unite` returns null, the result would not be a manifold).
+  and tools 1e6 times smaller than the other solid. Solids touching only in
+  an edge, a line or a point have no union (`Solid.Unite` returns null, the
+  result would not be a manifold), and a solid touching the inside of another
+  one cannot be subtracted (the result would have a cavity, which a `Solid`
+  cannot have; the other solid is returned unchanged).
   Unions of spheres with offset axes measure 0.03 to 0.05 % too small or too
   large, while both differences are exact. In the union, the hole edges of the merged faces
   have `Path2D` curves, and these faces triangulate to a slightly smaller area
   than the same faces in the differences; not yet investigated further.
+
+- [ ] `Border.Clip` sets the global `Precision.eps` through `PrecisionOverride`
+  while it runs, so every other thread computes with that precision in the
+  meantime. Boolean operations and imports running in parallel (the parallel
+  STEP import, the tests) are affected: `a_small_cut_can_be_subtracted_from_a_long_profile`
+  and `an_almost_straight_spline_still_shares_a_plane_with_an_arc` failed once
+  in a full test run and passed when run alone or again.
 
 - [ ] `tests/CADability.Tests/Files/CDB/Volumes.cdb.json` cannot be read by
   the JSON reader of this repository: it stores `SphericalSurface`,

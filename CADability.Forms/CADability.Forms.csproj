@@ -10,6 +10,9 @@
     <AssemblyOriginatorKeyFile>CADabilityKey.snk</AssemblyOriginatorKeyFile>
     <LangVersion>12.0</LangVersion>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- the input of the API documentation on the website (.github/workflows/pages.yml), see CADability.csproj -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591;CS1570;CS1571;CS1572;CS1573;CS1574;CS1580;CS1584;CS1587;CS1734</NoWarn>
   </PropertyGroup>
 
   <!-- Configurations -->

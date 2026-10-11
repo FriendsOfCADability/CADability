@@ -1414,6 +1414,7 @@ namespace CADability
     {
         private Shell shell1; // the two shells, which are intersected
         private Shell shell2; // either shell1 and shell2 are set or multipleFaces is set
+        private Shell original1, original2; // the shells shell1 and shell2 were cloned from, they stay intact while shell1 and shell2 are taken apart
         private List<Face> multipleFaces; // the faces, which are intersected. 
         private PlaneSurface splittingOnplane; // when splitting a Shell with a plane, this is the surface
         private bool allowOpenEdges;
@@ -1799,6 +1800,15 @@ namespace CADability
                     cancelledfaces.Add(dfk.face2);
                 }
             }
+            if (operation == Operation.difference && overlappingFaces != null)
+            {   // shell2 has been reversed, so a pair of identical faces with the same orientation had opposite orientations: the shells
+                // touch there from both sides, and the face of shell1 stays as it is. The common part, which is made for overlapping faces,
+                // could not be connected to the rest of shell1, because each of its edges is also an edge of a face of shell2, and the result was empty.
+                foreach (DoubleFaceKey dfk in overlappingFaces.Keys.ToList())
+                {
+                    if (new HashSet<Vertex>(dfk.face1.Vertices).SetEquals(dfk.face2.Vertices)) overlappingFaces.Remove(dfk);
+                }
+            }
         }
         private void AddFacesToIntersectionVertices(Face f1, Face f2, IntersectionVertex iv)
         {
@@ -2146,6 +2156,8 @@ namespace CADability
 #endif
             shell1 = s1.Clone() as Shell;   // hier wird gekloned, weil die Faces im Verlauf geändert werden und das Original
             shell2 = s2.Clone() as Shell;   // unverändert bleiben soll. ZUm Debuggen kann man das Klonen weglassen
+            original1 = s1;
+            original2 = s2;
             if (shell1.HasOpenEdgesExceptPoles()) shell1.TryConnectOpenEdges();
             if (shell2.HasOpenEdgesExceptPoles()) shell2.TryConnectOpenEdges();
             shell1.RecalcVertices();
@@ -3106,32 +3118,30 @@ namespace CADability
                 BoundingRect ext1, ext2;
                 ext1 = df.face1.Area.GetExtent();
                 ext2 = df.face2.Area.GetExtent();
-                IDualSurfaceCurve[] innerCurves = Surfaces.IntersectInner(df.face1.Surface, ext1, df.face2.Surface, ext2);
-                for (int i = 0; i < innerCurves.Length; i++)
+                IDualSurfaceCurve[][] innerLoops = Surfaces.IntersectInner(df.face1.Surface, ext1, df.face2.Surface, ext2);
+                foreach (IDualSurfaceCurve[] loop in innerLoops)
                 {   // es handelt sich immer um geschlossene Kurven
                     // Da es sich um echte innere Kurven handeln muss, also keine Schnitte mit den Kanten, genügt es, auf einen inneren Punkt zu testen
-                    if (!df.face1.Area.Contains(df.face1.Surface.PositionOf(innerCurves[i].Curve3D.StartPoint), false)) continue;
-                    if (!df.face2.Area.Contains(df.face2.Surface.PositionOf(innerCurves[i].Curve3D.StartPoint), false)) continue;
+                    if (!df.face1.Area.Contains(df.face1.Surface.PositionOf(loop[0].Curve3D.StartPoint), false)) continue;
+                    if (!df.face2.Area.Contains(df.face2.Surface.PositionOf(loop[0].Curve3D.StartPoint), false)) continue;
                     // es scheint besser zu sein, die Kurve aufzuteilen und zwei Kanten zu erzeugen
-                    IDualSurfaceCurve[] parts = innerCurves[i].Split(0.5);
-                    if (parts == null || parts.Length != 2) continue; // kommt nicht vor
-                    Vertex v1 = null, v2 = null;
-                    for (int j = 0; j < 2; j++)
+                    IDualSurfaceCurve[] parts = loop.Length == 1 ? loop[0].Split(0.5) : loop;
+                    if (parts == null || parts.Length < 2) continue; // kommt nicht vor
+                    // the parts follow each other, part j ends where part j + 1 starts
+                    Vertex[] vertices = new Vertex[parts.Length];
+                    for (int j = 0; j < parts.Length; j++) vertices[j] = new Vertex(parts[j].Curve3D.StartPoint);
+                    for (int j = 0; j < parts.Length; j++)
                     {
-
                         bool dir = ((df.face1.Surface.GetNormal(parts[j].Curve2D1.StartPoint) ^ df.face2.Surface.GetNormal(parts[j].Curve2D2.StartPoint)) * parts[j].Curve3D.StartDirection) > 0;
-                        Edge edge = new Edge(df.face1, parts[j].Curve3D, df.face1, parts[j].Curve2D1, dir, df.face2, parts[j].Curve2D1, !dir);
-                        if (j == 0)
-                        {
-                            edge.MakeVertices();
-                            v1 = edge.Vertex1;
-                            v2 = edge.Vertex2;
-                        }
-                        else
-                        {
-                            edge.Vertex1 = v2;
-                            edge.Vertex2 = v1;
-                        }
+                        // the 2d curves go along the 3d curve, on the face where the edge runs backwards it is reversed (as in createNewEdges)
+                        ICurve2D c2d1 = parts[j].Curve2D1.Clone(), c2d2 = parts[j].Curve2D2.Clone();
+                        if (dir) c2d2.Reverse();
+                        else c2d1.Reverse();
+                        Edge edge = new Edge(df.face1, parts[j].Curve3D, df.face1, c2d1, dir, df.face2, c2d2, !dir);
+                        edge.edgeInfo = new EdgeInfo(edge);
+                        edge.edgeInfo.isIntersection = true;
+                        edge.Vertex1 = vertices[j];
+                        edge.Vertex2 = vertices[(j + 1) % parts.Length];
                         HashSet<Edge> addTo;
                         if (!faceToIntersectionEdges.TryGetValue(df.face1, out addTo))
                         {
@@ -3708,6 +3718,33 @@ namespace CADability
             return false;
         }
 
+        /// <summary>
+        /// A point of <paramref name="shell"/>, which is not on <paramref name="other"/>: a vertex or the middle of a face. Where the
+        /// shells touch, their common points cannot decide whether one shell contains the other.
+        /// </summary>
+        private GeoPoint PointNotOn(Shell shell, Shell other)
+        {
+            BoundingCube otherExtent = other.GetExtent(precision);
+            bool IsOnOther(GeoPoint p)
+            {
+                if (!otherExtent.Contains(p)) return false;
+                foreach (Face face in other.Faces)
+                {
+                    if (face.GetExtent(precision).Contains(p) && Math.Abs(face.Distance(p)) < precision) return true;
+                }
+                return false;
+            }
+            foreach (Vertex vertex in shell.Vertices)
+            {
+                if (!IsOnOther(vertex.Position)) return vertex.Position;
+            }
+            foreach (Face face in shell.Faces)
+            {
+                GeoPoint2D c = face.Area.GetExtent().GetCenter();
+                if (face.Area.Contains(c, false) && !IsOnOther(face.Surface.PointAt(c))) return face.Surface.PointAt(c);
+            }
+            return shell.Vertices[0].Position;
+        }
         public Shell[] Result()
         {
             // this method relies on
@@ -4486,7 +4523,35 @@ namespace CADability
                                                  // allFaces now contains all the trimmed faces plus the faces, which are (directly or indirectly) connected (via edges) to the trimmed faces
             List<Face> nonManifoldParts = new List<Face>();
             shellsAreUnchanged = (allFaces.Count == 0);
-            if (allFaces.Count == 0)
+            if (allFaces.Count == 0 && original1 != null && original2 != null)
+            {   // the shells don't cross each other, but they may touch. When they touch, the faces of shell1 and shell2 have been split
+                // and taken apart by now, so the original shells are tested and returned. And a vertex, where the shells touch, lies on
+                // both shells, so it cannot tell whether one shell contains the other: a point is taken, which is not on the other shell.
+                bool oneInTwo = original2.Contains(PointNotOn(original1, original2));
+                bool twoInOne = original1.Contains(PointNotOn(original2, original1));
+                if (operation == Operation.union)
+                {
+                    if (oneInTwo) res.Add(original2.Clone() as Shell);
+                    else if (twoInOne) res.Add(original1.Clone() as Shell);
+                    else
+                    {   // shells are disjunct, as union we return both
+                        res.Add(original1.Clone() as Shell);
+                        res.Add(original2.Clone() as Shell);
+                    }
+                }
+                else if (operation == Operation.difference)
+                {
+                    if (!oneInTwo) res.Add(original1.Clone() as Shell); // shell1 remains unchanged, shell2 is outside or inside (a hole, which Solid cannot represent)
+                    // else: the result is empty, because shell2 contains shell1 completely
+                }
+                else if (operation == Operation.intersection)
+                {
+                    if (oneInTwo) res.Add(original1.Clone() as Shell);
+                    else if (twoInOne) res.Add(original2.Clone() as Shell);
+                    // else: shells are disjunct or touch, the result is empty
+                }
+            }
+            else if (allFaces.Count == 0)
             {
                 if (operation == Operation.union)
                 {
@@ -4826,6 +4891,21 @@ namespace CADability
             return res.ToArray();
         }
 
+        /// <summary>
+        /// The angle in (0, 2pi] by which the direction back along <paramref name="incoming"/> has to be turned clockwise to the direction
+        /// of <paramref name="outgoing"/>, which starts where <paramref name="incoming"/> ends. The smallest angle is the sharpest turn to
+        /// the left. Short chords are used instead of the tangents, so that curves which are tangent in the vertex are told apart by
+        /// their curvature.
+        /// </summary>
+        private static double ClockwiseTurn(ICurve2D incoming, ICurve2D outgoing)
+        {
+            GeoVector2D back = incoming.PointAt(1.0 - 1e-3) - incoming.EndPoint;
+            GeoVector2D forward = outgoing.PointAt(1e-3) - outgoing.StartPoint;
+            double a = Math.Atan2(back.y, back.x) - Math.Atan2(forward.y, forward.x);
+            while (a <= 0.0) a += 2.0 * Math.PI;
+            while (a > 2.0 * Math.PI) a -= 2.0 * Math.PI;
+            return a;
+        }
         private List<Edge> FindLoop(Edge edg, Vertex startVertex, Face onThisFace, HashSet<Edge> intersectionEdges, HashSet<Edge> originalEdges)
         {
             List<Edge> res = new List<Edge>();
@@ -4901,9 +4981,27 @@ namespace CADability
                 }
                 else if (connected.Count == 1)
                 {   // there is exactely one intersection edge starting at endVertex: use this edges
-                    res.Add(connected[0]);
+                    Edge next = connected[0];
+                    List<Edge> outlineHere = endVertex.ConditionalEdges(e => originalEdges.Contains(e) && e.Curve3D != null && e.StartVertex(onThisFace) == endVertex);
+                    if (outlineHere.Count > 0 && intersectionEdges.Contains(res[res.Count - 1]))
+                    {   // the intersection curve comes in and goes on, and an edge of the face starts here: the intersection curve touches
+                        // the outline in this vertex, e.g. the circle of a cylinder standing on a square face, which touches its sides.
+                        // The face is to the left of its edges, so the edge which turns most to the left closes the smallest loop.
+                        ICurve2D incoming = res[res.Count - 1].Curve2D(onThisFace);
+                        double best = ClockwiseTurn(incoming, next.Curve2D(onThisFace));
+                        foreach (Edge e in outlineHere)
+                        {
+                            double turn = ClockwiseTurn(incoming, e.Curve2D(onThisFace));
+                            if (turn < best)
+                            {
+                                best = turn;
+                                next = e;
+                            }
+                        }
+                    }
+                    res.Add(next);
                     usedVertices.Add(endVertex);
-                    endVertex = connected[0].EndVertex(onThisFace);
+                    endVertex = next.EndVertex(onThisFace);
                     continue;
                 }
                 bool intersectionEdgeEndHere = false;
@@ -9125,6 +9223,42 @@ namespace CADability
                 }
             }
         }
+        /// <summary>
+        /// The surfaces of the two faces are tangential along the intersection curve <paramref name="curve"/>. Returns true, when they
+        /// only touch there: the surface of <paramref name="face1"/> stays on one side of the surface of <paramref name="face2"/> on both
+        /// sides of the curve, like a cylinder lying on a plane. Such a curve is no intersection edge: it would split the face of the plane
+        /// into two parts, and only the part on one side would be kept. A curve along an existing edge of either face, e.g. where a face
+        /// is tangent to a rounded edge, is not checked.
+        /// </summary>
+        private bool TouchesWithoutCrossing(Face face1, Face face2, ICurve curve)
+        {
+            GeoPoint m = curve.PointAt(0.5);
+            double tangentialPrecision = (face1.GetExtent(0.0).Size + face2.GetExtent(0.0).Size) * Precision.eps;
+            foreach (Edge edg in face1.AllEdges.Concat(face2.AllEdges))
+            {
+                if (edg.Curve3D == null || edg.Curve3D.DistanceTo(m) >= tangentialPrecision) continue;
+                // a seam between two parts of the same surface, e.g. of the two halves of a cylinder, is no edge of the shape
+                if (edg.PrimaryFace != null && edg.SecondaryFace != null &&
+                    edg.PrimaryFace.Surface.SameGeometry(edg.PrimaryFace.Domain, edg.SecondaryFace.Surface, edg.SecondaryFace.Domain, precision, out ModOp2D _)) continue;
+                return false;
+            }
+            GeoVector side = face1.Surface.GetNormal(face1.Surface.PositionOf(m)) ^ curve.DirectionAt(0.5);
+            if (Precision.IsNullVector(side)) return false;
+            side = (1e-2 * Math.Min(face1.GetExtent(0.0).Size, face2.GetExtent(0.0).Size)) * side.Normalized;
+            int sign = 0;
+            foreach (GeoVector offset in new GeoVector[] { side, -side })
+            {   // a point of the surface of face1 beside the curve and its signed distance from the surface of face2
+                GeoPoint p = face1.Surface.PointAt(face1.Surface.PositionOf(m + offset));
+                GeoPoint2D uv2 = face2.Surface.PositionOf(p);
+                GeoVector n2 = face2.Surface.GetNormal(uv2);
+                if (Precision.IsNullVector(n2)) return false;
+                double d = (p - face2.Surface.PointAt(uv2)) * n2.Normalized;
+                if (Math.Abs(d) < precision) return false; // too close to decide
+                if (sign == 0) sign = Math.Sign(d);
+                else if (Math.Sign(d) != sign) return false; // the surfaces cross each other
+            }
+            return true;
+        }
         private void createNewEdges()
         {
             overlappingEdges = new Dictionary<DoubleFaceKey, HashSet<Edge>>();
@@ -9191,15 +9325,19 @@ namespace CADability
                 if (possibleEdge.Count == 2)
                 {   // maybe the intersection curve is an existing edge on both faces: we don't need it
                     List<Edge> commonEdges = new List<Edge>(possibleEdge[0].AllEdges.Intersect(possibleEdge[1].AllEdges));
-                    bool found1 = false, found2 = false;
-                    foreach (Edge edg in commonEdges)
+                    bool found = false;
+                    foreach (Edge edg1 in commonEdges)
                     {
-                        if (edg.PrimaryFace == item.Key.face1) found1 = true;
-                        if (edg.SecondaryFace == item.Key.face1) found1 = true;
-                        if (edg.PrimaryFace == item.Key.face2) found2 = true;
-                        if (edg.SecondaryFace == item.Key.face2) found2 = true;
+                        if (edg1.PrimaryFace != item.Key.face1 && edg1.SecondaryFace != item.Key.face1) continue;
+                        foreach (Edge edg2 in commonEdges)
+                        {
+                            if (edg2.PrimaryFace != item.Key.face2 && edg2.SecondaryFace != item.Key.face2) continue;
+                            // two edges between the same vertices are not necessarily the same curve: where the seams of two
+                            // spheres cross on their intersection circle, the seam of each one connects the crossing points
+                            if (edg1 == edg2 || (edg1.Curve3D != null && edg2.Curve3D != null && edg2.Curve3D.DistanceTo(edg1.Curve3D.PointAt(0.5)) < precision)) found = true;
+                        }
                     }
-                    if (found1 && found2) { involvedVertices.ExceptWith(possibleEdge); }
+                    if (found) { involvedVertices.ExceptWith(possibleEdge); }
                 }
 
                 if (involvedVertices.Count < 2) continue;
@@ -9402,6 +9540,7 @@ namespace CADability
                                 if (normalsCrossedMiddle.Length < Precision.eps)
                                 {
                                     // it is also tangential at the midpoint of the intersection curve
+                                    if (TouchesWithoutCrossing(item.Key.face1, item.Key.face2, tr)) continue;
                                     // we now use the uv points in the surfaces and slowly walk from the uv point in the direction of the center of the domain
                                     // (2d extent), until we find a point, where the normals are not parallel any more.
                                     GeoPoint2D uvf1 = item.Key.face1.Surface.PositionOf(m);
@@ -9585,14 +9724,14 @@ namespace CADability
                                         List<Edge> le = edge.Vertex1.EdgesOnFace(item.Key.face1);
                                         for (int k = 0; k < le.Count; k++)
                                         {
-                                            if (le[k] == edge) continue;
+                                            if (le[k] == edge || le[k].Curve3D == null) continue; // a pole has no curve
                                             if (le[k].Vertex1 == edge.Vertex1 && Precision.SameDirection(le[k].Curve3D.StartDirection, edge.Curve3D.StartDirection, false)) tangential = true;
                                             else if (le[k].Vertex2 == edge.Vertex1 && Precision.SameDirection(le[k].Curve3D.EndDirection, edge.Curve3D.StartDirection, false)) tangential = true;
                                         }
                                         le = edge.Vertex2.EdgesOnFace(item.Key.face1);
                                         for (int k = 0; k < le.Count; k++)
                                         {
-                                            if (le[k] == edge) continue;
+                                            if (le[k] == edge || le[k].Curve3D == null) continue; // a pole has no curve
                                             if (le[k].Vertex1 == edge.Vertex2 && Precision.SameDirection(le[k].Curve3D.StartDirection, edge.Curve3D.EndDirection, false)) tangential = true;
                                             else if (le[k].Vertex2 == edge.Vertex2 && Precision.SameDirection(le[k].Curve3D.EndDirection, edge.Curve3D.EndDirection, false)) tangential = true;
                                         }
@@ -9622,7 +9761,7 @@ namespace CADability
                                         List<Edge> le = edge.Vertex1.EdgesOnFace(item.Key.face2);
                                         for (int k = 0; k < le.Count; k++)
                                         {
-                                            if (le[k] == edge) continue;
+                                            if (le[k] == edge || le[k].Curve3D == null) continue; // a pole has no curve
                                             if (le[k].Vertex1 == edge.Vertex1 && Precision.SameDirection(le[k].Curve3D.StartDirection, edge.Curve3D.StartDirection, false)) tangential = true;
                                             else if (le[k].Vertex2 == edge.Vertex1 && Precision.SameDirection(le[k].Curve3D.EndDirection, edge.Curve3D.StartDirection, false)) tangential = true;
                                         }

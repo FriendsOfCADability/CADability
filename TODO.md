@@ -77,6 +77,13 @@ hole that touches the outline. A cylinder lying on a box no longer has empty
 differences: a tangential intersection curve along which the surfaces only
 touch, without crossing, is no intersection edge.
 
+The documentation is generated again: the package contains the XML
+documentation (`CADability.xml`), and the Pages workflow builds the libraries
+and runs docfx on them, under the old paths `/CADabilityDoc` and
+`/CADabilityFormsDoc`. The generated HTML of 2021 is no longer in the
+repository, and `docs/index.html` is a start page instead of the Jekyll
+template.
+
 Fixed in the next pull request: #194 (`Border.UnsplittedOutline` survives
 `CompoundShape.CreateFromList`), #293 (DXF block contents on layer 0 or
 ByBlock take the layer and colour of the INSERT; `CDfromParent` children keep
@@ -169,11 +176,12 @@ None left: all of them have been fixed.
 
 ## Documentation
 
-- [ ] The generated documentation is stale: `docs/CADabilityDoc` was last
-  generated on 2021-05-31 and `docs/index.md` is the unchanged Jekyll
-  template. Consider running docfx (`CADability/docfx.json`,
-  `CADability.Forms/docfx.json`) in the Pages workflow instead of committing
-  generated HTML.
+- [ ] About 440 doc comments have wrong `param` names, `cref`s that resolve to
+  nothing or malformed XML (compiler warnings CS1570 to CS1587 and CS1734, and
+  the `InvalidCref` warnings of docfx). The warnings are suppressed in
+  `CADability.csproj` and `CADability.Forms.csproj` since the XML
+  documentation is generated; remove them from `NoWarn` while fixing the
+  comments.
 
 ## Open discussions / feature requests (no action from triage)
 

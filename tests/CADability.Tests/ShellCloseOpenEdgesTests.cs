@@ -40,5 +40,37 @@ namespace CADability.Tests
             Assert.AreEqual(4, single.OpenEdges.Length);
             Assert.IsTrue(single.Faces[0].CheckConsistency());
         }
+
+        [TestMethod]
+        public void the_apex_of_a_cone_and_the_poles_of_a_sphere_are_poles()
+        {
+            foreach (Solid solid in new[] { Make3D.MakeCone(GeoPoint.Origin, GeoVector.XAxis, 10 * GeoVector.ZAxis, 5, 0), Make3D.MakeSphere(GeoPoint.Origin, 5) })
+            {
+                Shell shell = solid.Shells[0];
+                Assert.IsTrue(shell.OpenEdges.Length > 0, "the poles are open edges");
+                Assert.IsFalse(shell.HasOpenEdgesExceptPoles());
+                Assert.AreEqual(0, shell.OpenEdgesExceptPoles.Length);
+            }
+        }
+
+        [TestMethod]
+        public void a_cone_is_still_a_solid_after_a_step_round_trip()
+        {
+            Project project = Project.CreateSimpleProject();
+            project.GetActiveModel().Add(Make3D.MakeCone(GeoPoint.Origin, GeoVector.XAxis, 10 * GeoVector.ZAxis, 5, 0));
+            string file = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"cone-{Guid.NewGuid():N}.stp");
+            try
+            {
+                new ExportStep().WriteToFile(file, project);
+                Project read = Project.ReadFromFile(file, "stp");
+                IEnumerable<IGeoObject> all = read.GetActiveModel().AllObjects.SelectMany(go => go is Block block ? block.Children.ToList() : new List<IGeoObject> { go });
+                Solid cone = all.OfType<Solid>().Single();
+                Assert.IsTrue(cone.Shells[0].OpenEdges.Any(edge => edge.Curve3D == null), "the apex is a pole in the file too");
+            }
+            finally
+            {
+                File.Delete(file);
+            }
+        }
     }
 }

@@ -36,7 +36,10 @@ call into one display list), #253 (opt-in `CapturesMouse` on
 is a minor one), #254 (`MultipleChoiceInput.SetChoices`, also new public API),
 #249 (an approximated curve keeps its colour), #65 (changing the colour or
 another attribute of an edge is reported by its solid, shell or face, so the
-view is repainted and the change can be undone).
+view is repainted and the change can be undone), #303 (every `Model.Add`
+overload adds invalid objects; construct actions and the DXF import check
+`HasValidData` themselves, and the DXF and STEP exports skip invalid
+objects).
 
 Fixed in the next pull request: #194 (`Border.UnsplittedOutline` survives
 `CompoundShape.CreateFromList`), #293 (DXF block contents on layer 0 or
@@ -68,9 +71,7 @@ d3db7052; a rewrite is not planned, prototype on branch `ShapeItProgress`).
 Each of these was reproduced, or confirmed by reading the code, on `17f949e`.
 All issues that could not be verified at first have since been checked.
 
-- [ ] **#303 Model.Add() silently drops invalid GeoObjects.** The
-  `HasValidData()` check in `Model.Add(IGeoObject)` is unchanged, and the
-  other overloads still don't check. This needs a design decision.
+None left: all of them have been fixed.
 
 ## Found while fixing (not yet addressed)
 
@@ -118,6 +119,12 @@ All issues that could not be verified at first have since been checked.
   returns true. Either implement them (ACadSharp can write DWG) or remove
   them from `Settings.cs` and the string tables, and let `Project.Export`
   report unsupported formats.
+
+- [ ] Curves for which `HasValidData` is false still fail in curve operations
+  (found for #303): a `Polyline` without vertices throws a
+  `NullReferenceException` in `PositionOf`, `Approximate` and the exports, an
+  arc with sweep 0 a `GeoVectorException`. `Project.Export` returns false for
+  STEP and STL even when the file was written.
 
 ## Documentation
 

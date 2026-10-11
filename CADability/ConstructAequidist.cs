@@ -97,7 +97,7 @@ namespace CADability.Actions
                         {
                             go = (go as Path).Curves[0];
                         }
-                        Frame.Project.GetActiveModel().Add(go);
+                        if (go.HasValidData()) Frame.Project.GetActiveModel().Add(go);
                     }
                 }
             }

@@ -93,14 +93,16 @@ None left: all of them have been fixed.
   touching boxes (`Intersect` throws), and tools 1e6 times smaller than the
   other solid. A box minus a sphere of radius 4 centred on its top face fails
   an assertion in Debug builds and returns the box unchanged in Release
-  builds. Two spheres now intersect in an exact circle, but some positions
-  still give wrong results (sphere A of radius 5 at the origin, axes along z
-  unless noted): B of radius 5 at (2, 1, 5): A - B is 386.36 instead of
-  387.16 and B - A 406.85; B of radius 5 at (0, 0, 6), turned by 30° about
-  (1, 0.3, 0.2): A - B is 402.76 instead of 414.69; B of radius 3 at
-  (1, 2, 6): B - A is 100.28 instead of 99.39; B of radius 5 at (6, 0, 0.5):
-  every operation is empty, as before. Unions of spheres with offset axes
-  are 0.03 to 0.05 % off.
+  builds. Two spheres now intersect in an exact circle. Still wrong: a sphere
+  of radius 5 at the origin and one of radius 5 at (6, 0, 0.5), both with
+  their axes along z, give empty results, as before. The edges of both
+  spheres cross exactly on the intersection circle, so every intersection
+  point is found four times, and no intersection edge is made. Unions of
+  spheres with offset axes measure 0.03 to 0.05 % too small or too large,
+  while both differences are exact. In the union, the hole edges of the
+  merged faces have `Path2D` curves, and these faces triangulate to a slightly
+  smaller area than the same faces in the differences; not yet investigated
+  further.
 
 - [ ] `tests/CADability.Tests/Files/CDB/Volumes.cdb.json` cannot be read by
   the JSON reader of this repository: it stores `SphericalSurface`,

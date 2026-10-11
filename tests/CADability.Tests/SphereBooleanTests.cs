@@ -37,21 +37,24 @@ namespace CADability.Tests
         }
 
         [DataTestMethod]
-        [DataRow(0.0, 0.0, 6.0, 0.0, 0.0, 1.0, 0.0, DisplayName = "coaxial, the seams in the same plane")]
-        [DataRow(0.0, 0.0, 6.0, 0.0, 0.0, 1.0, 30.0, DisplayName = "coaxial, the seams turned against each other")]
-        [DataRow(2.0, 1.0, 5.0, 1.0, 0.3, 0.2, 70.0, DisplayName = "axes offset")]
-        public void two_spheres_can_be_united_intersected_and_subtracted(double x, double y, double z, double ax, double ay, double az, double degrees)
+        [DataRow(0.0, 0.0, 6.0, 5.0, 0.0, 0.0, 1.0, 0.0, DisplayName = "coaxial, the seams in the same plane")]
+        [DataRow(0.0, 0.0, 6.0, 5.0, 0.0, 0.0, 1.0, 30.0, DisplayName = "coaxial, the seams turned against each other")]
+        [DataRow(0.0, 0.0, 6.0, 5.0, 1.0, 0.3, 0.2, 30.0, DisplayName = "coaxial, the second sphere tilted")]
+        [DataRow(2.0, 1.0, 5.0, 5.0, 0.0, 0.0, 1.0, 0.0, DisplayName = "axes offset, the seams parallel")]
+        [DataRow(2.0, 1.0, 5.0, 5.0, 1.0, 0.3, 0.2, 70.0, DisplayName = "axes offset")]
+        [DataRow(1.0, 2.0, 6.0, 3.0, 0.0, 0.0, 1.0, 0.0, DisplayName = "different radii")]
+        public void two_spheres_can_be_united_intersected_and_subtracted(double x, double y, double z, double radius, double ax, double ay, double az, double degrees)
         {
             GeoPoint center = new GeoPoint(x, y, z);
             Solid A() => Sphere(GeoPoint.Origin, 5.0, GeoVector.ZAxis, 0.0);
-            Solid B() => Sphere(center, 5.0, new GeoVector(ax, ay, az), degrees);
-            double v = 4.0 / 3.0 * Math.PI * 125.0;
-            double lens = Lens(5.0, 5.0, center.ToVector().Length);
+            Solid B() => Sphere(center, radius, new GeoVector(ax, ay, az), degrees);
+            double va = 4.0 / 3.0 * Math.PI * 125.0, vb = 4.0 / 3.0 * Math.PI * radius * radius * radius;
+            double lens = Lens(5.0, radius, center.ToVector().Length);
 
-            AssertSolid(WithinAMinute(() => Solid.Unite(A(), B()), "union"), 2.0 * v - lens, "union");
+            AssertSolid(WithinAMinute(() => Solid.Unite(A(), B()), "union"), va + vb - lens, "union");
             AssertSolid(WithinAMinute(() => Solid.Intersect(A(), B()), "intersection").Single(), lens, "intersection");
-            AssertSolid(WithinAMinute(() => Solid.Subtract(A(), B()), "difference").Single(), v - lens, "a - b");
-            AssertSolid(WithinAMinute(() => Solid.Subtract(B(), A()), "difference").Single(), v - lens, "b - a");
+            AssertSolid(WithinAMinute(() => Solid.Subtract(A(), B()), "difference").Single(), va - lens, "a - b");
+            AssertSolid(WithinAMinute(() => Solid.Subtract(B(), A()), "difference").Single(), vb - lens, "b - a");
         }
 
         [TestMethod]

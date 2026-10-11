@@ -1006,12 +1006,27 @@ namespace CADability.GeoObject
 				if (!IsInside(this, thisBounds, mid) || !IsInside(other, otherBounds, mid)) continue;
 				Ellipse part = circle.Clone() as Ellipse;
 				part.Trim(splits[i], splits[i + 1]);
-				ICurve2D c2d1 = GetProjectedCurve(part, 0.0);
-				ICurve2D c2d2 = other.GetProjectedCurve(part, 0.0);
+				ICurve2D c2d1 = ProjectedPart(this, part);
+				ICurve2D c2d2 = ProjectedPart(other, part);
 				if (c2d1 == null || c2d2 == null) continue;
 				res.Add(new DualSurfaceCurve(part, this, c2d1, other, c2d2));
 			}
 			return res.ToArray();
+		}
+		/// <summary>
+		/// The 2d curve of a part of the intersection circle on <paramref name="sphere"/>. The parts start and end on the seam
+		/// or on the bounds. A ProjectedCurve without a domain takes the periodic domain from its start point, and a start
+		/// point on the seam may be taken at u = 0 while the rest of the part is near u = 2pi, so that the inner points jump
+		/// by the period. The part is projected into the period around its middle instead.
+		/// </summary>
+		private static ICurve2D ProjectedPart(SphericalSurface sphere, Ellipse part)
+		{
+			ICurve2D res = sphere.GetProjectedCurve(part, 0.0);
+			if (res is Line2D) return res; // a meridian or a circle of latitude, exact
+			GeoPoint2D mid = sphere.PositionOf(part.PointAt(0.5));
+			// a little less than the period, a domain of the full period is not used to adjust the start and end point
+			double halfWidth = Math.PI * (1.0 - 1e-3);
+			return new ProjectedCurve(part, sphere, true, new BoundingRect(mid.x - halfWidth, -Math.PI / 2.0, mid.x + halfWidth, Math.PI / 2.0));
 		}
 		private static bool IsInside(SphericalSurface sphere, BoundingRect bounds, GeoPoint p)
 		{

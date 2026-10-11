@@ -844,6 +844,15 @@ namespace CADability.GeoObject
 		public override IDualSurfaceCurve[] GetDualSurfaceCurves(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, List<GeoPoint> seeds, List<Tuple<double, double, double, double>> extremePositions)
 		{   // hier sollten die Schnitte mit Ebene, Cylinder, Kegel und Kugel gelöst werden
 			// mit höheren Flächen sollte bei diesen (also z.B. Torus) implementiert werden
+			if (other is PlaneSurface planeSurface && IsRealSphere)
+			{   // a circle around the foot of the center. The code below, which also handles ellipsoids, returned the whole
+				// circle for each face of a sphere, with a 2d curve over the full period
+				Plane plane = planeSurface.Plane;
+				double dist = Math.Abs(plane.Distance(Location)), r = RadiusX;
+				if (dist > r - Precision.eps) return new IDualSurfaceCurve[0]; // apart or touching in a single point
+				GeoPoint foot = plane.ToGlobal(plane.Project(Location));
+				return CircleIntersection(foot, plane.Normal, Math.Sqrt(r * r - dist * dist), thisBounds, other, otherBounds);
+			}
 			if (other is PlaneSurface)
 			{   // das Ergebnis sollte aus einer möglichst nicht geschlossenen Kurve bestehen
 				// selbst, wenn in den Bounds zwei Stücke entstehen.
@@ -915,7 +924,7 @@ namespace CADability.GeoObject
 				if (d < Precision.eps || d > r1 + r2 - Precision.eps || d < Math.Abs(r1 - r2) + Precision.eps) return new IDualSurfaceCurve[0];
 				double a = (d * d + r1 * r1 - r2 * r2) / (2.0 * d); // distance of that plane from the center of this sphere
 				normal = (1.0 / d) * normal;
-				return SphereSphereIntersection(Location + a * normal, normal, Math.Sqrt(r1 * r1 - a * a), thisBounds, sphere, otherBounds);
+				return CircleIntersection(Location + a * normal, normal, Math.Sqrt(r1 * r1 - a * a), thisBounds, sphere, otherBounds);
 			}
 			else if (other is ICylinder cyl)
 			{
@@ -936,18 +945,20 @@ namespace CADability.GeoObject
 			return base.GetDualSurfaceCurves(thisBounds, other, otherBounds, seeds, extremePositions);
 		}
 		/// <summary>
-		/// The circle in which this sphere and <paramref name="other"/> intersect, as the parts that lie inside both
-		/// <paramref name="thisBounds"/> and <paramref name="otherBounds"/>. The circle is split where it crosses the seam
-		/// (u = 0) of either sphere, so that each part is a continuous 2d curve on both of them, and where it crosses the
-		/// bounds of either sphere.
+		/// The circle in which this sphere and <paramref name="other"/>, another sphere or a plane, intersect, as the parts
+		/// that lie inside the bounds of the spheres. The circle is split where it crosses the seam (u = 0) of a sphere, so
+		/// that each part is a continuous 2d curve on it, and where it crosses the bounds of a sphere. The bounds of a plane
+		/// are not used, the caller trims the parts with the points where the edges of the faces cross the other surface.
 		/// </summary>
-		private IDualSurfaceCurve[] SphereSphereIntersection(GeoPoint center, GeoVector normal, double radius, BoundingRect thisBounds, SphericalSurface other, BoundingRect otherBounds)
+		private IDualSurfaceCurve[] CircleIntersection(GeoPoint center, GeoVector normal, double radius, BoundingRect thisBounds, ISurface other, BoundingRect otherBounds)
 		{
 			Ellipse circle = Ellipse.Construct();
 			circle.SetCirclePlaneCenterRadius(new Plane(center, normal), center, radius);
 			const int n = 72;
 			List<double> splits = new List<double>();
-			foreach ((SphericalSurface sphere, BoundingRect bounds) in new[] { (this, thisBounds), (other, otherBounds) })
+			List<(SphericalSurface, BoundingRect)> spheres = new List<(SphericalSurface, BoundingRect)>() { (this, thisBounds) };
+			if (other is SphericalSurface otherSphere) spheres.Add((otherSphere, otherBounds));
+			foreach ((SphericalSurface sphere, BoundingRect bounds) in spheres)
 			{
 				// each function changes its sign where the circle has to be split: the seam, where u jumps by the period,
 				// and the four lines of the bounds
@@ -1003,11 +1014,12 @@ namespace CADability.GeoObject
 			{
 				if (splits[i + 1] - splits[i] < 1e-6) continue;
 				GeoPoint mid = circle.PointAt((splits[i] + splits[i + 1]) / 2.0);
-				if (!IsInside(this, thisBounds, mid) || !IsInside(other, otherBounds, mid)) continue;
+				if (!IsInside(this, thisBounds, mid)) continue;
+				if (other is SphericalSurface os && !IsInside(os, otherBounds, mid)) continue;
 				Ellipse part = circle.Clone() as Ellipse;
 				part.Trim(splits[i], splits[i + 1]);
 				ICurve2D c2d1 = ProjectedPart(this, part);
-				ICurve2D c2d2 = ProjectedPart(other, part);
+				ICurve2D c2d2 = other is SphericalSurface os2 ? ProjectedPart(os2, part) : other.GetProjectedCurve(part, 0.0);
 				if (c2d1 == null || c2d2 == null) continue;
 				res.Add(new DualSurfaceCurve(part, this, c2d1, other, c2d2));
 			}

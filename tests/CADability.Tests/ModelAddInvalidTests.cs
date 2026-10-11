@@ -121,7 +121,7 @@ namespace CADability.Tests
             Assert.IsTrue(Project.ReadFromFile(dxf, "dxf").GetActiveModel().AllObjects.OfType<Line>().Any(), "the valid line is exported");
 
             string step = TestContext.TestName + ".stp";
-            project.Export(step, "step"); // returns false even when it succeeds
+            Assert.IsTrue(project.Export(step, "step"));
             Assert.AreEqual(1, Project.ReadFromFile(step, "step").GetActiveModel().AllObjects.OfType<Solid>().Count(), "the box is exported");
         }
     }

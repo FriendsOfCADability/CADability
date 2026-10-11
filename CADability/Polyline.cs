@@ -53,6 +53,7 @@ namespace CADability.GeoObject
         protected Polyline()
             : base()
         {
+            vertex = new GeoPoint[0]; // not null, so that an empty polyline can be cloned, modified and saved
             planarState = PlanarState.Unknown;
             if (Constructed != null) Constructed(this);
         }
@@ -1036,7 +1037,7 @@ namespace CADability.GeoObject
             {
                 // planarState = PlanarState.Unknown; Ebene bleibt erhalten
                 Array.Reverse(vertex);
-                if (closed)
+                if (closed && vertex.Length > 0)
                 {
                     GeoPoint swap = vertex[vertex.Length - 1];
                     Array.Copy(vertex, 0, vertex, 1, vertex.Length - 1);
@@ -1596,7 +1597,7 @@ namespace CADability.GeoObject
         protected Polyline(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
-            vertex = info.GetValue("Vertex", typeof(GeoPoint[])) as GeoPoint[];
+            vertex = info.GetValue("Vertex", typeof(GeoPoint[])) as GeoPoint[] ?? new GeoPoint[0];
             closed = (bool)info.GetValue("Closed", typeof(bool));
             colorDef = info.GetValue("ColorDef", typeof(ColorDef)) as ColorDef;
             lineWidth = LineWidth.Read("LineWidth", info, context);
@@ -1633,7 +1634,7 @@ namespace CADability.GeoObject
         public override void SetObjectData(IJsonReadData data)
         {
             base.SetObjectData(data);
-            vertex = data.GetProperty<GeoPoint[]>("Vertex");
+            vertex = data.GetProperty<GeoPoint[]>("Vertex") ?? new GeoPoint[0]; // older files may contain null
             closed = data.GetProperty<bool>("Closed");
             colorDef = data.GetPropertyOrDefault<ColorDef>("ColorDef");
             lineWidth = data.GetPropertyOrDefault<LineWidth>("LineWidth");

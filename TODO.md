@@ -41,6 +41,12 @@ overload adds invalid objects; construct actions and the DXF import check
 `HasValidData` themselves, and the DXF and STEP exports skip invalid
 objects).
 
+Fixed from the list below: `ImportSTL.Read` closes the file,
+`Border.UnsplittedOutline` is saved, an empty `Polyline` can be cloned, moved,
+reversed and saved (the JSON reader accepts a property written as null), an
+arc without sweep can be approximated, and `Project.Export` returns whether it
+wrote the file.
+
 Fixed in the next pull request: #194 (`Border.UnsplittedOutline` survives
 `CompoundShape.CreateFromList`), #293 (DXF block contents on layer 0 or
 ByBlock take the layer and colour of the INSERT; `CDfromParent` children keep
@@ -101,8 +107,6 @@ None left: all of them have been fixed.
   vertex coincide as a pole, including a closed B-spline edge, so a STEP
   `CLOSED_SHELL` with a single open face (issue66_fma_02.stp) still becomes a
   Solid.
-- [ ] `Border.UnsplittedOutline` is not serialized and is lost on save/load.
-- [ ] `ImportSTL.Read` never disposes its readers.
 - [ ] CADability has no "floating" layer 0 in blocks. The DXF import
   resolves block contents on layer 0 to the layer of the INSERT (#293), so
   they are displayed and hidden like in AutoCAD, but the information is lost:
@@ -114,17 +118,17 @@ None left: all of them have been fixed.
   linetype still maps to the solid "ByBlock" pattern.
 
 - [ ] The settings `DxfDwg.Format` (DWG/DXF/DXB) and `DxfDwg.Text`
-  (Fit/Original) are shown in the control center but read nowhere. Related:
-  `Project.Export` with the format "dwg" or "dxb" writes nothing and still
-  returns true. Either implement them (ACadSharp can write DWG) or remove
-  them from `Settings.cs` and the string tables, and let `Project.Export`
-  report unsupported formats.
+  (Fit/Original) are shown in the control center but read nowhere. Either
+  implement them (ACadSharp can write DWG) or remove them from `Settings.cs`
+  and the string tables. `Project.Export` now returns false for "dwg" and
+  "dxb", which it does not write.
+- [ ] The export dialog offers HTML, but `Project.Export` writes nothing for
+  "html". `Project.ExportToWebGl` exists, but builds the path of its template
+  `WebGLS.html` with backslashes and the template is not part of the package.
 
-- [ ] Curves for which `HasValidData` is false still fail in curve operations
-  (found for #303): a `Polyline` without vertices throws a
-  `NullReferenceException` in `PositionOf`, `Approximate` and the exports, an
-  arc with sweep 0 a `GeoVectorException`. `Project.Export` returns false for
-  STEP and STL even when the file was written.
+- [ ] A `Polyline` without vertices still throws in the curve operations
+  that need a point (`StartPoint`, `PointAt`, `PositionOf`, `Length`, ...).
+  Cloning, moving, reversing and saving it work now.
 
 ## Documentation
 

@@ -5249,6 +5249,12 @@ namespace CADability.GeoObject
 
         public virtual IDualSurfaceCurve[] GetDualSurfaceCurves(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, List<GeoPoint> seeds, List<Tuple<double, double, double, double>> extremePositions)
         {
+            if (this is ISurfaceOfRevolution && other is SphericalSurface sphere && sphere.IsRealSphere && Surfaces.GetCommonAxis(this, other, out Axis _))
+            {   // a sphere whose center is on the axis of this surface: the sphere intersects them in exact circles
+                IDualSurfaceCurve[] fromSphere = other.GetDualSurfaceCurves(otherBounds, this, thisBounds, seeds, null);
+                for (int i = 0; i < fromSphere.Length; i++) fromSphere[i].SwapSurfaces();
+                return fromSphere;
+            }
             if (this is ISurfaceOfRevolution && other is ISurfaceOfRevolution && !(this is SurfaceOfRevolution) && !(other is SurfaceOfRevolution)) // SurfaceOfRevolution rotates in v!
             {
                 ISurfaceOfRevolution tsor = (this as ISurfaceOfRevolution);

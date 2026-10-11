@@ -9591,14 +9591,14 @@ namespace CADability
                                         List<Edge> le = edge.Vertex1.EdgesOnFace(item.Key.face1);
                                         for (int k = 0; k < le.Count; k++)
                                         {
-                                            if (le[k] == edge) continue;
+                                            if (le[k] == edge || le[k].Curve3D == null) continue; // a pole has no curve
                                             if (le[k].Vertex1 == edge.Vertex1 && Precision.SameDirection(le[k].Curve3D.StartDirection, edge.Curve3D.StartDirection, false)) tangential = true;
                                             else if (le[k].Vertex2 == edge.Vertex1 && Precision.SameDirection(le[k].Curve3D.EndDirection, edge.Curve3D.StartDirection, false)) tangential = true;
                                         }
                                         le = edge.Vertex2.EdgesOnFace(item.Key.face1);
                                         for (int k = 0; k < le.Count; k++)
                                         {
-                                            if (le[k] == edge) continue;
+                                            if (le[k] == edge || le[k].Curve3D == null) continue; // a pole has no curve
                                             if (le[k].Vertex1 == edge.Vertex2 && Precision.SameDirection(le[k].Curve3D.StartDirection, edge.Curve3D.EndDirection, false)) tangential = true;
                                             else if (le[k].Vertex2 == edge.Vertex2 && Precision.SameDirection(le[k].Curve3D.EndDirection, edge.Curve3D.EndDirection, false)) tangential = true;
                                         }
@@ -9628,7 +9628,7 @@ namespace CADability
                                         List<Edge> le = edge.Vertex1.EdgesOnFace(item.Key.face2);
                                         for (int k = 0; k < le.Count; k++)
                                         {
-                                            if (le[k] == edge) continue;
+                                            if (le[k] == edge || le[k].Curve3D == null) continue; // a pole has no curve
                                             if (le[k].Vertex1 == edge.Vertex1 && Precision.SameDirection(le[k].Curve3D.StartDirection, edge.Curve3D.StartDirection, false)) tangential = true;
                                             else if (le[k].Vertex2 == edge.Vertex1 && Precision.SameDirection(le[k].Curve3D.EndDirection, edge.Curve3D.StartDirection, false)) tangential = true;
                                         }

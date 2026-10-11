@@ -50,7 +50,9 @@ curve for a pole (a STEP `CLOSED_SHELL` with a single disc became a solid).
 A sphere and a plane intersect in the parts of a circle that lie on each
 face of the sphere: the whole circle was returned for every face, so a box
 minus a sphere returned the box unchanged. The same holds for a sphere and a
-cone, cylinder or torus on an axis through its centre. Two spheres intersect in an exact circle: the general intersection
+cone, cylinder or torus on an axis through its centre (a cylinder first
+returned every circle on every face of the sphere, a cone divided by a null
+vector). Two spheres intersect in an exact circle: the general intersection
 approximated it, and the union of two spheres of radius 5 whose centres are
 6 apart did not return.
 
@@ -95,11 +97,7 @@ None left: all of them have been fixed.
   edge, gaps of about 1e-5 (between `Precision.eps` and the BRep precision),
   touching boxes (`Intersect` throws), and tools 1e6 times smaller than the
   other solid. Spheres and planes, and spheres and surfaces of revolution on an
-  axis through the centre, now intersect in exact circles. Still wrong, on
-  master as well (sphere of radius 5 at the origin): a cylinder of radius 2
-  along the z axis gives cylinder - sphere 124.25 instead of 80.57 (the same
-  cylinder along the x axis is right); a cone on the axis (1, 1, 1) throws a
-  `GeoVectorException`. Two spheres: a sphere of radius 5 at the origin and
+  axis through the centre, now intersect in exact circles. Two spheres: a sphere of radius 5 at the origin and
   one of radius 5 at (6, 0, 0.5), both with their axes along z, give empty
   results, as before. The edges of both
   spheres cross exactly on the intersection circle, so every intersection

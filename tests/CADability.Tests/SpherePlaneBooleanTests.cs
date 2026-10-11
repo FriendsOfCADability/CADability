@@ -118,5 +118,25 @@ namespace CADability.Tests
             AssertConsistent(Sphere, () => Make3D.MakeCone(new GeoPoint(0, 0, 2), GeoVector.XAxis, 10 * GeoVector.ZAxis, 3, 1), "a cone into the sphere");
             AssertConsistent(Sphere, () => Make3D.MakeTorus(new GeoPoint(0, 0, 3), GeoVector.ZAxis, 3, 1), "a torus through the sphere");
         }
+
+        [TestMethod]
+        public void a_cylinder_and_a_cone_on_an_axis_through_the_center()
+        {
+            // a cylinder of radius 2 through a sphere of radius 5 leaves a napkin ring of the height h = 2 sqrt(21): pi h^3 / 6
+            Solid Sphere() => Make3D.MakeSphere(GeoPoint.Origin, 5);
+            double h = 2 * Math.Sqrt(21), ring = Math.PI * h * h * h / 6, sphere = 4.0 / 3.0 * Math.PI * 125, cylinder = Math.PI * 4 * 16;
+            foreach (GeoVector axis in new[] { GeoVector.ZAxis, new GeoVector(1, 2, 3).Normalized })
+            {
+                // along z, the seams of both lie in the same plane; the cylinder first went another way than the sphere first
+                GeoVector across = axis.Normalized ^ (Math.Abs(axis.z) < 0.9 ? GeoVector.ZAxis : GeoVector.XAxis);
+                Solid Cylinder() => Make3D.MakeCylinder(GeoPoint.Origin + (-8) * axis, 2 * across.Normalized, 16 * axis);
+                AssertVolume(WithinAMinute(() => Solid.Subtract(Sphere(), Cylinder()), "ring"), ring, "sphere - cylinder along " + axis.ToString());
+                AssertVolume(WithinAMinute(() => Solid.Intersect(Cylinder(), Sphere()), "core"), sphere - ring, "cylinder * sphere along " + axis.ToString());
+                double outside = WithinAMinute(() => Solid.Subtract(Cylinder(), Sphere()), "ends").Sum(x => x.Volume(1e-2));
+                Assert.AreEqual(cylinder - (sphere - ring), outside, 0.5, "cylinder - sphere along " + axis.ToString());
+            }
+            // a cone on the axis (1, 1, 1): the extreme positions of a cone and a sphere on its axis divided by a null vector
+            AssertConsistent(Sphere, () => Make3D.MakeCone(GeoPoint.Origin, new GeoVector(1, -1, 0), 10 * new GeoVector(1, 1, 1).Normalized, 3, 1), "a cone on a tilted axis");
+        }
     }
 }

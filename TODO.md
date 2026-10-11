@@ -62,7 +62,14 @@ returns it in two halves. Solids that touch without a common volume give
 correct results: `Solid.Intersect` threw a `NullReferenceException` whenever
 they touched in a face, solids touching in an edge or a point had a whole box
 as intersection, and two boxes touching in a whole face had empty
-differences.
+differences. DXF pattern hatches: line hatch styles are told apart by their
+dashes, which become positive dash and gap lengths in drawing units (the
+negative gaps of DXF were kept, and the patterns were not added to the
+project), the lines are as far apart as the perpendicular part of the pattern
+offset, and in a block they take the lineweight of the INSERT for ByBlock and
+of its layer for ByLayer on layer "0". The linetype ByBlock outside of blocks
+is "Continuous", and the project gets no line patterns "ByLayer" and
+"ByBlock".
 
 Fixed in the next pull request: #194 (`Border.UnsplittedOutline` survives
 `CompoundShape.CreateFromList`), #293 (DXF block contents on layer 0 or
@@ -136,9 +143,6 @@ None left: all of them have been fixed.
   moving the block to another layer later leaves those contents on the old
   layer, and the DXF export writes them on that layer instead of layer 0. A
   complete solution needs a "layer from parent" counterpart to `CDfromParent`.
-- [ ] DXF hatch line styles are not told apart by dash pattern, pattern hatch
-  lines keep the style's lineweight (no ByBlock), and a top-level ByBlock
-  linetype still maps to the solid "ByBlock" pattern.
 
 - [ ] The settings `DxfDwg.Format` (DWG/DXF/DXB) and `DxfDwg.Text`
   (Fit/Original) are shown in the control center but read nowhere. Either

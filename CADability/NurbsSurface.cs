@@ -2023,6 +2023,61 @@ namespace CADability.GeoObject
         /// <returns>true, if simpler form exists</returns>
         public bool GetSimpleSurface(double precision, out ISurface simpleSurface, out ModOp2D reparametrisation)
         {
+            return GetSimpleSurface(precision, out simpleSurface, out reparametrisation, false);
+        }
+        /// <summary>
+        /// Like <see cref="GetSimpleSurface(double, out ISurface, out ModOp2D)"/>. The found surface always has the same shape as this
+        /// surface. A rational parametrisation, as of an exact NURBS cylinder, sphere or torus, does not run linearly with the angle,
+        /// so no <see cref="ModOp2D"/> maps it to the parameters of the simple surface. Unless <paramref name="geometryOnly"/> is set,
+        /// such a surface is not simplified. With <paramref name="geometryOnly"/>, <paramref name="reparametrisation"/> is only
+        /// an approximation, for callers that recompute the curves on the new surface from their 3D curves.
+        /// </summary>
+        internal bool GetSimpleSurface(double precision, out ISurface simpleSurface, out ModOp2D reparametrisation, bool geometryOnly)
+        {
+            if (precision == 0.0) precision = PolesExtent.Size * 1e-3; // the same as in FindSimpleSurface
+            if (!FindSimpleSurface(precision, out simpleSurface, out reparametrisation)) return false;
+            if (geometryOnly ? HasSameShape(simpleSurface, precision) : IsReparametrisation(simpleSurface, reparametrisation, precision)) return true;
+            simpleSurface = null;
+            reparametrisation = ModOp2D.Identity;
+            return false;
+        }
+        /// <summary>
+        /// True, when <paramref name="reparametrisation"/> maps the parameters of this surface to the parameters of the same point
+        /// on <paramref name="surface"/>, checked on a grid of 9 x 9 points.
+        /// </summary>
+        private bool IsReparametrisation(ISurface surface, ModOp2D reparametrisation, double precision)
+        {
+            GetNaturalBounds(out double umin, out double umax, out double vmin, out double vmax);
+            const int n = 8;
+            for (int i = 0; i <= n; i++)
+            {
+                for (int j = 0; j <= n; j++)
+                {
+                    GeoPoint2D uv = new GeoPoint2D(umin + i * (umax - umin) / n, vmin + j * (vmax - vmin) / n);
+                    if ((PointAt(uv) | surface.PointAt(reparametrisation * uv)) > precision) return false;
+                }
+            }
+            return true;
+        }
+        /// <summary>
+        /// True, when the points of this surface on a grid of 9 x 9 points lie on <paramref name="surface"/>.
+        /// </summary>
+        private bool HasSameShape(ISurface surface, double precision)
+        {
+            GetNaturalBounds(out double umin, out double umax, out double vmin, out double vmax);
+            const int n = 8;
+            for (int i = 0; i <= n; i++)
+            {
+                for (int j = 0; j <= n; j++)
+                {
+                    GeoPoint p = PointAt(new GeoPoint2D(umin + i * (umax - umin) / n, vmin + j * (vmax - vmin) / n));
+                    if ((p | surface.PointAt(surface.PositionOf(p))) > precision) return false;
+                }
+            }
+            return true;
+        }
+        private bool FindSimpleSurface(double precision, out ISurface simpleSurface, out ModOp2D reparametrisation)
+        {
             reparametrisation = ModOp2D.Identity;
             simpleSurface = null; // damit alles gesetzt ist
             if (precision == 0.0)
@@ -2196,6 +2251,10 @@ namespace CADability.GeoObject
                     double r1 = Math.Abs(rad[0] - rad[1]) + Math.Abs(rad[1] - rad[2]) + Math.Abs(rad[2] - rad[0]);
                     double r2 = Math.Abs(rad[3] - rad[4]) + Math.Abs(rad[4] - rad[5]) + Math.Abs(rad[5] - rad[3]);
                     ToroidalSurface ts = null;
+                    // a closed but not periodic surface has its first and last test circle at the same place, so the three
+                    // centers do not span a plane
+                    try
+                    {
                     if ((d1 > d2) && (r1 < r2))
                     {   // die ersten 3 Kreise sin "v" Kreise
                         Plane pln = new Plane(cnt[0], cnt[1], cnt[2]); // Ebene der Mittelpunkte der 3 kleinen Kreise
@@ -2219,6 +2278,11 @@ namespace CADability.GeoObject
                         pln = new Plane(tcnt, cnt[3], cnt[5]);
 
                         ts = new ToroidalSurface(tcnt, pln.DirectionX, pln.DirectionY, pln.Normal, ((cnt[3] | tcnt) + (cnt[4] | tcnt) + (cnt[5] | tcnt)) / 3, (rad[3] + rad[4] + rad[5]) / 3);
+                    }
+                    }
+                    catch (PlaneException)
+                    {
+                        ts = null;
                     }
                     if (ts != null)
                     {

@@ -2670,6 +2670,8 @@ namespace CADability.GeoObject
 
 		ICurve ICurve.Approximate(bool linesOnly, double maxError)
 		{
+			// an arc without sweep has no direction to approximate along
+			if (Math.Abs(sweepParameter) < Precision.epsa) return Line.TwoPoints(StartPoint, EndPoint);
 			if (this.IsCircle && !linesOnly)
 			{
 				// Kreise und -bögen durch Kreisbögen annähern ist Unsinn

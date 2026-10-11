@@ -6654,9 +6654,9 @@ namespace CADability.Actions
 		#region von der Anwenderklasse zu überschreibende Methoden
 		/// <summary>
 		/// Called, when the ConstructAction is done, i.e. all non-optional inputs
-		/// have been fixed. The default implementation adds the active object (if it exists)
-		/// to the active model and removes this action. Override this method if you need
-		/// a different behaviour.
+		/// have been fixed. The default implementation adds the active object (if it exists and
+		/// <see cref="IGeoObject.HasValidData"/> returns true) to the active model and removes this action.
+		/// Override this method if you need a different behaviour.
 		/// </summary>
 		public virtual void OnDone()
 		{
@@ -6664,7 +6664,8 @@ namespace CADability.Actions
 			{
 				InputDefinitions[i].OnActionDone();
 			}
-			if (activeObject != null && showActiveObject) // showActiveObject hinzugefügt, ist das OK?
+			// an invalid object, e.g. a line with identical start and end point, is not added (Model.Add does not check this)
+			if (activeObject != null && showActiveObject && activeObject.HasValidData()) // showActiveObject hinzugefügt, ist das OK?
 			{
 				if (disassembleBlock && activeObject is Block)
 				{

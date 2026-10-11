@@ -34,7 +34,18 @@ Fixed later: #308 (`ActionFeedBack.Repaint` paints the feedback once per view
 call into one display list), #253 (opt-in `CapturesMouse` on
 `BooleanInput` and `MultipleChoiceInput`; new public API, so the next release
 is a minor one), #254 (`MultipleChoiceInput.SetChoices`, also new public API),
-#249 (an approximated curve keeps its colour).
+#249 (an approximated curve keeps its colour), #65 (changing the colour or
+another attribute of an edge is reported by its solid, shell or face, so the
+view is repainted and the change can be undone), #303 (every `Model.Add`
+overload adds invalid objects; construct actions and the DXF import check
+`HasValidData` themselves, and the DXF and STEP exports skip invalid
+objects).
+
+Fixed from the list below: `ImportSTL.Read` closes the file,
+`Border.UnsplittedOutline` is saved, an empty `Polyline` can be cloned, moved,
+reversed and saved (the JSON reader accepts a property written as null), an
+arc without sweep can be approximated, and `Project.Export` returns whether it
+wrote the file.
 
 Fixed in the next pull request: #194 (`Border.UnsplittedOutline` survives
 `CompoundShape.CreateFromList`), #293 (DXF block contents on layer 0 or
@@ -66,13 +77,7 @@ d3db7052; a rewrite is not planned, prototype on branch `ShapeItProgress`).
 Each of these was reproduced, or confirmed by reading the code, on `17f949e`.
 All issues that could not be verified at first have since been checked.
 
-- [ ] **#65 Edge colour not changed.** Changing an edge curve's colour is not
-  forwarded to the solid, so the view is not refreshed. `Edge.PaintTo3D` also
-  always paints black (8994f99d). Decide whether edge colours should be
-  editable at all.
-- [ ] **#303 Model.Add() silently drops invalid GeoObjects.** The
-  `HasValidData()` check in `Model.Add(IGeoObject)` is unchanged, and the
-  other overloads still don't check. This needs a design decision.
+None left: all of them have been fixed.
 
 ## Found while fixing (not yet addressed)
 
@@ -102,7 +107,6 @@ All issues that could not be verified at first have since been checked.
   vertex coincide as a pole, including a closed B-spline edge, so a STEP
   `CLOSED_SHELL` with a single open face (issue66_fma_02.stp) still becomes a
   Solid.
-- [ ] `Border.UnsplittedOutline` is not serialized and is lost on save/load.
 - [ ] The triangulation of a ruled surface between two splines
   (`Make3D.MakeRuledShell`) overestimates its area by up to 3.7 % at a
   precision of a thousandth of its size: long thin triangles along the rulings
@@ -110,7 +114,6 @@ All issues that could not be verified at first have since been checked.
   `Triangulation.FlipToDelaunay` leaves them, because a ruling is exact and the
   other diagonal is not. A criterion for how well the triangles cover the
   surface, rather than how far their edges are from it, would catch them.
-- [ ] `ImportSTL.Read` never disposes its readers.
 - [ ] CADability has no "floating" layer 0 in blocks. The DXF import
   resolves block contents on layer 0 to the layer of the INSERT (#293), so
   they are displayed and hidden like in AutoCAD, but the information is lost:
@@ -122,11 +125,17 @@ All issues that could not be verified at first have since been checked.
   linetype still maps to the solid "ByBlock" pattern.
 
 - [ ] The settings `DxfDwg.Format` (DWG/DXF/DXB) and `DxfDwg.Text`
-  (Fit/Original) are shown in the control center but read nowhere. Related:
-  `Project.Export` with the format "dwg" or "dxb" writes nothing and still
-  returns true. Either implement them (ACadSharp can write DWG) or remove
-  them from `Settings.cs` and the string tables, and let `Project.Export`
-  report unsupported formats.
+  (Fit/Original) are shown in the control center but read nowhere. Either
+  implement them (ACadSharp can write DWG) or remove them from `Settings.cs`
+  and the string tables. `Project.Export` now returns false for "dwg" and
+  "dxb", which it does not write.
+- [ ] The export dialog offers HTML, but `Project.Export` writes nothing for
+  "html". `Project.ExportToWebGl` exists, but builds the path of its template
+  `WebGLS.html` with backslashes and the template is not part of the package.
+
+- [ ] A `Polyline` without vertices still throws in the curve operations
+  that need a point (`StartPoint`, `PointAt`, `PositionOf`, `Length`, ...).
+  Cloning, moving, reversing and saving it work now.
 
 ## Documentation
 

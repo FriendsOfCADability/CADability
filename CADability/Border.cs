@@ -4026,6 +4026,7 @@ namespace CADability.Shapes
 		protected Border(SerializationInfo info, StreamingContext context) : this()
 		{
 			Segments = (ICurve2D[])InfoReader.Read(info, "Segments", typeof(ICurve2D[]));
+			UnsplittedOutline = (ICurve2D)InfoReader.Read(info, "UnsplittedOutline", typeof(ICurve2D)); // after Segments, which resets it
 		}
 		/// <summary>
 		/// Implements <see cref="ISerializable.GetObjectData"/>
@@ -4035,6 +4036,7 @@ namespace CADability.Shapes
 		public void GetObjectData(SerializationInfo info, StreamingContext context)
 		{
 			info.AddValue("Segments", segment, typeof(ICurve2D[]));
+			if (UnsplittedOutline != null) info.AddValue("UnsplittedOutline", UnsplittedOutline, typeof(ICurve2D));
 		}
 		#endregion
 		#region IDeserializationCallback Members
@@ -4609,11 +4611,13 @@ namespace CADability.Shapes
 		public void GetObjectData(IJsonWriteData data)
 		{
 			data.AddProperty("Segments", segment);
+			if (UnsplittedOutline != null) data.AddProperty("UnsplittedOutline", UnsplittedOutline);
 		}
 
 		public void SetObjectData(IJsonReadData data)
 		{
 			segment = data.GetProperty<ICurve2D[]>("Segments");
+			UnsplittedOutline = data.GetPropertyOrDefault<ICurve2D>("UnsplittedOutline"); // missing in older files
 			data.RegisterForSerializationDoneCallback(this);
 		}
 		void IJsonSerializeDone.SerializationDone(CADability.JsonSerialize jsonSerialize)
@@ -4622,6 +4626,7 @@ namespace CADability.Shapes
 			{
 				jsonSerialize.InvokeSerializationDoneCallback(segment[i]);
 			}
+			if (UnsplittedOutline != null) jsonSerialize.InvokeSerializationDoneCallback(UnsplittedOutline);
 			bool reversed;
 			Recalc(out reversed); // this also calculates the extent
 		}

@@ -309,7 +309,12 @@ namespace CADability.DXF
             try
             {
                 IGeoObject geoObject = GeoObjectFromEntity(item);
-                if (geoObject != null)
+                if (geoObject != null && !geoObject.HasValidData())
+                {   // e.g. a line of length 0 or a circle with radius 0, which Model.Add used to drop
+                    System.Diagnostics.Trace.WriteLine("dxf: degenerate " + item.GetType().Name + " skipped (handle " + item.Handle.ToString("X") + ")");
+                    empty++;
+                }
+                else if (geoObject != null)
                 {
                     model.Add(geoObject);
                     converted++;

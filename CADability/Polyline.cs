@@ -653,7 +653,7 @@ namespace CADability.GeoObject
             {
                 res.Add(new QuadTreeLine(this, vertex[i - 1], vertex[i], projection));
             }
-            if (IsClosed)
+            if (IsClosed && vertex.Length > 0)
             {
                 res.Add(new QuadTreeLine(this, vertex[vertex.Length - 1], vertex[0], projection));
             }
@@ -722,7 +722,7 @@ namespace CADability.GeoObject
             {
                 if (cube.Interferes(ref vertex[i], ref vertex[i + 1])) return true;
             }
-            if (closed)
+            if (closed && vertex.Length > 0)
             {
                 if (cube.Interferes(ref vertex[0], ref vertex[vertex.Length - 1])) return true;
             }
@@ -750,6 +750,7 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public override bool HitTest(Projection.PickArea area, bool onlyInside)
         {
+            if (vertex.Length == 0) return false; // nothing to pick, not even inside a window
             if (onlyInside)
             {
                 for (int i = 0; i < vertex.Length; ++i)
@@ -810,7 +811,7 @@ namespace CADability.GeoObject
 			}
 
 			// If closed, check the last-to-first segment
-			if (closed)
+			if (closed && vertex.Length > 0)
 			{
 				Geometry.DistLL(vertex[vertex.Length - 1], vertex[0] - vertex[vertex.Length - 1], fromHere, direction, out double pos1, out double pos2);
 				if (pos1 >= 0.0 && pos1 <= 1.0 && pos2 < res)
@@ -847,10 +848,12 @@ namespace CADability.GeoObject
         {
             get
             {
+                ThrowIfNoPoints("StartPoint");
                 return vertex[0];
             }
             set
             {
+                ThrowIfNoPoints("StartPoint");
                 SetPoint(0, value);
             }
         }
@@ -858,14 +861,24 @@ namespace CADability.GeoObject
         {
             get
             {
+                ThrowIfNoPoints("EndPoint");
                 if (IsClosed) return vertex[0];
                 else return vertex[vertex.Length - 1];
             }
             set
             {
+                ThrowIfNoPoints("EndPoint");
                 if (IsClosed) SetPoint(0, value);
                 else SetPoint(vertex.Length - 1, value);
             }
+        }
+        /// <summary>
+        /// A polyline without vertices has no point to return: throw the same exception as <see cref="StartDirection"/>
+        /// instead of an IndexOutOfRangeException.
+        /// </summary>
+        private void ThrowIfNoPoints(string member)
+        {
+            if (vertex.Length == 0) throw new PolylineException(member + ": NoPoints", PolylineException.PolylineExceptionType.NoPoints);
         }
         public GeoVector StartDirection
         {
@@ -891,6 +904,7 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public GeoVector DirectionAt(double Position)
         {	// TODO: noch skalierung des Parameters beachten
+            if (vertex.Length < 2) throw new PolylineException("DirectionAt: NoPoints", PolylineException.PolylineExceptionType.NoPoints);
             int c = vertex.Length;
             if (closed) ++c;
             int i, iend;
@@ -932,6 +946,7 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public GeoPoint PointAt(double Position)
         {
+            ThrowIfNoPoints("PointAt");
             int c = vertex.Length;
             if (closed) ++c;
             int i, iend;
@@ -1026,6 +1041,7 @@ namespace CADability.GeoObject
         public double PositionOf(GeoPoint p, Plane pl)
         {
             ICurve2D c2d = GetProjectedCurve(pl);
+            if (c2d == null) return -1.0; // fewer than two different points, like PositionOf(GeoPoint)
             return c2d.PositionOf(pl.Project(p));
         }
         /// <summary>
@@ -1051,7 +1067,7 @@ namespace CADability.GeoObject
             {
                 double l = 0.0;
                 for (int i = 1; i < vertex.Length; ++i) l += Geometry.Dist(vertex[i - 1], vertex[i]);
-                if (closed) l += Geometry.Dist(vertex[vertex.Length - 1], vertex[0]);
+                if (closed && vertex.Length > 0) l += Geometry.Dist(vertex[vertex.Length - 1], vertex[0]);
                 return l;
             }
         }
@@ -1062,6 +1078,7 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public ICurve[] Split(double Position)
         {
+            if (vertex.Length < 2) return new ICurve[0]; // nothing to split
             if (closed)
             {
                 GeoPoint[] v1 = new GeoPoint[vertex.Length + 1];
@@ -1132,7 +1149,7 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public ICurve[] Split(double Position1, double Position2)
         {
-            if (!closed) return new ICurve[] { };
+            if (!closed || vertex.Length < 2) return new ICurve[] { };
             GeoPoint p2 = PointAt(Position2);
             if (Position1 > Position2)
             {
@@ -1181,6 +1198,7 @@ namespace CADability.GeoObject
         {
             // wenn StartPos==EndPos, dann wird SetPoints eine Exception
             // werfen. Ist das überall berücksichtigt?
+            if (vertex.Length < 2) return; // nothing to trim
             if (closed)
             {
                 if (StartPos > EndPos)
@@ -1337,6 +1355,7 @@ namespace CADability.GeoObject
             get
             {
                 ICurve[] res;
+                if (vertex.Length == 0) return new ICurve[0];
                 if (closed) res = new ICurve[vertex.Length];
                 else res = new ICurve[vertex.Length - 1];
                 for (int i = 0; i < vertex.Length - 1; ++i)
@@ -1498,6 +1517,7 @@ namespace CADability.GeoObject
         double[] ICurve.GetExtrema(GeoVector direction)
         {
             List<double> res = new List<double>();
+            if (vertex.Length == 0) return res.ToArray();
             int c = vertex.Length;
             if (closed) ++c;
             GeoPoint sp = StartPoint;
@@ -1555,6 +1575,7 @@ namespace CADability.GeoObject
         }
         double ICurve.DistanceTo(GeoPoint p)
         {
+            if (vertex.Length == 0) return double.MaxValue;
             double pos = (this as ICurve).PositionOf(p);
             if (pos >= 0.0 && pos <= 1.0)
             {

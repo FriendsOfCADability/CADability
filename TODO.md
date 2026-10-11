@@ -141,10 +141,6 @@ None left: all of them have been fixed.
   "html". `Project.ExportToWebGl` exists, but builds the path of its template
   `WebGLS.html` with backslashes and the template is not part of the package.
 
-- [ ] A `Polyline` without vertices still throws in the curve operations
-  that need a point (`StartPoint`, `PointAt`, `PositionOf`, `Length`, ...).
-  Cloning, moving, reversing and saving it work now.
-
 ## Documentation
 
 - [ ] The generated documentation is stale: `docs/CADabilityDoc` was last

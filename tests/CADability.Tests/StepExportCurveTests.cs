@@ -228,6 +228,13 @@ namespace CADability.Tests
             // the CLOSED_SHELL of the file contains a single face; the import used to close it with a coincident second face
             // with the same orientation, which was inconsistent
             Assert.AreEqual(1, faces.Count, "the single face of the file");
+            // its closed BSpline edge starts and ends at the same vertex, but is not a pole (OpenEdgesExceptPoles took it for
+            // one): the shell is open and must not become a solid
+            List<IGeoObject> imported = project.GetActiveModel().AllObjects.SelectMany(go => go is Block block ? block.Children.ToList() : new List<IGeoObject> { go }).ToList();
+            Assert.IsFalse(imported.OfType<Solid>().Any(), "a single face is not a solid");
+            Shell shell = imported.OfType<Shell>().Single();
+            Assert.IsTrue(shell.HasOpenEdgesExceptPoles());
+            Assert.AreEqual(1, shell.OpenEdgesExceptPoles.Length);
             Assert.IsTrue(faces[0].CheckConsistency());
             Assert.IsTrue(faces.All(face => face.AllEdges.Length == 1 && face.AllEdges[0].Curve3D is BSpline), "a disc bounded by a single closed BSpline");
             double area = Area(faces);

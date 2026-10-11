@@ -54,7 +54,15 @@ cone, cylinder or torus on an axis through its centre (a cylinder first
 returned every circle on every face of the sphere, a cone divided by a null
 vector). Two spheres intersect in an exact circle: the general intersection
 approximated it, and the union of two spheres of radius 5 whose centres are
-6 apart did not return.
+6 apart did not return. Spheres side by side work as well: where the seams of
+both spheres cross on the intersection circle, the parts of the seams between
+the crossing points were taken for an edge both faces already have, and a
+circle that crosses no edge was dropped, because the exact intersection
+returns it in two halves. Solids that touch without a common volume give
+correct results: `Solid.Intersect` threw a `NullReferenceException` whenever
+they touched in a face, solids touching in an edge or a point had a whole box
+as intersection, and two boxes touching in a whole face had empty
+differences.
 
 Fixed in the next pull request: #194 (`Border.UnsplittedOutline` survives
 `CompoundShape.CreateFromList`), #293 (DXF block contents on layer 0 or
@@ -95,18 +103,18 @@ None left: all of them have been fixed.
   remain wrong, 2 crash with a stack overflow or a timeout, all unchanged by
   the fix). Examples: a box bottom 3e-7 below the tangent plane of a rounded
   edge, gaps of about 1e-5 (between `Precision.eps` and the BRep precision),
-  touching boxes (`Intersect` throws), and tools 1e6 times smaller than the
-  other solid. Spheres and planes, and spheres and surfaces of revolution on an
-  axis through the centre, now intersect in exact circles. Two spheres: a sphere of radius 5 at the origin and
-  one of radius 5 at (6, 0, 0.5), both with their axes along z, give empty
-  results, as before. The edges of both
-  spheres cross exactly on the intersection circle, so every intersection
-  point is found four times, and no intersection edge is made. Unions of
-  spheres with offset axes measure 0.03 to 0.05 % too small or too large,
-  while both differences are exact. In the union, the hole edges of the
-  merged faces have `Path2D` curves, and these faces triangulate to a slightly
-  smaller area than the same faces in the differences; not yet investigated
-  further.
+  and tools 1e6 times smaller than the other solid. Touching solids: a
+  cylinder standing on a box (its bottom disc inside the top face of the box)
+  is lost in the union, the result is the box alone; the common disc is cut
+  out of the top face, but its circle is not connected to the side of the
+  cylinder, because the circle edge of the cylinder still belongs to the disc
+  as well. A cylinder lying on a box (touching in a line) gives empty
+  differences. Solids touching only in an edge or a point have no union
+  (`Solid.Unite` returns null, the result would not be a manifold).
+  Unions of spheres with offset axes measure 0.03 to 0.05 % too small or too
+  large, while both differences are exact. In the union, the hole edges of the merged faces
+  have `Path2D` curves, and these faces triangulate to a slightly smaller area
+  than the same faces in the differences; not yet investigated further.
 
 - [ ] `tests/CADability.Tests/Files/CDB/Volumes.cdb.json` cannot be read by
   the JSON reader of this repository: it stores `SphericalSurface`,

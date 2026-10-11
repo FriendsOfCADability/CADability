@@ -43,6 +43,12 @@ namespace CADability.Tests
         [DataRow(2.0, 1.0, 5.0, 5.0, 0.0, 0.0, 1.0, 0.0, DisplayName = "axes offset, the seams parallel")]
         [DataRow(2.0, 1.0, 5.0, 5.0, 1.0, 0.3, 0.2, 70.0, DisplayName = "axes offset")]
         [DataRow(1.0, 2.0, 6.0, 3.0, 0.0, 0.0, 1.0, 0.0, DisplayName = "different radii")]
+        // the seams of both spheres lie in the plane y == 0 and cross each other on the intersection circle: the parts of the seams
+        // between the crossing points connect the same vertices, but they are different curves, not a common edge of both faces
+        [DataRow(6.0, 0.0, 0.5, 5.0, 0.0, 0.0, 1.0, 0.0, DisplayName = "side by side, the seams cross on the circle")]
+        [DataRow(6.0, 0.0, 0.0, 5.0, 0.0, 0.0, 1.0, 0.0, DisplayName = "side by side, the seams cross on the circle, the centers on the equator")]
+        // the circle crosses no edge, it lies inside one face of each sphere
+        [DataRow(0.0, 6.0, 0.5, 5.0, 0.0, 0.0, 1.0, 0.0, DisplayName = "side by side, the circle inside a face")]
         public void two_spheres_can_be_united_intersected_and_subtracted(double x, double y, double z, double radius, double ax, double ay, double az, double degrees)
         {
             GeoPoint center = new GeoPoint(x, y, z);

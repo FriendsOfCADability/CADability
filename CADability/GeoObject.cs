@@ -583,9 +583,9 @@ namespace CADability.GeoObject
                 _isAttribute = isAttribute;
                 _propertyName = propertyName;
                 _change = null;
-                if (_geoObject.isChanging++ == 0 && _geoObject.WillChangeEvent != null)
+                if (_geoObject.isChanging++ == 0 && (_geoObject.WillChangeEvent != null || _geoObject.owner is Edge))
                 {
-                    // only allocate and fire the event if this is the outermost change and there are subscribers
+                    // only allocate and fire the event if this is the outermost change and there are subscribers (an edge reports the change, see FireWillChange)
                     _change = new GeoObjectChange(_geoObject, propertyName, _oldValue) { OnlyAttributeChanged = isAttribute };
                     _geoObject.FireWillChange(_change);
                 }
@@ -593,7 +593,7 @@ namespace CADability.GeoObject
 
             public void Dispose()
             {
-                if (--_geoObject.isChanging == 0 && (_geoObject.DidChangeEvent != null || _geoObject.FeedBackChangedEvent != null))
+                if (--_geoObject.isChanging == 0 && (_geoObject.DidChangeEvent != null || _geoObject.FeedBackChangedEvent != null || _geoObject.owner is Edge))
                 {
                     _geoObject.FireDidChange(_change ?? new GeoObjectChange(_geoObject, _propertyName, _oldValue) { OnlyAttributeChanged = _isAttribute });
                 }
@@ -952,6 +952,7 @@ namespace CADability.GeoObject
         protected void FireWillChange(GeoObjectChange Change)
         {
             if (WillChangeEvent != null) WillChangeEvent(this, Change);
+            ReportingOwnerOfEdge(Change)?.FireWillChange(Change);
         }
         /// <summary>
         /// Helper method to raise the <see cref="DidChangeEvent"/>.
@@ -961,6 +962,25 @@ namespace CADability.GeoObject
         {
             if (DidChangeEvent != null) DidChangeEvent(this, Change);
             if (FeedBackChangedEvent != null) FeedBackChangedEvent(this);
+            ReportingOwnerOfEdge(Change)?.FireDidChange(Change);
+        }
+        /// <summary>
+        /// Nobody subscribes to the change events of the curve of an <see cref="Edge"/>. When an attribute of such a curve
+        /// changes, e.g. the color of an edge picked in a view, the solid, shell or face the edge belongs to reports the change
+        /// in its place, so that it is repainted and the change can be undone. Geometric changes of an edge curve are not
+        /// reported: they are part of a change of the solid, shell or face, which reports it itself.
+        /// </summary>
+        private IGeoObjectImpl ReportingOwnerOfEdge(GeoObjectChange change)
+        {
+            if (!(owner is Edge edge) || change == null || !change.OnlyAttributeChanged) return null;
+            IGeoObjectImpl res = edge.Owner as IGeoObjectImpl; // a face, or a shell if the edge connects two faces
+            while (res != null)
+            {
+                if (res.isChanging > 0) return null; // it is being changed and reports this change itself, if necessary
+                if (!(res.owner is Shell || res.owner is Solid)) return res;
+                res = res.owner as IGeoObjectImpl;
+            }
+            return null;
         }
         /// <summary>
         /// Overrides <see cref="IGeoObject.Modify"/>. Must be implemented by each GeoObject.
@@ -1530,22 +1550,33 @@ namespace CADability.GeoObject
                     sh.UpdateAttributes(alc);
                 }
             }
-            if (this is Shell)
+            if (this is Shell || this is Face)
             {
-                foreach (Face fc in (this as Shell).Faces)
+                ++isChanging; // the edge curves only take the attributes of the lists, this is not reported (see ReportingOwnerOfEdge)
+                try
                 {
-                    fc.UpdateAttributes(alc);
-                }
-            }
-            if (this is Face)
-            {
-                foreach (Edge edge in (this as Face).AllEdges)
-                {
-                    if (edge.Curve3D != null)
-                    {   // Leider werden so alle Kanten zweimal durch die Mühle geschickt, wenn sie von einem Solid oder Shell komme
-                        // wir bräuchten noch einen Parameter um das zu vermeiden
-                        edge.Curve3D.UpdateAttributes(alc);
+                    if (this is Shell)
+                    {
+                        foreach (Face fc in (this as Shell).Faces)
+                        {
+                            fc.UpdateAttributes(alc);
+                        }
                     }
+                    if (this is Face)
+                    {
+                        foreach (Edge edge in (this as Face).AllEdges)
+                        {
+                            if (edge.Curve3D != null)
+                            {   // Leider werden so alle Kanten zweimal durch die Mühle geschickt, wenn sie von einem Solid oder Shell komme
+                                // wir bräuchten noch einen Parameter um das zu vermeiden
+                                edge.Curve3D.UpdateAttributes(alc);
+                            }
+                        }
+                    }
+                }
+                finally
+                {
+                    --isChanging;
                 }
             }
         }

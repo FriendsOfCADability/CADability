@@ -965,7 +965,7 @@ namespace CADability.GeoObject
             int mainAxis = export.WriteAxis2Placement3d(GeoPoint.Origin, GeoVector.ZAxis, GeoVector.XAxis);
             for (int i = 0; i < containedObjects.Count; i++)
             {
-                if (containedObjects[i] is IExportStep)
+                if (containedObjects[i] is IExportStep && containedObjects[i].HasValidData())
                 {
                     int toMap = (containedObjects[i] as IExportStep).Export(export, true); // true is correct here, because it is part of a map
                     int axis = export.WriteAxis2Placement3d(GeoPoint.Origin, GeoVector.ZAxis, GeoVector.XAxis);

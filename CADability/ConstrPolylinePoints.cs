@@ -96,7 +96,7 @@ namespace CADability.Actions
             if (NewActiveAction != null && NewActiveAction.GetID().StartsWith("Constr.") && polyline.Vertices.Length > 1)
             {
                 polyline.RemoveDoublePoints();
-                CurrentMouseView.Model.Add(polyline);
+                if (polyline.HasValidData()) CurrentMouseView.Model.Add(polyline);
             }
             base.OnInactivate(NewActiveAction, RemovingAction);
         }
@@ -108,7 +108,7 @@ namespace CADability.Actions
                 if (polyline.Vertices.Length > 1)
                 {
                     polyline.RemoveDoublePoints();
-                    CurrentMouseView.Model.Add(polyline);
+                    if (polyline.HasValidData()) CurrentMouseView.Model.Add(polyline);
                 }
             }
             return base.OnCommand(MenuId);

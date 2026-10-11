@@ -30,6 +30,68 @@ loops forever on tiny domains), #287 (hatch polyline boundaries are always
 closed on DXF import), #204 and #147 (`Plane.FromPoints` fits relative to the
 centroid and orients the normal by a fixed rule).
 
+Fixed later: #308 (`ActionFeedBack.Repaint` paints the feedback once per view
+call into one display list), #253 (opt-in `CapturesMouse` on
+`BooleanInput` and `MultipleChoiceInput`; new public API, so the next release
+is a minor one), #254 (`MultipleChoiceInput.SetChoices`, also new public API),
+#249 (an approximated curve keeps its colour), #65 (changing the colour or
+another attribute of an edge is reported by its solid, shell or face, so the
+view is repainted and the change can be undone), #303 (every `Model.Add`
+overload adds invalid objects; construct actions and the DXF import check
+`HasValidData` themselves, and the DXF and STEP exports skip invalid
+objects).
+
+Fixed from the list below: `ImportSTL.Read` closes the file,
+`Border.UnsplittedOutline` is saved, an empty `Polyline` can be cloned, moved,
+reversed and saved (the JSON reader accepts a property written as null), an
+arc without sweep can be approximated, `Project.Export` returns whether it
+wrote the file, and `Shell.OpenEdgesExceptPoles` no longer takes a closed
+curve for a pole (a STEP `CLOSED_SHELL` with a single disc became a solid).
+A sphere and a plane intersect in the parts of a circle that lie on each
+face of the sphere: the whole circle was returned for every face, so a box
+minus a sphere returned the box unchanged. The same holds for a sphere and a
+cone, cylinder or torus on an axis through its centre (a cylinder first
+returned every circle on every face of the sphere, a cone divided by a null
+vector). Two spheres intersect in an exact circle: the general intersection
+approximated it, and the union of two spheres of radius 5 whose centres are
+6 apart did not return. Spheres side by side work as well: where the seams of
+both spheres cross on the intersection circle, the parts of the seams between
+the crossing points were taken for an edge both faces already have, and a
+circle that crosses no edge was dropped, because the exact intersection
+returns it in two halves. Solids that touch without a common volume give
+correct results: `Solid.Intersect` threw a `NullReferenceException` whenever
+they touched in a face, solids touching in an edge or a point had a whole box
+as intersection, and two boxes touching in a whole face had empty
+differences. DXF pattern hatches: line hatch styles are told apart by their
+dashes, which become positive dash and gap lengths in drawing units (the
+negative gaps of DXF were kept, and the patterns were not added to the
+project), the lines are as far apart as the perpendicular part of the pattern
+offset, and in a block they take the lineweight of the INSERT for ByBlock and
+of its layer for ByLayer on layer "0". The linetype ByBlock outside of blocks
+is "Continuous", and the project gets no line patterns "ByLayer" and
+"ByBlock". A cylinder standing on a box, its bottom circle touching the sides
+of the top face, is no longer lost in the union: where an intersection curve
+touches the outline of a face, the loop takes the edge that turns most to the
+left, and the top face is split into its four corners instead of getting a
+hole that touches the outline. A cylinder lying on a box no longer has empty
+differences: a tangential intersection curve along which the surfaces only
+touch, without crossing, is no intersection edge.
+
+The documentation is generated again: the package contains the XML
+documentation (`CADability.xml`), and the Pages workflow builds the libraries
+and runs docfx on them, under the old paths `/CADabilityDoc` and
+`/CADabilityFormsDoc`. The generated HTML of 2021 is no longer in the
+repository, and `docs/index.html` is a start page instead of the Jekyll
+template.
+
+A `PrecisionOverride` applies only to the thread that creates it.
+`Border.Clip` overrides `Precision.eps` for every call, and every other thread
+computed with that precision in the meantime, e.g. in the parallel STEP import
+and in parallel tests. `Precision.eps` and `Precision.epsa` are properties now
+instead of fields: source code compiles unchanged, but binaries compiled
+against 1.5.0 or earlier that read them have to be recompiled (release notes
+of 1.6.0).
+
 Fixed in the next pull request: #194 (`Border.UnsplittedOutline` survives
 `CompoundShape.CreateFromList`), #293 (DXF block contents on layer 0 or
 ByBlock take the layer and colour of the INSERT; `CDfromParent` children keep
@@ -60,27 +122,7 @@ d3db7052; a rewrite is not planned, prototype on branch `ShapeItProgress`).
 Each of these was reproduced, or confirmed by reading the code, on `17f949e`.
 All issues that could not be verified at first have since been checked.
 
-- [ ] **#249 Path colour changes when approximated.** `Path.Approximate`
-  creates child curves with the default black colour, and `CopyAttributes`
-  overwrites only null child colours, so the colour is lost.
-- [ ] **#65 Edge colour not changed.** Changing an edge curve's colour is not
-  forwarded to the solid, so the view is not refreshed. `Edge.PaintTo3D` also
-  always paints black (8994f99d). Decide whether edge colours should be
-  editable at all.
-- [ ] **#308 ActionFeedBack generates too many OpenGL lists.** Still one
-  list per object per repaint, an unused `foreach (IView vw in
-  frame.AllViews)` loop, and the unconditional "Delete List" `Debug.WriteLine`
-  in `PaintToOpenGL.cs`.
-- [ ] **#253 MultipleChoiceInput & mouse move events.**
-  `MultipleChoiceInput.BuildShowProperty` (and `BooleanInput`) does not
-  subscribe `PropertyEntryChangedStateEvent`, so selecting it doesn't change
-  the current input.
-- [ ] **#254 MultipleChoiceInput with variable choices.** Not implemented
-  yet. Needs new public API (`SetChoices` or a virtual property factory), which
-  means a minor version bump.
-- [ ] **#303 Model.Add() silently drops invalid GeoObjects.** The
-  `HasValidData()` check in `Model.Add(IGeoObject)` is unchanged, and the
-  other overloads still don't check. This needs a design decision.
+None left: all of them have been fixed.
 
 ## Found while fixing (not yet addressed)
 
@@ -89,8 +131,15 @@ All issues that could not be verified at first have since been checked.
   remain wrong, 2 crash with a stack overflow or a timeout, all unchanged by
   the fix). Examples: a box bottom 3e-7 below the tangent plane of a rounded
   edge, gaps of about 1e-5 (between `Precision.eps` and the BRep precision),
-  touching boxes (`Intersect` throws), and tools 1e6 times smaller than the
-  other solid.
+  and tools 1e6 times smaller than the other solid. Solids touching only in
+  an edge, a line or a point have no union (`Solid.Unite` returns null, the
+  result would not be a manifold), and a solid touching the inside of another
+  one cannot be subtracted (the result would have a cavity, which a `Solid`
+  cannot have; the other solid is returned unchanged).
+  Unions of spheres with offset axes measure 0.03 to 0.05 % too small or too
+  large, while both differences are exact. In the union, the hole edges of the merged faces
+  have `Path2D` curves, and these faces triangulate to a slightly smaller area
+  than the same faces in the differences; not yet investigated further.
 
 - [ ] `tests/CADability.Tests/Files/CDB/Volumes.cdb.json` cannot be read by
   the JSON reader of this repository: it stores `SphericalSurface`,
@@ -106,21 +155,12 @@ All issues that could not be verified at first have since been checked.
 - [ ] The sphere and torus branches of `NurbsSurface.GetSimpleSurface` fit an
   affine reparametrisation, which cannot follow the rational parametrisation;
   the 3D error can reach the radius. The torus fit has no degeneracy check.
-- [ ] `Shell.OpenEdgesExceptPoles` treats every open edge whose start and end
-  vertex coincide as a pole, including a closed B-spline edge, so a STEP
-  `CLOSED_SHELL` with a single open face (issue66_fma_02.stp) still becomes a
-  Solid.
-- [ ] `Border.UnsplittedOutline` is not serialized and is lost on save/load.
-- [ ] `ImportSTL.Read` never disposes its readers.
 - [ ] CADability has no "floating" layer 0 in blocks. The DXF import
   resolves block contents on layer 0 to the layer of the INSERT (#293), so
   they are displayed and hidden like in AutoCAD, but the information is lost:
   moving the block to another layer later leaves those contents on the old
   layer, and the DXF export writes them on that layer instead of layer 0. A
   complete solution needs a "layer from parent" counterpart to `CDfromParent`.
-- [ ] DXF hatch line styles are not told apart by dash pattern, pattern hatch
-  lines keep the style's lineweight (no ByBlock), and a top-level ByBlock
-  linetype still maps to the solid "ByBlock" pattern.
 - [ ] The triangulation of a face on a `SurfaceOfRevolution` overestimates its
   area, the more the larger the angle: a spline rotated by half a turn gives
   951.5 instead of 946.4 (integral of the surface derivatives and Pappus's
@@ -129,19 +169,26 @@ All issues that could not be verified at first have since been checked.
   triangulation instead of the area.
 
 - [ ] The settings `DxfDwg.Format` (DWG/DXF/DXB) and `DxfDwg.Text`
-  (Fit/Original) are shown in the control center but read nowhere. Related:
-  `Project.Export` with the format "dwg" or "dxb" writes nothing and still
-  returns true. Either implement them (ACadSharp can write DWG) or remove
-  them from `Settings.cs` and the string tables, and let `Project.Export`
-  report unsupported formats.
+  (Fit/Original) are shown in the control center but read nowhere. Either
+  implement them (ACadSharp can write DWG) or remove them from `Settings.cs`
+  and the string tables. `Project.Export` now returns false for "dwg" and
+  "dxb", which it does not write.
+- [ ] The export dialog offers HTML, but `Project.Export` writes nothing for
+  "html". `Project.ExportToWebGl` exists, but builds the path of its template
+  `WebGLS.html` with backslashes and the template is not part of the package.
+
+- [ ] A `Polyline` without vertices still throws in the curve operations
+  that need a point (`StartPoint`, `PointAt`, `PositionOf`, `Length`, ...).
+  Cloning, moving, reversing and saving it work now.
 
 ## Documentation
 
-- [ ] The generated documentation is stale: `docs/CADabilityDoc` was last
-  generated on 2021-05-31 and `docs/index.md` is the unchanged Jekyll
-  template. Consider running docfx (`CADability/docfx.json`,
-  `CADability.Forms/docfx.json`) in the Pages workflow instead of committing
-  generated HTML.
+- [ ] About 440 doc comments have wrong `param` names, `cref`s that resolve to
+  nothing or malformed XML (compiler warnings CS1570 to CS1587 and CS1734, and
+  the `InvalidCref` warnings of docfx). The warnings are suppressed in
+  `CADability.csproj` and `CADability.Forms.csproj` since the XML
+  documentation is generated; remove them from `NoWarn` while fixing the
+  comments.
 
 ## Open discussions / feature requests (no action from triage)
 

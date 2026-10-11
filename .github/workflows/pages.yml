@@ -1,9 +1,15 @@
 name: Deploy GitHub Pages
 
+# The website: docs/ (the start page) and the API documentation, which docfx generates from the
+# built libraries and their XML documentation, together with the articles in CADability/articles.
+# The documentation keeps its old paths, /CADabilityDoc and /CADabilityFormsDoc, which the README
+# and other sites link to.
+
 on:
   push:
     branches:
       - master
+  workflow_dispatch:
 
 # Allow only one concurrent deployment, cancelling in-progress runs is disabled
 # to avoid incomplete deployments. Queued runs wait for the active deployment.
@@ -22,15 +28,45 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # ACadSharp is built from source (external/ACadSharp submodule, which
+          # itself pulls in CSUtilities as a submodule)
+          submodules: recursive
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          # ACadSharp's TargetFrameworks include net10.0, so restore needs the .NET 10 SDK
+          dotnet-version: '10.0.x'
+
+      - name: Build the libraries
+        # CopyLocalLockFileAssemblies puts the referenced packages next to the dlls, where docfx finds them.
+        # CADability.Forms targets net8.0-windows and builds on Linux with EnableWindowsTargeting (set in its csproj).
+        run: |
+          dotnet build CADability/CADability.csproj -c Release -p:CopyLocalLockFileAssemblies=true
+          dotnet build CADability.Forms/CADability.Forms.csproj -c Release -p:CopyLocalLockFileAssemblies=true
+
+      - name: Install docfx
+        run: dotnet tool install --global docfx --version 2.81.0
+
+      - name: Generate the documentation
+        # docfx resolves the Windows.Forms types (e.g. the base class UserControl) from the reference
+        # assemblies, which the build of CADability.Forms restored into the NuGet cache
+        run: |
+          mkdir -p CADability.Forms/obj/docfx-refs
+          cp ~/.nuget/packages/microsoft.windowsdesktop.app.ref/8.*/ref/net8.0/*.dll CADability.Forms/obj/docfx-refs/
+          docfx CADability/docfx.json
+          docfx CADability.Forms/docfx.json
+
+      - name: Assemble the site
+        run: |
+          mkdir -p _site
+          cp -r docs/. _site/
+          cp -r CADability/_site _site/CADabilityDoc
+          cp -r CADability.Forms/_site _site/CADabilityFormsDoc
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
-
-      - name: Build with Jekyll
-        uses: actions/jekyll-build-pages@v1
-        with:
-          source: ./docs
-          destination: ./_site
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

@@ -935,12 +935,13 @@ namespace CADability
 		}
 		/// <summary>
 		/// Adds an object to this model. If the model is beeing displayed the object will appear in the view
-		/// immediately.
+		/// immediately. The object is added even if <see cref="IGeoObject.HasValidData"/> returns false, like with
+		/// the other overloads, so that e.g. imported data can be repaired later. Check it before adding, if
+		/// invalid objects are not wanted. The object is only rejected by a handler of <see cref="AddingGeoObjectEvent"/>.
 		/// </summary>
 		/// <param name="ObjectToAdd">The GeoObject to add</param>
 		public void Add(IGeoObject ObjectToAdd)
 		{
-			if (!ObjectToAdd.HasValidData()) return; // die Objekte überprüfen sich hier selbst
 			bool cancel = false;
 			if (AddingGeoObjectEvent != null) AddingGeoObjectEvent(ObjectToAdd, ref cancel);
 			if (cancel) return; // der Anwender hat was dagegen

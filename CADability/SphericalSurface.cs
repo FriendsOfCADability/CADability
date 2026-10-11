@@ -1006,32 +1006,12 @@ namespace CADability.GeoObject
 				if (!IsInside(this, thisBounds, mid) || !IsInside(other, otherBounds, mid)) continue;
 				Ellipse part = circle.Clone() as Ellipse;
 				part.Trim(splits[i], splits[i + 1]);
-				ICurve2D c2d1 = ProjectedPart(this, part);
-				ICurve2D c2d2 = ProjectedPart(other, part);
+				ICurve2D c2d1 = GetProjectedCurve(part, 0.0);
+				ICurve2D c2d2 = other.GetProjectedCurve(part, 0.0);
 				if (c2d1 == null || c2d2 == null) continue;
 				res.Add(new DualSurfaceCurve(part, this, c2d1, other, c2d2));
 			}
 			return res.ToArray();
-		}
-		/// <summary>
-		/// The 2d curve of a part of the intersection circle on <paramref name="sphere"/>. A part may start or end exactly on
-		/// the seam, and then the projection can put that end on the wrong side of it, so that the 2d curve runs around the
-		/// whole sphere. In that case the part is projected into the period around its middle.
-		/// </summary>
-		private static ICurve2D ProjectedPart(SphericalSurface sphere, Ellipse part)
-		{
-			ICurve2D res = sphere.GetProjectedCurve(part, 0.0);
-			const int n = 16;
-			double du = 0.0, u0 = sphere.PositionOf(part.PointAt(0.0)).x;
-			for (int i = 1; i <= n; i++)
-			{
-				double u1 = sphere.PositionOf(part.PointAt(i / (double)n)).x;
-				du += Math.IEEERemainder(u1 - u0, 2.0 * Math.PI); // the change of u, continued across the seam
-				u0 = u1;
-			}
-			if (res != null && Math.Abs((res.EndPoint.x - res.StartPoint.x) - du) < 1e-3) return res;
-			GeoPoint2D mid = sphere.PositionOf(part.PointAt(0.5));
-			return new ProjectedCurve(part, sphere, true, new BoundingRect(mid.x - Math.PI, -Math.PI / 2.0, mid.x + Math.PI, Math.PI / 2.0));
 		}
 		private static bool IsInside(SphericalSurface sphere, BoundingRect bounds, GeoPoint p)
 		{

@@ -906,6 +906,17 @@ namespace CADability.GeoObject
 				}
 				return new IDualSurfaceCurve[0];
 			}
+			else if (other is SphericalSurface sphere && IsRealSphere && sphere.IsRealSphere)
+			{   // two spheres meet in a circle in the plane perpendicular to the line through their centers. The general
+				// intersection approximated it, and building the tetraeder hull of that approximation took minutes.
+				GeoVector normal = sphere.Location - Location;
+				double d = normal.Length, r1 = RadiusX, r2 = sphere.RadiusX;
+				// concentric, apart, one inside the other, or touching in a single point
+				if (d < Precision.eps || d > r1 + r2 - Precision.eps || d < Math.Abs(r1 - r2) + Precision.eps) return new IDualSurfaceCurve[0];
+				double a = (d * d + r1 * r1 - r2 * r2) / (2.0 * d); // distance of that plane from the center of this sphere
+				normal = (1.0 / d) * normal;
+				return SphereSphereIntersection(Location + a * normal, normal, Math.Sqrt(r1 * r1 - a * a), thisBounds, sphere, otherBounds);
+			}
 			else if (other is ICylinder cyl)
 			{
 				if (cyl.Axis.Distance(this.Location) < Precision.eps && Math.Abs(cyl.Radius - this.RadiusX) < Precision.eps)
@@ -923,6 +934,111 @@ namespace CADability.GeoObject
 				}
 			}
 			return base.GetDualSurfaceCurves(thisBounds, other, otherBounds, seeds, extremePositions);
+		}
+		/// <summary>
+		/// The circle in which this sphere and <paramref name="other"/> intersect, as the parts that lie inside both
+		/// <paramref name="thisBounds"/> and <paramref name="otherBounds"/>. The circle is split where it crosses the seam
+		/// (u = 0) of either sphere, so that each part is a continuous 2d curve on both of them, and where it crosses the
+		/// bounds of either sphere.
+		/// </summary>
+		private IDualSurfaceCurve[] SphereSphereIntersection(GeoPoint center, GeoVector normal, double radius, BoundingRect thisBounds, SphericalSurface other, BoundingRect otherBounds)
+		{
+			Ellipse circle = Ellipse.Construct();
+			circle.SetCirclePlaneCenterRadius(new Plane(center, normal), center, radius);
+			const int n = 72;
+			List<double> splits = new List<double>();
+			foreach ((SphericalSurface sphere, BoundingRect bounds) in new[] { (this, thisBounds), (other, otherBounds) })
+			{
+				// each function changes its sign where the circle has to be split: the seam, where u jumps by the period,
+				// and the four lines of the bounds
+				List<Func<GeoPoint2D, double>> crossings = new List<Func<GeoPoint2D, double>>();
+				crossings.Add(uv => uv.x - Math.PI); // u is in [0, 2pi), it jumps at the seam, where u - pi changes its sign by a jump
+				if (!bounds.IsEmpty() && !bounds.IsInfinite)
+				{
+					foreach (double ub in new[] { bounds.Left, bounds.Right })
+					{
+						crossings.Add(uv => Math.IEEERemainder(uv.x - ub, 2.0 * Math.PI));
+					}
+					foreach (double vb in new[] { bounds.Bottom, bounds.Top })
+					{
+						crossings.Add(uv => uv.y - vb);
+					}
+				}
+				foreach (Func<GeoPoint2D, double> f in crossings)
+				{
+					double f0 = f(sphere.PositionOf(circle.PointAt(0.0)));
+					for (int i = 1; i <= n; i++)
+					{
+						double t1 = (i - 1) / (double)n, t2 = i / (double)n;
+						double f2 = f(sphere.PositionOf(circle.PointAt(t2)));
+						if (Math.Sign(f0) != Math.Sign(f2))
+						{
+							double fa = f0;
+							for (int j = 0; j < 50; j++)
+							{
+								double tm = (t1 + t2) / 2.0;
+								double fm = f(sphere.PositionOf(circle.PointAt(tm)));
+								if (Math.Sign(fm) != Math.Sign(fa)) t2 = tm;
+								else { t1 = tm; fa = fm; }
+							}
+							splits.Add((t1 + t2) / 2.0);
+						}
+						f0 = f2;
+					}
+				}
+			}
+			if (splits.Count > 0)
+			{   // start the circle at a split point, an arbitrary start point would split the circle where no edge meets it
+				double s0 = splits[0];
+				GeoVector dirx = circle.PointAt(s0) - center;
+				circle.SetCirclePlaneCenterRadius(new Plane(center, dirx, normal ^ dirx), center, radius);
+				for (int i = 0; i < splits.Count; i++) splits[i] = splits[i] - s0 - Math.Floor(splits[i] - s0); // the parameter is proportional to the angle
+			}
+			splits.Add(0.0);
+			splits.Add(1.0);
+			splits.Sort();
+			if (splits.Count <= 3) splits.Insert(1, 0.5); // a whole circle would have a closed 2d curve
+			List<IDualSurfaceCurve> res = new List<IDualSurfaceCurve>();
+			for (int i = 0; i < splits.Count - 1; i++)
+			{
+				if (splits[i + 1] - splits[i] < 1e-6) continue;
+				GeoPoint mid = circle.PointAt((splits[i] + splits[i + 1]) / 2.0);
+				if (!IsInside(this, thisBounds, mid) || !IsInside(other, otherBounds, mid)) continue;
+				Ellipse part = circle.Clone() as Ellipse;
+				part.Trim(splits[i], splits[i + 1]);
+				ICurve2D c2d1 = ProjectedPart(this, part);
+				ICurve2D c2d2 = ProjectedPart(other, part);
+				if (c2d1 == null || c2d2 == null) continue;
+				res.Add(new DualSurfaceCurve(part, this, c2d1, other, c2d2));
+			}
+			return res.ToArray();
+		}
+		/// <summary>
+		/// The 2d curve of a part of the intersection circle on <paramref name="sphere"/>. A part may start or end exactly on
+		/// the seam, and then the projection can put that end on the wrong side of it, so that the 2d curve runs around the
+		/// whole sphere. In that case the part is projected into the period around its middle.
+		/// </summary>
+		private static ICurve2D ProjectedPart(SphericalSurface sphere, Ellipse part)
+		{
+			ICurve2D res = sphere.GetProjectedCurve(part, 0.0);
+			const int n = 16;
+			double du = 0.0, u0 = sphere.PositionOf(part.PointAt(0.0)).x;
+			for (int i = 1; i <= n; i++)
+			{
+				double u1 = sphere.PositionOf(part.PointAt(i / (double)n)).x;
+				du += Math.IEEERemainder(u1 - u0, 2.0 * Math.PI); // the change of u, continued across the seam
+				u0 = u1;
+			}
+			if (res != null && Math.Abs((res.EndPoint.x - res.StartPoint.x) - du) < 1e-3) return res;
+			GeoPoint2D mid = sphere.PositionOf(part.PointAt(0.5));
+			return new ProjectedCurve(part, sphere, true, new BoundingRect(mid.x - Math.PI, -Math.PI / 2.0, mid.x + Math.PI, Math.PI / 2.0));
+		}
+		private static bool IsInside(SphericalSurface sphere, BoundingRect bounds, GeoPoint p)
+		{
+			if (bounds.IsEmpty() || bounds.IsInfinite) return true;
+			GeoPoint2D uv = sphere.PositionOf(p);
+			SurfaceHelper.AdjustPeriodic(sphere, bounds, ref uv);
+			return bounds.Contains(uv);
 		}
 		public override GeoPoint2D[] PerpendicularFoot(GeoPoint fromHere)
 		{

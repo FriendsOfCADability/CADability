@@ -47,6 +47,9 @@ reversed and saved (the JSON reader accepts a property written as null), an
 arc without sweep can be approximated, `Project.Export` returns whether it
 wrote the file, and `Shell.OpenEdgesExceptPoles` no longer takes a closed
 curve for a pole (a STEP `CLOSED_SHELL` with a single disc became a solid).
+Two spheres intersect in an exact circle: the general intersection
+approximated it, and the union of two spheres of radius 5 whose centres are
+6 apart did not return.
 
 Fixed in the next pull request: #194 (`Border.UnsplittedOutline` survives
 `CompoundShape.CreateFromList`), #293 (DXF block contents on layer 0 or
@@ -88,10 +91,16 @@ None left: all of them have been fixed.
   the fix). Examples: a box bottom 3e-7 below the tangent plane of a rounded
   edge, gaps of about 1e-5 (between `Precision.eps` and the BRep precision),
   touching boxes (`Intersect` throws), and tools 1e6 times smaller than the
-  other solid. Two more found while checking the pole fix, both on master
-  too: a box minus a sphere of radius 4 centred on its top face throws, and
-  the union of two spheres of radius 5 whose centres are 6 apart does not
-  return within a minute.
+  other solid. A box minus a sphere of radius 4 centred on its top face fails
+  an assertion in Debug builds and returns the box unchanged in Release
+  builds. Two spheres now intersect in an exact circle, but some positions
+  still give wrong results (sphere A of radius 5 at the origin, axes along z
+  unless noted): B of radius 5 at (2, 1, 5): A - B is 386.36 instead of
+  387.16 and B - A 406.85; B of radius 5 at (0, 0, 6), turned by 30° about
+  (1, 0.3, 0.2): A - B is 402.76 instead of 414.69; B of radius 3 at
+  (1, 2, 6): B - A is 100.28 instead of 99.39; B of radius 5 at (6, 0, 0.5):
+  every operation is empty, as before. Unions of spheres with offset axes
+  are 0.03 to 0.05 % off.
 
 - [ ] `tests/CADability.Tests/Files/CDB/Volumes.cdb.json` cannot be read by
   the JSON reader of this repository: it stores `SphericalSurface`,

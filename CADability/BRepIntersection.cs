@@ -258,21 +258,21 @@ namespace CADability
             this.root = root;
             this.Type = ItemType.Edge;
             this.edge = edge;
-            hashCode = ++hashCodeCounter;
+            hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter);
         }
         public BRepItem(OctTree<BRepItem> root, Face face)
         {
             this.root = root;
             this.Type = ItemType.Face;
             this.face = face;
-            hashCode = ++hashCodeCounter;
+            hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter);
         }
         public BRepItem(OctTree<BRepItem> root, Vertex vertex)
         {
             this.Type = ItemType.Vertex;
             this.root = root;
             this.vertex = vertex;
-            hashCode = ++hashCodeCounter;
+            hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter);
         }
         public BRepItem(OctTree<BRepItem> root, Vertex vertex, Edge edge, Face face)
         {
@@ -282,7 +282,7 @@ namespace CADability
             isIntersection = true;
             this.edge = edge;
             this.face = face;
-            hashCode = ++hashCodeCounter;
+            hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter);
         }
         bool FaceHitTest(ref BoundingCube cube, Face face, double precision)
         {
@@ -3494,7 +3494,7 @@ namespace CADability
             public EdgeOnFace()
             {
                 outgoing = new List<EdgeOnFace>();
-                hashCode = ++hashCodeCounter;
+                hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter);
             }
 
             public EdgeOnFace(Edge edge, Face face, bool isIntersection) : this()
@@ -9015,9 +9015,6 @@ namespace CADability
         //            return res.ToArray();
 
         //        }
-#if DEBUG
-        internal static HashSet<Face> collectConnected = new HashSet<Face>();
-#endif
         /// <summary>
         /// Return all the faces, which are directely or indirectely connected to "startWith" from the set "allFaces"
         /// Also remove thos found faces from "allfaces"
@@ -9027,9 +9024,6 @@ namespace CADability
         /// <param name="result"></param>
         internal static HashSet<Face> extractConnectedFaces(HashSet<Face> allFaces, Face startWith)
         {
-#if DEBUG
-            collectConnected.Add(startWith);
-#endif
             HashSet<Face> result = new HashSet<Face>();
             result.Add(startWith);
             allFaces.Remove(startWith);

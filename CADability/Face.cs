@@ -239,7 +239,7 @@ namespace CADability.GeoObject
         {
             lockTriangulationRecalc = new object();
             lockTriangulationData = new object();
-            hashCode = hashCodeCounter++;
+            hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter) - 1;
             extent = BoundingCube.EmptyBoundingCube;
             if (Constructed != null) Constructed(this);
 #if DEBUG
@@ -8188,7 +8188,7 @@ namespace CADability.GeoObject
             {
                 orientedOutward = true;
             }
-            hashCode = hashCodeCounter++;
+            hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter) - 1;
             extent = BoundingCube.EmptyBoundingCube;
             lockTriangulationRecalc = new object();
             lockTriangulationData = new object();

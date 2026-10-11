@@ -113,6 +113,13 @@ None left: all of them have been fixed.
   moving the block to another layer later leaves those contents on the old
   layer, and the DXF export writes them on that layer instead of layer 0. A
   complete solution needs a "layer from parent" counterpart to `CDfromParent`.
+- [ ] `Precision.eps` and `Precision.epsa` are global static fields, and
+  `PrecisionOverride` changes them for every thread (`Border.Clip` uses it).
+  An operation running at the same time on another thread computes with the
+  overridden precision, and overrides that end in a different order than they
+  began can leave the wrong value behind. Parallel STEP import and boolean
+  operations on several threads are affected. A fix needs thread-local values
+  behind the public fields, which changes public API.
 - [ ] DXF hatch line styles are not told apart by dash pattern, pattern hatch
   lines keep the style's lineweight (no ByBlock), and a top-level ByBlock
   linetype still maps to the solid "ByBlock" pattern.

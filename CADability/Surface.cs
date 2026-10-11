@@ -7581,7 +7581,7 @@ namespace CADability.GeoObject
                 static int hashCodeCounter = 0;
                 public IntersectionPoint()
                 {
-                    hashCode = ++hashCodeCounter;
+                    hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter);
                 }
 
                 public void AddPatch(UVPatch uvPatch)
@@ -10585,7 +10585,7 @@ namespace CADability.GeoObject
                 static int hashCodeCounter = 0;
                 public IntersectionPoint()
                 {
-                    hashCode = ++hashCodeCounter;
+                    hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter);
                 }
 
                 public void AddPatch(UVPatch uvPatch)

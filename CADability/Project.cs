@@ -1208,12 +1208,11 @@ namespace CADability
             return ACadVersion.AC1015;
         }
         /// <summary>
-        /// Export the project in one of the following formats:
-        /// dxf, dwg, iges, step, vrml, stl, sat and xt (sat and xt must be licensed seperately) 
+        /// Export the project in one of the following formats: cdb, dxf, step (or stp) and stl.
         /// </summary>
         /// <param name="fileName">Path and filename for the generated output file</param>
-        /// <param name="format">Format, one of the strings: dxf, dwg, iges, step, vrml, stl, sat, xt </param>
-        /// <returns>true on success</returns>
+        /// <param name="format">Format, one of the strings: cdb, dxf, step, stp, stl</param>
+        /// <returns>true, if the file was written, false for a format that cannot be exported (e.g. dwg, iges, html)</returns>
         public bool Export(string fileName, string format)
         {
             format = format.ToLower();
@@ -1221,15 +1220,15 @@ namespace CADability
             {
                 case "cdb": return WriteToFile(fileName);
                 case "html":
-                    return true;
+                    break; // not implemented, see ExportToWebGl
                 case "dxf":
                     CADability.DXF.Export export = new DXF.Export(DxfExportVersion());
                     export.WriteToFile(this, fileName);
                     return true;
                 case "dwg":
-                    return true;
+                    break;
                 case "dxb":
-                    return true;
+                    break;
                 case "igs":
                 case "iges":
                     break;
@@ -1237,13 +1236,13 @@ namespace CADability
                 case "stp":
                     ExportStep exportStep = new ExportStep();
                     exportStep.WriteToFile(fileName, this);
-                    break;
+                    return true;
                 case "vrml":
                 case "wrl":
                     break;
                 case "stl":
                     ExportToSTL(fileName);
-                    break;
+                    return true;
                 case "brep":
                     break;
                 case "sat":

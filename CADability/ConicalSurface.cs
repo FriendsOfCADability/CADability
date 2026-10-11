@@ -1615,6 +1615,7 @@ namespace CADability.GeoObject
                         double lp = Geometry.LinePar(this.Location, this.Axis, ss.Location);
                         GeoPoint onAxis = Location + lp * Axis;
                         GeoVector dir = ss.Location - onAxis;
+                        if (Precision.IsNullVector(dir)) return 0; // sphere and cone have the same axis, as in CylindricalSurface
                         GeoPoint2D[] ips = this.GetLineIntersection(onAxis, dir); // two points, one is perpendicular
                         if (ips.Length == 2)
                         {

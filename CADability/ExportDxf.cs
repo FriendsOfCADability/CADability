@@ -170,6 +170,7 @@ namespace CADability.DXF
 
         private Entity[] GeoObjectToEntity(IGeoObject geoObject)
         {
+            if (!geoObject.HasValidData()) return null; // e.g. a circle with radius 0 would abort the export
             Entity entity = null;
             Entity[] entities = null;
             switch (geoObject)

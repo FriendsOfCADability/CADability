@@ -97,7 +97,7 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
             List<int> representationItems = new List<int>();
             foreach (IGeoObject go in pr.GetActiveModel())
             {
-                if (go is IExportStep)
+                if (go is IExportStep && go.HasValidData()) // e.g. an empty polyline would abort the export
                 {
                     int n = (go as IExportStep).Export(this, true);
                     if (lst.Length == 0) lst.Append("#" + n.ToString());
@@ -144,7 +144,7 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
             List<int> representationItems = new List<int>();
             foreach (IGeoObject go in pr.GetActiveModel())
             {
-                if (go is IExportStep)
+                if (go is IExportStep && go.HasValidData()) // e.g. an empty polyline would abort the export
                 {
                     int n = (go as IExportStep).Export(this, true);
                     if (lst.Length == 0) lst.Append("#" + n.ToString());

@@ -2,7 +2,7 @@
 
 The "Boundary Representation" (BRep) classes describe solid objects in CADability. They follow the definition outlined in the Wikipedia article [Boundary representation](https://en.wikipedia.org/wiki/Boundary_representation).
 
-The main classes are [Solid](../api/CADability.Solid.html), [Shell](../api/CADability.Shell.html), [Face](../api/CADability.Face.html), [Edge](../api/CADability.Edge.html), and [Vertex](../api/CADability.Vertex.html).
+The main classes are [Solid](xref:CADability.GeoObject.Solid), [Shell](xref:CADability.GeoObject.Shell), [Face](xref:CADability.GeoObject.Face), [Edge](xref:CADability.Edge), and [Vertex](xref:CADability.Vertex).
 
 Consider a simple cube: it has six (planar) faces, twelve edges, and eight vertices. The shell consists of the six faces, and the solid is defined by this shell.
 

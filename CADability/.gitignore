@@ -7,3 +7,5 @@
 /**/bin/
 /**/obj/
 /**/_site/
+/api/*.yml
+/api/.manifest

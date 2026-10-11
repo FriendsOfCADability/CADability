@@ -8,8 +8,8 @@ the structure (but not the graphical implementation) of the user interface and s
 For your first experience you can simply build and start the solution and try to draw or construct 3d objects. Typically you will replace the CADability.App 
 by your own application or use only the CADability.dll to analyze or compose 3d models.
 
-Here is a quick overview of the [organizational classes](articles/orgclass.html).
+Here is a quick overview of the [organizational classes](articles/orgclass.md).
 
-This is an overview of the CAD [database](articles/database.html), the geometrical entities that make up a model.
+This is an overview of the CAD [database](articles/database.md), the geometrical entities that make up a model.
 
-And this is the [complete table of contents](api/toc.html).
+And this is the [API documentation](api/index.md).

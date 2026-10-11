@@ -520,7 +520,8 @@ namespace CADability.GeoObject
         }
         ~FontCache()
         {
-            Gdi.DeleteDC(hDC);
+            // the constructor throws where there is no GDI (e.g. on Linux), and an exception in a finalizer ends the process
+            if (hDC != IntPtr.Zero) Gdi.DeleteDC(hDC);
         }
         public Path2D[] GetOutline2D(string fontName, int fontStyle, char c, out double width)
         {

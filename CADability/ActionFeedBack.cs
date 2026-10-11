@@ -57,34 +57,33 @@ namespace CADability.Actions
             if (Settings.GlobalSettings.GetBoolValue("ActionFeedBack.UseZBuffer", true)) paintTo3D.UseZBuffer(true);
 
             Color selectColor = frame.GetColorSetting("Select.SelectColor", Color.Yellow); // die Farbe für die selektierten Objekte
-            Color focusColor = frame.GetColorSetting("Select.FocusColor", Color.LightBlue); // die Farbe für das Objekt mit dem Focus
-            foreach (IView vw in frame.AllViews)
+            // Repaint is called once for each view with that view's paintTo3D, so the feedback is painted once here (issue #308:
+            // a loop over all views painted it once per view into the same view).
+            for (int i = 0; i < repaintObjects.Count; ++i)
             {
-                for (int i = 0; i < repaintObjects.Count; ++i)
+                IFeedBack go = repaintObjects[i] as IFeedBack;
+                if (go != null)
                 {
-                    IFeedBack go = repaintObjects[i] as IFeedBack;
-                    if (go != null)
-                    {
-                        go.PaintTo3D(paintTo3D);
-                    }
+                    go.PaintTo3D(paintTo3D);
                 }
+            }
 
+            if (paintAsSelected.Count > 0)
+            {
                 bool oldSelectMode = paintTo3D.SelectMode;
                 paintTo3D.SelectMode = true;
                 bool pse = paintTo3D.PaintSurfaceEdges;
                 paintTo3D.PaintSurfaceEdges = false;
+                paintTo3D.SelectColor = selectColor;
+                // all objects painted as selected go into a single display list, not one list per object and repaint (issue #308)
+                paintTo3D.OpenList("feedback");
                 for (int i = 0; i < paintAsSelected.Count; ++i)
                 {
                     IGeoObjectImpl go = paintAsSelected[i] as IGeoObjectImpl;
-                    if (go != null)
-                    {
-                        paintTo3D.SelectColor = selectColor;
-                        paintTo3D.OpenList("feedback");
-                        go.PaintTo3D(paintTo3D);
-                        IPaintTo3DList list = paintTo3D.CloseList();
-                        if (list != null) paintTo3D.SelectedList(list, -1); // changed from selectWidth to -1 (also show faces which are behind other faces)
-                    }
+                    if (go != null) go.PaintTo3D(paintTo3D);
                 }
+                IPaintTo3DList list = paintTo3D.CloseList();
+                if (list != null) paintTo3D.SelectedList(list, -1); // changed from selectWidth to -1 (also show faces which are behind other faces)
                 paintTo3D.PaintSurfaceEdges = pse;
                 paintTo3D.SelectMode = oldSelectMode;
             }

@@ -67,8 +67,6 @@ namespace CADability.Tests
             }
             finally
             {
-                GC.Collect(); // ImportSTL.Read does not close its reader
-                GC.WaitForPendingFinalizers();
                 try { File.Delete(file); } catch (IOException) { }
             }
         }

@@ -355,6 +355,7 @@ namespace CADability
             object IJsonReadData.GetProperty(string name, Type type)
             {
                 object val = this[name];
+                if (val == null) return null; // a property written with the value null, e.g. an array that was not set
                 if (root.typeVersions.TryGetValue(type.FullName, out int tv) && tv == -1) return val; // maybe it was ISerialize in an old version and is now SerializeAsStruct: this would fail
                 if (SerializeAsStruct(type))
                 {

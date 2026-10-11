@@ -70,5 +70,53 @@ namespace CADability.Tests
             Assert.AreEqual(2, apart.Length, "the slab cuts the sphere in two");
             Assert.AreEqual(sphere5 - zone, apart.Sum(s => s.Volume(1e-2)), (sphere5 - zone) * 2e-3, "sphere - slab");
         }
+
+        /// <summary>The four booleans of a and b must be consistent: a - b and a * b make up a, b - a and a * b make up b.</summary>
+        private static void AssertConsistent(Func<Solid> a, Func<Solid> b, string what)
+        {
+            double va = a().Volume(1e-2), vb = b().Volume(1e-2);
+            double Sum(Solid[] solids, string op)
+            {
+                Assert.IsNotNull(solids, what + ": " + op);
+                Assert.IsTrue(solids.Length > 0, what + ": " + op + " is empty");
+                foreach (Solid s in solids) Assert.AreEqual(0, s.Shells[0].OpenEdgesExceptPoles.Length, what + ": " + op + ": open edges");
+                return solids.Sum(s => s.Volume(1e-2));
+            }
+            double amb = Sum(WithinAMinute(() => Solid.Subtract(a(), b()), what), "a - b");
+            double ab = Sum(WithinAMinute(() => Solid.Intersect(a(), b()), what), "a * b");
+            double bma = Sum(WithinAMinute(() => Solid.Subtract(b(), a()), what), "b - a");
+            double apb = Sum(WithinAMinute(() => new[] { Solid.Unite(a(), b()) }, what), "a + b");
+            Assert.AreEqual(va, amb + ab, va * 2e-3, what + ": a - b and a * b");
+            Assert.AreEqual(vb, bma + ab, vb * 2e-3, what + ": b - a and a * b");
+            Assert.AreEqual(va + vb - ab, apb, (va + vb) * 2e-3, what + ": a + b");
+        }
+
+        [TestMethod]
+        public void a_sphere_on_a_corner_of_a_box()
+        {
+            // a pole of the sphere lies on the vertical edge of the box, and the arc from the pole is a meridian
+            Solid Sphere() => Make3D.MakeSphere(new GeoPoint(10, 10, 10), 4);
+            double sphere = 4.0 / 3.0 * Math.PI * 64;
+            AssertVolume(WithinAMinute(() => Solid.Intersect(Sphere(), Box()), "corner"), sphere / 8, "sphere * box, centred on a corner");
+            AssertVolume(WithinAMinute(() => Solid.Subtract(Sphere(), Box()), "corner"), sphere * 7 / 8, "sphere - box, centred on a corner");
+            AssertVolume(WithinAMinute(() => Solid.Subtract(Box(), Sphere()), "corner"), 4000 - sphere / 8, "box - sphere, centred on a corner");
+        }
+
+        [TestMethod]
+        public void boxes_and_a_cone_through_a_sphere()
+        {
+            Solid Sphere() => Make3D.MakeSphere(GeoPoint.Origin, 5);
+            // the circles on the faces x = 1 and x = -1 cross the seam of the sphere, those on y = 1 and y = -1 do not
+            AssertConsistent(Sphere, () => Make3D.MakeBox(new GeoPoint(-1, -1, -8), 2 * GeoVector.XAxis, 2 * GeoVector.YAxis, 16 * GeoVector.ZAxis), "a box through both poles");
+            AssertConsistent(() => Make3D.MakeSphere(new GeoPoint(1, 2, 3), 5), () =>
+            {
+                Solid box = Make3D.MakeBox(new GeoPoint(-2, -2, -2), 4 * GeoVector.XAxis, 4 * GeoVector.YAxis, 12 * GeoVector.ZAxis);
+                box.Modify(ModOp.Rotate(GeoPoint.Origin, new GeoVector(1, 1, 0), SweepAngle.Deg(35)));
+                return box;
+            }, "a tilted box");
+            // a cone on an axis through the center: the general intersection threw a PlaneException
+            AssertConsistent(Sphere, () => Make3D.MakeCone(new GeoPoint(0, 0, 2), GeoVector.XAxis, 10 * GeoVector.ZAxis, 3, 1), "a cone into the sphere");
+            AssertConsistent(Sphere, () => Make3D.MakeTorus(new GeoPoint(0, 0, 3), GeoVector.ZAxis, 3, 1), "a torus through the sphere");
+        }
     }
 }

@@ -1208,11 +1208,24 @@ namespace CADability
             return ACadVersion.AC1015;
         }
         /// <summary>
-        /// Export the project in one of the following formats: cdb, dxf, step (or stp) and stl.
+        /// The DWG version <see cref="Export"/> writes: the version of <see cref="DxfExportVersion"/>, but at
+        /// least AutoCAD 2004 (AC1018). ACadSharp writes no DWG before AutoCAD 14, and before AutoCAD 2004 it
+        /// drops the polyface meshes, which are the export of faces, shells and solids. It cannot write
+        /// AutoCAD 2007 (AC1021) DWG either, so that becomes AutoCAD 2010 (AC1024).
+        /// </summary>
+        private static ACadVersion DwgExportVersion()
+        {
+            ACadVersion version = DxfExportVersion();
+            if (version < ACadVersion.AC1018) return ACadVersion.AC1018;
+            if (version == ACadVersion.AC1021) return ACadVersion.AC1024;
+            return version;
+        }
+        /// <summary>
+        /// Export the project in one of the following formats: cdb, dxf, dwg, step (or stp) and stl.
         /// </summary>
         /// <param name="fileName">Path and filename for the generated output file</param>
-        /// <param name="format">Format, one of the strings: cdb, dxf, step, stp, stl</param>
-        /// <returns>true, if the file was written, false for a format that cannot be exported (e.g. dwg, iges, html)</returns>
+        /// <param name="format">Format, one of the strings: cdb, dxf, dwg, step, stp, stl</param>
+        /// <returns>true, if the file was written, false for a format that cannot be exported (e.g. dxb, iges, html)</returns>
         public bool Export(string fileName, string format)
         {
             format = format.ToLower();
@@ -1220,13 +1233,15 @@ namespace CADability
             {
                 case "cdb": return WriteToFile(fileName);
                 case "html":
-                    break; // not implemented, see ExportToWebGl
+                    break; // not supported, ExportToWebGl needs a template that is not part of CADability
                 case "dxf":
                     CADability.DXF.Export export = new DXF.Export(DxfExportVersion());
                     export.WriteToFile(this, fileName);
                     return true;
                 case "dwg":
-                    break;
+                    CADability.DXF.Export dwgExport = new DXF.Export(DwgExportVersion());
+                    dwgExport.WriteToFile(this, fileName, true);
+                    return true;
                 case "dxb":
                     break;
                 case "igs":
@@ -1727,8 +1742,12 @@ namespace CADability
         {
             try
             {
-                var reader = new DwgReader(filename, null);
-                var cadDoc = reader.Read();
+                // the reader keeps the file open until it is disposed
+                ACadSharp.CadDocument cadDoc;
+                using (var reader = new DwgReader(filename, null))
+                {
+                    cadDoc = reader.Read();
+                }
                 CADability.DXF.Import import = new DXF.Import(cadDoc);
                 return import.Project;
             }

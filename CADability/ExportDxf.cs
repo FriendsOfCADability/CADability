@@ -105,6 +105,15 @@ namespace CADability.DXF
 
         public void WriteToFile(Project toExport, string filename)
         {
+            WriteToFile(toExport, filename, false);
+        }
+        /// <summary>
+        /// Writes the model space of <paramref name="toExport"/> to <paramref name="filename"/>, as DWG when
+        /// <paramref name="asDwg"/> is set, otherwise as DXF. ACadSharp writes DWG from AutoCAD 14 on, except
+        /// AutoCAD 2007, see <see cref="Project.Export"/>.
+        /// </summary>
+        internal void WriteToFile(Project toExport, string filename, bool asDwg)
+        {
             Model modelSpace = null;
             if (toExport.GetModelCount() == 1) modelSpace = toExport.GetModel(0);
             else modelSpace = toExport.FindModel("*Model_Space");
@@ -128,6 +137,14 @@ namespace CADability.DXF
                         msBlock.Entities.Add(e);
             }
             SetExtents(modelSpace);
+            if (asDwg)
+            {
+                using (var writer = new DwgWriter(filename, doc))
+                {
+                    writer.Write();
+                }
+                return;
+            }
             using (var writer = new DxfWriter(filename, doc, false))
             {
                 ConfigureWriter(writer);

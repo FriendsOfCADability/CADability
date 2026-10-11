@@ -67,6 +67,10 @@ a degenerate sphere fit in `NurbsSurface.GetSimpleSurface` is detected, and
 `Border.UnsplittedOutline` survives `ChangeCyclicalStart`, `Clone`,
 `GetModified` and `Move`.
 
+Fixed from the list below: the export dialog writes DWG through ACadSharp
+and no longer offers HTML, which nothing wrote; the settings `DxfDwg.Format`
+and `DxfDwg.Text`, which were read nowhere, are removed.
+
 Closed as not reproducible: #265 (the STEP round trip gives an identical solid
 on master and on the commit from the time of the report, 0fb61554).
 
@@ -127,15 +131,6 @@ None left: all of them have been fixed.
 - [ ] DXF hatch line styles are not told apart by dash pattern, pattern hatch
   lines keep the style's lineweight (no ByBlock), and a top-level ByBlock
   linetype still maps to the solid "ByBlock" pattern.
-
-- [ ] The settings `DxfDwg.Format` (DWG/DXF/DXB) and `DxfDwg.Text`
-  (Fit/Original) are shown in the control center but read nowhere. Either
-  implement them (ACadSharp can write DWG) or remove them from `Settings.cs`
-  and the string tables. `Project.Export` now returns false for "dwg" and
-  "dxb", which it does not write.
-- [ ] The export dialog offers HTML, but `Project.Export` writes nothing for
-  "html". `Project.ExportToWebGl` exists, but builds the path of its template
-  `WebGLS.html` with backslashes and the template is not part of the package.
 
 - [ ] A `Polyline` without vertices still throws in the curve operations
   that need a point (`StartPoint`, `PointAt`, `PositionOf`, `Length`, ...).

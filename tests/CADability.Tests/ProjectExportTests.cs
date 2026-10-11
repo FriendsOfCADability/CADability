@@ -3,7 +3,7 @@ using CADability.GeoObject;
 namespace CADability.Tests
 {
     /// <summary>
-    /// Project.Export returned false for STEP and STL, which it wrote, and true for dwg, dxb and html, which it does not write.
+    /// Project.Export returned false for STEP and STL, which it wrote, and true for dwg, dxb and html, which it did not write. DWG is written now.
     /// </summary>
     [TestClass]
     public class ProjectExportTests
@@ -15,7 +15,7 @@ namespace CADability.Tests
         [DataRow("step", true)]
         [DataRow("stp", true)]
         [DataRow("stl", true)]
-        [DataRow("dwg", false)]
+        [DataRow("dwg", true)]
         [DataRow("dxb", false)]
         [DataRow("html", false)]
         [DataRow("iges", false)]

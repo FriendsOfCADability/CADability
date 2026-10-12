@@ -85,15 +85,7 @@ namespace CADability.Tests
         {
             string file = TestFile("CDB", "issue347.cdb.json");
             Assert.IsTrue(File.Exists(file), $"test file not found: {file}");
-            Project project = null;
-            try
-            {
-                project = Project.ReadFromFile(file, "cdb");
-            }
-            catch (TypeInitializationException e) when (e.GetBaseException() is PlatformNotSupportedException)
-            {
-                Assert.Inconclusive("reading a project needs System.Drawing printing, which is only available on Windows");
-            }
+            Project project = Project.ReadFromFile(file, "cdb");
             Assert.IsNotNull(project);
             List<Face> faces = new List<Face>();
             foreach (IGeoObject go in project.GetActiveModel().AllObjects)
@@ -132,15 +124,7 @@ namespace CADability.Tests
         {
             string file = TestFile("CDB", "issue168.cdb.json");
             Assert.IsTrue(File.Exists(file), $"test file not found: {file}");
-            Project project = null;
-            try
-            {
-                project = Project.ReadFromFile(file, "cdb");
-            }
-            catch (TypeInitializationException e) when (e.GetBaseException() is PlatformNotSupportedException)
-            {
-                Assert.Inconclusive("reading a project needs System.Drawing printing, which is only available on Windows");
-            }
+            Project project = Project.ReadFromFile(file, "cdb");
             Assert.IsNotNull(project);
             List<Solid> solids = project.GetActiveModel().AllObjects.OfType<Solid>().ToList();
             Solid main = solids.Single(s => s.Name == "main53335");

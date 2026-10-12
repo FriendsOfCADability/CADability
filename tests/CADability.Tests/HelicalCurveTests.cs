@@ -253,7 +253,7 @@ namespace CADability.Tests
         {
             HelicalCurve h = MakeTestHelix();
             h.ColorDef = new CADability.Attribute.ColorDef("red", System.Drawing.Color.Red);
-            // the curve itself is serialized: reading a whole project needs System.Drawing printing, i.e. Windows
+            // the curve itself is serialized, without a project around it
             HelicalCurve restored = JsonSerialize.FromString(JsonSerialize.ToString(h)) as HelicalCurve;
             Assert.IsNotNull(restored, "the helical curve must survive the round trip");
             Assert.AreEqual(h.Radius, restored.Radius, 1e-12);

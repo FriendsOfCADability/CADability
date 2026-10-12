@@ -97,7 +97,7 @@ namespace CADability.Actions
                     }
                 }
                 Plane pln;
-                CompoundShape cs = CompoundShape.CreateFromList(curves, Precision.eps, out pln);
+                CompoundShape cs = CompoundShape.CreateFromList(curves, Precision.eps, out pln, false, true); // a face needs the exact curves
                 if (cs != null && !cs.Empty)
                 {   // man konnte ein CompoundShape erzeugen, dann dieses zu Faces machen und verwenden
                     for (int i = 0; i < cs.SimpleShapes.Length; i++)

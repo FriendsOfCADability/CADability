@@ -3,66 +3,43 @@
     {
       "src": [
         {
+          "src": "bin/Release/net8.0-windows",
           "files": [
-            "*.csproj"
-          ],
-          "cwd": ".",
-          "exclude": [
-            "**/obj/**",
-            "**/bin/**",
-            "_site/**"
+            "CADability.Forms.dll"
           ]
         }
       ],
-      "dest": "obj/api"
+      "dest": "api",
+      "references": [
+        {
+          "src": "obj/docfx-refs",
+          "files": [
+            "*.dll"
+          ]
+        }
+      ]
     }
   ],
   "build": {
     "content": [
       {
         "files": [
-          "api/**.yml"
-        ],
-        "cwd": "obj"
-      },
-      {
-        "files": [
-          "api/*.md",
-          "articles/**.md",
+          "api/**.yml",
+          "api/index.md",
           "toc.yml",
           "*.md"
-        ],
-        "exclude": [
-          "obj/**",
-          "_site/**"
         ]
       }
     ],
-    "resource": [
-      {
-        "files": [
-          "images/**"
-        ],
-        "exclude": [
-          "obj/**",
-          "_site/**"
-        ]
-      }
-    ],
-    "overwrite": [
-      {
-        "files": [
-          "apidoc/**.md"
-        ],
-        "exclude": [
-          "obj/**",
-          "_site/**"
-        ]
-      }
-    ],
-    "dest": "../docs/CADabilityFormsDoc",
+    "dest": "_site",
     "template": [
-      "default"
-    ]
+      "default",
+      "modern"
+    ],
+    "globalMetadata": {
+      "_appTitle": "CADability.Forms",
+      "_appName": "CADability.Forms",
+      "_enableSearch": true
+    }
   }
 }

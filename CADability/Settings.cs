@@ -556,20 +556,13 @@ namespace CADability
                 DxfDwgSetting.resourceIdInternal = "DxfDwg";
                 DxfDwgSetting.myName = "DxfDwg";
                 GlobalSettings.AddSetting("DxfDwg", DxfDwgSetting);
-                MultipleChoiceSetting mcsFormat = new MultipleChoiceSetting("DxfDwg.Format", "Format");
-                mcsFormat.CurrentSelection = 0;
-                DxfDwgSetting.AddSetting("Format", mcsFormat);
                 MultipleChoiceSetting mcsVersion = new MultipleChoiceSetting("DxfDwg.Version", "Version");
                 mcsVersion.CurrentSelection = 7;
                 DxfDwgSetting.AddSetting("Version", mcsVersion);
             }
-            if (!GlobalSettings.ContainsSetting("DxfDwg.Text"))
-            {
-                Settings DxfDwgSetting = GlobalSettings.GetSubSetting("DxfDwg");
-                MultipleChoiceSetting mcsText = new MultipleChoiceSetting("DxfDwg.Text", "Text");
-                mcsText.CurrentSelection = 0;
-                DxfDwgSetting.AddSetting("Text", mcsText);
-            }
+            // "Format" (DWG/DXF/DXB) and "Text" (Fit/Original) were never read, the export dialog chooses the format
+            if (GlobalSettings.ContainsSetting("DxfDwg.Format")) GlobalSettings.RemoveSetting("DxfDwg.Format");
+            if (GlobalSettings.ContainsSetting("DxfDwg.Text")) GlobalSettings.RemoveSetting("DxfDwg.Text");
             if (!GlobalSettings.ContainsSetting("DxfDwg.ImportDimension"))
             {
                 Settings DxfDwgSetting = GlobalSettings.GetSubSetting("DxfDwg");

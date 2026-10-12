@@ -1,7 +1,8 @@
 # Issue triage — open items
 
 Result of going through all open issues on 2026-10-09 against master
-`17f949e`. Issue #173 was skipped because it is already being worked on.
+`17f949e`. Issue #173 was skipped because it was already being worked on; it
+is fixed in #374, see below.
 
 Closed during this triage, because they were already solved on master:
 
@@ -47,6 +48,50 @@ reversed and saved (the JSON reader accepts a property written as null), an
 arc without sweep can be approximated, `Project.Export` returns whether it
 wrote the file, and `Shell.OpenEdgesExceptPoles` no longer takes a closed
 curve for a pole (a STEP `CLOSED_SHELL` with a single disc became a solid).
+A sphere and a plane intersect in the parts of a circle that lie on each
+face of the sphere: the whole circle was returned for every face, so a box
+minus a sphere returned the box unchanged. The same holds for a sphere and a
+cone, cylinder or torus on an axis through its centre (a cylinder first
+returned every circle on every face of the sphere, a cone divided by a null
+vector). Two spheres intersect in an exact circle: the general intersection
+approximated it, and the union of two spheres of radius 5 whose centres are
+6 apart did not return. Spheres side by side work as well: where the seams of
+both spheres cross on the intersection circle, the parts of the seams between
+the crossing points were taken for an edge both faces already have, and a
+circle that crosses no edge was dropped, because the exact intersection
+returns it in two halves. Solids that touch without a common volume give
+correct results: `Solid.Intersect` threw a `NullReferenceException` whenever
+they touched in a face, solids touching in an edge or a point had a whole box
+as intersection, and two boxes touching in a whole face had empty
+differences. DXF pattern hatches: line hatch styles are told apart by their
+dashes, which become positive dash and gap lengths in drawing units (the
+negative gaps of DXF were kept, and the patterns were not added to the
+project), the lines are as far apart as the perpendicular part of the pattern
+offset, and in a block they take the lineweight of the INSERT for ByBlock and
+of its layer for ByLayer on layer "0". The linetype ByBlock outside of blocks
+is "Continuous", and the project gets no line patterns "ByLayer" and
+"ByBlock". A cylinder standing on a box, its bottom circle touching the sides
+of the top face, is no longer lost in the union: where an intersection curve
+touches the outline of a face, the loop takes the edge that turns most to the
+left, and the top face is split into its four corners instead of getting a
+hole that touches the outline. A cylinder lying on a box no longer has empty
+differences: a tangential intersection curve along which the surfaces only
+touch, without crossing, is no intersection edge.
+
+The documentation is generated again: the package contains the XML
+documentation (`CADability.xml`), and the Pages workflow builds the libraries
+and runs docfx on them, under the old paths `/CADabilityDoc` and
+`/CADabilityFormsDoc`. The generated HTML of 2021 is no longer in the
+repository, and `docs/index.html` is a start page instead of the Jekyll
+template.
+
+A `PrecisionOverride` applies only to the thread that creates it.
+`Border.Clip` overrides `Precision.eps` for every call, and every other thread
+computed with that precision in the meantime, e.g. in the parallel STEP import
+and in parallel tests. `Precision.eps` and `Precision.epsa` are properties now
+instead of fields: source code compiles unchanged, but binaries compiled
+against 1.5.0 or earlier that read them have to be recompiled (release notes
+of 1.6.0).
 
 Fixed in the next pull request: #194 (`Border.UnsplittedOutline` survives
 `CompoundShape.CreateFromList`), #293 (DXF block contents on layer 0 or
@@ -63,6 +108,19 @@ already in a block, files that are only read are opened with `FileShare.Read`,
 a degenerate sphere fit in `NurbsSurface.GetSimpleSurface` is detected, and
 `Border.UnsplittedOutline` survives `ChangeCyclicalStart`, `Clone`,
 `GetModified` and `Move`.
+
+Fixed in #374: #173 (splines with coinciding poles, the usual way to model a
+corner). `BSpline.GetProjectedCurve` returns the exact projection instead of a
+spline through some points that rounded the corners, `BSpline2D` handles
+points where the derivative vanishes, and the DXF import keeps such a spline
+as one `BSpline` instead of a polyline, so the export writes it back with the
+same poles and knots. Extrude, Rotate, MakePipe and faces made from curves
+split the spline at its corners, and these faces keep splines and ellipses
+exact instead of approximating them by thousands of arcs.
+
+Fixed from the list below: the export dialog writes DWG through ACadSharp
+and no longer offers HTML, which nothing wrote; the settings `DxfDwg.Format`
+and `DxfDwg.Text`, which were read nowhere, are removed.
 
 Closed as not reproducible: #265 (the STEP round trip gives an identical solid
 on master and on the commit from the time of the report, 0fb61554).
@@ -87,11 +145,15 @@ None left: all of them have been fixed.
   remain wrong, 2 crash with a stack overflow or a timeout, all unchanged by
   the fix). Examples: a box bottom 3e-7 below the tangent plane of a rounded
   edge, gaps of about 1e-5 (between `Precision.eps` and the BRep precision),
-  touching boxes (`Intersect` throws), and tools 1e6 times smaller than the
-  other solid. Two more found while checking the pole fix, both on master
-  too: a box minus a sphere of radius 4 centred on its top face throws, and
-  the union of two spheres of radius 5 whose centres are 6 apart does not
-  return within a minute.
+  and tools 1e6 times smaller than the other solid. Solids touching only in
+  an edge, a line or a point have no union (`Solid.Unite` returns null, the
+  result would not be a manifold), and a solid touching the inside of another
+  one cannot be subtracted (the result would have a cavity, which a `Solid`
+  cannot have; the other solid is returned unchanged).
+  Unions of spheres with offset axes measure 0.03 to 0.05 % too small or too
+  large, while both differences are exact. In the union, the hole edges of the merged faces
+  have `Path2D` curves, and these faces triangulate to a slightly smaller area
+  than the same faces in the differences; not yet investigated further.
 
 - [ ] `tests/CADability.Tests/Files/CDB/Volumes.cdb.json` cannot be read by
   the JSON reader of this repository: it stores `SphericalSurface`,
@@ -113,22 +175,20 @@ None left: all of them have been fixed.
   moving the block to another layer later leaves those contents on the old
   layer, and the DXF export writes them on that layer instead of layer 0. A
   complete solution needs a "layer from parent" counterpart to `CDfromParent`.
-- [ ] DXF hatch line styles are not told apart by dash pattern, pattern hatch
-  lines keep the style's lineweight (no ByBlock), and a top-level ByBlock
-  linetype still maps to the solid "ByBlock" pattern.
-
-- [ ] The settings `DxfDwg.Format` (DWG/DXF/DXB) and `DxfDwg.Text`
-  (Fit/Original) are shown in the control center but read nowhere. Either
-  implement them (ACadSharp can write DWG) or remove them from `Settings.cs`
-  and the string tables. `Project.Export` now returns false for "dwg" and
-  "dxb", which it does not write.
-- [ ] The export dialog offers HTML, but `Project.Export` writes nothing for
-  "html". `Project.ExportToWebGl` exists, but builds the path of its template
-  `WebGLS.html` with backslashes and the template is not part of the package.
-
-- [ ] A `Polyline` without vertices still throws in the curve operations
-  that need a point (`StartPoint`, `PointAt`, `PositionOf`, `Length`, ...).
-  Cloning, moving, reversing and saving it work now.
+- [ ] A DXF SPLINE comes back without the periodic flag when its knots are
+  clamped (the issue 173 file has flags 11, the export writes 9), and with the
+  default knot and control point tolerances (42, 43). Neither follows from the
+  curve, and `BSpline` has no place to keep them.
+- [ ] `BSpline.IsClosed` means periodic, so a closed spline with clamped knots
+  (start point equal to end point) counts as open.
+- [ ] The contour hatch (`HatchStyleContour`) loses inner rings when the
+  outline keeps an exact `BSpline2D` (5 instead of 8 rings in a test), which is
+  why hatching still approximates splines in `Border.Reduce`.
+- [ ] `Make3D.MakeRevolution` only works in DEBUG builds and throws
+  `NotImplementedException` otherwise, but `Constr3DPathRotate` calls it.
+- [ ] `Make3D.MakeRuledShell`/`MakeRuledSolid` pair the curves of the two paths
+  by index and do not split splines at their corners, so a ruled face can get a
+  kink inside.
 - [ ] The triangulation of a ruled surface between two splines
   (`Make3D.MakeRuledShell`) overestimates its area by up to 3.7 % at a
   precision of a thousandth of its size: long thin triangles along the rulings
@@ -139,11 +199,12 @@ None left: all of them have been fixed.
 
 ## Documentation
 
-- [ ] The generated documentation is stale: `docs/CADabilityDoc` was last
-  generated on 2021-05-31 and `docs/index.md` is the unchanged Jekyll
-  template. Consider running docfx (`CADability/docfx.json`,
-  `CADability.Forms/docfx.json`) in the Pages workflow instead of committing
-  generated HTML.
+- [ ] About 440 doc comments have wrong `param` names, `cref`s that resolve to
+  nothing or malformed XML (compiler warnings CS1570 to CS1587 and CS1734, and
+  the `InvalidCref` warnings of docfx). The warnings are suppressed in
+  `CADability.csproj` and `CADability.Forms.csproj` since the XML
+  documentation is generated; remove them from `NoWarn` while fixing the
+  comments.
 
 ## Open discussions / feature requests (no action from triage)
 

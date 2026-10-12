@@ -2,20 +2,14 @@
   "metadata": [
     {
       "src": [
-		{
-			"files": [
-				"**.csproj"
-			],
-			"exclude": [
-				"**/obj/**",
-				"**/bin/**",
-				"_site/**"
-			]
-		}
+        {
+          "src": "bin/Release/netstandard2.0",
+          "files": [
+            "CADability.dll"
+          ]
+        }
       ],
-      "dest": "api",
-      "disableGitFeatures": false,
-      "disableDefaultFilter": false
+      "dest": "api"
     }
   ],
   "build": {
@@ -23,11 +17,7 @@
       {
         "files": [
           "api/**.yml",
-          "api/index.md"
-        ]
-      },
-      {
-        "files": [
+          "api/index.md",
           "articles/**.md",
           "articles/**/toc.yml",
           "toc.yml",
@@ -35,35 +25,15 @@
         ]
       }
     ],
-    "resource": [
-      {
-        "files": [
-          "images/**"
-        ]
-      }
-    ],
-    "overwrite": [
-      {
-        "files": [
-          "apidoc/**.md"
-        ],
-        "exclude": [
-          "obj/**",
-          "_site/**"
-        ]
-      }
-    ],
-    "dest": "../docs/CADabilityDoc",
-    "globalMetadataFiles": [],
-    "fileMetadataFiles": [],
+    "dest": "_site",
     "template": [
-      "default"
+      "default",
+      "modern"
     ],
-    "postProcessors": [],
-    "markdownEngineName": "markdig",
-    "noLangKeyword": false,
-    "keepFileLink": false,
-    "cleanupCacheHistory": false,
-    "disableGitFeatures": false
+    "globalMetadata": {
+      "_appTitle": "CADability",
+      "_appName": "CADability",
+      "_enableSearch": true
+    }
   }
 }

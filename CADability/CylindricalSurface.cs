@@ -962,6 +962,13 @@ namespace CADability.GeoObject
                     }
                 }
             }
+            if (other is SphericalSurface sphere && sphere.IsRealSphere && Surfaces.GetCommonAxis(this, other, out Axis _))
+            {   // a sphere whose center is on the axis: the sphere intersects them in exact circles (the code below splits the
+                // bounds into parts and returned every circle on every face of the sphere)
+                IDualSurfaceCurve[] fromSphere = other.GetDualSurfaceCurves(otherBounds, this, thisBounds, seeds, null);
+                for (int i = 0; i < fromSphere.Length; i++) fromSphere[i].SwapSurfaces();
+                return fromSphere;
+            }
             if (other is PlaneSurface)
             {
                 return GetPlaneIntersection(other as PlaneSurface, thisBounds.Left, thisBounds.Right, thisBounds.Bottom, thisBounds.Top, Precision.eps);

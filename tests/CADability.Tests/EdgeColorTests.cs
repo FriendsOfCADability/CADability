@@ -127,15 +127,7 @@ namespace CADability.Tests
 
             MemoryStream written = new MemoryStream();
             project.WriteToJson(written); // closes the stream
-            Project read = null;
-            try
-            {
-                read = Project.ReadFromJson(new MemoryStream(written.ToArray()));
-            }
-            catch (TypeInitializationException ex) when (ex.GetBaseException() is PlatformNotSupportedException)
-            {
-                Assert.Inconclusive("reading a project needs System.Drawing printing, which is only available on Windows");
-            }
+            Project read = Project.ReadFromJson(new MemoryStream(written.ToArray()));
             Assert.IsTrue(IsRed(read.GetActiveModel().AllObjects.OfType<Solid>().Single()), "saved and read");
         }
     }

@@ -184,8 +184,6 @@ None left: all of them have been fixed.
 - [ ] The contour hatch (`HatchStyleContour`) loses inner rings when the
   outline keeps an exact `BSpline2D` (5 instead of 8 rings in a test), which is
   why hatching still approximates splines in `Border.Reduce`.
-- [ ] `Make3D.MakeRevolution` only works in DEBUG builds and throws
-  `NotImplementedException` otherwise, but `Constr3DPathRotate` calls it.
 - [ ] `Make3D.MakeRuledShell`/`MakeRuledSolid` pair the curves of the two paths
   by index and do not split splines at their corners, so a ruled face can get a
   kink inside.

@@ -1765,7 +1765,7 @@ namespace CADability.GeoObject
         {
             if (curveToRotate != null)
             {
-                int nc = (curveToRotate as IExportStep).Export(export, false);
+                int nc = export.WriteCurve(curveToRotate);
                 int na = export.WriteAxis1Placement3d(axisLocation, axisDirection);
                 return export.WriteDefinition("SURFACE_OF_REVOLUTION('',#" + nc.ToString() + ",#" + na.ToString() + ")");
             }
@@ -1773,7 +1773,7 @@ namespace CADability.GeoObject
             {
                 IGeoObject go = basisCurve2D.MakeGeoObject(Plane.XYPlane);
                 go.Modify(toSurface);
-                int nc = (go as IExportStep).Export(export, false);
+                int nc = export.WriteCurve(go as ICurve);
                 GeoPoint axisLocation = toSurface * GeoPoint.Origin;
                 GeoVector axisDirection = toSurface * GeoVector.YAxis;
                 int na = export.WriteAxis1Placement3d(axisLocation, axisDirection);

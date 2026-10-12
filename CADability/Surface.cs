@@ -5249,6 +5249,12 @@ namespace CADability.GeoObject
 
         public virtual IDualSurfaceCurve[] GetDualSurfaceCurves(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, List<GeoPoint> seeds, List<Tuple<double, double, double, double>> extremePositions)
         {
+            if (this is ISurfaceOfRevolution && other is SphericalSurface sphere && sphere.IsRealSphere && Surfaces.GetCommonAxis(this, other, out Axis _))
+            {   // a sphere whose center is on the axis of this surface: the sphere intersects them in exact circles
+                IDualSurfaceCurve[] fromSphere = other.GetDualSurfaceCurves(otherBounds, this, thisBounds, seeds, null);
+                for (int i = 0; i < fromSphere.Length; i++) fromSphere[i].SwapSurfaces();
+                return fromSphere;
+            }
             if (this is ISurfaceOfRevolution && other is ISurfaceOfRevolution && !(this is SurfaceOfRevolution) && !(other is SurfaceOfRevolution)) // SurfaceOfRevolution rotates in v!
             {
                 ISurfaceOfRevolution tsor = (this as ISurfaceOfRevolution);
@@ -5373,7 +5379,7 @@ namespace CADability.GeoObject
     }
 
 
-    public class Surfaces
+    public partial class Surfaces
     {
         internal static ICurve Intersect(PlaneSurface surface1, BoundingRect bounds1, CylindricalSurface surface2, BoundingRect bounds2, List<GeoPoint> points)
         {
@@ -6331,10 +6337,14 @@ namespace CADability.GeoObject
             // return false;
         }
 
-        internal static IDualSurfaceCurve[] IntersectInner(ISurface surface1, BoundingRect ext1, ISurface surface2, BoundingRect ext2)
+        /// <summary>
+        /// The closed intersection curves of two surfaces inside the bounds, which cross no edge. Each loop is a single closed
+        /// curve or consecutive parts of one, as e.g. the exact intersection of two spheres returns the circle in halves.
+        /// </summary>
+        internal static IDualSurfaceCurve[][] IntersectInner(ISurface surface1, BoundingRect ext1, ISurface surface2, BoundingRect ext2)
         {
             int ep = surface1.GetExtremePositions(ext1, surface2, ext2, out List<Tuple<double, double, double, double>> extremePositions);
-            List<IDualSurfaceCurve> res = new List<IDualSurfaceCurve>();
+            List<IDualSurfaceCurve[]> res = new List<IDualSurfaceCurve[]>();
             if (extremePositions != null && extremePositions.Count > 0)
             {   // lets calculate some seeds from the fixed curves on one of the surfaces
                 List<GeoPoint> seeds = new List<GeoPoint>();
@@ -6380,11 +6390,14 @@ namespace CADability.GeoObject
                     }
                     seeds.Add(seeds.First());
                     IDualSurfaceCurve[] candidates = surface1.GetDualSurfaceCurves(ext1, surface2, ext2, seeds, null);
+                    List<IDualSurfaceCurve> open = new List<IDualSurfaceCurve>();
                     for (int i = 0; i < candidates.Length; i++)
                     {
-                        if (candidates[i].Curve3D.IsClosed) res.Add(candidates[i]);
-                        else if (Precision.Equals(candidates[i].Curve3D.StartPoint, candidates[i].Curve3D.EndPoint)) res.Add(candidates[i]);
+                        if (candidates[i].Curve3D.IsClosed) res.Add(new IDualSurfaceCurve[] { candidates[i] });
+                        else if (Precision.Equals(candidates[i].Curve3D.StartPoint, candidates[i].Curve3D.EndPoint)) res.Add(new IDualSurfaceCurve[] { candidates[i] });
+                        else open.Add(candidates[i]);
                     }
+                    res.AddRange(ChainToLoops(open));
                 }
             }
             if (res.Count == 0 && ep == -1)
@@ -6416,6 +6429,27 @@ namespace CADability.GeoObject
                 //}
             }
             return res.ToArray();
+        }
+        /// <summary>
+        /// Chains the open curves, where each one ends where the next one starts, and returns the chains that are closed.
+        /// </summary>
+        private static List<IDualSurfaceCurve[]> ChainToLoops(List<IDualSurfaceCurve> open)
+        {
+            List<IDualSurfaceCurve[]> res = new List<IDualSurfaceCurve[]>();
+            while (open.Count > 0)
+            {
+                List<IDualSurfaceCurve> loop = new List<IDualSurfaceCurve>() { open[0] };
+                open.RemoveAt(0);
+                while (!Precision.IsEqual(loop[loop.Count - 1].Curve3D.EndPoint, loop[0].Curve3D.StartPoint))
+                {
+                    int next = open.FindIndex(c => Precision.IsEqual(c.Curve3D.StartPoint, loop[loop.Count - 1].Curve3D.EndPoint));
+                    if (next < 0) break;
+                    loop.Add(open[next]);
+                    open.RemoveAt(next);
+                }
+                if (Precision.IsEqual(loop[loop.Count - 1].Curve3D.EndPoint, loop[0].Curve3D.StartPoint)) res.Add(loop.ToArray());
+            }
+            return res;
         }
         private static GeoPoint IntersectionSeedPoint(ISurface surface1, BoundingRect ext1, ISurface surface2, BoundingRect ext2)
         {
@@ -7581,7 +7615,7 @@ namespace CADability.GeoObject
                 static int hashCodeCounter = 0;
                 public IntersectionPoint()
                 {
-                    hashCode = ++hashCodeCounter;
+                    hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter);
                 }
 
                 public void AddPatch(UVPatch uvPatch)
@@ -10585,7 +10619,7 @@ namespace CADability.GeoObject
                 static int hashCodeCounter = 0;
                 public IntersectionPoint()
                 {
-                    hashCode = ++hashCodeCounter;
+                    hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter);
                 }
 
                 public void AddPatch(UVPatch uvPatch)

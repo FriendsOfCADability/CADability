@@ -29,6 +29,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\CADability\CADability.csproj" />
+    <!-- direct reference because tests read exported files with ACadSharp; does not flow from
+         CADability (PrivateAssets="all" there) -->
+    <ProjectReference Include="..\..\external\ACadSharp\src\ACadSharp\ACadSharp.csproj" />
   </ItemGroup>
 
 </Project>

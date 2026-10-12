@@ -102,7 +102,7 @@ namespace CADability
             this.createdEdges = new List<Edge>(1); // empty list, so that clones use the same list
             lock (lockStatic)
             {
-                this.id = idCounter++;
+                this.id = System.Threading.Interlocked.Increment(ref idCounter) - 1;
             }
             locker = new Locker(this);
         }
@@ -115,7 +115,7 @@ namespace CADability
             this.createdEdges = new List<Edge>(1); // empty list, so that clones use the same list
             lock (lockStatic)
             {
-                id = idCounter++;
+                id = System.Threading.Interlocked.Increment(ref idCounter) - 1;
             }
             locker = new Locker(this);
         }
@@ -131,7 +131,7 @@ namespace CADability
 #endif
             lock (lockStatic)
             {
-                id = idCounter++;
+                id = System.Threading.Interlocked.Increment(ref idCounter) - 1;
             }
             locker = toClone.locker;
         }
@@ -145,7 +145,7 @@ namespace CADability
             this.forward = forward;
             lock (lockStatic)
             {
-                id = idCounter++;
+                id = System.Threading.Interlocked.Increment(ref idCounter) - 1;
             }
             locker = new Locker(this);
         }
@@ -817,7 +817,7 @@ namespace CADability
         }
         internal Edge()
         {
-            hashCode = hashCodeCounter++; // 
+            hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter) - 1; // 
 #if DEBUG
             if (hashCode == 36008)
             {
@@ -3660,7 +3660,7 @@ namespace CADability
                 // #64=EDGE_CURVE('',#44,#58,#63,.F.) ;
                 int nv1 = (Vertex1 as IExportStep).Export(export, false);
                 int nv2 = (Vertex2 as IExportStep).Export(export, false);
-                int cn = (curve3d as IExportStep).Export(export, false);
+                int cn = export.WriteCurve(curve3d); // a Path or another curve without a STEP entity is written as a BSpline
                 ec = export.WriteDefinition("EDGE_CURVE('',#" + nv1.ToString() + ",#" + nv2.ToString() + ",#" + cn.ToString() + ",.T.)");
                 export.EdgeToDefInd[this] = ec;
             }

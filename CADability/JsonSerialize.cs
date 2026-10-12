@@ -355,6 +355,7 @@ namespace CADability
             object IJsonReadData.GetProperty(string name, Type type)
             {
                 object val = this[name];
+                if (val == null) return null; // a property written with the value null, e.g. an array that was not set
                 if (root.typeVersions.TryGetValue(type.FullName, out int tv) && tv == -1) return val; // maybe it was ISerialize in an old version and is now SerializeAsStruct: this would fail
                 if (SerializeAsStruct(type))
                 {
@@ -1542,9 +1543,16 @@ namespace CADability
                 {
                     outStream.Write(flt.ToString("G9", NumberFormatInfo.InvariantInfo));
                 }
+                else if (value is char chr)
+                {
+                    //A char is primitive but no number: written as is, e.g. the '{' of an XData
+                    //control string, it makes the file invalid JSON. It goes out as a one
+                    //character string and comes back as one.
+                    WriteString(chr.ToString());
+                }
                 else
                 {
-                    outStream.Write(value); // Boolean, (S)Byte, (U)IntNn
+                    outStream.Write(value); // (S)Byte, (U)IntNn
                 }
             }
             else if (value is string)

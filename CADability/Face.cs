@@ -239,7 +239,7 @@ namespace CADability.GeoObject
         {
             lockTriangulationRecalc = new object();
             lockTriangulationData = new object();
-            hashCode = hashCodeCounter++;
+            hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter) - 1;
             extent = BoundingCube.EmptyBoundingCube;
             if (Constructed != null) Constructed(this);
 #if DEBUG
@@ -3076,7 +3076,7 @@ namespace CADability.GeoObject
         public static Face MakeFace(GeoObjectList list)
         {
             list.DecomposeAll();
-            CompoundShape cs = CompoundShape.CreateFromList(list, Precision.eps, out Plane commonplane);
+            CompoundShape cs = CompoundShape.CreateFromList(list, Precision.eps, out Plane commonplane, false, true);
             if (cs != null)
             {
                 if (cs.SimpleShapes.Length == 1 && cs.SimpleShapes[0].Area > Precision.eps)
@@ -3369,7 +3369,7 @@ namespace CADability.GeoObject
         public static Face MakePlanarFace(IGeoObject[] bounds)
         {
             Plane pln;
-            CompoundShape cs = CompoundShape.CreateFromList(new GeoObjectList(bounds), Precision.eps, out pln);
+            CompoundShape cs = CompoundShape.CreateFromList(new GeoObjectList(bounds), Precision.eps, out pln, false, true);
             if (cs == null || cs.SimpleShapes.Length != 1) return null;
             PlaneSurface ps = new PlaneSurface(pln);
             return MakeFace(ps, cs.SimpleShapes[0]);
@@ -8188,7 +8188,7 @@ namespace CADability.GeoObject
             {
                 orientedOutward = true;
             }
-            hashCode = hashCodeCounter++;
+            hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter) - 1;
             extent = BoundingCube.EmptyBoundingCube;
             lockTriangulationRecalc = new object();
             lockTriangulationData = new object();
@@ -8275,7 +8275,7 @@ namespace CADability.GeoObject
                     }
                     else
                     {   // Face ist nicht Teil einer Shell oder eines Solid
-                        colorDef = value;
+                        colorDef = ColorDefForOwner(value);
                     }
                 }
             }
@@ -8710,7 +8710,8 @@ namespace CADability.GeoObject
             {
                 ISurface simpleSurface;
                 ModOp2D modify;
-                if ((surface as NurbsSurface).GetSimpleSurface(maxError, out simpleSurface, out modify))
+                // the edges are recomputed from their 3D curves, so the surface only needs the same shape
+                if ((surface as NurbsSurface).GetSimpleSurface(maxError, out simpleSurface, out modify, true))
                 {   // die Kanten werden grundlegend neu berechnet, die 2D Kurven werden neu gemacht, es ist hier also
                     // keine Modifikation der 2D Kurven nötig.
                     recalcEdges.UnionWith(Edges);
@@ -11142,10 +11143,11 @@ namespace CADability.GeoObject
             SurfaceHelper.AdjustPeriodic(surface, Area.GetExtent(), res);
             return res;
         }
-        private int StepBound(ExportStep export, Edge[] edges)
+        private int StepBound(ExportStep export, Edge[] edges, bool outer)
         {
             // #65=EDGE_LOOP('',(#66,#67,#68,#69)) ;
             // #70=FACE_OUTER_BOUND('',#65,.T.);
+            // ISO 10303-42 allows at most one FACE_OUTER_BOUND per face: the outline. The holes are written as FACE_BOUND.
             StringBuilder edgloop = new StringBuilder();
             HashSet<Edge> seamsSeen = new HashSet<Edge>();
             for (int i = 0; i < edges.Length; i++)
@@ -11163,7 +11165,7 @@ namespace CADability.GeoObject
                 else edgloop.Append(",#" + nr.ToString());
             }
             int nel = export.WriteDefinition("EDGE_LOOP('',(" + edgloop.ToString() + "))");
-            return export.WriteDefinition("FACE_OUTER_BOUND('',#" + nel.ToString() + ",.T.)");
+            return export.WriteDefinition((outer ? "FACE_OUTER_BOUND('',#" : "FACE_BOUND('',#") + nel.ToString() + ",.T.)");
         }
         int IExportStep.Export(ExportStep export, bool topLevel)
         {
@@ -11182,11 +11184,11 @@ namespace CADability.GeoObject
                 if (ip != null) iv = ip.IntegerValue;
 #endif
                 StringBuilder boundList = new StringBuilder();
-                int outlnr = StepBound(export, outline);
+                int outlnr = StepBound(export, outline, true);
                 boundList.Append("#" + outlnr.ToString());
                 for (int i = 0; i < holes.Length; i++)
                 {
-                    int holenr = StepBound(export, holes[i]);
+                    int holenr = StepBound(export, holes[i], false);
                     boundList.Append(",#" + holenr.ToString());
                 }
                 int surfacenr = (Surface as IExportStep).Export(export, topLevel);

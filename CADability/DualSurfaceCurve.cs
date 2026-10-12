@@ -917,6 +917,12 @@ namespace CADability
                 else if (par3d > 1 - 1e-6) uv = endPoint2d;
             }
             GeoVector dir3d = curve3D.DirectionAt(par3d);
+            // The derivative of a spline vanishes where it passes through coinciding poles. Only the direction is
+            // used here, and that is the direction from inside of the curve (issue 173).
+            for (double offset = 1e-8; dir3d.IsNullVector() && offset < 0.5; offset *= 10)
+            {
+                dir3d = curve3D.DirectionAt(par3d < 0.5 ? par3d + offset : par3d - offset);
+            }
             // Punkt auf der Fläche und Richtung im Raum:
             // wie drückt sich diese Raumrichtung in diru und dirv aus
             GeoPoint loc;
@@ -925,7 +931,7 @@ namespace CADability
             Matrix m = DenseMatrix.OfColumnArrays(diru, dirv, diru ^ dirv);
             Vector b = new DenseVector(dir3d);
             Vector s = (Vector)m.Solve(b);
-            if (s.IsValid())
+            if (s.IsValid() && (s[0] != 0.0 || s[1] != 0.0))
             {   // what about the length? Added the .Normalized, because in "HyperCube Evolution - Double Z motor 1.stp" the direction length is definitely wrong
                 dir = (endParam - startParam) * new GeoVector2D(s[0], s[1]).Normalized;
             }

@@ -25,11 +25,11 @@ For DWG/DXF handling CADability builds [ACadSharp](https://github.com/FriendsOfC
 
 or, in an existing clone, run `git submodule update --init --recursive` before building.
 
-Here is a quick overview of the [organizational classes](https://sofagh.github.io/CADability/CADabilityDoc/articles/orgclass.html).
+Here is a quick overview of the [organizational classes](https://friendsofcadability.github.io/CADability/CADabilityDoc/articles/orgclass.html).
 
-This is an overview of the CAD [database](https://sofagh.github.io/CADability/CADabilityDoc/articles/database.html), the geometrical entities that make up a model.
+This is an overview of the CAD [database](https://friendsofcadability.github.io/CADability/CADabilityDoc/articles/database.html), the geometrical entities that make up a model.
 
-And this is the [complete table of contents](https://sofagh.github.io/CADability/CADabilityDoc/api/toc.html).
+And this is the [complete table of contents](https://friendsofcadability.github.io/CADability/CADabilityDoc/api/toc.html).
 
 License: CADability uses some open source code copied into it source code:
 - [ACadSharp](https://github.com/FriendsOfCADability/ACadSharp) (built from source as a git submodule): Copyright (c) 2026 Albert Domenech, MIT license

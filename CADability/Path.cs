@@ -2320,10 +2320,10 @@ namespace CADability.GeoObject
             {
                 using (ChangingAttribute.Create(this, colorDef))
                 {
-                    colorDef = value;
+                    colorDef = ColorDefForOwner(value);
                     if (subCurves != null) for (int i = 0; i < subCurves.Length; ++i)
                     {
-                        (subCurves[i] as IColorDef).ColorDef = value;
+                        (subCurves[i] as IColorDef).ColorDef = colorDef;
                     }
                 }
             }

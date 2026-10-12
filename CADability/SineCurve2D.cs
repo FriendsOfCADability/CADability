@@ -1,4 +1,6 @@
-﻿using System;
+﻿using MathNet.Numerics.LinearAlgebra;
+using MathNet.Numerics.Optimization;
+using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 
@@ -33,6 +35,91 @@ namespace CADability.Curve2D
         /// point of this curve. Negative when the curve is reversed.
         /// </summary>
         public double UDiff => udiff;
+        /// <summary>
+        /// Creates the sine curve with the period 2*pi, which starts at <paramref name="p1"/>, ends at <paramref name="p4"/>
+        /// and passes (in the least squares sense) through <paramref name="p2"/> and <paramref name="p3"/>:
+        /// y == a*sin(x-x0)+y0. This is how a planar section of a cylinder (an ellipse) looks like in the parameter
+        /// system of the cylinder. Returns null, if the points cannot be fitted.
+        /// </summary>
+        public static SineCurve2D Create(GeoPoint2D p1, GeoPoint2D p2, GeoPoint2D p3, GeoPoint2D p4)
+        {
+            if (Math.Abs(p4.x - p1.x) < 1e-14) return null; // x would be constant
+            (double a, double b, double c, double x0, double y0, NonlinearMinimizationResult result) = Fit4Points(p1, p2, p3, p4);
+            if (result.ReasonForExit != ExitCondition.Converged && result.ReasonForExit != ExitCondition.RelativePoints
+                && result.ReasonForExit != ExitCondition.RelativeGradient) return null;
+            if (double.IsNaN(a) || double.IsNaN(x0) || double.IsNaN(y0)) return null;
+            return new SineCurve2D(c, b, new ModOp2D(1, 0, x0, 0, a, y0));
+        }
+        /// <summary>
+        /// Fits f(u)=(b*u+c+x0, a*sin(b*u+c)+y0) with u in [0,1], u=0 hits p1, u=1 hits p4.
+        /// Assumes the 4 points lie on such a curve.
+        /// </summary>
+        private static (double a, double b, double c, double x0, double y0, NonlinearMinimizationResult result)
+            Fit4Points(GeoPoint2D p1, GeoPoint2D p2, GeoPoint2D p3, GeoPoint2D p4)
+        {
+            var xs = Vector<double>.Build.Dense(new[] { p1.x, p2.x, p3.x, p4.x });
+            var ys = Vector<double>.Build.Dense(new[] { p1.y, p2.y, p3.y, p4.y });
+
+            // Endpoint constraint u=0 -> p1, u=1 -> p4 implies:
+            double b = p4.x - p1.x;
+
+            // Parameter vector p = [a, x0, y0]
+            Func<Vector<double>, Vector<double>, Vector<double>> values =
+                (p, x) =>
+                {
+                    double a = p[0], x0 = p[1], y0 = p[2];
+                    var yhat = Vector<double>.Build.Dense(x.Count);
+                    for (int i = 0; i < x.Count; i++)
+                        yhat[i] = a * Math.Sin(x[i] - x0) + y0;
+                    return yhat;
+                };
+
+            // Jacobian: rows = data points (4), cols = parameters (3)
+            // dy/da  = sin(x-x0)
+            // dy/dx0 = -a*cos(x-x0)
+            // dy/dy0 = 1
+            Func<Vector<double>, Vector<double>, Matrix<double>> jacobian =
+                (p, x) =>
+                {
+                    double a = p[0], x0 = p[1];
+                    var J = Matrix<double>.Build.Dense(x.Count, 3);
+                    for (int i = 0; i < x.Count; i++)
+                    {
+                        double t = x[i] - x0;
+                        J[i, 0] = Math.Sin(t);
+                        J[i, 1] = -a * Math.Cos(t);
+                        J[i, 2] = 1.0;
+                    }
+                    return J;
+                };
+
+            var objective = ObjectiveFunction.NonlinearModel(values, jacobian, xs, ys);
+
+            // initial guess
+            double y0Guess = (p1.y + p2.y + p3.y + p4.y) / 4.0;
+            double ymin = Math.Min(Math.Min(p1.y, p2.y), Math.Min(p3.y, p4.y));
+            double ymax = Math.Max(Math.Max(p1.y, p2.y), Math.Max(p3.y, p4.y));
+            double aGuess = 0.5 * (ymax - ymin);
+            if (Math.Abs(aGuess) < 1e-12) aGuess = 1.0;
+            double x0Guess = p1.x; // often fine; LM will refine
+
+            var initialGuess = Vector<double>.Build.Dense(new[] { aGuess, x0Guess, y0Guess });
+
+            var lm = new LevenbergMarquardtMinimizer(
+                initialMu: 1e-3,
+                gradientTolerance: 1e-15,
+                stepTolerance: 1e-15,
+                functionTolerance: 1e-15,
+                maximumIterations: 50);
+
+            var res = lm.FindMinimum(objective, initialGuess);
+
+            double ra = res.MinimizingPoint[0];
+            double rx0 = res.MinimizingPoint[1];
+            double ry0 = res.MinimizingPoint[2];
+            double c = p1.x - rx0; // because x(0)=c+x0 = X1
+            return (ra, b, c, rx0, ry0, res);
+        }
         /// <summary>
         /// Shifts this curve along its sine wave so that it starts at <paramref name="p2d"/>, which is
         /// expected to lie on the curve. NOTE: the parameter span is kept, so the END POINT MOVES BY THE

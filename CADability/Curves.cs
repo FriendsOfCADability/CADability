@@ -766,10 +766,22 @@ namespace CADability.GeoObject
             {
                 addTo.Remove(toApproximate);
                 IGeoObject go = app;
-                go.CopyAttributes(toApproximate);
+                CopyAttributesToApproximation(go, toApproximate);
                 addTo.Add(go);
                 soa.SetSelectedObjects(new GeoObjectList(go));
             }
+        }
+        /// <summary>
+        /// Gives the approximation of a curve the attributes of the original curve. An approximation is often a
+        /// <see cref="Path"/> of new lines and arcs, and a path paints its curves with their own colors. New lines come
+        /// with the default color black, which <see cref="IGeoObject.CopyAttributes"/> does not overwrite (it only fills
+        /// in curves without a color), so the approximated path was painted black (issue #249). The color of the
+        /// original is therefore set for the whole path, including its curves.
+        /// </summary>
+        internal static void CopyAttributesToApproximation(IGeoObject approximation, IGeoObject original)
+        {
+            approximation.CopyAttributes(original);
+            if (approximation is Path path && original is Attribute.IColorDef cd && cd.ColorDef != null) path.ColorDef = cd.ColorDef;
         }
 
         internal static bool SameGeometry(ICurve curve1, ICurve curve2, double precision, out bool reverse)

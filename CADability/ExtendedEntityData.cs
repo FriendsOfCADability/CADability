@@ -61,8 +61,35 @@ namespace CADability.DXF
             List<object> values = data.GetProperty<List<object>>("Values");
             for (int i = 0; i < keys.Count; i++)
             {
-                Data.Add(new KeyValuePair<XDataCode, object>((XDataCode)(int)(double)(keys[i]), values[i]));
+                XDataCode code = (XDataCode)(int)(double)(keys[i]);
+                Data.Add(new KeyValuePair<XDataCode, object>(code, RestoreValueType(code, values[i])));
             }
+        }
+
+        // JSON only knows numbers and strings, so every integer comes back as a double and a
+        // control string as a one character string. Give them back the types the DXF/DWG import
+        // stores, because the DXF export only accepts those: it wrote a 16 bit integer that
+        // had been read back from a cdb file as 0.
+        private static object RestoreValueType(XDataCode code, object value)
+        {
+            switch (code)
+            {
+                case XDataCode.Int16:
+                    if (value is double d16) return (short)d16;
+                    break;
+                case XDataCode.Int32:
+                    if (value is double d32) return (int)d32;
+                    break;
+                case XDataCode.LayerName:
+                case XDataCode.DatabaseHandle:
+                    // ACadSharp gives both as the handle of the referenced object
+                    if (value is double handle) return (ulong)handle;
+                    break;
+                case XDataCode.ControlString:
+                    if (value is string s && s.Length == 1) return s[0];
+                    break;
+            }
+            return value;
         }
     }
 }

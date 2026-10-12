@@ -579,12 +579,11 @@ namespace CADability.Curve2D
         {
             get
             {
-                // siehe auch http://en.wikipedia.org/wiki/Ellipse,  A good approximation is Ramanujan's:
-                if (Math.Abs(sweepPar) < 1e-2) return Geometry.Dist(StartPoint, EndPoint);
-                // diese Länge ist ziemlich genau, meist so 5 Stellen identisch mit der von OCas berechneten
-                ICurve2D approx = this.Approximate(false, -Math.Abs(sweepPar) / Math.PI * 36); // in ca. 5° Schritte
-                return approx.Length;
-                // wir dürfen nicht ocas verwenden (wg. BackgroungThread)
+                // the exact elliptic integral: the polygon through points 5 degrees apart, which was used here,
+                // is about 0.07% too short for an ellipse with axes 1:1.4 (a miter cut at 45 degrees)
+                // fromUnitCircle maps the unit circle to perpendicular axes with the lengths of majorAxis and
+                // minorAxis (or to the unit circle itself, when one of them is degenerate)
+                return ArcLength.OfEllipse(majorAxis * majorAxis, minorAxis * minorAxis, 0.0, startPar, sweepPar);
             }
         }
         /// <summary>
@@ -708,36 +707,10 @@ namespace CADability.Curve2D
         /// <returns></returns>
         public override ICurve2D GetModified(ModOp2D m)
         {
-#if DEBUG
-            ////DebuggerContainer dc = new DebuggerContainer();
-            ////GeoPoint[] tst = new GeoPoint[10];
-            ////for (int i = 0; i < 10; i++)
-            ////{
-            ////    tst[i] = new GeoPoint(PointAt(i / 9.0));
-            ////}
-            ////Polyline pl = Polyline.Construct();
-            ////try
-            ////{
-            ////    pl.SetPoints(tst, false);
-            ////    dc.Add(pl, 0);
-            ////}
-            ////catch { }
-            ////EllipseArc2D dbg = EllipseArc2D.Create(m * center, m * majorAxis, m * minorAxis, m * StartPoint, m * EndPoint, counterClock);
-            ////for (int i = 0; i < 10; i++)
-            ////{
-            ////    tst[i] = new GeoPoint(dbg.PointAt(i / 9.0));
-            ////}
-            ////pl = Polyline.Construct();
-            ////try
-            ////{
-            ////    pl.SetPoints(tst, false);
-            ////    dc.Add(pl, 1);
-            ////}
-            ////catch { }
-#endif
-            EllipseArc2D res = EllipseArc2D.Create(m * center, m * majorAxis, m * minorAxis, m * StartPoint, m * EndPoint, counterClock);
-            if (Math.Abs(res.sweepPar) < 1e-6 && Math.Abs(this.sweepPar) > Math.PI * 2.0 - 1e-6) res.sweepPar = this.sweepPar;
-            return res;
+            // a degenerate ellipse has no fromUnitCircle (it is the identity)
+            if (majorAxis.IsNullVector() || minorAxis.IsNullVector()) return EllipseArc2D.Create(m * center, m * majorAxis, m * minorAxis, m * StartPoint, m * EndPoint, counterClock);
+            // the arc is the image of an arc of the unit circle under fromUnitCircle
+            return Circle2D.ModifiedArc(m * fromUnitCircle, GeoPoint2D.Origin, 1.0, startPar, sweepPar, false);
         }
         /// <summary>
         /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.GetFused (ICurve2D, double)"/>

@@ -212,11 +212,16 @@ namespace CADability.Forms
         }
         public PaintToOpenGL(double precision = 1e-6)
         {
-            try
-            {   // hier gab es noch keinen OpenGL Aufruf, einmal CheckError nullt diesen
-                CheckError(true);
-            }
-            catch { }
+            // having a CheckError here leads to an AccessViolationException,
+            // if two threads call PaintToBitmap at the same time
+            // 
+            //try
+            //{   // hier gab es noch keinen OpenGL Aufruf, einmal CheckError nullt diesen
+
+            //    CheckError(true);
+            //}
+            //catch { }
+
             if (MainThread == null) MainThread = Thread.CurrentThread;
             this.precision = precision;
             paintSurfaces = true;
@@ -2199,7 +2204,6 @@ namespace CADability.Forms
                 {
                     for (int i = 0; i < toDelete.Count; ++i)
                     {
-                        System.Diagnostics.Debug.WriteLine($"Delete List. Count:{openLists.Count}");
 #if DEBUG
                         //System.Diagnostics.Trace.WriteLine("----- OpenGl List Nr.: " + toDelete[i].ToString());
 #endif

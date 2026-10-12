@@ -2485,9 +2485,9 @@ namespace CADability
         {
             string filter =
                 StringTable.GetString("File.Dxf.Filter") + "|" +
+                StringTable.GetString("File.Dwg.Filter") + "|" +
                 StringTable.GetString("File.STEP.Filter") + "|" +
-                StringTable.GetString("File.STL.Filter") + "|" +
-                StringTable.GetString("File.Html.Filter");
+                StringTable.GetString("File.STL.Filter");
             int filterIndex = lastFileType;
             string filename = null;
             if (UIService.ShowSaveFileDlg("MenuId.Export", StringTable.GetString("MenuId.Export"), filter, ref filterIndex, ref filename) == Substitutes.DialogResult.OK)

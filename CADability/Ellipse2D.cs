@@ -535,7 +535,11 @@ namespace CADability.Curve2D
         /// <returns></returns>
         public override ICurve2D GetModified(ModOp2D m)
         {
-            return new Ellipse2D(m * center, m * majorAxis, m * minorAxis); // Hauptachsentransformation im Konstruktor
+            // a degenerate ellipse has no fromUnitCircle (it is the identity)
+            if (majorAxis.IsNullVector() || minorAxis.IsNullVector()) return new Ellipse2D(m * center, m * majorAxis, m * minorAxis);
+            // the ellipse is the image of the unit circle under fromUnitCircle, PointAt runs backwards around it in these cases
+            double sweep = counterClock == fromUnitCircle.Determinant < 0 ? -2.0 * Math.PI : 2.0 * Math.PI;
+            return Circle2D.ModifiedArc(m * fromUnitCircle, GeoPoint2D.Origin, 1.0, 0.0, sweep, true);
         }
         /// <summary>
         /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.PositionOf (GeoPoint2D)"/>
@@ -547,7 +551,7 @@ namespace CADability.Curve2D
             GeoPoint2D p0 = toUnitCircle * p;
             double a = Math.Atan2(p0.y, p0.x);
             if (a < 0.0) a += 2.0 * Math.PI;
-            if (!counterClock) a = 2.0 * Math.PI - a;
+            if (counterClock == fromUnitCircle.Determinant < 0) a = 2.0 * Math.PI - a; // the same as in PointAt
             return a / (2.0 * Math.PI);
         }
         internal double ParamOf(GeoPoint2D p)
@@ -763,12 +767,11 @@ namespace CADability.Curve2D
         {
             get
             {
-                // Umfang der Ellipse gemäß http://mathworld.wolfram.com/Ellipse.html
-                double a = majorAxis.Length;
-                double b = minorAxis.Length;
-                double h = (a - b) / (a + b);
-                h = h * h;
-                return Math.PI * (a + b) * (1 + (3 * h) / (10 + Math.Sqrt(4 - 3 * h)));
+                // the exact circumference, Ramanujan's approximation, which was used here, has a relative error
+                // which grows with the eccentricity
+                // fromUnitCircle maps the unit circle to perpendicular axes with the lengths of majorAxis and
+                // minorAxis (or to the unit circle itself, when one of them is degenerate)
+                return ArcLength.OfEllipse(majorAxis * majorAxis, minorAxis * minorAxis, 0.0, 0.0, 2.0 * Math.PI);
             }
         }
         public override double Sweep

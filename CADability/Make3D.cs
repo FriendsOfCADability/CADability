@@ -70,9 +70,10 @@ namespace CADability.GeoObject
             throw new NotImplementedException();
         }
         /// <summary>
-        /// Creates a <see cref="Solid"/>, a <see cref="Shell"/> or a <see cref="Face"/> by rotating a <see cref="Path"/>, a <see cref="Face"/>
-        /// or a <see cref="Shell"/> around a given axis. Rotating a path yields a shell, rotating a face or a shell
-        /// returns a <see cref="Solid"/>. Rotating a different type of <see cref="IGeoObject"/> returns null.
+        /// Creates a <see cref="Shell"/> or a <see cref="Solid"/> by rotating a <see cref="Path"/>, a curve or a <see cref="Face"/>
+        /// around a given axis. Rotating a path or a curve yields the shell of the rotated curves, also when the path is
+        /// closed. Rotating a face yields a <see cref="Solid"/>. Rotating a different type of <see cref="IGeoObject"/> returns
+        /// null, as does a rotation that fails.
         /// </summary>
         /// <param name="faceShellOrPath">object to rotate</param>
         /// <param name="location">a point on the axis</param>
@@ -82,26 +83,20 @@ namespace CADability.GeoObject
         /// <returns>the created solid or shell</returns>
         public static IGeoObject MakeRevolution(IGeoObject faceShellOrPath, GeoPoint location, GeoVector direction, double sweep, Project project)
         {
-#if DEBUG
-            if (faceShellOrPath is Face)
+            Axis axis = new Axis(location, direction);
+            IGeoObject res = null;
+            if (faceShellOrPath is Face face)
             {
-                Path pth = Path.Construct();
-                Face fc = (faceShellOrPath as Face);
-                for (int i = 0; i < fc.OutlineEdges.Length; i++)
-                {
-                    if (fc.OutlineEdges[i].Forward(fc)) pth.Add(fc.OutlineEdges[i].Curve3D.Clone());
-                    else
-                    {
-                        ICurve crv = fc.OutlineEdges[i].Curve3D.Clone();
-                        crv.Reverse();
-                        pth.Add(crv);
-                    }
-                }
-                IGeoObject res = Rotate(pth, new Axis(location, direction), sweep, SweepAngle.Deg(0.0), project);
-                if (res != null) return res;
+                res = Rotate(face, axis, sweep, SweepAngle.Deg(0.0), project, false);
             }
-#endif
-            throw new NotImplementedException();
+            else if (faceShellOrPath is ICurve)
+            {   // a path or a single curve
+                res = Rotate(faceShellOrPath, axis, sweep, SweepAngle.Deg(0.0), project, true);
+                // a closed path rotated a full turn encloses a volume, but this method makes the shell of the curves
+                if (res is Solid solid && solid.Shells.Length == 1) res = solid.Shells[0].Clone();
+            }
+            if (res != null && project != null) project.SetDefaults(res);
+            return res;
         }
         public static Solid MakePrismMiter(SimpleShape outline, GeoPoint[] path, GeoVector topDirection, GeoVector mainDirection, GeoVector startMiter, GeoVector endMiter)
         {
@@ -956,6 +951,8 @@ namespace CADability.GeoObject
 
         public static IGeoObject MakePipe(IGeoObject faceShellOrPath, Path along, Project project)
         {
+            faceShellOrPath = SplitSplinesAtCorners(faceShellOrPath);
+            along = (Path)SplitSplinesAtCorners(along);
             if (faceShellOrPath is Path)
             {
                 Path path = (faceShellOrPath as Path);
@@ -2364,16 +2361,23 @@ namespace CADability.GeoObject
                 vmax = tmp;
             }
             Face f1 = Face.MakeFace(cs, new SimpleShape(Border.MakeRectangle(0, Math.PI, vmin, vmax)));
-            Face f2 = Face.MakeFace(cs, new SimpleShape(Border.MakeRectangle(Math.PI, Math.PI * 2, vmin, vmax)));
-            Plane pln1 = new Plane(location, directionX, directionY);
-            Plane pln2 = new Plane(location + directionZ, directionX, directionY);
-            Border bdr1 = Border.MakeCircle(GeoPoint2D.Origin, radius1);
-            Border bdr2 = Border.MakeCircle(GeoPoint2D.Origin, radius2);
-            bdr1.SplitSingleCurve(); // makes two half circles, splitted at 180°
-            bdr2.SplitSingleCurve();
-            Face f3 = Face.MakeFace(new PlaneSurface(pln1), new SimpleShape(bdr1));
-            Face f4 = Face.MakeFace(new PlaneSurface(pln2), new SimpleShape(bdr2));
-            Shell[] sh = SewFaces(new Face[] { f1, f2, f3, f4 });
+            // each face needs its own surface: reversing the orientation of a face reverses its surface
+            Face f2 = Face.MakeFace(cs.Clone(), new SimpleShape(Border.MakeRectangle(Math.PI, Math.PI * 2, vmin, vmax)));
+            List<Face> faces = new List<Face> { f1, f2 };
+            // a pointed cone (radius 0 at one end) has no cap at its apex
+            if (radius1 > 0.0)
+            {
+                Border bdr1 = Border.MakeCircle(GeoPoint2D.Origin, radius1);
+                bdr1.SplitSingleCurve(); // makes two half circles, splitted at 180°
+                faces.Add(Face.MakeFace(new PlaneSurface(new Plane(location, directionX, directionY)), new SimpleShape(bdr1)));
+            }
+            if (radius2 > 0.0)
+            {
+                Border bdr2 = Border.MakeCircle(GeoPoint2D.Origin, radius2);
+                bdr2.SplitSingleCurve();
+                faces.Add(Face.MakeFace(new PlaneSurface(new Plane(location + directionZ, directionX, directionY)), new SimpleShape(bdr2)));
+            }
+            Shell[] sh = SewFaces(faces.ToArray());
             if (sh.Length == 1) return Solid.MakeSolid(sh[0]);
             return null;
         }
@@ -2382,7 +2386,8 @@ namespace CADability.GeoObject
             SphericalSurface ss = new SphericalSurface(location, radius * GeoVector.XAxis, radius * GeoVector.YAxis, radius * GeoVector.ZAxis);
             Border bdr = Border.MakeRectangle(0, Math.PI, -Math.PI / 2, Math.PI / 2);
             Face f1 = Face.MakeFace(ss, new SimpleShape(Border.MakeRectangle(0, Math.PI, -Math.PI / 2, Math.PI / 2)));
-            Face f2 = Face.MakeFace(ss, new SimpleShape(Border.MakeRectangle(Math.PI, Math.PI * 2, -Math.PI / 2, Math.PI / 2)));
+            // each face needs its own surface: reversing the orientation of a face reverses its surface
+            Face f2 = Face.MakeFace(ss.Clone(), new SimpleShape(Border.MakeRectangle(Math.PI, Math.PI * 2, -Math.PI / 2, Math.PI / 2)));
             Shell[] sh = SewFaces(new Face[] { f1, f2 });
             if (sh.Length == 1) return Solid.MakeSolid(sh[0]);
             return null;
@@ -2407,9 +2412,10 @@ namespace CADability.GeoObject
             ToroidalSurface ts = new ToroidalSurface(location, directionX, directionY, normal, radius1, radius2);
             Face[] fcs = new Face[4];
             fcs[0] = Face.MakeFace(ts, new BoundingRect(0, 0, Math.PI, Math.PI));
-            fcs[1] = Face.MakeFace(ts, new BoundingRect(0, Math.PI, Math.PI, 2 * Math.PI));
-            fcs[2] = Face.MakeFace(ts, new BoundingRect(Math.PI, 0, 2 * Math.PI, Math.PI));
-            fcs[3] = Face.MakeFace(ts, new BoundingRect(Math.PI, Math.PI, 2 * Math.PI, 2 * Math.PI));
+            // each face needs its own surface: reversing the orientation of a face reverses its surface
+            fcs[1] = Face.MakeFace(ts.Clone(), new BoundingRect(0, Math.PI, Math.PI, 2 * Math.PI));
+            fcs[2] = Face.MakeFace(ts.Clone(), new BoundingRect(Math.PI, 0, 2 * Math.PI, Math.PI));
+            fcs[3] = Face.MakeFace(ts.Clone(), new BoundingRect(Math.PI, Math.PI, 2 * Math.PI, 2 * Math.PI));
             Shell[] shell = SewFaces(fcs);
             if (shell.Length == 1) return Solid.MakeSolid(shell[0]);
             return null;
@@ -2572,6 +2578,37 @@ namespace CADability.GeoObject
             return res;
         }
         /// <summary>
+        /// A spline with corners as a path of its smooth pieces (see <see cref="BSpline.SplitAtCorners"/>), also inside a
+        /// path. A surface made from a curve with a kink would have that kink inside one face. Other objects are returned
+        /// unchanged.
+        /// </summary>
+        internal static IGeoObject SplitSplinesAtCorners(IGeoObject go)
+        {
+            if (go is BSpline bsp)
+            {
+                ICurve[] parts = bsp.SplitAtCorners();
+                if (parts.Length < 2) return go;
+                Path res = Path.Construct();
+                res.Set(parts);
+                res.CopyAttributes(bsp);
+                return res;
+            }
+            if (go is Path path && path.Curves.Any(c => c is BSpline b && b.CornerParameters().Count > 0))
+            {
+                List<ICurve> parts = new List<ICurve>();
+                foreach (ICurve curve in path.Curves)
+                {
+                    if (curve is BSpline b) parts.AddRange(b.SplitAtCorners());
+                    else parts.Add(curve.Clone());
+                }
+                Path res = Path.Construct();
+                res.Set(parts.ToArray());
+                res.CopyAttributes(path);
+                return res;
+            }
+            return go;
+        }
+        /// <summary>
         /// Extrudes the provided object <paramref name="faceShellPathCurve"/> along the <paramref name="extension"/>.
         /// </summary>
         /// <param name="faceShellPathCurve">Object to extrude, may be a <see cref="Face"/>, <see cref="Shell"/>, <see cref="Path"/> or <see cref="ICurve"/> object</param>
@@ -2580,6 +2617,7 @@ namespace CADability.GeoObject
         /// <returns>The extruded face, shell or solid, null if extrusion not possible</returns>
         static public IGeoObject Extrude(IGeoObject faceShellPathCurve, GeoVector extension, Project project)
         {
+            faceShellPathCurve = SplitSplinesAtCorners(faceShellPathCurve);
             if (faceShellPathCurve is Path || faceShellPathCurve is Polyline)
             {   // Pfad vor der Kurve abhandeln, denn Path ist auch ICurve
                 Path path;
@@ -2665,6 +2703,15 @@ namespace CADability.GeoObject
 
         static public IGeoObject Rotate(IGeoObject faceShellPathCurve, Axis axis, SweepAngle rotation, SweepAngle offset, Project project)
         {
+            return Rotate(faceShellPathCurve, axis, rotation, offset, project, false);
+        }
+        /// <summary>
+        /// Rotates a face, a path or a curve around <paramref name="axis"/>. A closed planar path or curve becomes a face
+        /// first and the result a solid, unless <paramref name="pathAsShell"/> is set: then only the path is rotated and the
+        /// result is the shell (or face) of the rotated curves, which is also what an open or not planar path gives.
+        /// </summary>
+        private static IGeoObject Rotate(IGeoObject faceShellPathCurve, Axis axis, SweepAngle rotation, SweepAngle offset, Project project, bool pathAsShell)
+        {
             Face originalFace = faceShellPathCurve as Face;
             if (faceShellPathCurve is Face)
             {
@@ -2680,6 +2727,7 @@ namespace CADability.GeoObject
                 pth.Set(crvs);
                 faceShellPathCurve = pth;
             }
+            faceShellPathCurve = SplitSplinesAtCorners(faceShellPathCurve);
             if (faceShellPathCurve is Ellipse && !(faceShellPathCurve as Ellipse).IsArc)
             {
                 Path pth = Path.Construct();
@@ -2721,7 +2769,7 @@ namespace CADability.GeoObject
                 }
                 path.Flatten(); // Flatten wirft zu kurze segmente hoffentlich raus
                 bool fullRotation = rotation.IsCloseTo(Math.PI * 2.0);
-                if (originalFace == null)
+                if (originalFace == null && !pathAsShell)
                 {
                     if (path.GetPlanarState() == PlanarState.Planar && path.IsClosed)
                     {
@@ -2739,14 +2787,43 @@ namespace CADability.GeoObject
                     }
                 }
 
-                if (originalFace == null) return null;
+                if (originalFace == null && !pathAsShell) return null;
 
                 Edge[][] sideEdges;
                 SweepAngle[] sweepAngles;
                 SweepAngle[] offsetAngles;
                 List<Face> faces = new List<Face>(path.CurveCount + 2);
                 List<Edge> allSideEdges = new List<Edge>();
-                if (!fullRotation)
+                if (originalFace == null)
+                {   // only the path is rotated: the edges at the start and at the end of the rotation are its curves,
+                    // there are no faces to close the ends
+                    Edge[] PathEdges(SweepAngle angle)
+                    {
+                        ModOp m = ModOp.Rotate(axis.Location, axis.Direction, angle);
+                        Edge[] res = new Edge[path.CurveCount];
+                        for (int i = 0; i < res.Length; i++) res[i] = new Edge(null, path.Curve(i).CloneModified(m));
+                        return res;
+                    }
+                    if (!fullRotation)
+                    {
+                        Edge[] end = PathEdges(offset + rotation);
+                        Edge[] start = PathEdges(offset);
+                        sideEdges = new Edge[][] { end, start };
+                        sweepAngles = new SweepAngle[] { rotation };
+                        offsetAngles = new SweepAngle[] { offset };
+                    }
+                    else
+                    {   // full rotation, split into two parts as below
+                        Edge[] half = PathEdges(offset + Math.PI);
+                        Edge[] start = PathEdges(offset);
+                        sideEdges = new Edge[][] { half, start, half };
+                        sweepAngles = new SweepAngle[] { Math.PI, Math.PI };
+                        offsetAngles = new SweepAngle[] { offset, offset + Math.PI };
+                    }
+                    allSideEdges.AddRange(sideEdges[0]);
+                    allSideEdges.AddRange(sideEdges[1]);
+                }
+                else if (!fullRotation)
                 {
                     Face side1 = originalFace.Clone() as Face;
                     Face side2 = originalFace.Clone() as Face;
@@ -3082,7 +3159,7 @@ namespace CADability.GeoObject
         }
         static public Solid[] ImportSTL(string fileName)
         {
-            using (BinaryReader reader = new BinaryReader(File.Open(fileName, FileMode.Open)))
+            using (BinaryReader reader = new BinaryReader(File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.Read)))
             {
                 byte[] head = reader.ReadBytes(5);
                 if (head[0] == (byte)('s')

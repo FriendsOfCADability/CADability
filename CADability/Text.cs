@@ -1,4 +1,4 @@
-﻿using CADability.Actions;
+using CADability.Actions;
 using CADability.Attribute;
 using CADability.Curve2D;
 using CADability.Shapes;
@@ -15,6 +15,7 @@ using System.Collections.Generic;
 //#endif
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading;
 
@@ -519,7 +520,8 @@ namespace CADability.GeoObject
         }
         ~FontCache()
         {
-            Gdi.DeleteDC(hDC);
+            // the constructor throws where there is no GDI (e.g. on Linux), and an exception in a finalizer ends the process
+            if (hDC != IntPtr.Zero) Gdi.DeleteDC(hDC);
         }
         public Path2D[] GetOutline2D(string fontName, int fontStyle, char c, out double width)
         {
@@ -959,22 +961,10 @@ namespace CADability.GeoObject
         private LineAlignMode lineAlignment;
         // private IGeoObject[] cachedDisplayItems;
         private static HashSet<string> fontFamilyNames;
-        internal static HashSet<string> FontFamilyNames
-        {
-            get
-            {
-                if (fontFamilyNames == null)
-                {
-                    FontFamily[] ff = FontFamily.Families;
-                    fontFamilyNames = new HashSet<string>();
-                    for (int i = 0; i < ff.Length; i++)
-                    {
-                        fontFamilyNames.Add(ff[i].Name.ToUpper());
-                    }
-                }
-                return fontFamilyNames;
-            }
-        }
+        internal static HashSet<string> FontFamilyNames =>
+            LazyInitializer.EnsureInitialized(ref fontFamilyNames, () =>
+                new HashSet<string>(FontFamily.Families.Select(f => f.Name.ToUpper())));
+
         #region polymorph construction
         public delegate Text ConstructionDelegate();
         public static ConstructionDelegate Constructor;
@@ -984,6 +974,7 @@ namespace CADability.GeoObject
             return new Text();
         }
         #endregion
+
         protected Text()
         {
             displayAsPath = Settings.GlobalSettings.GetIntValue("Font.DisplayMode", 1) == 1; // müsste nur einmal geladen werden, macht aber direkt bei der static Deklaration Probleme

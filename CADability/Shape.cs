@@ -1137,6 +1137,14 @@ namespace CADability.Shapes
         }
         public void Reduce(double precision)
         {
+            Reduce(precision, false);
+        }
+        /// <summary>
+        /// Like <see cref="Reduce(double)"/>, with <paramref name="keepExactCurves"/> splines and ellipses are kept
+        /// instead of approximated, see <see cref="Border.Reduce(double, bool)"/>.
+        /// </summary>
+        internal void Reduce(double precision, bool keepExactCurves)
+        {
             if (precision < 0)
             {
                 Reduce2D r2d = new Reduce2D();
@@ -1147,7 +1155,7 @@ namespace CADability.Shapes
             }
             else
             {
-                outline.Reduce(precision);
+                outline.Reduce(precision, keepExactCurves);
                 outline.ReduceDeadEnd(precision); // kann leer werden!
 
                 bool shrink = false;
@@ -1160,7 +1168,7 @@ namespace CADability.Shapes
                     }
                     else
                     {
-                        holes[j].Reduce(precision);
+                        holes[j].Reduce(precision, keepExactCurves);
                         holes[j].ReduceDeadEnd(precision);
                     }
                 }
@@ -2085,11 +2093,21 @@ namespace CADability.Shapes
         /// <returns>The shape, may be null if no shape could be created</returns>
         public static CompoundShape CreateFromList(GeoObjectList TheObjects, double maxGap, out Plane plane, bool partInPart = false)
         {
+            return CreateFromList(TheObjects, maxGap, out plane, partInPart, false);
+        }
+        /// <summary>
+        /// Like <see cref="CreateFromList(GeoObjectList, double, out Plane, bool)"/>. With <paramref name="keepExactCurves"/>
+        /// splines and ellipses stay what they are instead of being approximated by lines and arcs, which is what a
+        /// face needs, see <see cref="Border.Reduce(double, bool)"/>.
+        /// </summary>
+        internal static CompoundShape CreateFromList(GeoObjectList TheObjects, double maxGap, out Plane plane, bool partInPart, bool keepExactCurves)
+        {
             ArrayList curvesal = new ArrayList();
 
             foreach (IGeoObject go in TheObjects)
             {	// TODO: Blöcke auflösen!!!
-                ICurve cv = go as ICurve;
+                // a face needs edges that are smooth inside, so splines are split at their corners
+                ICurve cv = (keepExactCurves ? Make3D.SplitSplinesAtCorners(go) : go) as ICurve;
                 if (cv != null)
                 {
                     curvesal.Add(cv);
@@ -2115,7 +2133,7 @@ namespace CADability.Shapes
                 {
                     for (int i = 0; i < res.simpleShapes.Length; i++)
                     {
-                        res.simpleShapes[i].Reduce(maxGap);
+                        res.simpleShapes[i].Reduce(maxGap, keepExactCurves);
                     }
                 }
                 return res;

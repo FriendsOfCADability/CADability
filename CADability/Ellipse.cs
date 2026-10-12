@@ -1971,7 +1971,7 @@ namespace CADability.GeoObject
             {
                 using (ChangingAttribute.Create(this, colorDef))
                 {
-                    colorDef = value;
+                    colorDef = ColorDefForOwner(value);
                 }
             }
         }
@@ -2499,11 +2499,8 @@ namespace CADability.GeoObject
 		{
 			get
 			{
-				// the 2d curves solve this task already, is kind of an overkill
-				// but works fine
-				// oder: http://ca.geocities.com/web_sketches/ellipse_notes/ellipse_arc_length/ellipse_arc_length.html
-				ICurve2D c2d = GetProjectedCurve(this.plane);
-				return c2d.Length;
+				// the radii are along the perpendicular axes DirectionX and DirectionY of the plane
+				return ArcLength.OfEllipse(majorRadius * majorRadius, minorRadius * minorRadius, 0.0, startParameter, sweepParameter);
 			}
 		}
 
@@ -2673,6 +2670,8 @@ namespace CADability.GeoObject
 
 		ICurve ICurve.Approximate(bool linesOnly, double maxError)
 		{
+			// an arc without sweep has no direction to approximate along
+			if (Math.Abs(sweepParameter) < Precision.epsa) return Line.TwoPoints(StartPoint, EndPoint);
 			if (this.IsCircle && !linesOnly)
 			{
 				// Kreise und -bögen durch Kreisbögen annähern ist Unsinn

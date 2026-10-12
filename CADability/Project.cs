@@ -1096,13 +1096,14 @@ namespace CADability
         }
 
         /// <summary>
-        /// Saves the project in a file with the given FileName.
-        /// If FileName is null, a SaveFileDialog is presented. Uses WriteToStream.
+        /// Saves the project in a file with the given FileName, in JSON format.
+        /// If FileName is null, a SaveFileDialog is presented.
         /// </summary>
         /// <param name="FileName">The file name</param>
         /// <returns>true, if successful, false if the user pressed escape in the SaveFileDialog</returns>
         public virtual bool WriteToFile(string FileName)
         {
+            // the json format is the only format we write, no more writing in binary ISerializable format
             if (FileName == null || FileName.Length == 0)
             {
                 int filterIndex = 0;
@@ -1156,10 +1157,10 @@ namespace CADability
         {
             try
             {
+                // copy the project through JSON: the binary serialization is not available on .NET 5 and later
                 MemoryStream ms = new MemoryStream();
-                WriteToStream(ms);
-                ms.Seek(0, SeekOrigin.Begin);
-                Project pr = Project.ReadFromStream(ms);
+                new JsonSerialize().ToStream(ms, this); // closes the stream
+                Project pr = Project.ReadFromJson(new MemoryStream(ms.ToArray()));
                 pr.UserData.Clear();
                 foreach (Model m in pr)
                 {
@@ -1186,12 +1187,62 @@ namespace CADability
             }
         }
         /// <summary>
-        /// Export the project in one of the following formats:
-        /// dxf, dwg, iges, step, vrml, stl, sat and xt (sat and xt must be licensed seperately) 
+        /// The DXF versions behind the choices of the setting "DxfDwg.Version", in the order of
+        /// "DxfDwg.Version.Values" in the string tables: 2.5, 2.6, 9, 10, 11/12, 13, 14, 2000,
+        /// 2004, 2007, 2010, 2013, 2018. ACadSharp cannot write the versions before AutoCAD 13,
+        /// they are <see cref="ACadVersion.Unknown"/> here. New versions are appended to the end
+        /// of the list, so that a stored selection keeps its meaning.
+        /// </summary>
+        private static readonly ACadVersion[] dxfDwgVersions = new ACadVersion[]
+        {
+            ACadVersion.Unknown, // 2.5
+            ACadVersion.Unknown, // 2.6
+            ACadVersion.Unknown, // 9
+            ACadVersion.Unknown, // 10
+            ACadVersion.Unknown, // 11/12
+            ACadVersion.AC1012,  // 13
+            ACadVersion.AC1014,  // 14
+            ACadVersion.AC1015,  // 2000
+            ACadVersion.AC1018,  // 2004
+            ACadVersion.AC1021,  // 2007
+            ACadVersion.AC1024,  // 2010
+            ACadVersion.AC1027,  // 2013
+            ACadVersion.AC1032,  // 2018
+        };
+        /// <summary>
+        /// The DXF version <see cref="Export"/> writes, from the setting "DxfDwg.Version" (DXF/DWG
+        /// Version in the export settings of the control center). Its default is AutoCAD 2000
+        /// (AC1015), the widest readership. AutoCAD 2010 (AC1024) is the first version whose DXF
+        /// knows the arc length dimension (ARC_DIMENSION). A choice ACadSharp cannot write falls
+        /// back to AutoCAD 2000.
+        /// </summary>
+        private static ACadVersion DxfExportVersion()
+        {
+            int selection = Settings.GlobalSettings.GetIntValue("DxfDwg.Version", 7);
+            if (selection >= 0 && selection < dxfDwgVersions.Length && dxfDwgVersions[selection] != ACadVersion.Unknown)
+                return dxfDwgVersions[selection];
+            Trace.WriteLine("dxf: setting DxfDwg.Version (selection " + selection.ToString() + ") is not a version that can be written, using AC1015");
+            return ACadVersion.AC1015;
+        }
+        /// <summary>
+        /// The DWG version <see cref="Export"/> writes: the version of <see cref="DxfExportVersion"/>, but at
+        /// least AutoCAD 2004 (AC1018). ACadSharp writes no DWG before AutoCAD 14, and before AutoCAD 2004 it
+        /// drops the polyface meshes, which are the export of faces, shells and solids. It cannot write
+        /// AutoCAD 2007 (AC1021) DWG either, so that becomes AutoCAD 2010 (AC1024).
+        /// </summary>
+        private static ACadVersion DwgExportVersion()
+        {
+            ACadVersion version = DxfExportVersion();
+            if (version < ACadVersion.AC1018) return ACadVersion.AC1018;
+            if (version == ACadVersion.AC1021) return ACadVersion.AC1024;
+            return version;
+        }
+        /// <summary>
+        /// Export the project in one of the following formats: cdb, dxf, dwg, step (or stp) and stl.
         /// </summary>
         /// <param name="fileName">Path and filename for the generated output file</param>
-        /// <param name="format">Format, one of the strings: dxf, dwg, iges, step, vrml, stl, sat, xt </param>
-        /// <returns>true on success</returns>
+        /// <param name="format">Format, one of the strings: cdb, dxf, dwg, step, stp, stl</param>
+        /// <returns>true, if the file was written, false for a format that cannot be exported (e.g. dxb, iges, html)</returns>
         public bool Export(string fileName, string format)
         {
             format = format.ToLower();
@@ -1199,15 +1250,17 @@ namespace CADability
             {
                 case "cdb": return WriteToFile(fileName);
                 case "html":
-                    return true;
+                    break; // not supported, ExportToWebGl needs a template that is not part of CADability
                 case "dxf":
-                    CADability.DXF.Export export = new DXF.Export(ACadVersion.AC1015);
+                    CADability.DXF.Export export = new DXF.Export(DxfExportVersion());
                     export.WriteToFile(this, fileName);
                     return true;
                 case "dwg":
+                    CADability.DXF.Export dwgExport = new DXF.Export(DwgExportVersion());
+                    dwgExport.WriteToFile(this, fileName, true);
                     return true;
                 case "dxb":
-                    return true;
+                    break;
                 case "igs":
                 case "iges":
                     break;
@@ -1215,13 +1268,13 @@ namespace CADability
                 case "stp":
                     ExportStep exportStep = new ExportStep();
                     exportStep.WriteToFile(fileName, this);
-                    break;
+                    return true;
                 case "vrml":
                 case "wrl":
                     break;
                 case "stl":
                     ExportToSTL(fileName);
-                    break;
+                    return true;
                 case "brep":
                     break;
                 case "sat":
@@ -1571,7 +1624,9 @@ namespace CADability
                 {
                     try
                     {
+#pragma warning disable CS0618 // reading the legacy binary format is what ReadFromStream is kept for
                         res = ReadFromStream(stream);
+#pragma warning restore CS0618
                     }
                     catch (ProjectOldVersionException)
                     {
@@ -1644,7 +1699,7 @@ namespace CADability
         private static Project ReadConvertedFile(string FileName, bool useProgress)
         {
             Project res = null;
-            FileStream stream = File.Open(FileName, FileMode.Open);
+            FileStream stream = File.Open(FileName, FileMode.Open, FileAccess.Read, FileShare.Read);
             useProgress = useProgress && !Settings.GlobalSettings.GetBoolValue("DontUse.WindowsForms", false);
             //ProgressFeedBack pf = null;
             //if (useProgress)
@@ -2120,7 +2175,7 @@ namespace CADability
         }
         public static object DeserializeObject(string fileName)
         {
-            Stream stream = File.Open(fileName, System.IO.FileMode.Open);
+            Stream stream = File.Open(fileName, System.IO.FileMode.Open, FileAccess.Read, FileShare.Read);
             BinaryFormatter formatter = new BinaryFormatter();
             object res = formatter.Deserialize(stream);
             stream.Close();
@@ -2229,6 +2284,9 @@ namespace CADability
                 catch (SerializationException)
                 {
                 }
+                catch (Exception e) when (IsSystemDrawingUnavailable(e))
+                {
+                }
             }
             base.resourceIdInternal = "ProjectSettings";
         }
@@ -2335,7 +2393,7 @@ namespace CADability
                     gdiViews = data.GetPropertyOrDefault<List<GDI2DView>>("GdiViews");
                 }
             }
-            catch (PlatformNotSupportedException) { }
+            catch (Exception e) when (IsSystemDrawingUnavailable(e)) { }
 #endif
             projectedModels = data.GetPropertyOrDefault<List<ProjectedModel>>("ProjectedModels");
             namedValues = data.GetPropertyOrDefault<NamedValuesProperty>("NamedValues");
@@ -2350,8 +2408,17 @@ namespace CADability
                     printDocument.DefaultPageSettings = data.GetPropertyOrDefault<PageSettings>("DefaultPageSettings");
                 }
             }
-            catch (PlatformNotSupportedException) { }
+            catch (Exception e) when (IsSystemDrawingUnavailable(e)) { }
             data.RegisterForSerializationDoneCallback(this);
+        }
+        /// <summary>
+        /// System.Drawing printing is only supported on Windows. Elsewhere the first use of a PrintDocument does not
+        /// throw the PlatformNotSupportedException itself but a TypeInitializationException of a printing class that
+        /// wraps it, so both mean that the printer settings cannot be restored and the project is read without them.
+        /// </summary>
+        private static bool IsSystemDrawingUnavailable(Exception e)
+        {
+            return e is PlatformNotSupportedException || (e is TypeInitializationException && e.GetBaseException() is PlatformNotSupportedException);
         }
         void IJsonSerializeDone.SerializationDone(JsonSerialize jsonSerialize)
         {

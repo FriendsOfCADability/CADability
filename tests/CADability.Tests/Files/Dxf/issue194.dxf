@@ -1,0 +1,238 @@
+999
+Reduced from TestHoles.dxf attached to issue #194: header, layers and entities only
+  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1015
+  0
+ENDSEC
+  0
+SECTION
+  2
+TABLES
+  0
+TABLE
+  2
+LTYPE
+ 70
+1
+  0
+LTYPE
+  2
+CONTINUOUS
+ 70
+0
+  3
+Solid line
+ 72
+65
+ 73
+0
+ 40
+0.0
+  0
+ENDTAB
+  0
+TABLE
+  2
+LAYER
+ 70
+3
+  0
+LAYER
+  2
+0
+ 70
+     0
+ 62
+     7
+  6
+Continuous
+  0
+LAYER
+  2
+Outer_Loop
+ 70
+     0
+ 62
+     7
+  6
+Continuous
+  0
+LAYER
+  2
+Interior_Loops
+ 70
+     0
+ 62
+     7
+  6
+Continuous
+  0
+ENDTAB
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+LINE
+100
+AcDbEntity
+  8
+Outer_Loop
+  6
+Continuous
+ 62
+     3
+370
+   211
+100
+AcDbLine
+ 10
+0.0
+ 20
+3.0
+ 30
+0.0
+ 11
+5.75
+ 21
+3.0
+ 31
+0.0
+  0
+ARC
+100
+AcDbEntity
+  8
+Outer_Loop
+  6
+Continuous
+ 62
+     3
+370
+   211
+100
+AcDbCircle
+ 10
+5.75
+ 20
+1.5
+ 30
+0.0
+ 40
+1.5
+100
+AcDbArc
+ 50
+270.0
+ 51
+90.0
+  0
+LINE
+100
+AcDbEntity
+  8
+Outer_Loop
+  6
+Continuous
+ 62
+     3
+370
+   211
+100
+AcDbLine
+ 10
+5.75
+ 20
+0.0
+ 30
+0.0
+ 11
+0.0
+ 21
+0.0
+ 31
+0.0
+  0
+ARC
+100
+AcDbEntity
+  8
+Outer_Loop
+  6
+Continuous
+ 62
+     3
+370
+   211
+100
+AcDbCircle
+ 10
+0.0
+ 20
+1.5
+ 30
+0.0
+ 40
+1.5
+100
+AcDbArc
+ 50
+90.0
+ 51
+270.0
+  0
+CIRCLE
+100
+AcDbEntity
+  8
+Interior_Loops
+  6
+Continuous
+ 62
+     3
+370
+   211
+100
+AcDbCircle
+ 10
+2.3125
+ 20
+1.5
+ 30
+0.0
+ 40
+0.2655
+  0
+CIRCLE
+100
+AcDbEntity
+  8
+Interior_Loops
+  6
+Continuous
+ 62
+     3
+370
+   211
+100
+AcDbCircle
+ 10
+6.3125
+ 20
+1.5
+ 30
+0.0
+ 40
+0.2655
+  0
+ENDSEC
+  0
+EOF

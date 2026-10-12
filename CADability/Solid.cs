@@ -939,12 +939,12 @@ namespace CADability.GeoObject
             {
                 using (ChangingAttribute.Create(this, colorDef))
                 {
-                    colorDef = value;
+                    colorDef = ColorDefForOwner(value);
                     if (shells != null)
                     {
                         for (int i = 0; i < shells.Length; ++i)
                         {
-                            shells[i].ColorDef = value;
+                            shells[i].ColorDef = colorDef;
                         }
                     }
                 }

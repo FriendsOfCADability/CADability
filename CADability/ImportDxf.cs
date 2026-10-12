@@ -13,6 +13,7 @@ using CADability.GeoObject;
 using CADability.Shapes;
 using CADability.Curve2D;
 using CADability.Attribute;
+using PlaneSurface = CADability.GeoObject.PlaneSurface;
 #if WEBASSEMBLY
 using CADability.WebDrawing;
 using Point = CADability.WebDrawing.Point;
@@ -34,6 +35,40 @@ namespace CADability.DXF
         private Dictionary<string, ColorDef> layerColorTable;
         private Dictionary<string, Attribute.Layer> layerTable;
         private IDxfProgress progress;
+        /// <summary>
+        /// Greater than zero while the entities of a block definition are converted. A ByBlock
+        /// color only has a meaning there: it is the color of the INSERT (or DIMENSION) that places
+        /// the block.
+        /// </summary>
+        private int blockDefinitionDepth;
+        /// <summary>
+        /// Stand-ins for the linetype and lineweight of block contents that are only known when the
+        /// block is placed: ByBlock, and ByLayer on layer "0". CADability has nothing like
+        /// <see cref="ColorDef.CDfromParent"/> for these, so they are not part of the project's lists
+        /// and are replaced in every placed copy of the block, see <see cref="ResolveLayerZero(GeoObject.Block, Entity)"/>.
+        /// </summary>
+        private readonly LinePattern byLayerPattern = new LinePattern("ByLayer"), byBlockPattern = new LinePattern("ByBlock");
+        private readonly LineWidth byLayerWidth = new LineWidth("ByLayer", 0.0), byBlockWidth = new LineWidth("ByBlock", 0.0);
+        /// <summary>
+        /// Line hatch styles with a stand-in line width, for pattern hatches in block definitions. Like the stand-ins
+        /// they are not part of the project.
+        /// </summary>
+        private readonly List<HatchStyleLines> standInHatchStyles = new List<HatchStyleLines>();
+        /// <summary>
+        /// Read from the setting "DxfDwg.ImportDimension" (Import Dimension in the export settings
+        /// of the control center): 0, "As Block", is the default, and a DIMENSION then keeps the
+        /// picture AutoCAD drew. With 1, "As Dimension", it is rebuilt as CADability's own
+        /// <see cref="GeoObject.Dimension"/>, which can be measured and edited but is redrawn by
+        /// CADability's style engine and will not match the original line for line.
+        /// </summary>
+        private bool dimensionsAsDimension;
+        /// <summary>
+        /// The dimension styles this import created, each with an untouched copy to compare new
+        /// candidates with. The style itself cannot be compared: drawing a dimension creates
+        /// its <see cref="Attribute.DimensionStyle.HatchStyleSolid"/>, which
+        /// <see cref="Attribute.DimensionStyle.SameData"/> compares as well.
+        /// </summary>
+        private List<(Attribute.DimensionStyle pristine, Attribute.DimensionStyle used)> importedDimensionStyles;
 
         public Import(string fileName)
             : this(fileName, null)
@@ -303,7 +338,12 @@ namespace CADability.DXF
             try
             {
                 IGeoObject geoObject = GeoObjectFromEntity(item);
-                if (geoObject != null)
+                if (geoObject != null && !geoObject.HasValidData())
+                {   // e.g. a line of length 0 or a circle with radius 0, which Model.Add used to drop
+                    System.Diagnostics.Trace.WriteLine("dxf: degenerate " + item.GetType().Name + " skipped (handle " + item.Handle.ToString("X") + ")");
+                    empty++;
+                }
+                else if (geoObject != null)
                 {
                     model.Add(geoObject);
                     converted++;
@@ -378,6 +418,8 @@ namespace CADability.DXF
             blockTable = new Dictionary<string, GeoObject.Block>();
             layerColorTable = new Dictionary<string, ColorDef>();
             layerTable = new Dictionary<string, Attribute.Layer>();
+            importedDimensionStyles = new List<(Attribute.DimensionStyle, Attribute.DimensionStyle)>();
+            dimensionsAsDimension = Settings.GlobalSettings.GetIntValue("DxfDwg.ImportDimension", 0) == 1;
             foreach (var item in doc.Layers)
             {
                 Attribute.Layer layer = project.LayerList.CreateOrFind(item.Name);
@@ -389,13 +431,11 @@ namespace CADability.DXF
             }
             foreach (var item in doc.LineTypes)
             {
-                List<double> pattern = new List<double>();
-                foreach (var seg in item.Segments)
-                {
-                    if (!seg.IsShape && !seg.IsText)
-                        pattern.Add(Math.Abs(seg.Length));
-                }
-                project.LinePatternList.CreateOrFind(item.Name, pattern.ToArray());
+                // ByLayer and ByBlock are no patterns, FindLinePattern resolves them
+                if (string.Equals(item.Name, LineType.ByLayerName, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.Name, LineType.ByBlockName, StringComparison.OrdinalIgnoreCase)) continue;
+                // a shape or text segment keeps its length, only the shape or text is not drawn
+                project.LinePatternList.CreateOrFind(item.Name, PatternFromDxfDashes(item.Segments.Select(seg => seg.Length)));
             }
             FillModelSpace(project.GetModel(0));
             Model paperSpace = new Model();
@@ -522,7 +562,7 @@ namespace CADability.DXF
             {
                 if (project.HatchStyleList[i] is HatchStyleSolid hss)
                 {
-                    if (hss.Color.Color.ToArgb() == clr.ToArgb()) return hss;
+                    if (hss.Color != null && hss.Color.Color.ToArgb() == clr.ToArgb()) return hss;
                 }
             }
             HatchStyleSolid nhss = new HatchStyleSolid();
@@ -532,33 +572,50 @@ namespace CADability.DXF
             return nhss;
         }
 
-        private HatchStyleLines FindOrCreateHatchStyleLines(Entity entity, double lineAngle, double lineDistance, double[] dashes)
+        /// <summary>
+        /// A solid hatch style without a color of its own. A <see cref="GeoObject.Hatch"/> with such a
+        /// style is filled with its own <see cref="GeoObject.Hatch.ColorDef"/>, which
+        /// <see cref="SetAttributes"/> sets from the entity like the color of every other entity, with
+        /// ByLayer, ByBlock and the handling of layer "0" in blocks.
+        /// </summary>
+        private HatchStyleSolid FindOrCreateSolidHatchStyle()
         {
-            Color layerColor = Color.White;
-            if (entity.Layer != null) layerColor = AcadColorToDrawing(entity.Layer.Color);
-            if (layerColor.ToArgb() == Color.White.ToArgb()) layerColor = Color.Black;
-
             for (int i = 0; i < project.HatchStyleList.Count; i++)
             {
-                if (project.HatchStyleList[i] is HatchStyleLines hsl)
-                {
-                    if (hsl.ColorDef.Color.ToArgb() == layerColor.ToArgb() &&
-                        hsl.LineAngle == lineAngle && hsl.LineDistance == lineDistance) return hsl;
-                }
+                if (project.HatchStyleList[i] is HatchStyleSolid hss && hss.Color == null) return hss;
+            }
+            HatchStyleSolid nhss = new HatchStyleSolid();
+            nhss.Name = NewName("Solid", project.HatchStyleList);
+            project.HatchStyleList.Add(nhss);
+            return nhss;
+        }
+
+        /// <summary>
+        /// A line hatch style without a color of its own, see <see cref="FindOrCreateSolidHatchStyle()"/>. Styles
+        /// differ in angle, distance, dash pattern and line width. The line width follows the lineweight of the
+        /// HATCH like that of every other entity. Inside a block definition it may be a stand-in (ByBlock, or
+        /// ByLayer on layer "0"): such a style is not part of the project, and <see cref="ResolveLayerZero"/>
+        /// replaces it in every placed copy of the block.
+        /// </summary>
+        private HatchStyleLines FindOrCreateHatchStyleLines(string name, double lineAngle, double lineDistance, LinePattern linePattern, LineWidth lineWidth)
+        {
+            bool standIn = lineWidth == byLayerWidth || lineWidth == byBlockWidth;
+            IEnumerable<HatchStyleLines> existing = standIn ? standInHatchStyles
+                : Enumerable.Range(0, project.HatchStyleList.Count).Select(i => project.HatchStyleList[i]).OfType<HatchStyleLines>();
+            foreach (HatchStyleLines hsl in existing)
+            {
+                if (hsl.ColorDef == null && hsl.LineWidth == lineWidth && hsl.LinePattern == linePattern &&
+                    hsl.LineAngle == lineAngle && hsl.LineDistance == lineDistance &&
+                    hsl.MarginOffset == 0.0 && hsl.Number == 0 && !hsl.Alternate) return hsl;
             }
             HatchStyleLines nhsl = new HatchStyleLines();
-            string name = NewName(entity.Layer?.Name ?? "Default", project.HatchStyleList);
-            nhsl.Name = name;
+            nhsl.Name = NewName(name, project.HatchStyleList);
             nhsl.LineAngle = lineAngle;
             nhsl.LineDistance = lineDistance;
-            nhsl.ColorDef = project.ColorList.CreateOrFind(layerColor.ToString(), layerColor);
-
-            LineWeightType lw = entity.LineWeight;
-            if (lw == LineWeightType.ByLayer && entity.Layer != null) lw = entity.Layer.LineWeight;
-            if ((int)lw < 0) lw = LineWeightType.W0;
-            nhsl.LineWidth = project.LineWidthList.CreateOrFind("DXF_" + lw.ToString(), ((int)lw) / 100.0);
-            nhsl.LinePattern = FindOrcreateLinePattern(dashes);
-            project.HatchStyleList.Add(nhsl);
+            nhsl.LineWidth = lineWidth;
+            nhsl.LinePattern = linePattern;
+            if (standIn) standInHatchStyles.Add(nhsl);
+            else project.HatchStyleList.Add(nhsl);
             return nhsl;
         }
 
@@ -579,52 +636,125 @@ namespace CADability.DXF
             return name;
         }
 
-        private LinePattern FindOrcreateLinePattern(double[] dashes, string name = null)
+        /// <summary>
+        /// The line pattern of a pattern hatch line. Its dashes are given in drawing units, so the pattern scales
+        /// with the drawing. A continuous line gets "Continuous" or another continuous pattern of the project.
+        /// </summary>
+        private LinePattern FindOrCreateHatchLinePattern(IEnumerable<double> dxfDashes)
         {
-            if (dashes.Length == 0)
+            double[] pattern = PatternFromDxfDashes(dxfDashes);
+            if (pattern.Length == 0)
             {
-                for (int i = 0; i < project.LinePatternList.Count; i++)
+                LinePattern continuous = project.LinePatternList.Find(LineType.ContinuousName);
+                for (int i = 0; continuous == null && i < project.LinePatternList.Count; i++)
                 {
-                    if (project.LinePatternList[i].Pattern == null || project.LinePatternList[i].Pattern.Length == 0)
-                        return project.LinePatternList[i];
+                    if (project.LinePatternList[i].Pattern == null || project.LinePatternList[i].Pattern.Length == 0) continuous = project.LinePatternList[i];
                 }
-                return new LinePattern(NewName("DXFpattern", project.LinePatternList));
+                return continuous;
             }
-            if (dashes[0] < 0)
+            return project.LinePatternList.CreateOrFind(pattern, LinePattern.Scaling.World);
+        }
+
+        /// <summary>
+        /// Converts DXF dash lengths (positive: a dash, negative: a gap, 0: a dot) into the pattern of a
+        /// <see cref="LinePattern"/>, which alternates dashes and gaps, starting with a dash, and has only positive
+        /// lengths. Consecutive dashes or gaps are joined, a leading gap is moved to the end. A pattern without a
+        /// gap is a continuous line and gives an empty pattern, as does a pattern without a dash.
+        /// </summary>
+        internal static double[] PatternFromDxfDashes(IEnumerable<double> dxfDashes)
+        {
+            List<(bool dash, double length)> segments = new List<(bool, double)>();
+            void Append(bool dash, double length)
             {
-                List<double> pattern = new List<double>(dashes);
-                if (pattern[pattern.Count - 1] > 0)
-                {
-                    pattern.Insert(0, pattern[pattern.Count - 1]);
-                    pattern.RemoveAt(pattern.Count - 1);
-                }
-                else pattern.Insert(0, 0.0);
-                if ((pattern.Count & 0x01) != 0) pattern.Add(0.0);
-                dashes = pattern.ToArray();
+                if (segments.Count > 0 && segments[segments.Count - 1].dash == dash)
+                    segments[segments.Count - 1] = (dash, segments[segments.Count - 1].length + length);
+                else segments.Add((dash, length));
             }
-            else if ((dashes.Length & 0x01) != 0)
+            foreach (double d in dxfDashes) Append(d >= 0.0, Math.Abs(d));
+            if (!segments.Exists(sg => sg.dash) || !segments.Exists(sg => !sg.dash)) return new double[0];
+            if (!segments[0].dash)
             {
-                List<double> pattern = new List<double>(dashes);
-                pattern.Add(0.0);
-                dashes = pattern.ToArray();
+                (bool, double) leading = segments[0];
+                segments.RemoveAt(0);
+                Append(leading.Item1, leading.Item2);
             }
-            return new LinePattern(NewName("DXFpattern", project.LinePatternList), dashes);
+            if (segments[segments.Count - 1].dash)
+            {   // the last dash continues in the first one
+                segments[0] = (true, segments[0].length + segments[segments.Count - 1].length);
+                segments.RemoveAt(segments.Count - 1);
+            }
+            return segments.Select(sg => sg.length).ToArray();
         }
 
         private void SetAttributes(IGeoObject go, Entity entity)
         {
-            if (go is IColorDef cd) cd.ColorDef = FindOrCreateColor(entity.Color, entity.Layer);
+            if (go is IColorDef cd)
+            {
+                // Inside a block definition ByBlock means "the color of the placing INSERT".
+                // CADability expresses exactly that with CDfromParent: the child then shows the
+                // color of the Block it belongs to, and the Block gets the INSERT's color.
+                if (entity.Color.IsByBlock && blockDefinitionDepth > 0) cd.ColorDef = ColorDef.CDfromParent;
+                else cd.ColorDef = FindOrCreateColor(entity.Color, entity.Layer);
+            }
+            // An entity that the import turns into a Block of several parts (a pattern hatch with
+            // several lines, a 3DFACE that is not flat, a mesh, an MLINE, a LEADER, a TABLE) leaves
+            // parts without a color of their own. Those parts show the color of the entity, which
+            // the Block carries, and follow it when it is resolved later (ByBlock, layer "0" in a
+            // block). A Hatch is left out: its contents are generated from its style and take the
+            // color of the Hatch there.
+            if (go is GeoObject.Block parts && !(go is GeoObject.Hatch))
+            {
+                for (int i = 0; i < parts.Count; i++)
+                {
+                    if (parts.Item(i) is IColorDef part && part.ColorDef == null) part.ColorDef = ColorDef.CDfromParent;
+                }
+            }
             if (entity.Layer != null && layerTable.TryGetValue(entity.Layer.Name, out Attribute.Layer layer))
                 go.Layer = layer;
             if (go is ILinePattern lp && entity.LineType != null)
-                lp.LinePattern = project.LinePatternList.Find(entity.LineType.Name);
+                lp.LinePattern = FindLinePattern(entity.LineType.Name, entity.Layer);
             if (go is ILineWidth ld)
+                ld.LineWidth = FindLineWidth(entity.LineWeight, entity.Layer);
+        }
+
+        private static bool IsLayerZero(ACadSharp.Tables.Layer layer) => layer != null && layer.Name == "0";
+
+        private static bool IsDefpointsLayer(ACadSharp.Tables.Layer layer) => layer != null
+            && string.Equals(layer.Name, ACadSharp.Tables.Layer.DefpointsName, StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// The line pattern for a linetype on the given layer: ByLayer is the linetype of the layer.
+        /// Inside a block definition ByBlock, and ByLayer on layer "0", depend on the placing entity
+        /// and give a stand-in.
+        /// </summary>
+        private LinePattern FindLinePattern(string lineTypeName, ACadSharp.Tables.Layer layer)
+        {
+            bool byLayer = string.Equals(lineTypeName, LineType.ByLayerName, StringComparison.OrdinalIgnoreCase);
+            if (blockDefinitionDepth > 0)
             {
-                LineWeightType lw = entity.LineWeight;
-                if (lw == LineWeightType.ByLayer && entity.Layer != null) lw = entity.Layer.LineWeight;
-                if ((int)lw < 0) lw = LineWeightType.W0;
-                ld.LineWidth = project.LineWidthList.CreateOrFind("DXF_" + lw.ToString(), ((int)lw) / 100.0);
+                if (string.Equals(lineTypeName, LineType.ByBlockName, StringComparison.OrdinalIgnoreCase)) return byBlockPattern;
+                if (byLayer && IsLayerZero(layer)) return byLayerPattern;
             }
+            if (byLayer) lineTypeName = layer?.LineType?.Name ?? LineType.ContinuousName;
+            // outside a block definition ByBlock is drawn continuous, and ByLayer cannot be the linetype of a layer
+            if (string.Equals(lineTypeName, LineType.ByBlockName, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(lineTypeName, LineType.ByLayerName, StringComparison.OrdinalIgnoreCase)) lineTypeName = LineType.ContinuousName;
+            return project.LinePatternList.Find(lineTypeName);
+        }
+
+        /// <summary>
+        /// The line width for a lineweight on the given layer, like <see cref="FindLinePattern"/>.
+        /// </summary>
+        private LineWidth FindLineWidth(LineWeightType lw, ACadSharp.Tables.Layer layer)
+        {
+            if (blockDefinitionDepth > 0)
+            {
+                if (lw == LineWeightType.ByBlock) return byBlockWidth;
+                if (lw == LineWeightType.ByLayer && IsLayerZero(layer)) return byLayerWidth;
+            }
+            if (lw == LineWeightType.ByLayer && layer != null) lw = layer.LineWeight;
+            if ((int)lw < 0) lw = LineWeightType.W0;
+            return project.LineWidthList.CreateOrFind("DXF_" + lw.ToString(), ((int)lw) / 100.0);
         }
 
         private void SetUserData(IGeoObject go, Entity entity)
@@ -646,23 +776,109 @@ namespace CADability.DXF
 
         }
 
-        private GeoObject.Block FindBlock(BlockRecord blockRec)
+        /// <summary>
+        /// The converted contents of a block definition, cached per block record. With
+        /// <paramref name="dimensionBlock"/> the block is the picture of a DIMENSION, and its
+        /// entities on the non-plotting layer DEFPOINTS (the definition points) are left out;
+        /// such a block is cached separately, so an INSERT of the same record still gets them.
+        /// </summary>
+        private GeoObject.Block FindBlock(BlockRecord blockRec, bool dimensionBlock = false)
         {
             if (blockRec == null) return null;
             string key = blockRec.Handle.ToString("X");
+            if (dimensionBlock) key += ":DIMENSION";
             if (!blockTable.TryGetValue(key, out GeoObject.Block found))
             {
                 found = GeoObject.Block.Construct();
                 found.Name = blockRec.Name;
                 found.RefPoint = GeoPoint(blockRec.BlockEntity?.BasePoint ?? XYZ.Zero);
                 blockTable[key] = found; // register before filling (prevents infinite recursion)
-                foreach (Entity ent in blockRec.Entities)
+                ++blockDefinitionDepth;
+                try
                 {
-                    IGeoObject go = GeoObjectFromEntity(ent);
-                    if (go != null) found.Add(go);
+                    foreach (Entity ent in blockRec.Entities)
+                    {
+                        if (dimensionBlock && IsDefpointsLayer(ent.Layer)) continue;
+                        try
+                        {
+                            IGeoObject go = GeoObjectFromEntity(ent);
+                            if (go != null) found.Add(go);
+                        }
+                        catch (Exception ex)
+                        {
+                            // One unreadable entity must not cost the whole block, the same choice
+                            // ConvertAndAdd makes for the model space. Letting the exception through
+                            // also left the half filled block in the cache for the next INSERT.
+                            System.Diagnostics.Trace.WriteLine("dxf: skipped " + ent.GetType().Name + " (handle "
+                                + ent.Handle.ToString("X") + ") in block '" + blockRec.Name + "': " + ex.Message);
+                        }
+                    }
+                }
+                finally
+                {
+                    --blockDefinitionDepth;
                 }
             }
             return found;
+        }
+
+        /// <summary>
+        /// Entities on layer "0" inside a block definition are drawn on the layer of the entity
+        /// that places the block, and with that layer's color when they are ByLayer. The block
+        /// definition is converted once and cached, so its layer-0 children carry layer "0" and
+        /// the "0:ByLayer" color; this moves them, including those of nested blocks, to the layer
+        /// of <paramref name="placing"/> on the clone that belongs to this placement.
+        /// The stand-ins for linetype and lineweight (ByLayer on layer "0" and ByBlock) are replaced
+        /// with the values of that layer and of <paramref name="placing"/>. While
+        /// <paramref name="placing"/> is itself part of a block definition, these values may be
+        /// stand-ins again, which the placement of the enclosing block resolves.
+        /// </summary>
+        private void ResolveLayerZero(GeoObject.Block placed, Entity placing)
+        {
+            Attribute.Layer layerZero = null, target = null;
+            ColorDef byLayerZero = null, byLayerTarget = null;
+            if (placing.Layer != null && layerTable.TryGetValue(placing.Layer.Name, out target)
+                && layerTable.TryGetValue("0", out layerZero) && target != layerZero)
+            {
+                layerColorTable.TryGetValue("0", out byLayerZero);
+                layerColorTable.TryGetValue(placing.Layer.Name, out byLayerTarget);
+            }
+            else target = null; // the contents on layer "0" stay there
+            LinePattern patternByLayer = FindLinePattern(LineType.ByLayerName, placing.Layer);
+            LinePattern patternByBlock = FindLinePattern(placing.LineType?.Name ?? LineType.ByLayerName, placing.Layer);
+            LineWidth widthByLayer = FindLineWidth(LineWeightType.ByLayer, placing.Layer);
+            LineWidth widthByBlock = FindLineWidth(placing.LineWeight, placing.Layer);
+            Resolve(placed);
+
+            void Resolve(GeoObject.Block block)
+            {
+                for (int i = 0; i < block.Count; i++)
+                {
+                    IGeoObject child = block.Item(i);
+                    if (target != null && child.Layer == layerZero)
+                    {
+                        child.Layer = target;
+                        if (child is IColorDef cd && byLayerZero != null && byLayerTarget != null && cd.ColorDef == byLayerZero)
+                            cd.ColorDef = byLayerTarget;
+                    }
+                    if (child is ILinePattern lp)
+                    {
+                        if (lp.LinePattern == byLayerPattern) lp.LinePattern = patternByLayer;
+                        else if (lp.LinePattern == byBlockPattern) lp.LinePattern = patternByBlock;
+                    }
+                    if (child is ILineWidth lw)
+                    {
+                        if (lw.LineWidth == byLayerWidth) lw.LineWidth = widthByLayer;
+                        else if (lw.LineWidth == byBlockWidth) lw.LineWidth = widthByBlock;
+                    }
+                    if (child is GeoObject.Hatch hatch && hatch.HatchStyle is HatchStyleLines hsl && (hsl.LineWidth == byLayerWidth || hsl.LineWidth == byBlockWidth))
+                    {   // the lines of a pattern hatch are generated from its style
+                        hatch.HatchStyle = FindOrCreateHatchStyleLines(hsl.Name, hsl.LineAngle, hsl.LineDistance, hsl.LinePattern,
+                            hsl.LineWidth == byLayerWidth ? widthByLayer : widthByBlock);
+                    }
+                    if (child is GeoObject.Block nested) Resolve(nested);
+                }
+            }
         }
 
         private IGeoObject CreateLine(ACadSharp.Entities.Line line)
@@ -768,14 +984,12 @@ namespace CADability.DXF
             }
             else
             {
-                bool forcePolyline2D = false;
                 GeoPoint[] poles = new GeoPoint[spline.ControlPoints.Count];
                 double[] weights = new double[spline.ControlPoints.Count];
                 for (int i = 0; i < poles.Length; i++)
                 {
                     poles[i] = GeoPoint(spline.ControlPoints[i]);
                     weights[i] = (spline.Weights != null && i < spline.Weights.Count) ? spline.Weights[i] : 1.0;
-                    if (i > 0 && (poles[i] | poles[i - 1]) < Precision.eps) forcePolyline2D = true;
                 }
                 double[] kn = new double[spline.Knots.Count];
                 for (int i = 0; i < kn.Length; i++) kn[i] = spline.Knots[i];
@@ -816,42 +1030,12 @@ namespace CADability.DXF
                         path.Set(parts.ToArray());
                         return path;
                     }
-                    if (forcePolyline2D)
-                    {
-                        ICurve curve = (ICurve)bsp;
-                        double maxError = Settings.GlobalSettings.GetDoubleValue("Approximate.Precision", 0.01);
-                        ICurve approxCurve = curve.Approximate(true, maxError);
-                        int usedCurves;
-                        if (approxCurve is GeoObject.Line || (approxCurve.SubCurves != null && approxCurve.SubCurves.Length == 1 && approxCurve.SubCurves[0] is GeoObject.Line))
-                            usedCurves = 2;
-                        else
-                            usedCurves = approxCurve.SubCurves?.Length ?? 2;
-                        return CreateSplineAsPolyline(bsp, usedCurves);
-                    }
+                    // Coinciding poles (a corner of the curve) used to make this a polyline, because the spline was
+                    // displayed wrongly. That was ICurve.GetProjectedCurve, which is fixed now (issue 173).
                     return bsp;
                 }
             }
             return null;
-        }
-
-        private IGeoObject CreateSplineAsPolyline(BSpline bsp, int segments)
-        {
-            // Approximate the spline as a polyline (fallback for degenerate splines)
-            List<GeoObject.Line> lines = new List<GeoObject.Line>();
-            for (int i = 0; i < segments; i++)
-            {
-                double t0 = (double)i / segments;
-                double t1 = (double)(i + 1) / segments;
-                GeoPoint p0 = ((ICurve)bsp).PointAt(t0);
-                GeoPoint p1 = ((ICurve)bsp).PointAt(t1);
-                GeoObject.Line l = GeoObject.Line.Construct();
-                l.StartPoint = p0;
-                l.EndPoint = p1;
-                lines.Add(l);
-            }
-            GeoObject.Path path = GeoObject.Path.Construct();
-            path.Set(new GeoObjectList(lines.Cast<IGeoObject>().ToList()), false, 1e-6);
-            return path.CurveCount > 0 ? (IGeoObject)path : null;
         }
 
         private IGeoObject CreateFace(ACadSharp.Entities.Face3D face)
@@ -1044,9 +1228,7 @@ namespace CADability.DXF
 
             if (hatch.IsSolid)
             {
-                Color layerColor = hatch.Layer != null ? AcadColorToDrawing(hatch.Layer.Color) : Color.Black;
-                if (layerColor.ToArgb() == Color.White.ToArgb()) layerColor = Color.Black;
-                res.HatchStyle = FindOrCreateSolidHatchStyle(layerColor);
+                res.HatchStyle = FindOrCreateSolidHatchStyle();
                 return res;
             }
             else
@@ -1058,15 +1240,16 @@ namespace CADability.DXF
                     {
                         if (list.Count > 0) res = res.Clone() as GeoObject.Hatch;
                         double lineAngle = lineDef.Angle;
-                        double offX = lineDef.Offset.X;
-                        double offY = lineDef.Offset.Y;
-                        double[] dashes = lineDef.DashLengths != null ? lineDef.DashLengths.ToArray() : new double[0];
-                        HatchStyleLines hsl = FindOrCreateHatchStyleLines(hatch, lineAngle, Math.Sqrt(offX * offX + offY * offY), dashes);
+                        // the offset from one line to the next, in drawing units: only its part perpendicular to the
+                        // lines is their distance, the part along them shifts the dashes
+                        double distance = Math.Abs(lineDef.LineOffset);
+                        HatchStyleLines hsl = FindOrCreateHatchStyleLines(hatch.Layer?.Name ?? "Default", lineAngle, distance,
+                            FindOrCreateHatchLinePattern(lineDef.DashLengths ?? Enumerable.Empty<double>()), FindLineWidth(hatch.LineWeight, hatch.Layer));
                         res.HatchStyle = hsl;
                         list.Add(res);
                     }
                 }
-                if (list.Count == 0) { res.HatchStyle = FindOrCreateSolidHatchStyle(Color.Black); return res; }
+                if (list.Count == 0) { res.HatchStyle = FindOrCreateSolidHatchStyle(); return res; }
                 if (list.Count > 1)
                 {
                     GeoObject.Block block = GeoObject.Block.Construct();
@@ -1090,12 +1273,15 @@ namespace CADability.DXF
             for (int i = 0; i < n; i++)
             {
                 int next = (i + 1) % n;
-                if (!pl.IsClosed && next == 0) break;
 
                 XYZ v0 = verts[i];
                 XYZ v1 = verts[next];
                 GeoPoint p0 = plane.ToGlobal(new GeoPoint2D(v0.X, v0.Y));
                 GeoPoint p1 = plane.ToGlobal(new GeoPoint2D(v1.X, v1.Y));
+                // A hatch boundary loop is closed by definition, so the closing edge is added even
+                // when the "is closed" flag (group code 73) is not set. It is only skipped when the
+                // last vertex already repeats the first one, because it would have zero length.
+                if (next == 0 && Precision.IsEqual(p0, p1)) break;
 
                 double bulge = (bulgesArr != null && i < bulgesArr.Length) ? bulgesArr[i] : v0.Z;
 
@@ -1162,14 +1348,13 @@ namespace CADability.DXF
                 new XY(solid.FirstCorner.X, solid.FirstCorner.Y),
                 new XY(solid.SecondCorner.X, solid.SecondCorner.Y),
                 new XY(solid.FourthCorner.X, solid.FourthCorner.Y),
-                new XY(solid.ThirdCorner.X, solid.ThirdCorner.Y),
-                AcadColorToDrawing(solid.Color));
+                new XY(solid.ThirdCorner.X, solid.ThirdCorner.Y));
         }
 
 
-        private IGeoObject BuildSolidHatch(Plane ocs, XY c1, XY c2, XY c3, XY c4, Color color)
+        private IGeoObject BuildSolidHatch(Plane ocs, XY c1, XY c2, XY c3, XY c4)
         {
-            HatchStyleSolid hst = FindOrCreateSolidHatchStyle(color.ToArgb() == Color.White.ToArgb() ? Color.Black : color);
+            HatchStyleSolid hst = FindOrCreateSolidHatchStyle();
             // Convert OCS corners to WCS, then remove duplicates.
             List<GeoPoint> points = new List<GeoPoint>();
             points.Add(ocs.ToGlobal(new GeoPoint2D(c1.X, c1.Y)));
@@ -1209,6 +1394,7 @@ namespace CADability.DXF
                     ModOp.Scale(insert.XScale, insert.YScale, insert.ZScale) *
                     ModOp.Translate(CADability.GeoPoint.Origin - block.RefPoint);
                 res.Modify(transform);
+                ResolveLayerZero((GeoObject.Block)res, insert);
                 return res;
             }
             return null;
@@ -1591,6 +1777,23 @@ namespace CADability.DXF
             return null;
         }
 
+        /// <summary>
+        /// The font a DXF text style names. A TrueType style carries the file it was loaded
+        /// from, which is not what a font is called, so the style name wins where there is one.
+        /// </summary>
+        private static string FontNameFromStyle(ACadSharp.Tables.TextStyle style)
+        {
+            string filename = style?.Filename ?? "";
+            string name = style?.Name ?? "";
+            if (filename.EndsWith(".shx", StringComparison.OrdinalIgnoreCase)) filename = filename.Substring(0, filename.Length - 4);
+            if (filename.EndsWith(".ttf", StringComparison.OrdinalIgnoreCase))
+            {
+                if (name.Length > 1) filename = name;
+                else filename = filename.Substring(0, filename.Length - 4);
+            }
+            return string.IsNullOrEmpty(filename) ? "Arial" : filename;
+        }
+
         private string processAcadString(string acstr)
         {
             var sb = new StringBuilder(acstr);
@@ -1614,21 +1817,10 @@ namespace CADability.DXF
             string txtstring = processAcadString(txt.Value ?? "");
             if (txtstring.Trim().Length == 0) return null;
 
-            string filename = txt.Style?.Filename ?? "";
-            string name = txt.Style?.Name ?? "";
             long trueType = (long)(txt.Style?.TrueType ?? 0);
-            bool bold = (trueType & 2L) != 0;
-            bool italic = (trueType & 1L) != 0;
-
-            if (filename.EndsWith(".shx", StringComparison.OrdinalIgnoreCase)) filename = filename.Substring(0, filename.Length - 4);
-            if (filename.EndsWith(".ttf", StringComparison.OrdinalIgnoreCase))
-            {
-                if (name != null && name.Length > 1) filename = name;
-                else filename = filename.Substring(0, filename.Length - 4);
-            }
-            text.Font = string.IsNullOrEmpty(filename) ? "Arial" : filename;
-            text.Bold = bold;
-            text.Italic = italic;
+            text.Font = FontNameFromStyle(txt.Style);
+            text.Bold = (trueType & 2L) != 0;
+            text.Italic = (trueType & 1L) != 0;
             text.TextString = txtstring;
 
             double h = txt.Height;
@@ -1680,14 +1872,503 @@ namespace CADability.DXF
             return text;
         }
 
+        /// <summary>
+        /// Imports a DIMENSION as the anonymous block AutoCAD keeps with it, which holds the
+        /// picture it drew: dimension line, extension lines, arrows and the measurement text.
+        /// Like the block of an INSERT, its contents on layer "0" and ByBlock take the attributes
+        /// of the DIMENSION. A DIMENSION without that block (DXF R12 and several third party
+        /// writers leave it out) is drawn by ACadSharp from its definition points and style.
+        /// The data that makes the block a dimension is kept in UserData, see
+        /// <see cref="SetDimensionUserData"/>.
+        /// With the setting "DxfDwg.ImportDimension" set to "As Dimension" the DIMENSION becomes a
+        /// <see cref="GeoObject.Dimension"/> instead, where its definition points allow that.
+        /// </summary>
         private IGeoObject CreateDimension(ACadSharp.Entities.Dimension dimension)
         {
-            if (dimension.Block != null)
+            if (dimensionsAsDimension)
             {
-                GeoObject.Block block = FindBlock(dimension.Block);
-                if (block != null) return block.Clone();
+                GeoObject.Dimension native = TryCreateNativeDimension(dimension);
+                if (native != null)
+                {
+                    SetDimensionUserData(native, dimension);
+                    return native;
+                }
+                // the type has no counterpart or the rebuild failed: keep the picture
             }
-            return null;
+            BlockRecord blockRec = dimension.Block;
+            if (blockRec == null || blockRec.Entities.Count == 0)
+            {
+                try
+                {
+                    dimension.UpdateBlock();
+                    blockRec = dimension.Block;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.WriteLine("dxf: dimension " + dimension.Handle.ToString("X")
+                        + " has no block and could not be regenerated: " + ex.Message);
+                    return null;
+                }
+            }
+            GeoObject.Block block = FindBlock(blockRec, true);
+            if (block == null || block.Count == 0) return null;
+            GeoObject.Block res = (GeoObject.Block)block.Clone();
+            ResolveLayerZero(res, dimension);
+            SetDimensionUserData(res, dimension);
+            return res;
+        }
+
+        /// <summary>
+        /// Keeps what makes an imported block a dimension: the DXF dimension type under the key
+        /// "CADability.DxfDimension", the measured value ("CADability.DxfDimension.Measurement"),
+        /// the text override ("CADability.DxfDimension.Text") and the name of the dimension
+        /// style ("CADability.DxfDimension.Style"). An application can tell imported dimensions
+        /// from ordinary blocks by the first key.
+        /// </summary>
+        private static void SetDimensionUserData(IGeoObject go, ACadSharp.Entities.Dimension dimension)
+        {
+            go.UserData.Add("CADability.DxfDimension", dimension.GetType().Name);
+            try
+            {
+                double measurement = dimension.Measurement;
+                if (!double.IsNaN(measurement) && !double.IsInfinity(measurement))
+                    go.UserData.Add("CADability.DxfDimension.Measurement", measurement);
+            }
+            catch (Exception) { /* a degenerate dimension has no measurement */ }
+            if (!string.IsNullOrEmpty(dimension.Text))
+                go.UserData.Add("CADability.DxfDimension.Text", dimension.Text);
+            if (dimension.Style != null)
+                go.UserData.Add("CADability.DxfDimension.Style", dimension.Style.Name);
+        }
+
+        /// <summary>
+        /// Builds CADability's own <see cref="GeoObject.Dimension"/> from a DXF DIMENSION: a
+        /// dimension that can be measured, edited and moved, instead of the frozen picture the
+        /// anonymous block holds. CADability redraws it with its own style engine, so it will
+        /// not look line for line like the original, which is why this is only done on request.
+        /// Returns null when the type has no counterpart or the definition points describe
+        /// nothing that can be drawn; the caller then keeps the block.
+        /// </summary>
+        private GeoObject.Dimension TryCreateNativeDimension(ACadSharp.Entities.Dimension dimension)
+        {
+            try
+            {
+                GeoObject.Dimension dim = MapDimensionGeometry(dimension);
+                if (dim == null) return null;
+                dim.DimensionStyle = FindOrCreateDimensionStyle(dimension);
+                ApplyDimensionText(dim, dimension);
+                return dim;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine("dxf: dimension " + dimension.Handle.ToString("X")
+                    + " (" + dimension.GetType().Name + ") not rebuilt as a Dimension, keeping the block: "
+                    + ex.Message);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// The definition points of a DXF dimension, in the shape CADability's dimension wants
+        /// them. All eight DXF types have a counterpart: the three angular ones, the arc length
+        /// dimension among them, share CADability's DimAngle, and the ordinate dimension becomes
+        /// a coordinate dimension. Null means the definition points do not describe a dimension
+        /// that can be drawn.
+        /// </summary>
+        private GeoObject.Dimension MapDimensionGeometry(ACadSharp.Entities.Dimension dimension)
+        {
+            GeoVector normal = GeoVector(dimension.Normal);
+            if (normal.IsNullVector()) normal = CADability.GeoVector.ZAxis;
+            normal.Norm();
+            // The rotation angles below are measured in the OCS that the normal spans.
+            Plane ocs = Plane(XYZ.Zero, new XYZ(normal.x, normal.y, normal.z));
+            GeoVector ocsX = ocs.DirectionX;
+            GeoVector ocsY = ocs.DirectionY;
+
+            GeoObject.Dimension dim = GeoObject.Dimension.Construct();
+            dim.Normal = normal;
+            switch (dimension)
+            {
+                // DimensionLinear derives from DimensionAligned, so it has to be asked first
+                case ACadSharp.Entities.DimensionLinear linear:
+                    {
+                        GeoVector dir = Math.Cos(linear.Rotation) * ocsX + Math.Sin(linear.Rotation) * ocsY;
+                        if (dir.IsNullVector()) return null;
+                        dim.DimType = GeoObject.Dimension.EDimType.DimPoints;
+                        dim.DimLineDirection = dir;
+                        dim.DimLineRef = GeoPoint(linear.DefinitionPoint);
+                        dim.AddPoint(GeoPoint(linear.FirstPoint));
+                        dim.AddPoint(GeoPoint(linear.SecondPoint));
+                    }
+                    break;
+                case ACadSharp.Entities.DimensionAligned aligned:
+                    {
+                        GeoPoint p1 = GeoPoint(aligned.FirstPoint);
+                        GeoPoint p2 = GeoPoint(aligned.SecondPoint);
+                        GeoVector dir = p2 - p1; // an aligned dimension runs parallel to its points
+                        if (dir.IsNullVector()) return null;
+                        dim.DimType = GeoObject.Dimension.EDimType.DimPoints;
+                        dim.DimLineDirection = dir;
+                        dim.DimLineRef = GeoPoint(aligned.DefinitionPoint);
+                        dim.AddPoint(p1);
+                        dim.AddPoint(p2);
+                    }
+                    break;
+                case ACadSharp.Entities.DimensionRadius radial:
+                    {
+                        // a radial dimension has its center in group 10 and the point on the
+                        // circle in group 15
+                        GeoPoint center = GeoPoint(radial.DefinitionPoint);
+                        GeoVector dir = GeoPoint(radial.AngleVertex) - center;
+                        double r = dir.Length;
+                        if (r < Precision.eps) return null;
+                        dir.Norm();
+                        dim.DimType = GeoObject.Dimension.EDimType.DimRadius;
+                        dim.AddPoint(center);
+                        dim.Radius = r;
+                        // DimLineRef is where the dimension line ends; a leader length of zero
+                        // puts it on the circle.
+                        dim.DimLineRef = center + (r + Math.Max(0.0, radial.LeaderLength)) * dir;
+                    }
+                    break;
+                case ACadSharp.Entities.DimensionDiameter diametric:
+                    {
+                        // group 15 is the end of the diameter where the leader and the text are,
+                        // group 10 the opposite one
+                        GeoPoint onCircle = GeoPoint(diametric.AngleVertex);
+                        GeoPoint opposite = GeoPoint(diametric.DefinitionPoint);
+                        GeoPoint center = new GeoPoint(onCircle, opposite);
+                        GeoVector dir = onCircle - center;
+                        double r = dir.Length;
+                        if (r < Precision.eps) return null;
+                        dir.Norm();
+                        dim.DimType = GeoObject.Dimension.EDimType.DimDiameter;
+                        dim.AddPoint(center);
+                        dim.Radius = r;
+                        // Without a leader AutoCAD draws the dimension line across the circle,
+                        // which is what CADability does for a reference point inside it.
+                        dim.DimLineRef = diametric.LeaderLength > 0.0
+                            ? center + (r + diametric.LeaderLength) * dir
+                            : center + 0.5 * r * dir;
+                    }
+                    break;
+                case ACadSharp.Entities.DimensionAngular3Pt angular3:
+                    {
+                        GeoPoint center = GeoPoint(angular3.AngleVertex);
+                        GeoPoint arcPoint = GeoPoint(angular3.DefinitionPoint);
+                        if (!SetAngleDimension(dim, center, GeoPoint(angular3.FirstPoint) - center,
+                                GeoPoint(angular3.SecondPoint) - center, arcPoint, normal, (arcPoint - center).Length))
+                            return null;
+                    }
+                    break;
+                case ACadSharp.Entities.DimensionAngular2Line angular2:
+                    {
+                        GeoPoint center = GeoPoint(angular2.Center); // where the two lines cross
+                        if (double.IsNaN(center.x) || double.IsNaN(center.y) || double.IsNaN(center.z))
+                            return null; // parallel lines have no vertex
+                        GeoPoint arcPoint = GeoPoint(angular2.DimensionArc);
+                        GeoVector leg1 = GeoPoint(angular2.SecondPoint) - GeoPoint(angular2.FirstPoint);
+                        GeoVector leg2 = GeoPoint(angular2.DefinitionPoint) - GeoPoint(angular2.AngleVertex);
+                        if (!SetAngleDimension(dim, center, leg1, leg2, arcPoint, normal, (arcPoint - center).Length))
+                            return null;
+                    }
+                    break;
+                case ACadSharp.Entities.DimensionArc arc:
+                    {
+                        // An arc length dimension is an angular dimension whose text shows the
+                        // length of the arc instead of the angle, which CADability's dimension
+                        // style has as its fifth way of writing an angle (see MapDimensionStyle).
+                        // The legs keep the radius of the arc, because the length is read off it.
+                        GeoPoint center = GeoPoint(arc.Center);
+                        GeoVector leg1 = GeoPoint(arc.FirstPoint) - center;
+                        GeoVector leg2 = GeoPoint(arc.SecondPoint) - center;
+                        if (!SetAngleDimension(dim, center, leg1, leg2, GeoPoint(arc.DefinitionPoint), normal, leg1.Length))
+                            return null;
+                    }
+                    break;
+                case ACadSharp.Entities.DimensionOrdinate ordinate:
+                    {
+                        // An ordinate dimension measures one feature against the origin (group
+                        // 10), along the X or the Y axis of the drawing.
+                        dim.DimType = GeoObject.Dimension.EDimType.DimCoord;
+                        dim.DimLineDirection = ordinate.IsOrdinateTypeX ? ocsX : ocsY;
+                        dim.DimLineRef = GeoPoint(ordinate.LeaderEndpoint);
+                        dim.AddPoint(GeoPoint(ordinate.DefinitionPoint));
+                        dim.AddPoint(GeoPoint(ordinate.FeatureLocation));
+                    }
+                    break;
+                default:
+                    return null; // a dimension type this version of ACadSharp does not know
+            }
+            // Every type but the angular one spans its plane from the dimension line and the
+            // normal. Where those are parallel the dimension cannot be drawn at all, and the
+            // picture in the block is the better answer.
+            if (dim.DimType != GeoObject.Dimension.EDimType.DimAngle)
+            {
+                GeoVector dimLine = dim.DimType == GeoObject.Dimension.EDimType.DimRadius
+                    || dim.DimType == GeoObject.Dimension.EDimType.DimDiameter
+                    ? dim.DimLineRef - dim.GetPoint(0)
+                    : dim.DimLineDirection;
+                if (dimLine.IsNullVector() || (normal ^ dimLine).IsNullVector()) return null;
+            }
+            return dim;
+        }
+
+        /// <summary>
+        /// Fills an angular dimension. DXF gives the two legs as lines that may point either
+        /// way and says which of the four sectors is meant by the point the dimension arc runs
+        /// through. CADability sweeps counterclockwise from the first leg to the second, so the
+        /// legs are turned into the pair that encloses that point. The points on the legs are
+        /// placed at <paramref name="legRadius"/> from the center.
+        /// </summary>
+        private static bool SetAngleDimension(GeoObject.Dimension dim, GeoPoint center,
+            GeoVector leg1, GeoVector leg2, GeoPoint arcPoint, GeoVector normal, double legRadius)
+        {
+            if (leg1.IsNullVector() || leg2.IsNullVector()) return false;
+            GeoVector toArc = arcPoint - center;
+            if (toArc.Length < Precision.eps || legRadius < Precision.eps) return false;
+            Plane plane;
+            try { plane = new Plane(center, normal); }
+            catch (PlaneException) { return false; }
+
+            double a1 = plane.Project(leg1).Angle.Radian;
+            double a2 = plane.Project(leg2).Angle.Radian;
+            double toArcAngle = plane.Project(toArc).Angle.Radian;
+            GeoVector best1 = leg1, best2 = leg2;
+            double smallestSweep = double.MaxValue;
+            for (int flip1 = 0; flip1 < 2; flip1++)
+            {
+                for (int flip2 = 0; flip2 < 2; flip2++)
+                {
+                    double start = a1 + flip1 * Math.PI;
+                    double sweep = Normalized(a2 + flip2 * Math.PI - start);
+                    if (Normalized(toArcAngle - start) > sweep) continue; // the arc is elsewhere
+                    if (sweep >= smallestSweep) continue;
+                    smallestSweep = sweep;
+                    best1 = flip1 == 0 ? leg1 : -leg1;
+                    best2 = flip2 == 0 ? leg2 : -leg2;
+                }
+            }
+            best1.Norm();
+            best2.Norm();
+            if ((best1 ^ best2).IsNullVector()) return false; // collinear legs span no plane
+            dim.DimType = GeoObject.Dimension.EDimType.DimAngle;
+            dim.AddPoint(center);
+            dim.AddPoint(center + legRadius * best1);
+            dim.AddPoint(center + legRadius * best2);
+            dim.DimLineRef = arcPoint;
+            return true;
+        }
+
+        /// <summary>An angle brought into [0, 2π).</summary>
+        private static double Normalized(double angle)
+        {
+            double res = angle % (2.0 * Math.PI);
+            return res < 0.0 ? res + 2.0 * Math.PI : res;
+        }
+
+        /// <summary>
+        /// The CADability dimension style for a DXF dimension. Overrides of the style it names
+        /// (XData "DSTYLE", the rule rather than the exception in real drawings) are applied, so
+        /// such a dimension gets a style of its own, which is not written into the style its
+        /// neighbours use. Dimensions that end up with the same data share one style.
+        /// </summary>
+        private Attribute.DimensionStyle FindOrCreateDimensionStyle(ACadSharp.Entities.Dimension dimension)
+        {
+            ACadSharp.Tables.DimensionStyle acad;
+            try { acad = dimension.GetActiveDimensionStyle(); }
+            catch (Exception) { acad = dimension.Style; }
+            if (acad == null) acad = ACadSharp.Tables.DimensionStyle.Default;
+
+            string name = dimension.Style?.Name ?? acad.Name ?? "Standard";
+            Attribute.DimensionStyle style = Attribute.DimensionStyle.GetDefault();
+            MapDimensionStyle(acad, style, dimension);
+            foreach ((Attribute.DimensionStyle pristine, Attribute.DimensionStyle used) in importedDimensionStyles)
+            {
+                if (pristine.SameData(style)) return used;
+            }
+            style.Name = UnusedDimensionStyleName(name);
+            importedDimensionStyles.Add((style.Clone(), style));
+            project.DimensionStyleList.Add(style);
+            return style;
+        }
+
+        private string UnusedDimensionStyleName(string name)
+        {
+            if (project.DimensionStyleList.Find(name) == null) return name;
+            for (int i = 1; ; i++)
+            {
+                string candidate = name + "_" + i.ToString();
+                if (project.DimensionStyleList.Find(candidate) == null) return candidate;
+            }
+        }
+
+        /// <summary>
+        /// Translates the DIMSTYLE variables that CADability has a counterpart for. DIMSCALE
+        /// is applied to the sizes rather than kept, because CADability draws its sizes as they
+        /// are. Left out are the parts CADability expresses differently or not at all:
+        /// alternate units, tolerance texts, the fit rules and the text placement variables.
+        /// </summary>
+        private void MapDimensionStyle(ACadSharp.Tables.DimensionStyle acad,
+            Attribute.DimensionStyle style, ACadSharp.Entities.Dimension owner)
+        {
+            double scale = acad.ScaleFactor > 0.0 ? acad.ScaleFactor : 1.0;
+            style.Types = Attribute.DimensionStyle.ETypeFlag.DimAllTypes;
+            style.TextSize = acad.TextHeight * scale;
+            style.TextSizeTol = acad.TextHeight * acad.ToleranceScaleFactor * scale;
+            style.SymbolSize = acad.ArrowSize * scale;
+            style.ExtLineOffset = acad.ExtensionLineOffset * scale;
+            style.ExtLineExtension = acad.ExtensionLineExtension * scale;
+            style.DimLineExtension = acad.DimensionLineExtension * scale;
+            style.DimensionLineGap = acad.DimensionLineGap * scale;
+            style.LineIncrement = acad.DimensionLineIncrement * scale;
+            style.CenterMarkSize = Math.Abs(acad.CenterMarkSize) * scale;
+            style.Scale = acad.LinearScaleFactor != 0.0 ? acad.LinearScaleFactor : 1.0;
+            style.ScaleAlt = acad.AlternateUnitScaleFactor != 0.0 ? acad.AlternateUnitScaleFactor : 1.0;
+            style.Round = acad.Rounding > 0.0 ? acad.Rounding : DecimalsToRounding(acad.DecimalPlaces);
+            style.RoundAlt = acad.AlternateUnitRounding > 0.0
+                ? acad.AlternateUnitRounding : DecimalsToRounding(acad.AlternateUnitDecimalPlaces);
+            // An arc length dimension is an angular one whose text is the length of the arc. Its
+            // symbol has no place of its own in CADability, so it leads the text; AutoCAD puts
+            // it above the text when DIMARCSYM says so.
+            bool arcLength = owner is ACadSharp.Entities.DimensionArc;
+            style.AngleText = arcLength
+                ? Attribute.DimensionStyle.EAngleText.ArcLength
+                : MapAngleText(acad.AngularUnit);
+            string arcSymbol = arcLength && acad.ArcLengthSymbolPosition != ArcLengthSymbolPosition.None
+                ? ArcLengthSymbol : "";
+            style.TextPrefix = arcSymbol + (acad.Prefix ?? "");
+            style.TextPostfix = acad.Suffix ?? "";
+            style.TextFont = FontNameFromStyle(acad.Style);
+            // DIMTAD says whether the text sits on the dimension line or above it, DIMGAP how
+            // far; CADability measures that distance in text heights.
+            style.TextDist = acad.TextVerticalAlignment == DimensionTextVerticalAlignment.Centered
+                || acad.TextHeight <= 0.0
+                ? 0.0
+                : Math.Abs(acad.DimensionLineGap) / acad.TextHeight;
+            style.Symbol = MapArrowSymbol(acad);
+            style.DimNoExtLine1 = acad.SuppressFirstExtensionLine;
+            style.DimNoExtLine2 = acad.SuppressSecondExtensionLine;
+            style.DimNoDimLine = acad.SuppressFirstDimensionLine && acad.SuppressSecondDimensionLine;
+            style.DimTxtInsideHor = acad.TextInsideHorizontal;
+            style.DimTxtOutsideHor = acad.TextOutsideHorizontal;
+            style.DimTxtOutside = acad.TextOutsideExtensions;
+            style.DimLineColor = DimensionStyleColor(acad.DimensionLineColor, owner);
+            style.ExtLineColor = DimensionStyleColor(acad.ExtensionLineColor, owner);
+            style.FontColor = DimensionStyleColor(acad.TextColor, owner);
+            style.FillColor = style.DimLineColor;
+            style.DimLineWidth = DimensionStyleWidth(acad.DimensionLineWeight, owner);
+            style.ExtLineWidth = DimensionStyleWidth(acad.ExtensionLineWeight, owner);
+        }
+
+        /// <summary>The symbol AutoCAD marks an arc length with.</summary>
+        internal const string ArcLengthSymbol = "\u2312";
+
+        /// <summary>
+        /// DIMAUNIT, the four ways AutoCAD writes an angle. CADability knows a fifth, the length
+        /// of the arc, which only an arc length dimension uses.
+        /// </summary>
+        private static Attribute.DimensionStyle.EAngleText MapAngleText(ACadSharp.Types.Units.AngularUnitFormat unit)
+        {
+            switch (unit)
+            {
+                case ACadSharp.Types.Units.AngularUnitFormat.DegreesMinutesSeconds:
+                    return Attribute.DimensionStyle.EAngleText.DegreeMinuteSecond;
+                case ACadSharp.Types.Units.AngularUnitFormat.Gradians:
+                    return Attribute.DimensionStyle.EAngleText.Grade;
+                case ACadSharp.Types.Units.AngularUnitFormat.Radians:
+                    return Attribute.DimensionStyle.EAngleText.Radian;
+                default:
+                    return Attribute.DimensionStyle.EAngleText.DegreeDecimal;
+            }
+        }
+
+        /// <summary>DIMDEC as the rounding increment CADability formats with.</summary>
+        private static double DecimalsToRounding(short decimalPlaces)
+        {
+            int places = Math.Min(8, Math.Max(0, (int)decimalPlaces));
+            return Math.Pow(10.0, -places);
+        }
+
+        /// <summary>
+        /// A DIMSTYLE color is ByBlock by default, which for a dimension means the color of the
+        /// DIMENSION itself.
+        /// </summary>
+        private ColorDef DimensionStyleColor(ACadSharp.Color color, Entity owner)
+        {
+            if (color.IsByBlock) return FindOrCreateColor(owner.Color, owner.Layer);
+            return FindOrCreateColor(color, owner.Layer);
+        }
+
+        /// <summary>
+        /// The same for a DIMSTYLE lineweight, which is ByBlock by default as well.
+        /// </summary>
+        private LineWidth DimensionStyleWidth(LineWeightType weight, Entity owner)
+        {
+            LineWeightType lw = weight == LineWeightType.ByBlock ? owner.LineWeight : weight;
+            if (lw == LineWeightType.ByLayer && owner.Layer != null) lw = owner.Layer.LineWeight;
+            if ((int)lw < 0) lw = LineWeightType.W0;
+            return project.LineWidthList.CreateOrFind("DXF_" + lw.ToString(), ((int)lw) / 100.0);
+        }
+
+        /// <summary>
+        /// AutoCAD names its arrow heads by block, CADability picks from a few shapes. An unknown
+        /// or user defined arrow block becomes the filled arrow AutoCAD also uses when no block
+        /// is named.
+        /// </summary>
+        private static Attribute.DimensionStyle.ESymbol MapArrowSymbol(ACadSharp.Tables.DimensionStyle acad)
+        {
+            BlockRecord arrow = acad.SeparateArrowBlocks ? acad.DimArrow1 : acad.ArrowBlock;
+            string name = (arrow?.Name ?? "").TrimStart('_').ToUpperInvariant();
+            switch (name)
+            {
+                case "OPEN":
+                case "OPEN30":
+                case "OPEN90":
+                    return Attribute.DimensionStyle.ESymbol.DimOpenArrow;
+                case "CLOSED":
+                case "CLOSEDBLANK":
+                    return Attribute.DimensionStyle.ESymbol.DimClosedArrow;
+                case "DOT":
+                case "DOTSMALL":
+                    return Attribute.DimensionStyle.ESymbol.DimFilledCircle;
+                case "DOTBLANK":
+                case "ORIGIN":
+                case "ORIGIN2":
+                    return Attribute.DimensionStyle.ESymbol.DimCircle;
+                case "OBLIQUE":
+                case "ARCHTICK":
+                case "INTEGRAL":
+                    return Attribute.DimensionStyle.ESymbol.DimSlash;
+                default:
+                    return Attribute.DimensionStyle.ESymbol.DimFilledArrow;
+            }
+        }
+
+        /// <summary>
+        /// DXF group 1 overrides the measured text: empty means "use the measurement", a single
+        /// space means "no text at all", and anything else is the text, where "&lt;&gt;" stands
+        /// for the measurement. CADability has no such placeholder, so a text around it becomes
+        /// prefix and postfix and the measurement keeps being computed.
+        /// </summary>
+        private void ApplyDimensionText(GeoObject.Dimension dim, ACadSharp.Entities.Dimension dimension)
+        {
+            string text = dimension.Text;
+            if (string.IsNullOrEmpty(text)) return; // measured, CADability formats it itself
+            text = processAcadString(StripMTextFormatCodes(text));
+            if (text.Trim().Length == 0)
+            {
+                dim.SetDimText(0, " "); // a single space suppresses the text in AutoCAD
+                return;
+            }
+            int placeholder = text.IndexOf("<>", StringComparison.Ordinal);
+            if (placeholder < 0)
+            {
+                dim.SetDimText(0, text);
+                return;
+            }
+            dim.SetPrefix(0, text.Substring(0, placeholder));
+            dim.SetPostfix(0, text.Substring(placeholder + 2));
         }
 
         private string StripMTextFormatCodes(string value)

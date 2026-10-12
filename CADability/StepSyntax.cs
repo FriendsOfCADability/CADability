@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -1735,59 +1735,33 @@ Zero_Surface_Normal:-Geometry_With_Local_Irregularity
 Zone_Structural_Makeup:-Laminate_Table
 ";
         private static string[] deflines = def.Split(new string[] { "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
-        private static Dictionary<string, string[]> subType = null;
-        private static Dictionary<string, string[]> parameter = null;
-        public static Dictionary<string, string[]> SubType
+        private static readonly Dictionary<string, string[]> subType = new Dictionary<string, string[]>();
+        private static readonly Dictionary<string, string[]> parameter = new Dictionary<string, string[]>();
+
+        // Publish both complete tables together before allowing concurrent readers.
+        static StepSyntax()
         {
-            get
+            for (int i = 0; i < deflines.Length; i++)
             {
-                if (subType == null)
+                string[] parts = deflines[i].Split(':');
+                List<string> subTypes = new List<string>();
+                List<string> parameters = new List<string>();
+                if (parts.Length == 2)
                 {
-                    subType = new Dictionary<string, string[]>();
-                    for (int i = 0; i < deflines.Length; i++)
+                    string[] names = parts[1].Split(',');
+                    for (int j = 0; j < names.Length; j++)
                     {
-                        string[] parts = deflines[i].Split(':');
-                        List<string> subTypes = new List<string>();
-                        if (parts.Length == 2)
-                        {
-                            string[] names = parts[1].Split(',');
-                            for (int j = 0; j < names.Length; j++)
-                            {
-                                if (names[j].StartsWith("-")) subTypes.Add(names[j].Substring(1));
-                            }
-                        }
-                        if (subTypes.Count > 0) subType[parts[0]] = subTypes.ToArray();
+                        if (names[j].StartsWith("-")) subTypes.Add(names[j].Substring(1));
+                        if (names[j].StartsWith("*")) names[j] = names[j].Substring(1); // discard "multiple" information
+                        if (!names[j].StartsWith("-")) parameters.Add(names[j]);
                     }
                 }
-                return subType;
+                if (subTypes.Count > 0) subType[parts[0]] = subTypes.ToArray();
+                if (parameters.Count > 0) parameter[parts[0]] = parameters.ToArray();
             }
         }
-        public static Dictionary<string, string[]> Parameter
-        {
-            get
-            {
-                if (parameter == null)
-                {
-                    parameter = new Dictionary<string, string[]>();
-                    for (int i = 0; i < deflines.Length; i++)
-                    {
-                        string[] parts = deflines[i].Split(':');
-                        List<string> parameters = new List<string>();
-                        if (parts.Length == 2)
-                        {
-                            string[] names = parts[1].Split(',');
-                            for (int j = 0; j < names.Length; j++)
-                            {
-                                if (names[j].StartsWith("*")) names[j] = names[j].Substring(1); // discard "multiple" infromation
-                                if (!names[j].StartsWith("-")) parameters.Add(names[j]);
-                            }
-                        }
-                        if (parameters.Count > 0) parameter[parts[0]] = parameters.ToArray();
-                    }
-                }
-                return parameter;
-            }
-        }
+        public static IReadOnlyDictionary<string, string[]> SubType => subType;
+        public static IReadOnlyDictionary<string, string[]> Parameter => parameter;
         public static string[] GetAllParameters(string type, HashSet<string> usedSubTypes = null)
         {
             if (usedSubTypes == null) usedSubTypes = new HashSet<string>();

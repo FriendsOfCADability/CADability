@@ -979,6 +979,7 @@ namespace CADability.Shapes
 		}
 		public void ChangeCyclicalStart(int newStartIndex)
 		{
+			ICurve2D unsplittedOutline = UnsplittedOutline;
 			ICurve2D[] newsegment = new ICurve2D[segment.Length];
 			Array.Copy(segment, newStartIndex, newsegment, 0, segment.Length - newStartIndex);
 			Array.Copy(segment, 0, newsegment, segment.Length - newStartIndex, newStartIndex);
@@ -990,6 +991,8 @@ namespace CADability.Shapes
 			}
 			bool reversed;
 			Recalc(out reversed);
+			// only the start moved, the border is still the same closed curve
+			KeepUnsplittedOutline(unsplittedOutline);
 		}
 		public Border Clone()
 		{
@@ -998,7 +1001,21 @@ namespace CADability.Shapes
 			{
 				cloned[i] = segment[i].Clone();
 			}
-			return new Border(cloned);
+			Border res = new Border(cloned);
+			res.KeepUnsplittedOutline(UnsplittedOutline?.Clone());
+			return res;
+		}
+		/// <summary>
+		/// Sets <see cref="UnsplittedOutline"/> after an operation that kept the geometry of this border, because the
+		/// setter of <see cref="Segments"/> resets it (issue #194). The curve is turned to run like the segments:
+		/// <see cref="Recalc"/> may have reversed them, and <see cref="GetModified"/> reverses them for a reflection,
+		/// while a modified BSpline2D keeps its direction and a modified Circle2D always runs counterclockwise.
+		/// </summary>
+		private void KeepUnsplittedOutline(ICurve2D outline)
+		{
+			if (outline == null) return;
+			if (Math.Sign(outline.GetArea()) != Math.Sign(RecalcArea())) outline.Reverse();
+			UnsplittedOutline = outline;
 		}
 		public ICurve2D[] GetClonedSegments()
 		{
@@ -1015,11 +1032,18 @@ namespace CADability.Shapes
 			double prec = (Extent.Width + Extent.Height) * 1e-8;
 			Reduce(prec);
 		}
-		internal void Reduce(double prec)
+		/// <summary>
+		/// Approximates the segments by lines and arcs, fuses what can be fused and removes segments shorter than
+		/// <paramref name="prec"/>. With <paramref name="keepExactCurves"/> splines and ellipses are kept as they are:
+		/// a face needs its exact outline, and approximating with prec, which is the maximum gap between the
+		/// segments and often tiny, turns a single spline into thousands of arcs (issue 173).
+		/// </summary>
+		internal void Reduce(double prec, bool keepExactCurves = false)
 		{
 			List<ICurve2D> red = new List<ICurve2D>(segment);
 			for (int i = red.Count - 1; i >= 0; --i)
 			{
+				if (keepExactCurves && (red[i] is BSpline2D || red[i] is Ellipse2D)) continue;
 				if (!(red[i] is Line2D) && !(red[i] is Arc2D) && !(red[i] is Circle2D))
 				{
 					ICurve2D app = red[i].Approximate(false, prec); // in Linien und Bögen annähern. Das könnte man noch über einen 2. Parameter steuern
@@ -1073,9 +1097,14 @@ namespace CADability.Shapes
 				}
 			}
 			bool wasClosed = isClosed;
+			ICurve2D unsplittedOutline = UnsplittedOutline;
 			Segments = red.ToArray();
 			if (wasClosed) forceClosed();
 			Recalc(out _);
+			// Reduce only approximates and fuses the segments within prec, the closed border still describes the
+			// same curve. So the unsplitted original curve (e.g. the circle of a hole) remains valid, while the
+			// setter of Segments has reset it (issue #194).
+			if (wasClosed) UnsplittedOutline = unsplittedOutline;
 		}
 		internal bool ReduceDeadEnd()
 		{
@@ -1138,7 +1167,9 @@ namespace CADability.Shapes
 					}
 				}
 			}
-			Segments = red.ToArray();
+			// segments are only ever removed. If none was removed, the border is unchanged and must keep its
+			// UnsplittedOutline, which the setter of Segments would reset (issue #194)
+			if (red.Count < segment.Length) Segments = red.ToArray();
 			if (segment.Length == 0)
 			{
 				area = 0.0;
@@ -3441,7 +3472,13 @@ namespace CADability.Shapes
 					segs[i].Reverse();
 				}
 			}
-			return new Border(segs.ToArray(), isClosed);
+			Border res = new Border(segs.ToArray(), isClosed);
+			// the modified border is the modified single curve, unless the modification degenerates it
+			if (UnsplittedOutline != null && segs.Count == segment.Length && m.Determinant != 0.0)
+			{
+				res.KeepUnsplittedOutline(UnsplittedOutline.GetModified(m));
+			}
+			return res;
 		}
 		public ICurve2D[] GetPart(double startParam, double endParam, bool forward)
 		{
@@ -3996,6 +4033,7 @@ namespace CADability.Shapes
 		protected Border(SerializationInfo info, StreamingContext context) : this()
 		{
 			Segments = (ICurve2D[])InfoReader.Read(info, "Segments", typeof(ICurve2D[]));
+			UnsplittedOutline = (ICurve2D)InfoReader.Read(info, "UnsplittedOutline", typeof(ICurve2D)); // after Segments, which resets it
 		}
 		/// <summary>
 		/// Implements <see cref="ISerializable.GetObjectData"/>
@@ -4005,6 +4043,7 @@ namespace CADability.Shapes
 		public void GetObjectData(SerializationInfo info, StreamingContext context)
 		{
 			info.AddValue("Segments", segment, typeof(ICurve2D[]));
+			if (UnsplittedOutline != null) info.AddValue("UnsplittedOutline", UnsplittedOutline, typeof(ICurve2D));
 		}
 		#endregion
 		#region IDeserializationCallback Members
@@ -4041,6 +4080,7 @@ namespace CADability.Shapes
 			{
 				segment[i].Move(dx, dy);
 			}
+			UnsplittedOutline?.Move(dx, dy);
 			bool reversed;
 			Recalc(out reversed);
 		}
@@ -4578,11 +4618,13 @@ namespace CADability.Shapes
 		public void GetObjectData(IJsonWriteData data)
 		{
 			data.AddProperty("Segments", segment);
+			if (UnsplittedOutline != null) data.AddProperty("UnsplittedOutline", UnsplittedOutline);
 		}
 
 		public void SetObjectData(IJsonReadData data)
 		{
 			segment = data.GetProperty<ICurve2D[]>("Segments");
+			UnsplittedOutline = data.GetPropertyOrDefault<ICurve2D>("UnsplittedOutline"); // missing in older files
 			data.RegisterForSerializationDoneCallback(this);
 		}
 		void IJsonSerializeDone.SerializationDone(CADability.JsonSerialize jsonSerialize)
@@ -4591,6 +4633,7 @@ namespace CADability.Shapes
 			{
 				jsonSerialize.InvokeSerializationDoneCallback(segment[i]);
 			}
+			if (UnsplittedOutline != null) jsonSerialize.InvokeSerializationDoneCallback(UnsplittedOutline);
 			bool reversed;
 			Recalc(out reversed); // this also calculates the extent
 		}

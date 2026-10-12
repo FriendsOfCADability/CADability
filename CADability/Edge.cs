@@ -102,7 +102,7 @@ namespace CADability
             this.createdEdges = new List<Edge>(1); // empty list, so that clones use the same list
             lock (lockStatic)
             {
-                this.id = idCounter++;
+                this.id = System.Threading.Interlocked.Increment(ref idCounter) - 1;
             }
             locker = new Locker(this);
         }
@@ -115,7 +115,7 @@ namespace CADability
             this.createdEdges = new List<Edge>(1); // empty list, so that clones use the same list
             lock (lockStatic)
             {
-                id = idCounter++;
+                id = System.Threading.Interlocked.Increment(ref idCounter) - 1;
             }
             locker = new Locker(this);
         }
@@ -131,7 +131,7 @@ namespace CADability
 #endif
             lock (lockStatic)
             {
-                id = idCounter++;
+                id = System.Threading.Interlocked.Increment(ref idCounter) - 1;
             }
             locker = toClone.locker;
         }
@@ -145,7 +145,7 @@ namespace CADability
             this.forward = forward;
             lock (lockStatic)
             {
-                id = idCounter++;
+                id = System.Threading.Interlocked.Increment(ref idCounter) - 1;
             }
             locker = new Locker(this);
         }
@@ -817,7 +817,7 @@ namespace CADability
         }
         internal Edge()
         {
-            hashCode = hashCodeCounter++; // 
+            hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter) - 1; // 
 #if DEBUG
             if (hashCode == 36008)
             {

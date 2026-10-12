@@ -272,6 +272,12 @@ namespace CADability.Actions
 		private int dragWidth;
 		private int pickRadius;
 		private IPaintTo3DList displayList;
+		/// <summary>
+		/// The display list precision of the model when <see cref="displayList"/> was made. Curves like splines are
+		/// painted as a polyline with that precision; when the model recalculates its display lists more precisely,
+		/// e.g. after zooming in, the selection must be made again, or it no longer lies on the curve.
+		/// </summary>
+		private double displayListModelPrecision;
 
 		private GeoPoint2D fixPoint; // der Fixpunkt beim Ziehen an den Handles
 		private BoundingRect orgExtend; // Ausdehunug der original Objekte beim Ziehen
@@ -507,8 +513,11 @@ namespace CADability.Actions
 				}
 				if ((PaintToSelect.Capabilities & PaintCapabilities.ZoomIndependentDisplayList) != 0)
 				{
+					double modelPrecision = View.Model != null ? View.Model.displayListPrecision : 0.0;
+					if (modelPrecision != displayListModelPrecision) displayList = null;
 					if (displayList == null)
 					{
+						displayListModelPrecision = modelPrecision;
 						PaintToSelect.OpenList("selected");
 						foreach (IGeoObject go in selectedObjects)
 						{
@@ -2363,7 +2372,7 @@ namespace CADability.Actions
 						ICurve app = (sel[i] as ICurve).Approximate(Frame.GetIntSetting("Approximate.Mode", 0) == 0, Frame.GetDoubleSetting("Approximate.Precision", 0.01));
 						addTo.Remove(sel[i]);
 						IGeoObject go = app;
-						go.CopyAttributes(sel[i]);
+						Curves.CopyAttributesToApproximation(go, sel[i]);
 						addTo.Add(go);
 						newSelectedObjects.Add(go);
 					}

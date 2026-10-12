@@ -3244,16 +3244,11 @@ namespace CADability.GeoObject
         public bool HasOpenEdgesExceptPoles()
         {
             Edge[] open = OpenEdges;
-            bool ok = true;
             for (int i = 0; i < open.Length; i++)
             {
-                if (open[i].Vertex1 != open[i].Vertex2)
-                {
-                    ok = false;
-                    break;
-                }
+                if (!IsPole(open[i])) return true;
             }
-            return !ok;
+            return false;
         }
         public Edge[] OpenEdgesExceptPoles
         {
@@ -3262,13 +3257,22 @@ namespace CADability.GeoObject
                 List<Edge> open = new List<Edge>(OpenEdges);
                 for (int i = open.Count - 1; i >= 0; --i)
                 {
-                    if (open[i].Vertex1 == open[i].Vertex2)
+                    if (IsPole(open[i]))
                     {
                         open.RemoveAt(i);
                     }
                 }
                 return open.ToArray();
             }
+        }
+        /// <summary>
+        /// A pole, like the apex of a cone, is an edge that collapses to a single point: it starts and ends at the same
+        /// vertex and has no length. A closed curve, like the circle that bounds a single disc, also starts and ends at the
+        /// same vertex, but if it is open, the shell is open.
+        /// </summary>
+        private static bool IsPole(Edge edge)
+        {
+            return edge.Vertex1 == edge.Vertex2 && (edge.Curve3D == null || edge.Curve3D.Length < Precision.eps);
         }
         public bool RemoveFeature(List<Face> facesToRemove)
         {
@@ -7570,21 +7574,22 @@ namespace CADability.GeoObject
                 {
                     IGeoObjectOwner owner = shell.Owner;
                     Solid newSolid = null;
-                    if (shell.OpenEdges.Length > 0)
+                    // one undo step: closing the open edges gives the edge curves of the new faces the edge style, which the model hears of
+                    using (frame.Project.Undo.UndoFrame)
                     {
-                        if (shell.CloseOpenEdges())
+                        if (shell.OpenEdges.Length > 0)
+                        {
+                            if (shell.CloseOpenEdges())
+                            {
+                                newSolid = Solid.MakeSolid(shell);
+                            }
+                        }
+                        else
                         {
                             newSolid = Solid.MakeSolid(shell);
                         }
-                    }
-                    else
-                    {
-                        newSolid = Solid.MakeSolid(shell);
-                    }
-                    // ActiveFrame.Frame;
-                    if (newSolid != null)
-                    {
-                        using (frame.Project.Undo.UndoFrame)
+                        // ActiveFrame.Frame;
+                        if (newSolid != null)
                         {
                             owner.Remove(shell);
                             shell.Owner = newSolid; // unfortunately owner.Remove(shell) sets the shell.owner to null

@@ -239,7 +239,7 @@ namespace CADability.GeoObject
         {
             lockTriangulationRecalc = new object();
             lockTriangulationData = new object();
-            hashCode = hashCodeCounter++;
+            hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter) - 1;
             extent = BoundingCube.EmptyBoundingCube;
             if (Constructed != null) Constructed(this);
 #if DEBUG
@@ -3076,7 +3076,7 @@ namespace CADability.GeoObject
         public static Face MakeFace(GeoObjectList list)
         {
             list.DecomposeAll();
-            CompoundShape cs = CompoundShape.CreateFromList(list, Precision.eps, out Plane commonplane);
+            CompoundShape cs = CompoundShape.CreateFromList(list, Precision.eps, out Plane commonplane, false, true);
             if (cs != null)
             {
                 if (cs.SimpleShapes.Length == 1 && cs.SimpleShapes[0].Area > Precision.eps)
@@ -3369,7 +3369,7 @@ namespace CADability.GeoObject
         public static Face MakePlanarFace(IGeoObject[] bounds)
         {
             Plane pln;
-            CompoundShape cs = CompoundShape.CreateFromList(new GeoObjectList(bounds), Precision.eps, out pln);
+            CompoundShape cs = CompoundShape.CreateFromList(new GeoObjectList(bounds), Precision.eps, out pln, false, true);
             if (cs == null || cs.SimpleShapes.Length != 1) return null;
             PlaneSurface ps = new PlaneSurface(pln);
             return MakeFace(ps, cs.SimpleShapes[0]);
@@ -8188,7 +8188,7 @@ namespace CADability.GeoObject
             {
                 orientedOutward = true;
             }
-            hashCode = hashCodeCounter++;
+            hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter) - 1;
             extent = BoundingCube.EmptyBoundingCube;
             lockTriangulationRecalc = new object();
             lockTriangulationData = new object();
@@ -8710,7 +8710,8 @@ namespace CADability.GeoObject
             {
                 ISurface simpleSurface;
                 ModOp2D modify;
-                if ((surface as NurbsSurface).GetSimpleSurface(maxError, out simpleSurface, out modify))
+                // the edges are recomputed from their 3D curves, so the surface only needs the same shape
+                if ((surface as NurbsSurface).GetSimpleSurface(maxError, out simpleSurface, out modify, true))
                 {   // die Kanten werden grundlegend neu berechnet, die 2D Kurven werden neu gemacht, es ist hier also
                     // keine Modifikation der 2D Kurven nötig.
                     recalcEdges.UnionWith(Edges);

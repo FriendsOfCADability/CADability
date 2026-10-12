@@ -1,4 +1,8 @@
 - name: Introduction
-  href: ../article/intro.html
-- name: Objects
-  href: ../articles/toc.html
+  href: general.md
+- name: Organizational classes
+  href: orgclass.md
+- name: Data model
+  href: database.md
+- name: Boundary representation
+  href: brep.md

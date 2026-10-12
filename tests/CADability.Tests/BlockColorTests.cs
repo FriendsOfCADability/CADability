@@ -628,31 +628,9 @@ namespace CADability.Tests
         private static string CdbFile([CallerFilePath] string thisFile = "")
             => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(thisFile), "Files", "CDB", "issue293.cdb.json");
 
-        private static Project ReadProject(string file)
-        {
-            try
-            {
-                return Project.ReadFromFile(file, "cdb");
-            }
-            catch (TypeInitializationException e) when (e.GetBaseException() is PlatformNotSupportedException)
-            {
-                Assert.Inconclusive("reading a project needs System.Drawing printing, which is only available on Windows");
-                return null;
-            }
-        }
+        private static Project ReadProject(string file) => Project.ReadFromFile(file, "cdb");
 
-        private static Project ReadProject(Stream stream)
-        {
-            try
-            {
-                return Project.ReadFromJson(stream);
-            }
-            catch (TypeInitializationException e) when (e.GetBaseException() is PlatformNotSupportedException)
-            {
-                Assert.Inconclusive("reading a project needs System.Drawing printing, which is only available on Windows");
-                return null;
-            }
-        }
+        private static Project ReadProject(Stream stream) => Project.ReadFromJson(stream);
 
         /// <summary>
         /// Records which color is current when a polyline is painted.

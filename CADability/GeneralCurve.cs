@@ -1190,11 +1190,8 @@ namespace CADability.GeoObject
             if (Precision.SameDirection(v2, d, false) || Precision.SameDirection(v1, d, false) || v1.IsNullVector() || v2.IsNullVector())
             {
                 // es geht einfach nur geradeaus
-                pars.Add(from);
-                points.Add(p1);
                 GeoPoint pm = new GeoPoint(p1, p2);
-                vertices.Add(pm);
-                vertices.Add(pm);
+                AddPiece(from, to, p1, p2, pm, pm, points, pars, vertices, deepth);
             }
             else
             {
@@ -1259,31 +1256,24 @@ namespace CADability.GeoObject
 
                             // Orientierung überprüfen
                             Plane plt = new Plane(p1, p3, p2); // geht ggf. nach PlaneException
-                            pars.Add(from);
-                            points.Add(p1);
                             GeoPoint pm = new GeoPoint(p1, p2, p3, p4);
                             GeoPoint p11 = plt.ToLocal(pm);
                             if (p11.z > 0) // war vorher anders so sind die Ebenen alle so orientiert, dass sie nach außen zeigen
                             // aber die Orientierung ist immer noch nicht gut
                             // if ((((p2 - p1) ^ (p3 - p1)) * (p4 - p1)) < 0)
                             {
-                                vertices.Add(p4);
-                                vertices.Add(p3);
+                                AddPiece(from, to, p1, p2, p4, p3, points, pars, vertices, deepth);
                             }
                             else
                             {
-                                vertices.Add(p3);
-                                vertices.Add(p4);
+                                AddPiece(from, to, p1, p2, p3, p4, points, pars, vertices, deepth);
                             }
                             //}
                         }
                         else
                         {   // es geht völlig gerade weiter
-                            pars.Add(from);
-                            points.Add(p1);
                             GeoPoint pm = new GeoPoint(p1, p2);
-                            vertices.Add(pm);
-                            vertices.Add(pm);
+                            AddPiece(from, to, p1, p2, pm, pm, points, pars, vertices, deepth);
                         }
                     }
                 }
@@ -1299,13 +1289,113 @@ namespace CADability.GeoObject
                     }
                     res.SetPoints(vtx, false);
 #endif
-                    pars.Add(from);
-                    points.Add(p1);
                     GeoPoint pm = new GeoPoint(p1, p2);
-                    vertices.Add(pm);
-                    vertices.Add(pm);
+                    AddPiece(from, to, p1, p2, pm, pm, points, pars, vertices, deepth);
                 }
             }
+        }
+        /// <summary>
+        /// Pieces of the curve shorter than this (in the parameter range 0 to 1) are not split any further, even if their
+        /// hull does not enclose them.
+        /// </summary>
+        private const double MinPieceLength = 1e-6;
+        /// <summary>
+        /// How many more pieces <see cref="AddPiece"/> may still make by splitting. An S needs about twenty splits to
+        /// isolate its inflection point; the limit keeps a curve that is nowhere enclosed, e.g. because it returns
+        /// invalid points, from being cut into an exponential number of pieces.
+        /// </summary>
+        private int splitBudget = 1000;
+        /// <summary>
+        /// Adds the piece of the curve from <paramref name="from"/> to <paramref name="to"/> with the hull spanned by
+        /// <paramref name="p1"/>, <paramref name="p2"/>, <paramref name="t1"/> and <paramref name="t2"/>. The hull is
+        /// made from the end points and the end tangents, which encloses the piece only if it turns one way. A piece
+        /// with an inflection point, an S, lies partly beside such a hull, and the hit tests and intersections that
+        /// rely on the hull miss it there. Such a piece is split in the middle and its halves are made instead.
+        /// </summary>
+        private void AddPiece(double from, double to, GeoPoint p1, GeoPoint p2, GeoPoint t1, GeoPoint t2, List<GeoPoint> points, List<double> pars, List<GeoPoint> vertices, int deepth)
+        {
+            if (to - from > MinPieceLength && splitBudget > 0 && !Encloses(from, to, p1, p2, t1, t2))
+            {
+                --splitBudget;
+                double m = (from + to) / 2.0;
+                MakeTetraeder(from, m, points, pars, vertices, deepth + 1);
+                MakeTetraeder(m, to, points, pars, vertices, deepth + 1);
+                return;
+            }
+            pars.Add(from);
+            points.Add(p1);
+            vertices.Add(t1);
+            vertices.Add(t2);
+        }
+        /// <summary>
+        /// Whether five points inside the piece of the curve from <paramref name="from"/> to <paramref name="to"/> lie
+        /// in the hull spanned by p1, p2, t1 and t2.
+        /// </summary>
+        private bool Encloses(double from, double to, GeoPoint p1, GeoPoint p2, GeoPoint t1, GeoPoint t2)
+        {
+            double tolerance = Precision.eps + 1e-8 * (p1 | p2);
+            for (int i = 1; i <= 5; ++i)
+            {
+                if (!IsInHull(theCurve.PointAt(from + i * (to - from) / 6.0), p1, p2, t1, t2, tolerance)) return false;
+            }
+            return true;
+        }
+        /// <summary>
+        /// Whether <paramref name="q"/> lies in the convex hull of the four points, which may be a tetrahedron, a flat
+        /// quadrilateral or triangle, or a segment, with the distance <paramref name="tolerance"/>.
+        /// </summary>
+        private static bool IsInHull(GeoPoint q, GeoPoint p1, GeoPoint p2, GeoPoint t1, GeoPoint t2, double tolerance)
+        {
+            GeoPoint[] v = new GeoPoint[] { p1, p2, t1, t2 };
+            double size = 0.0;
+            for (int i = 0; i < 4; ++i)
+                for (int j = i + 1; j < 4; ++j) size = Math.Max(size, v[i] | v[j]);
+            double volume = (p2 - p1) * ((t1 - p1) ^ (t2 - p1));
+            if (Math.Abs(volume) > 1e-9 * size * size * size)
+            {   // a real tetrahedron: q must be on the inner side of all four faces
+                int[,] faces = new int[,] { { 0, 1, 2, 3 }, { 0, 1, 3, 2 }, { 0, 2, 3, 1 }, { 1, 2, 3, 0 } };
+                for (int f = 0; f < 4; ++f)
+                {
+                    GeoPoint a = v[faces[f, 0]];
+                    GeoVector n = (v[faces[f, 1]] - a) ^ (v[faces[f, 2]] - a);
+                    n.Norm();
+                    if (n * (v[faces[f, 3]] - a) < 0) n = -n;
+                    if (n * (q - a) < -tolerance) return false;
+                }
+                return true;
+            }
+            // flat: the convex hull is covered by the four triangles of the points
+            return IsInTriangle(q, p1, p2, t1, tolerance) || IsInTriangle(q, p1, p2, t2, tolerance)
+                || IsInTriangle(q, p1, t1, t2, tolerance) || IsInTriangle(q, p2, t1, t2, tolerance);
+        }
+        private static bool IsInTriangle(GeoPoint q, GeoPoint a, GeoPoint b, GeoPoint c, double tolerance)
+        {
+            GeoVector n = (b - a) ^ (c - a);
+            double longest = Math.Max(a | b, Math.Max(b | c, a | c));
+            if (n.Length <= 1e-12 * longest * longest)
+            {   // the triangle is a segment
+                return Math.Min(DistanceToSegment(q, a, b), Math.Min(DistanceToSegment(q, b, c), DistanceToSegment(q, a, c))) <= tolerance;
+            }
+            n.Norm();
+            if (Math.Abs(n * (q - a)) > tolerance) return false;
+            GeoPoint[] t = new GeoPoint[] { a, b, c };
+            for (int i = 0; i < 3; ++i)
+            {
+                GeoPoint e0 = t[i], e1 = t[(i + 1) % 3], opposite = t[(i + 2) % 3];
+                GeoVector inward = n ^ (e1 - e0);
+                inward.Norm();
+                if (inward * (opposite - e0) < 0) inward = -inward;
+                if (inward * (q - e0) < -tolerance) return false;
+            }
+            return true;
+        }
+        private static double DistanceToSegment(GeoPoint q, GeoPoint a, GeoPoint b)
+        {
+            GeoVector d = b - a;
+            double l2 = d * d;
+            if (l2 == 0.0) return q | a;
+            double s = Math.Max(0.0, Math.Min(1.0, ((q - a) * d) / l2));
+            return q | (a + s * d);
         }
         protected void MakeTetraederHull()
         {
@@ -2570,8 +2660,10 @@ namespace CADability.GeoObject
                 double umindist = -1.0;
                 if (all.Length > 0)
                 {
+                    HashSet<CurveTetraeder> tested = new HashSet<CurveTetraeder>();
                     for (int i = 0; i < all.Length; ++i)
                     {
+                        tested.Add(all[i]);
                         GeoPoint pfound;
                         double u;
                         double d = FindClosestPoint(p, all[i].umin, all[i].umax, out pfound, out u);
@@ -2579,6 +2671,23 @@ namespace CADability.GeoObject
                         {
                             mindist = d;
                             umindist = u;
+                        }
+                    }
+                    // the pieces found first are those whose hull is next to p, but a closer point of the curve may lie on
+                    // a piece whose hull only reaches the cube around p that the distance found so far spans
+                    if (mindist < double.MaxValue && mindist > OctTree.precision)
+                    {
+                        foreach (CurveTetraeder ct in OctTree.GetObjectsFromBox(new BoundingCube(p, mindist)))
+                        {
+                            if (!tested.Add(ct)) continue;
+                            GeoPoint pfound;
+                            double u;
+                            double d = FindClosestPoint(p, ct.umin, ct.umax, out pfound, out u);
+                            if (d < mindist)
+                            {
+                                mindist = d;
+                                umindist = u;
+                            }
                         }
                     }
                 }
@@ -2608,6 +2717,9 @@ namespace CADability.GeoObject
                 dbg.Add(Line.TwoPoints(theCurve.PointAt(umin), theCurve.PointAt(umax)));
 #endif
                 double d = (dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
+                // the derivative vanishes where coinciding poles model a corner, and the Newton step would divide by 0
+                // and make everything NaN, so that this segment, which may contain the point, would be ignored
+                if (!(d > 0.0)) return GoldenSectionClosestPoint(p, umin, umax, out pfound, out u);
                 double lambda = -((pfound.x - p.x) * dir.x + (pfound.y - p.y) * dir.y + (pfound.z - p.z) * dir.z) / d;
                 u += lambda;
                 if (u < umin)
@@ -2642,6 +2754,51 @@ namespace CADability.GeoObject
             return dist;
         }
 
+        /// <summary>
+        /// The distance from <paramref name="p"/> to the closest point of the curve between <paramref name="umin"/> and
+        /// <paramref name="umax"/>, found by a golden section search, which needs no derivative.
+        /// </summary>
+        private double GoldenSectionClosestPoint(GeoPoint p, double umin, double umax, out GeoPoint pfound, out double u)
+        {
+            const double invPhi = 0.6180339887498949;
+            double a = umin, b = umax;
+            double c = b - invPhi * (b - a), e = a + invPhi * (b - a);
+            double dc = theCurve.PointAt(c) | p, de = theCurve.PointAt(e) | p;
+            // the interval cannot get narrower than the spacing of doubles at umin and umax, so a tolerance relative to
+            // a short interval alone may never be reached; the iteration count is a second limit (0.618^200 ~ 1e-42)
+            const double machineEpsilon = 2.220446049250313e-16; // the spacing of doubles at 1.0
+            double tolerance = Math.Max((umax - umin) * 1e-14, 4.0 * machineEpsilon * Math.Max(Math.Abs(umin), Math.Abs(umax)));
+            for (int iteration = 0; b - a > tolerance && iteration < 200; ++iteration)
+            {
+                if (dc < de)
+                {
+                    b = e; e = c; de = dc;
+                    c = b - invPhi * (b - a);
+                    dc = theCurve.PointAt(c) | p;
+                }
+                else
+                {
+                    a = c; c = e; dc = de;
+                    e = a + invPhi * (b - a);
+                    de = theCurve.PointAt(e) | p;
+                }
+            }
+            u = (a + b) / 2.0;
+            pfound = theCurve.PointAt(u);
+            double dist = pfound | p;
+            // the minimum may be at an end of the interval
+            foreach (double end in new[] { umin, umax })
+            {
+                GeoPoint pe = theCurve.PointAt(end);
+                if ((pe | p) < dist)
+                {
+                    dist = pe | p;
+                    pfound = pe;
+                    u = end;
+                }
+            }
+            return dist;
+        }
         internal double GetLength()
         {
             double length = 0.0;

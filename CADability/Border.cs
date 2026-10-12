@@ -1032,11 +1032,18 @@ namespace CADability.Shapes
 			double prec = (Extent.Width + Extent.Height) * 1e-8;
 			Reduce(prec);
 		}
-		internal void Reduce(double prec)
+		/// <summary>
+		/// Approximates the segments by lines and arcs, fuses what can be fused and removes segments shorter than
+		/// <paramref name="prec"/>. With <paramref name="keepExactCurves"/> splines and ellipses are kept as they are:
+		/// a face needs its exact outline, and approximating with prec, which is the maximum gap between the
+		/// segments and often tiny, turns a single spline into thousands of arcs (issue 173).
+		/// </summary>
+		internal void Reduce(double prec, bool keepExactCurves = false)
 		{
 			List<ICurve2D> red = new List<ICurve2D>(segment);
 			for (int i = red.Count - 1; i >= 0; --i)
 			{
+				if (keepExactCurves && (red[i] is BSpline2D || red[i] is Ellipse2D)) continue;
 				if (!(red[i] is Line2D) && !(red[i] is Arc2D) && !(red[i] is Circle2D))
 				{
 					ICurve2D app = red[i].Approximate(false, prec); // in Linien und Bögen annähern. Das könnte man noch über einen 2. Parameter steuern
@@ -4026,6 +4033,7 @@ namespace CADability.Shapes
 		protected Border(SerializationInfo info, StreamingContext context) : this()
 		{
 			Segments = (ICurve2D[])InfoReader.Read(info, "Segments", typeof(ICurve2D[]));
+			UnsplittedOutline = (ICurve2D)InfoReader.Read(info, "UnsplittedOutline", typeof(ICurve2D)); // after Segments, which resets it
 		}
 		/// <summary>
 		/// Implements <see cref="ISerializable.GetObjectData"/>
@@ -4035,6 +4043,7 @@ namespace CADability.Shapes
 		public void GetObjectData(SerializationInfo info, StreamingContext context)
 		{
 			info.AddValue("Segments", segment, typeof(ICurve2D[]));
+			if (UnsplittedOutline != null) info.AddValue("UnsplittedOutline", UnsplittedOutline, typeof(ICurve2D));
 		}
 		#endregion
 		#region IDeserializationCallback Members
@@ -4609,11 +4618,13 @@ namespace CADability.Shapes
 		public void GetObjectData(IJsonWriteData data)
 		{
 			data.AddProperty("Segments", segment);
+			if (UnsplittedOutline != null) data.AddProperty("UnsplittedOutline", UnsplittedOutline);
 		}
 
 		public void SetObjectData(IJsonReadData data)
 		{
 			segment = data.GetProperty<ICurve2D[]>("Segments");
+			UnsplittedOutline = data.GetPropertyOrDefault<ICurve2D>("UnsplittedOutline"); // missing in older files
 			data.RegisterForSerializationDoneCallback(this);
 		}
 		void IJsonSerializeDone.SerializationDone(CADability.JsonSerialize jsonSerialize)
@@ -4622,6 +4633,7 @@ namespace CADability.Shapes
 			{
 				jsonSerialize.InvokeSerializationDoneCallback(segment[i]);
 			}
+			if (UnsplittedOutline != null) jsonSerialize.InvokeSerializationDoneCallback(UnsplittedOutline);
 			bool reversed;
 			Recalc(out reversed); // this also calculates the extent
 		}

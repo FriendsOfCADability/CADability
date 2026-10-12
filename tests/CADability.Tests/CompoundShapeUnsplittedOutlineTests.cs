@@ -111,6 +111,25 @@ namespace CADability.Tests
         }
 
         [TestMethod]
+        public void SavingAndReading_KeepsUnsplittedOutline()
+        {
+            GeoPoint2D center = new GeoPoint2D(5, 7);
+            Border border = SplitCircle(center, 3);
+            Border read = (Border)JsonSerialize.FromString(JsonSerialize.ToString(border));
+            Assert.AreEqual(2, read.Segments.Length);
+            AssertIsCircle(read.UnsplittedOutline, center, 3, "read");
+            AssertOrientedLikeTheBorder(read, "read");
+
+            Border plain = (Border)JsonSerialize.FromString(JsonSerialize.ToString(Border.MakeRectangle(0, 10, 0, 5)));
+            Assert.IsNull(plain.UnsplittedOutline, "a border without UnsplittedOutline");
+
+            // the hole of a hatch, the way a CompoundShape stores it in a project
+            SimpleShape withHole = new SimpleShape(Border.MakeRectangle(0, 20, 0, 20), SplitCircle(new GeoPoint2D(10, 10), 4));
+            CompoundShape shape = (CompoundShape)JsonSerialize.FromString(JsonSerialize.ToString(new CompoundShape(withHole)));
+            AssertIsCircle(shape.SimpleShapes[0].Holes[0].UnsplittedOutline, new GeoPoint2D(10, 10), 4, "hole of a compound shape");
+        }
+
+        [TestMethod]
         public void Clone_KeepsUnsplittedOutline()
         {
             GeoPoint2D center = new GeoPoint2D(5, 7);

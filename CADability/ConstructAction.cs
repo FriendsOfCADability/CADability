@@ -3852,6 +3852,36 @@ namespace CADability.Actions
 				Choice = val;
 				constructAction.RefreshDependantProperties();
 			}
+			/// <summary>
+			/// Replaces the choices this input offers, also while the action is running, e.g. to leave out choices that
+			/// don't apply in the current situation (issue #254). <see cref="Choice"/> is an index into the new choices.
+			/// The selected entry is kept if its text is among the new choices. Otherwise the first choice is selected
+			/// and <see cref="SetChoiceEvent"/> is raised with it, as if the user had selected it.
+			/// </summary>
+			/// <param name="choices">the texts of the new choices, at least one</param>
+			public void SetChoices(string[] choices)
+			{
+				if (choices == null || choices.Length == 0) throw new ArgumentException("at least one choice is required", nameof(choices));
+				string[] oldChoices = directValues ?? StringTable.GetSplittedStrings(resourceIdValues);
+				string selected = (oldChoices != null && choice >= 0 && choice < oldChoices.Length) ? oldChoices[choice] : null;
+				directValues = (string[])choices.Clone();
+				int newChoice = selected != null ? Array.IndexOf(directValues, selected) : -1;
+				bool selectionLost = newChoice < 0;
+				if (selectionLost) newChoice = 0;
+				Choice = newChoice;
+				if (multipleChoiceProperty != null)
+				{
+					multipleChoiceProperty.Choices = directValues;
+					multipleChoiceProperty.SetSelection(newChoice);
+					multipleChoiceProperty.Refresh();
+				}
+				if (selectionLost)
+				{
+					if (DefaultChoice != null) DefaultChoice.Integer = newChoice;
+					SetChoiceEvent?.Invoke(newChoice);
+					constructAction?.RefreshDependantProperties();
+				}
+			}
 
 			/// <summary>
 			/// Constructs a MultipleChoiceInput object with no initial value
@@ -6624,9 +6654,9 @@ namespace CADability.Actions
 		#region von der Anwenderklasse zu überschreibende Methoden
 		/// <summary>
 		/// Called, when the ConstructAction is done, i.e. all non-optional inputs
-		/// have been fixed. The default implementation adds the active object (if it exists)
-		/// to the active model and removes this action. Override this method if you need
-		/// a different behaviour.
+		/// have been fixed. The default implementation adds the active object (if it exists and
+		/// <see cref="IGeoObject.HasValidData"/> returns true) to the active model and removes this action.
+		/// Override this method if you need a different behaviour.
 		/// </summary>
 		public virtual void OnDone()
 		{
@@ -6634,7 +6664,8 @@ namespace CADability.Actions
 			{
 				InputDefinitions[i].OnActionDone();
 			}
-			if (activeObject != null && showActiveObject) // showActiveObject hinzugefügt, ist das OK?
+			// an invalid object, e.g. a line with identical start and end point, is not added (Model.Add does not check this)
+			if (activeObject != null && showActiveObject && activeObject.HasValidData()) // showActiveObject hinzugefügt, ist das OK?
 			{
 				if (disassembleBlock && activeObject is Block)
 				{

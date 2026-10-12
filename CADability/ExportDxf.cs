@@ -37,6 +37,7 @@ namespace CADability.DXF
         private readonly bool dimensionsAsDimension;
         private double triangulationPrecision = 0.1;
 
+        [CLSCompliant(false)] // ACadVersion comes from ACadSharp, which is not CLS compliant
         public Export(ACadVersion version = ACadVersion.AC1015)
         {
             doc = new CadDocument(version);
@@ -105,6 +106,15 @@ namespace CADability.DXF
 
         public void WriteToFile(Project toExport, string filename)
         {
+            WriteToFile(toExport, filename, false);
+        }
+        /// <summary>
+        /// Writes the model space of <paramref name="toExport"/> to <paramref name="filename"/>, as DWG when
+        /// <paramref name="asDwg"/> is set, otherwise as DXF. ACadSharp writes DWG from AutoCAD 14 on, except
+        /// AutoCAD 2007, see <see cref="Project.Export"/>.
+        /// </summary>
+        internal void WriteToFile(Project toExport, string filename, bool asDwg)
+        {
             Model modelSpace = null;
             if (toExport.GetModelCount() == 1) modelSpace = toExport.GetModel(0);
             else modelSpace = toExport.FindModel("*Model_Space");
@@ -128,6 +138,14 @@ namespace CADability.DXF
                         msBlock.Entities.Add(e);
             }
             SetExtents(modelSpace);
+            if (asDwg)
+            {
+                using (var writer = new DwgWriter(filename, doc))
+                {
+                    writer.Write();
+                }
+                return;
+            }
             using (var writer = new DxfWriter(filename, doc, false))
             {
                 ConfigureWriter(writer);
@@ -170,6 +188,7 @@ namespace CADability.DXF
 
         private Entity[] GeoObjectToEntity(IGeoObject geoObject)
         {
+            if (!geoObject.HasValidData()) return null; // e.g. a circle with radius 0 would abort the export
             Entity entity = null;
             Entity[] entities = null;
             switch (geoObject)
@@ -1105,7 +1124,25 @@ namespace CADability.DXF
 
             var spline = new ACadSharp.Entities.Spline();
             spline.Degree = bspline.Degree;
-            spline.IsClosed = bspline.IsClosed;
+            // The flags are what follows from the curve: closed when it ends where it starts, planar (with the normal of
+            // its plane) or even linear, rational with weights. What the writing program merely declared, e.g. periodic
+            // for a spline with clamped knots, is not part of the curve and cannot be written back (issue 173).
+            ICurve curve = bspline;
+            spline.IsClosed = bspline.IsClosed || Precision.IsEqual(curve.StartPoint, curve.EndPoint);
+            if (bspline.HasWeights) spline.Flags |= SplineFlags.Rational;
+            switch (curve.GetPlanarState())
+            {
+                case PlanarState.Planar:
+                    spline.Flags |= SplineFlags.Planar;
+                    GeoVector normal = curve.GetPlane().Normal;
+                    // the sign is arbitrary, prefer the one pointing to positive z (then y, then x)
+                    if (normal.z < 0 || (normal.z == 0 && (normal.y < 0 || (normal.y == 0 && normal.x < 0)))) normal = -normal;
+                    spline.Normal = ToXYZ(normal);
+                    break;
+                case PlanarState.UnderDetermined: // all poles on a line
+                    spline.Flags |= SplineFlags.Planar | SplineFlags.Linear;
+                    break;
+            }
             foreach (var pt in poles) spline.ControlPoints.Add(pt);
             foreach (var k in knots) spline.Knots.Add(k);
             if (bspline.HasWeights)

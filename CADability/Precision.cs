@@ -2,13 +2,6 @@
 
 namespace CADability
 {
-    #region ACHTUNG
-    /* Achtung:
-     * [ThreadStatic] wäre das richtige für eps aund epsa. Jedoch darf man [ThreadStatic] Members nicht initialisieren.
-     * Man müsste also drauf achten in allen Methoden, dass wenn 0.0, dann noch nicht initialisiert...
-     */
-    #endregion
-
     /// <summary>
     /// Precision specifies the order of size of a typical model. For example 
     /// two points are considered geometrically equal if their distance is less than
@@ -19,15 +12,46 @@ namespace CADability
 
     public class Precision
     {
+        private static double globalEps = 1e-6, globalEpsa = 1e-6;
+        // The values of the innermost PrecisionOverride on this thread, 0.0 where there is none: a [ThreadStatic] field
+        // cannot be initialized, it is 0.0 on every new thread.
+        [ThreadStatic] private static double threadEps, threadEpsa;
+        // The number of PrecisionOverrides alive on all threads. As long as there is none, eps and epsa are read
+        // without accessing the thread static fields.
+        private static int activeOverrides;
         /// <summary>
-        /// The maximum distance for which two points are considered geometrically equal.
+        /// The maximum distance for which two points are considered geometrically equal. Setting it changes the value
+        /// for all threads, a <see cref="PrecisionOverride"/> changes it only for the thread that creates it.
         /// </summary>
-        public static double eps = 1e-6;
+        public static double eps
+        {
+            get { return activeOverrides == 0 || threadEps == 0.0 ? globalEps : threadEps; }
+            set { globalEps = value; }
+        }
         // public static double size = 1000.0;
         /// <summary>
-        /// The maximum difference in radians for two angles to be considered geometrically equal.
+        /// The maximum difference in radians for two angles to be considered geometrically equal. Setting it changes the
+        /// value for all threads, a <see cref="PrecisionOverride"/> changes it only for the thread that creates it.
         /// </summary>
-        public static double epsa = 1e-6;
+        public static double epsa
+        {
+            get { return activeOverrides == 0 || threadEpsa == 0.0 ? globalEpsa : threadEpsa; }
+            set { globalEpsa = value; }
+        }
+        internal static (double eps, double epsa) BeginOverride(double eps, double epsa)
+        {
+            (double, double) previous = (threadEps, threadEpsa);
+            System.Threading.Interlocked.Increment(ref activeOverrides);
+            threadEps = eps;
+            threadEpsa = epsa;
+            return previous;
+        }
+        internal static void EndOverride((double eps, double epsa) previous)
+        {
+            threadEps = previous.eps;
+            threadEpsa = previous.epsa;
+            System.Threading.Interlocked.Decrement(ref activeOverrides);
+        }
         public static void SetFromModel(Model m)
         {
             // TODO: size ist maximale Modellgröße, eps = size *1e-9
@@ -326,36 +350,32 @@ namespace CADability
     /// <summary>
     /// Use this class to temporary override the values for the precision. The best
     /// way to use this class is the C# using statement. The constructor of this
-    /// class overrides the values for the global <see cref="Precision"/>. The <see cref="Dispose"/>
-    /// method restores the previous values.
+    /// class overrides the values of <see cref="Precision"/> for the current thread, other threads
+    /// keep their values. The <see cref="Dispose"/> method restores the previous values, it must be called
+    /// on the same thread (so there must be no await inside the using statement).
     /// </summary>
 
     public class PrecisionOverride : IDisposable
     {
-        private double oldeps;
-        private double oldepsa;
+        private (double eps, double epsa) previous;
+        private bool disposed;
         /// <summary>
-        /// Sets the global Precision.eps value.
+        /// Sets Precision.eps for the current thread.
         /// </summary>
         /// <param name="eps">The new Precision.eps value</param>
         public PrecisionOverride(double eps)
         {
-            oldeps = Precision.eps;
-            oldepsa = Precision.epsa;
-            Precision.eps = eps;
+            previous = Precision.BeginOverride(eps, Precision.epsa);
         }
 
         /// <summary>
-        /// Sets the global Precision.eps and epsa value.
+        /// Sets Precision.eps and Precision.epsa for the current thread.
         /// </summary>
         /// <param name="eps">The new Precision.eps value</param>
         /// <param name="epsa">The new Precision.epsa value</param>
         public PrecisionOverride(double eps, double epsa)
         {
-            oldeps = Precision.eps;
-            oldepsa = Precision.epsa;
-            Precision.eps = eps;
-            Precision.epsa = epsa;
+            previous = Precision.BeginOverride(eps, epsa);
         }
 
         #region IDisposable Members
@@ -365,8 +385,9 @@ namespace CADability
         /// </summary>
         public void Dispose()
         {
-            Precision.eps = oldeps;
-            Precision.epsa = oldepsa;
+            if (disposed) return;
+            disposed = true;
+            Precision.EndOverride(previous);
         }
 
         #endregion

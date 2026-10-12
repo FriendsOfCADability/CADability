@@ -26,7 +26,7 @@ namespace CADability
             this.position = position;
             edges = new HashSet<Edge>();
             uvposition = new Dictionary<Face, GeoPoint2D>();
-            hashCode = hashCodeCounter++;
+            hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter) - 1;
 #if DEBUG
             if (37747 == hashCode || 37844 == hashCode) { }
 #endif
@@ -387,7 +387,7 @@ namespace CADability
         {
             edges = new HashSet<Edge>();
             uvposition = new Dictionary<Face, GeoPoint2D>();
-            hashCode = hashCodeCounter++;
+            hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter) - 1;
         }
         public void GetObjectData(IJsonWriteData data)
         {
@@ -432,7 +432,7 @@ namespace CADability
             position = (GeoPoint)info.GetValue("Position", typeof(GeoPoint));
             deserializedEdges = (Edge[])info.GetValue("Edges", typeof(Edge[]));
             uvposition = new Dictionary<Face, GeoPoint2D>();
-            hashCode = hashCodeCounter++;
+            hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter) - 1;
         }
 
         /// <summary>

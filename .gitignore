@@ -350,3 +350,6 @@ CADability.Forms/log.txt
 /CADability.Forms/UnfoldOptions.cs
 /CADability.Forms/ImportSVG.cs
 /CADability.BlenderInterface/CADability.BlenderInterface.csproj
+
+# the website, assembled by .github/workflows/pages.yml
+/_site/

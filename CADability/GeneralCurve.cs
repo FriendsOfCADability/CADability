@@ -2660,8 +2660,10 @@ namespace CADability.GeoObject
                 double umindist = -1.0;
                 if (all.Length > 0)
                 {
+                    HashSet<CurveTetraeder> tested = new HashSet<CurveTetraeder>();
                     for (int i = 0; i < all.Length; ++i)
                     {
+                        tested.Add(all[i]);
                         GeoPoint pfound;
                         double u;
                         double d = FindClosestPoint(p, all[i].umin, all[i].umax, out pfound, out u);
@@ -2669,6 +2671,23 @@ namespace CADability.GeoObject
                         {
                             mindist = d;
                             umindist = u;
+                        }
+                    }
+                    // the pieces found first are those whose hull is next to p, but a closer point of the curve may lie on
+                    // a piece whose hull only reaches the cube around p that the distance found so far spans
+                    if (mindist < double.MaxValue && mindist > OctTree.precision)
+                    {
+                        foreach (CurveTetraeder ct in OctTree.GetObjectsFromBox(new BoundingCube(p, mindist)))
+                        {
+                            if (!tested.Add(ct)) continue;
+                            GeoPoint pfound;
+                            double u;
+                            double d = FindClosestPoint(p, ct.umin, ct.umax, out pfound, out u);
+                            if (d < mindist)
+                            {
+                                mindist = d;
+                                umindist = u;
+                            }
                         }
                     }
                 }
@@ -2745,7 +2764,11 @@ namespace CADability.GeoObject
             double a = umin, b = umax;
             double c = b - invPhi * (b - a), e = a + invPhi * (b - a);
             double dc = theCurve.PointAt(c) | p, de = theCurve.PointAt(e) | p;
-            while (b - a > (umax - umin) * 1e-14)
+            // the interval cannot get narrower than the spacing of doubles at umin and umax, so a tolerance relative to
+            // a short interval alone may never be reached; the iteration count is a second limit (0.618^200 ~ 1e-42)
+            const double machineEpsilon = 2.220446049250313e-16; // the spacing of doubles at 1.0
+            double tolerance = Math.Max((umax - umin) * 1e-14, 4.0 * machineEpsilon * Math.Max(Math.Abs(umin), Math.Abs(umax)));
+            for (int iteration = 0; b - a > tolerance && iteration < 200; ++iteration)
             {
                 if (dc < de)
                 {

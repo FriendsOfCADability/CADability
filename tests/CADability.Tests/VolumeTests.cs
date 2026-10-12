@@ -254,22 +254,7 @@ namespace CADability.Tests
         /// The untrimmed pointed cone, the cone with a box cut away beside the axis and the cone with a bore across
         /// it, each with its exact volume and area.
         /// </summary>
-        /// <summary>
-        /// Reads the cdb file. Reading a project initializes the printing settings of System.Drawing, which is only
-        /// supported on Windows, so on other systems the test is inconclusive.
-        /// </summary>
-        private static Project ReadProject(string file)
-        {
-            try
-            {
-                return Project.ReadFromFile(file, "cdb");
-            }
-            catch (TypeInitializationException e) when (e.GetBaseException() is PlatformNotSupportedException)
-            {
-                Assert.Inconclusive("reading a project needs System.Drawing printing, which is only available on Windows");
-                return null;
-            }
-        }
+        private static Project ReadProject(string file) => Project.ReadFromFile(file, "cdb");
 
         private static (string name, Shell shell, double volume, double area)[] PointedCones()
         {

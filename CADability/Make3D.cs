@@ -956,6 +956,8 @@ namespace CADability.GeoObject
 
         public static IGeoObject MakePipe(IGeoObject faceShellOrPath, Path along, Project project)
         {
+            faceShellOrPath = SplitSplinesAtCorners(faceShellOrPath);
+            along = (Path)SplitSplinesAtCorners(along);
             if (faceShellOrPath is Path)
             {
                 Path path = (faceShellOrPath as Path);
@@ -2581,6 +2583,37 @@ namespace CADability.GeoObject
             return res;
         }
         /// <summary>
+        /// A spline with corners as a path of its smooth pieces (see <see cref="BSpline.SplitAtCorners"/>), also inside a
+        /// path. A surface made from a curve with a kink would have that kink inside one face. Other objects are returned
+        /// unchanged.
+        /// </summary>
+        internal static IGeoObject SplitSplinesAtCorners(IGeoObject go)
+        {
+            if (go is BSpline bsp)
+            {
+                ICurve[] parts = bsp.SplitAtCorners();
+                if (parts.Length < 2) return go;
+                Path res = Path.Construct();
+                res.Set(parts);
+                res.CopyAttributes(bsp);
+                return res;
+            }
+            if (go is Path path && path.Curves.Any(c => c is BSpline b && b.CornerParameters().Count > 0))
+            {
+                List<ICurve> parts = new List<ICurve>();
+                foreach (ICurve curve in path.Curves)
+                {
+                    if (curve is BSpline b) parts.AddRange(b.SplitAtCorners());
+                    else parts.Add(curve.Clone());
+                }
+                Path res = Path.Construct();
+                res.Set(parts.ToArray());
+                res.CopyAttributes(path);
+                return res;
+            }
+            return go;
+        }
+        /// <summary>
         /// Extrudes the provided object <paramref name="faceShellPathCurve"/> along the <paramref name="extension"/>.
         /// </summary>
         /// <param name="faceShellPathCurve">Object to extrude, may be a <see cref="Face"/>, <see cref="Shell"/>, <see cref="Path"/> or <see cref="ICurve"/> object</param>
@@ -2589,6 +2622,7 @@ namespace CADability.GeoObject
         /// <returns>The extruded face, shell or solid, null if extrusion not possible</returns>
         static public IGeoObject Extrude(IGeoObject faceShellPathCurve, GeoVector extension, Project project)
         {
+            faceShellPathCurve = SplitSplinesAtCorners(faceShellPathCurve);
             if (faceShellPathCurve is Path || faceShellPathCurve is Polyline)
             {   // Pfad vor der Kurve abhandeln, denn Path ist auch ICurve
                 Path path;
@@ -2689,6 +2723,7 @@ namespace CADability.GeoObject
                 pth.Set(crvs);
                 faceShellPathCurve = pth;
             }
+            faceShellPathCurve = SplitSplinesAtCorners(faceShellPathCurve);
             if (faceShellPathCurve is Ellipse && !(faceShellPathCurve as Ellipse).IsArc)
             {
                 Path pth = Path.Construct();

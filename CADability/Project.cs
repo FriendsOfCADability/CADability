@@ -2296,6 +2296,9 @@ namespace CADability
                 catch (SerializationException)
                 {
                 }
+                catch (Exception e) when (IsSystemDrawingUnavailable(e))
+                {
+                }
             }
             base.resourceIdInternal = "ProjectSettings";
         }
@@ -2402,7 +2405,7 @@ namespace CADability
                     gdiViews = data.GetPropertyOrDefault<List<GDI2DView>>("GdiViews");
                 }
             }
-            catch (PlatformNotSupportedException) { }
+            catch (Exception e) when (IsSystemDrawingUnavailable(e)) { }
 #endif
             projectedModels = data.GetPropertyOrDefault<List<ProjectedModel>>("ProjectedModels");
             namedValues = data.GetPropertyOrDefault<NamedValuesProperty>("NamedValues");
@@ -2417,8 +2420,17 @@ namespace CADability
                     printDocument.DefaultPageSettings = data.GetPropertyOrDefault<PageSettings>("DefaultPageSettings");
                 }
             }
-            catch (PlatformNotSupportedException) { }
+            catch (Exception e) when (IsSystemDrawingUnavailable(e)) { }
             data.RegisterForSerializationDoneCallback(this);
+        }
+        /// <summary>
+        /// System.Drawing printing is only supported on Windows. Elsewhere the first use of a PrintDocument does not
+        /// throw the PlatformNotSupportedException itself but a TypeInitializationException of a printing class that
+        /// wraps it, so both mean that the printer settings cannot be restored and the project is read without them.
+        /// </summary>
+        private static bool IsSystemDrawingUnavailable(Exception e)
+        {
+            return e is PlatformNotSupportedException || (e is TypeInitializationException && e.GetBaseException() is PlatformNotSupportedException);
         }
         void IJsonSerializeDone.SerializationDone(JsonSerialize jsonSerialize)
         {

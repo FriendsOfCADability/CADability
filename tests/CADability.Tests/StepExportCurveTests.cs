@@ -191,16 +191,7 @@ namespace CADability.Tests
         {
             string cdb = Path.Combine(this.TestContext.DeploymentDirectory, this.TestContext.TestName, "issue66.cdb.json");
             Assert.IsTrue(File.Exists(cdb));
-            Project project;
-            try
-            {
-                project = Project.ReadFromFile(cdb, "cdb");
-            }
-            catch (TypeInitializationException e) when (e.GetBaseException() is PlatformNotSupportedException)
-            {
-                Assert.Inconclusive("reading a project needs System.Drawing printing, which is only available on Windows");
-                return;
-            }
+            Project project = Project.ReadFromFile(cdb, "cdb");
             Solid original = project.GetActiveModel().AllObjects.OfType<Solid>().Single();
             Assert.IsTrue(original.Shells[0].Edges.Any(edge => edge.Curve3D is GeoObject.Path), "the test file is meant to contain edges with a Path");
             double volume = original.Volume(1e-4);

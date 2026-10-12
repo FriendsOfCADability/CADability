@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CADability</title>
+  <meta name="description" content="CADability is a .NET class library that implements a 3d CAD system, with or without user interface.">
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #1f2328;
+      --muted: #59636e;
+      --accent: #0969da;
+      --card: #f6f8fa;
+      --border: #d1d9e0;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --fg: #e6edf3;
+        --muted: #9198a1;
+        --accent: #4493f8;
+        --card: #151b23;
+        --border: #3d444d;
+      }
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 48px 16px;
+    }
+    h1 { font-size: 2.2em; margin: 0 0 8px; }
+    h2 { font-size: 1.2em; margin: 0 0 4px; }
+    p { margin: 0 0 16px; }
+    .lead { color: var(--muted); font-size: 1.1em; margin-bottom: 32px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .cards { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 32px; }
+    .card { display: block; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--fg); }
+    .card:hover { border-color: var(--accent); text-decoration: none; }
+    .card p { color: var(--muted); margin: 0; font-size: 0.95em; }
+    code { background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; }
+    footer { color: var(--muted); font-size: 0.9em; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>CADability</h1>
+    <p class="lead">A .NET class library that implements a 3d CAD system: geometry, solid modeling, data exchange
+      (STEP, DWG, DXF, STL) and an extensible user interface, which you can use with or without the Windows.Forms control.</p>
+
+    <div class="cards">
+      <a class="card" href="CADabilityDoc/index.html">
+        <h2>CADability</h2>
+        <p>Introduction, articles and the API of the core library.</p>
+      </a>
+      <a class="card" href="CADabilityDoc/api/index.html">
+        <h2>API reference</h2>
+        <p>All namespaces and classes of CADability.</p>
+      </a>
+      <a class="card" href="CADabilityFormsDoc/index.html">
+        <h2>CADability.Forms</h2>
+        <p>The Windows.Forms control and frame that show a CADability project.</p>
+      </a>
+    </div>
+
+    <p>Install the package from NuGet: <code>dotnet add package CADability</code>
+      (<a href="https://www.nuget.org/packages/CADability">nuget.org</a>).</p>
+    <p>The sources, issues and releases are on <a href="https://github.com/FriendsOfCADability/CADability">GitHub</a>.</p>
+
+    <footer>CADability is provided under the MIT license.</footer>
+  </main>
+</body>
+</html>

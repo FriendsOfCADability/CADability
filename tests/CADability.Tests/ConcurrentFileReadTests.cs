@@ -29,15 +29,7 @@ namespace CADability.Tests
             using (OpenForReading(file))
             {
                 Task<Project>[] reads = Enumerable.Range(0, Readers).Select(_ => Task.Run(() => Project.ReadFromFile(file, "cdb"))).ToArray();
-                try
-                {
-                    projects = Task.WhenAll(reads).GetAwaiter().GetResult();
-                }
-                catch (TypeInitializationException e) when (e.GetBaseException() is PlatformNotSupportedException)
-                {
-                    Assert.Inconclusive("reading a project needs System.Drawing printing, which is only available on Windows");
-                    return;
-                }
+                projects = Task.WhenAll(reads).GetAwaiter().GetResult();
             }
             foreach (Project project in projects)
             {

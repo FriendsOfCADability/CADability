@@ -49,6 +49,11 @@ namespace CADability.DXF
         private readonly LinePattern byLayerPattern = new LinePattern("ByLayer"), byBlockPattern = new LinePattern("ByBlock");
         private readonly LineWidth byLayerWidth = new LineWidth("ByLayer", 0.0), byBlockWidth = new LineWidth("ByBlock", 0.0);
         /// <summary>
+        /// Line hatch styles with a stand-in line width, for pattern hatches in block definitions. Like the stand-ins
+        /// they are not part of the project.
+        /// </summary>
+        private readonly List<HatchStyleLines> standInHatchStyles = new List<HatchStyleLines>();
+        /// <summary>
         /// Read from the setting "DxfDwg.ImportDimension" (Import Dimension in the export settings
         /// of the control center): 0, "As Block", is the default, and a DIMENSION then keeps the
         /// picture AutoCAD drew. With 1, "As Dimension", it is rebuilt as CADability's own
@@ -396,13 +401,11 @@ namespace CADability.DXF
             }
             foreach (var item in doc.LineTypes)
             {
-                List<double> pattern = new List<double>();
-                foreach (var seg in item.Segments)
-                {
-                    if (!seg.IsShape && !seg.IsText)
-                        pattern.Add(Math.Abs(seg.Length));
-                }
-                project.LinePatternList.CreateOrFind(item.Name, pattern.ToArray());
+                // ByLayer and ByBlock are no patterns, FindLinePattern resolves them
+                if (string.Equals(item.Name, LineType.ByLayerName, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.Name, LineType.ByBlockName, StringComparison.OrdinalIgnoreCase)) continue;
+                // a shape or text segment keeps its length, only the shape or text is not drawn
+                project.LinePatternList.CreateOrFind(item.Name, PatternFromDxfDashes(item.Segments.Select(seg => seg.Length)));
             }
             FillModelSpace(project.GetModel(0));
             Model paperSpace = new Model();
@@ -557,31 +560,31 @@ namespace CADability.DXF
         }
 
         /// <summary>
-        /// A line hatch style without a color of its own, see <see cref="FindOrCreateSolidHatchStyle()"/>.
+        /// A line hatch style without a color of its own, see <see cref="FindOrCreateSolidHatchStyle()"/>. Styles
+        /// differ in angle, distance, dash pattern and line width. The line width follows the lineweight of the
+        /// HATCH like that of every other entity. Inside a block definition it may be a stand-in (ByBlock, or
+        /// ByLayer on layer "0"): such a style is not part of the project, and <see cref="ResolveLayerZero"/>
+        /// replaces it in every placed copy of the block.
         /// </summary>
-        private HatchStyleLines FindOrCreateHatchStyleLines(Entity entity, double lineAngle, double lineDistance, double[] dashes)
+        private HatchStyleLines FindOrCreateHatchStyleLines(string name, double lineAngle, double lineDistance, LinePattern linePattern, LineWidth lineWidth)
         {
-            LineWeightType lw = entity.LineWeight;
-            if (lw == LineWeightType.ByLayer && entity.Layer != null) lw = entity.Layer.LineWeight;
-            if ((int)lw < 0) lw = LineWeightType.W0;
-            LineWidth lineWidth = project.LineWidthList.CreateOrFind("DXF_" + lw.ToString(), ((int)lw) / 100.0);
-
-            for (int i = 0; i < project.HatchStyleList.Count; i++)
+            bool standIn = lineWidth == byLayerWidth || lineWidth == byBlockWidth;
+            IEnumerable<HatchStyleLines> existing = standIn ? standInHatchStyles
+                : Enumerable.Range(0, project.HatchStyleList.Count).Select(i => project.HatchStyleList[i]).OfType<HatchStyleLines>();
+            foreach (HatchStyleLines hsl in existing)
             {
-                if (project.HatchStyleList[i] is HatchStyleLines hsl)
-                {
-                    if (hsl.ColorDef == null && hsl.LineWidth == lineWidth &&
-                        hsl.LineAngle == lineAngle && hsl.LineDistance == lineDistance) return hsl;
-                }
+                if (hsl.ColorDef == null && hsl.LineWidth == lineWidth && hsl.LinePattern == linePattern &&
+                    hsl.LineAngle == lineAngle && hsl.LineDistance == lineDistance &&
+                    hsl.MarginOffset == 0.0 && hsl.Number == 0 && !hsl.Alternate) return hsl;
             }
             HatchStyleLines nhsl = new HatchStyleLines();
-            string name = NewName(entity.Layer?.Name ?? "Default", project.HatchStyleList);
-            nhsl.Name = name;
+            nhsl.Name = NewName(name, project.HatchStyleList);
             nhsl.LineAngle = lineAngle;
             nhsl.LineDistance = lineDistance;
             nhsl.LineWidth = lineWidth;
-            nhsl.LinePattern = FindOrcreateLinePattern(dashes);
-            project.HatchStyleList.Add(nhsl);
+            nhsl.LinePattern = linePattern;
+            if (standIn) standInHatchStyles.Add(nhsl);
+            else project.HatchStyleList.Add(nhsl);
             return nhsl;
         }
 
@@ -602,36 +605,54 @@ namespace CADability.DXF
             return name;
         }
 
-        private LinePattern FindOrcreateLinePattern(double[] dashes, string name = null)
+        /// <summary>
+        /// The line pattern of a pattern hatch line. Its dashes are given in drawing units, so the pattern scales
+        /// with the drawing. A continuous line gets "Continuous" or another continuous pattern of the project.
+        /// </summary>
+        private LinePattern FindOrCreateHatchLinePattern(IEnumerable<double> dxfDashes)
         {
-            if (dashes.Length == 0)
+            double[] pattern = PatternFromDxfDashes(dxfDashes);
+            if (pattern.Length == 0)
             {
-                for (int i = 0; i < project.LinePatternList.Count; i++)
+                LinePattern continuous = project.LinePatternList.Find(LineType.ContinuousName);
+                for (int i = 0; continuous == null && i < project.LinePatternList.Count; i++)
                 {
-                    if (project.LinePatternList[i].Pattern == null || project.LinePatternList[i].Pattern.Length == 0)
-                        return project.LinePatternList[i];
+                    if (project.LinePatternList[i].Pattern == null || project.LinePatternList[i].Pattern.Length == 0) continuous = project.LinePatternList[i];
                 }
-                return new LinePattern(NewName("DXFpattern", project.LinePatternList));
+                return continuous;
             }
-            if (dashes[0] < 0)
+            return project.LinePatternList.CreateOrFind(pattern, LinePattern.Scaling.World);
+        }
+
+        /// <summary>
+        /// Converts DXF dash lengths (positive: a dash, negative: a gap, 0: a dot) into the pattern of a
+        /// <see cref="LinePattern"/>, which alternates dashes and gaps, starting with a dash, and has only positive
+        /// lengths. Consecutive dashes or gaps are joined, a leading gap is moved to the end. A pattern without a
+        /// gap is a continuous line and gives an empty pattern, as does a pattern without a dash.
+        /// </summary>
+        internal static double[] PatternFromDxfDashes(IEnumerable<double> dxfDashes)
+        {
+            List<(bool dash, double length)> segments = new List<(bool, double)>();
+            void Append(bool dash, double length)
             {
-                List<double> pattern = new List<double>(dashes);
-                if (pattern[pattern.Count - 1] > 0)
-                {
-                    pattern.Insert(0, pattern[pattern.Count - 1]);
-                    pattern.RemoveAt(pattern.Count - 1);
-                }
-                else pattern.Insert(0, 0.0);
-                if ((pattern.Count & 0x01) != 0) pattern.Add(0.0);
-                dashes = pattern.ToArray();
+                if (segments.Count > 0 && segments[segments.Count - 1].dash == dash)
+                    segments[segments.Count - 1] = (dash, segments[segments.Count - 1].length + length);
+                else segments.Add((dash, length));
             }
-            else if ((dashes.Length & 0x01) != 0)
+            foreach (double d in dxfDashes) Append(d >= 0.0, Math.Abs(d));
+            if (!segments.Exists(sg => sg.dash) || !segments.Exists(sg => !sg.dash)) return new double[0];
+            if (!segments[0].dash)
             {
-                List<double> pattern = new List<double>(dashes);
-                pattern.Add(0.0);
-                dashes = pattern.ToArray();
+                (bool, double) leading = segments[0];
+                segments.RemoveAt(0);
+                Append(leading.Item1, leading.Item2);
             }
-            return new LinePattern(NewName("DXFpattern", project.LinePatternList), dashes);
+            if (segments[segments.Count - 1].dash)
+            {   // the last dash continues in the first one
+                segments[0] = (true, segments[0].length + segments[segments.Count - 1].length);
+                segments.RemoveAt(segments.Count - 1);
+            }
+            return segments.Select(sg => sg.length).ToArray();
         }
 
         private void SetAttributes(IGeoObject go, Entity entity)
@@ -683,7 +704,10 @@ namespace CADability.DXF
                 if (string.Equals(lineTypeName, LineType.ByBlockName, StringComparison.OrdinalIgnoreCase)) return byBlockPattern;
                 if (byLayer && IsLayerZero(layer)) return byLayerPattern;
             }
-            if (byLayer && layer?.LineType != null) lineTypeName = layer.LineType.Name;
+            if (byLayer) lineTypeName = layer?.LineType?.Name ?? LineType.ContinuousName;
+            // outside a block definition ByBlock is drawn continuous, and ByLayer cannot be the linetype of a layer
+            if (string.Equals(lineTypeName, LineType.ByBlockName, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(lineTypeName, LineType.ByLayerName, StringComparison.OrdinalIgnoreCase)) lineTypeName = LineType.ContinuousName;
             return project.LinePatternList.Find(lineTypeName);
         }
 
@@ -816,6 +840,11 @@ namespace CADability.DXF
                         if (lw.LineWidth == byLayerWidth) lw.LineWidth = widthByLayer;
                         else if (lw.LineWidth == byBlockWidth) lw.LineWidth = widthByBlock;
                     }
+                    if (child is GeoObject.Hatch hatch && hatch.HatchStyle is HatchStyleLines hsl && (hsl.LineWidth == byLayerWidth || hsl.LineWidth == byBlockWidth))
+                    {   // the lines of a pattern hatch are generated from its style
+                        hatch.HatchStyle = FindOrCreateHatchStyleLines(hsl.Name, hsl.LineAngle, hsl.LineDistance, hsl.LinePattern,
+                            hsl.LineWidth == byLayerWidth ? widthByLayer : widthByBlock);
+                    }
                     if (child is GeoObject.Block nested) Resolve(nested);
                 }
             }
@@ -924,14 +953,12 @@ namespace CADability.DXF
             }
             else
             {
-                bool forcePolyline2D = false;
                 GeoPoint[] poles = new GeoPoint[spline.ControlPoints.Count];
                 double[] weights = new double[spline.ControlPoints.Count];
                 for (int i = 0; i < poles.Length; i++)
                 {
                     poles[i] = GeoPoint(spline.ControlPoints[i]);
                     weights[i] = (spline.Weights != null && i < spline.Weights.Count) ? spline.Weights[i] : 1.0;
-                    if (i > 0 && (poles[i] | poles[i - 1]) < Precision.eps) forcePolyline2D = true;
                 }
                 double[] kn = new double[spline.Knots.Count];
                 for (int i = 0; i < kn.Length; i++) kn[i] = spline.Knots[i];
@@ -972,42 +999,12 @@ namespace CADability.DXF
                         path.Set(parts.ToArray());
                         return path;
                     }
-                    if (forcePolyline2D)
-                    {
-                        ICurve curve = (ICurve)bsp;
-                        double maxError = Settings.GlobalSettings.GetDoubleValue("Approximate.Precision", 0.01);
-                        ICurve approxCurve = curve.Approximate(true, maxError);
-                        int usedCurves;
-                        if (approxCurve is GeoObject.Line || (approxCurve.SubCurves != null && approxCurve.SubCurves.Length == 1 && approxCurve.SubCurves[0] is GeoObject.Line))
-                            usedCurves = 2;
-                        else
-                            usedCurves = approxCurve.SubCurves?.Length ?? 2;
-                        return CreateSplineAsPolyline(bsp, usedCurves);
-                    }
+                    // Coinciding poles (a corner of the curve) used to make this a polyline, because the spline was
+                    // displayed wrongly. That was ICurve.GetProjectedCurve, which is fixed now (issue 173).
                     return bsp;
                 }
             }
             return null;
-        }
-
-        private IGeoObject CreateSplineAsPolyline(BSpline bsp, int segments)
-        {
-            // Approximate the spline as a polyline (fallback for degenerate splines)
-            List<GeoObject.Line> lines = new List<GeoObject.Line>();
-            for (int i = 0; i < segments; i++)
-            {
-                double t0 = (double)i / segments;
-                double t1 = (double)(i + 1) / segments;
-                GeoPoint p0 = ((ICurve)bsp).PointAt(t0);
-                GeoPoint p1 = ((ICurve)bsp).PointAt(t1);
-                GeoObject.Line l = GeoObject.Line.Construct();
-                l.StartPoint = p0;
-                l.EndPoint = p1;
-                lines.Add(l);
-            }
-            GeoObject.Path path = GeoObject.Path.Construct();
-            path.Set(new GeoObjectList(lines.Cast<IGeoObject>().ToList()), false, 1e-6);
-            return path.CurveCount > 0 ? (IGeoObject)path : null;
         }
 
         private IGeoObject CreateFace(ACadSharp.Entities.Face3D face)
@@ -1212,10 +1209,11 @@ namespace CADability.DXF
                     {
                         if (list.Count > 0) res = res.Clone() as GeoObject.Hatch;
                         double lineAngle = lineDef.Angle;
-                        double offX = lineDef.Offset.X;
-                        double offY = lineDef.Offset.Y;
-                        double[] dashes = lineDef.DashLengths != null ? lineDef.DashLengths.ToArray() : new double[0];
-                        HatchStyleLines hsl = FindOrCreateHatchStyleLines(hatch, lineAngle, Math.Sqrt(offX * offX + offY * offY), dashes);
+                        // the offset from one line to the next, in drawing units: only its part perpendicular to the
+                        // lines is their distance, the part along them shifts the dashes
+                        double distance = Math.Abs(lineDef.LineOffset);
+                        HatchStyleLines hsl = FindOrCreateHatchStyleLines(hatch.Layer?.Name ?? "Default", lineAngle, distance,
+                            FindOrCreateHatchLinePattern(lineDef.DashLengths ?? Enumerable.Empty<double>()), FindLineWidth(hatch.LineWeight, hatch.Layer));
                         res.HatchStyle = hsl;
                         list.Add(res);
                     }

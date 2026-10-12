@@ -162,13 +162,14 @@ None left: all of them have been fixed.
   `VolumesMatchAnalytic` and `IntegratedVolumeMatchesAnalyticOnEveryMesh` end
   in a `NullReferenceException` in `JsonSerialize.SerializationInfoFromJsonData`
   whenever the file is actually read.
-- [ ] `ModOp2D.IsIsogonal` mixes matrix indices in its second check and is
-  false even for the identity, so `Circle2D`/`Arc2D.GetModified` turn circles
-  into `Ellipse2D` under uniform scaling. `Circle2D.GetModified` also drops the
-  orientation of the circle.
-- [ ] The sphere and torus branches of `NurbsSurface.GetSimpleSurface` fit an
-  affine reparametrisation, which cannot follow the rational parametrisation;
-  the 3D error can reach the radius. The torus fit has no degeneracy check.
+- [ ] `Face.MakeRegularSurface` no longer simplifies exact rational NURBS
+  cylinders, cones, spheres and tori, because it maps the edges with the
+  reparametrisation of `NurbsSurface.GetSimpleSurface`, which cannot follow a
+  rational parametrisation. It could recompute the edges from their 3D curves,
+  as `Shell.MakeRegularSurfaces` does.
+- [ ] `OffsetSurface.GetModified` keeps a constant offset (`offset * m.Factor`)
+  under a non-uniform scaling, which is not the image of the offset surface;
+  it should return a NURBS approximation instead (#415).
 - [ ] CADability has no "floating" layer 0 in blocks. The DXF import
   resolves block contents on layer 0 to the layer of the INSERT (#293), so
   they are displayed and hidden like in AutoCAD, but the information is lost:

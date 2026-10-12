@@ -8710,7 +8710,8 @@ namespace CADability.GeoObject
             {
                 ISurface simpleSurface;
                 ModOp2D modify;
-                if ((surface as NurbsSurface).GetSimpleSurface(maxError, out simpleSurface, out modify))
+                // the edges are recomputed from their 3D curves, so the surface only needs the same shape
+                if ((surface as NurbsSurface).GetSimpleSurface(maxError, out simpleSurface, out modify, true))
                 {   // die Kanten werden grundlegend neu berechnet, die 2D Kurven werden neu gemacht, es ist hier also
                     // keine Modifikation der 2D Kurven nötig.
                     recalcEdges.UnionWith(Edges);

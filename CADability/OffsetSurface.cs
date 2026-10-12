@@ -374,12 +374,23 @@ namespace CADability.GeoObject
         /// <returns></returns>
         public override ISurface GetModified(ModOp m)
         {
-            if (m.IsIsogonal)
+            // Only correct for an isogonal m. A scaling with different factors along perpendicular axes was treated as
+            // isogonal before ModOp.IsIsogonal checked the lengths, and is still accepted here with the same approximate
+            // result rather than throwing, until such a surface is approximated by a NURBS surface (issue #415).
+            if (m.IsIsogonal || HasPerpendicularAxes(m))
             {
                 OffsetSurface res = new OffsetSurface(baseSurface.GetModified(m), offset * m.Factor, usedArea);
                 return res;
             }
             else throw new NotImplementedException("Modify OffsetSurface with non ortogonal Matrix");
+        }
+        private static bool HasPerpendicularAxes(ModOp m)
+        {
+            double[,] a = m.Matrix;
+            GeoVector x = new GeoVector(a[0, 0], a[1, 0], a[2, 0]);
+            GeoVector y = new GeoVector(a[0, 1], a[1, 1], a[2, 1]);
+            GeoVector z = new GeoVector(a[0, 2], a[1, 2], a[2, 2]);
+            return Precision.IsPerpendicular(x, y, false) && Precision.IsPerpendicular(x, z, false) && Precision.IsPerpendicular(y, z, false);
         }
         /// <summary>
         /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.CopyData (ISurface)"/>

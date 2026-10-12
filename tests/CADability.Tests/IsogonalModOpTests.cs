@@ -67,6 +67,28 @@ namespace CADability.Tests
             Assert.IsFalse(ModOp.Scale(new GeoVector(1, 1, 0), 2).IsIsogonal, "scaling in one direction");
         }
 
+        /// <summary>
+        /// OffsetSurface.GetModified throws for a modification that is not isogonal. A non-uniform scaling counted as
+        /// isogonal before, so scaling a face on an offset surface (e.g. from a STEP OFFSET_SURFACE) non-uniformly must
+        /// still work, with the same approximate offset as before (issue #415), instead of throwing now.
+        /// </summary>
+        [TestMethod]
+        public void OffsetSurfaceCanStillBeScaledNonUniformly()
+        {
+            GeoObject.CylindricalSurface cylinder = new GeoObject.CylindricalSurface(GeoPoint.Origin, 10 * GeoVector.XAxis, 10 * GeoVector.YAxis, GeoVector.ZAxis);
+            GeoObject.Face face = GeoObject.Face.MakeFace(new GeoObject.OffsetSurface(cylinder, 2.0), new Shapes.SimpleShape(Shapes.Border.MakeRectangle(0, Math.PI / 2, 0, 20)));
+            GeoPoint before = face.Surface.PointAt(new GeoPoint2D(0.3, 5));
+            Assert.AreEqual(12.0, before | new GeoPoint(0, 0, 5), 1e-9, "offset point before the modification");
+
+            GeoObject.Face uniform = face.Clone() as GeoObject.Face;
+            uniform.Modify(ModOp.Scale(2.0));
+            Assert.AreEqual(24.0, uniform.Surface.PointAt(new GeoPoint2D(0.3, 5)) | new GeoPoint(0, 0, 10), 1e-9, "uniform scaling");
+
+            GeoObject.Face nonUniform = face.Clone() as GeoObject.Face;
+            nonUniform.Modify(ModOp.Scale(1.0, 2.0, 1.0));
+            Assert.IsInstanceOfType(nonUniform.Surface, typeof(GeoObject.OffsetSurface));
+        }
+
         [TestMethod]
         public void ModifiedCirclesAndArcs()
         {

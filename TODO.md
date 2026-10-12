@@ -167,6 +167,9 @@ None left: all of them have been fixed.
   reparametrisation of `NurbsSurface.GetSimpleSurface`, which cannot follow a
   rational parametrisation. It could recompute the edges from their 3D curves,
   as `Shell.MakeRegularSurfaces` does.
+- [ ] `OffsetSurface.GetModified` keeps a constant offset (`offset * m.Factor`)
+  under a non-uniform scaling, which is not the image of the offset surface;
+  it should return a NURBS approximation instead (#415).
 - [ ] CADability has no "floating" layer 0 in blocks. The DXF import
   resolves block contents on layer 0 to the layer of the INSERT (#293), so
   they are displayed and hidden like in AutoCAD, but the information is lost:

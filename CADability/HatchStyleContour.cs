@@ -591,9 +591,9 @@ namespace CADability.Attribute
         }
         /// <summary>
         /// This method is used by a <see cref="Hatch"/> object to calculate its contents. It generates a
-        /// set of parallel lines according to <see cref="LineDistance"/> and <see cref="LineAngle"/> 
-        /// and clips them with the given shape. The lines are projected into the 3D world
-        /// by the given plane. <seealso cref="CompoundShape.Clip"/>
+        /// set of contours parallel to the border of the shape according to <see cref="LineDistance"/>,
+        /// <see cref="FirstDistance"/>, <see cref="HoleMode"/> and <see cref="SpiralMode"/>. The contours
+        /// are projected into the 3D world by the given plane.
         /// </summary>
         /// <param name="shape">shape of the hatch object</param>
         /// <param name="plane">local plane of the hatch object</param>

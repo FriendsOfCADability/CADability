@@ -692,8 +692,8 @@ namespace CADability.Actions
         /// <summary>
         /// Override if your action needs to handle menu selection changes (very rare)
         /// </summary>
-        /// <param name="MenuId"></param>
-        /// <param name="selected"></param>
+        /// <param name="selectedMenuItem">the menu item that was selected or deselected</param>
+        /// <param name="selected">true, if selected, false if deselected</param>
         public virtual void OnSelected(MenuWithHandler selectedMenuItem, bool selected) { }
         #endregion
     }

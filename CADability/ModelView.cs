@@ -74,6 +74,7 @@ namespace CADability
 		/// </summary>
 		/// <param name="contextMenu"></param>
 		/// <param name="viewPosition"></param>
+		/// <param name="collapsed">Optional callback which is invoked when the context menu is closed (its int parameter is not used)</param>
 		void ShowContextMenu(MenuWithHandler[] contextMenu, Point viewPosition, System.Action<int> collapsed = null);
 		DragDropEffects DoDragDrop(GeoObjectList dragList, DragDropEffects all);
 		/// <summary>
@@ -1569,7 +1570,7 @@ namespace CADability
 		/// <summary>
 		/// Overrides <see cref="PropertyEntryImpl.ContextMenu"/>, 
 		/// returns the context menu with the id "MenuId.ModelView".
-		/// (see <see cref="MenuResource.LoadContextMenu"/>)
+		/// (see <see cref="MenuResource.LoadMenuDefinition(string, bool, ICommandHandler)"/>)
 		/// </summary>
 		public override MenuWithHandler[] ContextMenu
 		{

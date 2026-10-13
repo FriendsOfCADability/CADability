@@ -125,10 +125,9 @@ namespace CADability.Attribute
             return res;
         }
         /// <summary>
-        /// Alle Layer sollen sich mit ihrer ColorDef Property auf ColorDef Objekte
-        /// aus der im Parameter gegebenen Liste beziehen. Die Liste wird ggf. erweitert.
+        /// Creates a copy of this list containing clones of all layers. The current layer of the
+        /// copy is the clone of the current layer of this list.
         /// </summary>
-        /// <param name="ct">Die Liste der benannten Farben</param>
         internal LayerList clone()
         {
             LayerList res = new LayerList();
@@ -619,7 +618,7 @@ namespace CADability.Attribute
         List<Layer> checkedLayers;
         Layer[] deserializedCheckedLayers;
         /// <summary>
-        /// Creates a new <see cref="CheckedLayerlist"/> with the provided layer list and a set of
+        /// Creates a new <see cref="CheckedLayerList"/> with the provided layer list and a set of
         /// initially checked layers
         /// </summary>
         /// <param name="layerList">List of all layers to display</param>

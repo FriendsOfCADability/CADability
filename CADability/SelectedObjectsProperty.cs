@@ -565,11 +565,6 @@ namespace CADability.UserInterface
                 return MenuResource.LoadMenuDefinition("MenuId.SelectedObjects", false, Frame.CommandHandler);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.OnSpecialKey (IShowProperty, KeyEventArgs)"/>
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="args"></param>
 #endregion
         public void ShowOpen(IShowProperty toShow)
         {

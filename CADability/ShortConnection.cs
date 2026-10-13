@@ -1469,6 +1469,7 @@ namespace CADability
         /// </summary>
         /// <param name="startPoint">The polyline starts here</param>
         /// <param name="endPoint">the polyline end here</param>
+        /// <param name="xyOffset">Distance to keep from the forbidden areas: the forbidden areas are inflated by this value</param>
         /// <returns>Intermediate points to go around the forbidden area</returns>
         public List<GeoPoint2D> FindPath(GeoPoint2D startPoint, GeoPoint2D endPoint, double xyOffset)
         {

@@ -850,11 +850,14 @@ namespace CADability
         /// <summary>
         /// Creates an edge which is the edge of two connected faces.
         /// </summary>
+        /// <param name="owner">the owner of the edge; since it belongs to two faces this is usually a <see cref="Shell"/></param>
         /// <param name="curve3d">the 3-dimensional curve</param>
         /// <param name="primaryFace">first face</param>
         /// <param name="curveOnPrimaryFace">2-d curve on first face</param>
+        /// <param name="forwardOnPrimaryFace">true, if the 3d curve has the same orientation as the 2d curve on the first face (which runs counterclockwise seen from outside)</param>
         /// <param name="secondaryFace">seconsd face</param>
         /// <param name="curveOnSecondaryFace">2-d curve on second face</param>
+        /// <param name="forwardOnSecondaryFace">true, if the 3d curve has the same orientation as the 2d curve on the second face</param>
         public Edge(IGeoObject owner, ICurve curve3d, Face primaryFace, ICurve2D curveOnPrimaryFace, bool forwardOnPrimaryFace, Face secondaryFace, ICurve2D curveOnSecondaryFace, bool forwardOnSecondaryFace)
             : this()
         {
@@ -873,9 +876,11 @@ namespace CADability
         /// <summary>
         /// Creates an edge which is the edge of two connected faces.
         /// </summary>
+        /// <param name="owner">the owner of the edge, the <see cref="Face"/> or the <see cref="Shell"/> it belongs to</param>
         /// <param name="curve3d">the 3-dimensional curve</param>
         /// <param name="primaryFace">first face</param>
         /// <param name="curveOnPrimaryFace">2-d curve on first face</param>
+        /// <param name="forwardOnPrimaryFace">true, if the 3d curve has the same orientation as the 2d curve on the first face (which runs counterclockwise seen from outside)</param>
         public Edge(IGeoObject owner, ICurve curve3d, Face primaryFace, ICurve2D curveOnPrimaryFace, bool forwardOnPrimaryFace)
             : this()
         {
@@ -1064,6 +1069,7 @@ namespace CADability
         /// Use the vertices in the provided Set. If the endpoints of the curve don't coincide with one of the vertices, create a new one and add it to the set.
         /// </summary>
         /// <param name="toUse"></param>
+        /// <param name="precision">maximum distance of an end point of the curve to a vertex in the set for that vertex to be used</param>
         internal void UseVertices(HashSet<Vertex> toUse, double precision = 1e-6)
         {
             if (curve3d != null)

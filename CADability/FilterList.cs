@@ -10,7 +10,7 @@ namespace CADability.Attribute
 {
     /// <summary>
     /// A FilterList is a list of <see cref="Filter"/>s. The <see cref="Project"/> owns a FilterList which is used
-    /// by the <see cref="CADAbility.Actions.SelectObjectsAction"/> to decide which <see cref="IGeoObject"/>s may be selected or must be rejected.
+    /// by the <see cref="CADability.Actions.SelectObjectsAction"/> to decide which <see cref="IGeoObject"/>s may be selected or must be rejected.
     /// You may add a handler to the <see cref="PreFilterEvent"/> event to do your own filtering or use the
     /// default filtering machanism (or both). The FilterList of the project is displayed in the ControlCenter
     /// and may be interactively manipulated.

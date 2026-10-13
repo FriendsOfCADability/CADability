@@ -92,7 +92,7 @@ namespace CADability.GeoObject
             /// </summary>
             DidSnapToObjectSnapPoint,
             /// <summary>
-            /// <see cref="SnapModes.SnapToCenter"/> caused the snapping.
+            /// <see cref="SnapModes.SnapToObjectCenter"/> caused the snapping.
             /// </summary>
             DidSnapToObjectCenter,
             /// <summary>

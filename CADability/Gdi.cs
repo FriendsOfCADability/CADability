@@ -135,7 +135,7 @@ namespace CADability
         ///         when in color-index mode.
         ///     </para>
         ///     <para>
-        ///         When this flag is set, you must call <see cref="SetSystemPaletteUse" /> in
+        ///         When this flag is set, you must call <c>SetSystemPaletteUse</c> in
         ///         your program to force a one-to-one mapping of the logical palette and the
         ///         system palette.  If your OpenGL hardware supports multiple hardware palettes
         ///         and the device driver can allocate spare hardware palettes for OpenGL, this
@@ -184,7 +184,7 @@ namespace CADability
         ///         Indicates whether a device can swap individual layer planes with pixel
         ///         formats that include double-buffered overlay or underlay planes.
         ///         Otherwise all layer planes are swapped together as a group.  When this
-        ///         flag is set, <see cref="Wgl.wglSwapLayerBuffers" /> is supported.
+        ///         flag is set, <c>wglSwapLayerBuffers</c> is supported.
         ///     </para>
         /// </summary>
         // #define PFD_SWAP_LAYER_BUFFERS      0x00000800

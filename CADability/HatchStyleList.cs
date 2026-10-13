@@ -18,7 +18,7 @@ namespace CADability.Attribute
     /// <summary>
     /// List of <see cref="HatchStyle"/> derived objects. Typically a <see cref="Project"/>
     /// or the <see cref="Settings"/> maintain such a list.
-    /// The list is serializable and can be shown and modified in the <see cref="ControlCenter"/>.
+    /// The list is serializable and can be shown and modified in the <see cref="IControlCenter">ControlCenter</see>.
     /// There can not be two hatch-styles with the same name.
     /// </summary>
     [Serializable]

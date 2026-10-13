@@ -1252,7 +1252,7 @@ namespace CADability.GeoObject
         /// from the apex along a surface line, and it never changes its sign within a face: the used area lies
         /// either completely on one side of the apex or completely on the other. Both nappes are oriented
         /// outward, so the same offset has to move the apex in opposite directions on them.
-        /// <see cref="ISurfaceImpl.Domain"/> is the only place that carries this information; when it is empty
+        /// <see cref="ISurfaceImpl.usedArea"/> is the only place that carries this information; when it is empty
         /// - a surface that is not bound to a face - the positive nappe is assumed.
         /// </summary>
         private bool OnPositiveNappe => usedArea.IsEmpty() || usedArea.IsInfinite || usedArea.IsInvalid() || usedArea.GetCenter().y + voffset >= 0.0;

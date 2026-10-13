@@ -3,7 +3,7 @@
 namespace CADability.UserInterface
 {
     /// <summary>
-    /// State of a menu entry or toolbar button. Used in the <see cref="ICommandHandler.UpdateCommand"/> event.
+    /// State of a menu entry or toolbar button. Used in the <see cref="ICommandHandler.OnUpdateCommand"/> method.
     /// </summary>
     public class CommandState
     {

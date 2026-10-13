@@ -113,6 +113,11 @@ namespace CADability.GeoObject
         /// in which the 2d curve for this surface will be returned, if this surface is periodic. the resulting curves may exceed the area provided by umin, umax, vmin, vmax.
         /// </summary>
         /// <param name="pl">plane to intersect with</param>
+        /// <param name="umin">minimum u value of the parameter space of this surface to consider</param>
+        /// <param name="umax">maximum u value of the parameter space of this surface to consider</param>
+        /// <param name="vmin">minimum v value of the parameter space of this surface to consider</param>
+        /// <param name="vmax">maximum v value of the parameter space of this surface to consider</param>
+        /// <param name="precision">maximum allowed deviation of the resulting curves from the exact intersection</param>
         /// <returns>intersection curves</returns>
         IDualSurfaceCurve[] GetPlaneIntersection(PlaneSurface pl, double umin, double umax, double vmin, double vmax, double precision);
         /// <summary>
@@ -231,14 +236,19 @@ namespace CADability.GeoObject
         /// <summary>
         /// Create a NurbSurface as an approximation of this surface
         /// </summary>
-        /// <param name="precision"></param>
+        /// <param name="umin">minimum u value of the part of this surface to approximate</param>
+        /// <param name="umax">maximum u value of the part of this surface to approximate</param>
+        /// <param name="vmin">minimum v value of the part of this surface to approximate</param>
+        /// <param name="vmax">maximum v value of the part of this surface to approximate</param>
+        /// <param name="precision">maximum allowed deviation of the approximation from this surface</param>
         /// <returns></returns>
         NurbsSurface Approximate(double umin, double umax, double vmin, double vmax, double precision);
         /// <summary>
         /// Returns the projection of the given curve in 2D coordinates. Should only be used for curves 
         /// that are close to the surface.
         /// </summary>
-        /// <param name="curve"></param>
+        /// <param name="curve">the 3d curve to project onto this surface</param>
+        /// <param name="precision">maximum allowed deviation of the resulting 2d curve (mapped onto the surface) from the provided curve</param>
         /// <returns></returns>
         ICurve2D GetProjectedCurve(ICurve curve, double precision); // muss mit BoundingRect domain erweitert werden
         /// <summary>
@@ -246,6 +256,8 @@ namespace CADability.GeoObject
         /// The result may be empty.
         /// </summary>
         /// <param name="curve">The curve to be intersected with</param>
+        /// <param name="uvExtent">The part of the parameter space of this surface in which intersection points are searched. It is also
+        /// the periodic domain in which the u/v values of the intersection points are returned</param>
         /// <param name="ips">Resulting 3d intersection points</param>
         /// <param name="uvOnFaces">u/v values of the intersection points on this surface</param>
         /// <param name="uOnCurve3Ds">u parameter of intersection points on the curve</param>
@@ -341,10 +353,9 @@ namespace CADability.GeoObject
         /// <summary>
         /// Returns the extent of a patch of the surface clipped rectangular in the 2d parameter space
         /// </summary>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
+        /// <param name="uvPatch">the rectangle in the parameter space which defines the patch</param>
+        /// <param name="rough">true: a quickly computed extent which encloses the patch but may be larger than necessary
+        /// (e.g. the hull of the poles of a NURBS surface), false: the extent should be as tight as possible</param>
         /// <returns></returns>
         BoundingCube GetPatchExtent(BoundingRect uvPatch, bool rough = false);
         /// <summary>
@@ -404,9 +415,8 @@ namespace CADability.GeoObject
         /// <summary>
         /// used internally. the maximum distance of the 3d curve, formed by the uv-line from sp to ep, to the 3d-line from PointAt(sp) to PointAt(ep)
         /// </summary>
-        /// <param name="sp"></param>
-        /// <param name="ep"></param>
-        /// <param name="surface"></param>
+        /// <param name="sp">start point of the line in the uv system</param>
+        /// <param name="ep">end point of the line in the uv system</param>
         /// <param name="mp">The uv point where this distance occurres</param>
         /// <returns></returns>
         double MaxDist(GeoPoint2D sp, GeoPoint2D ep, out GeoPoint2D mp);
@@ -417,14 +427,21 @@ namespace CADability.GeoObject
         /// <param name="thisBounds">Bounds for this surface</param>
         /// <param name="other">Other surface</param>
         /// <param name="otherBounds">Bounds of other surface</param>
+        /// <param name="seed">A 3d point on the intersection curve which is sought: of all intersection curves only the one
+        /// passing through this point is returned</param>
         /// <returns>Array of intersection curves</returns>
         ICurve Intersect(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, GeoPoint seed);
         /// <summary>
         /// Returns intersectionCurves 
         /// </summary>
-        /// <param name="bounds1"></param>
-        /// <param name="surface2"></param>
-        /// <param name="bounds2"></param>
+        /// <param name="thisBounds">Bounds for this surface</param>
+        /// <param name="other">Other surface</param>
+        /// <param name="otherBounds">Bounds of other surface</param>
+        /// <param name="seeds">3d points known to lie on the intersection curves (typically the intersection points of the edges of one face
+        /// with the other face), used as starting points for the intersection curves; may be null</param>
+        /// <param name="extremePositions">Positions (u1, v1, u2, v2) where the surfaces have an extremum of their distance, as returned by
+        /// <see cref="GetExtremePositions(BoundingRect, ISurface, BoundingRect, out List{Tuple{double, double, double, double}})"/>. Entries may be double.NaN.
+        /// They are used to find closed intersection curves which do not cross the bounds; may be null</param>
         /// <returns></returns>
         IDualSurfaceCurve[] GetDualSurfaceCurves(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, List<GeoPoint> seeds, List<Tuple<double, double, double, double>> extremePositions = null);
         /// <summary>
@@ -446,6 +463,7 @@ namespace CADability.GeoObject
         /// Returns null, if there is no simpler form
         /// </summary>
         /// <param name="precision">maximal allowed deviation of the new surface</param>
+        /// <param name="bounds">the part of the parameter space in which the surfaces must coincide; null: the natural bounds of this surface</param>
         /// <returns></returns>
         ISurface GetCanonicalForm(double precision, BoundingRect? bounds = null);
         /// <summary>
@@ -481,7 +499,7 @@ namespace CADability.GeoObject
         /// <summary>
         /// returns true, if the provided direction can be interpreted as a surface of rotation around the provided <paramref name="rotationAxis"/>
         /// </summary>
-        /// <param name="direction"></param>
+        /// <param name="rotationAxis">the axis to test</param>
         /// <returns></returns>
         bool IsRotated(Axis rotationAxis);
         /// <summary>
@@ -3756,9 +3774,10 @@ namespace CADability.GeoObject
             return res;
         }
         /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.GetPatchExtent (BoundingRect)"/>
+        /// Implements <see cref="CADability.GeoObject.ISurface.GetPatchExtent(BoundingRect, bool)"/>
         /// </summary>
         /// <param name="uvPatch"></param>
+        /// <param name="rough">true: a quickly computed extent which may be larger than necessary is sufficient (ignored here)</param>
         /// <returns></returns>
         public virtual BoundingCube GetPatchExtent(BoundingRect uvPatch, bool rough)
         {   // kann natürlich in den einzelnen flächen besser gelöst werden
@@ -3875,9 +3894,9 @@ namespace CADability.GeoObject
             return false;
         }
         /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.GetNonPeriodicSurface (ICurve[])"/>
+        /// Implements <see cref="CADability.GeoObject.ISurface.GetNonPeriodicSurface(ICurve[])"/>
         /// </summary>
-        /// <param name="maxOutline"></param>
+        /// <param name="orientedCurves">3d curves describing the outline that will be used on the resulting surface</param>
         /// <returns></returns>
         public virtual ISurface GetNonPeriodicSurface(ICurve[] orientedCurves)
         {
@@ -10199,13 +10218,14 @@ namespace CADability.GeoObject
             return res;
         }
         /// <summary>
-        /// Finde die Stelle mit maximalen oder minimalen Abstand der Kurve (gegeben durch die Strecke [sp, ep] in uv) zu der gegebenen Ebene (norm)
-        /// Die Ebene geht gewöhnlich durch die beiden Punkte bei sp und ep, dann gibt es immer ein dazwischenliegendes Maximum.
+        /// Find the position with the maximum or minimum distance of the curve (given by the segment [sp, ep] in uv) to the given plane (norm).
+        /// The plane usually passes through the two points at sp and ep, then there is always a maximum in between.
         /// </summary>
-        /// <param name="sp"></param>
-        /// <param name="ep"></param>
-        /// <param name="result"></param>
-        /// <returns></returns>
+        /// <param name="sp">start point of the segment in the uv system</param>
+        /// <param name="ep">end point of the segment in the uv system</param>
+        /// <param name="norm">normal vector of the plane</param>
+        /// <param name="result">the uv position between sp and ep where the tangent of the curve is perpendicular to norm</param>
+        /// <returns>true if such a position was found, false if the iteration failed</returns>
         internal bool findMaxPlaneDist(GeoPoint2D sp, GeoPoint2D ep, GeoVector norm, out GeoPoint2D result)
         {
             // finde den u/v Wert zwischen sp und ep, wo die Tangentialebene parallel zur Sekante liegt
@@ -10323,15 +10343,16 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
-        /// Newton Verfahren zum Finden eines Maximums für eine gegebene Richtung, von einem (u,v) Punkt ausgehend
-        /// Es wird ein Polynom 2. Grades in u und v in diesem Punkt erzeugt, dessen 1. und 2. Ableitungen mit der Fläche übereinstimmen, das also die Fläche in diesem Punkt approximiert.
-        /// Für dieses Polynom kann einfach das maximum in diese Richtung gefunden werden (2 lineare Gleichungen, so dass diru und dirv senkrecht zu gegebenen Rictung stehen)
-        /// Dieser (u,v) Punkt wird auf die Fläche übertragen für den nächsten Iterationsschritt. 
+        /// Newton method to find a maximum for a given direction, starting from a (u,v) point.
+        /// A polynomial of degree 2 in u and v is created at this point, whose 1st and 2nd derivatives coincide with those of the surface, i.e. which approximates the surface at this point.
+        /// For this polynomial the maximum in the given direction is easily found (2 linear equations, so that diru and dirv are perpendicular to the given direction).
+        /// This (u,v) point is transferred to the surface for the next iteration step. 
         /// </summary>
-        /// <param name="startpos"></param>
-        /// <param name="normal"></param>
-        /// <param name="result"></param>
-        /// <returns></returns>
+        /// <param name="startpos">uv position to start the iteration from</param>
+        /// <param name="maxStepSize">maximum size of a Newton step in the uv system; if a step exceeds twice this size the iteration is considered to diverge and fails</param>
+        /// <param name="normal">direction for which the maximum is sought, i.e. the normal of the surface at the result</param>
+        /// <param name="result">the uv position found</param>
+        /// <returns>true if the iteration converged, false otherwise</returns>
         internal bool findMaxPlaneDist(GeoPoint2D startpos, double maxStepSize, GeoVector normal, out GeoPoint2D result)
         {
             // duu, dv u.s.w: die 1. und 2. Ableitungen nach u und v, d2u = 1/2 * duu
@@ -12288,10 +12309,11 @@ namespace CADability.GeoObject
         /// <summary>
         /// Newton approximation of footpoint of p3d on this path of the surface.
         /// </summary>
-        /// <param name="p3d"></param>
-        /// <param name="found"></param>
-        /// <param name="res"></param>
-        /// <returns></returns>
+        /// <param name="p3d">the 3d point whose footpoint is sought</param>
+        /// <param name="found">the patch of the surface in which the footpoint is searched</param>
+        /// <param name="res">the uv position of the footpoint</param>
+        /// <param name="mindist">the distance of p3d to the surface normal at the final position, i.e. the remaining error of the approximation</param>
+        /// <returns>true if the iteration converged, false otherwise</returns>
         private bool PositionOf(GeoPoint p3d, ParEpi found, out GeoPoint2D res, out double mindist)
         {
 #if DEBUGx

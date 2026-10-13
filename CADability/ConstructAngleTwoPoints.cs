@@ -75,8 +75,8 @@ namespace CADability.Actions
         /// Implements <see cref="Action.OnInactivate"/>. If you override this method
         /// don't forget to call the bas implementation.
         /// </summary>
-        /// <param name="NewActiveAction"><paramref name="Action.OnInactivate.NewActiveAction"/></param>
-        /// <param name="RemovingAction"><paramref name="Action.OnInactivate.RemovingAction"/></param>
+        /// <param name="NewActiveAction">the action that will become active</param>
+        /// <param name="RemovingAction">true: if called because the action is removed, false: if called when a new action is set on top of this action</param>
         public override void OnInactivate(Action NewActiveAction, bool RemovingAction)
         {
             foreach (IView vw in base.Frame.AllViews)

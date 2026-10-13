@@ -813,6 +813,7 @@ namespace CADability.GeoObject
         /// </summary>
         /// <param name="crv1"></param>
         /// <param name="crv2"></param>
+        /// <param name="precision">Maximum distance between the endpoint of crv1 and the startpoint of crv2, also used as the tolerance when comparing the geometry of the curves</param>
         /// <returns>the combined curve or null, if not possible</returns>
         public static ICurve Combine(ICurve crv1, ICurve crv2, double precision)
         {

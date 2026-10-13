@@ -39,16 +39,16 @@ namespace CADability
 
 
         /// <summary>
-        /// Liefert das Quadrat.
+        /// Returns the square.
         /// </summary>
-        /// <param name=a>Zu quadrierender Wert</param>
+        /// <param name="a">Value to be squared</param>
         internal static double sqr(double a) { return a * a; }
 
         /// <summary>
-        /// "sign liefert den Betrag von a mit dem Vorzeichen von b"
+        /// sign returns the absolute value of a with the sign of b
         /// </summary>
-        /// <param name=a>nur der Betrag wird</param>
-        /// <param name=b>nur das Vorzeichen wird ausgewertet</param>
+        /// <param name="a">only the absolute value is used</param>
+        /// <param name="b">only the sign is evaluated</param>
         internal static double sign(double a, double b)
         {
             if (b < 0)
@@ -57,13 +57,14 @@ namespace CADability
         }
 
         /// <summary>
-        /// Summary of quadgl.
+        /// Computes the real solutions of the quadratic equation a*x^2 + b*x + c = 0.
         /// </summary>
-        /// <param name=a></param>
-        /// <param name=b></param>
-        /// <param name=c></param>
-        /// <param name=x></param>
-        /// <param name=y></param>
+        /// <param name="a">coefficient of x^2</param>
+        /// <param name="b">coefficient of x</param>
+        /// <param name="c">constant term</param>
+        /// <param name="x">receives the first real solution, 0.0 if there is none</param>
+        /// <param name="y">receives the second real solution (equal to x if there is only one), 0.0 if there is none</param>
+        /// <returns>number of real solutions (0, 1 or 2)</returns>
         internal static int quadgl(double a, double b, double c, out double x, out double y)
         {
             double d;
@@ -107,12 +108,13 @@ namespace CADability
         }
 
         /// <summary>
-        /// Summary of ragbq.
+        /// Computes the real solutions of the biquadratic equation a*x^4 + b*x^2 + c = 0.
         /// </summary>
-        /// <param name=a></param>
-        /// <param name=b></param>
-        /// <param name=c></param>
-        /// <param name=x></param>
+        /// <param name="a">coefficient of x^4</param>
+        /// <param name="b">coefficient of x^2</param>
+        /// <param name="c">constant term</param>
+        /// <param name="x">receives the real solutions (at most 4)</param>
+        /// <returns>number of real solutions</returns>
         internal static int ragbq(double a, double b, double c, double[] x)
         // reelle loesungen der biquadratischen gleichung  a*x**4 + b*x**2 + c = 0. 
         {
@@ -144,13 +146,14 @@ namespace CADability
         }
 
         /// <summary>
-        /// ragle3 berechnet die REELLEN Loesungen einer Gleichung 3. Grades
+        /// ragle3 computes the REAL solutions of the cubic equation a*x^3 + b*x^2 + c*x + d = 0
         /// </summary>
-        /// <param name=a></param>
-        /// <param name=b></param>
-        /// <param name=c></param>
-        /// <param name=d></param>
-        /// <param name=x></param>
+        /// <param name="a">coefficient of x^3</param>
+        /// <param name="b">coefficient of x^2</param>
+        /// <param name="c">coefficient of x</param>
+        /// <param name="d">constant term</param>
+        /// <param name="x">receives the real solutions (at most 3)</param>
+        /// <returns>number of real solutions</returns>
         internal static int ragle3(double a, double b, double c, double d, double[] x)
         {
             if (x == null) x = new double[4];
@@ -313,15 +316,18 @@ namespace CADability
         }  // ragle3 
 
         /// <summary>
-        /// ragle4 berechnet die reellen loesungen einer gleichung 4. Grades, 
-        /// maximal 4 Lösungen in x.
+        /// ragle4 computes the real solutions of the quartic equation a*x^4 + b*x^3 + c*x^2 + d*x + e = 0,
+        /// at most 4 solutions in x.
         /// </summary>
-        /// <param name=a></param>
-        /// <param name=b></param>
-        /// <param name=c></param>
-        /// <param name=d></param>
-        /// <param name=e></param>
-        /// <param name=x></param>
+        /// <param name="a">coefficient of x^4</param>
+        /// <param name="b">coefficient of x^3</param>
+        /// <param name="c">coefficient of x^2</param>
+        /// <param name="d">coefficient of x</param>
+        /// <param name="e">constant term</param>
+        /// <param name="x">receives the real solutions (at most 4)</param>
+        /// <param name="newton">true: refine the solutions by a Newton iteration between the extrema of the polynomial,
+        /// false: discard solutions which do not satisfy the equation within <see cref="Precision.eps"/></param>
+        /// <returns>number of real solutions</returns>
         internal static int ragle4(double a, double b, double c, double d, double e, double[] x, bool newton = false)
         {
             if (x == null) x = new double[4]; // stimmt das mit 4 Lösungen ?
@@ -480,15 +486,16 @@ namespace CADability
             return nl;
         }  // ragle4 
         /// <summary>
-        /// Lösung für eine Gleichung 4. Grades, wobei jeweils zwischen gegebenen Segmentgrenzen eine Lösung sein muss
+        /// Solves the quartic equation a*x^4 + b*x^3 + c*x^2 + d*x + e = 0, where there must be exactly one solution
+        /// between each pair of consecutive segment bounds
         /// </summary>
-        /// <param name="a"></param>
-        /// <param name="b"></param>
-        /// <param name="c"></param>
-        /// <param name="d"></param>
-        /// <param name="e"></param>
-        /// <param name="segments"></param>
-        /// <param name="x"></param>
+        /// <param name="a">coefficient of x^4</param>
+        /// <param name="b">coefficient of x^3</param>
+        /// <param name="c">coefficient of x^2</param>
+        /// <param name="d">coefficient of x</param>
+        /// <param name="e">constant term</param>
+        /// <param name="segments">ascending bounds of the segments, each segment [segments[i], segments[i+1]] contains one solution</param>
+        /// <param name="xx">receives the solution of each segment, xx[i] is the solution in the i-th segment</param>
         private static void FindSegmentsSolutionQuad(double a, double b, double c, double d, double e, List<double> segments, double[] xx)
         {
             for (int i = 0; i < segments.Count - 1; i++)
@@ -1634,7 +1641,7 @@ namespace CADability
         /// <summary>
         /// Returns the perpendicular foot point of point p on the line (s,e)
         /// </summary>
-        /// <param name="P">The source point</param>
+        /// <param name="p">The source point</param>
         /// <param name="s">Startpoint of the line</param>
         /// <param name="e">Endpoint of the line</param>
         /// <returns>Footpoint</returns>
@@ -1652,7 +1659,7 @@ namespace CADability
         /// Returns the perpendicular foot point of point p on the line through s
         /// with direction v
         /// </summary>
-        /// <param name="P">The source point</param>
+        /// <param name="p">The source point</param>
         /// <param name="s">Startpoint of the line</param>
         /// <param name="v">Direction of the line</param>
         /// <returns>Footpoint</returns>
@@ -1669,7 +1676,7 @@ namespace CADability
         /// Returns the perpendicular foot point of point p on the line through s
         /// with direction v
         /// </summary>
-        /// <param name="P">The source point</param>
+        /// <param name="p">The source point</param>
         /// <param name="s">Startpoint of the line</param>
         /// <param name="v">Direction of the line</param>
         /// <returns>Footpoint</returns>
@@ -2024,8 +2031,8 @@ namespace CADability
         /// Returns the intersection points of a circle and a line in 2d.
         /// The result may contain 0 to 2 points.
         /// </summary>
-        /// <param name="lstart">point of the line</param>
-        /// <param name="lend">direction of the line</param>
+        /// <param name="pointofline">point of the line</param>
+        /// <param name="direction">direction of the line</param>
         /// <param name="center">center of the cricle</param>
         /// <param name="radius">radius of the circle</param>
         /// <returns>intersctione points</returns>
@@ -2422,6 +2429,8 @@ namespace CADability
         /// <param name="right">resulting right extremum</param>
         /// <param name="bottom">resulting bottom extremum</param>
         /// <param name="top">resulting top extremum</param>
+        /// <param name="forceRightHanded">true: the resulting majorAxis and minorAxis always form a right handed system,
+        /// false: they form a right handed system if and only if axis1 and axis2 do</param>
         internal static void PrincipalAxis(GeoPoint2D center, GeoVector2D axis1, GeoVector2D axis2, out GeoVector2D majorAxis, out GeoVector2D minorAxis, out GeoPoint2D left, out GeoPoint2D right, out GeoPoint2D bottom, out GeoPoint2D top, bool forceRightHanded)
         {
             // sog. Hauptachsentransformation: gesucht sind die beiden Hauptachsen, die 
@@ -3189,6 +3198,9 @@ namespace CADability
         /// relative to <paramref name="p1"/>, which keeps it well conditioned for points far from the
         /// coordinate origin.
         /// </summary>
+        /// <param name="p1">first point on the circle</param>
+        /// <param name="p2">second point on the circle</param>
+        /// <param name="p3">third point on the circle</param>
         /// <param name="center">center of the circle through the three points</param>
         /// <param name="radius">its radius</param>
         /// <returns>false, if the three points are colinear and there is no such circle</returns>

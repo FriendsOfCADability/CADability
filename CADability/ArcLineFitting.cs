@@ -2617,13 +2617,14 @@ namespace CADability
         }
 
         /// <summary>
-        /// Summary of quadgl.
+        /// Computes the real solutions of the quadratic equation a*x^2 + b*x + c = 0.
         /// </summary>
-        /// <param name=a></param>
-        /// <param name=b></param>
-        /// <param name=c></param>
-        /// <param name=x></param>
-        /// <param name=y></param>
+        /// <param name="a">coefficient of x^2</param>
+        /// <param name="b">coefficient of x</param>
+        /// <param name="c">constant term</param>
+        /// <param name="x">receives the first real solution, 0.0 if there is none</param>
+        /// <param name="y">receives the second real solution (equal to x if there is only one), 0.0 if there is none</param>
+        /// <returns>number of real solutions (0, 1 or 2)</returns>
         private static int Quadgl(double a, double b, double c, out double x, out double y)
         {
             double d;

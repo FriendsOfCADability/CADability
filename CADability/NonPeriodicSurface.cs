@@ -46,10 +46,12 @@ namespace CADability.GeoObject
         bool hasPole, fullPeriod;
         ModOp2D toNonPeriodicBounds, toPeriodicBounds;
         /// <summary>
+        /// Creates a non-periodic surface which describes the same geometry as the provided periodic surface (or surface with a pole)
+        /// with a different parametric system.
         /// </summary>
-        /// <param name="periodicSurface"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
+        /// <param name="periodicSurface">the periodic surface (or surface with a pole) to be reparameterized</param>
+        /// <param name="bounds">the part of the parameter space of <paramref name="periodicSurface"/> to be covered by this surface;
+        /// in the periodic direction the full period is used instead of the provided interval</param>
         public NonPeriodicSurface(ISurface periodicSurface, BoundingRect bounds)
         {
             this.periodicSurface = periodicSurface;

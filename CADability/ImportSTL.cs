@@ -6,6 +6,12 @@ using System.IO;
 
 namespace CADability
 {
+    /// <summary>
+    /// Reads STL files, ASCII or binary, and returns their triangles as <see cref="Shell"/>s of planar triangular
+    /// faces. Adjacent triangles are connected, so every set of connected triangles becomes one shell. A shell without
+    /// open edges can be turned into a solid with <see cref="Solid.MakeSolid"/>, which
+    /// <see cref="Project.ReadFromFile(string, string)"/> with the format "stl" does.
+    /// </summary>
     public class ImportSTL
     {
         private StreamReader sr;
@@ -13,6 +19,9 @@ namespace CADability
         private BinaryReader br;
         private int numdec = 0, numnum = 0;
 
+        /// <summary>
+        /// Creates an importer.
+        /// </summary>
         public ImportSTL()
         {
             // settings for precision etc
@@ -38,6 +47,12 @@ namespace CADability
             }
         }
 
+        /// <summary>
+        /// Reads the STL file, ASCII or binary, and returns the shells of connected triangles. A file that cannot be
+        /// opened throws an <see cref="IOException"/>, a file that is not a STL file an <see cref="ApplicationException"/>.
+        /// </summary>
+        /// <param name="fileName">Path of the STL file</param>
+        /// <returns>The shells, one for each set of connected triangles</returns>
         public Shell[] Read(string fileName)
         {
             using (Stream stream = File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.Read)) // may throw exceptions like "file not found" etc.
@@ -46,6 +61,12 @@ namespace CADability
             }
         }
 
+        /// <summary>
+        /// Reads STL data, ASCII or binary, from memory and returns the shells of connected triangles, see
+        /// <see cref="Read(string)"/>.
+        /// </summary>
+        /// <param name="byteArray">The contents of a STL file</param>
+        /// <returns>The shells, one for each set of connected triangles</returns>
         public Shell[] Read(byte[] byteArray)
         {
             using (Stream stream = new MemoryStream(byteArray))

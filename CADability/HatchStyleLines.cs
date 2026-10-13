@@ -294,9 +294,9 @@ namespace CADability.Attribute
             }
         }
         /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Removed"/>
+        /// Overrides <see cref="IShowPropertyImpl.Removed(IPropertyPage)"/>
         /// </summary>
-        /// <param name="propertyPage">the IPropertyTreeView from which it was removed</param>
+        /// <param name="pp">the <see cref="IPropertyPage"/> from which it was removed</param>
         public override void Removed(IPropertyPage pp)
         {
             subItems = null;

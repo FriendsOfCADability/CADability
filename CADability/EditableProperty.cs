@@ -49,6 +49,7 @@ namespace CADability.UserInterface
         /// <param name="getValueDelegate">Get the value of the property from the object, which holds the property</param>
         /// <param name="setValueDelegate">Set the value of th eproperty</param>
         /// <param name="resourceId">A resource id for the text of the label</param>
+        /// <param name="contextMenuId">Menu id (from the menu resource) of the context menu of this property, or null if there is no context menu</param>
         public EditableProperty(GetValueDelegate getValueDelegate, SetValueDelegate setValueDelegate, string resourceId = null, string contextMenuId = null) : this(resourceId, contextMenuId)
         {
             this.getValueDelegate = getValueDelegate;
@@ -61,6 +62,7 @@ namespace CADability.UserInterface
         /// <param name="objectWithProperty">The object, which holds the property</param>
         /// <param name="getSetProperty">The Name of the property</param>
         /// <param name="resourceId">A resource id for the text of the label</param>
+        /// <param name="contextMenuId">Menu id (from the menu resource) of the context menu of this property, or null if there is no context menu</param>
         public EditableProperty(object objectWithProperty, string getSetProperty, string resourceId = null, string contextMenuId = null) : this(resourceId, contextMenuId)
         {
             this.objectWithProperty = objectWithProperty;
@@ -70,7 +72,8 @@ namespace CADability.UserInterface
         /// Creates an EditableProperty without specifying the communication with the object holding the property.
         /// This must be specified before using the object by setting <see cref="EditableProperty{T}.OnGetValue"/> and <see cref="EditableProperty{T}.OnSetValue"/>
         /// </summary>
-        /// <param name="resourceId"></param>
+        /// <param name="resourceId">A resource id for the text of the label</param>
+        /// <param name="contextMenuId">Menu id (from the menu resource) of the context menu of this property, or null if there is no context menu</param>
         public EditableProperty(string resourceId = null, string contextMenuId = null) : base(resourceId)
         {
             this.contextMenuId = contextMenuId;
@@ -318,14 +321,14 @@ namespace CADability.UserInterface
                 {
                     ErrorMessage = "";
                     updateDeferred = DeferUpdate;
-                    /// ContextFrame and value changes:
-                    /// A editable property often represents and is connected to a property of an <see cref="IGeoObject"/>. The value of this property may be changed
-                    /// in different scenarios: typing with the keyboard, executing a menu command (e.g. dividing the length by two) or starting an action, which
-                    /// works on the property by setting the value.
-                    /// When typing or using an action, there will be multiple or many changes of the property, which would each create an undo step and each need
-                    /// a recalculation of the octtree (when the object is in a model). So we use a "context" for the changes. Changes within the same context frame
-                    /// have the following effect: the first change in a new frame saves the objects state for possible undo actions, and removes the object from
-                    /// the octtree. The last change of the frame re-inserts the object to the octtree.
+                    // ContextFrame and value changes:
+                    // A editable property often represents and is connected to a property of an IGeoObject. The value of this property may be changed
+                    // in different scenarios: typing with the keyboard, executing a menu command (e.g. dividing the length by two) or starting an action, which
+                    // works on the property by setting the value.
+                    // When typing or using an action, there will be multiple or many changes of the property, which would each create an undo step and each need
+                    // a recalculation of the octtree (when the object is in a model). So we use a "context" for the changes. Changes within the same context frame
+                    // have the following effect: the first change in a new frame saves the objects state for possible undo actions, and removes the object from
+                    // the octtree. The last change of the frame re-inserts the object to the octtree.
                     using (Frame.Project.Undo.ContextFrame(this))
                     {
                         SetValue(val, !DeferUpdate);

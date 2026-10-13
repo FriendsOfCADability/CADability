@@ -1968,7 +1968,7 @@ namespace CADability
         /// <summary>
         /// Connect all provided faces, remove the overhangs. Used by Shell.GetOffset.
         /// </summary>
-        /// <param name="shellsToConnect"></param>
+        /// <param name="facesToConnect">the faces to connect; they are used directly, not cloned</param>
         public BRepOperation(IEnumerable<Face> facesToConnect)
         {
             operation = Operation.connectMultiple;
@@ -6384,6 +6384,9 @@ namespace CADability
         /// <param name="face1"></param>
         /// <param name="face2"></param>
         /// <param name="secondToFirst"></param>
+        /// <param name="secondIsOpposite">true, if <paramref name="face2"/> is oriented opposite to <paramref name="face1"/> (marked by the
+        /// user data "BRepIntersection.IsOpposite"); its edges are then used as they are and common edges are matched with opposite start vertices,
+        /// otherwise its edges are reversed</param>
         /// <returns></returns>
         private Dictionary<Face, HashSet<Edge>> DifferenceDeprecated(Face face1, Face face2, ModOp2D secondToFirst, bool secondIsOpposite)
         {
@@ -6498,6 +6501,9 @@ namespace CADability
         /// <param name="face1"></param>
         /// <param name="face2"></param>
         /// <param name="secondToFirst"></param>
+        /// <param name="secondIsOpposite">true, if <paramref name="face2"/> is oriented opposite to <paramref name="face1"/> (marked by the
+        /// user data "BRepIntersection.IsOpposite"); its edges are then used as they are and common edges are matched with opposite start vertices,
+        /// otherwise its edges are reversed</param>
         /// <returns></returns>
         private List<Face> Difference(Face face1, Face face2, ModOp2D secondToFirst, bool secondIsOpposite)
         {
@@ -9119,7 +9125,7 @@ namespace CADability
         /// </summary>
         /// <param name="allFaces"></param>
         /// <param name="startWith"></param>
-        /// <param name="result"></param>
+        /// <returns>the faces connected to <paramref name="startWith"/>, including it; they are removed from <paramref name="allFaces"/></returns>
         internal static HashSet<Face> extractConnectedFaces(HashSet<Face> allFaces, Face startWith)
         {
             HashSet<Face> result = new HashSet<Face>();
@@ -10165,8 +10171,13 @@ namespace CADability
         /// surface at index 2.
         /// </summary>
         /// <param name="etr"></param>
-        /// <param name="edgeOnPrimary"></param>
-        /// <param name="edgeOnSecondary"></param>
+        /// <param name="radius">the radius of the rounding; the side to which the edge is rounded follows from the orientation of its faces</param>
+        /// <param name="curveOnPrimary">the 2d curves on the primary face of the edge, along which the returned surfaces touch it, indexed like the returned surfaces</param>
+        /// <param name="curveOnSecondary">the same for the secondary face of the edge</param>
+        /// <param name="curveOnRuledSurfaceP">the 2d curves on the returned surfaces, along which they touch the primary face (only set for the middle surface [2])</param>
+        /// <param name="curveOnRuledSurfaceS">the same for the secondary face</param>
+        /// <param name="openAtStart">true, if the start vertex of the edge is not shared with another edge to be rounded, so the rounding is open there (currently not used)</param>
+        /// <param name="openAtEnd">the same for the end vertex of the edge (currently not used)</param>
         /// <returns></returns>
         private ISurface[] RoundEdge(Edge etr, double radius, out ICurve2D[] curveOnPrimary, out ICurve2D[] curveOnSecondary, out ICurve2D[] curveOnRuledSurfaceP, out ICurve2D[] curveOnRuledSurfaceS, bool openAtStart, bool openAtEnd)
         {
@@ -10346,6 +10357,7 @@ namespace CADability
         /// <param name="along"></param>
         /// <param name="startDir"></param>
         /// <param name="endDir"></param>
+        /// <param name="radius">the radius of the arc that is swept, i.e. the radius of the cylindrical or the minor radius of the toroidal surface</param>
         /// <returns></returns>
         static public ISurface ExtrudeArc(ICurve along, GeoVector startDir, GeoVector endDir, double radius)
         {

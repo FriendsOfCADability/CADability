@@ -320,7 +320,7 @@ namespace CADability.Curve2D
 		/// </summary>
 		/// <param name="position">Position where to calculate point and derivatives</param>
 		/// <param name="point">The point at the required position</param>
-		/// <param name="deriv">The first derivative at the provided parameter</param>
+		/// <param name="deriv1">The first derivative at the provided parameter</param>
 		/// <param name="deriv2">The second derivative at the provided parameter</param>
 		/// <returns></returns>
 		bool TryPointDeriv2At(double position, out GeoPoint2D point, out GeoVector2D deriv1, out GeoVector2D deriv2);

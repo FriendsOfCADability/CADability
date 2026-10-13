@@ -131,7 +131,7 @@ namespace CADability.UserInterface
         /// <summary>
         /// Replaces the standard menu resource by the provided XML document
         /// </summary>
-        /// <param name="XmlStream">The document</param>
+        /// <param name="XmlMenuDocument">The document</param>
         static public void SetMenuResource(XmlDocument XmlMenuDocument)
         {
             mMenuDocument = XmlMenuDocument;
@@ -216,12 +216,12 @@ namespace CADability.UserInterface
             }
         }
         /// <summary>
-        /// Loads a MainMenu from the menu resource with the provided name. For the unmodified standard resource
-        /// the menuname will be "SDI Menu"
+        /// Creates a flat context menu from the provided menu ids. The text of each entry is looked up in the
+        /// <see cref="StringTable"/> with the menu id as resource id, all entries use the provided command handler.
         /// </summary>
-        /// <param name="MenuName">Name of the menu to load</param>
-        /// <param name="frame">Frame which handles the menu commands</param>
-        /// <returns></returns>
+        /// <param name="menuIDs">Ids of the menu entries</param>
+        /// <param name="Handler">Command handler which handles the menu commands</param>
+        /// <returns>The menu entries</returns>
         static public MenuWithHandler[] CreateContextMenuWithHandler(string[] menuIDs, ICommandHandler Handler)
         {
             MenuWithHandler[] res = new MenuWithHandler[menuIDs.Length];
@@ -235,6 +235,14 @@ namespace CADability.UserInterface
             }
             return res;
         }
+        /// <summary>
+        /// Loads a menu from the menu resource with the provided name. For the unmodified standard resource
+        /// the name of the main menu will be "SDI Menu"
+        /// </summary>
+        /// <param name="MenuName">Name of the menu to load: the "Name" attribute of a "MainMenu" node or the "MenuId" attribute of a "Popup" node</param>
+        /// <param name="main">true to load a main menu, false to load a popup (context) menu</param>
+        /// <param name="handler">Command handler which handles the menu commands</param>
+        /// <returns>The menu entries</returns>
         static public MenuWithHandler[] LoadMenuDefinition(string MenuName, bool main, ICommandHandler handler)
         {
             List<MenuWithHandler> result = new List<MenuWithHandler>();

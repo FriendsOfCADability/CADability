@@ -5,7 +5,7 @@ using System.Collections;
 namespace CADability.Attribute
 {
     /// <summary>
-    /// Comparer to sort lists of INamedAttributes<see cref="Layerlist"/>.
+    /// Comparer to sort lists of INamedAttributes (e.g. <see cref="LayerList"/>).
     /// </summary>
 
     public class NamedAttributeComparer : IComparer
@@ -111,7 +111,7 @@ namespace CADability.Attribute
         /// <summary>
         /// substitutes the attribute to the list member with the same name or adds objects attribute to the list.
         /// </summary>
-        /// <param IGeoObject="Object2Update">the Object with Attribute to substitute
+        /// <param name="Object2Update">the Object with Attribute to substitute</param>
         void Update(IGeoObject Object2Update);
 
         /// <summary>

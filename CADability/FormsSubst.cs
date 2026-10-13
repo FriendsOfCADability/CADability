@@ -11,9 +11,7 @@ using Point = System.Drawing.Point;
 // MouseEventArgs, MouseButtons, Keys, 
 // MessageBox, Clipboard, IDataObject, Control.ModifierKeys
 
-/// <summary>
-/// Simple substitues for Windows.Forms enum and simple data objects. Copy of the Windows.Forms code.
-/// </summary>
+// Simple substitutes for Windows.Forms enum and simple data objects. Copy of the Windows.Forms code.
 namespace CADability.Substitutes
 {
     [Flags]

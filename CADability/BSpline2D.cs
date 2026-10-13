@@ -3392,7 +3392,7 @@ namespace CADability.Curve2D
         /// </para>
         /// <para>
         /// This uses <see cref="DirectionAt"/> as the derivative of <see cref="PointAt"/>, which for this
-        /// class it is. That is NOT true of every ICurve2D - <see cref="GeoObject.ProjectedCurve"/> takes its
+        /// class it is. That is NOT true of every ICurve2D - <see cref="CADability.ProjectedCurve"/> takes its
         /// point from an approximating spline and its direction from the exact projection, and the two
         /// disagree by tens of percent - which is why this integration lives here and not in
         /// <see cref="GeneralCurve2D"/>.

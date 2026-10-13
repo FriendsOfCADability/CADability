@@ -1504,8 +1504,8 @@ namespace CADability.Attribute
             get { return name; }
         }
         /// <summary>
-        /// Overrides <see cref="PropertyEntryImpl.EntryType"/>, 
-        /// returns <see cref="ShowPropertyEntryType.GroupTitle"/>.
+        /// Overrides <see cref="PropertyEntryImpl.ContextMenu"/>, 
+        /// returns the context menu with the id "MenuId.DimStyleEntry".
         /// </summary>
         public override MenuWithHandler[] ContextMenu
         {

@@ -352,8 +352,8 @@ namespace CADability.Actions
 		/// <summary>
 		/// Method definition of the <see cref="BeforeShowContextMenuEvent"/>
 		/// </summary>
-		/// <param name="selected">The object on which the click occurred.</param>
-		/// <param name="vw">The <see cref="IView">view</see> in which the click happend</param>
+		/// <param name="selectedObjects">The currently selected objects for which the context menu is going to be displayed</param>
+		/// <param name="cm">The menu items of the context menu which is about to be displayed. The handler may modify them</param>
 		public delegate void BeforeShowContextMenuDelegate(GeoObjectList selectedObjects, MenuWithHandler[] cm);
 		/// <summary>
 		/// Event raised before context menue is displayed, you can modify it here.
@@ -1000,8 +1000,8 @@ namespace CADability.Actions
 		/// Implements <see cref="Action.OnInactivate"/>. If you override this method
 		/// don't forget to call the bas implementation.
 		/// </summary>
-		/// <param name="NewActiveAction"><paramref name="Action.OnInactivate.NewActiveAction"/></param>
-		/// <param name="RemovingAction"><paramref name="Action.OnInactivate.RemovingAction"/></param>
+		/// <param name="NewActiveAction">the action that will become active</param>
+		/// <param name="RemovingAction">true: if called because the action is removed, false: if called when a new action is set on top of this action</param>
 		public override void OnInactivate(Action NewActiveAction, bool RemovingAction)
 		{
 			bool RemoveProperty = true;
@@ -1309,8 +1309,8 @@ namespace CADability.Actions
 		/// Implements <see cref="Action.OnMouseMove"/>. If you override this method
 		/// don't forget to call the bas implementation.
 		/// </summary>
-		/// <param name="e"><paramref name="Action.OnMouseMove.e"/></param>
-		/// <param name="vw"><paramref name="Action.OnMouseMove.vw"/></param>
+		/// <param name="e">MouseEventArgs of the call</param>
+		/// <param name="vw">the IView which contains the mouse</param>
 		public override void OnMouseMove(MouseEventArgs e, IView vw)
 		{
 			if (FilterMouseMessagesEvent != null)
@@ -1474,8 +1474,8 @@ namespace CADability.Actions
 		/// Implements <see cref="Action.OnMouseUp"/>. If you override this method
 		/// don't forget to call the bas implementation.
 		/// </summary>
-		/// <param name="e"><paramref name="Action.OnMouseUp.e"/></param>
-		/// <param name="vw"><paramref name="Action.OnMouseUp.vw"/></param>
+		/// <param name="e">MouseEventArgs of the call</param>
+		/// <param name="vw">the IView which contains the mouse</param>
 		public override void OnMouseUp(MouseEventArgs e, IView vw)
 		{
 			if (FilterMouseMessagesEvent != null)
@@ -1619,8 +1619,8 @@ namespace CADability.Actions
 		/// Implements <see cref="Action.OnMouseDown"/>. If you override this method
 		/// don't forget to call the bas implementation.
 		/// </summary>
-		/// <param name="e"><paramref name="Action.OnMouseDown.e"/></param>
-		/// <param name="vw"><paramref name="Action.OnMouseDown.vw"/></param>
+		/// <param name="e">MouseEventArgs of the call</param>
+		/// <param name="vw">the IView which contains the mouse</param>
 		public override void OnMouseDown(MouseEventArgs e, IView vw)
 		{
 			if (FilterMouseMessagesEvent != null)
@@ -1883,7 +1883,7 @@ namespace CADability.Actions
 			selectedObjectsProperty.Refresh();
 		}
 		/// <summary>
-		/// Implements <see cref="Action.OnDelete"/>. This implementation initiates the menu command "MenuId.Object.Delete".
+		/// Implements <see cref="Action.OnDelete()"/>. This implementation initiates the menu command "MenuId.Object.Delete".
 		/// </summary>
 		public override bool OnDelete()
 		{
@@ -2384,6 +2384,7 @@ namespace CADability.Actions
 		/// Overrides <see cref="ICommandHandler.OnUpdateCommand"/>. See <see cref="ICommandHandler.OnUpdateCommand"/> for more information.
 		/// </summary>
 		/// <param name="MenuId"></param>
+		/// <param name="CommandState">the command state to manipulate</param>
 		/// <returns></returns>
 		public override bool OnUpdateCommand(string MenuId, CommandState CommandState)
 		{

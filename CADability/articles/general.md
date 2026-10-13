@@ -8,6 +8,8 @@ the user interface and some organizational classes.
 For your first experience you can simply build and start the solution and try to draw or construct 3d objects. Typically you will replace the CADability.App 
 by your own application or use only the CADability.dll to analyze some 3d models.
 
+The [getting started](gettingstarted.md) article shows the first steps with code: read a file, look at the model, build and combine solids, export, and show the model in a form.
+
 Here is a quick overview of the [organizational classes](orgclass.md)
 
 This is an overview of the CAD [database](database.md), the geometrical entities that make up a model.

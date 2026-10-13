@@ -44,7 +44,7 @@ namespace CADability.UserInterface
             }
         }
         /// <summary>
-        /// Implements <see cref="CADability.IHotSpot.StartDrag ()"/>
+        /// Implements <see cref="CADability.IHotSpot.StartDrag(IFrame)"/>
         /// </summary>
         public void StartDrag(IFrame frame)
         {

@@ -194,6 +194,7 @@ namespace CADability
         /// Places the patch on the paper leaving the scalinfactor unchanged. The parameters 
         /// specify the position of the model origin on the paper.
         /// </summary>
+        /// <param name="index">Index of the patch in the list of patches of this layout</param>
         /// <param name="xPos">horizontal position of the origin</param>
         /// <param name="yPos">vertical position of the origin</param>
         public void MovePatch(int index, double xPos, double yPos)
@@ -209,6 +210,7 @@ namespace CADability
         /// <summary>
         /// Marks the given Layer as visible in the context of this ProjectedModel.
         /// </summary>
+        /// <param name="index">Index of the patch in the list of patches of this layout</param>
         /// <param name="l">The layer</param>
         public void AddVisibleLayer(int index, Layer l)
         {
@@ -217,6 +219,7 @@ namespace CADability
         /// <summary>
         /// Marks the given Layer as invisible in the context of this ProjectedModel.
         /// </summary>
+        /// <param name="index">Index of the patch in the list of patches of this layout</param>
         /// <param name="l">The layer</param>
         public void RemoveVisibleLayer(int index, Layer l)
         {
@@ -225,6 +228,7 @@ namespace CADability
         /// <summary>
         /// Determins whether the given <see cref="Layer"/> is marked visible in the context of this ProjectedModel.
         /// </summary>
+        /// <param name="index">Index of the patch in the list of patches of this layout</param>
         /// <param name="l">The layer</param>
         public bool IsLayerVisible(int index, Layer l)
         {

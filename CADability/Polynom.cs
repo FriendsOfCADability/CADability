@@ -2099,6 +2099,7 @@ namespace CADability
         /// </summary>
         /// <param name="p"></param>
         /// <param name="startHere">initial guess for the parameter</param>
+        /// <param name="dist">distance of the curve point at the returned parameter to <paramref name="p"/>, double.MaxValue if not found</param>
         /// <returns>the parameter for the point p or double.MaxValue, if not found</returns>
         public double PositionOf(GeoPoint p, double startHere, out double dist)
         {

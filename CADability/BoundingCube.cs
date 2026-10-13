@@ -531,6 +531,7 @@ namespace CADability
         /// will also be accepted.
         /// </summary>
         /// <param name="p">The Point</param>
+        /// <param name="prec">The precision by which the cube is extended</param>
         /// <returns><c>true</c> if there is containment</returns>
         public bool Contains(GeoPoint p, double prec)
         {

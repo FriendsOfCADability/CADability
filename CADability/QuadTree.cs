@@ -1220,10 +1220,9 @@ namespace CADability
             }
         }
         /// <summary>
-        /// Returns an enumerator for all objects that are close to the specified bounding rectangle.
+        /// Returns an enumerator for all objects in this QuadTree. Each object is returned only once.
         /// </summary>
-        /// <param name="r">The rectangle to filter objects</param>
-        /// <returns>Enumerator for those objects</returns>
+        /// <returns>Enumerator for all objects</returns>
         public IEnumerable<T> AllObjects()
         {
             HashSet<T> elimiinateDouble = new HashSet<T>();

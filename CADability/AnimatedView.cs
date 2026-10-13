@@ -356,6 +356,7 @@ namespace CADability
         /// <see cref="NextStepEvent"/> to enable the user of this class to provide some
         /// additional display changes or other tasks.
         /// </summary>
+        /// <param name="schedule">The <see cref="ISchedule"/> which sets the positions of the drives for each point in time of the animation</param>
         /// <param name="startTime">Start time for the animation</param>
         /// <param name="endTime">Stop time for the animation</param>
         /// <param name="speed">Speed factor</param>
@@ -412,7 +413,8 @@ namespace CADability
         /// takes place.
         /// </summary>
         /// <param name="firstObject">First Solid of the test</param>
-        /// <param name="secondObject">Sirst Solid of the test</param>
+        /// <param name="secondObject">Second Solid of the test</param>
+        /// <param name="precision">Precision of the collision test (used to partition the faces of the solids)</param>
         /// <param name="collisionPoint">Collision point</param>
         /// <returns>True if there is a collision, false otherwise</returns>
         public bool Collision(Solid firstObject, Solid secondObject, double precision, out GeoPoint collisionPoint)

@@ -93,6 +93,7 @@ namespace CADability
         /// </summary>
         /// <param name="toMove"></param>
         /// <param name="mainMovement"></param>
+        /// <param name="moveConnected">true: faces connected to a moved face by a non-tangential edge or only by a vertex are moved along with it (unless their surface is invariant in the direction of <paramref name="mainMovement"/>), false: only tangentially connected faces follow the movement</param>
         public void MoveFaces(Dictionary<Face, GeoVector> toMove, GeoVector mainMovement, bool moveConnected = false)
         {
             Dictionary<Face, GeoVector> nextLevel = new Dictionary<Face, GeoVector>();

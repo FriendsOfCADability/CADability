@@ -38,10 +38,29 @@ namespace CADability
 #24=MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION(' ',(%5),#17);
      */
 
+    /// <summary>
+    /// Implemented by the objects (solids, shells, faces, curves, blocks...) and the surfaces that can be written to a
+    /// STEP file by <see cref="ExportStep"/>.
+    /// </summary>
     public interface IExportStep
     {
+        /// <summary>
+        /// Writes the STEP entities for this object with <see cref="ExportStep.WriteDefinition"/> and returns the number
+        /// of the entity that represents the object.
+        /// </summary>
+        /// <param name="export">the export to write to</param>
+        /// <param name="topLevel">true when the object is written as an object of the model, false when it is written as
+        /// part of another object (e.g. a face of a shell, or an edge's curve)</param>
+        /// <returns>the number of the STEP entity</returns>
         int Export(ExportStep export, bool topLevel);
     }
+    /// <summary>
+    /// Writes the active model of a project to a STEP file (ISO 10303-21, AP214). Solids are written as
+    /// <c>MANIFOLD_SOLID_BREP</c>, open shells as <c>SHELL_BASED_SURFACE_MODEL</c>, curves as <c>GEOMETRIC_CURVE_SET</c>,
+    /// blocks as assemblies of their contents; the colours of the objects become <c>STYLED_ITEM</c>s and the names of
+    /// solids and blocks are kept. Objects that do not implement <see cref="IExportStep"/> (e.g. text and dimensions)
+    /// are skipped. <see cref="Project.Export"/> with the format "step" uses this class.
+    /// </summary>
     public class ExportStep
     {
         readonly string header =
@@ -73,11 +92,29 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
 
         private StreamWriter stream;
         private int currentItem { get; set; }
+        /// <summary>
+        /// The precision written to the file as the <c>UNCERTAINTY_MEASURE_WITH_UNIT</c>, 1e-6 by default: two points
+        /// closer than this are the same point for a reader of the file.
+        /// </summary>
         public double Precision { get; internal set; }
 
+        /// <summary>
+        /// The numbers of the <c>VERTEX_POINT</c> entities already written, so that a vertex shared by several edges is
+        /// written only once. Filled while writing.
+        /// </summary>
         public Dictionary<Vertex, int> VertexToDefInd;
+        /// <summary>
+        /// The numbers of the <c>EDGE_CURVE</c> entities already written, so that an edge shared by two faces is written
+        /// only once. Filled while writing.
+        /// </summary>
         public Dictionary<Edge, int> EdgeToDefInd;
+        /// <summary>
+        /// The numbers of the <c>STYLED_ITEM</c> entities written for each colour. Filled while writing.
+        /// </summary>
         public Dictionary<ColorDef, int> StyledItems;
+        /// <summary>
+        /// Creates an export with the default <see cref="Precision"/>. Each instance writes one file or byte array.
+        /// </summary>
         public ExportStep()
         {
             VertexToDefInd = new Dictionary<Vertex, int>();
@@ -86,6 +123,11 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
             Precision = 1e-6;
         }
 
+        /// <summary>
+        /// Writes the active model of the project as a STEP file into memory, see <see cref="WriteToFile"/>.
+        /// </summary>
+        /// <param name="pr">the project to export</param>
+        /// <returns>the contents of the STEP file</returns>
         public byte[] WriteToByteArray(Project pr)
         {
             var memoryStream = new MemoryStream();
@@ -133,6 +175,12 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
             return memoryStream.ToArray();
         }
 
+        /// <summary>
+        /// Writes the active model of the project to a STEP file. The file is created or overwritten; the name of the
+        /// project's file and the current date go into the header.
+        /// </summary>
+        /// <param name="fileName">Path of the STEP file to write</param>
+        /// <param name="pr">the project to export</param>
         public void WriteToFile(string fileName, Project pr)
         {
 

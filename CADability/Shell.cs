@@ -3464,6 +3464,8 @@ namespace CADability.GeoObject
         /// It heals the hole, described by <paramref name="sortedEdges"/>. The edges are sorted so that following the edges they go clockwise around the hole to fix.
         /// </summary>
         /// <param name="sortedEdges">Edges, which only have the <see cref="Edge.PrimaryFace"/> set (the <see cref="Edge.SecondaryFace"/> must be null)</param>
+        /// <param name="addToShell">true: the new faces are connected to this shell, the edges in <paramref name="sortedEdges"/> get the new face as their secondary face;
+        /// false: the new faces get their own edges and this shell remains unchanged</param>
         /// <returns></returns>
         public HashSet<Face> CloseEdgeLoop(List<Edge> sortedEdges, bool addToShell)
         {
@@ -6716,8 +6718,8 @@ namespace CADability.GeoObject
         /// All edges in edgeLoop join one of the faces in facesToCutoff. These parts of the shell will not be used.
         /// At this loop, which remains open in the first step, the resulting shell will be closed by faces with surfaces from facesToCutOff.
         /// </summary>
-        /// <param name="edge"></param>
-        /// <param name="face"></param>
+        /// <param name="edgeLoop">a closed loop of edges of this shell, at which the shell is split</param>
+        /// <param name="facesToCutOff">faces of this shell adjacent to the loop: the part of the shell containing them is cut off and their surfaces close the resulting shell</param>
         /// <returns></returns>
         public Shell FeatureFromEdges(Edge[] edgeLoop, Face[] facesToCutOff)
         {
@@ -7312,7 +7314,10 @@ namespace CADability.GeoObject
         /// Returns "features" of the shell. A feature is a subset of the faces of the shell, which is seperated by the provided <paramref name="loops"/>.
         /// Since such a feature has open edges, there is also a face or multiple faces, which close the feature to make it to a solid.
         /// </summary>
-        /// <param name="bounds"></param>
+        /// <param name="loops">the closed loops of edges, which delimit the features</param>
+        /// <param name="features">receives the features found: each is the set of faces reachable from <paramref name="startWith"/> without crossing the loops</param>
+        /// <param name="lids">receives the faces, which close a feature to a solid; currently only passed on to the recursive calls, nothing is added</param>
+        /// <param name="startWith">the faces to start from; the feature grows from these across all edges, which are not in <paramref name="loops"/></param>
         public void FeaturesFromEdges(List<Edge[]> loops, List<IEnumerable<Face>> features, List<IEnumerable<Face>> lids, IEnumerable<Face> startWith)
         {
             HashSet<Edge> margin = new HashSet<Edge>();

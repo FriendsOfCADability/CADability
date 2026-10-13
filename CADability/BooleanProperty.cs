@@ -111,17 +111,18 @@ namespace CADability.UserInterface
             SelectedText = BooleanTextTrue;
         }
         /// <summary>
-        /// Erzeugt eine BooleanProperty, welches einen eigenen boolean Wert enthält und
-        /// diesen darstellen und manipulieren kann. Der Wert ist über die Property BooleanValue
-        /// verfügbar.
+        /// Creates a BooleanProperty, which contains its own boolean value and can display
+        /// and manipulate it. The value is available via the property BooleanValue.
         /// </summary>
-        /// <param name="resourceIdLabel">ResourceId für den Label und dessen ToolTips. Die
-        /// Texte für die ToolTips werden unter dieser ResourceId gefolgt von ".ShortInfo" bzw. ".DetailedInfo"
-        /// gesucht. Unter ".Images" findet sich der Name und die Indizes einer ImageList
-        /// in der Resource</param>
-        /// <param name="resourceIdValues">ResourceId für die Texte für true bzw. false. Der Text muss
-        /// mit einem Trennzeichen beginnen, gefolgt von dem Text für true, gefolgt von dem Trennzeichen,
-        /// gefolgt von dem Wert für false, z.B. "|ja|nein"</param>
+        /// <param name="resourceIdLabel">ResourceId for the label and its tooltips. The
+        /// texts for the tooltips are looked up under this ResourceId followed by ".ShortInfo" or ".DetailedInfo"
+        /// respectively. Under ".Images" the name and the indices of an ImageList
+        /// in the resource are found</param>
+        /// <param name="resourceIdValues">ResourceId for the texts for true and false. The text must
+        /// start with a separator character, followed by the text for true, followed by the separator,
+        /// followed by the text for false, e.g. "|yes|no"</param>
+        /// <param name="settingName">Name of the value when this property is used in a setting. It is passed
+        /// as the name in the <see cref="SettingChangedEvent"/></param>
         public BooleanProperty(string resourceIdLabel, string resourceIdValues, string settingName)
         {
             this.settingName = settingName;

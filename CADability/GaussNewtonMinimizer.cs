@@ -189,6 +189,7 @@ namespace CADability
         /// Calculates the closest line approximating the provided <paramref name="points"/>.
         /// </summary>
         /// <param name="points">Points to be approximated by the line</param>
+        /// <param name="precision">Required precision: the fit is accepted when the error of the approximation is below the square of this value, otherwise double.MaxValue is returned</param>
         /// <param name="location">Location of the line</param>
         /// <param name="direction">direction of the line</param>
         /// <returns>maximum distance to the line</returns>

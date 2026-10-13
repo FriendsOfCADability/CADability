@@ -457,6 +457,7 @@ namespace CADability
         /// Find a connection (of edges) between startVertex and the first stopVertex on the provided face
         /// </summary>
         /// <param name="startVertex"></param>
+        /// <param name="usableEdges">The edges that may be used for the connection</param>
         /// <param name="stopVertices"></param>
         /// <param name="onThisFace"></param>
         /// <returns></returns>

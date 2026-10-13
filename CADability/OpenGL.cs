@@ -238,13 +238,13 @@ namespace CADability
             ///         This member is one of the following values:
             ///     </para>
             ///     <para>
-            ///         <see cref="WinNt.PROCESSOR_INTEL_386" />
+            ///         <c>PROCESSOR_INTEL_386</c>
             ///     </para>
             ///     <para>
-            ///         <see cref="WinNt.PROCESSOR_INTEL_486" />
+            ///         <c>PROCESSOR_INTEL_486</c>
             ///     </para>
             ///     <para>
-            ///         <see cref="WinNt.PROCESSOR_INTEL_PENTIUM" />
+            ///         <c>PROCESSOR_INTEL_PENTIUM</c>
             ///     </para>
             /// </summary>
             public int ProcessorType;
@@ -269,17 +269,17 @@ namespace CADability
             ///     </para>
             ///     <para>
             ///         If <i>SystemInfoUnion.ProcessorArchitecture</i> is
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_INTEL" />, <i>ProcessorLevel</i>
+            ///         <c>PROCESSOR_ARCHITECTURE_INTEL</c>, <i>ProcessorLevel</i>
             ///         is defined by the CPU vendor.
             ///     </para>
             ///     <para>
             ///         If <i>SystemInfoUnion.ProcessorArchitecture</i> is
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_IA64" />, <i>ProcessorLevel</i> is
+            ///         <c>PROCESSOR_ARCHITECTURE_IA64</c>, <i>ProcessorLevel</i> is
             ///         set to 1.
             ///     </para>
             ///     <para>
             ///         If <i>SystemInfoUnion.ProcessorArchitecture</i> is
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_MIPS" />, <i>ProcessorLevel</i> is
+            ///         <c>PROCESSOR_ARCHITECTURE_MIPS</c>, <i>ProcessorLevel</i> is
             ///         of the form 00xx, where xx is an 8-bit implementation number (bits 8-15 of
             ///         the PRId register).  The member can be the following value:
             ///     </para>
@@ -297,7 +297,7 @@ namespace CADability
             ///     </para>
             ///     <para>
             ///         If <i>SystemInfoUnion.ProcessorArchitecture</i> is
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_ALPHA" />, <i>ProcessorLevel</i>
+            ///         <c>PROCESSOR_ARCHITECTURE_ALPHA</c>, <i>ProcessorLevel</i>
             ///         is of the form xxxx, where xxxx is a 16-bit processor version number (the
             ///         low-order 16 bits of a version number from the firmware).  The member can
             ///         be one of the following values:
@@ -324,7 +324,7 @@ namespace CADability
             ///     </para>
             ///     <para>
             ///         If <i>SystemInfoUnion.ProcessorArchitecture</i> is
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_PPC" />, <i>ProcessorLevel</i> is
+            ///         <c>PROCESSOR_ARCHITECTURE_PPC</c>, <i>ProcessorLevel</i> is
             ///         of the form xxxx, where xxxx is a 16-bit processor version number (the
             ///         high-order 16 bits of the Processor Version Register).  The member can be
             ///         one of the following values:
@@ -474,7 +474,7 @@ namespace CADability
             ///     </para>
             ///     <para>
             ///         <b>Windows Me/98/95:</b>  The system always sets this member to zero, the
-            ///         value defined for <see cref="WinNt.PROCESSOR_ARCHITECTURE_INTEL" />.
+            ///         value defined for <c>PROCESSOR_ARCHITECTURE_INTEL</c>.
             ///     </para>
             /// </summary>
             [FieldOffset(0)]
@@ -488,26 +488,26 @@ namespace CADability
             ///         values:
             ///     </para>
             ///     <para>
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_UNKNOWN" />
+            ///         <c>PROCESSOR_ARCHITECTURE_UNKNOWN</c>
             ///     </para>
             ///     <para>
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_INTEL" />
+            ///         <c>PROCESSOR_ARCHITECTURE_INTEL</c>
             ///     </para>
             ///     <para>
-            ///         <b>Windows NT 3.51:</b>  <see cref="WinNt.PROCESSOR_ARCHITECTURE_MIPS" />
-            ///     </para>
-            ///     <para>
-            ///         <b>Windows NT 4.0 and earlier:</b>
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_ALPHA" />
+            ///         <b>Windows NT 3.51:</b>  <c>PROCESSOR_ARCHITECTURE_MIPS</c>
             ///     </para>
             ///     <para>
             ///         <b>Windows NT 4.0 and earlier:</b>
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_PPC" />
+            ///         <c>PROCESSOR_ARCHITECTURE_ALPHA</c>
             ///     </para>
             ///     <para>
-            ///         <b>64-bit Windows:</b>  <see cref="WinNt.PROCESSOR_ARCHITECTURE_IA64" />,
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_IA32_ON_WIN64" />,
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_AMD64" />
+            ///         <b>Windows NT 4.0 and earlier:</b>
+            ///         <c>PROCESSOR_ARCHITECTURE_PPC</c>
+            ///     </para>
+            ///     <para>
+            ///         <b>64-bit Windows:</b>  <c>PROCESSOR_ARCHITECTURE_IA64</c>,
+            ///         <c>PROCESSOR_ARCHITECTURE_IA32_ON_WIN64</c>,
+            ///         <c>PROCESSOR_ARCHITECTURE_AMD64</c>
             ///     </para>
             /// </summary>
             [FieldOffset(0)]
@@ -1199,20 +1199,20 @@ namespace CADability
         ///                 <description>Description</description>
         ///             </listheader>
         ///             <item>
-        ///                 <term><see cref="WinNt.PF_3DNOW_INSTRUCTIONS_AVAILABLE" /></term>
+        ///                 <term><c>PF_3DNOW_INSTRUCTIONS_AVAILABLE</c></term>
         ///                 <description>
         ///                     The 3D-Now instruction set is available.
         ///                 </description>
         ///             </item>
         ///             <item>
-        ///                 <term><see cref="WinNt.PF_COMPARE_EXCHANGE_DOUBLE" /></term>
+        ///                 <term><c>PF_COMPARE_EXCHANGE_DOUBLE</c></term>
         ///                 <description>
         ///                     The compare and exchange double operation is available (Pentium,
         ///                     MIPS, and Alpha).
         ///                 </description>
         ///             </item>
         ///             <item>
-        ///                 <term><see cref="WinNt.PF_FLOATING_POINT_EMULATED" /></term>
+        ///                 <term><c>PF_FLOATING_POINT_EMULATED</c></term>
         ///                 <description>
         ///                     <para>
         ///                         Floating-point operations are emulated using a software
@@ -1230,38 +1230,38 @@ namespace CADability
         ///                 </description>
         ///             </item>
         ///             <item>
-        ///                 <term><see cref="WinNt.PF_FLOATING_POINT_PRECISION_ERRATA" /></term>
+        ///                 <term><c>PF_FLOATING_POINT_PRECISION_ERRATA</c></term>
         ///                 <description>
         ///                     <b>Pentium:</b>  In rare circumstances, a floating-point precision
         ///                     error can occur.
         ///                 </description>
         ///             </item>
         ///             <item>
-        ///                 <term><see cref="WinNt.PF_MMX_INSTRUCTIONS_AVAILABLE" /></term>
+        ///                 <term><c>PF_MMX_INSTRUCTIONS_AVAILABLE</c></term>
         ///                 <description>
         ///                     The MMX instruction set is available.
         ///                 </description>
         ///             </item>
         ///             <item>
-        ///                 <term><see cref="WinNt.PF_PAE_ENABLED" /></term>
+        ///                 <term><c>PF_PAE_ENABLED</c></term>
         ///                 <description>
         ///                     The processor is PAE-enabled.
         ///                 </description>
         ///             </item>
         ///             <item>
-        ///                 <term><see cref="WinNt.PF_RDTSC_INSTRUCTION_AVAILABLE" /></term>
+        ///                 <term><c>PF_RDTSC_INSTRUCTION_AVAILABLE</c></term>
         ///                 <description>
         ///                     The RDTSC instruction is available.
         ///                 </description>
         ///             </item>
         ///             <item>
-        ///                 <term><see cref="WinNt.PF_XMMI_INSTRUCTIONS_AVAILABLE" /></term>
+        ///                 <term><c>PF_XMMI_INSTRUCTIONS_AVAILABLE</c></term>
         ///                 <description>
         ///                     The SSE instruction set is available.
         ///                 </description>
         ///             </item>
         ///             <item>
-        ///                 <term><see cref="WinNt.PF_XMMI64_INSTRUCTIONS_AVAILABLE" /></term>
+        ///                 <term><c>PF_XMMI64_INSTRUCTIONS_AVAILABLE</c></term>
         ///                 <description>
         ///                     The SSE2 instruction set is available.
         ///                 </description>

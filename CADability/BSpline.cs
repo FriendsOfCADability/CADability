@@ -776,6 +776,7 @@ namespace CADability.GeoObject
         /// <param name="points">List of points to pass through</param>
         /// <param name="maxDegree">maximum degree for the BSpline. Must be between 3 an 25</param>
         /// <param name="closed">true if the resulting BSpline should be closed</param>
+        /// <param name="throughPointKnots">Optional parameter values for the through points. If null, they are calculated from the distances of the points</param>
         /// <returns>success</returns>
         public bool ThroughPoints(GeoPoint[] points, int maxDegree, bool closed, double[] throughPointKnots = null)
         {

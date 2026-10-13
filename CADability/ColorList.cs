@@ -103,16 +103,11 @@ namespace CADability.Attribute
             set { owner = value; }
         }
         /// <summary>
-        /// Liefert den Index zu dem gegebenen Namen.
+        /// Adds a color, or overwrites an existing one if the name already exists.
         /// </summary>
-        /// <param name="Name">Der Name der gesuchten Farbe.</param>
-        /// <returns>Index der gesuchten Farbe oder -1, wenn keine Farbe mit diesem Namen in der Tabelle existiert.</returns>
-        /// <summary>
-        /// Fügt eine Farbe hinzu, oder überschreibt eine bestehende, wenn der Name bereits existiert.
-        /// </summary>
-        /// <param name="Name">Bezeichnung der Farbe.</param>
-        /// <param name="Color">RGB (oder auch ARGB) Wert der Farbe.</param>
-        /// <returns>Index des neuen oder veränderten Eintrags.</returns>
+        /// <param name="Name">Name of the color.</param>
+        /// <param name="Color">RGB (or ARGB) value of the color.</param>
+        /// <returns>Index of the new or modified entry.</returns>
         public int AddColor(string Name, Color Color)
         {
             int ind = IndexOf(Name);
@@ -169,10 +164,10 @@ namespace CADability.Attribute
             if (DidModifyEvent != null) DidModifyEvent(this, null);
         }
         /// <summary>
-        /// Liefert den Namen zu dem gegebenen Index.
+        /// Returns the index of the given name.
         /// </summary>
-        /// <param name="Index">Der Index.</param>
-        /// <returns>Der Name.</returns>
+        /// <param name="Name">The name of the color to look for.</param>
+        /// <returns>Index of the color or -1, if there is no color with this name in the table.</returns>
         public int IndexOf(string Name)
         {
             int i;
@@ -189,6 +184,11 @@ namespace CADability.Attribute
                     return i;
             return -1;
         }
+        /// <summary>
+        /// Returns the name of the given index.
+        /// </summary>
+        /// <param name="Index">The index.</param>
+        /// <returns>The name.</returns>
         public string GetName(int Index)
         {
             if (Index < namedColors.Count)

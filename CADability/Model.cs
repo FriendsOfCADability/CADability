@@ -980,7 +980,12 @@ namespace CADability
 			if (octTree != null) AddOctreeObjects(ObjectToAdd, octTree);
 		}
 		/// <summary>
-		/// Adds multiple GeoObjects to this model.
+		/// Adds all objects of the list to this model. Objects that belong to another owner (a model or a block) are
+		/// removed from it first. Like <see cref="Add(IGeoObject)"/> this adds objects even when
+		/// <see cref="IGeoObject.HasValidData"/> returns false. The whole list is one undo step.
+		/// <see cref="AddingGeoObjectsEvent"/> and <see cref="GeoObjectsAddedEvent"/> are raised once for the list,
+		/// <see cref="GeoObjectAddedEvent"/> for each object unless <see cref="NoSingleAddEvents"/> is set;
+		/// <see cref="AddingGeoObjectEvent"/> is not raised, so a handler of it cannot reject objects added this way.
 		/// </summary>
 		/// <param name="ListToAdd">List of the GeoObjects to add</param>
 		public void Add(GeoObjectList ListToAdd)
@@ -1027,7 +1032,7 @@ namespace CADability
 			if (GeoObjectsAddedEvent != null) GeoObjectsAddedEvent(ListToAdd);
 		}
 		/// <summary>
-		/// Adds multiple GeoObjects to this model.
+		/// Adds all objects of the array to this model, same as <see cref="Add(GeoObjectList)"/>.
 		/// </summary>
 		/// <param name="ListToAdd">Array of the GeoObjects to add</param>
 		public void Add(IGeoObject[] ListToAdd)

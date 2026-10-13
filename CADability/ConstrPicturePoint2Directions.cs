@@ -349,11 +349,11 @@ namespace CADability.Actions
         //    return scalingFactor;
         //}
 
-        /// <summary>
-        /// Will be called when some number is entered into the scaling factor input field
-        /// </summary>
-        /// <param name="val">The new value</param>
-        /// <returns>true, if accepted</returns>
+        // <summary>
+        // Will be called when some number is entered into the scaling factor input field
+        // </summary>
+        // <param name="val">The new value</param>
+        // <returns>true, if accepted</returns>
         //bool OnSetScalingFactor(double val)
         //{
         //    if (val > Precision.eps) // accept only positive values
@@ -366,10 +366,10 @@ namespace CADability.Actions
         //    return false;
         //}
 
-        /// <summary>
-        /// Called by the scaling factor input field to determine which number to display
-        /// </summary>
-        /// <returns></returns>
+        // <summary>
+        // Called by the scaling factor input field to determine which number to display
+        // </summary>
+        // <returns></returns>
         //double OnGetScalingFactor()
         //{
         //    return scalingFactor;

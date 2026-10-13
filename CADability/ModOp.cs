@@ -292,12 +292,6 @@ namespace CADability
             return res;
         }
         /// <summary>
-        /// Creates a rotation about a fixpoint
-        /// </summary>
-        /// <param name="Center">the fixpoint</param>
-        /// <param name="Rotation">the rotation angle</param>
-        /// <returns>resulting modification</returns>
-        /// <summary>
         /// The reflection about the line through <paramref name="axisPoint"/> with the direction
         /// <paramref name="axisDirection"/>. Points on that line stay where they are.
         /// </summary>
@@ -319,6 +313,12 @@ namespace CADability
             res.Matrix12 = axisPoint.y - (res.Matrix10 * axisPoint.x + res.Matrix11 * axisPoint.y);
             return res;
         }
+        /// <summary>
+        /// Creates a rotation about a fixpoint
+        /// </summary>
+        /// <param name="Center">the fixpoint</param>
+        /// <param name="Rotation">the rotation angle</param>
+        /// <returns>resulting modification</returns>
         public static ModOp2D Rotate(GeoPoint2D Center, SweepAngle Rotation)
         {
             ModOp2D res;
@@ -1092,7 +1092,7 @@ namespace CADability
         /// <summary>
         /// Modifies the given 3 dimensional vector and returns the 2d vector, omitting the z-coordinate
         /// </summary>
-        /// <param name="p">the vector to project</param>
+        /// <param name="v">the vector to project</param>
         /// <returns>the resulting vector</returns>
         internal GeoVector2D Project(GeoVector v)
         {
@@ -1229,7 +1229,7 @@ namespace CADability
         /// <summary>
         /// Creates a rotation around the fixpoint that moves the vector <paramref name="from"/> to the vector <paramref name="to"/>.
         /// </summary>
-        /// <param name="FixPoint">Fixpoint for the rotation</param>
+        /// <param name="fixPoint">Fixpoint for the rotation</param>
         /// <param name="from">Source vector</param>
         /// <param name="to">Destination vector</param>
         /// <returns>The modification that performs the rotation</returns>
@@ -1357,7 +1357,7 @@ namespace CADability
         /// <summary>
         /// Constructs a ModOp, that performs a reflection about the given point
         /// </summary>
-        /// <param name="pln">point for reflection</param>
+        /// <param name="center">point for reflection</param>
         /// <returns>resulting transformation</returns>
         public static ModOp ReflectPoint(GeoPoint center)
         {

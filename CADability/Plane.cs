@@ -46,7 +46,7 @@ namespace CADability
         /// <summary>
         /// Operator to seamlessly use a Plane as a PlaneRef 
         /// </summary>
-        /// <param name="pr">The Plane to convert</param>
+        /// <param name="p">The Plane to convert</param>
         /// <returns>The resulting PlaneRef</returns>
         public static implicit operator PlaneRef(Plane p) { return new PlaneRef(p); }
         /// <summary>
@@ -54,8 +54,8 @@ namespace CADability
         /// If there is no common plane the result may be not optimal (residual is not minimal)
         /// </summary>
         /// <param name="Cloud">the cloud of points</param>
-        /// <param name="isCommon">yields true, if all points lie on the plane</param>
-        /// <returns>the plane, may be null</returns>
+        /// <param name="commonPlane">the common plane of the points, if one was found, otherwise the XY plane</param>
+        /// <returns>true, if all points lie on the plane</returns>
         public static bool FindCommonPlane(GeoPoint[] Cloud, out Plane commonPlane)
         {   // für besseren Algorithmus suche nach "Householder" in open cascade
             // Plane muss halt gemacht werden
@@ -213,12 +213,14 @@ namespace CADability
         }
         /// <summary>
         /// Finds a plane that best fits through the given points. Calculates also the maximum distance
-        /// of the points from that plane. If <paramref name="MaxDistance"/> is 0.0 or small, the points are coplanar.
+        /// of the points from that plane. If <paramref name="maxDistance"/> is 0.0 or small, the points are coplanar.
         /// The normal of the plane points to positive z. If it is (almost) perpendicular to the z-axis, it points to positive y,
         /// and if it is (almost) the x-axis, it points to positive x. Points in the XY plane yield a plane with the normal +Z.
         /// </summary>
-        /// <param name="Points">points to build the plane from</param>
-        /// <param name="MaxDistance">maximum distance of the points from the plane</param>
+        /// <param name="points">points to build the plane from</param>
+        /// <param name="maxDistance">maximum distance of the points from the plane</param>
+        /// <param name="isLinear">true, if the points do not define a plane because there are fewer than three distinct points
+        /// or they all lie (almost) on a line; the XY plane is returned in that case</param>
         /// <returns>the plane</returns>
         public static Plane FromPoints(GeoPoint[] points, out double maxDistance, out bool isLinear)
         {
@@ -747,7 +749,7 @@ namespace CADability
         /// plane will be changed to a point closest to the location of AlignTo, if relocate
         /// is true, otherwise the location remains unchanged.
         /// </summary>
-        /// <param name="AlignTo">Plane to align to</param>
+        /// <param name="alignTo">Plane to align to</param>
         /// <param name="relocate">relocate this plane</param>
         public void Align(Plane alignTo, bool relocate)
         {

@@ -58,6 +58,7 @@ namespace CADability.Actions
         /// <param name="toRotate"></param>
         /// <param name="referenceFace"></param>
         /// <param name="pickBeam"></param>
+        /// <param name="axisEdge">optional edge whose curve is a line to be used as the rotation axis, located at the center of the edge. If null, the common linear edge of the two faces closest to <paramref name="pickBeam"/> is used</param>
         /// <returns></returns>
         static public (Axis axis, GeoVector fromHere, GeoVector toHere) GetRotationAxis(Face toRotate, Face referenceFace, Axis pickBeam, Edge axisEdge = null)
         {

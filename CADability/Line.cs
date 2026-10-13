@@ -17,7 +17,7 @@ namespace CADability.GeoObject
     using CADability.UserInterface;
 
     /// <summary>
-    /// The line is a <see href="GeoObject.html">IGeoObject</see>. It is actually a line segment
+    /// The line is a <see cref="IGeoObject"/>. It is actually a line segment
     /// not an infinite line.
     /// </summary>
     [Serializable()]

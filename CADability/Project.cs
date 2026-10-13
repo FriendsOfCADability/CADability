@@ -531,7 +531,7 @@ namespace CADability
         }
 #endif
         /// <summary>
-        /// Returns the number of <see cref="ModelViews"/> in this project
+        /// Returns the number of model views (<see cref="ModelView"/>) in this project
         /// </summary>
         internal int ModelViewCount
         {
@@ -1019,6 +1019,15 @@ namespace CADability
             }
             return true;
         }
+        /// <summary>
+        /// Creates a project with one empty <see cref="Model"/> and the standard views of it (from top, from right, from
+        /// front and an isometric view). The model's extent is taken from the global setting "DefaultModelSize", or is
+        /// 0 to 100 in each direction. The project has the default attribute lists (layers, colours, styles...), so
+        /// objects can be given default attributes with <see cref="SetDefaults"/>. This is the project to start with when
+        /// CADability is used as a library without a user interface; <see cref="GetActiveModel"/> returns the model to add
+        /// objects to. The imports create their project this way.
+        /// </summary>
+        /// <returns>the new project</returns>
         static public Project CreateSimpleProject()
         {
             Project res = Construct();
@@ -1207,7 +1216,13 @@ namespace CADability
             return version;
         }
         /// <summary>
-        /// Export the project in one of the following formats: cdb, dxf, dwg, step (or stp) and stl.
+        /// Exports the project in one of the following formats: cdb (CADability's own JSON format, same as
+        /// <see cref="WriteToFile"/>), dxf, dwg, step (or stp) and stl. The case of <paramref name="format"/> does not
+        /// matter, the extension of the file name is not used. DXF and DWG write all models (see <see cref="DXF.Export"/>;
+        /// the DXF version is the setting "DxfDwg.Version", DWG is written as AutoCAD 2004 or later), STEP and STL write
+        /// the active model only. STEP writes solids, shells and faces as boundary representation and curves as curve
+        /// sets (see <see cref="ExportStep"/>), STL writes the triangulation of the faces with the precision of the setting
+        /// "Export.STL.Precision" (see <see cref="ExportToSTL"/>).
         /// </summary>
         /// <param name="fileName">Path and filename for the generated output file</param>
         /// <param name="format">Format, one of the strings: cdb, dxf, dwg, step, stp, stl</param>
@@ -1254,6 +1269,12 @@ namespace CADability
             }
             return false;
         }
+        /// <summary>
+        /// Writes the active model to a binary STL file: the triangulation of all faces, shells and solids, with the
+        /// precision (maximal distance between the triangles and the surface) of the setting "Export.STL.Precision",
+        /// 0.005 by default. Curves, text and other objects without faces are not written.
+        /// </summary>
+        /// <param name="fileName">Path and filename of the STL file</param>
         public void ExportToSTL(string fileName)
         {
             Model m = GetActiveModel();
@@ -1558,11 +1579,13 @@ namespace CADability
             }
         }
         /// <summary>
-        /// Creates a new project reading the data from the file with the given name.
-        /// If FileName is null, an OpenFileDialog will be displayed.
+        /// Reads a project from a file in CADability's own format (cdb): the JSON format written by
+        /// <see cref="WriteToFile"/>, or the binary format of older versions, which is converted when read. To read
+        /// DXF, DWG, STEP or STL files use <see cref="ReadFromFile(string, string)"/>.
         /// </summary>
         /// <param name="FileName">The name of the file</param>
-        /// <returns>The newly created project or null if failed to create a project</returns>
+        /// <returns>The project read from the file, or null when <paramref name="FileName"/> is null or the file does not
+        /// contain a project</returns>
         public static Project ReadFromFile(string FileName)
         {
             return ReadFromFile(FileName, true);
@@ -1743,6 +1766,25 @@ namespace CADability
                 throw new InvalidOperationException("Failed to read DWG file '" + filename + "': " + ex.Message, ex);
             }
         }
+        /// <summary>
+        /// Reads a file of the given format and returns it as a new project. <paramref name="Format"/> is one of
+        /// "cdb" (CADability's own format, see <see cref="ReadFromFile(string)"/>), "dxf", "dwg", "step" or "stp" and "stl";
+        /// the case does not matter, the extension of the file name is not used. For the exchange formats the project is
+        /// created with <see cref="CreateSimpleProject"/> and the imported objects are added to its model: DXF and DWG
+        /// bring their layers, blocks, colours, line styles and hatch styles along (see <see cref="DXF.Import"/>), STEP files
+        /// give solids, open shells and faces, named like their products and arranged in <see cref="Block"/>s
+        /// according to the assembly structure when the setting "ImportStep.UseHierarchy" is true (see
+        /// <see cref="ImportStep"/>), and STL files give a solid for every closed set of triangles and a shell for every
+        /// open one. Objects without a colour or layer get the project's standard ones.
+        /// A DWG file that cannot be read throws an <see cref="InvalidOperationException"/>; a DXF or STEP file that cannot
+        /// be read throws an exception as well.
+        /// </summary>
+        /// <param name="FileName">The name of the file</param>
+        /// <param name="Format">The format: cdb, dxf, dwg, step, stp or stl</param>
+        /// <param name="useProgress">no longer used, the progress bar is shown by the frame when there is one</param>
+        /// <param name="makeCompounds">no longer used</param>
+        /// <returns>The new project, or null for an unknown or unsupported format (e.g. brep, sat, x_t) and for a STL
+        /// file without shells</returns>
         public static Project ReadFromFile(string FileName, string Format, bool useProgress, bool makeCompounds = true)
         {
             useProgress = useProgress && !Settings.GlobalSettings.GetBoolValue("DontUse.WindowsForms", false);
@@ -1813,6 +1855,13 @@ namespace CADability
             }
             return null;
         }
+        /// <summary>
+        /// Reads a file of the given format and returns it as a new project, see
+        /// <see cref="ReadFromFile(string, string, bool, bool)"/>.
+        /// </summary>
+        /// <param name="FileName">The name of the file</param>
+        /// <param name="Format">The format: cdb, dxf, dwg, step, stp or stl</param>
+        /// <returns>The new project, or null for an unknown or unsupported format</returns>
         public static Project ReadFromFile(string FileName, string Format)
         {
             return ReadFromFile(FileName, Format, true);
@@ -2128,6 +2177,15 @@ namespace CADability
                 deferRefresh = value;
             }
         }
+        /// <summary>
+        /// Gives the object the default attributes of this project: the default <see cref="Style"/> for its kind of object
+        /// (<see cref="IGeoObject.PreferredStyle"/>), and the current layer, colour, dimension style, line width, line pattern
+        /// and hatch style of the project's attribute lists for every attribute the object does not have yet. The
+        /// construct actions and the methods of <see cref="Make3D"/> that take a project call this. Call it for objects you
+        /// create yourself before adding them to a model, otherwise they have no layer and colour and are drawn in the
+        /// default colour.
+        /// </summary>
+        /// <param name="go">the object to set the attributes of</param>
         public void SetDefaults(IGeoObject go)
         {
             Style style = this.StyleList.GetDefault(go.PreferredStyle);

@@ -22,7 +22,7 @@ namespace CADability.GeoObject
     }
 
     /// <summary>
-    /// The dimension object represents a dimensioning in a model and is a <see href="a2f7e3d8-5886-48a6-b0a2-a896dcce8c4a.htm">GeoObject</see>.
+    /// The dimension object represents a dimensioning in a model and is a <see cref="IGeoObject"/>.
     /// To use a dimension object you must at least set the properties <see cref="DimensionStyle"/>, <see cref="DimLineRef"/>,
     /// <see cref="DimLineDirection"/>, and add two points with the <see cref="AddPoint"/> method. Example:
     /// <code>
@@ -349,13 +349,13 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
-        /// Ein Symbol zufügen. Die Maßlinie ist immer die X-Achse.
+        /// Adds a symbol. The dimension line is always the x axis.
         /// </summary>
-        /// <param name="List">hier zufügen</param>
-        /// <param name="xPos">x-Position des Punktes</param>
-        /// <param name="layoutFactor">Faktor Papier->Welt</param>
-        /// <param name="leftSide">Symbol auf der linken Seite</param>
-        /// <param name="outside">Symbol ist außerhalb</param>
+        /// <param name="list">the list to add to</param>
+        /// <param name="xPos">x position of the point</param>
+        /// <param name="layoutFactor">factor paper->world</param>
+        /// <param name="leftSide">symbol on the left side</param>
+        /// <param name="outside">symbol is outside</param>
         private void AddSymbol(GeoObjectList list, double xPos, double layoutFactor, bool leftSide, bool outside)
         {
             Angle dir;

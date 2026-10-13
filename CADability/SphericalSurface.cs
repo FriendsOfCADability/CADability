@@ -1098,7 +1098,7 @@ namespace CADability.GeoObject
 			return res;
 		}
 		/// <summary>
-		/// The 2d curve of a part of the intersection circle on <paramref name="sphere"/>. The parts start and end on the seam
+		/// The 2d curve of a part of the intersection circle on <paramref name="surface"/>. The parts start and end on the seam
 		/// or on the bounds. A ProjectedCurve without a domain takes the periodic domain from its start point, and a start
 		/// point on the seam may be taken at u = 0 while the rest of the part is near u = 2pi, so that the inner points jump
 		/// by the period. The part is projected into the period around its middle instead.
@@ -1336,7 +1336,7 @@ namespace CADability.GeoObject
 			return -1; // means: no implementation for this combination
 		}
 		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetNonPeriodicSurface (Border)"/>
+		/// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetNonPeriodicSurface(ICurve[])"/>
 		/// </summary>
 		/// <returns></returns>
 		public override ISurface GetNonPeriodicSurface(ICurve[] orientedCurves)

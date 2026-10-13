@@ -176,6 +176,7 @@ namespace CADability.Shapes
 		/// </summary>
 		/// <param name="segments">The oriented and ordered segments</param>
 		/// <param name="forceConnected">True: border will be closed even if segments aren't connected at the end</param>
+		/// <param name="flatten">True: segments which are <see cref="Path2D"/> objects are replaced by their sub curves</param>
 		public Border(ICurve2D[] segments, bool forceConnected, bool flatten = true)
 			: this()
 		{
@@ -587,10 +588,12 @@ namespace CADability.Shapes
 			return new Border(segments);
 		}
 		/// <summary>
-		/// segments enthält die Kurven zwar in richtiger Reohenfolge doch u.U. in falscher Richtung.
-		/// Hier wird also vor dem Erzeugen der Border ggf. umorientiert
+		/// segments contains the curves in the correct order, but possibly in the wrong direction.
+		/// So they are reoriented here, if necessary, before the border is created.
 		/// </summary>
 		/// <param name="segments"></param>
+		/// <param name="forceClosed">True: the start point of the first segment is moved onto the end point of the last segment,
+		/// so that the resulting border is closed</param>
 		/// <returns></returns>
 		public static Border FromUnorientedList(ICurve2D[] segments, bool forceClosed)
 		{
@@ -1700,12 +1703,10 @@ namespace CADability.Shapes
 			else return PositionInternal.Inside; // ungerade Schnittanzahl
 		}
 		/// <summary>
-		/// Returns the <see cref="Position"/> of the given Point relative to this Border.
-		/// If the outline of the border interferes with a square around p (width and height
-		/// is 2*precision), the result will be OnCurve.
+		/// Returns the <see cref="Position"/> of the center of the given rectangle relative to this Border.
+		/// If the outline of the border interferes with the rectangle, the result will be OnCurve.
 		/// </summary>
-		/// <param name="p">The Point to test</param>
-		/// <param name="precision">The "radius" (half width) of a square centered at p</param>
+		/// <param name="rect">The rectangle to test, its center is the point whose position is wanted</param>
 		/// <returns>Inside, Outside or OnCurve (on the outline of this border)</returns>
 		public Position GetPosition(BoundingRect rect)
 		{
@@ -2158,10 +2159,12 @@ namespace CADability.Shapes
 			return res;
 		}
 		/// <summary>
-		/// Identisch mit Split weiter oben, jedoch werden die Punkte noch nachgebessert durch die gegebenen GeoPoint2D
+		/// Identical to Split above, but the split points are additionally corrected to the given GeoPoint2D
 		/// </summary>
 		/// <param name="parameter"></param>
 		/// <param name="points"></param>
+		/// <param name="orientation">for each split point the orientation (sign of the cross product) of the direction of this border
+		/// and the direction of the crossing curve, 0.0 if they only touch; it determines the orientation of the resulting parts</param>
 		/// <returns></returns>
 		internal Border[] Split(double[] parameter, GeoPoint2D[] points, double[] orientation)
 		{
@@ -2465,6 +2468,9 @@ namespace CADability.Shapes
 		/// In other cases there may be a set of solutions, e.g. if the border is not convex.
 		/// </summary>
 		/// <param name="dist">the distance of the desired parallel border</param>
+		/// <param name="approxSpline">true: BSpline segments are approximated by lines and arcs (with <paramref name="precision"/>) before the parallel is computed</param>
+		/// <param name="precision">precision relative to <paramref name="dist"/>: segments shorter than dist*precision are ignored and points closer than that are considered equal; 0.0 means 1e-3</param>
+		/// <param name="roundAngle">inner angle (in radians) at a corner below which the parallel segments are connected by an arc instead of being extended to their intersection</param>
 		/// <returns>array of parallel borders (maybe empty)</returns>
 		public Border[] GetParallel(double dist, bool approxSpline, double precision, double roundAngle)
 		{

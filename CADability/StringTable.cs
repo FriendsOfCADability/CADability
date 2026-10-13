@@ -96,6 +96,13 @@ namespace CADability.UserInterface
             stringXmlDocument.Load(str);
             AddStrings(stringXmlDocument);
         }
+        /// <summary>
+        /// Adds the strings of the given xml document to the string table.
+        /// </summary>
+        /// <param name="doc">xml document to parse</param>
+        /// <remarks>
+        /// See file "StringTable.xml" for the required xml schema.
+        /// </remarks>
         public static void AddStrings(XmlDocument doc)
         {
             string language = "unknown";
@@ -156,18 +163,12 @@ namespace CADability.UserInterface
         /// </summary>
         public static event ActiveLanguageChangedDelegate ActiveLanguageChangedEvent;
         /// <summary>
-        /// Adds the strings of the given xml document to the string table.
-        /// </summary>
-        /// <param name="doc">xml document to parse</param>
-        /// <remarks>
-        /// See file "StringTable.xml" for the required xml schema.
-        /// </remarks>
-        /// <summary>
         /// Adds a single string to the Stringtable. This can be used for adding new strings or
         /// overriding existing strings.
         /// </summary>
         /// <param name="language">the language of the string</param>
         /// <param name="resourceID">the ID of the string</param>
+        /// <param name="cat">the category of the string (label, info or tip)</param>
         /// <param name="text">the string</param>
         public static void AddString(string language, string resourceID, Category cat, string text)
         {

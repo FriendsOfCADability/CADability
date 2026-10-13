@@ -131,7 +131,7 @@ namespace CADability.UserInterface
         /// </summary>
         Lockable = 1 << 19,
         /// <summary>
-        /// Clicking on the entry calls<see cref="IPropertyEntry.ButtonClicked(PropertyEntryButton)"/> with the flag <see cref="PropertyEntryButton.directMenu", displayed as right arrow/>
+        /// Clicking on the entry calls<see cref="IPropertyEntry.ButtonClicked(PropertyEntryButton)"/> with the flag <see cref="PropertyEntryButton.directMenu"/>, displayed as right arrow
         /// </summary>
         DirectMenu = 1 << 20,
         /// <summary>
@@ -200,7 +200,7 @@ namespace CADability.UserInterface
         /// </summary>
         int IndentLevel { get; set; }
         /// <summary>
-        /// Returns the sub-items, will only be called when <see cref="EntryType.HasSubEntries"/> is set.
+        /// Returns the sub-items, will only be called when <see cref="PropertyEntryType.HasSubEntries"/> is set.
         /// </summary>
         IPropertyEntry[] SubItems { get; }
         /// <summary>
@@ -214,7 +214,7 @@ namespace CADability.UserInterface
         /// <returns></returns>
         string[] GetDropDownList();
         /// <summary>
-        /// Notification that the label or value part is being edited. Will only be called when <see cref="Flags> contains <see cref="PropertyEntryType.ValueEditable"/> or <see cref="PropertyEntryType.LabelEditable"> is set.
+        /// Notification that the label or value part is being edited. Will only be called when <see cref="Flags"/> contains <see cref="PropertyEntryType.ValueEditable"/> or <see cref="PropertyEntryType.LabelEditable"/>.
         /// </summary>
         /// <param name="editValue">true: editing the value part, false: editing the label part</param>
         void StartEdit(bool editValue);
@@ -222,6 +222,8 @@ namespace CADability.UserInterface
         /// Notification when the editing process is being terminated. 
         /// </summary>
         /// <param name="aborted">true: the edit has been aborted, false: normal end of edit process</param>
+        /// <param name="modified">true: the text has been modified while editing, false: the text is unchanged</param>
+        /// <param name="newValue">the text as it was when editing ended</param>
         void EndEdit(bool aborted, bool modified, string newValue);
         /// <summary>
         /// The text being edited has changed
@@ -232,12 +234,12 @@ namespace CADability.UserInterface
         /// <summary>
         /// This item is now selected in the property page. The item <paramref name="previousSelected"/> was selected before (may be null).
         /// </summary>
-        /// <param name="selectedIndex"></param>
+        /// <param name="previousSelected">the entry that was selected before, may be null</param>
         void Selected(IPropertyEntry previousSelected);
         /// <summary>
         /// This item was selected in the property page but is no more selected. The item <paramref name="nowSelected"/> will be selected instead (may be null).
         /// </summary>
-        /// <param name="selectedIndex"></param>
+        /// <param name="nowSelected">the entry that will be selected instead, may be null</param>
         void UnSelected(IPropertyEntry nowSelected);
         /// <summary>
         /// Select this entry
@@ -344,7 +346,7 @@ namespace CADability.UserInterface
         /// </summary>
         /// <param name="show">true: show, false: hide</param>
         /// <param name="percent">progress percentage (0..100)</param>
-        /// <param name="Title">title of the progress bar, null: don't change the current title</param>
+        /// <param name="title">title of the progress bar, null: don't change the current title</param>
         void ShowProgressBar(bool show, double percent = 0.0, string title = null);
     }
 

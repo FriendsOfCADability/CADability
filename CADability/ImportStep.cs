@@ -385,6 +385,18 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 	/// <item>StepImport.CombineFaces: adjacent faces with the same surface may be combined to a single face</item>
 	/// </list>
 	/// </summary>
+	/// <summary>
+	/// Reads STEP files (ISO 10303-21, AP203/AP214/AP242) and converts their geometry to CADability objects: solids
+	/// (<c>MANIFOLD_SOLID_BREP</c>), open shells (<c>SHELL_BASED_SURFACE_MODEL</c>), single faces and curves. The
+	/// assembly structure of the file is turned into a hierarchy of <see cref="Block"/>s when <see cref="HierarchyToBlocks"/>
+	/// is set; the product names become the names of the blocks, solids and shells. Colours (<c>STYLED_ITEM</c>) are kept.
+	/// <see cref="Project.ReadFromFile(string, string)"/> with the format "step" uses this class and puts the result into
+	/// a new project; use it directly to get the objects without a project, e.g. to add them to an existing model.
+	/// Global settings that influence the import: "StepImport.Parallel" (convert the solids on several threads, true by
+	/// default), "StepImport.Blocks" (false decomposes the blocks of the assembly structure into their objects),
+	/// "StepImport.AddLocation" (keep the placement of each assembly component in its user data "STEP.Location") and
+	/// "StepImport.CombineFaces" (merge adjacent faces on the same surface).
+	/// </summary>
 	public class ImportStep
 	{
 #if DEBUG
@@ -1227,6 +1239,9 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 
 			}
 		}
+		/// <summary>
+		/// Creates an importer. Set <see cref="HierarchyToBlocks"/> if wanted, then call <see cref="Read"/> once.
+		/// </summary>
 		public ImportStep()
 		{
 			definitions = new List<Item>();
@@ -1263,6 +1278,12 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 				Item item = definitions[cdsr[i]];
 			}
 		}
+		/// <summary>
+		/// The problems encountered by <see cref="Read"/>: the key is the number of the STEP entity (the number after
+		/// <c>#</c> in the file) that could not be imported, the value describes the problem, e.g. "face not imported"
+		/// or "closedShell with open edges". The key 0 reports a syntax error of the file. Empty when the file was
+		/// imported without problems.
+		/// </summary>
 		public Dictionary<int, string> Problems
 		{
 			get
@@ -1271,12 +1292,26 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 			}
 		}
 		/// <summary>
-		/// Convert the hierarchy of objects into a hierarchy of <see cref="Block"/>s.
+		/// Set to true to convert the assembly structure of the file into a hierarchy of <see cref="Block"/>s: a product
+		/// with several components becomes a block that contains the components (recursively), with the product's
+		/// name. False (the default) returns the solids and shells as a flat list. <see cref="Project.ReadFromFile(string, string)"/>
+		/// sets it from the global setting "ImportStep.UseHierarchy".
 		/// </summary>
 		public bool HierarchyToBlocks
 		{
 			set { makeBlocks = value; }
 		}
+		/// <summary>
+		/// Reads the STEP file and returns the imported objects: <see cref="Solid"/>s, open <see cref="Shell"/>s,
+		/// <see cref="Face"/>s and curves, or <see cref="Block"/>s containing them when <see cref="HierarchyToBlocks"/>
+		/// is set. Solids and shells are named after their products. The objects have no layer and no colour unless the file
+		/// specifies one, see <see cref="Project.SetDefaults"/>. Entities that cannot be converted are skipped and
+		/// reported in <see cref="Problems"/>; a file that cannot be parsed yields an empty list with the syntax error in
+		/// <see cref="Problems"/>. A file that cannot be opened throws an <see cref="System.IO.IOException"/>.
+		/// Call this only once per instance.
+		/// </summary>
+		/// <param name="filename">Path of the STEP file</param>
+		/// <returns>The imported objects</returns>
 		public GeoObjectList Read(string filename)
 		{
 			GeoObjectList res = new GeoObjectList();
@@ -5116,6 +5151,14 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 #endif
 			return res;
 		}
+		/// <summary>
+		/// Returns the value of the enum <typeparamref name="T"/> whose name equals <paramref name="value"/>, ignoring
+		/// case. Used for the enumerations of the STEP file, e.g. <c>.CARTESIAN.</c>. A null or empty value is read as
+		/// "Unspecified", and a name that does not exist returns the default value of <typeparamref name="T"/>.
+		/// </summary>
+		/// <typeparam name="T">the enum type</typeparam>
+		/// <param name="value">the name of the enum value as it appears in the STEP file, without the dots</param>
+		/// <returns>the enum value</returns>
 		public static T ParseEnum<T>(string value)
 		{
 			if (string.IsNullOrEmpty(value)) value = "Unspecified"; // all enums seem to end with this

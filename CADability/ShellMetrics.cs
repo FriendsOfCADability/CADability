@@ -288,9 +288,13 @@ namespace CADability.GeoObject
         /// <summary>
         /// The integral of <paramref name="integrand"/>, a function of S, Su and Sv, over the parameter domain of a
         /// face, as the boundary integral of <see cref="GreenFaceIntegral"/>. Volume and area differ only in the
-        /// integrand. The derivatives come from <see cref="ISurface.DerivativeAt"/> when that passes
+        /// integrand. The derivatives come from <see cref="ISurface.DerivationAt"/> when that passes
         /// <see cref="DerivativesAreConsistent"/>, otherwise from central differences of PointAt.
         /// </summary>
+        /// <param name="surface">The surface of the face</param>
+        /// <param name="shape">The outline and the holes of the face in the uv domain of the surface</param>
+        /// <param name="rect">The bounding rectangle of the domain, inside which the surface is defined; it sizes the difference steps and the derivative check</param>
+        /// <param name="integrand">The function of the point S and the derivatives Su and Sv whose integral over the domain is wanted</param>
         /// <param name="scale">The magnitude the tolerance is relative to, size^3 for a volume, size^2 for an area</param>
         /// <returns>The integral, NaN when it cannot be computed reliably</returns>
         private static double IntegrateOverDomain(ISurface surface, SimpleShape shape, BoundingRect rect,
@@ -345,7 +349,7 @@ namespace CADability.GeoObject
         }
 
         /// <summary>
-        /// Whether <see cref="ISurface.DerivativeAt"/> really is the derivative of <see cref="ISurface.PointAt"/>,
+        /// Whether <see cref="ISurface.DerivationAt"/> really is the derivative of <see cref="ISurface.PointAt"/>,
         /// checked against central differences at 3 x 3 points of the domain rectangle.
         /// <para>
         /// The integrand is built from DerivativeAt, the tetrahedron sum only from points, so a surface that gets its
@@ -428,6 +432,9 @@ namespace CADability.GeoObject
         /// with respect to the normalized position, and a curve for which it is not makes the face return NaN.
         /// </para>
         /// </summary>
+        /// <param name="shape">The outline and the holes of the face in uv, the domain D</param>
+        /// <param name="rect">The bounding rectangle of the domain; the inner integrals run along lines of constant v inside it, starting at its middle u0</param>
+        /// <param name="density">The function f(u,v) to integrate over the domain</param>
         /// <param name="scale">The magnitude the tolerance is relative to</param>
         /// <param name="uKnots">Values of u inside the domain where the surface is less smooth, see <see cref="KnotLines"/></param>
         /// <param name="vKnots">The same for v</param>
@@ -807,7 +814,8 @@ namespace CADability.GeoObject
         }
 
         /// <summary>
-        /// The relative difference below which two volumes or areas count as equal for <see cref="SortCanonically"/>.
+        /// The relative difference below which two volumes or areas count as equal when shells are sorted canonically by them
+        /// (the intended <c>SortCanonically</c> does not exist yet, so the constant is currently unused).
         /// Far above what the integration leaves (about 1e-9), far below any real difference between two parts.
         /// </summary>
         private const double SortTolerance = 1e-6;

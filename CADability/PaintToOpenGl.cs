@@ -111,13 +111,14 @@ namespace CADability
         PaintCapabilities Capabilities { get; }
 
         /// <summary>
-        /// Will be called before any other paint methods are called. May be called multiple times after <see cref="Init"/> has been called
+        /// Will be called before any other paint methods are called. May be called multiple times after the implementation has been initialized (its <c>Init</c> method has been called)
         /// </summary>
         void MakeCurrent();
         /// <summary>
         /// Sets the color for the next paint methods, if lockColor == 1: the color is kept unchanged until lockColor==-1 is called, lockColor==0: normal color setting
         /// </summary>
         /// <param name="color">The color to use for drawing</param>
+        /// <param name="lockColor">1: lock the color, it is kept until SetColor is called with -1; -1: unlock the color; 0: normal color setting</param>
         void SetColor(Color color, int lockColor = 0);
         /// <summary>
         /// Never use this color for drawing (because it is the background color)
@@ -151,6 +152,7 @@ namespace CADability
         /// </summary>
         /// <param name="points"></param>
         /// <param name="size"></param>
+        /// <param name="pointSymbol">the <see cref="PointSymbol"/> (dot, cross, circle etc.) to draw at each point</param>
         void Points(GeoPoint[] points, float size, PointSymbol pointSymbol);
         /// <summary>
         /// Draw a set of solid-filled triangles with the current color.
@@ -642,6 +644,7 @@ namespace CADability
         /// <param name="viewDirection">direction of view</param>
         /// <param name="width">of the bitmap</param>
         /// <param name="height">of the bitmap</param>
+        /// <param name="extent">the extent to show in the bitmap; if null, the extent of the objects is used</param>
         /// <returns></returns>
         public static Bitmap PaintToBitmap(GeoObjectList list, GeoVector viewDirection, int width, int height, BoundingCube? extent = null)
         {

@@ -265,6 +265,8 @@ namespace CADability.GeoObject
         /// <param name="surface">the surface as defined in the step file</param>
         /// <param name="loops">the loops of 3d edges, both outlines and holes, for this face</param>
         /// <param name="sameSense">orientation of the surface so that the normal points outward</param>
+        /// <param name="precision">precision for comparing the geometry of the edge curves, used to detect and remove duplicate
+        /// or opposite edges in a loop</param>
         /// <returns></returns>
         internal static Face[] MakeFacesFromStepAdvancedFace(ISurface surface, List<List<StepEdgeDescriptor>> loops, bool sameSense, double precision)
         {
@@ -3071,7 +3073,7 @@ namespace CADability.GeoObject
         /// <summary>
         /// Try to make a Face from the provided objects, using the curves to make a planar face
         /// </summary>
-        /// <param name="sel"></param>
+        /// <param name="list">the objects to make the face from, the curves in this list must form a single closed planar outline</param>
         /// <returns></returns>
         public static Face MakeFace(GeoObjectList list)
         {
@@ -10907,10 +10909,12 @@ namespace CADability.GeoObject
             return false;
         }
         /// <summary>
-        /// Returns a face, that has the provided offset to this face. When dist>0 the offset will be to the outside, when dist&lt0, the offset will be to the inside
+        /// Returns a face, that has the provided offset to this face. When dist>0 the offset will be to the outside, when dist&lt;0, the offset will be to the inside
         /// Self intersection will not be checked.
         /// </summary>
-        /// <param name="dist"></param>
+        /// <param name="dist">the offset distance</param>
+        /// <param name="vertices">maps each vertex of this face to the already created vertex of the offset face, which is used
+        /// for the edges of the resulting face, so that adjacent offset faces share their vertices</param>
         /// <returns></returns>
         public Face GetOffset(double dist, Dictionary<Vertex, Vertex> vertices)
         {

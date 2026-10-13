@@ -111,6 +111,7 @@ namespace CADability.Curve2D
         /// <param name="center">Center of the ellipse</param>
         /// <param name="majorAxis">Major axis of the ellipse</param>
         /// <param name="minorAxis">Minor axis of the ellipse</param>
+        /// <param name="counterClock">true if the ellipse is oriented counterclockwise, false if clockwise</param>
         /// <param name="left">left extremum of the ellipse</param>
         /// <param name="right">right extremum of the ellipse</param>
         /// <param name="bottom">bottom extremum of the ellipse</param>
@@ -582,7 +583,7 @@ namespace CADability.Curve2D
         /// <summary>
         /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.PerpendicularFoot (GeoPoint2D)"/>
         /// </summary>
-        /// <param name="FromHere"></param>
+        /// <param name="fromHere">from this point</param>
         /// <returns></returns>
         public override GeoPoint2D[] PerpendicularFoot(GeoPoint2D fromHere)
         {

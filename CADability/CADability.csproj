@@ -23,11 +23,11 @@
     <LangVersion>12.0</LangVersion>
     <!-- the XML documentation goes into the package, so that the doc comments show up in the IDE of
          its users, and is the input of the API documentation on the website (.github/workflows/pages.yml).
-         CS1591 (no doc comment on a public member) would be reported for thousands of members, the
-         others for about 440 existing doc comments with wrong param names, unresolved crefs or
-         malformed XML, which still have to be fixed (see TODO.md). -->
+         CS1591 (no doc comment on a public member) would be reported for thousands of members. The other
+         doc comment warnings (CS1570 to CS1587 and CS1734: malformed XML, wrong param names, unresolved
+         crefs) are not suppressed, so a broken comment shows up in the build. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);CS1591;CS1570;CS1571;CS1572;CS1573;CS1574;CS1580;CS1584;CS1587;CS1734</NoWarn>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
 
     <!-- Symbols and source stepping for consumers of the package: the symbols travel as a separate
          .snupkg to nuget.org's symbol server, and Source Link records the commit in the package and

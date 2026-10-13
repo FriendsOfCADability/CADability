@@ -170,13 +170,13 @@ namespace CADability
         // und deren XAchse die Richtung der Kurve in diesem Punkt
 
         /// <summary>
-        /// Defines a CurveDrive providing the curve for the movement and the object beeing moved.
+        /// Defines a CurveDrive providing the curve for the movement. The objects being moved are
+        /// specified by <see cref="IDrive.MovedObjects"/>.
         /// The currentPosition describes the position of the object as it is defined in the model
         /// relative to the startpoint of the curve. It must be between 0.0 and the
         /// <see cref="ICurve.Length">length</see> of the curve.
         /// </summary>
         /// <param name="along">Curve for the movement</param>
-        /// <param name="toMove">Object beeing moved</param>
         /// <param name="currentPosition">Current position of the object</param>
         public CurveDrive(ICurve along, double currentPosition)
             : this()
@@ -961,13 +961,12 @@ namespace CADability
         IGeoObject[] movedObjectsDeserialized;
         private ListWithEvents<IGeoObject> movedObjects;
         /// <summary>
-        /// Defines a AxisDrive object. The axis and the driven objects must be provided. The
-        /// position is meassured in radians.
+        /// Defines a AxisDrive object. The axis must be provided, the driven objects are specified
+        /// by <see cref="IDrive.MovedObjects"/>. The position is meassured in radians.
         /// </summary>
         /// <param name="location">Location of the axis</param>
         /// <param name="direction">Direction of the axis</param>
         /// <param name="currentPosition">Current position of the object</param>
-        /// <param name="toRotate">Objects to rotate</param>
         public AxisDrive(GeoPoint location, GeoVector direction, double currentPosition)
         {
             this.location = location;

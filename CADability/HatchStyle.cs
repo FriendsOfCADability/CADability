@@ -68,8 +68,7 @@ namespace CADability.Attribute
         }
         /// <summary>
 		/// Generates the lines or other GeoObjects that fill out the given shape
-		/// in the given plane. If a HatchStyle returns null, it must implement the
-		/// <see cref="Paint"/> and the <see cref="HitTest"/> methods.
+		/// in the given plane. Derived classes must override this method.
 		/// Default implementation returns null.
 		/// </summary>
 		/// <param name="shape">The shape to be filled</param>

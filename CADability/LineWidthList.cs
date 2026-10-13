@@ -270,9 +270,9 @@ namespace CADability.Attribute
             }
         }
         /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Added"/>
+        /// Overrides <see cref="IShowPropertyImpl.Added(IPropertyPage)"/>
         /// </summary>
-        /// <param name="propertyTreeView"></param>
+        /// <param name="pp">the <see cref="IPropertyPage"/> to which it was added</param>
         public override void Added(IPropertyPage pp)
         {
             base.resourceIdInternal = "LineWidthList";

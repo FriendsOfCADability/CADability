@@ -28,10 +28,11 @@ namespace CADability.UserInterface
         public object user;
 
         /// <summary>
-        /// Konstruktor mit Initialisierung.
+        /// Constructor with initialization.
         /// </summary>
-        /// <param name="LabelText">Der Text der Anzeige auf der linken Seite</param>
-        /// <param name="Choices">Die Auswahlmöglichkeiten</param>
+        /// <param name="resourceId">Resource id of the text displayed on the left side</param>
+        /// <param name="Choices">The choices</param>
+        /// <param name="InitialSelection">The initially selected text (one of the choices)</param>
         public MultipleChoiceProperty(string resourceId, string[] Choices, string InitialSelection)
             : this()
         {

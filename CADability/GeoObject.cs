@@ -5,9 +5,6 @@ using System.Runtime.Serialization;
 using CADability.UserInterface;
 
 
-/// <summary>
-/// Namespace GeoObject
-/// </summary>
 namespace CADability.GeoObject
 {
     using System.Collections.Generic;
@@ -195,8 +192,7 @@ namespace CADability.GeoObject
     }
 
     /// <summary>
-    /// IGeoObject is the interface that all geometric entities must support
-    /// (see <a href="c90ccd0b-e1de-4859-8d4d-20e516a766cd.htm">GeoObject</a>).
+    /// IGeoObject is the interface that all geometric entities must support.
     /// </summary>
 
     public interface IGeoObject : ILayer, IStyle, IOctTreeInsertable, IComparable
@@ -712,6 +708,8 @@ namespace CADability.GeoObject
             /// when there is an undo.
             /// </summary>
             /// <param name="geoObject">the GeoObject</param>
+            /// <param name="UndoNecessary">true, if undo is required</param>
+            /// <param name="onlyAttribute">true, if only an attribute is changed in contrast to a change of the geometry</param>
             public Changing(IGeoObjectImpl geoObject, bool UndoNecessary, bool onlyAttribute)
             {
                 ++geoObject.isChanging;

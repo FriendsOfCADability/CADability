@@ -236,12 +236,16 @@ None left: all of them have been fixed.
 
 ## Documentation
 
-- [ ] About 440 doc comments have wrong `param` names, `cref`s that resolve to
-  nothing or malformed XML (compiler warnings CS1570 to CS1587 and CS1734, and
-  the `InvalidCref` warnings of docfx). The warnings are suppressed in
-  `CADability.csproj` and `CADability.Forms.csproj` since the XML
-  documentation is generated; remove them from `NoWarn` while fixing the
-  comments.
+- [x] The about 440 broken doc comments (wrong `param` names, unresolved
+  `cref`s, malformed XML) are fixed and the warnings CS1570 to CS1587 and
+  CS1734 are no longer suppressed; only CS1591 (no doc comment) stays in
+  `NoWarn`. There is a "Getting started" article with code for the main
+  entry points, and `Make3D`, the boolean operations of `Solid`, the import
+  and export methods of `Project`, `Model.Add` and the STEP and STL classes
+  are documented (#403).
+- [ ] Content, see #403: 37 % of the public types and members have a
+  summary, about 1,500 of the 5,000 summaries are boilerplate ("Overrides
+  ...", "Implements ..."), 116 are empty and about 140 are in German.
 
 ## Open discussions / feature requests (no action from triage)
 

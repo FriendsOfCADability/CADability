@@ -233,11 +233,9 @@ namespace CADability.GeoObject
 			res.Recalc();
 			return res;
 		}
-		/// <summary>
-		/// Creates a path from a list of properly connected curve objects.
-		/// The curve objects will be removed from their owner (if there is a owner)
-		/// </summary>
-		/// <param name="connectedCurves">array of connected ICurve objects</param>
+		// Creates a path from a list of properly connected curve objects.
+		// The curve objects will be removed from their owner (if there is a owner)
+		// connectedCurves: array of connected ICurve objects
 		//protected Path(ICurve[] connectedCurves)
 		//    : this()
 		//{
@@ -265,7 +263,8 @@ namespace CADability.GeoObject
 		/// If flatten is true, UserData will be lost.
 		/// </summary>
 		/// <param name="BeginWith">Curve to begin with</param>
-		/// <param name="projectedModel">Projected model to search</param>
+		/// <param name="model">Model to search for connected curves</param>
+		/// <param name="projection">Projection, in which the end points of the curves are projected to find connected objects in the model</param>
 		/// <param name="flatten">true: flatten the result, false: result not flattened</param>
 		/// <returns>The path or null if no cennecting objects found</returns>
 		public static Path CreateFromModel(ICurve BeginWith, Model model, Projection projection, bool flatten)
@@ -518,6 +517,7 @@ namespace CADability.GeoObject
 		/// </summary>
 		/// <param name="l">List of unsorted GeoObjects</param>
 		/// <param name="moreThanOne">if true, the path must consist of more than one curve</param>
+		/// <param name="maxgap">maximum distance between the end point of the path and the start or end point of the next curve for them to count as connected</param>
 		/// <returns>success</returns>
 		public bool Set(GeoObjectList l, bool moreThanOne, double maxgap)
 		{

@@ -1116,11 +1116,12 @@ namespace CADability
         /// <summary>
         /// Returns the parameters for all intersection point of this curve with other
         /// curves in the model. The curve must be planar. To get the 3D intersection point
-        /// call <see cref="ICurve.PointAt"/>. If CheckExtension is true, there will also be
+        /// call <see cref="ICurve.PointAt"/>. Depending on <paramref name="mode"/>, there will also be
         /// intersection parameters in the extension of the curve (if the curve can extend)
         /// </summary>
         /// <param name="Curve">Curve to test for intersection points</param>
-        /// <param name="CheckExtension">Also check the extended curve</param>
+        /// <param name="mode">Specifies whether only intersections inside the curve, intersections in the extensions
+        /// (at the start, at the end or both) or also self intersections are returned</param>
         /// <returns>Array of parameters</returns>
         public double[] GetIntersectionParameters(ICurve Curve, IntersectionMode mode)
         {

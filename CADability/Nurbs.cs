@@ -278,15 +278,16 @@ namespace CADability
     internal class Nurbs
     {
         /// <summary>
-        /// NURBS Buch S. 68,
-        /// knot (U) ist der flache Knotenvektor (mit Wiederholungen)
-        /// n ist noch nicht ganz klar, aber hat mit der Länge des Knotenvectors zu tun
+        /// NURBS book p. 68 (FindSpan): binary search for the knot span containing u.
+        /// knot (U) is the flat knot vector (with repetitions).
+        /// The search is restricted to the index range [low, high]; callers pass the degree as low
+        /// and the number of poles (knot.Length - degree - 1) as high.
         /// </summary>
-        /// <param name="n"></param>
-        /// <param name="degree"></param>
-        /// <param name="u"></param>
-        /// <param name="knot"></param>
-        /// <returns></returns>
+        /// <param name="high">upper index of the search range (the number of poles)</param>
+        /// <param name="low">lower index of the search range (the degree)</param>
+        /// <param name="u">the parameter value to locate</param>
+        /// <param name="knot">the flat knot vector (with repetitions)</param>
+        /// <returns>the index i of the span with knot[i] &lt;= u &lt; knot[i+1], or high-1 if u is at or beyond knot[high]</returns>
         static int FindSpan(int high, int low, double u, double[] knot)
         {
             if (u >= knot[high]) return high - 1; // Sonderfall
@@ -2277,7 +2278,7 @@ namespace CADability
         /// Returns a nurbs curve of a surface with fixed v parameter. The type of the poles of the returned curve is the same 
         /// as the type of poles of the surface (rational/nonrational)
         /// </summary>
-        /// <param name="u">Fixed v parameter</param>
+        /// <param name="v">Fixed v parameter</param>
         /// <returns>the nurbs curve</returns>
         public Nurbs<T, C> FixedV(double v)
         {

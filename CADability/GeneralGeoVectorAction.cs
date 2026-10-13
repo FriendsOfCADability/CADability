@@ -88,8 +88,8 @@ namespace CADability.Actions
         /// Implements <see cref="Action.OnMouseMove"/>. If you override this method
         /// don't forget to call the bas implementation.
         /// </summary>
-        /// <param name="e"><paramref name="Action.OnMouseMove.e"/></param>
-        /// <param name="vw"><paramref name="Action.OnMouseMove.vw"/></param>
+        /// <param name="e">MouseEventArgs of the call</param>
+        /// <param name="vw">the IView which contains the mouse</param>
         public override void OnMouseMove(MouseEventArgs e, IView vw)
         {
             using (Frame.Project.Undo.ContextFrame(this))
@@ -113,8 +113,8 @@ namespace CADability.Actions
         /// Implements <see cref="Action.OnMouseUp"/>. If you override this method
         /// don't forget to call the bas implementation.
         /// </summary>
-        /// <param name="e"><paramref name="Action.OnMouseUp.e"/></param>
-        /// <param name="vw"><paramref name="Action.OnMouseUp.vw"/></param>
+        /// <param name="e">MouseEventArgs of the call</param>
+        /// <param name="vw">the IView which contains the mouse</param>
         public override void OnMouseUp(MouseEventArgs e, IView vw)
         {
             using (Frame.Project.Undo.ContextFrame(this))
@@ -140,8 +140,8 @@ namespace CADability.Actions
         /// Implements <see cref="Action.OnInactivate"/>. If you override this method
         /// don't forget to call the bas implementation.
         /// </summary>
-        /// <param name="NewActiveAction"><paramref name="Action.OnInactivate.NewActiveAction"/></param>
-        /// <param name="RemovingAction"><paramref name="Action.OnInactivate.RemovingAction"/></param>
+        /// <param name="NewActiveAction">the action that will become active</param>
+        /// <param name="RemovingAction">true: if called because the action is removed, false: if called when a new action is set on top of this action</param>
         public override void OnInactivate(Action NewActiveAction, bool RemovingAction)
         {
             if (geoVectorProperty != null)

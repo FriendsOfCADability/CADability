@@ -76,6 +76,7 @@ namespace CADability.UserInterface
         /// edit box. ResourceId+".ShortInfo": a short tooltip text ResourceId+"DetailedInfo":
         /// a longer tooltip text.
         /// </param>
+        /// <param name="frame">The <see cref="IFrame"/> this property belongs to, used to access the project</param>
         public MultiGeoPointProperty(IIndexedGeoPoint controlledObject, string resourceId, IFrame frame)
         {
             this.Frame = frame;

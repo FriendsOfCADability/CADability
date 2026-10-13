@@ -44,7 +44,7 @@ namespace CADability
     /// <summary>
     /// Implement this interface if your object needs a callback after the first pass of the serialisation/deserialisation.
     /// To ensure this interface of your object is called, you must call <see cref="JsonSerialize.RegisterForSerializationDoneCallback(IJsonSerializeDone)"/>,
-    /// in the implementation of <see cref="IJsonSerialize.GetObjectData(IJsonWriteData)"/> or <see cref="IJsonSerialize.SetObjectData(IJsonWriteData)"/>.
+    /// in the implementation of <see cref="IJsonSerialize.GetObjectData(IJsonWriteData)"/> or <see cref="IJsonSerialize.SetObjectData(IJsonReadData)"/>.
     /// When the object is beeing read, the properties might be empty objects in the first pass. When <see cref="SerializationDone(JsonSerialize)"/> is called
     /// all properties had their first pass, i.e. <see cref="IJsonSerialize.SetObjectData(IJsonReadData)"/> has been called on those objects.
     /// When the object is beeing written, this mechanism provides the opportunity to modify the object in <see cref="IJsonSerialize.GetObjectData(IJsonWriteData)"/> and

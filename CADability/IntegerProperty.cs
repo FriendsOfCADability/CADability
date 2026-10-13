@@ -285,9 +285,7 @@ namespace CADability.UserInterface
                 return MenuResource.CreateContextMenuWithHandler(menuIDs, this);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.UnSelected ()"/>
-        /// </summary>
+        // Overrides IShowPropertyImpl.UnSelected()
         //public override void UnSelected()
         //{
         //    if (minValue != maxValue)

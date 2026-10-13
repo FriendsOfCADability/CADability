@@ -177,7 +177,7 @@ namespace CADability.GeoObject
         internal Flags flags;
         private Edge[] edges; // secondary data, not serialized
         /// <summary>
-        /// Returns all the edges of this Shell. Each egde is unique in the array
+        /// Returns all the edges of all shells of this solid. Each edge is unique in the array
         /// but may belong to two different faces.
         /// </summary>
         public Edge[] Edges
@@ -204,8 +204,21 @@ namespace CADability.GeoObject
             }
         }
         #region polymorph construction
+        /// <summary>
+        /// Signature of <see cref="Constructor"/>.
+        /// </summary>
+        /// <returns>the new solid</returns>
         public delegate Solid ConstructionDelegate();
+        /// <summary>
+        /// When set, <see cref="Construct"/> calls this delegate instead of creating a <see cref="Solid"/>, so that an
+        /// application can substitute a derived class for every solid CADability creates (also when reading files).
+        /// </summary>
         public static ConstructionDelegate Constructor;
+        /// <summary>
+        /// Creates an empty solid, or an instance of the class <see cref="Constructor"/> provides. Set its shell with
+        /// <see cref="SetShell"/>, or use <see cref="MakeSolid"/>, which does both.
+        /// </summary>
+        /// <returns>the new solid</returns>
         public static Solid Construct()
         {
             if (Constructor != null) return Constructor();
@@ -231,6 +244,9 @@ namespace CADability.GeoObject
                 return shells;
             }
         }
+        /// <summary>
+        /// The outer shell of the solid, i.e. <see cref="Shells"/>[0].
+        /// </summary>
         public Shell Shell => Shells[0];
         private void OnWillChange(IGeoObject Sender, GeoObjectChange Change)
         {
@@ -246,6 +262,12 @@ namespace CADability.GeoObject
                 FireDidChange(Change);
             }
         }
+        /// <summary>
+        /// Sets the (outer) shell of this solid, replacing all previous shells. The shell must be closed (no
+        /// <see cref="Shell.OpenEdges"/>) and oriented outward to form a valid solid; this is not checked here.
+        /// The solid becomes the owner of the shell.
+        /// </summary>
+        /// <param name="sh">the shell that bounds the solid</param>
         public void SetShell(Shell sh)
         {
             if (shells != null)
@@ -290,6 +312,13 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Creates a solid bound by the given closed shell (see <see cref="SetShell"/>). The solid takes the colour of the
+        /// shell. Shells come from the modelling methods in <see cref="Make3D"/> (e.g. <see cref="Make3D.SewFaces"/>) or from
+        /// the imports; check <see cref="Shell.OpenEdges"/> to make sure the shell is closed before making a solid of it.
+        /// </summary>
+        /// <param name="sh">the closed shell</param>
+        /// <returns>the solid</returns>
         public static Solid MakeSolid(Shell sh)
         {
             Solid res = Solid.Construct();
@@ -297,6 +326,12 @@ namespace CADability.GeoObject
             res.colorDef = sh.ColorDef;
             return res;
         }
+        /// <summary>
+        /// Replaces the faces of the shell <paramref name="sh"/>, which must be one of the shells of this solid, so that the
+        /// change can be undone. Used by the modelling actions to apply the result of a boolean operation to the solid.
+        /// </summary>
+        /// <param name="sh">the shell to modify</param>
+        /// <param name="faces">the new faces of the shell</param>
         public void SetFaces(Shell sh, Face[] faces)
         {   // nur wg. Undo
             Face[] clonedFaces = (Face[])sh.Faces.Clone();
@@ -328,6 +363,9 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// The <see cref="Name"/> of the solid, or an empty string when it has none.
+        /// </summary>
         public string NameOrEmpty
         {
             get
@@ -712,7 +750,10 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
-        /// Unites the two solids and returns the union. If the solids are disjunct, null is returned.
+        /// Unites the two solids and returns the union as a new solid; the operands are not modified. If the solids are
+        /// disjunct (they do not overlap, touch or intersect), null is returned. Only the outer shell of each solid takes
+        /// part in the operation, cavities (further entries of <see cref="Shells"/>) are ignored. The result has no layer or
+        /// colour, use <see cref="Project.SetDefaults"/> or <see cref="IGeoObject.CopyAttributes"/> to set them.
         /// </summary>
         /// <param name="solid1">first solid</param>
         /// <param name="solid2">second solid</param>
@@ -731,12 +772,15 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
-        /// Returns the intersection of two solids, i.e. those parts that are common to both solids. If the
-        /// solids are disjunct, an empty array is returned. There may be more than one solid body as a restult.
+        /// Returns the intersection of two solids, i.e. those parts that are common to both solids, as new solids; the
+        /// operands are not modified. If the solids are disjunct or only touch, an empty array is returned. There may be
+        /// more than one solid as a result. Only the outer shell of each solid takes part in the operation, cavities
+        /// (further entries of <see cref="Shells"/>) are ignored. The result has no layer or colour, use
+        /// <see cref="Project.SetDefaults"/> or <see cref="IGeoObject.CopyAttributes"/> to set them.
         /// </summary>
         /// <param name="solid1">first solid</param>
         /// <param name="solid2">second solid</param>
-        /// <returns>array of common parts</returns>
+        /// <returns>array of common parts, empty when there are none</returns>
         static public Solid[] Intersect(Solid solid1, Solid solid2)
         {
             // hier fehlt noch der Löcherkäse: Solids mit mehreren Shells
@@ -750,13 +794,16 @@ namespace CADability.GeoObject
             return sres;
         }
         /// <summary>
-        /// Returns the difference of two solids. The second solid is removed from the first solid. If the
-        /// solids are disjunct, (a clone of the) the first solid is returned. If the second solid contains the
-        /// first solid, an empty array is returned.
+        /// Returns the difference of two solids as new solids: the second solid is removed from the first solid; the
+        /// operands are not modified. If the solids are disjunct, a copy of the first solid is returned. If the second
+        /// solid contains the first solid, an empty array is returned. Subtracting may split the first solid into
+        /// several parts. Only the outer shell of each solid takes part in the operation, cavities (further entries of
+        /// <see cref="Shells"/>) are ignored. The result has no layer or colour, use <see cref="Project.SetDefaults"/>
+        /// or <see cref="IGeoObject.CopyAttributes"/> to set them.
         /// </summary>
         /// <param name="first">first solid</param>
-        /// <param name="second">second solid</param>
-        /// <returns>the difference</returns>
+        /// <param name="second">second solid, which is subtracted</param>
+        /// <returns>the difference, one or more solids, or an empty array</returns>
         static public Solid[] Subtract(Solid first, Solid second)
         {
             // hier fehlt noch der Löcherkäse: Solids mit mehreren Shells
@@ -802,6 +849,13 @@ namespace CADability.GeoObject
             }
             return simplified;
         }
+        /// <summary>
+        /// Splits the solid by a plane and returns the parts on both sides as new solids; this solid is not modified.
+        /// A plane that does not cut the solid returns a single copy of it. Only the outer shell takes part, cavities
+        /// are ignored.
+        /// </summary>
+        /// <param name="pln">the plane</param>
+        /// <returns>the parts of the solid</returns>
         public Solid[] SplitByPlane(Plane pln)
         {
             BRepOperation brepOp = new BRepOperation(Shells[0], pln);
@@ -814,6 +868,13 @@ namespace CADability.GeoObject
             }
             return res;
         }
+        /// <summary>
+        /// Returns the points where the (infinite) line through <paramref name="location"/> with the given direction crosses
+        /// the faces of this solid, in no particular order.
+        /// </summary>
+        /// <param name="location">a point on the line</param>
+        /// <param name="direction">direction of the line</param>
+        /// <returns>the intersection points, empty when the line misses the solid</returns>
         public GeoPoint[] GetLineIntersection(GeoPoint location, GeoVector direction)
         {
             List<GeoPoint> result = new List<GeoPoint>();
@@ -1076,6 +1137,12 @@ namespace CADability.GeoObject
             }
         }
 
+        /// <summary>
+        /// Returns true when the other solid has the same shells, faces and edges with the same geometry (within
+        /// <see cref="Precision.eps"/>) as this solid. Attributes like layer and colour are not compared.
+        /// </summary>
+        /// <param name="other">the solid to compare with</param>
+        /// <returns>true when the geometry is the same</returns>
         public bool SameGeometry(Solid other)
         {
             if (this.Shells.Length != other.Shells.Length) return false;

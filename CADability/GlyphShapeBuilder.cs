@@ -15,7 +15,7 @@ namespace CADability.GeoObject
     internal static class GlyphShapeBuilder
     {
         /// <summary>
-        /// Result of <see cref="MakeShape(Path2D[], double)"/> together with some diagnostic information.
+        /// Result of <see cref="MakeShape(Path2D[])"/> together with some diagnostic information.
         /// </summary>
         internal struct ShapeResult
         {

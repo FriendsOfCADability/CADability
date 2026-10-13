@@ -1410,10 +1410,10 @@ namespace CADability
             return pln.Project(p1);
         }
         /// <summary>
-        /// Liefert den Raumpunkt (Welt3D) zum Welt2D Punkt gemäß Zeichenebene (DrawingPlane)
+        /// Returns the 3D world point for the given 2D world point according to the drawing plane (DrawingPlane)
         /// </summary>
-        /// <param name="p">der Welt2D Punkt</param>
-        /// <returns>Welt3D Punkt</returns>
+        /// <param name="w2d">the 2D world point</param>
+        /// <returns>3D world point</returns>
         public GeoPoint DrawingPlanePoint(GeoPoint2D w2d)
         {
             GeoPoint p0 = new GeoPoint(w2d.x, w2d.y, 0.0);

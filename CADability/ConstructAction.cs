@@ -950,10 +950,6 @@ namespace CADability.Actions
 			#endregion
 		}
 		public class InputContainer : InputObject, IInputObject
-		/// <summary>
-		/// Input object for the ConstructAction that yields an <see cref="Angle"/>.
-		/// See <see cref="ConstructAction.SetInput"/>
-		/// </summary>
 		{
 			SimplePropertyGroup simplePropertyGroup; // der Container
 			IPropertyEntry[] contents; // der Inhalt, wenn es noch keinen Container gibt
@@ -1077,6 +1073,10 @@ namespace CADability.Actions
 
 			#endregion
 		}
+		/// <summary>
+		/// Input object for the ConstructAction that yields an <see cref="Angle"/>.
+		/// See <see cref="ConstructAction.SetInput"/>
+		/// </summary>
 		public class AngleInput : InputObject, IInputObject
 		{
 			/// <summary>
@@ -1241,7 +1241,7 @@ namespace CADability.Actions
 			/// <summary>
 			/// Delegate definiation for <see cref="InputValueChangedEvent"/>
 			/// </summary>
-			/// <param name="length">New length value</param>
+			/// <param name="angle">New angle value</param>
 			public delegate void InputValueChangedDelegate(Angle angle);
 			/// <summary>
 			/// Event will be rasied if the Angle property changed
@@ -1979,7 +1979,7 @@ namespace CADability.Actions
 			/// <summary>
 			/// Delegate definiation for <see cref="InputValueChangedEvent"/>
 			/// </summary>
-			/// <param name="length">New length value</param>
+			/// <param name="newValue">New double value</param>
 			public delegate void InputValueChangedDelegate(double newValue);
 			/// <summary>
 			/// Event will be rasied if the Length property changed
@@ -3560,7 +3560,7 @@ namespace CADability.Actions
 			/// <summary>
 			/// Delegate definiation for <see cref="InputValueChangedEvent"/>
 			/// </summary>
-			/// <param name="length">New length value</param>
+			/// <param name="newValue">New boolean value</param>
 			public delegate void InputValueChangedDelegate(bool newValue);
 			/// <summary>
 			/// Event will be rasied if the Length property changed
@@ -3822,7 +3822,7 @@ namespace CADability.Actions
 			/// <summary>
 			/// Delegate definiation for <see cref="InputValueChangedEvent"/>
 			/// </summary>
-			/// <param name="length">New length value</param>
+			/// <param name="newValue">Index of the newly selected choice</param>
 			public delegate void InputValueChangedDelegate(int newValue);
 			/// <summary>
 			/// Event will be rasied if the Length property changed
@@ -4893,7 +4893,7 @@ namespace CADability.Actions
 			/// <summary>
 			/// Set the selected GeoObject
 			/// </summary>
-			/// <param name="curve">this curve should be selected</param>
+			/// <param name="geoObject">this GeoObject should be selected</param>
 			public void SetSelectedGeoObject(IGeoObject geoObject)
 			{
 				geoObjectProperty.SetSelectedGeoObject(geoObject);
@@ -4919,7 +4919,7 @@ namespace CADability.Actions
 			/// </summary>
 			public event MouseOverGeoObjectsDelegate MouseOverGeoObjectsEvent;
 			/// <summary>
-			/// Delegate definition for <see cref="CurveSelectionChangedEvent"/>
+			/// Delegate definition for <see cref="GeoObjectSelectionChangedEvent"/>
 			/// </summary>
 			/// <param name="sender">this object</param>
 			/// <param name="SelectedGeoObject">the user selected GeoObject</param>
@@ -5174,8 +5174,8 @@ namespace CADability.Actions
 			/// <summary>
 			/// Forces the given geoObjects to be displayed
 			/// </summary>
-			/// <param name="GeoObjects">array of GeoObjects</param>
-			/// <param name="selectedGeoObject">currently selected GeoObject</param>
+			/// <param name="objects">array of BRep objects (faces, edges or vertices)</param>
+			/// <param name="selectedBRepObject">currently selected BRep object</param>
 			public void SetBRepObject(object[] objects, object selectedBRepObject)
 			{
 				if (this.selectedBRepObject != null) constructAction.feedBack.RemoveSelected(BRepObjectToGeoObject(this.selectedBRepObject));
@@ -5190,7 +5190,7 @@ namespace CADability.Actions
 			/// <summary>
 			/// Set the selected GeoObject
 			/// </summary>
-			/// <param name="curve">this curve should be selected</param>
+			/// <param name="bRepObject">this BRep object should be selected</param>
 			public void SetSelectedBRepObject(object bRepObject)
 			{
 				bRepObjectProperty.SetSelectedBRepObject(bRepObject);
@@ -5204,22 +5204,22 @@ namespace CADability.Actions
 				return bRepObjects;
 			}
 			/// <summary>
-			/// Delegate definition for <see cref="MouseOverGeoObjectsEvent"/>
+			/// Delegate definition for <see cref="MouseOverBRepObjectsEvent"/>
 			/// </summary>
 			/// <param name="sender">this object</param>
-			/// <param name="TheGeoObjects">GeoObjects under the cursor</param>
+			/// <param name="bRepObjects">BRep objects under the cursor</param>
 			/// <param name="up">mous was clicked</param>
-			/// <returns>true, if you accept (one of the) GeoObjects</returns>
+			/// <returns>true, if you accept (one of the) BRep objects</returns>
 			public delegate bool MouseOverBRepObjectsDelegate(BRepObjectInput sender, object[] bRepObjects, bool up);
 			/// <summary>
 			/// Provide a method here to react on the user moving the cursor over GeoObjects.
 			/// </summary>
 			public event MouseOverBRepObjectsDelegate MouseOverBRepObjectsEvent;
 			/// <summary>
-			/// Delegate definition for <see cref="CurveSelectionChangedEvent"/>
+			/// Delegate definition for <see cref="BRepObjectSelectionChangedEvent"/>
 			/// </summary>
 			/// <param name="sender">this object</param>
-			/// <param name="SelectedGeoObject">the user selected GeoObject</param>
+			/// <param name="SelectedBRepObject">the user selected BRep object</param>
 			public delegate void BRepObjectSelectionChangedDelegate(BRepObjectInput sender, object SelectedBRepObject);
 			/// <summary>
 			/// Provide a method here to react on the user selecting a different curve
@@ -5432,7 +5432,7 @@ namespace CADability.Actions
 			/// <summary>
 			/// Delegate definiation for <see cref="InputValueChangedEvent"/>
 			/// </summary>
-			/// <param name="length">New length value</param>
+			/// <param name="newValue">New string value</param>
 			public delegate void InputValueChangedDelegate(string newValue);
 			/// <summary>
 			/// Event will be rasied if the Length property changed
@@ -5782,7 +5782,7 @@ namespace CADability.Actions
 			/// <summary>
 			/// Delegate definiation for <see cref="InputValueChangedEvent"/>
 			/// </summary>
-			/// <param name="length">New length value</param>
+			/// <param name="newValue">New string value</param>
 			public delegate void InputValueChangedDelegate(string newValue);
 			/// <summary>
 			/// Event will be rasied if the Length property changed
@@ -5990,7 +5990,7 @@ namespace CADability.Actions
 			/// <summary>
 			/// Delegate definiation for <see cref="InputValueChangedEvent"/>
 			/// </summary>
-			/// <param name="length">New length value</param>
+			/// <param name="intValue">New integer value</param>
 			public delegate void InputValueChangedDelegate(int intValue);
 			/// <summary>
 			/// Event will be rasied if the Angle property changed
@@ -6795,8 +6795,8 @@ namespace CADability.Actions
 		/// Implements <see cref="Action.OnMouseMove"/>. If you override this method
 		/// don't forget to call the bas implementation.
 		/// </summary>
-		/// <param name="e"><paramref name="Action.OnMouseMove.e"/></param>
-		/// <param name="vw"><paramref name="Action.OnMouseMove.vw"/></param>
+		/// <param name="e">MouseEventArgs of the call</param>
+		/// <param name="vw">the IView which contains the mouse</param>
 		public override void OnMouseMove(MouseEventArgs e, IView vw)
 		{
 			CurrentMousePoint = new Point(e.X, e.Y);
@@ -6817,8 +6817,8 @@ namespace CADability.Actions
 		/// Implements <see cref="Action.OnMouseUp"/>. If you override this method
 		/// don't forget to call the bas implementation.
 		/// </summary>
-		/// <param name="e"><paramref name="Action.OnMouseUp.e"/></param>
-		/// <param name="vw"><paramref name="Action.OnMouseUp.vw"/></param>
+		/// <param name="e">MouseEventArgs of the call</param>
+		/// <param name="vw">the IView which contains the mouse</param>
 		public override void OnMouseUp(MouseEventArgs e, IView vw)
 		{
 			CurrentMousePoint = new Point(e.X, e.Y);
@@ -6926,8 +6926,8 @@ namespace CADability.Actions
 		/// Implements <see cref="Action.OnMouseDown"/>. If you override this method
 		/// don't forget to call the bas implementation.
 		/// </summary>
-		/// <param name="e"><paramref name="Action.OnMouseDown.e"/></param>
-		/// <param name="vw"><paramref name="Action.OnMouseDown.vw"/></param>
+		/// <param name="e">MouseEventArgs of the call</param>
+		/// <param name="vw">the IView which contains the mouse</param>
 		public override void OnMouseDown(MouseEventArgs e, IView vw)
 		{
 			CurrentMousePoint = new Point(e.X, e.Y);
@@ -6962,7 +6962,7 @@ namespace CADability.Actions
 			}
 		}
 		/// <summary>
-		/// Overrides <see cref="Action.OnEscape"/>. Usually you don't override this
+		/// Overrides <see cref="Action.OnEscape(object)"/>. Usually you don't override this
 		/// method, but handle the appropriate events of the input objects.
 		/// </summary>
 		public override bool OnEscape(object sender)
@@ -6982,7 +6982,7 @@ namespace CADability.Actions
 			return OnEscape(null);
 		}
 		/// <summary>
-		/// Overrides <see cref="Action.OnEnter"/>. Usually you don't override this
+		/// Overrides <see cref="Action.OnEnter(object)"/>. Usually you don't override this
 		/// method, but handle the appropriate events of the input objects.
 		/// </summary>
 		public override bool OnEnter(object sender)
@@ -7287,8 +7287,8 @@ namespace CADability.Actions
 		/// Implements <see cref="Action.OnInactivate"/>. If you override this method
 		/// don't forget to call the bas implementation.
 		/// </summary>
-		/// <param name="NewActiveAction"><paramref name="Action.OnInactivate.NewActiveAction"/></param>
-		/// <param name="RemovingAction"><paramref name="Action.OnInactivate.RemovingAction"/></param>
+		/// <param name="NewActiveAction">the action that will become active</param>
+		/// <param name="RemovingAction">true: if called because the action is removed, false: if called when a new action is set on top of this action</param>
 		public override void OnInactivate(Action NewActiveAction, bool RemovingAction)
 		{
 			if (!RemovingAction)
@@ -7371,6 +7371,7 @@ namespace CADability.Actions
 		/// </summary>
 		/// <param name="e">MouseEventArgs with the mouse position</param>
 		/// <param name="vw">the view</param>
+		/// <param name="DidSnap">returns the snap mode that was applied, i.e. the reason why the point was snapped, or <see cref="SnapPointFinder.DidSnapModes.DidNotSnap"/> if no snapping took place</param>
 		/// <returns>point in model space</returns>
 		public virtual new GeoPoint SnapPoint(MouseEventArgs e, IView vw, out SnapPointFinder.DidSnapModes DidSnap)
 		{

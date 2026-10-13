@@ -2090,6 +2090,7 @@ namespace CADability.Shapes
         /// <param name="TheObjects">The objects to be connected to a shape</param>
         /// <param name="maxGap">Maximum gap between curves</param>
         /// <param name="plane">The common plane and the location of the shape in 3d space</param>
+        /// <param name="partInPart">If true, parts that lie inside other parts are also returned, otherwise they are removed</param>
         /// <returns>The shape, may be null if no shape could be created</returns>
         public static CompoundShape CreateFromList(GeoObjectList TheObjects, double maxGap, out Plane plane, bool partInPart = false)
         {

@@ -43,6 +43,8 @@ namespace CADability.GeoObject
         /// <param name="location"></param>
         /// <param name="directionX"></param>
         /// <param name="directionY"></param>
+        /// <param name="directionZ">the direction of the axis, along which the v parameter increments; it should be perpendicular to
+        /// <paramref name="directionX"/> and <paramref name="directionY"/>, but may also form a left handed system with them</param>
         public CylindricalSurface(GeoPoint location, GeoVector directionX, GeoVector directionY, GeoVector directionZ) : base()
         {
             // this may also be a left handed system
@@ -2028,10 +2030,12 @@ namespace CADability.GeoObject
             return null;
         }
         /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetProjectedCurve (ICurve, double)"/>
+        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetTouchingPoints(BoundingRect, ISurface, BoundingRect)"/>:
+        /// returns the points, where this surface and <paramref name="other"/> touch each other (are tangential)
         /// </summary>
-        /// <param name="curve"></param>
-        /// <param name="precision"></param>
+        /// <param name="thisBounds">the uv bounds of this surface, in which touching points are searched</param>
+        /// <param name="other">the other surface</param>
+        /// <param name="otherBounds">the uv bounds of the other surface, in which touching points are searched</param>
         /// <returns></returns>
         public override GeoPoint[] GetTouchingPoints(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds)
         {   // still most of it to implement!!!
@@ -2392,7 +2396,7 @@ namespace CADability.GeoObject
             return e;
         }
         /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetNonPeriodicSurface (Border)"/>
+        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetNonPeriodicSurface(ICurve[])"/>
         /// </summary>
         /// <returns></returns>
         public override ISurface GetNonPeriodicSurface(ICurve[] orientedCurves)

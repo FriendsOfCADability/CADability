@@ -393,7 +393,7 @@ namespace CADability.Attribute
     /// This class filters <see cref="IGeoObject"/>s according to their attributes or other properties.
     /// A <see cref="Project"/> contains a <see cref="FilterList"/> which contains Filters. The task of a filter
     /// is to decide, whether a IGeoObject is accepted by this filter or not. The <see cref="FilterList"/> is
-    /// used by the <see cref="SelectObjectsAction"/> to decide, whether an object may be selected or not.
+    /// used by the <see cref="CADability.Actions.SelectObjectsAction"/> to decide, whether an object may be selected or not.
     /// Filters may also be used for other purposes. In this standard implementation the attributes of a IGeoObject
     /// and the type of the object are used to accept or reject an object. 
     /// You may derive a class from this Filter class and handle the static <see cref="Constructor"/> delegate

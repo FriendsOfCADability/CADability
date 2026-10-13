@@ -944,15 +944,16 @@ namespace CADability.UserInterface
         /// <param name="ToEdit">Das zu editiernde Objekt</param>
         void StartEditLabel(IShowProperty ToEdit);
         /// <summary>
-        /// Die Untereinträge des im Parameter gegebenen Objektes sollenn (erzeugt und) sichtbar sein.
+        /// The sub entries of the object given in the parameter shall be (created and) visible.
         /// </summary>
-        /// <param name="ToOpen"></param>
+        /// <param name="ToOpen">The object whose sub entries are to be opened or closed</param>
+        /// <param name="open">true to open (show) the sub entries, false to close them</param>
         void OpenSubEntries(IShowProperty ToOpen, bool open);
         /// <summary>
-        /// Die Untereinträge des im Parameter gegebenen Objektes sollenn (erzeugt und) sichtbar sein.
+        /// Moves the focus from the object given in the parameter to the next or previous object in the tab order.
         /// </summary>
-        /// <param name="HasCurrentFocus">Das aktuell fokussierte Objekt</param>	
-        ///<param name="Forward">=wahr setzt den Fukus auf das nächste Objekt der Tab-Reighenfolge, = falsch auf das verhergehende</param>	
+        /// <param name="CurrentProperty">The currently focused object</param>
+        /// <param name="Forward">true sets the focus on the next object in the tab order, false on the previous one</param>
         void SelectNext(IShowProperty CurrentProperty, bool Forward);
         /// <summary>
         /// Determins whether this IPropertyTreeView is on top of all IPropertyTreeView objects.
@@ -1059,12 +1060,10 @@ namespace CADability.UserInterface
      * ein EditControl erzeugen und dem ParentControl zufügen und auch wieder entfernen.
      */
 
-    /// <summary>
-    /// Interface for Objects in the ControlCenter. 
-    /// The ControlCenter is unlimited in the number of controls it may contain in contrast to a Windows.Forms.Control which is limited.
-    /// Objects implementing this interface act like Controls getting only those notifications provided in this interface.
-    /// this interface enables the implementing object to react on mouse and paint messages like a Control does.
-    /// PRELIMINARY! may be extended in future!
-    /// </summary>
+    // Interface for Objects in the ControlCenter. 
+    // The ControlCenter is unlimited in the number of controls it may contain in contrast to a Windows.Forms.Control which is limited.
+    // Objects implementing this interface act like Controls getting only those notifications provided in this interface.
+    // this interface enables the implementing object to react on mouse and paint messages like a Control does.
+    // PRELIMINARY! may be extended in future!
 
 }

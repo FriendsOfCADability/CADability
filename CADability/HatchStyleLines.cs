@@ -63,6 +63,7 @@ namespace CADability.Attribute
             if (shape == null) return res;
             if (marginOffset != 0.0)
             {
+                shape = shape.Clone(); // the shape belongs to the hatch and must not be approximated
                 shape.Approximate(false, Settings.GlobalSettings.GetDoubleValue("Approximate.Precision", 0.01));
                 shape = shape.Shrink(marginOffset);
             }

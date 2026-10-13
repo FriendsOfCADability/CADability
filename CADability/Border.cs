@@ -2730,7 +2730,8 @@ namespace CADability.Shapes
 		/// In other cases there may be a set of solutions, e.g. if the border is not convex.
 		/// </summary>
 		/// <param name="dist">the distance of the desired parallel border</param>
-		/// <param name="approxSpline">true: BSpline segments are approximated by lines and arcs (with <paramref name="precision"/>) before the parallel is computed</param>
+		/// <param name="approxSpline">true: BSpline segments are approximated by lines and arcs (with <paramref name="precision"/>) before the parallel is computed;
+		/// false: segments without an exact parallel of their own (splines, ellipses) are approximated by lines and arcs with dist*precision</param>
 		/// <param name="precision">precision relative to <paramref name="dist"/>: segments shorter than dist*precision are ignored and points closer than that are considered equal; 0.0 means 1e-3</param>
 		/// <param name="roundAngle">inner angle (in radians) at a corner below which the parallel segments are connected by an arc instead of being extended to their intersection</param>
 		/// <returns>array of parallel borders (maybe empty)</returns>
@@ -2744,8 +2745,29 @@ namespace CADability.Shapes
 			// precision bedeutet Genauigkeit in anbhängigkeit von dist
 			if (precision == 0.0) precision = 1e-3; // ein tausendstel von dist
 
-			// Winzige Teilstücke in der Umrandung stören und erzeugen großen Aufwand
 			List<ICurve2D> toIterate = new List<ICurve2D>(segment);
+			if (!approxSpline)
+			{   // only lines and arcs have an exact parallel, the others (splines, ellipses) would throw: the parallel of their
+				// approximation by lines and arcs deviates from the exact parallel no more than the approximation from the curve.
+				// This comes before the removal of tiny segments, which the approximation may produce next to a corner.
+				for (int i = toIterate.Count - 1; i >= 0; --i)
+				{
+					if (toIterate[i] is Line2D || toIterate[i] is Circle2D || toIterate[i] is Polyline2D) continue;
+					if (toIterate[i] is Path2D subPath)
+					{   // its subcurves may be splines or paths themselves, so they are visited too
+						toIterate.RemoveAt(i);
+						toIterate.InsertRange(i, subPath.SubCurves);
+						i += subPath.SubCurves.Length;
+						continue;
+					}
+					ICurve2D aprx = toIterate[i].Approximate(false, Math.Abs(dist * precision));
+					toIterate.RemoveAt(i);
+					if (aprx is Polyline2D poly) toIterate.InsertRange(i, poly.GetSubCurves());
+					else if (aprx is Path2D path) toIterate.InsertRange(i, path.SubCurves);
+					else toIterate.Insert(i, aprx);
+				}
+			}
+			// Winzige Teilstücke in der Umrandung stören und erzeugen großen Aufwand
 			for (int i = toIterate.Count - 2; i >= 1; --i)
 			{
 				if (toIterate[i].Length < Math.Abs(dist * precision))

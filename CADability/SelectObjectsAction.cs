@@ -2672,7 +2672,8 @@ namespace CADability.Actions
 		{
 			Plane pln;
 			double prec = selectedObjects.GetExtent().Size * 1e-4;
-			CompoundShape cs = CompoundShape.CreateFromList(selectedObjects, prec, out pln);
+			// the hatch keeps the exact curves of its outline; the hatch styles approximate them where they need to
+			CompoundShape cs = CompoundShape.CreateFromList(selectedObjects, prec, out pln, false, true);
 			if (cs != null)
 			{   // die Ebene zur Zeichenebene ausrichten
 				Plane OrgPlane = pln;

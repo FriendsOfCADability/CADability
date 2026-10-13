@@ -204,9 +204,6 @@ None left: all of them have been fixed.
   curve, and `BSpline` has no place to keep them.
 - [ ] `BSpline.IsClosed` means periodic, so a closed spline with clamped knots
   (start point equal to end point) counts as open.
-- [ ] The contour hatch (`HatchStyleContour`) loses inner rings when the
-  outline keeps an exact `BSpline2D` (5 instead of 8 rings in a test), which is
-  why hatching still approximates splines in `Border.Reduce`.
 - [ ] `Make3D.MakeRuledShell`/`MakeRuledSolid` pair the curves of the two paths
   by index and do not split splines at their corners, so a ruled face can get a
   kink inside.

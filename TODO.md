@@ -122,6 +122,28 @@ Fixed from the list below: the export dialog writes DWG through ACadSharp
 and no longer offers HTML, which nothing wrote; the settings `DxfDwg.Format`
 and `DxfDwg.Text`, which were read nowhere, are removed.
 
+Fixed in the review before 1.6.0: #373 (XData points are `GeoPoint`s,
+displacements and directions `GeoVector`s and layer references the name of
+the layer, so no ACadSharp type is in `ExtendedEntityData.Data`; points,
+binary data and layer names survive a cdb file; the DXF export writes points
+as points, merges the X/Y/Z triples of the netDxf era into one point and
+takes a database handle as the `ulong` the import gives). Also: a helix from a
+file of 1.5.0 or earlier is read with an empty `UserData` instead of null
+(`HelicalCurve` did not write its base attributes before, and
+`IGeoObjectImpl.SetObjectData` took the missing entry for null);
+`Make3D.Rotate` of a face whose edge is a spline with corners no longer runs
+out of the face's edges (`IndexOutOfRangeException`), the path of a face is
+not split; a spline in Bézier form (every inner knot with the multiplicity of
+the degree) is split only at real corners, where the tangents differ or the
+derivative vanishes on one side, so extruding or rotating it or making a face
+from it gives one face per smooth piece and not one per segment; the
+intersection circle of a sphere is split at the seam wherever the domain of
+the face lies (the seam was looked for at the natural bounds, which are the
+used area of a face or unbounded, so a face straddling the seam got a part
+that jumped by the period); `Shell.CloseOpenEdges` no longer dereferences the
+curve of a pole edge; `IGeoObjectImpl.UniqueIdCounter` is incremented with
+`Interlocked`, like the hash code counters of #389.
+
 Closed as not reproducible: #265 (the STEP round trip gives an identical solid
 on master and on the commit from the time of the report, 0fb61554).
 
@@ -188,21 +210,59 @@ None left: all of them have been fixed.
 - [ ] `Make3D.MakeRuledShell`/`MakeRuledSolid` pair the curves of the two paths
   by index and do not split splines at their corners, so a ruled face can get a
   kink inside.
-- [ ] The triangulation of a face on a `SurfaceOfRevolution` overestimates its
-  area, the more the larger the angle: a spline rotated by half a turn gives
-  951.5 instead of 946.4 (integral of the surface derivatives and Pappus's
-  theorem agree), by three quarters of a turn 1451.9 instead of 1419.6. Found with
-  `MakeRevolutionTests.Spline`, which therefore checks the points of the
-  triangulation instead of the area.
+- [ ] The triangulation of a ruled surface between two splines
+  (`Make3D.MakeRuledShell`) overestimates its area by up to 3.7 % at a
+  precision of a thousandth of its size: long thin triangles along the rulings
+  overlap their neighbours while their edges stay within the deflection.
+  `Triangulation.FlipToDelaunay` leaves them, because a ruling is exact and the
+  other diagonal is not. A criterion for how well the triangles cover the
+  surface, rather than how far their edges are from it, would catch them.
+- [ ] The DXF writer of ACadSharp writes every handle reference of XData,
+  a layer reference (1003) included, as a database handle (1005), see
+  `DxfSectionWriterBase.writeExtendedData`. The export therefore writes a
+  layer name as the handle of the layer, which comes back as a handle, not
+  as a name (#373 left this as it is). A database handle (1005) refers to
+  the document the XData came from; ACadSharp writes 0 when no object of the
+  exported document has it.
+- [ ] `Make3D.Rotate` of a face whose spline edge has straight pieces along
+  and across the axis (a quadratic spline around three sides of a rectangle
+  with doubled poles at the corners, closed by a line) ends in a
+  `PlaneException` from `Plane.Intersect` in
+  `SurfaceOfRevolution.GetLineIntersection`, called by
+  `Shell.AssertOutwardOrientation` while sewing. Found with the first
+  version of `MakeRevolutionTests.FaceWithACornerSplineEdgeGivesASolid`; not
+  investigated further, the surface of revolution of such a meridian has
+  planar and cylindrical parts.
 
 ## Documentation
 
-- [ ] About 440 doc comments have wrong `param` names, `cref`s that resolve to
-  nothing or malformed XML (compiler warnings CS1570 to CS1587 and CS1734, and
-  the `InvalidCref` warnings of docfx). The warnings are suppressed in
-  `CADability.csproj` and `CADability.Forms.csproj` since the XML
-  documentation is generated; remove them from `NoWarn` while fixing the
-  comments.
+- [x] The about 440 broken doc comments (wrong `param` names, unresolved
+  `cref`s, malformed XML) are fixed and the warnings CS1570 to CS1587 and
+  CS1734 are no longer suppressed; only CS1591 (no doc comment) stays in
+  `NoWarn`. There is a "Getting started" article with code for the main
+  entry points, and `Make3D`, the boolean operations of `Solid`, the import
+  and export methods of `Project`, `Model.Add` and the STEP and STL classes
+  are documented (#403).
+- [x] Content, see #403: the 116 empty and the 136 German summaries are
+  written and translated, the public members that only had `param` tags have
+  a summary, and the about 1,200 "Overrides ..." / "Implements ..." summaries
+  are `<inheritdoc/>` now, so the pages of the overrides show the description
+  of the base member (docfx resolves it, also over two levels; the base
+  members in `IGeoObject`, `IGeoObjectImpl`, `ISurface`, `IShowProperty` and
+  `IPropertyEntry` were documented for that). The 76 `GetObjectData`
+  implementations say what the binary serialization is still for.
+- [x] Coverage, see #403: the GeoObject types, the attributes and their
+  lists, `Model`, `Project`, the views, the geometry basics, the surfaces,
+  the 2d curves and shapes, the import and export classes, the property
+  classes and the actions are documented, the about 900 overrides without a
+  comment are `<inheritdoc/>`, and every public type has a summary. Of the
+  about 14,500 public types and members docfx lists, about 850 (6 %) have no
+  doc comment now, down from about 9,100 (63 %). They are members of
+  internal helpers (`Polynom`, `BRepIntersection`, `QuadTree`,
+  `JsonSerialize`, `ExtendedEntityData`...), so CS1591 stays in `NoWarn`;
+  the about 4,400 OpenGL and Win32 constants in `OpenGL.cs` and
+  `FormsSubst.cs` mirror the C headers and suppress CS1591 with a pragma.
+  CADability.Forms still has 139 members without a comment.
 
 ## Open discussions / feature requests (no action from triage)
 

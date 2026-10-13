@@ -5,7 +5,10 @@ using System.Text;
 namespace CADability.UserInterface
 {
     /// <summary>
-    /// 
+    /// Keeps the list of most recently used files in the global settings (key "MRUFileList"). The
+    /// <see cref="FrameImpl"/> adds the path of a project when it is opened, imported or saved and fills the
+    /// "recent files" menu from <see cref="GetMRUFiles"/>. Each entry has the form "path;filetype"; the
+    /// oldest entry is dropped when the list exceeds ten entries.
     /// </summary>
 
     public class MRUFiles

@@ -8,7 +8,10 @@ namespace CADability.Actions
 
 {
     /// <summary>
-    /// 
+    /// Construction of a circular arc from its centre, its start point and its end point. The radius is the distance from the
+    /// centre to the start point, the end point only determines the end angle; a boolean input selects the direction
+    /// (counterclockwise or clockwise). The radius is shown as a read-only value. The arc lies in the active drawing plane.
+    /// Menu id: "Constr.Arc.CenterCenterStartEnd".
     /// </summary>
     internal class ConstrArcCenterStartEnd : ConstructAction
     {

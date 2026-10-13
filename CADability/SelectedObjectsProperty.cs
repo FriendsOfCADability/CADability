@@ -7,10 +7,21 @@ using System.Linq;
 
 namespace CADability.UserInterface
 {
+    /// <summary>
+    /// Collects the property entries with which the attributes of several selected objects are changed at once: the
+    /// number of objects, line pattern, line width, layer, color and style, the custom attributes and the user data
+    /// (<see cref="IMultiObjectUserData"/>) common to all objects and, when all objects are of the same type, the
+    /// properties they share. The entries are grouped in <see cref="attributeProperties"/>, which
+    /// <see cref="SelectedObjectsProperty"/> shows when more than one object is selected. Changing one of the entries
+    /// applies the attribute to all selected objects.
+    /// </summary>
     public class MultiObjectsProperties
     {
         GeoObjectList selectedObjects;
         IFrame frame;
+        /// <summary>
+        /// The group entry ("Select.Attributes") which contains all entries for the common attributes of the selected objects.
+        /// </summary>
         public SimplePropertyGroup attributeProperties;
         private LinePatternSelectionProperty multiLinePattern; // LinePattern für mehrere Objekte
         private LineWidthSelectionProperty multiLineWidth; // LineWidth für mehrere Objekte
@@ -20,7 +31,17 @@ namespace CADability.UserInterface
         private IntegerProperty objectCount;
         private Dictionary<string, IPropertyEntry> multiAttributes; // Liste aller custom SelectionProperties
         private Dictionary<string, IPropertyEntry> multiUserData; // Liste aller Userdata mit IMultiObjectUserData interface
+        /// <summary>
+        /// true while an attribute is being applied to all selected objects. The change events of the objects are ignored
+        /// during that time, so that the entries are not re-initialized for every single object.
+        /// </summary>
         public bool isChangingMultipleAttributes; // es werden gerade Attribute der Objekte geändert
+        /// <summary>
+        /// Creates the entries for the common attributes of <paramref name="selectedObjects"/>; the attribute lists are taken
+        /// from the project of <paramref name="frame"/>.
+        /// </summary>
+        /// <param name="frame">The frame whose project provides the attribute lists</param>
+        /// <param name="selectedObjects">The selected objects</param>
         public MultiObjectsProperties(IFrame frame, GeoObjectList selectedObjects)
         {
             this.selectedObjects = selectedObjects;
@@ -199,6 +220,11 @@ namespace CADability.UserInterface
             MultiChangeDone();
         }
 
+        /// <summary>
+        /// Updates the selection entries (line pattern, line width, layer, color, style) from the selected objects: when all
+        /// objects share an attribute, it is shown as selected, otherwise the entry shows its "multiple values" text. Called
+        /// after the selection has changed and whenever an attribute of one of the objects was changed from elsewhere.
+        /// </summary>
         public void InitMultiAttributeSelection()
         {
             if (multiLinePattern == null) return;
@@ -398,16 +424,26 @@ namespace CADability.UserInterface
         }
     }
     /// <summary>
-    /// Eigenschaftsanzeige für die Markierten Objekte. Diese Anzeige wird bei Änderung
-    /// der Markierung neu generiert. Die Anzeige ermöglicht für jedes markierte Objekt
-    /// Änderungen der Eigenschaften.
+    /// Property entry for the currently selected objects, shown in the control center by
+    /// <see cref="CADability.Actions.SelectObjectsAction"/>. It is regenerated whenever the selection
+    /// changes and contains the properties of each selected object as a sub entry, so that every object can
+    /// be edited individually; with more than one object it also offers their common attributes (layer,
+    /// color, style etc.) for a combined change. The hotspots of the sub entries are passed on to the views.
     /// </summary>
 
     public class SelectedObjectsProperty : PropertyEntryImpl, IDisplayHotSpots
     {
+        /// <summary>
+        /// The currently selected objects, as set by <see cref="SetGeoObjectList(GeoObjectList)"/>.
+        /// </summary>
         protected GeoObjectList selectedObjects;
         private IPropertyEntry[] showProperties;
         private MultiObjectsProperties multiObjectsProperties;
+        /// <summary>
+        /// The selected object whose property entry is currently selected in the property page, or null. The
+        /// <see cref="CADability.Actions.SelectObjectsAction"/> paints it highlighted and uses it as the target of some of its
+        /// commands. Changes are reported by <see cref="FocusedObjectChangedEvent"/>.
+        /// </summary>
         public IGeoObject focusedSelectedObject; // eines kann fokusiert sein
         internal bool IsChanging
         {
@@ -418,6 +454,7 @@ namespace CADability.UserInterface
         }
         internal IGeoObject ContextMenuSource; // dieses Objekt ist verantwortlich für das aktuelle Contextmenue
                                                // aufgrund einer Auswahl in einer der ComboBoxen
+        /// <inheritdoc/>
         public override void Refresh()
         {
             showProperties = null;
@@ -428,22 +465,58 @@ namespace CADability.UserInterface
             }
         }
         #region polymorph construction
+        /// <summary>
+        /// Delegate for <see cref="Constructor"/>: creates the property entry for the selected objects.
+        /// </summary>
+        /// <param name="Frame">The frame in which the entry is used</param>
+        /// <returns>The new entry, typically an instance of a class derived from <see cref="SelectedObjectsProperty"/></returns>
         public delegate SelectedObjectsProperty ConstructionDelegate(IFrame Frame);
+        /// <summary>
+        /// Delegate for <see cref="FocusedObjectChangedEvent"/>.
+        /// </summary>
+        /// <param name="sender">The entry raising the event</param>
+        /// <param name="focused">The object whose entry is now selected, or null when no object is focused</param>
         public delegate void FocusedObjectChangedDelegate(SelectedObjectsProperty sender, IGeoObject focused);
+        /// <summary>
+        /// Raised when the user selects or deselects the entry of one of the selected objects, i.e. when
+        /// <see cref="focusedSelectedObject"/> changes.
+        /// </summary>
         public event FocusedObjectChangedDelegate FocusedObjectChangedEvent;
+        /// <summary>
+        /// Hook to replace the entry for the selected objects by an application specific one: when set,
+        /// <see cref="Construct(IFrame)"/> calls this delegate instead of creating a plain <see cref="SelectedObjectsProperty"/>.
+        /// </summary>
         public static ConstructionDelegate Constructor;
+        /// <summary>
+        /// Creates the property entry for the selected objects, via <see cref="Constructor"/> when that is set, otherwise as a
+        /// plain <see cref="SelectedObjectsProperty"/>. Called by <see cref="CADability.Actions.SelectObjectsAction"/> when it
+        /// starts.
+        /// </summary>
+        /// <param name="Frame">The frame in which the entry is used</param>
+        /// <returns>The new entry with an empty list of selected objects</returns>
         public static SelectedObjectsProperty Construct(IFrame Frame)
         {
             if (Constructor != null) return Constructor(Frame);
             return new SelectedObjectsProperty(Frame);
         }
         #endregion
+        /// <summary>
+        /// Creates the entry with an empty list of selected objects. Use <see cref="Construct(IFrame)"/> to create an instance.
+        /// </summary>
+        /// <param name="Frame">The frame in which the entry is used</param>
         protected SelectedObjectsProperty(IFrame Frame)
             : base(Frame)
         {
             selectedObjects = new GeoObjectList(); // zuerst eine leere Liste
             resourceIdInternal = "SelectedObjects.Title";
         }
+        /// <summary>
+        /// Replaces the list of selected objects. The entry unsubscribes from the change events of the previous objects,
+        /// subscribes to those of the new ones, discards its sub entries (they are recreated on demand from
+        /// <see cref="IGeoObject.GetShowProperties(IFrame)"/>) and refreshes its display. Called by the
+        /// <see cref="CADability.Actions.SelectObjectsAction"/> whenever the selection changes.
+        /// </summary>
+        /// <param name="SelectedObjects">The new selection; the list is used directly, not copied</param>
         public void SetGeoObjectList(GeoObjectList SelectedObjects)
         {
             for (int i = 0; i < selectedObjects.Count; ++i)
@@ -478,6 +551,7 @@ namespace CADability.UserInterface
             }
         }
         #region PropertyEntryImpl overrides
+        /// <inheritdoc/>
         public override PropertyEntryType Flags
         {
             get
@@ -487,6 +561,7 @@ namespace CADability.UserInterface
         }
         #endregion
         #region PropertyEntryImpl overrides
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -558,6 +633,7 @@ namespace CADability.UserInterface
                 }
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -565,24 +641,38 @@ namespace CADability.UserInterface
                 return MenuResource.LoadMenuDefinition("MenuId.SelectedObjects", false, Frame.CommandHandler);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.OnSpecialKey (IShowProperty, KeyEventArgs)"/>
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="args"></param>
 #endregion
+        /// <summary>
+        /// Expands the given sub entry (e.g. the entry of one of the selected objects) in the property page, provided this
+        /// entry is displayed.
+        /// </summary>
+        /// <param name="toShow">The sub entry to expand</param>
         public void ShowOpen(IShowProperty toShow)
         {
             if (propertyPage != null) propertyPage.OpenSubEntries(toShow as IPropertyEntry, true);
         }
+        /// <summary>
+        /// Forwards the hotspot changes of the entries of the selected objects to <see cref="HotspotChangedEvent"/>.
+        /// </summary>
+        /// <param name="sender">The hotspot that changed</param>
+        /// <param name="mode">The kind of change</param>
         protected void OnSubHotspotChanged(IHotSpot sender, HotspotChangeMode mode)
         {
             if (HotspotChangedEvent != null) HotspotChangedEvent(sender, mode);
         }
+        /// <summary>
+        /// Selects the given sub entry in the property page. The entry must be displayed on a property page.
+        /// </summary>
+        /// <param name="ToSelect">The sub entry to select</param>
         public void ShowSelected(IShowProperty ToSelect)
         {
             propertyPage.SelectEntry(ToSelect as IPropertyEntry);
         }
+        /// <summary>
+        /// Expands the sub entries in the property page and selects this entry: with a single selected object its property
+        /// entry is expanded, with several objects only the group with the common attributes. Does nothing when the entry is
+        /// not displayed.
+        /// </summary>
         public void OpenSubEntries()
         {   // bei einem Objekt: die Darstellung des Objektes aufklappen,
             // bei mehreren Objekten: die 
@@ -612,10 +702,13 @@ namespace CADability.UserInterface
         }
         #region IDisplayHotSpots Members
 
-        public event CADability.HotspotChangedDelegate HotspotChangedEvent;
         /// <summary>
-        /// Implements <see cref="CADability.IDisplayHotSpots.ReloadProperties ()"/>
+        /// Raised when a hotspot of one of the selected objects is to be shown, hidden, selected, deselected or moved
+        /// (implements <see cref="IDisplayHotSpots.HotspotChangedEvent"/>). The hotspots originate from the property entries
+        /// of the selected objects.
         /// </summary>
+        public event CADability.HotspotChangedDelegate HotspotChangedEvent;
+        /// <inheritdoc/>
         public void ReloadProperties()
         {
             if (showProperties != null)

@@ -1,4 +1,4 @@
-using CADability.Attribute;
+﻿using CADability.Attribute;
 using CADability.GeoObject;
 using CADability.Shapes;
 using CADability.Substitutes;
@@ -30,24 +30,54 @@ using System.Threading;
 namespace CADability
 {
 
+    /// <summary>
+    /// Exception thrown by methods of <see cref="Project"/> when they are called with invalid arguments, e.g.
+    /// <see cref="Project.SetActiveModel(int)"/> with an index that is out of range. <see cref="ExceptionType"/> tells
+    /// the reason.
+    /// </summary>
     public class ProjectException : ApplicationException
     {
+        /// <summary>
+        /// The reasons for a <see cref="ProjectException"/>: <see cref="tExceptionType.InvalidModelIndex"/> means that a
+        /// model index is out of range.
+        /// </summary>
         public enum tExceptionType { InvalidModelIndex };
+        /// <summary>
+        /// The reason for the exception.
+        /// </summary>
         public tExceptionType ExceptionType;
+        /// <summary>
+        /// Creates the exception with the given reason.
+        /// </summary>
+        /// <param name="ExceptionType">The reason for the exception</param>
         public ProjectException(tExceptionType ExceptionType)
         {
             this.ExceptionType = ExceptionType;
         }
     }
 
+    /// <summary>
+    /// Exception for errors when a project file is read, e.g. a file written by a newer version of CADability.
+    /// <see cref="ResourceId"/> names the entry of the <see cref="StringTable"/> with the message for the user.
+    /// <see cref="Project.ReadFromFile(string)"/> catches it and returns null. The current code does not throw it itself,
+    /// it remains for projects or deserialization constructors of user objects that do.
+    /// </summary>
     public class ProjectSerializationException : SerializationException
     {
         private string resourceId; // resourceId für die MessageBox
+        /// <summary>
+        /// Creates the exception.
+        /// </summary>
+        /// <param name="resourceId">The id of the message for the user in the <see cref="StringTable"/>, may be null</param>
         public ProjectSerializationException(string resourceId)
             : base()
         {
             this.resourceId = resourceId;
         }
+        /// <summary>
+        /// The id of the message for the user in the <see cref="StringTable"/> (see <see cref="StringTable.GetString(string)"/>),
+        /// or null if there is none.
+        /// </summary>
         public string ResourceId
         {
             get { return resourceId; }
@@ -188,8 +218,25 @@ namespace CADability
             ICommandHandler, IEnumerable, IDeserializationCallback, IJsonSerialize, IJsonSerializeDone
     {
         #region polymorph construction
+        /// <summary>
+        /// Delegate for <see cref="Constructor"/>: creates a new, empty project, usually an object of a class derived from
+        /// <see cref="Project"/>.
+        /// </summary>
+        /// <returns>The new project</returns>
         public delegate Project ConstructionDelegate();
+        /// <summary>
+        /// Hook for the polymorphic construction of projects. When set, <see cref="Construct"/> calls this delegate instead of
+        /// creating a plain <see cref="Project"/>, so that an application can substitute its own class derived from Project
+        /// wherever CADability creates a project by <see cref="Construct"/> (e.g. <see cref="CreateSimpleProject"/>).
+        /// Null by default.
+        /// </summary>
         public static ConstructionDelegate Constructor;
+        /// <summary>
+        /// Creates a new, empty project: by <see cref="Constructor"/> if that is set, otherwise a plain <see cref="Project"/>.
+        /// Use it instead of the constructor when an application may have substituted a derived class. The project has no
+        /// model yet; <see cref="CreateSimpleProject"/> creates a project with a model and the standard views.
+        /// </summary>
+        /// <returns>The new project</returns>
         public static Project Construct()
         {
             if (Constructor != null) return Constructor();
@@ -252,10 +299,11 @@ namespace CADability
                 modelView = null;
             }
             /// <summary>
-            /// Implements <see cref="ISerializable.GetObjectData"/>
+            /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+            /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
             /// </summary>
-            /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-            /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+            /// <param name="info">receives the data</param>
+            /// <param name="context">the destination of the serialization</param>
             public void GetObjectData(SerializationInfo info, StreamingContext context)
             {
                 if (modelView != null)
@@ -343,6 +391,9 @@ namespace CADability
             symbolList = new GeoObjectList();
             namedValues = new NamedValuesProperty();
         }
+        /// <summary>
+        /// Finalizer. It does nothing; a project holds no unmanaged resources.
+        /// </summary>
         ~Project()
         {
             // System.Diagnostics.Trace.WriteLine("destructing project: " + fileName);
@@ -531,7 +582,7 @@ namespace CADability
         }
 #endif
         /// <summary>
-        /// Returns the number of <see cref="ModelViews"/> in this project
+        /// Returns the number of model views (<see cref="ModelView"/>) in this project
         /// </summary>
         internal int ModelViewCount
         {
@@ -540,6 +591,12 @@ namespace CADability
                 return projectedModels.Count;
             }
         }
+        /// <summary>
+        /// The <see cref="AnimatedView"/>s defined in this project. The list is saved with the project.
+        /// <see cref="FrameImpl.AddView(IView)"/> and <see cref="FrameImpl.RemoveView(IView)"/> add views to and remove them
+        /// from this list and also register them with the frame; the list may be modified directly, but the frame does not
+        /// notice that.
+        /// </summary>
         public List<AnimatedView> AnimatedViews
         {
             get
@@ -759,6 +816,17 @@ namespace CADability
             return true;
         }
 #endif
+        /// <summary>
+        /// Adds a new <see cref="ProjectedModel"/>, the persistent part of a <see cref="ModelView"/> (the model, the
+        /// projection and the visible layers), with the given name to the project. The name should be unique among the model
+        /// views of the project, because the frame and the project refer to model views by name. No ModelView is created and
+        /// no <see cref="ViewChangedEvent"/> is raised; <see cref="FrameImpl.AddView(IView)"/> calls this when a ModelView is
+        /// added to the frame.
+        /// </summary>
+        /// <param name="name">The name of the model view</param>
+        /// <param name="model">The model that is shown</param>
+        /// <param name="projection">The projection; it is used as is, not cloned</param>
+        /// <returns>The index of the new entry in the list of projected models of the project</returns>
         public int AddProjectedModel(string name, Model model, Projection projection)
         {
 
@@ -791,6 +859,13 @@ namespace CADability
                 }
             }
         }
+        /// <summary>
+        /// Removes the <see cref="ProjectedModel"/> with the given index from the list of model views of the project, without
+        /// any checks: unlike <see cref="RemoveModelView(ModelView)"/> it also removes the last one and raises no
+        /// <see cref="ViewChangedEvent"/>.
+        /// </summary>
+        /// <param name="index">The index of the projected model, as returned by
+        /// <see cref="AddProjectedModel(string, Model, Projection)"/></param>
         public void RemoveModelView(int index)
         {
             projectedModels.RemoveAt(index);
@@ -872,6 +947,9 @@ namespace CADability
                 activeViewName = value;
             }
         }
+        /// <summary>
+        /// The same list as <see cref="SymbolList"/>.
+        /// </summary>
         public GeoObjectList AdditionalSymbols { get { return symbolList; } }
         /// <summary>
         /// The <see cref="CADability.UserData"/> object can take any kind of data. If the data objects
@@ -880,6 +958,12 @@ namespace CADability
         /// they are displayed and can be modified on the project tab page of the control center.
         /// </summary>
         public UserData UserData;
+        /// <summary>
+        /// The <see cref="CADability.Attribute.FilterList"/> of this project: a list of filters that decide which objects
+        /// may be selected or snapped to by the actions (see <see cref="CADability.Actions.SelectObjectsAction"/>). The actions
+        /// pass it to <see cref="Model.GetObjectsFromRect(BoundingRect, Projection, HashSet{Layer}, PickMode, FilterList)"/>
+        /// and to the <see cref="SnapPointFinder"/>. It is shown in the control center and saved with the project.
+        /// </summary>
         public FilterList FilterList
         {
             get
@@ -887,6 +971,10 @@ namespace CADability
                 return filterList;
             }
         }
+        /// <summary>
+        /// A list of objects (symbols) that are saved with the project but do not belong to any model, e.g. templates for
+        /// objects to insert. CADability itself only keeps and serializes the list; the application decides what to put into it.
+        /// </summary>
         public GeoObjectList SymbolList
         {
             get
@@ -894,10 +982,24 @@ namespace CADability
                 return symbolList;
             }
         }
+        /// <summary>
+        /// Returns the named value with the given name. Named values are user defined doubles, <see cref="GeoPoint"/>s and
+        /// <see cref="GeoVector"/>s with a name each, which can be referred to by name in input fields and formulas. They are
+        /// shown and edited in the "named values" group of the project in the control center and saved with the project.
+        /// </summary>
+        /// <param name="name">The name of the value</param>
+        /// <returns>The value, or null if there is no value with this name</returns>
         public object GetNamedValue(string name)
         {
             return namedValues.GetNamedValue(name);
         }
+        /// <summary>
+        /// Sets or adds the named value with the given name (see <see cref="GetNamedValue(string)"/>). With <paramref name="val"/>
+        /// null the value is removed. With <paramref name="name"/> null a unique name is generated from the type of the
+        /// value and, if the project is shown in the control center, the user is prompted to edit that name.
+        /// </summary>
+        /// <param name="name">The name of the value, or null to generate one</param>
+        /// <param name="val">The value (a double, <see cref="GeoPoint"/> or <see cref="GeoVector"/>), or null to remove the entry</param>
         public void SetNamedValue(string name, object val)
         {
             namedValues.SetNamedValue(name, val);
@@ -932,17 +1034,26 @@ namespace CADability
             get { return fileName; }
             set { fileName = value; }
         }
+        /// <summary>
+        /// Makes the model with the given index (see <see cref="GetModel(int)"/>) the active model of the project, which
+        /// <see cref="GetActiveModel"/> returns: the model that new views show and that the imports and the methods working
+        /// without a view (e.g. <see cref="ExportToWebGl(string)"/>) use.
+        /// </summary>
+        /// <param name="Index">The index of the model</param>
+        /// <exception cref="ProjectException">if the index is out of range
+        /// (<see cref="ProjectException.tExceptionType.InvalidModelIndex"/>)</exception>
         public void SetActiveModel(int Index)
         {
             if (Index < 0 || Index >= models.Count) throw new ProjectException(ProjectException.tExceptionType.InvalidModelIndex);
             activeModelIndex = Index;
         }
         /// <summary>
-        /// Liefert die Standard Darstellung des gegebenen Modells.
-        /// Wenn keine definiert ist, die Draufsicht.
+        /// Creates a <see cref="ModelView"/> that shows the given model in the standard projection, i.e. the view from top with
+        /// the x/y plane as drawing plane. Note that a new view is created on each call; views already defined for the model
+        /// are not looked up.
         /// </summary>
-        /// <param name="m"></param>
-        /// <returns></returns>
+        /// <param name="m">The model to show</param>
+        /// <returns>The new model view</returns>
         public ModelView GetStandardModelView(Model m)
         {
             // noch nicht richtig implementiert
@@ -951,6 +1062,12 @@ namespace CADability
             view.Projection.DrawingPlane = new Plane(Plane.StandardPlane.XYPlane, 0.0);
             return view;
         }
+        /// <summary>
+        /// Creates a <see cref="ModelView"/> that shows the active model (<see cref="GetActiveModel"/>) in the standard
+        /// projection, i.e. the view from top with the x/y plane as drawing plane. Like
+        /// <see cref="GetStandardModelView(Model)"/> it creates a new view on each call.
+        /// </summary>
+        /// <returns>The new model view</returns>
         public ModelView GetStandardModelView()
         {
             // noch nicht richtig implementiert
@@ -959,6 +1076,15 @@ namespace CADability
             view.Projection.DrawingPlane = new Plane(Plane.StandardPlane.XYPlane, 0.0);
             return view;
         }
+        /// <summary>
+        /// Creates a <see cref="ModelView"/> that shows the given model in one of the standard projections: 0 the view from
+        /// top with the x/y plane as drawing plane, 1 the view from the right with the y/z plane, 2 the view from the front
+        /// with the x/z plane, 3 an isometric view in the direction (-1, -1, -1) with the drawing plane perpendicular to it.
+        /// Any other index gives the view from top. A new view is created on each call.
+        /// </summary>
+        /// <param name="m">The model to show</param>
+        /// <param name="Index">Selects the projection, 0 to 3</param>
+        /// <returns>The new model view</returns>
         public ModelView GetStandardModelView(Model m, int Index)
         {
             Projection pr;
@@ -989,10 +1115,11 @@ namespace CADability
             return view;
         }
         /// <summary>
-        /// Überprüft, ob Daten verändert wurden (IsModified) und fordert ggf. den Anwender auf
-        /// das Projekt zu speichern. 
+        /// Checks whether the project has been modified (<see cref="IsModified"/>) and, if so, asks the user whether to save
+        /// it; on "yes" the project is written to its file. Without a user interface (setting "DontUse.WindowsForms") a
+        /// modified project is saved without asking.
         /// </summary>
-        /// <returns>false, wenn Abbrechen gedrückt wurde, true sonst (speichern oder verwerfen)</returns>
+        /// <returns>false if the user pressed cancel, true otherwise (saved or discarded)</returns>
         public virtual bool SaveModified()
         {
             if (IsModified)
@@ -1019,6 +1146,15 @@ namespace CADability
             }
             return true;
         }
+        /// <summary>
+        /// Creates a project with one empty <see cref="Model"/> and the standard views of it (from top, from right, from
+        /// front and an isometric view). The model's extent is taken from the global setting "DefaultModelSize", or is
+        /// 0 to 100 in each direction. The project has the default attribute lists (layers, colours, styles...), so
+        /// objects can be given default attributes with <see cref="SetDefaults"/>. This is the project to start with when
+        /// CADability is used as a library without a user interface; <see cref="GetActiveModel"/> returns the model to add
+        /// objects to. The imports create their project this way.
+        /// </summary>
+        /// <returns>the new project</returns>
         static public Project CreateSimpleProject()
         {
             Project res = Construct();
@@ -1062,6 +1198,11 @@ namespace CADability
             }
             return res;
         }
+        /// <summary>
+        /// The <see cref="UndoRedoSystem"/> of this project, which records the undoable changes of the models and objects of
+        /// the project; the models of the project share it (<see cref="Model.Undo"/>). Use
+        /// <see cref="UndoRedoSystem.UndoFrame"/> to combine several changes into one undo step.
+        /// </summary>
         public UndoRedoSystem Undo
         {
             get { return undoRedoSystem; }
@@ -1153,6 +1294,13 @@ namespace CADability
             return count;
         }
 
+        /// <summary>
+        /// Saves a copy of the project in the given file (JSON format, like <see cref="WriteToFile(string)"/>) from which all
+        /// <see cref="CADability.UserData"/> of the project, of its models and of all their objects (including child objects)
+        /// has been removed. This project is not changed. Useful to pass a project on without application specific data.
+        /// </summary>
+        /// <param name="fileName">The name of the file to write</param>
+        /// <returns>true on success, false if the copy could not be made or written</returns>
         public bool WriteToFileWithoutUserData(string fileName)
         {
             try
@@ -1238,7 +1386,13 @@ namespace CADability
             return version;
         }
         /// <summary>
-        /// Export the project in one of the following formats: cdb, dxf, dwg, step (or stp) and stl.
+        /// Exports the project in one of the following formats: cdb (CADability's own JSON format, same as
+        /// <see cref="WriteToFile"/>), dxf, dwg, step (or stp) and stl. The case of <paramref name="format"/> does not
+        /// matter, the extension of the file name is not used. DXF and DWG write all models (see <see cref="DXF.Export"/>;
+        /// the DXF version is the setting "DxfDwg.Version", DWG is written as AutoCAD 2004 or later), STEP and STL write
+        /// the active model only. STEP writes solids, shells and faces as boundary representation and curves as curve
+        /// sets (see <see cref="ExportStep"/>), STL writes the triangulation of the faces with the precision of the setting
+        /// "Export.STL.Precision" (see <see cref="ExportToSTL"/>).
         /// </summary>
         /// <param name="fileName">Path and filename for the generated output file</param>
         /// <param name="format">Format, one of the strings: cdb, dxf, dwg, step, stp, stl</param>
@@ -1285,6 +1439,12 @@ namespace CADability
             }
             return false;
         }
+        /// <summary>
+        /// Writes the active model to a binary STL file: the triangulation of all faces, shells and solids, with the
+        /// precision (maximal distance between the triangles and the surface) of the setting "Export.STL.Precision",
+        /// 0.005 by default. Curves, text and other objects without faces are not written.
+        /// </summary>
+        /// <param name="fileName">Path and filename of the STL file</param>
         public void ExportToSTL(string fileName)
         {
             Model m = GetActiveModel();
@@ -1299,6 +1459,12 @@ namespace CADability
             }
         }
 #if !WEBASSEMBLY
+        /// <summary>
+        /// Writes the active model (<see cref="GetActiveModel"/>) as a HTML file that displays it with WebGL, see
+        /// <see cref="CADability.ExportToWebGl"/>. The HTML template "WebGLS.html" is expected in the directory of the
+        /// CADability assembly. If there is an active view, its view direction is used as the initial view direction.
+        /// </summary>
+        /// <param name="fileName">The name of the HTML file to write</param>
         public void ExportToWebGl(string fileName)
         {
             ExportToWebGl wgl = new ExportToWebGl(GetActiveModel());
@@ -1589,11 +1755,13 @@ namespace CADability
             }
         }
         /// <summary>
-        /// Creates a new project reading the data from the file with the given name.
-        /// If FileName is null, an OpenFileDialog will be displayed.
+        /// Reads a project from a file in CADability's own format (cdb): the JSON format written by
+        /// <see cref="WriteToFile"/>, or the binary format of older versions, which is converted when read. To read
+        /// DXF, DWG, STEP or STL files use <see cref="ReadFromFile(string, string)"/>.
         /// </summary>
         /// <param name="FileName">The name of the file</param>
-        /// <returns>The newly created project or null if failed to create a project</returns>
+        /// <returns>The project read from the file, or null when <paramref name="FileName"/> is null or the file does not
+        /// contain a project</returns>
         public static Project ReadFromFile(string FileName)
         {
             return ReadFromFile(FileName, true);
@@ -1744,6 +1912,25 @@ namespace CADability
                 throw new InvalidOperationException("Failed to read DWG file '" + filename + "': " + ex.Message, ex);
             }
         }
+        /// <summary>
+        /// Reads a file of the given format and returns it as a new project. <paramref name="Format"/> is one of
+        /// "cdb" (CADability's own format, see <see cref="ReadFromFile(string)"/>), "dxf", "dwg", "step" or "stp" and "stl";
+        /// the case does not matter, the extension of the file name is not used. For the exchange formats the project is
+        /// created with <see cref="CreateSimpleProject"/> and the imported objects are added to its model: DXF and DWG
+        /// bring their layers, blocks, colours, line styles and hatch styles along (see <see cref="DXF.Import"/>), STEP files
+        /// give solids, open shells and faces, named like their products and arranged in <see cref="Block"/>s
+        /// according to the assembly structure when the setting "ImportStep.UseHierarchy" is true (see
+        /// <see cref="ImportStep"/>), and STL files give a solid for every closed set of triangles and a shell for every
+        /// open one. Objects without a colour or layer get the project's standard ones.
+        /// A DWG file that cannot be read throws an <see cref="InvalidOperationException"/>; a DXF or STEP file that cannot
+        /// be read throws an exception as well.
+        /// </summary>
+        /// <param name="FileName">The name of the file</param>
+        /// <param name="Format">The format: cdb, dxf, dwg, step, stp or stl</param>
+        /// <param name="useProgress">no longer used, the progress bar is shown by the frame when there is one</param>
+        /// <param name="makeCompounds">no longer used</param>
+        /// <returns>The new project, or null for an unknown or unsupported format (e.g. brep, sat, x_t) and for a STL
+        /// file without shells</returns>
         public static Project ReadFromFile(string FileName, string Format, bool useProgress, bool makeCompounds = true)
         {
             useProgress = useProgress && !Settings.GlobalSettings.GetBoolValue("DontUse.WindowsForms", false);
@@ -1814,6 +2001,13 @@ namespace CADability
             }
             return null;
         }
+        /// <summary>
+        /// Reads a file of the given format and returns it as a new project, see
+        /// <see cref="ReadFromFile(string, string, bool, bool)"/>.
+        /// </summary>
+        /// <param name="FileName">The name of the file</param>
+        /// <param name="Format">The format: cdb, dxf, dwg, step, stp or stl</param>
+        /// <returns>The new project, or null for an unknown or unsupported format</returns>
         public static Project ReadFromFile(string FileName, string Format)
         {
             return ReadFromFile(FileName, Format, true);
@@ -1831,10 +2025,7 @@ namespace CADability
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -1842,10 +2033,7 @@ namespace CADability
                 return SubEntries.Length;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get
@@ -1898,13 +2086,51 @@ namespace CADability
             }
         }
         #endregion
+        /// <summary>
+        /// Delegate for <see cref="RefreshEvent"/>.
+        /// </summary>
+        /// <param name="sender">The project</param>
+        /// <param name="args">Not used, null</param>
         public delegate void RefreshDelegate(object sender, EventArgs args);
+        /// <summary>
+        /// Raised when the display of the project's objects must be refreshed because an attribute (a layer, colour, line
+        /// pattern, hatch style...) of the attribute lists of the project has been modified, and when
+        /// <see cref="DeferRefresh"/> is reset to false. The frame listens to it.
+        /// </summary>
         public event RefreshDelegate RefreshEvent;
+        /// <summary>
+        /// Delegate for <see cref="ViewChangedEvent"/>.
+        /// </summary>
+        /// <param name="sender">The project</param>
+        /// <param name="viewWhichChanged">The view concerned; currently always null, meaning that the list of views has changed</param>
         public delegate void ViewChangedDelegate(Project sender, IView viewWhichChanged);
+        /// <summary>
+        /// Raised when the list of views of the project has changed, i.e. a model view or a layout has been added or removed
+        /// (e.g. by <see cref="RemoveModelView(ModelView)"/> or by the commands of the project in the control center). The
+        /// frame listens to it to update its views.
+        /// </summary>
         public event ViewChangedDelegate ViewChangedEvent;
+        /// <summary>
+        /// Delegate for <see cref="ModelsChangedEvent"/>.
+        /// </summary>
+        /// <param name="sender">The project</param>
+        /// <param name="model">The model that was added, removed or renamed</param>
+        /// <param name="added">true if the model was added, false if it was removed or renamed</param>
         public delegate void ModelsChangedDelegate(Project sender, Model model, bool added);
+        /// <summary>
+        /// Raised after a model has been added to the project (<see cref="AddModel(Model)"/>), removed from it
+        /// (<see cref="RemoveModel(Model)"/>) or renamed. The views listen to it to update their list of models.
+        /// </summary>
         public event ModelsChangedDelegate ModelsChangedEvent;
+        /// <summary>
+        /// Delegate for <see cref="ProjectModifiedEvent"/>.
+        /// </summary>
+        /// <param name="sender">The project</param>
         public delegate void ProjectModifiedDelegate(Project sender);
+        /// <summary>
+        /// Raised whenever <see cref="IsModified"/> is set to true, i.e. after a change that has to be saved. It is not raised
+        /// when the flag is reset by saving.
+        /// </summary>
         public event ProjectModifiedDelegate ProjectModifiedEvent;
         internal static void InsertDebugLine(GeoPoint sp, GeoPoint ep, Color clr)
         {
@@ -2001,6 +2227,12 @@ namespace CADability
         }
 
 
+        /// <summary>
+        /// The colours (<see cref="CADability.Attribute.ColorList"/>) of this project. The attribute lists of a project contain the
+        /// attributes the objects of its models use; they are shown in the project tab of the control center, saved with the
+        /// project and initialized from the global settings when the project is created. New objects get the current entry
+        /// (see <see cref="SetDefaults(IGeoObject)"/>).
+        /// </summary>
         public ColorList ColorList
         {
             get
@@ -2008,6 +2240,12 @@ namespace CADability
                 return attributeLists["ColorList"] as ColorList;
             }
         }
+        /// <summary>
+        /// The layers (<see cref="CADability.Attribute.LayerList"/>) of this project. The attribute lists of a project contain the
+        /// attributes the objects of its models use; they are shown in the project tab of the control center, saved with the
+        /// project and initialized from the global settings when the project is created. New objects get the current entry
+        /// (see <see cref="SetDefaults(IGeoObject)"/>).
+        /// </summary>
         public LayerList LayerList
         {
             get
@@ -2015,6 +2253,12 @@ namespace CADability
                 return attributeLists["LayerList"] as LayerList;
             }
         }
+        /// <summary>
+        /// The hatch styles (<see cref="CADability.Attribute.HatchStyleList"/>) of this project. The attribute lists of a project contain the
+        /// attributes the objects of its models use; they are shown in the project tab of the control center, saved with the
+        /// project and initialized from the global settings when the project is created. New objects get the current entry
+        /// (see <see cref="SetDefaults(IGeoObject)"/>).
+        /// </summary>
         public HatchStyleList HatchStyleList
         {
             get
@@ -2022,6 +2266,12 @@ namespace CADability
                 return attributeLists["HatchStyleList"] as HatchStyleList;
             }
         }
+        /// <summary>
+        /// The dimension styles (<see cref="CADability.Attribute.DimensionStyleList"/>) of this project. The attribute lists of a project contain the
+        /// attributes the objects of its models use; they are shown in the project tab of the control center, saved with the
+        /// project and initialized from the global settings when the project is created. New objects get the current entry
+        /// (see <see cref="SetDefaults(IGeoObject)"/>).
+        /// </summary>
         public DimensionStyleList DimensionStyleList
         {
             get
@@ -2029,6 +2279,12 @@ namespace CADability
                 return attributeLists["DimensionStyleList"] as DimensionStyleList;
             }
         }
+        /// <summary>
+        /// The line widths (<see cref="CADability.Attribute.LineWidthList"/>) of this project. The attribute lists of a project contain the
+        /// attributes the objects of its models use; they are shown in the project tab of the control center, saved with the
+        /// project and initialized from the global settings when the project is created. New objects get the current entry
+        /// (see <see cref="SetDefaults(IGeoObject)"/>).
+        /// </summary>
         public LineWidthList LineWidthList
         {
             get
@@ -2036,6 +2292,12 @@ namespace CADability
                 return attributeLists["LineWidthList"] as LineWidthList;
             }
         }
+        /// <summary>
+        /// The line patterns (<see cref="CADability.Attribute.LinePatternList"/>) of this project. The attribute lists of a project contain the
+        /// attributes the objects of its models use; they are shown in the project tab of the control center, saved with the
+        /// project and initialized from the global settings when the project is created. New objects get the current entry
+        /// (see <see cref="SetDefaults(IGeoObject)"/>).
+        /// </summary>
         public LinePatternList LinePatternList
         {
             get
@@ -2043,6 +2305,12 @@ namespace CADability
                 return attributeLists["LinePatternList"] as LinePatternList;
             }
         }
+        /// <summary>
+        /// The styles (named combinations of attributes) (<see cref="CADability.Attribute.StyleList"/>) of this project. The attribute lists of a project contain the
+        /// attributes the objects of its models use; they are shown in the project tab of the control center, saved with the
+        /// project and initialized from the global settings when the project is created. New objects get the current entry
+        /// (see <see cref="SetDefaults(IGeoObject)"/>).
+        /// </summary>
         public StyleList StyleList
         {
             get
@@ -2115,6 +2383,10 @@ namespace CADability
 
         #endregion
         private bool deferRefresh;
+        /// <summary>
+        /// While true, modifications of attributes do not raise the <see cref="RefreshEvent"/>; setting it back to false
+        /// raises the event once. Use it to bracket a series of attribute changes so that the display is refreshed only once.
+        /// </summary>
         public bool DeferRefresh
         {
             get { return deferRefresh; }
@@ -2129,6 +2401,15 @@ namespace CADability
                 deferRefresh = value;
             }
         }
+        /// <summary>
+        /// Gives the object the default attributes of this project: the default <see cref="Style"/> for its kind of object
+        /// (<see cref="IGeoObject.PreferredStyle"/>), and the current layer, colour, dimension style, line width, line pattern
+        /// and hatch style of the project's attribute lists for every attribute the object does not have yet. The
+        /// construct actions and the methods of <see cref="Make3D"/> that take a project call this. Call it for objects you
+        /// create yourself before adding them to a model, otherwise they have no layer and colour and are drawn in the
+        /// default colour.
+        /// </summary>
+        /// <param name="go">the object to set the attributes of</param>
         public void SetDefaults(IGeoObject go)
         {
             Style style = this.StyleList.GetDefault(go.PreferredStyle);
@@ -2165,6 +2446,13 @@ namespace CADability
                 hs.HatchStyle = HatchStyleList.Current;
             }
         }
+        /// <summary>
+        /// Writes the given object to a file with the <see cref="BinaryFormatter"/>, overwriting an existing file. Obsolete:
+        /// the BinaryFormatter is deprecated and disabled on current .NET versions, and CADability writes its own files in
+        /// JSON format (<see cref="JsonSerialize"/>). Not used by CADability itself.
+        /// </summary>
+        /// <param name="toSerialize">The object to write</param>
+        /// <param name="fileName">The name of the file</param>
         public static void SerializeObject(ISerializable toSerialize, string fileName)
         {
             Stream stream = File.Open(fileName, System.IO.FileMode.Create);
@@ -2173,6 +2461,11 @@ namespace CADability
             stream.Close();
             stream.Dispose();
         }
+        /// <summary>
+        /// Reads an object written by <see cref="SerializeObject(ISerializable, string)"/> from the file. Obsolete, see there.
+        /// </summary>
+        /// <param name="fileName">The name of the file</param>
+        /// <returns>The object read</returns>
         public static object DeserializeObject(string fileName)
         {
             Stream stream = File.Open(fileName, System.IO.FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -2184,11 +2477,12 @@ namespace CADability
         }
 #if DEBUG
         /// <summary>
-        /// Probleme beim Serialisieren (z.B. Datenverlust) können hiermit getestet werden. Es wird in einen MemoryStream srialisiert
-        /// und gleich wieder deserialisiert. Das zurückgelieferte Objekt hat keine verbindung mehr zu anderen Objekten
+        /// Serializes the given object into a memory stream and immediately deserializes it again. This can be used to test for
+        /// problems with the serialization (e.g. loss of data). The returned object has no connection to any other object any
+        /// more; it is a deep copy of the input.
         /// </summary>
-        /// <param name="toSerialize"></param>
-        /// <returns></returns>
+        /// <param name="toSerialize">The object to serialize; it must be serializable</param>
+        /// <returns>The deserialized copy</returns>
         public static object SerializeDeserialize(object toSerialize)
         {
             Stream stream = new MemoryStream();
@@ -2323,10 +2617,11 @@ namespace CADability
         //    }
         //}
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public virtual void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Models", models);
@@ -2351,6 +2646,13 @@ namespace CADability
                 if (printDocument != null) info.AddValue("DefaultPageSettings", printDocument.DefaultPageSettings);
             }
         }
+        /// <summary>
+        /// Implements <see cref="IJsonSerialize.GetObjectData(IJsonWriteData)"/>: writes the models, the active model, the
+        /// attribute lists, the user data, the symbol list, the projected models, the named values, the filter list, the
+        /// animated views and the name of the active view, and, unless the global setting "DontSave.System.Drawing" is set,
+        /// the layouts, the GDI views and the page settings. This is the content of CADability's project files.
+        /// </summary>
+        /// <param name="data">Receives the data</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("Models", models);
@@ -2376,6 +2678,13 @@ namespace CADability
             }
         }
 
+        /// <summary>
+        /// Implements <see cref="IJsonSerialize.SetObjectData(IJsonReadData)"/>: reads the data written by
+        /// <see cref="GetObjectData(IJsonWriteData)"/>. Properties missing in the file get their default values; the printer
+        /// settings are skipped on platforms without System.Drawing printing. The object is completed (owner of the attribute
+        /// lists, views, event subscriptions) in the callback <see cref="IJsonSerializeDone.SerializationDone(JsonSerialize)"/>.
+        /// </summary>
+        /// <param name="data">The data to read from</param>
         public void SetObjectData(IJsonReadData data)
         {
             int version = data.Version;
@@ -2624,6 +2933,12 @@ namespace CADability
         void ICommandHandler.OnSelected(MenuWithHandler selectedMenuItem, bool selected) { }
         #endregion
         #region IEnumerable
+        /// <summary>
+        /// Not implemented, always throws a <see cref="NotImplementedException"/>. It exists only beside the
+        /// <see cref="IEnumerable"/> implementation, which enumerates the models; add models with <see cref="AddModel(Model)"/>.
+        /// </summary>
+        /// <param name="toAdd">Not used</param>
+        /// <exception cref="NotImplementedException">always</exception>
         public void Add(object toAdd)
         {
             throw new NotImplementedException();

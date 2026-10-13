@@ -5,7 +5,7 @@ using System.Collections;
 namespace CADability.Attribute
 {
     /// <summary>
-    /// Comparer to sort lists of INamedAttributes<see cref="Layerlist"/>.
+    /// Comparer to sort lists of INamedAttributes (e.g. <see cref="LayerList"/>).
     /// </summary>
 
     public class NamedAttributeComparer : IComparer
@@ -111,7 +111,7 @@ namespace CADability.Attribute
         /// <summary>
         /// substitutes the attribute to the list member with the same name or adds objects attribute to the list.
         /// </summary>
-        /// <param IGeoObject="Object2Update">the Object with Attribute to substitute
+        /// <param name="Object2Update">the Object with Attribute to substitute</param>
         void Update(IGeoObject Object2Update);
 
         /// <summary>
@@ -131,6 +131,13 @@ namespace CADability.Attribute
     }
 
 
+    /// <summary>
+    /// Signature for notifications that a property of a named attribute (e.g. the RGB value of a <see cref="ColorDef"/>)
+    /// was changed. Not used by any event of CADability at present; the lists report such changes with
+    /// <see cref="IAttributeList.AttributeChanged(INamedAttribute, ReversibleChange)"/> instead.
+    /// </summary>
+    /// <param name="Attribute">the attribute that was changed</param>
+    /// <param name="Change">describes the change and can undo it</param>
     public delegate void AttributeChangedDelegate(object Attribute, ReversibleChange Change);
 
 }

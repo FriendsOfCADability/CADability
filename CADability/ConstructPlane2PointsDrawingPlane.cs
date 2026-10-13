@@ -11,11 +11,20 @@ using Point = System.Drawing.Point;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Intermediate construction of a plane by two points: the plane contains the line through the two points the user picks and
+    /// is perpendicular to the active drawing plane (its x-axis is the direction from the first to the second point, its y-axis
+    /// the normal of the drawing plane, its origin the midpoint of the two points). It is started by a <see cref="ConstructAction.PlaneInput"/>
+    /// (menu id "MenuId.Plane.2PointsDrawingPlane") to define a plane while another construction is running; the resulting plane
+    /// is reported via <see cref="PlaneChangedEvent"/>, and the plane is shown as a feedback rectangle while the points are entered.
+    /// Its id is "Construct.Plane.2PointsDrawingPlane".
     /// </summary>
 
     public class ConstructPlane2PointsDrawingPlane : CADability.Actions.ConstructAction, IIntermediateConstruction, IConstructPlane
     {
+        /// <summary>
+        /// Thrown by <see cref="ConstructedPlane"/> when the plane is requested before both points are fixed or when the points did not
+        /// define a valid plane.
+        /// </summary>
         public class ConstructPlaneException : ApplicationException
         {
             public ConstructPlaneException(string Message) : base(Message) { }
@@ -43,23 +52,23 @@ namespace CADability.Actions
             catch (PlaneException)
             { } // nix zu tun
         }
+        /// <summary>
+        /// Signature of the handlers of <see cref="PlaneChangedEvent"/>: called with the current plane each time one of the two points
+        /// changes.
+        /// </summary>
+        /// <param name="plane">The plane as currently defined by the two points</param>
         public delegate void PlaneChangedDelegate(Plane plane);
         public event PlaneChangedDelegate PlaneChangedEvent;
         public ConstructPlane2PointsDrawingPlane()
         {
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.GetID ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override string GetID()
         {
             return "Construct.Plane.2PointsDrawingPlane";
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnSetAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnSetAction()
         {
 
@@ -82,10 +91,7 @@ namespace CADability.Actions
             base.FeedBack.Add(feedBackplane);
             base.OnSetAction();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.AutoRepeat ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool AutoRepeat()
         {
             return false;

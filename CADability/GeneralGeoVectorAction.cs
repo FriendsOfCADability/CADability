@@ -30,6 +30,13 @@ namespace CADability.Actions
             initialGeoVectorValue = ToModify.GetGeoVector();
             this.basePoint = basePoint;
         }
+        /// <summary>
+        /// Constructs a GeneralGeoVectorAction to modify the provided <see cref="GeoVectorProperty"/> and excludes
+        /// <paramref name="ignoreSnap"/> from the snapping, which is usually the object that is being modified.
+        /// </summary>
+        /// <param name="ToModify">Property to modify</param>
+        /// <param name="basePoint">The start point of the vector in model coordinates; the vector is the (snapped) mouse position minus this point</param>
+        /// <param name="ignoreSnap">Object not to snap to, may be null</param>
         public GeneralGeoVectorAction(GeoVectorProperty ToModify, GeoPoint basePoint, IGeoObject ignoreSnap) : this(ToModify, basePoint)
         {
             if (ignoreSnap != null)
@@ -88,8 +95,8 @@ namespace CADability.Actions
         /// Implements <see cref="Action.OnMouseMove"/>. If you override this method
         /// don't forget to call the bas implementation.
         /// </summary>
-        /// <param name="e"><paramref name="Action.OnMouseMove.e"/></param>
-        /// <param name="vw"><paramref name="Action.OnMouseMove.vw"/></param>
+        /// <param name="e">MouseEventArgs of the call</param>
+        /// <param name="vw">the IView which contains the mouse</param>
         public override void OnMouseMove(MouseEventArgs e, IView vw)
         {
             using (Frame.Project.Undo.ContextFrame(this))
@@ -98,14 +105,13 @@ namespace CADability.Actions
                 SetGeoVector(base.SnapPoint(e, vw, out DidSnap) - basePoint);
             }
         }
-        /// <summary>
-        /// Implements <see cref="Action.GetID"/>.
-        /// </summary>
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "GeneralGeoVectorAction[LeaveSelectProperties]"; // LeaveSelectProperties ist das Zauberwort, 
                                                                     // damit die Properties der SelectObjectAction stehen bleiben.
         }
+        /// <inheritdoc/>
         public override void OnRemoveAction()
         {
         }
@@ -113,8 +119,8 @@ namespace CADability.Actions
         /// Implements <see cref="Action.OnMouseUp"/>. If you override this method
         /// don't forget to call the bas implementation.
         /// </summary>
-        /// <param name="e"><paramref name="Action.OnMouseUp.e"/></param>
-        /// <param name="vw"><paramref name="Action.OnMouseUp.vw"/></param>
+        /// <param name="e">MouseEventArgs of the call</param>
+        /// <param name="vw">the IView which contains the mouse</param>
         public override void OnMouseUp(MouseEventArgs e, IView vw)
         {
             using (Frame.Project.Undo.ContextFrame(this))
@@ -140,8 +146,8 @@ namespace CADability.Actions
         /// Implements <see cref="Action.OnInactivate"/>. If you override this method
         /// don't forget to call the bas implementation.
         /// </summary>
-        /// <param name="NewActiveAction"><paramref name="Action.OnInactivate.NewActiveAction"/></param>
-        /// <param name="RemovingAction"><paramref name="Action.OnInactivate.RemovingAction"/></param>
+        /// <param name="NewActiveAction">the action that will become active</param>
+        /// <param name="RemovingAction">true: if called because the action is removed, false: if called when a new action is set on top of this action</param>
         public override void OnInactivate(Action NewActiveAction, bool RemovingAction)
         {
             if (geoVectorProperty != null)
@@ -154,12 +160,14 @@ namespace CADability.Actions
                 base.RemoveThisAction();
             }
         }
+        /// <inheritdoc/>
         public override bool OnEscape()
         {
             SetGeoVector(initialGeoVectorValue);
             base.RemoveThisAction();
             return true;
         }
+        /// <inheritdoc/>
         public override bool OnEnter()
         {
             base.RemoveThisAction();

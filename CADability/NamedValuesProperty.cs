@@ -7,7 +7,10 @@ using System.Text;
 namespace CADability
 {
 	/// <summary>
-	/// 
+	/// The named values of a <see cref="Project"/>: a table of user defined values (doubles, points and
+	/// vectors) with a name each, which can be referred to by name in input fields and formulas. The table
+	/// is saved with the project and shown as an editable group in the control center, where values are
+	/// added via the context menu, renamed and removed.
 	/// </summary>
 	[Serializable]
 	internal class NamedValuesProperty : IShowPropertyImpl, ICommandHandler, ISerializable
@@ -93,9 +96,7 @@ namespace CADability
 				return ShowPropertyEntryType.GroupTitle;
 			}
 		}
-		/// <summary>
-		/// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-		/// </summary>
+		/// <inheritdoc/>
 		public override ShowPropertyLabelFlags LabelType
 		{
 			get
@@ -110,10 +111,7 @@ namespace CADability
 				return MenuResource.LoadMenuDefinition("MenuId.NamedValues", false, this);
 			}
 		}
-		/// <summary>
-		/// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-		/// returns the number of subentries in this property view.
-		/// </summary>
+		/// <inheritdoc/>
 		public override int SubEntriesCount
 		{
 			get
@@ -356,10 +354,11 @@ namespace CADability
 			namedValues = info.GetValue("NamedValues", typeof(Hashtable)) as Hashtable;
 		}
 		/// <summary>
-		/// Implements <see cref="ISerializable.GetObjectData"/>
+		/// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+		/// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
 		/// </summary>
-		/// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-		/// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+		/// <param name="info">receives the data</param>
+		/// <param name="context">the destination of the serialization</param>
 		public void GetObjectData(SerializationInfo info, StreamingContext context)
 		{
 			info.AddValue("NamedValues", namedValues);

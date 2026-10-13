@@ -21,9 +21,29 @@ namespace CADability
     /// </summary>
     public abstract class ParametricProperty : IJsonSerialize
     {
+        /// <summary>
+        /// The name under which the parametric property appears in the property page of the <see cref="Shell"/> (or of the
+        /// <see cref="Solid"/> containing it). Several parametric properties of a shell may share the same name; a value entered
+        /// in the property page is then applied to all of them.
+        /// </summary>
         public string Name { get; set; }
+        /// <summary>
+        /// true when the value of this parametric property is meant to be preserved while other parametric properties of the
+        /// same shell are changed. The flag is set from the "preserve value" input of the parametric actions and can be toggled
+        /// in the context menu of the property entry. It is saved with the shell, but it is not yet evaluated when parametrics
+        /// are executed.
+        /// </summary>
         public bool Preserve { get; set; }
+        /// <summary>
+        /// The value of the parametric property: a length, a radius or diameter, an angle in radians or a ratio, depending on
+        /// the derived class. Getting it measures the current value in the shell; setting it only stores the desired value,
+        /// which is applied to the shell by the next call to <see cref="Execute(Parametric)"/>.
+        /// </summary>
         public abstract double Value { get; set; } // the value of the property is kept here
+        /// <summary>
+        /// Initializes the base part of a parametric property with its name.
+        /// </summary>
+        /// <param name="name">The name shown in the property page, see <see cref="Name"/></param>
         public ParametricProperty(string name)
         {
             Name = name;
@@ -41,6 +61,13 @@ namespace CADability
         /// <param name="clonedVertices"></param>
         /// <returns></returns>
         public abstract ParametricProperty Clone(Dictionary<Face, Face> clonedFaces, Dictionary<Edge, Edge> clonedEdges, Dictionary<Vertex, Vertex> clonedVertices);
+        /// <summary>
+        /// Clones this parametric property so that it refers to the faces, edges and vertices of the shell which is modified
+        /// by <paramref name="parametric"/> (the shell returned by <see cref="Parametric.Result"/>). The mapping is taken from
+        /// <see cref="Parametric.GetDictionaries"/>.
+        /// </summary>
+        /// <param name="parametric">The parametric modification whose cloned shell the result refers to</param>
+        /// <returns>The clone, referring to the objects of the cloned shell</returns>
         public ParametricProperty Clone(Parametric parametric)
         {
             parametric.GetDictionaries(out Dictionary<Face, Face> faceDict, out Dictionary<Edge, Edge> edgeDict, out Dictionary<Vertex, Vertex> vertexDict);
@@ -62,6 +89,12 @@ namespace CADability
         /// </summary>
         /// <returns></returns>
         public abstract IEnumerable<object> GetAffectedObjects();
+        /// <summary>
+        /// Returns the shell resulting from the parametric modifications executed on <paramref name="parametrics"/> so far,
+        /// i.e. the result of <see cref="Parametric.Result"/>.
+        /// </summary>
+        /// <param name="parametrics">The parametric modification on which <see cref="Execute(Parametric)"/> was called</param>
+        /// <returns>The modified shell, or null when the modifications did not yield a consistent shell</returns>
         public Shell GetResult(Parametric parametrics)
         {
             return parametrics.Result();
@@ -72,18 +105,43 @@ namespace CADability
         /// <param name="projection"></param>
         /// <returns></returns>
         public abstract GeoObjectList GetFeedback(Projection projection);
+        /// <summary>
+        /// The entry of the property page which currently displays this parametric property, or null when it is not
+        /// displayed. It is set by the <see cref="Shell"/> when the entry is added to or removed from a property page and is
+        /// used to refresh the displayed value after other parametric properties have changed the shell.
+        /// </summary>
         public IPropertyEntry PropertyEntry { get; set; }
+        /// <summary>
+        /// Writes the name and the <see cref="Preserve"/> flag for the JSON serialization (<see cref="IJsonSerialize"/>).
+        /// Derived classes override this method, call the base implementation and add their own data.
+        /// </summary>
+        /// <param name="data">Receives the data</param>
         public virtual void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("Name", Name);
             data.AddProperty("Preserve", Preserve);
         }
+        /// <summary>
+        /// Reads the name and the <see cref="Preserve"/> flag from the JSON serialization (<see cref="IJsonSerialize"/>).
+        /// Derived classes override this method, call the base implementation and read their own data.
+        /// </summary>
+        /// <param name="data">Provides the data</param>
         public virtual void SetObjectData(IJsonReadData data)
         {
             Name = data.GetStringProperty("Name");
             Preserve = data.GetPropertyOrDefault<bool>("Preserve");
         }
 
+        /// <summary>
+        /// Maps a list of objects of the original shell to the corresponding objects of a cloned shell. Faces, edges and
+        /// vertices are looked up in the dictionaries; a <see cref="Line"/> which is the axis of a face of revolution (user
+        /// data "CADability.AxisOf") is replaced by the axis of the cloned face. Objects which cannot be mapped are omitted.
+        /// </summary>
+        /// <param name="list">Faces, edges, vertices or axis lines of the original shell</param>
+        /// <param name="clonedFaces">Maps the faces of the original shell to the faces of the clone</param>
+        /// <param name="clonedEdges">Maps the edges of the original shell to the edges of the clone</param>
+        /// <param name="clonedVertices">Maps the vertices of the original shell to the vertices of the clone</param>
+        /// <returns>The corresponding objects of the cloned shell</returns>
         protected List<object> CloneWithDictionary(List<object> list, Dictionary<Face, Face> clonedFaces, Dictionary<Edge, Edge> clonedEdges, Dictionary<Vertex, Vertex> clonedVertices)
         {
             List<object> clonedObjects = new List<object>();
@@ -104,6 +162,13 @@ namespace CADability
             }
             return clonedObjects;
         }
+        /// <summary>
+        /// Maps a list of faces of the original shell to the corresponding faces of a cloned shell. Faces which are not found
+        /// in <paramref name="clonedFaces"/> are omitted.
+        /// </summary>
+        /// <param name="list">Faces of the original shell</param>
+        /// <param name="clonedFaces">Maps the faces of the original shell to the faces of the clone</param>
+        /// <returns>The corresponding faces of the cloned shell</returns>
         protected List<Face> CloneFacesWithDictionary(List<Face> list, Dictionary<Face, Face> clonedFaces)
         {
             List<Face> substFaces = new List<Face>();
@@ -114,6 +179,14 @@ namespace CADability
             return substFaces;
         }
 
+        /// <summary>
+        /// Updates the axis lines in <paramref name="objects"/> after the shell has been modified: each <see cref="Line"/>
+        /// which is the axis of a face of revolution (user data "CADability.AxisOf") receives the geometry of the current axis
+        /// of that face. Faces, edges and vertices in the list are part of the shell and have already been modified, so they
+        /// are left alone.
+        /// </summary>
+        /// <param name="objects">Faces, edges, vertices or axis lines referenced by the parametric property</param>
+        /// <param name="m">The modification that was applied to the shell</param>
         protected void ModifyAxis(List<object> objects, ModOp m)
         {
             foreach (object obj in objects)
@@ -130,24 +203,53 @@ namespace CADability
             }
         }
     }
+    /// <summary>
+    /// Parametric property of a shell which keeps the distance between two sets of faces editable, e.g. the thickness of
+    /// a plate or the depth of a pocket. The distance is measured between two reference objects (points, vertices, edges
+    /// or faces, one on each side). When the value changes, the faces to move are translated along the measured direction
+    /// by the difference (both sets by half of it in <see cref="Mode.symmetric"/> mode) and the shell is recalculated by a
+    /// <see cref="Parametric"/>. Instances are created by <see cref="ParametricsDistanceAction"/> (and by
+    /// <c>ParametricsExtrudeAction</c>, which is not part of the build yet) and added to the shell with
+    /// <see cref="Shell.AddParametricProperty(ParametricProperty)"/>.
+    /// </summary>
     public class ParametricDistanceProperty : ParametricProperty, IJsonSerialize, IJsonSerializeDone
     {
         private List<Face> facesToKeep, facesToMove; // if mode is symmetric, both faces will be moved
         private List<object> affectedObjects; // faces which are affected by this parametric
         private object fromHere, toHere; // vertices, edges or faces. they specify the direction, in which to move and the position of the arrow
 
+        /// <summary>
+        /// Flags which control how the distance is measured and how the faces are moved when the value changes.
+        /// </summary>
         [Flags]
         public enum Mode
         {
+            /// <summary>The faces connected to the moved faces are moved along (<see cref="Parametric.MoveFaces"/> is called with moveConnected set).</summary>
             connected = 1, // call parametric.MoveFaces with moveConnected==true
+            /// <summary>Both sets of faces are moved by half of the change: the faces to keep against the measured direction, the faces to move along it.</summary>
             symmetric = 2, // use facesToKeep with -0.5 and facesToMove with +0.5 factor to the direction
+            /// <summary>The "from" reference object is a face whose axis is used for the measurement. Reserved, not evaluated yet.</summary>
             fromAxis = 4, // fromHere is a face of which the axis is used
+            /// <summary>The "to" reference object is a face whose axis is used for the measurement. Reserved, not evaluated yet.</summary>
             toAxis = 8, // toHere is a face of which the axis is used
+            /// <summary>The "from" reference object is a face or an edge and the furthest connection to the "to" object is measured instead of the closest. Reserved, not evaluated yet.</summary>
             fromFurthest = 16, // fromHere is a face or edge (curve). Normally we use the closest connection to toHere, with this flag set we use the furthest
+            /// <summary>The "to" reference object is a face or an edge and the furthest connection to the "from" object is measured instead of the closest. Reserved, not evaluated yet.</summary>
             toFurthest = 32,// toHere is a face or edge (curve). Normally we use the closest connection to toHere, with this flag set we use the furthest
         }
         private Mode mode;
 
+        /// <summary>
+        /// Creates the distance property. The initial <see cref="Value"/> is the distance measured between
+        /// <paramref name="fromHere"/> and <paramref name="toHere"/>.
+        /// </summary>
+        /// <param name="name">Name shown in the property page</param>
+        /// <param name="facesToKeep">The faces which stay in place (in <see cref="Mode.symmetric"/> mode they are moved against the measured direction)</param>
+        /// <param name="facesToMove">The faces which are moved when the value changes</param>
+        /// <param name="affectedObjects">Faces, edges and vertices of the shell which are modified by this property, see <see cref="GetAffectedObjects"/></param>
+        /// <param name="mode">Flags controlling the measurement and the movement</param>
+        /// <param name="fromHere">Start of the measured distance: a <see cref="GeoPoint"/>, <see cref="Vertex"/>, <see cref="Edge"/> or <see cref="Face"/> on the side of the faces to keep</param>
+        /// <param name="toHere">End of the measured distance: a <see cref="GeoPoint"/>, <see cref="Vertex"/>, <see cref="Edge"/> or <see cref="Face"/> on the side of the faces to move</param>
         public ParametricDistanceProperty(string name, IEnumerable<Face> facesToKeep, IEnumerable<Face> facesToMove, IEnumerable<object> affectedObjects, Mode mode, object fromHere, object toHere) : base(name)
         {
             this.facesToMove = new List<Face>(facesToMove);
@@ -160,6 +262,7 @@ namespace CADability
             Value = startPoint | endPoint;
         }
 
+        /// <inheritdoc/>
         public override ParametricProperty Clone(Dictionary<Face, Face> clonedFaces, Dictionary<Edge, Edge> clonedEdges, Dictionary<Vertex, Vertex> clonedVertices)
         {
             List<Face> facesToKeepCloned = new List<Face>();
@@ -196,6 +299,7 @@ namespace CADability
             }
             return new ParametricDistanceProperty(Name, facesToKeepCloned, facesToMoveCloned, affectedObjectsCloned, mode, fromHereCloned, toHereCloned);
         }
+        /// <inheritdoc/>
         public override void Modify(ModOp m)
         {   // all referred objects like facesToMove or fromHere are part of the shell and already modified
             // with fromHere and toHere as GeoPoints we need to modify these points along with the modification of the Shell containing this parametric
@@ -210,6 +314,7 @@ namespace CADability
             if (!ExtrusionDirection.IsNullVector()) ExtrusionDirection = m * ExtrusionDirection; // change the direction, e.g. after a rotation of the shell
         }
         private double currentValue;
+        /// <inheritdoc/>
         public override double Value
         {
             get
@@ -234,6 +339,7 @@ namespace CADability
         /// if != NullVector, this is the direction of the extrusion. This is used by the distance calculation.
         /// </summary>
         public GeoVector ExtrusionDirection { get; set; } = GeoVector.NullVector;
+        /// <inheritdoc/>
         public override bool Execute(Parametric parametric)
         {
             GetDistanceVector(out GeoPoint startPoint, out GeoPoint endPoint);
@@ -378,6 +484,7 @@ namespace CADability
             }
 
         }
+        /// <inheritdoc/>
         public override GeoObjectList GetFeedback(Projection projection)
         {
             GetDistanceVector(out GeoPoint startPoint, out GeoPoint endPoint);
@@ -391,7 +498,11 @@ namespace CADability
             }
             else return projection.MakeArrow(startPoint, endPoint, projection.ProjectionPlane, Projection.ArrowMode.circleArrow);
         }
+        /// <summary>
+        /// Empty constructor for the JSON deserialization; the data is set by <see cref="SetObjectData(IJsonReadData)"/>.
+        /// </summary>
         protected ParametricDistanceProperty() : base("") { } // empty constructor for Json
+        /// <inheritdoc/>
         public override void GetObjectData(IJsonWriteData data)
         {
             base.GetObjectData(data);
@@ -405,6 +516,7 @@ namespace CADability
             data.AddProperty("ExtrusionDirection", ExtrusionDirection);
         }
 
+        /// <inheritdoc/>
         public override void SetObjectData(IJsonReadData data)
         {
             base.SetObjectData(data);
@@ -423,11 +535,13 @@ namespace CADability
             data.RegisterForSerializationDoneCallback(this);
         }
 
+        /// <inheritdoc/>
         public override object GetAnchor()
         {
             return fromHere;
         }
 
+        /// <inheritdoc/>
         public override IEnumerable<object> GetAffectedObjects()
         {
             return affectedObjects;
@@ -461,12 +575,26 @@ namespace CADability
 #endif
     }
 
+    /// <summary>
+    /// Parametric property of a shell which keeps the radius (or the diameter) of one or more faces with a radius
+    /// (cylinders, spheres, tori, fillets; see <see cref="ISurfaceWithRadius"/>) editable, e.g. the diameter of a hole.
+    /// When the value changes, the surfaces of the faces are replaced by surfaces with the new radius and the shell is
+    /// recalculated by <see cref="Parametric.ModifyRadius"/>. Instances are created by <c>ParametricsRadiusAction</c>, which is not part of the build yet.
+    /// </summary>
     public class ParametricRadiusProperty : ParametricProperty, IJsonSerialize
     {
         private List<Face> facesToModify; // the faces with the radius to modify
         private List<object> affectedObjects; // faces which are affected by this parametric
         private bool useDiameter; // the proerty refers to the diameter, not to the radius
 
+        /// <summary>
+        /// Creates the radius property. The initial <see cref="Value"/> is the radius (or diameter) of the first face in
+        /// <paramref name="facesToModify"/>.
+        /// </summary>
+        /// <param name="name">Name shown in the property page</param>
+        /// <param name="facesToModify">The faces whose radius is modified; their surfaces must implement <see cref="ISurfaceWithRadius"/></param>
+        /// <param name="useDiameter">true: the value is the diameter, false: the value is the radius</param>
+        /// <param name="affectedObjects">Faces, edges and vertices of the shell which are modified by this property, see <see cref="GetAffectedObjects"/></param>
         public ParametricRadiusProperty(string name, IEnumerable<Face> facesToModify, bool useDiameter, IEnumerable<object> affectedObjects) : base(name)
         {
             this.facesToModify = new List<Face>(facesToModify);
@@ -476,6 +604,7 @@ namespace CADability
             if (useDiameter) { Value *= 2; }
         }
 
+        /// <inheritdoc/>
         public override ParametricProperty Clone(Dictionary<Face, Face> clonedFaces, Dictionary<Edge, Edge> clonedEdges, Dictionary<Vertex, Vertex> clonedVertices)
         {
             List<object> affectedObjectsCloned = new List<object>();
@@ -492,10 +621,12 @@ namespace CADability
                 }
             return new ParametricRadiusProperty(Name, facesToModifyCloned, useDiameter, affectedObjectsCloned);
         }
+        /// <inheritdoc/>
         public override void Modify(ModOp m)
         {   // there is nothing to do, all referred objects like facesToMove or fromHere are part of the shell and already modified
         }
         private double currentValue;
+        /// <inheritdoc/>
         public override double Value
         {
             get
@@ -509,6 +640,7 @@ namespace CADability
                 currentValue = value;
             }
         }
+        /// <inheritdoc/>
         public override bool Execute(Parametric parametric)
         {
             double r = currentValue;
@@ -517,12 +649,13 @@ namespace CADability
             return parametric.Apply(); // the result may be inconsistent, but maybe further parametric operations make it consistent again
         }
 
+        /// <inheritdoc/>
         public override GeoObjectList GetFeedback(Projection projection)
         {
             double r = (facesToModify[0].Surface as ISurfaceWithRadius).Radius;
             GeoPoint2D cnt2d = facesToModify[0].Area.GetExtent().GetCenter();
             SurfaceHelper.MinMaxCurvature(facesToModify[0].Surface, cnt2d, out ICurve minCurvature, out ICurve maxCurvature);
-            if (minCurvature is Ellipse elli)
+            if (maxCurvature is Ellipse elli) // the circle of the smaller radius: the cross section of a cylinder, the minor circle of a torus
             {
                 if (useDiameter)
                 {
@@ -535,7 +668,11 @@ namespace CADability
             }
             return null;
         }
+        /// <summary>
+        /// Empty constructor for the JSON deserialization; the data is set by <see cref="SetObjectData(IJsonReadData)"/>.
+        /// </summary>
         protected ParametricRadiusProperty() : base("") { } // empty constructor for Json
+        /// <inheritdoc/>
         public override void GetObjectData(IJsonWriteData data)
         {
             base.GetObjectData(data);
@@ -544,6 +681,7 @@ namespace CADability
             data.AddProperty("UseDiameter", useDiameter);
         }
 
+        /// <inheritdoc/>
         public override void SetObjectData(IJsonReadData data)
         {
             base.SetObjectData(data);
@@ -551,11 +689,13 @@ namespace CADability
             useDiameter = data.GetProperty<bool>("UseDiameter");
         }
 
+        /// <inheritdoc/>
         public override object GetAnchor()
         {
             return GeoPoint.Origin;
         }
 
+        /// <inheritdoc/>
         public override IEnumerable<object> GetAffectedObjects()
         {
             return affectedObjects;
@@ -583,6 +723,14 @@ namespace CADability
 #endif
     }
 
+    /// <summary>
+    /// Parametric property of a shell which keeps the angle between two sets of faces editable. The rotation axis is
+    /// currently given by an edge whose two faces belong one to the backward and one to the forward faces (an axis defined
+    /// by faces with an axis or a normal is planned). When the value changes, the forward faces are rotated about the axis
+    /// by the difference (in <see cref="Mode.symmetric"/> mode both sets by half of it in opposite directions) and the
+    /// shell is recalculated by <see cref="Parametric.RotateFaces"/>. Intended to be created by
+    /// <see cref="ParametricsAngleAction"/>; the implementation is not complete yet.
+    /// </summary>
     public class ParametricRotationProperty : ParametricProperty, IJsonSerialize, IJsonSerializeDone
     {
         private List<Face> backwardFaces, forwardFaces; // if mode is symmetric, both faces will be moved
@@ -593,23 +741,38 @@ namespace CADability
         //     a 2d vector in the uv space of the second face
         // - two faces with an axisi: the angle in between
 
+        /// <summary>
+        /// Flags which control how the faces are rotated when the value changes.
+        /// </summary>
         [Flags]
         public enum Mode
         {
+            /// <summary>Both sets of faces are rotated by half of the change, in opposite directions.</summary>
             symmetric = 1, // use both backwardFaces and forwardFaces with half of the offset angle
         }
         private Mode mode;
 
+        /// <summary>
+        /// Creates the rotation property. The initial <see cref="Value"/> is the angle measured at the axis.
+        /// </summary>
+        /// <param name="name">Name shown in the property page</param>
+        /// <param name="backwardFaces">The faces which stay in place (in <see cref="Mode.symmetric"/> mode they are rotated backwards)</param>
+        /// <param name="forwardFaces">The faces which are rotated when the value changes</param>
+        /// <param name="affectedObjects">Faces, edges and vertices of the shell which are modified by this property, see <see cref="GetAffectedObjects"/></param>
+        /// <param name="mode">Flags controlling the rotation</param>
+        /// <param name="axis">The <see cref="Edge"/> defining the rotation axis; its two faces must be one of the backward and one of the forward faces</param>
         public ParametricRotationProperty(string name, IEnumerable<Face> backwardFaces, IEnumerable<Face> forwardFaces, IEnumerable<object> affectedObjects, Mode mode, object axis) : base(name)
         {
             this.backwardFaces = new List<Face>(backwardFaces);
             this.forwardFaces = new List<Face>(forwardFaces);
             this.affectedObjects = new List<object>(affectedObjects);
             this.mode = mode;
+            this.axis = axis;
             GetAngleVectors(out GeoPoint location, out GeoVector fromHere, out GeoVector toHere);
             Value = new Angle(fromHere, toHere);
         }
 
+        /// <inheritdoc/>
         public override ParametricProperty Clone(Dictionary<Face, Face> clonedFaces, Dictionary<Edge, Edge> clonedEdges, Dictionary<Vertex, Vertex> clonedVertices)
         {
             List<Face> forwardFacesCloned = new List<Face>();
@@ -633,11 +796,13 @@ namespace CADability
             if (axis is Edge edg && clonedEdges.TryGetValue(edg, out Edge clEdge)) clonedAxis = clEdge; // other cases to implement!
             return new ParametricRotationProperty(Name, forwardFacesCloned, backwardFacesCloned, affectedObjectsCloned, mode, clonedAxis);
         }
+        /// <inheritdoc/>
         public override void Modify(ModOp m)
         {   // all referred objects like facesToMove or fromHere are part of the shell and already modified
             // axis is currently only implemented as an edge, so nothing to do here
         }
         private double currentValue;
+        /// <inheritdoc/>
         public override double Value
         {
             get
@@ -688,17 +853,30 @@ namespace CADability
         {
             if (axis is Edge edge)
             {
+                Face toRotate = null, reference = null;
                 if (forwardFaces.Contains(edge.PrimaryFace) && backwardFaces.Contains(edge.SecondaryFace))
                 {
-                    (Axis axis, GeoVector fh, GeoVector th) = Actions.ParametricsAngleAction.GetRotationAxis(edge.PrimaryFace, edge.SecondaryFace, Axis.InvalidAxis, edge);
+                    toRotate = edge.PrimaryFace;
+                    reference = edge.SecondaryFace;
+                }
+                else if (forwardFaces.Contains(edge.SecondaryFace) && backwardFaces.Contains(edge.PrimaryFace))
+                {
+                    toRotate = edge.SecondaryFace;
+                    reference = edge.PrimaryFace;
+                }
+                if (toRotate != null)
+                {
+                    (Axis rotationAxis, GeoVector fh, GeoVector th) = Actions.ParametricsAngleAction.GetRotationAxis(toRotate, reference, Axis.InvalidAxis, edge);
                     fromHere = fh;
                     toHere = th;
-                    location = axis.Location;
+                    location = rotationAxis.Location;
+                    return;
                 }
             }
             location = GeoPoint.Invalid;
             fromHere = toHere = GeoVector.NullVector;
         }
+        /// <inheritdoc/>
         public override GeoObjectList GetFeedback(Projection projection)
         {
             GetAngleVectors(out GeoPoint location, out GeoVector fromHere, out GeoVector toHere);
@@ -710,7 +888,11 @@ namespace CADability
             }
             else return projection.MakeRotationArrow(new Axis(location, fromHere ^ toHere), fromHere, toHere);
         }
+        /// <summary>
+        /// Empty constructor for the JSON deserialization; the data is set by <see cref="SetObjectData(IJsonReadData)"/>.
+        /// </summary>
         protected ParametricRotationProperty() : base("") { } // empty constructor for Json
+        /// <inheritdoc/>
         public override void GetObjectData(IJsonWriteData data)
         {
             base.GetObjectData(data);
@@ -722,6 +904,7 @@ namespace CADability
             data.AddProperty("Axis", axis);
         }
 
+        /// <inheritdoc/>
         public override void SetObjectData(IJsonReadData data)
         {
             base.SetObjectData(data);
@@ -733,12 +916,14 @@ namespace CADability
             data.RegisterForSerializationDoneCallback(this);
         }
 
+        /// <inheritdoc/>
         public override object GetAnchor()
         {
             GetAngleVectors(out GeoPoint location, out GeoVector fromHere, out GeoVector toHere);
             return location;
         }
 
+        /// <inheritdoc/>
         public override IEnumerable<object> GetAffectedObjects()
         {
             return affectedObjects;
@@ -772,6 +957,13 @@ namespace CADability
 #endif
     }
 
+    /// <summary>
+    /// Parametric property of a shell which keeps a set of faces (e.g. a hole or a boss) centered between or onto other
+    /// objects of the shell: two vertices, edges or faces, or a single axis of a face of revolution. The
+    /// <see cref="Value"/> is the ratio of the division (0.5 for the center). When it changes, the faces are translated by
+    /// the vector computed by <see cref="ParametricsCenterAction.GetTranslationForCentering"/> and the shell is
+    /// recalculated. Instances are created by <see cref="ParametricsCenterAction"/>.
+    /// </summary>
     public class ParametricCenterProperty : ParametricProperty, IJsonSerialize, IJsonSerializeDone
     {
         private List<Face> facesToCenter; // These faces should be centered according to objectsToCenterOn
@@ -783,6 +975,15 @@ namespace CADability
         private List<object> affectedObjects; // faces which are affected by this parametric
 
 
+        /// <summary>
+        /// Creates the centering property.
+        /// </summary>
+        /// <param name="name">Name shown in the property page</param>
+        /// <param name="facesToCenter">The faces which are moved to keep them centered</param>
+        /// <param name="objectsToCenterOn">The objects between (or onto) which the faces are centered: two vertices, edges or faces, or a single axis</param>
+        /// <param name="referenceForCentering">The object of the faces to center which is to be positioned (a vertex, edge, face or axis); currently the center of the extent of the faces is positioned instead</param>
+        /// <param name="affectedObjects">Faces, edges and vertices of the shell which are modified by this property, see <see cref="GetAffectedObjects"/></param>
+        /// <param name="ratio">The ratio of the division, 0.5 for the center</param>
         public ParametricCenterProperty(string name, IEnumerable<Face> facesToCenter, IEnumerable<object> objectsToCenterOn, IEnumerable<object> referenceForCentering, IEnumerable<object> affectedObjects, double ratio) : base(name)
         {
             this.facesToCenter = new List<Face>(facesToCenter);
@@ -792,6 +993,7 @@ namespace CADability
             this.affectedObjects = new List<object>(affectedObjects);
         }
 
+        /// <inheritdoc/>
         public override ParametricProperty Clone(Dictionary<Face, Face> clonedFaces, Dictionary<Edge, Edge> clonedEdges, Dictionary<Vertex, Vertex> clonedVertices)
         {
             List<Face> facesToCenterCloned = CloneFacesWithDictionary(facesToCenter, clonedFaces);
@@ -800,11 +1002,13 @@ namespace CADability
             List<object> affectedObjectsCloned = CloneWithDictionary(affectedObjects, clonedFaces, clonedEdges, clonedVertices);
             return new ParametricCenterProperty(Name, facesToCenterCloned, objectsToCenterOnCloned, referenceForCenteringCloned, affectedObjectsCloned, ratio);
         }
+        /// <inheritdoc/>
         public override void Modify(ModOp m)
         {   // all referred objects like facesToMove or fromHere are part of the shell and already modified
             // axis is currently only implemented as an edge, so nothing to do here
             ModifyAxis(objectsToCenterOn, m);
         }
+        /// <inheritdoc/>
         public override double Value
         {
             get
@@ -834,11 +1038,16 @@ namespace CADability
             }
             return false;
         }
+        /// <inheritdoc/>
         public override GeoObjectList GetFeedback(Projection projection)
         {
             return new GeoObjectList(facesToCenter);
         }
+        /// <summary>
+        /// Empty constructor for the JSON deserialization; the data is set by <see cref="SetObjectData(IJsonReadData)"/>.
+        /// </summary>
         protected ParametricCenterProperty() : base("") { } // empty constructor for Json
+        /// <inheritdoc/>
         public override void GetObjectData(IJsonWriteData data)
         {
             base.GetObjectData(data);
@@ -850,6 +1059,7 @@ namespace CADability
             data.AddProperty("Ratio", ratio);
         }
 
+        /// <inheritdoc/>
         public override void SetObjectData(IJsonReadData data)
         {
             base.SetObjectData(data);
@@ -861,12 +1071,14 @@ namespace CADability
             data.RegisterForSerializationDoneCallback(this);
         }
 
+        /// <inheritdoc/>
         public override object GetAnchor()
         {
             BoundingCube ext = new BoundingCube(facesToCenter);
             return ext.GetCenter();
         }
 
+        /// <inheritdoc/>
         public override IEnumerable<object> GetAffectedObjects()
         {
             return affectedObjects;

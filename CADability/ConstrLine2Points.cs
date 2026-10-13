@@ -3,7 +3,8 @@
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a line segment by its start point and its end point. Instead of the end point the user may also
+    /// enter the length and the direction of the line. Menu id: "Constr.Line.TwoPoints".
     /// </summary>
     internal class ConstrLine2Points : ConstructAction
     {

@@ -16,7 +16,11 @@ using Point = System.Drawing.Point;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Trims a curve: the user clicks on a curve and the part of the curve between the intersection points with other
+    /// curves that are closest to the click is removed (the part is highlighted while the mouse moves over the curve).
+    /// Optionally a single curve to trim at can be selected first; otherwise all curves of the model that intersect the
+    /// clicked curve and the self intersections of the curve are used. A curve without intersections in its interior is
+    /// deleted. Menu id: "ToolsTrim".
     /// </summary>
     internal class ToolsTrim : ConstructAction
     {

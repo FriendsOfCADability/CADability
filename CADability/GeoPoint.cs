@@ -55,6 +55,11 @@ namespace CADability
             this.y = y;
             this.z = 0.0;
         }
+        /// <summary>
+        /// Constructs a new GeoPoint from a 2-dimensional point and a z-component.
+        /// </summary>
+        /// <param name="p">supplies the x- and y-component</param>
+        /// <param name="z">z-component</param>
         public GeoPoint(GeoPoint2D p, double z)
         {
             this.x = p.x;
@@ -108,6 +113,14 @@ namespace CADability
             z = (p1.z + p2.z) / 2;
         }
 
+        /// <summary>
+        /// Constructs a new GeoPoint by linear interpolation between two points: <c>(1 - ratio) * p1 + ratio * p2</c>.
+        /// A <paramref name="ratio"/> of 0.0 yields <paramref name="p1"/>, 1.0 yields <paramref name="p2"/>, values outside
+        /// the range [0, 1] extrapolate beyond the two points.
+        /// </summary>
+        /// <param name="p1">first point</param>
+        /// <param name="p2">second point</param>
+        /// <param name="ratio">position between the two points</param>
         public GeoPoint(GeoPoint p1, GeoPoint p2, double ratio)
         {
             x = (1 - ratio) * p1.x + ratio * p2.x;
@@ -139,6 +152,11 @@ namespace CADability
             y = p.Y;
             z = 0.0;
         }
+        /// <summary>
+        /// Constructs a new GeoPoint from a MathNet.Numerics vector with exactly three entries (x, y, z), typically the
+        /// solution of a linear system. Throws an <see cref="ApplicationException"/> when the vector has a different length.
+        /// </summary>
+        /// <param name="d">vector with the three components</param>
         public GeoPoint(Vector d)
         {
             if (d.Count == 3)
@@ -161,6 +179,12 @@ namespace CADability
         {
             return Math.Sqrt(sqr(x - To.x) + sqr(y - To.y) + sqr(z - To.z));
         }
+        /// <summary>
+        /// Returns the length of the polyline through the given points, i.e. the sum of the distances between consecutive
+        /// points. Returns 0.0 for fewer than two points. Used e.g. to check whether the poles of a BSpline are degenerate.
+        /// </summary>
+        /// <param name="points">the points in order</param>
+        /// <returns>sum of the distances between consecutive points</returns>
         public static double Distance(GeoPoint[] points)
         {
             double res = 0.0;
@@ -181,6 +205,11 @@ namespace CADability
                 return Math.Abs(x) + Math.Abs(y) + Math.Abs(z);
             }
         }
+        /// <summary>
+        /// True, when all three components are ordinary numbers, i.e. neither NaN nor infinite. <see cref="Invalid"/> and
+        /// points that could not be computed carry NaN, and every comparison with NaN is false, so test this property
+        /// before using a point that may have failed.
+        /// </summary>
         public bool IsValid
         {
             get
@@ -188,6 +217,12 @@ namespace CADability
                 return !double.IsNaN(x) && !double.IsNaN(y) && !double.IsNaN(z) && !double.IsInfinity(x) && !double.IsInfinity(y) && !double.IsInfinity(z);
             }
         }
+        /// <summary>
+        /// Gives access to the components by index: 0 is <see cref="x"/>, 1 is <see cref="y"/>, 2 is <see cref="z"/>.
+        /// Any other index throws an <see cref="IndexOutOfRangeException"/>. Convenient for loops over the coordinates.
+        /// </summary>
+        /// <param name="index">0, 1 or 2</param>
+        /// <value>the component with that index</value>
         public double this[int index]
         {
             get
@@ -211,13 +246,23 @@ namespace CADability
                 }
             }
         }
+        /// <summary>
+        /// Central projection of this point onto a plane: the line through <paramref name="center"/> and this point is
+        /// intersected with <paramref name="plane"/>, and the intersection is returned in the 2-dimensional coordinate system
+        /// of the plane. Throws a <see cref="PlaneException"/> when that line is parallel to the plane and a
+        /// <see cref="GeoVectorException"/> when this point coincides with <paramref name="center"/>. For a perpendicular
+        /// projection use <see cref="Plane.Project(GeoPoint)"/>.
+        /// </summary>
+        /// <param name="plane">the plane to project onto</param>
+        /// <param name="center">the center (eye point) of the projection</param>
+        /// <returns>the projected point in the coordinate system of the plane</returns>
         public GeoPoint2D Project(Plane plane, GeoPoint center)
         {
             return plane.Project(plane.Intersect(this, this - center));
         }
 
         /// <summary>
-        /// Determins whether two GeoPoints are exactly equal. Use <see cref="Precision.IsEqual"/>
+        /// Determins whether two GeoPoints are exactly equal. Use <see cref="Precision.IsEqual(GeoPoint, GeoPoint)"/>
         /// if you need more control over precision.
         /// </summary>
         /// <param name="p1">first point</param>
@@ -228,7 +273,7 @@ namespace CADability
             return p1.x == p2.x && p1.y == p2.y && p1.z == p2.z;
         }
         /// <summary>
-        /// Determins whether two GeoPoints are not equal. Use <see cref="Precision.IsEqual"/>
+        /// Determins whether two GeoPoints are not equal. Use <see cref="Precision.IsEqual(GeoPoint, GeoPoint)"/>
         /// if you need more control over precision.
         /// </summary>
         /// <param name="p1">first point</param>
@@ -268,6 +313,11 @@ namespace CADability
         {
             return new GeoPoint(p.x - v.x, p.y - v.y, p.z - v.z);
         }
+        /// <summary>
+        /// Negates all components, i.e. reflects the point at the origin.
+        /// </summary>
+        /// <param name="p">the point</param>
+        /// <returns>the point with negated components</returns>
         public static GeoPoint operator -(GeoPoint p)
         {
             return new GeoPoint(-p.x, -p.y, -p.z);
@@ -282,16 +332,36 @@ namespace CADability
         {
             return Geometry.Dist(p1, p2);
         }
+        /// <summary>
+        /// Returns the squared distance of the two points. Cheaper than the distance (the <c>|</c> operator) because no
+        /// square root is taken; use it when distances are only compared.
+        /// </summary>
+        /// <param name="p1">first point</param>
+        /// <param name="p2">second point</param>
+        /// <returns>the squared distance</returns>
         public static double operator &(GeoPoint p1, GeoPoint p2)
         {
             return (p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y) + (p1.z - p2.z) * (p1.z - p2.z);
         }
+        /// <summary>
+        /// Applies a 3x3 MathNet.Numerics matrix to the point, i.e. a linear transformation without translation.
+        /// The matrix must have three rows and three columns, which is only checked in debug builds. For affine
+        /// transformations use <see cref="ModOp"/>.
+        /// </summary>
+        /// <param name="m">the 3x3 matrix</param>
+        /// <param name="p">the point</param>
+        /// <returns>the transformed point</returns>
         public static GeoPoint operator *(Matrix m, GeoPoint p)
         {
             System.Diagnostics.Debug.Assert(m.ColumnCount == 3 && m.RowCount == 3);
             return new GeoPoint(m[0, 0] * p.x + m[0, 1] * p.y + m[0, 2] * p.z, m[1, 0] * p.x + m[1, 1] * p.y + m[1, 2] * p.z, m[2, 0] * p.x + m[2, 1] * p.y + m[2, 2] * p.z);
         }
 
+        /// <summary>
+        /// Converts the point to an array of its components, e.g. to pass it to numerical routines.
+        /// </summary>
+        /// <param name="p">the point</param>
+        /// <returns>the array {x, y, z}</returns>
         public static implicit operator double[](GeoPoint p) => new double[] { p.x, p.y, p.z };
 
         /// <summary>
@@ -439,11 +509,21 @@ namespace CADability
             z = data.GetValue<double>();
         }
 
+        /// <summary>
+        /// Writes the three components for the JSON serialization (<see cref="IJsonSerialize"/>). The struct is serialized inline as a
+        /// plain list of values and read back by the constructor taking an <see cref="IJsonReadStruct"/>.
+        /// </summary>
+        /// <param name="data">receives the values</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddValues(x, y, z);
         }
 
+        /// <summary>
+        /// Does nothing. Value types serialized inline are restored by the constructor taking an <see cref="IJsonReadStruct"/>;
+        /// this method only exists to satisfy <see cref="IJsonSerialize"/>.
+        /// </summary>
+        /// <param name="data">not used</param>
         public void SetObjectData(IJsonReadData data)
         {
         }
@@ -539,12 +619,25 @@ namespace CADability
             y = EndPoint.y - StartPoint.y;
             z = EndPoint.z - StartPoint.z;
         }
+        /// <summary>
+        /// Constructs a new GeoVector by linear interpolation between two vectors: <c>(1 - ratio) * v1 + ratio * v2</c>.
+        /// A <paramref name="ratio"/> of 0.0 yields <paramref name="v1"/>, 1.0 yields <paramref name="v2"/>. The result is
+        /// not normalized.
+        /// </summary>
+        /// <param name="v1">first vector</param>
+        /// <param name="v2">second vector</param>
+        /// <param name="ratio">position between the two vectors</param>
         public GeoVector(GeoVector v1, GeoVector v2, double ratio)
         {
             x = (1 - ratio) * v1.x + ratio * v2.x;
             y = (1 - ratio) * v1.y + ratio * v2.y;
             z = (1 - ratio) * v1.z + ratio * v2.z;
         }
+        /// <summary>
+        /// Constructs a new GeoVector as the arithmetic mean of the given vectors (their sum divided by their number).
+        /// The result is not normalized; an empty list yields NaN components.
+        /// </summary>
+        /// <param name="v">the vectors to average</param>
         public GeoVector(params GeoVector[] v)
         {
             x = 0.0;
@@ -575,7 +668,7 @@ namespace CADability
             z = Math.Sin(latitude);
         }
         /// <summary>
-        /// Returns true, if this vector is exactly the nullvector. Use <see cref="Precision.IsNullVector"/>
+        /// Returns true, if this vector is exactly the nullvector. Use <see cref="Precision.IsNullVector(GeoVector)"/>
         /// if you need more control over precision.
         /// </summary>
         /// <returns>true if nullvector</returns>
@@ -583,12 +676,17 @@ namespace CADability
         {
             return (x == 0.0 && y == 0.0 && z == 0.0);
         }
+        /// <summary>
+        /// Returns true, when the vector is an ordinary number, false when it is <see cref="Invalid"/> or the result of a
+        /// failed computation. Only the x-component is tested for NaN.
+        /// </summary>
+        /// <returns>true if valid</returns>
         public bool IsValid()
         {
             return !double.IsNaN(x);
         }
         /// <summary>
-        /// Determines whether this vector and the othe vector are perpendicular. Use <see cref="Precision.IsPerpendicular"/>
+        /// Determines whether this vector and the othe vector are perpendicular. Use <see cref="Precision.IsPerpendicular(GeoVector, GeoVector, bool)"/>
         /// if you need more control over precision.
         /// </summary>
         /// <param name="other">other vector</param>
@@ -599,7 +697,18 @@ namespace CADability
             if (other.Length == 0.0) return true; // oder was?
             return Math.Abs(this * other) / (Length * other.Length) < 1e-6;
         }
+        /// <summary>
+        /// Converts the vector to an array of its components, e.g. to pass it to numerical routines.
+        /// </summary>
+        /// <param name="v">the vector</param>
+        /// <returns>the array {x, y, z}</returns>
         public static implicit operator double[](GeoVector v) => new double[] { v.x, v.y, v.z };
+        /// <summary>
+        /// Gives access to the components by index: 0 is <see cref="x"/>, 1 is <see cref="y"/>, 2 is <see cref="z"/>.
+        /// Any other index throws an <see cref="IndexOutOfRangeException"/>. Convenient for loops over the coordinates.
+        /// </summary>
+        /// <param name="index">0, 1 or 2</param>
+        /// <value>the component with that index</value>
         public double this[int index]
         {
             get
@@ -649,7 +758,7 @@ namespace CADability
             return new GeoVector(-v.x, -v.y, -v.z);
         }
         /// <summary>
-        /// Determins whether the given vectors are exactly equal. Use <see cref="Precision.SameDirection"/>
+        /// Determins whether the given vectors are exactly equal. Use <see cref="Precision.SameDirection(GeoVector, GeoVector, bool)"/>
         /// if you need more control over precision.
         /// </summary>
         /// <param name="v1">first operand</param>
@@ -660,7 +769,7 @@ namespace CADability
             return (v1.x == v2.x && v1.y == v2.y && v1.z == v2.z);
         }
         /// <summary>
-        /// Determins whether the given vectors are not exactly equal. Use <see cref="Precision.SameDirection"/>
+        /// Determins whether the given vectors are not exactly equal. Use <see cref="Precision.SameDirection(GeoVector, GeoVector, bool)"/>
         /// if you need more control over precision.
         /// </summary>
         /// <param name="v1">first operand</param>
@@ -699,6 +808,14 @@ namespace CADability
         {
             return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
         }
+        /// <summary>
+        /// Applies a 3x3 MathNet.Numerics matrix to the vector, i.e. a linear transformation without translation.
+        /// The matrix must have three rows and three columns, which is only checked in debug builds. For affine
+        /// transformations use <see cref="ModOp"/>.
+        /// </summary>
+        /// <param name="m">the 3x3 matrix</param>
+        /// <param name="v">the vector</param>
+        /// <returns>the transformed vector</returns>
         public static GeoVector operator *(Matrix m, GeoVector v)
         {
             System.Diagnostics.Debug.Assert(m.ColumnCount == 3 && m.RowCount == 3);
@@ -776,7 +893,7 @@ namespace CADability
         /// </summary>
         public static readonly GeoVector NullVector = new GeoVector(0.0, 0.0, 0.0);
         /// <summary>
-        /// Gut zum Iterieren über alle Achsen
+        /// The three main axes <see cref="XAxis"/>, <see cref="YAxis"/> and <see cref="ZAxis"/> as an array, convenient for iterating over all axes.
         /// </summary>
         internal static readonly GeoVector[] MainAxis = new GeoVector[] { XAxis, YAxis, ZAxis };
         /// <summary>
@@ -793,10 +910,18 @@ namespace CADability
                 z *= f;
             }
         }
+        /// <summary>
+        /// The squared length of this vector (x*x + y*y + z*z). Cheaper than <see cref="Length"/> because no square root is
+        /// taken; use it when lengths are only compared.
+        /// </summary>
         public double LengthSqared
         {
             get { return x * x + y * y + z * z; }
         }
+        /// <summary>
+        /// The taxicab (Manhattan) length of this vector, i.e. the sum of the absolute values of the components. A cheap
+        /// estimate of the size of the vector for tolerance checks, not the euclidean <see cref="Length"/>.
+        /// </summary>
         public double TaxicabLength
         {
             get
@@ -816,6 +941,10 @@ namespace CADability
             y *= f;
             z *= f;
         }
+        /// <summary>
+        /// A copy of this vector scaled to <see cref="Length"/> 1.0; this vector itself remains unchanged (see <see cref="Norm"/>
+        /// to normalize in place). Throws a <see cref="GeoVectorException"/> if this vector is the nullvector.
+        /// </summary>
         public GeoVector Normalized
         {
             get
@@ -826,6 +955,10 @@ namespace CADability
             }
         }
 
+        /// <summary>
+        /// Normalizes this vector to <see cref="Length"/> 1.0 like <see cref="Norm"/>, but leaves the nullvector unchanged
+        /// instead of throwing an exception.
+        /// </summary>
         public void NormIfNotNull()
         {
             if (Length <= 0.0) return;
@@ -858,10 +991,11 @@ namespace CADability
             z = (double)info.GetValue("Z", typeof(double));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("X", x, typeof(double));
@@ -870,6 +1004,7 @@ namespace CADability
         }
 
         #endregion
+        /// <inheritdoc/>
         public override string ToString()
         {
             return "(" + x.ToString() + ", " + y.ToString() + ", " + z.ToString() + ")";
@@ -889,6 +1024,14 @@ namespace CADability
         {
             return new GeoVector2D(x, y);
         }
+        /// <summary>
+        /// Computes two unit vectors that are perpendicular to this vector and to each other, e.g. to span a plane
+        /// perpendicular to an axis. <paramref name="dirx"/>, <paramref name="diry"/> and this vector form a right handed
+        /// system. The choice of <paramref name="dirx"/> is arbitrary but deterministic, it depends on which component of
+        /// this vector is the largest. Throws a <see cref="GeoVectorException"/> if this vector is the nullvector.
+        /// </summary>
+        /// <param name="dirx">first perpendicular unit vector</param>
+        /// <param name="diry">second perpendicular unit vector, the normalized cross product of this vector and <paramref name="dirx"/></param>
         public void ArbitraryNormals(out GeoVector dirx, out GeoVector diry)
         {
             switch (MainDirection)
@@ -945,17 +1088,32 @@ namespace CADability
             return (v1.Normalized + v2.Normalized).Normalized;
         }
 
+        /// <summary>
+        /// Constructor for the JSON deserialization (<see cref="IJsonSerialize"/>): reads the three components in the order
+        /// <see cref="GetObjectData(IJsonWriteData)"/> wrote them. It is found by reflection, there is no need to call it directly.
+        /// </summary>
+        /// <param name="data">supplies the values</param>
         public GeoVector(IJsonReadStruct data)
         {
             x = data.GetValue<double>();
             y = data.GetValue<double>();
             z = data.GetValue<double>();
         }
+        /// <summary>
+        /// Writes the three components for the JSON serialization (<see cref="IJsonSerialize"/>). The struct is serialized inline as a
+        /// plain list of values and read back by the constructor taking an <see cref="IJsonReadStruct"/>.
+        /// </summary>
+        /// <param name="data">receives the values</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddValues(x, y, z);
         }
 
+        /// <summary>
+        /// Does nothing. Value types serialized inline are restored by the constructor taking an <see cref="IJsonReadStruct"/>;
+        /// this method only exists to satisfy <see cref="IJsonSerialize"/>.
+        /// </summary>
+        /// <param name="data">not used</param>
         public void SetObjectData(IJsonReadData data)
         {
         }
@@ -1045,6 +1203,10 @@ namespace CADability
             Location = location;
             Direction = direction;
         }
+        /// <summary>
+        /// An axis marked as invalid: its <see cref="Location"/> is <see cref="GeoPoint.Invalid"/> and its <see cref="Direction"/>
+        /// the nullvector. Returned by methods that could not determine an axis; test with <see cref="IsValid"/>.
+        /// </summary>
         static public Axis InvalidAxis
         {
             get
@@ -1052,10 +1214,21 @@ namespace CADability
                 return new Axis(GeoPoint.Invalid, GeoVector.NullVector);
             }
         }
+        /// <summary>
+        /// True, when the <see cref="Location"/> is a valid point (see <see cref="GeoPoint.IsValid"/>), false for
+        /// <see cref="InvalidAxis"/>. The direction is not checked.
+        /// </summary>
         public bool IsValid
         {
             get { return Location.IsValid; }
         }
+        /// <summary>
+        /// Determines whether the other axis describes the same infinite line: the directions are parallel within
+        /// <see cref="Precision.epsa"/> (opposite orientation counts as parallel) and the location of <paramref name="other"/>
+        /// lies on this axis within <see cref="Precision.eps"/>. See also <see cref="Precision.SameAxis(Axis, Axis)"/>.
+        /// </summary>
+        /// <param name="other">the axis to compare with</param>
+        /// <returns>true if both axes are geometrically the same line</returns>
         public bool SameGeometry(Axis other)
         {
             if (Precision.SameDirection(Direction,other.Direction,false))
@@ -1064,6 +1237,12 @@ namespace CADability
             }
             return false;
         }
+        /// <summary>
+        /// Returns the perpendicular distance of the point to the infinite line of this axis. The result is never negative.
+        /// If the direction is the nullvector, the distance to <see cref="Location"/> is returned.
+        /// </summary>
+        /// <param name="p">the point</param>
+        /// <returns>the distance</returns>
         public double Distance(GeoPoint p)
         {
             return Geometry.DistPL(p, this);
@@ -1080,29 +1259,52 @@ namespace CADability
             Direction = (GeoVector)info.GetValue("Direction", typeof(GeoVector));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Location", Location, typeof(GeoPoint));
             info.AddValue("Direction", Direction, typeof(GeoVector));
         }
+        /// <summary>
+        /// Constructor for the JSON deserialization (<see cref="IJsonSerialize"/>): reads the location and the direction in the order
+        /// <see cref="GetObjectData(IJsonWriteData)"/> wrote them. It is found by reflection, there is no need to call it directly.
+        /// </summary>
+        /// <param name="data">supplies the values</param>
         public Axis(IJsonReadStruct data)
         {
             Location = data.GetValue<GeoPoint>();
             Direction = data.GetValue<GeoVector>();
         }
+        /// <summary>
+        /// Writes the location and the direction for the JSON serialization (<see cref="IJsonSerialize"/>). The struct is serialized inline as a
+        /// plain list of values and read back by the constructor taking an <see cref="IJsonReadStruct"/>.
+        /// </summary>
+        /// <param name="data">receives the values</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddValues(Location, Direction);
         }
 
+        /// <summary>
+        /// Does nothing. Value types serialized inline are restored by the constructor taking an <see cref="IJsonReadStruct"/>;
+        /// this method only exists to satisfy <see cref="IJsonSerialize"/>.
+        /// </summary>
+        /// <param name="data">not used</param>
         public void SetObjectData(IJsonReadData data)
         {
         }
 
+        /// <summary>
+        /// Returns the part of this infinite axis inside the given cube as a <see cref="Line"/> object, e.g. to display the
+        /// axis of a cylinder within the extent of a model. If the axis does not pass through the cube, the returned line is
+        /// degenerate (both points at the origin).
+        /// </summary>
+        /// <param name="ext">the cube to clip with</param>
+        /// <returns>the clipped axis as a line</returns>
         public Line Clip(BoundingCube ext)
         {
             Line res = Line.Construct();
@@ -1203,11 +1405,24 @@ namespace CADability
             x /= p.Length;
             y /= p.Length;
         }
+        /// <summary>
+        /// Constructs a new GeoPoint2D by linear interpolation between two points: <c>(1 - ratio) * p1 + ratio * p2</c>.
+        /// A <paramref name="ratio"/> of 0.0 yields <paramref name="p1"/>, 1.0 yields <paramref name="p2"/>, values outside
+        /// the range [0, 1] extrapolate beyond the two points.
+        /// </summary>
+        /// <param name="p1">first point</param>
+        /// <param name="p2">second point</param>
+        /// <param name="ratio">position between the two points</param>
         public GeoPoint2D(GeoPoint2D p1, GeoPoint2D p2, double ratio)
         {
             x = (1 - ratio) * p1.x + ratio * p2.x;
             y = (1 - ratio) * p1.y + ratio * p2.y;
         }
+        /// <summary>
+        /// Converts the point to an array of its components, e.g. to pass it to numerical routines.
+        /// </summary>
+        /// <param name="p">the point</param>
+        /// <returns>the array {x, y}</returns>
         public static implicit operator double[](GeoPoint2D p) => new double[] { p.x, p.y };
         internal double TaxicabDistance(GeoPoint2D To)
         {	// Betragsnorm, heißt echt auf Englisch Taxicab oder Manhattan
@@ -1234,6 +1449,10 @@ namespace CADability
 
             return (dy * x - dx * y + from.y * to.x - from.x * to.y) < 0.0;
         }
+        /// <summary>
+        /// The point as a <see cref="System.Drawing.PointF"/> with single precision components, for use with System.Drawing.
+        /// Precision is lost in the conversion.
+        /// </summary>
         public System.Drawing.PointF PointF
         {
             get { return new System.Drawing.PointF((float)x, (float)y); }
@@ -1248,22 +1467,55 @@ namespace CADability
         {
             return new GeoPoint2D(p.x + v.x, p.y + v.y);
         }
+        /// <summary>
+        /// Subtracts a vector (offset) from a point.
+        /// </summary>
+        /// <param name="p">the point</param>
+        /// <param name="v">the offset</param>
+        /// <returns>the offset point</returns>
         public static GeoPoint2D operator -(GeoPoint2D p, GeoVector2D v)
         {
             return new GeoPoint2D(p.x - v.x, p.y - v.y);
         }
+        /// <summary>
+        /// Returns the vector that points from <paramref name="b"/> to <paramref name="a"/>.
+        /// </summary>
+        /// <param name="a">end point of the vector</param>
+        /// <param name="b">start point of the vector</param>
+        /// <returns>the vector from b to a</returns>
         public static GeoVector2D operator -(GeoPoint2D a, GeoPoint2D b)
         {
             return new GeoVector2D(a.x - b.x, a.y - b.y);
         }
+        /// <summary>
+        /// Returns the point in the middle of the two points, same as <c>new GeoPoint2D(a, b)</c>. An unusual use of the
+        /// division operator, kept as a shorthand.
+        /// </summary>
+        /// <param name="a">first point</param>
+        /// <param name="b">second point</param>
+        /// <returns>the midpoint</returns>
         public static GeoPoint2D operator /(GeoPoint2D a, GeoPoint2D b)
         {
             return new GeoPoint2D(a, b);
         }
+        /// <summary>
+        /// Determines whether two points are exactly equal. Use <see cref="Precision.IsEqual(GeoPoint2D, GeoPoint2D)"/>
+        /// if you need more control over precision.
+        /// </summary>
+        /// <param name="p1">first point</param>
+        /// <param name="p2">second point</param>
+        /// <returns>true if equal</returns>
         public static bool operator ==(GeoPoint2D p1, GeoPoint2D p2)
         {
             return p1.x == p2.x && p1.y == p2.y;
         }
+        /// <summary>
+        /// Determines whether two points are not exactly equal. Use <see cref="Precision.IsEqual(GeoPoint2D, GeoPoint2D)"/>
+        /// if you need more control over precision.
+        /// </summary>
+        /// <param name="p1">first point</param>
+        /// <param name="p2">second point</param>
+        /// <returns>true if not equal</returns>
         public static bool operator !=(GeoPoint2D p1, GeoPoint2D p2)
         {
             return p1.x != p2.x || p1.y != p2.y;
@@ -1288,22 +1540,37 @@ namespace CADability
         {
             return (p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y);
         }
+        /// <inheritdoc/>
         public override bool Equals(object o)
         {
             if (!(o is GeoPoint2D)) return false;
             GeoPoint2D second = (GeoPoint2D)o;
             return x == second.x && y == second.y;
         }
+        /// <inheritdoc/>
         public override string ToString()
         {
             return "(" + x.ToString() + ", " + y.ToString() + ")";
         }
+        /// <inheritdoc/>
         public override int GetHashCode()
         {
             return x.GetHashCode() | y.GetHashCode();
         }
+        /// <summary>
+        /// The origin (0.0, 0.0). This is a static field rather than a property for speed; do not assign to it.
+        /// </summary>
         public static GeoPoint2D Origin = new GeoPoint2D(0.0, 0.0);
+        /// <summary>
+        /// A point marked as invalid, both components are NaN. Returned by methods that could not compute a point; test
+        /// with <see cref="IsValid"/>, because comparisons with NaN are always false. This is a static field rather than a
+        /// property for speed; do not assign to it.
+        /// </summary>
         public static GeoPoint2D Invalid = new GeoPoint2D(double.NaN, double.NaN); // changed from maxvalue to nan, hopefully with no side effects!
+        /// <summary>
+        /// True, when neither component is NaN, false for <see cref="Invalid"/> and for points that could not be computed.
+        /// Infinite components are not detected, unlike <see cref="GeoPoint.IsValid"/>.
+        /// </summary>
         public bool IsValid
         {
             get
@@ -1311,6 +1578,9 @@ namespace CADability
                 return !double.IsNaN(x) && !double.IsNaN(y);
             }
         }
+        /// <summary>
+        /// True, when at least one component is NaN; the negation of <see cref="IsValid"/>.
+        /// </summary>
         public bool IsNan
         {
             get
@@ -1342,13 +1612,31 @@ namespace CADability
 
             #endregion
         }
+        /// <summary>
+        /// A non-generic <see cref="IComparer"/> that orders points by their x-component only, for use with
+        /// <see cref="Array.Sort(Array, IComparer)"/>. <see cref="GeoPoint2DICompareX"/> is the generic counterpart.
+        /// </summary>
         public static IComparer CompareX = new GeoPoint2DCompareX();
+        /// <summary>
+        /// Comparer that orders <see cref="GeoPoint2D"/> objects by their x-component only; points with equal x-components
+        /// are considered equal regardless of y. Use with <see cref="List{T}.Sort(IComparer{T})"/>. <see cref="CompareX"/>
+        /// is the non-generic counterpart.
+        /// </summary>
         public class GeoPoint2DICompareX : IComparer<GeoPoint2D>
         {
+            /// <summary>
+            /// Creates the comparer. It has no state.
+            /// </summary>
             public GeoPoint2DICompareX() { }
 
             #region IComparer<GeoPoint2D> Members
 
+            /// <summary>
+            /// Compares the x-components of the two points.
+            /// </summary>
+            /// <param name="x">first point</param>
+            /// <param name="y">second point</param>
+            /// <returns>-1 if the x-component of <paramref name="x"/> is smaller, 1 if it is greater, 0 if both are equal</returns>
             public int Compare(GeoPoint2D x, GeoPoint2D y)
             {
                 GeoPoint2D p1 = (GeoPoint2D)x;
@@ -1360,9 +1648,18 @@ namespace CADability
 
             #endregion
         }
+        /// <summary>
+        /// Comparer that orders <see cref="GeoPoint2D"/> objects by their distance to a fixed reference point, the closest
+        /// first. Used to sort e.g. intersection points by their distance to a given position:
+        /// <c>points.Sort(new GeoPoint2D.CompareCloseTo(position))</c>.
+        /// </summary>
         public class CompareCloseTo : IComparer<GeoPoint2D>
         {   // sortiert die Punkte im Abstand zu "ToHere"
             private GeoPoint2D ToHere;
+            /// <summary>
+            /// Creates a comparer for the distance to the given point.
+            /// </summary>
+            /// <param name="ToHere">the reference point the distances are measured to</param>
             public CompareCloseTo(GeoPoint2D ToHere)
             {
                 this.ToHere = ToHere;
@@ -1391,10 +1688,11 @@ namespace CADability
             y = (double)info.GetValue("Y", typeof(double));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("X", x);
@@ -1402,6 +1700,11 @@ namespace CADability
         }
         #endregion
 
+        /// <summary>
+        /// Returns the geometric center (arithmetic mean) of the given points. The list must not be empty.
+        /// </summary>
+        /// <param name="p">the points</param>
+        /// <returns>the center of the points</returns>
         public static GeoPoint2D Center(params GeoPoint2D[] p)
         {
             GeoPoint2D res = p[0];
@@ -1414,6 +1717,13 @@ namespace CADability
             res.y /= p.Length;
             return res;
         }
+        /// <summary>
+        /// Returns the signed area of the closed polygon through the given points (the last point is connected to the
+        /// first). The area is positive when the polygon runs counterclockwise and negative when it runs clockwise, so the
+        /// sign also tells the orientation of an outline. Returns 0.0 for an empty array.
+        /// </summary>
+        /// <param name="polygon">the vertices of the polygon in order</param>
+        /// <returns>the signed area</returns>
         public static double Area(GeoPoint2D[] polygon)
         {
             double sum = 0.0;
@@ -1439,16 +1749,31 @@ namespace CADability
             }
             return false;
         }
+        /// <summary>
+        /// Constructor for the JSON deserialization (<see cref="IJsonSerialize"/>): reads the two components in the order
+        /// <see cref="GetObjectData(IJsonWriteData)"/> wrote them. It is found by reflection, there is no need to call it directly.
+        /// </summary>
+        /// <param name="data">supplies the values</param>
         public GeoPoint2D(IJsonReadStruct data)
         {
             x = data.GetValue<double>();
             y = data.GetValue<double>();
         }
+        /// <summary>
+        /// Writes the two components for the JSON serialization (<see cref="IJsonSerialize"/>). The struct is serialized inline as a
+        /// plain list of values and read back by the constructor taking an <see cref="IJsonReadStruct"/>.
+        /// </summary>
+        /// <param name="data">receives the values</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddValues(x, y);
         }
 
+        /// <summary>
+        /// Does nothing. Value types serialized inline are restored by the constructor taking an <see cref="IJsonReadStruct"/>;
+        /// this method only exists to satisfy <see cref="IJsonSerialize"/>.
+        /// </summary>
+        /// <param name="data">not used</param>
         public void SetObjectData(IJsonReadData data)
         {
         }
@@ -1467,23 +1792,49 @@ namespace CADability
     [DebuggerDisplayAttribute("(x,y)={DebugString}")]
     public struct GeoVector2D : ISerializable, IJsonSerialize
     {
+        /// <summary>
+        /// x-component
+        /// </summary>
         public double x;
+        /// <summary>
+        /// y-component
+        /// </summary>
         public double y;
+        /// <summary>
+        /// Constructs a new GeoVector2D with the given components.
+        /// </summary>
+        /// <param name="x">x-component</param>
+        /// <param name="y">y-component</param>
         public GeoVector2D(double x, double y)
         {
             this.x = x;
             this.y = y;
         }
+        /// <summary>
+        /// Constructs the unit vector pointing in the given direction. The angle is measured counterclockwise from the
+        /// x-axis, so the angle 0 yields <see cref="XAxis"/>.
+        /// </summary>
+        /// <param name="dir">direction of the vector</param>
         public GeoVector2D(Angle dir)
         {
             x = Math.Cos(dir);
             y = Math.Sin(dir);
         }
+        /// <summary>
+        /// Constructs a new GeoVector2D from the x- and y-components of a 3-dimensional vector, i.e. its projection onto
+        /// the x/y plane. The z-component is dropped.
+        /// </summary>
+        /// <param name="v3">the 3-dimensional vector</param>
         public GeoVector2D(GeoVector v3)
         {
             this.x = v3.x;
             this.y = v3.y;
         }
+        /// <summary>
+        /// Converts the vector to an array of its components, e.g. to pass it to numerical routines.
+        /// </summary>
+        /// <param name="p">the vector</param>
+        /// <returns>the array {x, y}</returns>
         public static implicit operator double[](GeoVector2D p) => new double[] { p.x, p.y };
         /// <summary>
         /// Returns true, when both components are ordinary numbers. A vector that failed to be computed
@@ -1497,6 +1848,10 @@ namespace CADability
                 return !double.IsNaN(x) && !double.IsNaN(y) && !double.IsInfinity(x) && !double.IsInfinity(y);
             }
         }
+        /// <summary>
+        /// Normalizes this vector. After this operation the vector will have the <see cref="Length"/> 1.0. Throws a
+        /// <see cref="GeoVectorException"/> if the vector is the nullvector.
+        /// </summary>
         public void Norm()
         {
             if (Length <= 0.0) throw new GeoVectorException(GeoVectorException.tExceptionType.NullVector);
@@ -1504,6 +1859,10 @@ namespace CADability
             x *= f;
             y *= f;
         }
+        /// <summary>
+        /// A copy of this vector scaled to <see cref="Length"/> 1.0; this vector itself remains unchanged (see <see cref="Norm"/>
+        /// to normalize in place). Throws a <see cref="GeoVectorException"/> if this vector is the nullvector.
+        /// </summary>
         public GeoVector2D Normalized
         {
             get
@@ -1513,6 +1872,10 @@ namespace CADability
                 return new GeoVector2D(x * f, y * f);
             }
         }
+        /// <summary>
+        /// The length of this vector. Setting it scales the vector to the new length, keeping its direction; setting the
+        /// length of the nullvector yields NaN components.
+        /// </summary>
         public double Length
         {
             get
@@ -1527,6 +1890,10 @@ namespace CADability
                 y *= f;
             }
         }
+        /// <summary>
+        /// The taxicab (Manhattan) length of this vector, i.e. the sum of the absolute values of the components. A cheap
+        /// estimate of the size of the vector for tolerance checks, not the euclidean <see cref="Length"/>.
+        /// </summary>
         public double TaxicabLength
         {
             get
@@ -1534,6 +1901,10 @@ namespace CADability
                 return Math.Abs(x) + Math.Abs(y);
             }
         }
+        /// <summary>
+        /// The direction of this vector as an angle, measured counterclockwise from the x-axis in the range [0, 2*pi)
+        /// (0 for the nullvector). Setting it rotates the vector to that direction, keeping its length.
+        /// </summary>
         public Angle Angle
         {
             get
@@ -1557,22 +1928,51 @@ namespace CADability
                 return Math.Abs(x) > Math.Abs(y);
             }
         }
+        /// <summary>
+        /// Adds the two vectors.
+        /// </summary>
+        /// <param name="v1">first vector</param>
+        /// <param name="v2">second vector</param>
+        /// <returns>sum</returns>
         public static GeoVector2D operator +(GeoVector2D v1, GeoVector2D v2)
         {
             return new GeoVector2D(v1.x + v2.x, v1.y + v2.y);
         }
+        /// <summary>
+        /// Subtracts the second vector from the first vector.
+        /// </summary>
+        /// <param name="v1">first vector</param>
+        /// <param name="v2">second vector</param>
+        /// <returns>difference</returns>
         public static GeoVector2D operator -(GeoVector2D v1, GeoVector2D v2)
         {
             return new GeoVector2D(v1.x - v2.x, v1.y - v2.y);
         }
+        /// <summary>
+        /// Reverses the direction of the given vector.
+        /// </summary>
+        /// <param name="v1">vector to reverse</param>
+        /// <returns>reversed vector</returns>
         public static GeoVector2D operator -(GeoVector2D v1)
         {
             return new GeoVector2D(-v1.x, -v1.y);
         }
+        /// <summary>
+        /// Calculates the scalar product (dot product, inner product) of the two given vectors.
+        /// </summary>
+        /// <param name="v1">first vector</param>
+        /// <param name="v2">second vector</param>
+        /// <returns>the scalar product</returns>
         public static double operator *(GeoVector2D v1, GeoVector2D v2)
         {	// das Skalarprodukt
             return v1.x * v2.x + v1.y * v2.y;
         }
+        /// <summary>
+        /// Scales the given vector by the given factor.
+        /// </summary>
+        /// <param name="d">factor</param>
+        /// <param name="v">vector</param>
+        /// <returns>scaled vector</returns>
         public static GeoVector2D operator *(double d, GeoVector2D v)
         {
             return new GeoVector2D(d * v.x, d * v.y);
@@ -1588,20 +1988,34 @@ namespace CADability
         {
             return (v1 * v2) / (v1.Length * v2.Length);
         }
+        /// <summary>
+        /// Returns this vector rotated by 90 degrees counterclockwise, i.e. the perpendicular vector pointing to the left of
+        /// this one. The length is unchanged.
+        /// </summary>
+        /// <returns>the vector rotated to the left</returns>
         public GeoVector2D ToLeft()
         {
             return new GeoVector2D(-y, x);
         }
+        /// <summary>
+        /// Returns this vector rotated by 90 degrees clockwise, i.e. the perpendicular vector pointing to the right of this
+        /// one. The length is unchanged.
+        /// </summary>
+        /// <returns>the vector rotated to the right</returns>
         public GeoVector2D ToRight()
         {
             return new GeoVector2D(y, -x);
         }
+        /// <summary>
+        /// Returns the reversed vector, same as the unary minus operator.
+        /// </summary>
+        /// <returns>the reversed vector</returns>
         public GeoVector2D Opposite()
         {
             return new GeoVector2D(-x, -y);
         }
         /// <summary>
-        /// Returns true, if this vector is exactly the nullvector. Use <see cref="Precision.IsNullVector"/>
+        /// Returns true, if this vector is exactly the nullvector. Use <see cref="Precision.IsNullVector(GeoVector2D)"/>
         /// if you need more control over precision.
         /// </summary>
         /// <returns>true if nullvector</returns>
@@ -1609,18 +2023,33 @@ namespace CADability
         {
             return (x == 0.0 && y == 0.0);
         }
+        /// <summary>
+        /// The x-axis, same as new GeoVector2D(1.0, 0.0).
+        /// </summary>
         public static GeoVector2D XAxis
         {
             get { return new GeoVector2D(1.0, 0.0); }
         }
+        /// <summary>
+        /// The y-axis, same as new GeoVector2D(0.0, 1.0).
+        /// </summary>
         public static GeoVector2D YAxis
         {
             get { return new GeoVector2D(0.0, 1.0); }
         }
+        /// <summary>
+        /// Returns the unit vector pointing in the given direction. The angle is given in radians, measured
+        /// counterclockwise from the x-axis.
+        /// </summary>
+        /// <param name="angle">direction in radians</param>
+        /// <returns>the unit vector in that direction</returns>
         public static GeoVector2D FromAngle(double angle)
         {
             return new GeoVector2D(Math.Cos(angle), Math.Sin(angle));
         }
+        /// <summary>
+        /// The nullvector, same as new GeoVector2D(0.0, 0.0).
+        /// </summary>
         public static GeoVector2D NullVector
         {
             get { return new GeoVector2D(0.0, 0.0); }
@@ -1672,26 +2101,42 @@ namespace CADability
             y = (double)info.GetValue("Y", typeof(double));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("X", x);
             info.AddValue("Y", y);
         }
 
+        /// <summary>
+        /// Constructor for the JSON deserialization (<see cref="IJsonSerialize"/>): reads the two components in the order
+        /// <see cref="GetObjectData(IJsonWriteData)"/> wrote them. It is found by reflection, there is no need to call it directly.
+        /// </summary>
+        /// <param name="data">supplies the values</param>
         public GeoVector2D(IJsonReadStruct data)
         {
             x = data.GetValue<double>();
             y = data.GetValue<double>();
         }
+        /// <summary>
+        /// Writes the two components for the JSON serialization (<see cref="IJsonSerialize"/>). The struct is serialized inline as a
+        /// plain list of values and read back by the constructor taking an <see cref="IJsonReadStruct"/>.
+        /// </summary>
+        /// <param name="data">receives the values</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddValues(x, y);
         }
 
+        /// <summary>
+        /// Does nothing. Value types serialized inline are restored by the constructor taking an <see cref="IJsonReadStruct"/>;
+        /// this method only exists to satisfy <see cref="IJsonSerialize"/>.
+        /// </summary>
+        /// <param name="data">not used</param>
         public void SetObjectData(IJsonReadData data)
         {
         }

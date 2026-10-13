@@ -12,10 +12,27 @@ using System.Threading;
 namespace CADability.GeoObject
 {
 
+	/// <summary>
+	/// Exception thrown by <see cref="Path"/>, e.g. when start point, end point or directions are requested from a path that
+	/// contains no curves. <see cref="et"/> gives the reason.
+	/// </summary>
 	public class PathException : ApplicationException
 	{
+		/// <summary>
+		/// The reason for a <see cref="PathException"/>: <c>PathIsEmtpy</c> when the path contains no curves, <c>NotPlanar</c>
+		/// when a planar path was required. <c>PathIsInvalid</c> (curves not connected) and <c>NoModification</c> are not thrown
+		/// by the current implementation.
+		/// </summary>
 		public enum ExceptionType { PathIsEmtpy, PathIsInvalid, NoModification, NotPlanar };
+		/// <summary>
+		/// The reason for this exception.
+		/// </summary>
 		public ExceptionType et;
+		/// <summary>
+		/// Creates the exception with the reason and a message.
+		/// </summary>
+		/// <param name="ExceptionType">The reason for the exception</param>
+		/// <param name="msg">Description of the failure</param>
 		public PathException(ExceptionType ExceptionType, string msg)
 			: base(msg)
 		{
@@ -33,6 +50,10 @@ namespace CADability.GeoObject
 	public class Path : IGeoObjectImpl, IColorDef, ILinePattern, ILineWidth, ICurve,
 		IGeoObjectOwner, ISerializable, IDeserializationCallback, IExtentedableCurve, IJsonSerialize, IJsonSerializeDone
 	{
+		/// <summary>
+		/// Intended to select how <see cref="SetPoint(int, GeoPoint, ModificationMode)"/> adapts the two curves that meet in the
+		/// moved vertex. The current implementation treats both modes alike.
+		/// </summary>
 		public enum ModificationMode
 		{
 			/// <summary>
@@ -122,13 +143,42 @@ namespace CADability.GeoObject
 			}
 		}
 		#region polymorph construction
+		/// <summary>
+		/// Signature of the <see cref="Constructor"/> hook: creates a new, empty <see cref="Path"/> or an object of a class
+		/// derived from it.
+		/// </summary>
+		/// <returns>The newly created path</returns>
 		public delegate Path ConstructionDelegate();
+		/// <summary>
+		/// Optional hook for polymorphic construction. When set, <see cref="Construct()"/> calls this delegate instead of creating
+		/// a plain <see cref="Path"/>, so that an application can have its own derived class instantiated wherever CADability
+		/// creates a path.
+		/// </summary>
 		public static ConstructionDelegate Constructor;
+		/// <summary>
+		/// Creates a new path. This is the only way to create one, the constructor is protected. The returned path contains no
+		/// curves; fill it with <see cref="Set(ICurve[])"/> or <see cref="Set(GeoObjectList, bool, double)"/>, or use
+		/// <see cref="FromSegments(IEnumerable{ICurve}, bool)"/>.
+		/// </summary>
+		/// <returns>A new <see cref="Path"/>, or an object of the derived class provided by <see cref="Constructor"/></returns>
 		public static Path Construct()
 		{
 			if (Constructor != null) return Constructor();
 			return new Path();
 		}
+		/// <summary>
+		/// Creates a path from the given curves. When <paramref name="connectedAndOriented"/> is true, the curves are taken in
+		/// the given order and direction (see <see cref="Set(ICurve[])"/>; small gaps are closed by moving end points).
+		/// Otherwise they are sorted and reversed as needed to form a connected chain (see
+		/// <see cref="Set(GeoObjectList, bool, double)"/>), and curves that do not fit into the chain are left out. The curves
+		/// become children of the path and are removed from their previous owner; pass clones if the originals must stay in
+		/// their model.
+		/// </summary>
+		/// <param name="curves">The curves that make up the path</param>
+		/// <param name="connectedAndOriented">true if the curves are already in order and each one ends where the next one
+		/// starts</param>
+		/// <returns>The new path, or null when <paramref name="connectedAndOriented"/> is false and no connected chain of at
+		/// least two curves could be built</returns>
 		public static Path FromSegments(IEnumerable<ICurve> curves, bool connectedAndOriented)
 		{
 			Path res = Path.Construct();
@@ -148,6 +198,14 @@ namespace CADability.GeoObject
 				else return null;
 			}
 		}
+		/// <summary>
+		/// Groups the given curves into as many connected paths as possible: repeatedly builds a path of at least two curves
+		/// from the remaining curves (see <see cref="Set(GeoObjectList, bool, double)"/>) until no more connected chain is found.
+		/// Curves used in a path are removed from <paramref name="curves"/>, so afterwards the list holds the curves that could
+		/// not be connected to any other. The paths are flattened (see <see cref="Flatten"/>).
+		/// </summary>
+		/// <param name="curves">The curves to connect; curves used in a path are removed from this list</param>
+		/// <returns>The paths found, an empty list when no two curves connect</returns>
 		public static List<Path> FromSegments(List<ICurve> curves)
 		{
 			List<Path> res = new List<Path>();
@@ -175,7 +233,16 @@ namespace CADability.GeoObject
 			} while (created);
 			return res;
 		}
+		/// <summary>
+		/// Signature of the handlers of the <see cref="Constructed"/> event.
+		/// </summary>
+		/// <param name="justConstructed">The path that has just been created</param>
 		public delegate void ConstructedDelegate(Path justConstructed);
+		/// <summary>
+		/// Raised whenever a new path is created, i.e. for every <see cref="Construct()"/> call, every clone and every path read
+		/// from a file. The handler gets the new object; when it comes from <see cref="Construct()"/>, it contains no curves
+		/// yet.
+		/// </summary>
 		public static event ConstructedDelegate Constructed;
 		#endregion
 		//		private void RecalcPlane()
@@ -233,11 +300,9 @@ namespace CADability.GeoObject
 			res.Recalc();
 			return res;
 		}
-		/// <summary>
-		/// Creates a path from a list of properly connected curve objects.
-		/// The curve objects will be removed from their owner (if there is a owner)
-		/// </summary>
-		/// <param name="connectedCurves">array of connected ICurve objects</param>
+		// Creates a path from a list of properly connected curve objects.
+		// The curve objects will be removed from their owner (if there is a owner)
+		// connectedCurves: array of connected ICurve objects
 		//protected Path(ICurve[] connectedCurves)
 		//    : this()
 		//{
@@ -265,7 +330,8 @@ namespace CADability.GeoObject
 		/// If flatten is true, UserData will be lost.
 		/// </summary>
 		/// <param name="BeginWith">Curve to begin with</param>
-		/// <param name="projectedModel">Projected model to search</param>
+		/// <param name="model">Model to search for connected curves</param>
+		/// <param name="projection">Projection, in which the end points of the curves are projected to find connected objects in the model</param>
 		/// <param name="flatten">true: flatten the result, false: result not flattened</param>
 		/// <returns>The path or null if no cennecting objects found</returns>
 		public static Path CreateFromModel(ICurve BeginWith, Model model, Projection projection, bool flatten)
@@ -518,6 +584,7 @@ namespace CADability.GeoObject
 		/// </summary>
 		/// <param name="l">List of unsorted GeoObjects</param>
 		/// <param name="moreThanOne">if true, the path must consist of more than one curve</param>
+		/// <param name="maxgap">maximum distance between the end point of the path and the start or end point of the next curve for them to count as connected</param>
 		/// <returns>success</returns>
 		public bool Set(GeoObjectList l, bool moreThanOne, double maxgap)
 		{
@@ -830,6 +897,13 @@ namespace CADability.GeoObject
 		{
 			Set(new ICurve[] { });
 		}
+		/// <summary>
+		/// Removes a curve from this path and sets the remaining curves again with <see cref="Set(ICurve[])"/>. When a curve in
+		/// the middle is removed, the resulting gap is closed by moving the end point of the previous curve to the start point
+		/// of the next one (or the other way round if that fails). The change is undoable and raises the change events.
+		/// </summary>
+		/// <param name="toRemove">The curve to remove, one of <see cref="Curves"/></param>
+		/// <returns>true on success, false when the curve is not part of this path</returns>
 		public bool Remove(ICurve toRemove)
 		{
 			int ind = -1;
@@ -860,10 +934,7 @@ namespace CADability.GeoObject
 			return false;
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Decompose ()"/>
-		/// </summary>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override GeoObjectList Decompose()
 		{
 			ICurve[] tmpCurve = this.Curves;
@@ -929,6 +1000,12 @@ namespace CADability.GeoObject
 			}
 			return true;
 		}
+		/// <summary>
+		/// Rotates the order of the curves so that the curve with the given index becomes the first one. Meant for a closed
+		/// path, where this only moves the start point (and thus the parameter range) without changing the geometry. The change
+		/// is undoable and raises the change events.
+		/// </summary>
+		/// <param name="newStartCurve">Index of the curve that becomes the first curve, 0 to <see cref="CurveCount"/>-1</param>
 		public void ChangeCyclicalStart(int newStartCurve)
 		{
 			ICurve[] newSubCurves = new ICurve[subCurves.Length];
@@ -940,6 +1017,19 @@ namespace CADability.GeoObject
 				Recalc();
 			}
 		}
+		/// <summary>
+		/// Moves a vertex of the path, i.e. the point where the curve <paramref name="index"/>-1 ends and the curve
+		/// <paramref name="index"/> starts, and adapts both curves: each of them is transformed (moved, rotated and scaled) so
+		/// that its other end stays fixed and the connection follows the new point; a circular arc becomes an elliptical arc
+		/// this way. If that transformation cannot be computed, only the end point and the start point of the two curves are set.
+		/// Index 0 of an open path moves the start point of the first curve only, index <see cref="CurveCount"/> or -1 the end
+		/// point of the last curve only. If the path would become inconsistent (the curves no longer connect), the change is
+		/// reverted. The change is undoable and raises the change events.
+		/// </summary>
+		/// <param name="index">Index of the vertex, which is the index of the curve that starts there; -1 or
+		/// <see cref="CurveCount"/> for the end point of the last curve</param>
+		/// <param name="newValue">New position of the vertex</param>
+		/// <param name="mode">Intended to select how the curves are adapted; not evaluated by the current implementation</param>
 		public void SetPoint(int index, GeoPoint newValue, ModificationMode mode)
 		{
 			using (new Changing(this))
@@ -1041,6 +1131,17 @@ namespace CADability.GeoObject
 				}
 			}
 		}
+		/// <summary>
+		/// Sets the end point of the curve <paramref name="indexEndPoint"/> and the start point of the curve
+		/// <paramref name="indexStartPoint"/> to the same point in one step, so that the path stays consistent. Normally
+		/// <paramref name="indexStartPoint"/> is <paramref name="indexEndPoint"/>+1; pass -1 for one of them at the beginning or
+		/// the end of an open path. Each curve adapts itself as its <see cref="ICurve.StartPoint"/> or
+		/// <see cref="ICurve.EndPoint"/> setter does (a line is just shortened or lengthened, an arc changes its sweep). The
+		/// change is undoable and raises the change events.
+		/// </summary>
+		/// <param name="indexEndPoint">Index of the curve whose end point is set, or -1 for none</param>
+		/// <param name="indexStartPoint">Index of the curve whose start point is set, or -1 for none</param>
+		/// <param name="newValue">The new common point</param>
 		public void SetPoint(int indexEndPoint, int indexStartPoint, GeoPoint newValue)
 		{
 			// indexStartPoint muss um 1 größer sein als indexEndPoint
@@ -1126,8 +1227,11 @@ namespace CADability.GeoObject
 				Recalc();
 			}
 		}
+		/// <summary>
+		/// The number of sub curves (segments) of this path, 0 if the path is empty. Same as <see cref="CurveCount"/>.
+		/// </summary>
 		/// <value>
-		/// Gets the number uf subcurves in this path.
+		/// Gets the number of subcurves in this path.
 		/// </value>
 		public int Count
 		{
@@ -1170,6 +1274,10 @@ namespace CADability.GeoObject
 				return 0;
 			}
 		}
+		/// <summary>
+		/// The points where the curves are connected: the start points of all curves and, for an open path, the end point of
+		/// the last curve. For a closed path the end point coincides with the first vertex and is not repeated.
+		/// </summary>
 		public GeoPoint[] Vertices
 		{
 			get
@@ -1184,6 +1292,7 @@ namespace CADability.GeoObject
 			}
 		}
 		#region IGeoObjectImpl
+		/// <inheritdoc/>
 		public override Style.EDefaultFor PreferredStyle
 		{
 			get
@@ -1191,19 +1300,12 @@ namespace CADability.GeoObject
 				return Style.EDefaultFor.Curves;
 			}
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetShowProperties (IFrame)"/>
-		/// </summary>
-		/// <param name="Frame"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override IPropertyEntry GetShowProperties(IFrame Frame)
 		{
 			return new ShowPropertyPath(this, Frame);
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Clone ()"/>
-		/// </summary>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override IGeoObject Clone()
 		{
 			if (subCurves != null)
@@ -1225,10 +1327,7 @@ namespace CADability.GeoObject
 				return res;
 			}
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.CopyGeometry (IGeoObject)"/>
-		/// </summary>
-		/// <param name="ToCopyFrom"></param>
+		/// <inheritdoc/>
 		public override void CopyGeometry(IGeoObject ToCopyFrom)
 		{
 			using (new Changing(this))
@@ -1270,10 +1369,7 @@ namespace CADability.GeoObject
 				}
 			}
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Modify (ModOp)"/>
-		/// </summary>
-		/// <param name="m"></param>
+		/// <inheritdoc/>
 		public override void Modify(ModOp m)
 		{
 			using (new Changing(this))
@@ -1284,10 +1380,7 @@ namespace CADability.GeoObject
 				}
 			}
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.FindSnapPoint (SnapPointFinder)"/>
-		/// </summary>
-		/// <param name="spf"></param>
+		/// <inheritdoc/>
 		public override void FindSnapPoint(SnapPointFinder spf)
 		{   // einfach an die enthaltenen Objekte weitergeben, somit keine Probleme
 			// mit Mittelpunkt, Tangenten u.s.w.
@@ -1298,10 +1391,7 @@ namespace CADability.GeoObject
 				if (go != null) go.FindSnapPoint(spf);
 			}
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
-		/// </summary>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override BoundingCube GetBoundingCube()
 		{
 			BoundingCube res = BoundingCube.EmptyBoundingCube;
@@ -1311,12 +1401,20 @@ namespace CADability.GeoObject
 			}
 			return res;
 		}
-		public delegate bool PaintTo3DDelegate(Path toPaint, IPaintTo3D paintTo3D);
-		public static PaintTo3DDelegate OnPaintTo3D;
 		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3D (IPaintTo3D)"/>
+		/// Signature of the <see cref="OnPaintTo3D"/> hook. The handler returns true when it has painted the path itself, false
+		/// to let the default painting in <see cref="PaintTo3D(IPaintTo3D)"/> proceed.
 		/// </summary>
-		/// <param name="paintTo3D"></param>
+		/// <param name="toPaint">The path to paint</param>
+		/// <param name="paintTo3D">The paint interface to paint to</param>
+		/// <returns>true if the painting is done, false for the default painting</returns>
+		public delegate bool PaintTo3DDelegate(Path toPaint, IPaintTo3D paintTo3D);
+		/// <summary>
+		/// Static hook called at the beginning of <see cref="PaintTo3D(IPaintTo3D)"/> for every path. Set it to replace or
+		/// extend the way paths are displayed; when the handler returns true, the default painting is skipped.
+		/// </summary>
+		public static PaintTo3DDelegate OnPaintTo3D;
+		/// <inheritdoc/>
 		public override void PaintTo3D(IPaintTo3D paintTo3D)
 		{
 			if (OnPaintTo3D != null && OnPaintTo3D(this, paintTo3D)) return;
@@ -1333,10 +1431,7 @@ namespace CADability.GeoObject
 				(subCurves[i] as IGeoObjectImpl).PaintTo3D(paintTo3D);
 			}
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PrepareDisplayList (double)"/>
-		/// </summary>
-		/// <param name="precision"></param>
+		/// <inheritdoc/>
 		public override void PrepareDisplayList(double precision)
 		{
 			for (int i = 0; i < subCurves.Length; ++i)
@@ -1344,12 +1439,7 @@ namespace CADability.GeoObject
 				subCurves[i].PrepareDisplayList(precision);
 			}
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetQuadTreeItem (Projection, ExtentPrecision)"/>
-		/// </summary>
-		/// <param name="projection"></param>
-		/// <param name="extentPrecision"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override IQuadTreeInsertableZ GetQuadTreeItem(Projection projection, ExtentPrecision extentPrecision)
 		{
 			QuadTreeCollection res = new QuadTreeCollection(this, projection);
@@ -1360,6 +1450,7 @@ namespace CADability.GeoObject
 			}
 			return res;
 		}
+		/// <inheritdoc/>
 		public override Layer Layer
         {
             get => base.Layer;
@@ -1380,21 +1471,12 @@ namespace CADability.GeoObject
         }
         #endregion
         #region IOctTreeInsertable members
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (double)"/>
-        /// </summary>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingCube GetExtent(double precision)
 		{
 			return GetBoundingCube();
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
-		/// </summary>
-		/// <param name="cube"></param>
-		/// <param name="precision"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override bool HitTest(ref BoundingCube cube, double precision)
 		{
 			for (int i = 0; i < subCurves.Length; ++i)
@@ -1403,25 +1485,14 @@ namespace CADability.GeoObject
 			}
 			return false;
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection, BoundingRect, bool)"/>
-		/// </summary>
-		/// <param name="projection"></param>
-		/// <param name="rect"></param>
-		/// <param name="onlyInside"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override bool HitTest(Projection projection, BoundingRect rect, bool onlyInside)
 		{
 			ICurve2D c2d = (this as ICurve).GetProjectedCurve(projection.ProjectionPlane);
 			if (onlyInside) return c2d.GetExtent() <= rect;
 			else return c2d.HitTest(ref rect, false);
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection.PickArea, bool)"/>
-		/// </summary>
-		/// <param name="area"></param>
-		/// <param name="onlyInside"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override bool HitTest(Projection.PickArea area, bool onlyInside)
 		{
 			if (onlyInside)
@@ -1486,6 +1557,12 @@ namespace CADability.GeoObject
 		}
 		#endregion
 		#region ICurve Members
+		/// <summary>
+		/// The start point of the first curve. Setting it sets the start point of the first curve, which adapts itself as its
+		/// <see cref="ICurve.StartPoint"/> setter does; the change is undoable and raises the change events.
+		/// </summary>
+		/// <exception cref="PathException">with <see cref="PathException.ExceptionType.PathIsEmtpy"/> when the path contains no
+		/// curves</exception>
 		public GeoPoint StartPoint
 		{
 			get
@@ -1499,6 +1576,12 @@ namespace CADability.GeoObject
 				subCurves[0].StartPoint = value;
 			}
 		}
+		/// <summary>
+		/// The end point of the last curve. Setting it sets the end point of the last curve, which adapts itself as its
+		/// <see cref="ICurve.EndPoint"/> setter does; the change is undoable and raises the change events.
+		/// </summary>
+		/// <exception cref="PathException">with <see cref="PathException.ExceptionType.PathIsEmtpy"/> when the path contains no
+		/// curves</exception>
 		public GeoPoint EndPoint
 		{
 			get
@@ -1512,6 +1595,11 @@ namespace CADability.GeoObject
 				subCurves[subCurves.Length - 1].EndPoint = value;
 			}
 		}
+		/// <summary>
+		/// The start direction of the first curve (see <see cref="ICurve.StartDirection"/>).
+		/// </summary>
+		/// <exception cref="PathException">with <see cref="PathException.ExceptionType.PathIsEmtpy"/> when the path contains no
+		/// curves</exception>
 		public GeoVector StartDirection
 		{
 			get
@@ -1520,6 +1608,11 @@ namespace CADability.GeoObject
 				return subCurves[0].StartDirection;
 			}
 		}
+		/// <summary>
+		/// The end direction of the last curve (see <see cref="ICurve.EndDirection"/>).
+		/// </summary>
+		/// <exception cref="PathException">with <see cref="PathException.ExceptionType.PathIsEmtpy"/> when the path contains no
+		/// curves</exception>
 		public GeoVector EndDirection
 		{
 			get
@@ -1528,11 +1621,7 @@ namespace CADability.GeoObject
 				return subCurves[subCurves.Length - 1].EndDirection;
 			}
 		}
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.DirectionAt (double)"/>
-		/// </summary>
-		/// <param name="Position"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public GeoVector DirectionAt(double Position)
 		{
 			double pos = Position * subCurves.Length;
@@ -1541,11 +1630,7 @@ namespace CADability.GeoObject
 			if (ind >= subCurves.Length) ind = subCurves.Length - 1;
 			return Curve(ind).DirectionAt(pos - ind);
 		}
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.PointAt (double)"/>
-		/// </summary>
-		/// <param name="Position"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public GeoPoint PointAt(double Position)
 		{
 			// der Lauf der Parameter ist so zu interpretieren: Der Wert liegt zwischen 0 und 1
@@ -1561,32 +1646,18 @@ namespace CADability.GeoObject
 			// (z.B. wg. Verlängern). Deshalb nicht einfach Start- bzw. Endpunkt liefern
 			return Curve(ind).PointAt(pos - ind);
 		}
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.PositionOf (GeoPoint, Plane)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <param name="pl"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public double PositionOf(GeoPoint p, Plane pl)
 		{
 			throw new NotImplementedException("Path. PositionOf");
 		}
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.PositionOf (GeoPoint, double)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <param name="prefer"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public double PositionOf(GeoPoint p, double prefer)
 		{
 			if (subCurves.Length == 1) return subCurves[0].PositionOf(p, prefer);
 			else return PositionOf(p);
 		}
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.PositionOf (GeoPoint)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public double PositionOf(GeoPoint p)
 		{
 			double res = -1.0;
@@ -1647,6 +1718,9 @@ namespace CADability.GeoObject
 #endif
 			}
 		}
+		/// <summary>
+		/// The sum of the lengths of all curves, 0 for an empty path.
+		/// </summary>
 		public double Length
 		{
 			get
@@ -1660,11 +1734,7 @@ namespace CADability.GeoObject
 				return l;
 			}
 		}
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.Split (double)"/>
-		/// </summary>
-		/// <param name="Position"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public ICurve[] Split(double Position)
 		{
 			if (Position <= 0.0 || Position >= 1.0)
@@ -1720,12 +1790,7 @@ namespace CADability.GeoObject
 			Path p2 = Path.Construct(c2);
 			return new ICurve[] { p1, p2 };
 		}
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.Split (double, double)"/>
-		/// </summary>
-		/// <param name="Position1"></param>
-		/// <param name="Position2"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public ICurve[] Split(double Position1, double Position2)
 		{
 			if (!IsClosed) return new ICurve[] { };
@@ -1756,11 +1821,7 @@ namespace CADability.GeoObject
 			}
 			return new ICurve[] { }; // hat nicht geklappt
 		}
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.Trim (double, double)"/>
-		/// </summary>
-		/// <param name="StartPos"></param>
-		/// <param name="EndPos"></param>
+		/// <inheritdoc/>
 		public void Trim(double StartPos, double EndPos)
 		{
 			bool reverse = false;
@@ -1873,6 +1934,12 @@ namespace CADability.GeoObject
 			clone.Modify(m);
 			return (ICurve)clone;
 		}
+		/// <summary>
+		/// true when the end point of the last curve coincides with the start point of the first curve (within
+		/// <see cref="Precision.eps"/>).
+		/// </summary>
+		/// <exception cref="PathException">with <see cref="PathException.ExceptionType.PathIsEmtpy"/> when the path contains no
+		/// curves</exception>
 		public bool IsClosed
 		{
 			get
@@ -1880,6 +1947,9 @@ namespace CADability.GeoObject
 				return Precision.IsEqual(StartPoint, EndPoint);
 			}
 		}
+		/// <summary>
+		/// true when every curve of the path is singular, i.e. degenerates to a point; also true for an empty path.
+		/// </summary>
 		public bool IsSingular
 		{
 			get
@@ -1891,30 +1961,20 @@ namespace CADability.GeoObject
 				return true;
 			}
 		}
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.GetPlanarState ()"/>
-		/// </summary>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public PlanarState GetPlanarState()
 		{
 			if (planarState == PlanarState.Unknown) RecalcPlanarState();
 			return planarState;
 		}
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.GetPlane ()"/>
-		/// </summary>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public Plane GetPlane()
 		{
 			if (planarState == PlanarState.Unknown || inPlane == null) RecalcPlanarState();
 			if (inPlane != null) return inPlane;
 			else throw new PathException(PathException.ExceptionType.NotPlanar, "GetPlane: Path is not planar");
 		}
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.IsInPlane (Plane)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public bool IsInPlane(Plane p)
 		{
 			if (planarState == PlanarState.Unknown) RecalcPlanarState();
@@ -1936,11 +1996,7 @@ namespace CADability.GeoObject
 				return false;
 			}
 		}
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.GetProjectedCurve (Plane)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public CADability.Curve2D.ICurve2D GetProjectedCurve(Plane p)
 		{
 			List<ICurve2D> cvs = new List<ICurve2D>();
@@ -1955,6 +2011,7 @@ namespace CADability.GeoObject
 			res.DisplayClosed = isClosed;
 			return res;
 		}
+		/// <inheritdoc/>
 		public override string Description
 		{
 			get
@@ -2070,23 +2127,14 @@ namespace CADability.GeoObject
 			}
 			return false;
 		}
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.TryPointDeriv2At (double, out GeoPoint, out GeoVector, out GeoVector)"/>
-		/// </summary>
-		/// <param name="position"></param>
-		/// <param name="point"></param>
-		/// <param name="deriv"></param>
-		/// <param name="deriv2"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual bool TryPointDeriv2At(double position, out GeoPoint point, out GeoVector deriv, out GeoVector deriv2)
 		{
 			point = GeoPoint.Origin;
 			deriv = deriv2 = GeoVector.NullVector;
 			return false;
 		}
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.PointAndDerivativesAt(double, int)"/>.
-		/// </summary>
+		/// <inheritdoc/>
 		public IReadOnlyList<GeoVector> PointAndDerivativesAt(double position, int grad)
 		{
 			return GeneralCurve.PointAndDerivativesAt(this, position, grad);
@@ -2225,10 +2273,11 @@ namespace CADability.GeoObject
 		}
 
 		/// <summary>
-		/// Implements ISerializable:GetObjectData
+		/// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+		/// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
 		/// </summary>
-		/// <param name="info"></param>
-		/// <param name="context"></param>
+		/// <param name="info">receives the data</param>
+		/// <param name="context">the destination of the serialization</param>
 		public override void GetObjectData(SerializationInfo info, StreamingContext context)
 		{
 			base.GetObjectData(info, context);
@@ -2238,6 +2287,7 @@ namespace CADability.GeoObject
 			info.AddValue("LinePattern", linePattern);
 		}
 
+		/// <inheritdoc/>
 		public override void GetObjectData(IJsonWriteData data)
 		{
 			base.GetObjectData(data);
@@ -2247,6 +2297,7 @@ namespace CADability.GeoObject
 			if (linePattern != null) data.AddProperty("LinePattern", linePattern);
 		}
 
+		/// <inheritdoc/>
 		public override void SetObjectData(IJsonReadData data)
 		{
 			base.SetObjectData(data);
@@ -2288,6 +2339,11 @@ namespace CADability.GeoObject
 			Recalc(); // die Längen und isClosed wenigstens berechnen
 			if (Constructed != null) Constructed(this);
 		}
+		/// <summary>
+		/// Called by the JSON deserialization when all objects have been read: makes this path the owner of its curves and
+		/// connects their change events, so that the path notices when a curve is modified.
+		/// </summary>
+		/// <param name="jsonSerialize">The serializer that read the objects</param>
 		public void SerializationDone(JsonSerialize jsonSerialize)
 		{
 			for (int i = 0; i < subCurves.Length; ++i)
@@ -2313,6 +2369,11 @@ namespace CADability.GeoObject
 		#endregion
 		#region IColorDef Members
 		private ColorDef colorDef;
+		/// <summary>
+		/// The color of this path. Setting it also sets the color of all contained curves. It is an undoable attribute change
+		/// that raises the change events; a "color from parent" value is resolved against the <see cref="Block"/> that owns this
+		/// object.
+		/// </summary>
 		public ColorDef ColorDef
         {
             get => colorDef;
@@ -2352,6 +2413,10 @@ namespace CADability.GeoObject
 		#endregion
 		#region ILinePattern Members
 		private LinePattern linePattern;
+		/// <summary>
+		/// The line pattern (dashes) used to display this path, null for a solid line. Setting it also sets the pattern of all
+		/// contained curves; it is an undoable attribute change that raises the change events.
+		/// </summary>
 		public LinePattern LinePattern
         {
             get => linePattern;
@@ -2370,6 +2435,10 @@ namespace CADability.GeoObject
         #endregion
         #region ILineWidth Members
         private LineWidth lineWidth;
+		/// <summary>
+		/// The line width used to display this path, null for the default. Setting it also sets the line width of all contained
+		/// curves; it is an undoable attribute change that raises the change events.
+		/// </summary>
 		public LineWidth LineWidth
         {
             get => lineWidth;
@@ -2495,15 +2564,19 @@ namespace CADability.GeoObject
 			return res.ToArray();
 		}
 
+		/// <inheritdoc/>
 		public override BoundingRect GetExtent(Projection projection, ExtentPrecision extentPrecision)
 		{
 			return (this as ICurve).GetProjectedCurve(projection.ProjectionPlane).GetExtent();
 		}
 	}
 	/// <summary>
-	/// Dieses Objekt dient nur dazu, Kurven in der Nähe des verlängerten Pfades aus dem OctTree zu filtern
-	/// Wenn das erste und das letzte Segment unendlich verlängert werden und zwar in beide Richtungen,
-	/// so liefert das mehr Objekte als gewünscht, schaded aber nur der Performance
+	/// The infinitely extended version of a <see cref="Path"/>, as returned by
+	/// <see cref="IExtentedableCurve.GetExtendedCurve(ExtentedableCurveDirection)"/>. It is only used to filter the
+	/// objects of an octree that are close to the extended path: the first and the last segment of an open path are
+	/// replaced by their infinite extensions (if the segments can be extended), the other segments are used as they
+	/// are. Since the extensions reach in both directions, more objects than needed may be found, which only costs
+	/// performance.
 	/// </summary>
 	internal class InfinitePath : IOctTreeInsertable
 	{

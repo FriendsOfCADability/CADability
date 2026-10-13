@@ -1,9 +1,6 @@
 using System;
 
 
-/// <summary>
-/// Namespace GeoObject
-/// </summary>
 namespace CADability.GeoObject
 {
 	/// <summary>

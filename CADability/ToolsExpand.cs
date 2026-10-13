@@ -7,7 +7,10 @@ using CADability.UserInterface;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Tool that extends a curve: the user picks a curve near the end that is to be extended, and the curve is lengthened
+    /// up to its next intersection with another curve of the model. Optionally a target curve can be picked, in which case
+    /// the curve is extended (or shortened) to that curve, and a distance can be given to end the extension at that
+    /// distance before or beyond the target. Menu id: "ToolsExpand".
     /// </summary>
     internal class ToolsExpand : ConstructAction
     {

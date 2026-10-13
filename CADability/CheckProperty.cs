@@ -6,6 +6,13 @@ using CheckState = CADability.Substitutes.CheckState;
 
 namespace CADability.UserInterface
 {
+    /// <summary>
+    /// Property page entry with a check box. It either holds its own check state or reflects a boolean or
+    /// <see cref="CADability.Substitutes.CheckState"/> property of another object, which is read and written via
+    /// reflection (see the constructors). Clicking the box toggles the state (an indeterminate state is left unchanged)
+    /// and raises <see cref="CheckStateChangedEvent"/>. Used e.g. for the visible layers of a view and for the entries of
+    /// the attribute filters.
+    /// </summary>
     public class CheckProperty : IShowPropertyImpl
     {
         private object objectWithProperty;
@@ -15,11 +22,25 @@ namespace CADability.UserInterface
         private MethodInfo propertyInfoSetBool;
         private int state;
 
+        /// <summary>
+        /// Creates an entry which holds its own check state. Changes are reported by <see cref="CheckStateChangedEvent"/>.
+        /// </summary>
+        /// <param name="resourceID">Resource id of the label text</param>
+        /// <param name="state">The initial check state</param>
         public CheckProperty(string resourceID, CheckState state)
         {
             base.resourceIdInternal = resourceID;
             this.state = (int)state;
         }
+        /// <summary>
+        /// Creates an entry which reflects a property of <paramref name="ObjectWithProperty"/> via reflection. The object must
+        /// either have a property named <paramref name="PropertyName"/> of type bool or
+        /// <see cref="CADability.Substitutes.CheckState"/>, or a pair of methods "Get" + PropertyName(string) and
+        /// "Set" + PropertyName(string, bool), which receive the label text of the entry to identify it.
+        /// </summary>
+        /// <param name="ObjectWithProperty">The object holding the property</param>
+        /// <param name="PropertyName">Name of the property, or the suffix of the Get/Set methods</param>
+        /// <param name="resourceId">Resource id of the label text</param>
         public CheckProperty(object ObjectWithProperty, string PropertyName, string resourceId)
         {
 
@@ -31,6 +52,9 @@ namespace CADability.UserInterface
             propertyInfoGetBool = objectWithProperty.GetType().GetMethod("Get"+PropertyName, new Type[] { typeof(string) });
             propertyInfoSetBool = objectWithProperty.GetType().GetMethod("Set"+PropertyName, new Type[] { typeof(string), typeof(bool) });
         }
+        /// <summary>
+        /// Refreshes the display of the entry, e.g. after the check state of the connected object was changed from elsewhere.
+        /// </summary>
         public void Update()
         {
             propertyPage?.Refresh(this);
@@ -104,7 +128,15 @@ namespace CADability.UserInterface
             }
         }
 
+        /// <summary>
+        /// Delegate for <see cref="CheckStateChangedEvent"/>.
+        /// </summary>
+        /// <param name="label">The label text of the entry, to identify it</param>
+        /// <param name="state">The new check state</param>
         public delegate void CheckStateChangedDelegate(string label, CheckState state);
+        /// <summary>
+        /// Raised when the user has clicked the check box and the state was toggled.
+        /// </summary>
         public event CheckStateChangedDelegate CheckStateChangedEvent;
         #region IShowPropertyImpl overrides
         /// <summary>
@@ -112,6 +144,7 @@ namespace CADability.UserInterface
         /// returns <see cref="ShowPropertyEntryType.Control"/>.
         /// </summary>
         public override PropertyEntryType Flags => PropertyEntryType.Checkable;
+        /// <inheritdoc/>
         public override string Value
         {
             get
@@ -125,6 +158,7 @@ namespace CADability.UserInterface
                 }
             }
         }
+        /// <inheritdoc/>
         public override void ButtonClicked(PropertyEntryButton button)
         {
             if (button==PropertyEntryButton.check)

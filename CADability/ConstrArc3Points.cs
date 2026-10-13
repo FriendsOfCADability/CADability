@@ -12,7 +12,8 @@ using Keys = CADability.Substitutes.Keys;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a circular arc through three points: the user picks the start point, a point on the arc and the end
+    /// point. Centre and radius are shown as read-only values. Menu id: "Constr.Arc.3Points".
     /// </summary>
     internal class ConstrArc3Points : ConstructAction
     {

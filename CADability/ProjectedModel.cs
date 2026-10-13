@@ -47,7 +47,8 @@ namespace CADability
      */
 
     /// <summary>
-    /// INTERN: eine 2D Kure aus einer projizierten Kante entstanden, ggf mit Sichtbarkeitsberechnung.
+    /// INTERNAL: a 2d curve that results from projecting an <see cref="Edge"/>, together with its kind (hard edge, soft
+    /// edge or contour edge), used for the hidden line computation.
     /// </summary>
     internal class ProjectedEdge
     {
@@ -59,7 +60,11 @@ namespace CADability
 
 
     /// <summary>
-    ///
+    /// The projection of a <see cref="Model"/> with a certain <see cref="Projection"/> for the display in a
+    /// <see cref="ModelView"/>. It keeps display lists of the model's objects per layer, the set of visible layers and the
+    /// 2d extent of the projected model, and it follows changes of the model so that the display lists are updated. It also
+    /// provides the hit testing and the intersection queries (e.g. for trimming and extending curves) that the actions
+    /// need on the projected objects.
     /// </summary>
     [Serializable]
     public class ProjectedModel : ISerializable, IDeserializationCallback, IJsonSerialize
@@ -150,6 +155,15 @@ namespace CADability
         //    }
         //}
 
+        /// <summary>
+        /// Creates the projection of the given model with the given projection. The projected model registers itself with
+        /// the model to follow its changes and collects all objects of the model. If the precision of the projection
+        /// (<see cref="CADability.Projection.Precision"/>) is 0, it is set to a thousandth of the size of the model's extent.
+        /// Usually a ProjectedModel is created by the <see cref="Project"/>
+        /// (<see cref="Project.AddProjectedModel(string, Model, Projection)"/>) or by a <see cref="ModelView"/>, not directly.
+        /// </summary>
+        /// <param name="m">The model to display</param>
+        /// <param name="pr">The projection; it is used as is (not cloned) and is modified by the zoom, scroll and view direction methods</param>
         public ProjectedModel(Model m, Projection pr)
         {
             model = m;
@@ -183,6 +197,9 @@ namespace CADability
             recalcVisibility = false;
             dirty = true;
         }
+        /// <summary>
+        /// Finalizer. It does nothing; the display lists are released by <see cref="Disconnect(IPaintTo3D)"/>.
+        /// </summary>
         ~ProjectedModel()
         {
         }
@@ -201,6 +218,11 @@ namespace CADability
             double d = newExtent.Size / 1000;
             projection.Precision = d;
         }
+        /// <summary>
+        /// Replaces the projection by a new standard projection from top (<see cref="CADability.Projection.StandardProjection.FromTop"/>)
+        /// and discards the cached extent. Note that other holders of the previous projection object (e.g. the
+        /// <see cref="ModelView"/>) are not informed, and the display lists are not recalculated. Not used by CADability itself.
+        /// </summary>
         public void SetTopViewProjection()
         {
             // TODO: überprüfen: wo kommt das dran, da wird eine neue Projection gesetzt, das
@@ -209,6 +231,14 @@ namespace CADability
             projection = new Projection(Projection.StandardProjection.FromTop);
             extent.MakeEmpty();
         }
+        /// <summary>
+        /// Sets the view direction of the (parallel) projection so that the z axis of the world points upwards on the screen
+        /// (the y axis when looking along the z axis). The cached extent is discarded and, unless
+        /// <paramref name="temporary"/> is true, the display data of all objects is rebuilt. Temporary is used while the user
+        /// rotates the view with the mouse; call it again with temporary false when the rotation is finished.
+        /// </summary>
+        /// <param name="dir">The new view direction (from the viewer into the scene)</param>
+        /// <param name="temporary">true to postpone the rebuilding of the display data</param>
         public void SetViewDirection(GeoVector dir, bool temporary)
         {
             if (Precision.IsNullVector(dir ^ new GeoVector(0.0, 0.0, 1.0)))
@@ -224,30 +254,65 @@ namespace CADability
             extent.MakeEmpty();
             if (!temporary) RecalcAll(temporary);
         }
+        /// <summary>
+        /// Makes the projection a perspective projection with the viewer at <paramref name="fromHere"/> looking in
+        /// <paramref name="direction"/>; <paramref name="fixPoint"/> keeps its position on the screen. See
+        /// <see cref="SetViewDirection(GeoVector, bool)"/> for the meaning of <paramref name="temporary"/>.
+        /// </summary>
+        /// <param name="fromHere">The position of the viewer (eye point)</param>
+        /// <param name="direction">The view direction</param>
+        /// <param name="fixPoint">The point that stays at its place on the screen</param>
+        /// <param name="temporary">true to postpone the rebuilding of the display data</param>
         public void SetViewDirection(GeoPoint fromHere, GeoVector direction, GeoPoint fixPoint, bool temporary)
         {
             projection.SetPerspective(fromHere, direction, model.Extent, fixPoint);
             extent.MakeEmpty();
             if (!temporary) RecalcAll(temporary);
         }
+        /// <summary>
+        /// Sets the unscaled projection (the transformation from world coordinates to the 2d coordinates of the projection
+        /// plane, <see cref="CADability.Projection.UnscaledProjection"/>) directly; the projection becomes a parallel
+        /// projection. <see cref="ModelView.SetViewDirection(ModOp, GeoPoint, bool)"/> uses it when the user rotates the view
+        /// and then scrolls so that the fix point stays at its place. See <see cref="SetViewDirection(GeoVector, bool)"/> for
+        /// the meaning of <paramref name="temporary"/>.
+        /// </summary>
+        /// <param name="p">The new unscaled projection</param>
+        /// <param name="temporary">true to postpone the rebuilding of the display data</param>
         public void SetViewDirection(ModOp p, bool temporary)
         {
             projection.SetUnscaledProjection(p);
             extent.MakeEmpty();
             if (!temporary) RecalcAll(temporary);
         }
+        /// <summary>
+        /// Marks the display lists as invalid, discards the cached extent and rebuilds the display data of all objects of the
+        /// model. Call it after changes the projected model does not notice by itself, e.g. after setting
+        /// <see cref="Projection"/> or <see cref="UseLineWidth"/>; <see cref="ModelView.ForceInvalidateAll"/> calls it.
+        /// </summary>
         public void ForceRecalc()
         {
             dirty = true;
             extent.MakeEmpty();
             RecalcAll(false);
         }
+        /// <summary>
+        /// Obsolete, does nothing. It remains from the former GDI based display via a <see cref="PaintBuffer"/>; the
+        /// current display is connected with <see cref="Connect(IPaintTo3D)"/>.
+        /// </summary>
+        /// <param name="paintBuffer">Not used</param>
         public void Connect(PaintBuffer paintBuffer)
         {
             // sollte nicht mehr drankommen
             // paintBuffer.RepaintDrawingEvent += new CADability.PaintBuffer.Repaint(RepaintDrawing);
         }
         private IPaintTo3D paintTo3D;
+        /// <summary>
+        /// Connects this projected model with the paint interface of a canvas; <see cref="ModelView"/> calls it when it gets
+        /// its canvas. On the first connection the projected model registers itself with the model to follow its changes,
+        /// sets the precision of the projection if it is 0 and collects all objects of the model. The display lists are
+        /// built on the next paint. Pair it with <see cref="Disconnect(IPaintTo3D)"/>.
+        /// </summary>
+        /// <param name="paintTo3D">The paint interface of the canvas</param>
         public void Connect(IPaintTo3D paintTo3D)
         {
             this.paintTo3D = paintTo3D;
@@ -284,6 +349,12 @@ namespace CADability
                 dirty = true;
             }
         }
+        /// <summary>
+        /// Releases the display lists this projected model holds in the paint interface and forgets the paint interface. The
+        /// display lists are rebuilt when the projected model is connected again. <see cref="ModelView"/> calls it when it
+        /// loses its canvas.
+        /// </summary>
+        /// <param name="paintTo3D">The paint interface passed to <see cref="Connect(IPaintTo3D)"/></param>
         public void Disconnect(IPaintTo3D paintTo3D)
         {
             // entries may be null: IPaintTo3D.CloseList returns null for display lists without content
@@ -299,6 +370,10 @@ namespace CADability
             this.paintTo3D = null;
             Settings.GlobalSettings.SettingChangedEvent -= new SettingChangedDelegate(OnSettingChanged);
         }
+        /// <summary>
+        /// Obsolete counterpart of <see cref="Connect(PaintBuffer)"/>, it only unsubscribes from the global settings.
+        /// </summary>
+        /// <param name="paintBuffer">Not used</param>
         public void Disconnect(PaintBuffer paintBuffer)
         {
             // sollte nicht mehr drankommen
@@ -307,11 +382,23 @@ namespace CADability
         }
         internal event NeedsRepaintDelegate NeedsRepaintEvent;
 
+        /// <summary>
+        /// Replaces the extent of the projected model (<see cref="GetWorldExtent"/>) by the given rectangle, e.g. to define a
+        /// working area that "zoom total" (<see cref="ZoomTotal(Rectangle, double)"/>) shows regardless of the objects. The
+        /// value is not saved and is lost when the extent is recalculated after a change of the model or the projection.
+        /// </summary>
+        /// <param name="newVal">The extent in the 2d coordinates of the projection plane</param>
         public void ForceExtentTo(BoundingRect newVal)
         {
             workSpace = newVal;
             extent = newVal;
         }
+        /// <summary>
+        /// Returns the extent of all objects of the model projected with the current projection, as a rectangle in the 2d
+        /// coordinates of the projection plane (unscaled, not in pixels). The value is cached until the model or the
+        /// projection changes. Empty for an empty model.
+        /// </summary>
+        /// <returns>The 2d extent of the projected model</returns>
         public BoundingRect GetWorldExtent()
         {	// hier besser über alles aus dem QuadTree iterieren, oder?
             if (extent.IsEmpty())
@@ -332,12 +419,25 @@ namespace CADability
         //        }
         //    return res;
         //}
+        /// <summary>
+        /// Returns the extent of the given object projected with the current projection, in the 2d coordinates of the
+        /// projection plane. The raw extent (<see cref="ExtentPrecision.Raw"/>) is used, which may be somewhat larger than
+        /// the exact one.
+        /// </summary>
+        /// <param name="geoObject">The object</param>
+        /// <returns>The 2d extent of the projected object</returns>
         public BoundingRect GetDisplayExtent(IGeoObject geoObject)
         {
             if (projection.Precision == 0.0)
                 projection.Precision = Model.Extent.Size * 1e-3; // naja, das muss woanders gesetzt werden
             return geoObject.GetExtent(projection, ExtentPrecision.Raw);
         }
+        /// <summary>
+        /// Returns the common extent of the given objects projected with the current projection, in the 2d coordinates of
+        /// the projection plane (see <see cref="GetDisplayExtent(IGeoObject)"/>). Empty for an empty list.
+        /// </summary>
+        /// <param name="list">The objects</param>
+        /// <returns>The 2d extent of the projected objects</returns>
         public BoundingRect GetDisplayExtent(GeoObjectList list)
         {
             BoundingRect res = BoundingRect.EmptyBoundingRect;
@@ -347,10 +447,22 @@ namespace CADability
             }
             return res;
         }
+        /// <summary>
+        /// Returns the extent of the given object projected with the current projection in device (pixel) coordinates, i.e.
+        /// <see cref="GetDisplayExtent(IGeoObject)"/> converted with the placement of the projection
+        /// (<see cref="CADability.Projection.DeviceRect(BoundingRect)"/>).
+        /// </summary>
+        /// <param name="geoObject">The object</param>
+        /// <returns>The rectangle in pixels</returns>
         public Rectangle GetDeviceExtent(IGeoObject geoObject)
         {
             return projection.DeviceRect(GetDisplayExtent(geoObject));
         }
+        /// <summary>
+        /// Returns the extent of the whole projected model (<see cref="GetWorldExtent"/>) in device (pixel) coordinates
+        /// according to the current placement of the projection. Empty for an empty model.
+        /// </summary>
+        /// <returns>The extent in pixels</returns>
         public BoundingRect GetDisplayExtent()
         {
             BoundingRect ext = GetWorldExtent();
@@ -381,10 +493,24 @@ namespace CADability
             ext = ext * Factor;
             projection.SetPlacement(ClientRect, ext);
         }
+        /// <summary>
+        /// Sets the placement (scaling and offset) of the projection so that the given rectangle of the projection plane
+        /// fills the client rectangle (<see cref="CADability.Projection.SetPlacement(Rectangle, BoundingRect)"/>). The display
+        /// is not invalidated by this call; <see cref="ModelView.ZoomToRect(BoundingRect)"/> does that.
+        /// </summary>
+        /// <param name="ClientRect">The client rectangle of the canvas in pixels</param>
+        /// <param name="visibleRect">The rectangle in the 2d coordinates of the projection plane that should become visible</param>
         public void ZoomToRect(Rectangle ClientRect, BoundingRect visibleRect)
         {
             projection.SetPlacement(ClientRect, visibleRect);
         }
+        /// <summary>
+        /// Sets the placement of the projection so that the whole projected model (<see cref="GetWorldExtent"/>), enlarged by
+        /// <paramref name="Factor"/>, fills the client rectangle. For an empty model (or one without a 2d extent) a cube of
+        /// 100 units at the origin is shown instead. The display is not invalidated by this call.
+        /// </summary>
+        /// <param name="ClientRect">The client rectangle of the canvas in pixels</param>
+        /// <param name="Factor">Factor applied to the extent, e.g. 1.1 to leave a margin of 10 percent</param>
         public void ZoomTotal(Rectangle ClientRect, double Factor)
         {
             BoundingRect ext = GetWorldExtent();
@@ -409,6 +535,12 @@ namespace CADability
                 projection.SetPlacement(ClientRect, ext);
             }
         }
+        /// <summary>
+        /// Moves the placement of the projection, i.e. scrolls the displayed image by the given offsets in pixels
+        /// (<see cref="CADability.Projection.MovePlacement(double, double)"/>). The display is not invalidated by this call.
+        /// </summary>
+        /// <param name="dx">The horizontal offset in pixels</param>
+        /// <param name="dy">The vertical offset in pixels</param>
         public void Scroll(double dx, double dy)
         {
             projection.MovePlacement(dx, dy);
@@ -482,12 +614,26 @@ namespace CADability
         //    //    }
         //    //}
         //}
+        /// <summary>
+        /// The model that is displayed. Setting it only exchanges the reference: the display data is not rebuilt and the
+        /// events of the previous model are not unregistered, so create a new ProjectedModel to show another model.
+        /// </summary>
         public Model Model { get { return model; } set { model = value; } }
+        /// <summary>
+        /// The name of this projected model, which is also the name of the <see cref="ModelView"/> that shows it. It is
+        /// unique within the project (see <see cref="Project.AddProjectedModel(string, Model, Projection)"/>) and saved
+        /// with the project.
+        /// </summary>
         public string Name
         {
             get { return name; }
             set { name = value; }
         }
+        /// <summary>
+        /// Whether curves are to be displayed with their line width or all as thin lines. The initial value comes from the
+        /// global setting "View.UseLineWidth". The value is only stored here; the display uses the corresponding flag of the
+        /// <see cref="Projection"/>, which <see cref="ModelView"/> sets together with this one (context menu of the view).
+        /// </summary>
         public bool UseLineWidth
         {
             get
@@ -499,6 +645,12 @@ namespace CADability
                 useLineWidth = value;
             }
         }
+        /// <summary>
+        /// The projection with which the model is displayed: view direction, parallel or perspective, drawing plane, grid and
+        /// the placement (zoom and scroll position). The getter returns the object itself, which the zoom, scroll and view
+        /// direction methods modify in place; the setter stores a clone of the given projection. Call
+        /// <see cref="ForceRecalc"/> after setting a different projection.
+        /// </summary>
         public Projection Projection
         {
             get
@@ -539,6 +691,13 @@ namespace CADability
             if (l == null) return true;
             return visibleLayers.Contains(l);
         }
+        /// <summary>
+        /// Returns the layers that are marked visible in this projected model (see <see cref="AddVisibleLayer(Layer)"/>). An
+        /// empty array is treated as "no layer filter" by the picking methods, i.e. all objects are visible; a
+        /// <see cref="ModelView"/> marks all layers of the project visible when it gets a projected model without visible
+        /// layers. Objects without a layer are always visible.
+        /// </summary>
+        /// <returns>A copy of the set of visible layers</returns>
         public Layer[] GetVisibleLayers()
         {
             Layer[] res = new Layer[visibleLayers.Count];
@@ -560,6 +719,16 @@ namespace CADability
 
         }
 
+        /// <summary>
+        /// Finds the snap point for the mouse position described by the <see cref="SnapPointFinder"/>: all visible objects in
+        /// the pick area are asked for their snap points (<see cref="IGeoObject.FindSnapPoint(SnapPointFinder)"/>), then the
+        /// intersection points of curves in the pick area, the orthogonal position relative to the base point, the grid
+        /// points and the global and local origin are checked, as far as the snap modes of <paramref name="spf"/> ask for
+        /// them. The result (the best point, the object that caused it and the kind of snap) is left in
+        /// <paramref name="spf"/>, see <see cref="SnapPointFinder.SnapPoint"/>, <see cref="SnapPointFinder.BestObject"/> and
+        /// <see cref="SnapPointFinder.DidSnap"/>. The views call it when an action needs a snapped point.
+        /// </summary>
+        /// <param name="spf">The initialized snap point finder, receives the result</param>
         public void AdjustPoint(SnapPointFinder spf)
         {	
 	        // find relevant objects in octtree
@@ -665,6 +834,17 @@ namespace CADability
             }
             return res;
         }
+        /// <summary>
+        /// Returns the objects of the model that are hit by the given rectangle under the current projection, using the
+        /// octtree of the model. Invisible objects, objects on layers that are not visible in this projected model (when a
+        /// layer filter is active) and objects rejected by <paramref name="filterList"/> are left out;
+        /// <paramref name="pickMode"/> decides whether top level objects, a single object, edges or faces are returned
+        /// (see <see cref="PickMode"/>). Returns an empty list if the model has no octtree yet.
+        /// </summary>
+        /// <param name="pickrect">The pick rectangle in the 2d coordinates of the projection plane</param>
+        /// <param name="pickMode">What to pick</param>
+        /// <param name="filterList">Additional filter for the objects, may be null</param>
+        /// <returns>The objects that were hit, each only once</returns>
         public GeoObjectList GetObjectsFromRect(BoundingRect pickrect, PickMode pickMode, FilterList filterList)
         {
             GeoObjectList res = new GeoObjectList();
@@ -1112,15 +1292,24 @@ namespace CADability
             extent.MakeEmpty();
         }
         #region Helper Methods
+        /// <summary>
+        /// Selects which intersection points <see cref="GetIntersectionParameters(ICurve, IntersectionMode)"/> returns:
+        /// OnlyInside only the intersections within the parameter range of the curve; BothExtensions also the intersections
+        /// on the extension of the curve beyond its start and its end (for curves that can be extended, see
+        /// <see cref="IExtentedableCurve"/>); StartExtension and EndExtension also use the extension, and for closed curves
+        /// (arcs) count an intersection outside the curve as lying before the start resp. behind the end;
+        /// InsideAndSelfIntersection like OnlyInside plus the self intersections of the curve.
+        /// </summary>
         public enum IntersectionMode { OnlyInside, BothExtensions, StartExtension, EndExtension, InsideAndSelfIntersection }
         /// <summary>
         /// Returns the parameters for all intersection point of this curve with other
         /// curves in the model. The curve must be planar. To get the 3D intersection point
-        /// call <see cref="ICurve.PointAt"/>. If CheckExtension is true, there will also be
+        /// call <see cref="ICurve.PointAt"/>. Depending on <paramref name="mode"/>, there will also be
         /// intersection parameters in the extension of the curve (if the curve can extend)
         /// </summary>
         /// <param name="Curve">Curve to test for intersection points</param>
-        /// <param name="CheckExtension">Also check the extended curve</param>
+        /// <param name="mode">Specifies whether only intersections inside the curve, intersections in the extensions
+        /// (at the start, at the end or both) or also self intersections are returned</param>
         /// <returns>Array of parameters</returns>
         public double[] GetIntersectionParameters(ICurve Curve, IntersectionMode mode)
         {
@@ -1128,6 +1317,17 @@ namespace CADability
             return GetIntersectionParameters(Curve, mode, out targetCurves);
         }
 
+        /// <summary>
+        /// Like <see cref="GetIntersectionParameters(ICurve, IntersectionMode)"/>, and additionally returns for each parameter
+        /// the curve of the model that intersects there. Only curves on layers visible in this projected model are considered.
+        /// Intersections with faces are returned with a null target curve, self intersections with the curve itself. The
+        /// parameters are sorted ascending. If the curve cannot be projected, an empty array is returned and
+        /// <paramref name="targetCurves"/> is null.
+        /// </summary>
+        /// <param name="Curve">Curve to test for intersection points, must be planar</param>
+        /// <param name="mode">Which intersections to return, see <see cref="IntersectionMode"/></param>
+        /// <param name="targetCurves">Receives the intersecting curve for each parameter (null for a face)</param>
+        /// <returns>The parameters on <paramref name="Curve"/> of the intersection points, ascending</returns>
         public double[] GetIntersectionParameters(ICurve Curve, IntersectionMode mode, out ICurve[] targetCurves)
         {   // gehört hier nicht (mehr) hin, soll ins Modell
             try
@@ -1244,6 +1444,13 @@ namespace CADability
                 return new double[0];
             }
         }
+        /// <summary>
+        /// Tests whether the given object, projected with the current projection, touches the given rectangle
+        /// (<see cref="IOctTreeInsertable.HitTest(Projection, BoundingRect, bool)"/> with onlyInside false).
+        /// </summary>
+        /// <param name="go">The object to test</param>
+        /// <param name="rect">The rectangle in the 2d coordinates of the projection plane</param>
+        /// <returns>true if the object is hit</returns>
         public bool HitTest(IGeoObject go, BoundingRect rect)
         {
             return go.HitTest(projection, rect, false);
@@ -1443,6 +1650,12 @@ namespace CADability
         }
 
         #region ISerializable Members
+        /// <summary>
+        /// Constructor for the binary deserialization (<see cref="ISerializable"/>) of projects in the old file format. The
+        /// visible layers are completed in the deserialization callback. Files are written in JSON format now.
+        /// </summary>
+        /// <param name="info">The serialized data</param>
+        /// <param name="context">The source of the serialization</param>
         protected ProjectedModel(SerializationInfo info, StreamingContext context)
         {
             name = (string)info.GetValue("Name", typeof(string));
@@ -1493,10 +1706,19 @@ namespace CADability
         }
         #endregion
         #region IJsonSerialize
+        /// <summary>
+        /// Empty constructor for the JSON deserialization (<see cref="IJsonSerialize"/>); the data is set by
+        /// <see cref="SetObjectData(IJsonReadData)"/>.
+        /// </summary>
         protected ProjectedModel()
         {   // empty constructor for Json
         }
 
+        /// <summary>
+        /// Implements <see cref="IJsonSerialize.GetObjectData(IJsonWriteData)"/>: writes the name, the model, the projection,
+        /// the visible layers and the fix point and distance of the perspective view.
+        /// </summary>
+        /// <param name="data">Receives the data</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("Name", name);
@@ -1506,6 +1728,11 @@ namespace CADability
             data.AddProperty("FixPoint", fixPoint);
             data.AddProperty("Distance", distance);
         }
+        /// <summary>
+        /// Implements <see cref="IJsonSerialize.SetObjectData(IJsonReadData)"/>: reads the data written by
+        /// <see cref="GetObjectData(IJsonWriteData)"/> and marks the display lists as invalid.
+        /// </summary>
+        /// <param name="data">The data to read from</param>
         public void SetObjectData(IJsonReadData data)
         {
             name = data.GetStringProperty("Name");

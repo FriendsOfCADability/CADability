@@ -7,7 +7,14 @@ using System.Threading;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a <see cref="Hatch"/> from the curves that surround a clicked point. The user clicks
+    /// a point inside a region bounded by curves of the model (as seen in the current projection); the
+    /// action collects the curves around that point, builds a <see cref="CurveGraph"/> from them and makes
+    /// the enclosing shape the compound shape of a hatch with the current hatch style. The
+    /// <see cref="HatchMode"/> given to the constructor decides whether holes are left out, whether the
+    /// smallest or the largest enclosing outline is used. The action does not auto-repeat. Started from
+    /// the menu commands "MenuId.Constr.Hatch.Inside", "MenuId.Constr.Hatch.WithHoles" and
+    /// "MenuId.Constr.Hatch.Hull"; <see cref="GetID"/> returns "Constr.Hatch.InnerPoint".
     /// </summary>
 
     public class ConstrHatchInside : CADability.Actions.ConstructAction
@@ -50,17 +57,12 @@ namespace CADability.Actions
         {
             this.mode = mode;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.GetID ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "Constr.Hatch.InnerPoint";
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnSetAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void OnSetAction()
         {
             // die Titel Ids müssen sich unterscheiden, auch wg. der Hilfe
@@ -88,10 +90,7 @@ namespace CADability.Actions
             base.SetInput(gpi);
             base.OnSetAction();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.AutoRepeat ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool AutoRepeat()
         {
             return false;
@@ -322,9 +321,7 @@ namespace CADability.Actions
                 }
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnRemoveAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void OnRemoveAction()
         {
             if (findShapeIsRunning)

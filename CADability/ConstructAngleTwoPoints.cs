@@ -34,9 +34,7 @@ namespace CADability.Actions
             secondPointIsValid = false;
             succeeded = false;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnSetAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnSetAction()
         {
             base.TitleId = "Constr.AngleTwoPoints";
@@ -54,6 +52,7 @@ namespace CADability.Actions
             base.SetInput(firstPointInput, secondPointInput);
             base.OnSetAction();
         }
+        /// <inheritdoc/>
         public override void OnRemoveAction()
         {
             base.OnRemoveAction();
@@ -75,8 +74,8 @@ namespace CADability.Actions
         /// Implements <see cref="Action.OnInactivate"/>. If you override this method
         /// don't forget to call the bas implementation.
         /// </summary>
-        /// <param name="NewActiveAction"><paramref name="Action.OnInactivate.NewActiveAction"/></param>
-        /// <param name="RemovingAction"><paramref name="Action.OnInactivate.RemovingAction"/></param>
+        /// <param name="NewActiveAction">the action that will become active</param>
+        /// <param name="RemovingAction">true: if called because the action is removed, false: if called when a new action is set on top of this action</param>
         public override void OnInactivate(Action NewActiveAction, bool RemovingAction)
         {
             foreach (IView vw in base.Frame.AllViews)
@@ -86,10 +85,7 @@ namespace CADability.Actions
             base.OnInactivate(NewActiveAction, RemovingAction);
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.GetID ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override string GetID()
         {
             return "Constr.AngleTwoPoints";
@@ -148,9 +144,7 @@ namespace CADability.Actions
             get { return succeeded; }
         }
 #endregion
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnDone ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void OnDone()
         {
             succeeded = true;

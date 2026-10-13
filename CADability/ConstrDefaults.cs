@@ -135,10 +135,7 @@
         public ConstrDefaults()
         {
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.GetID ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override string GetID()
         {
             return "Constr.Defaults";

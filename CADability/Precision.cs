@@ -52,6 +52,11 @@ namespace CADability
             threadEpsa = previous.epsa;
             System.Threading.Interlocked.Decrement(ref activeOverrides);
         }
+        /// <summary>
+        /// Intended to derive <see cref="eps"/> from the size of a model. Not implemented: the call has no effect, the
+        /// precision values stay as they are.
+        /// </summary>
+        /// <param name="m">the model, not used</param>
         public static void SetFromModel(Model m)
         {
             // TODO: size ist maximale Modellgröße, eps = size *1e-9
@@ -68,6 +73,12 @@ namespace CADability
             return Geometry.Dist(p1, p2) < eps;
         }
 
+        /// <summary>
+        /// Determines whether all points are almost identical: each point must be within <see cref="eps"/> of its successor
+        /// in the array. Returns true for an empty array or a single point.
+        /// </summary>
+        /// <param name="pnts">the points to test</param>
+        /// <returns>true: all points coincide, false: two consecutive points are further apart than eps</returns>
         public static bool IsEqual(GeoPoint[] pnts)
         {
             for (int i = 0; i < pnts.Length - 1; i++)
@@ -77,26 +88,64 @@ namespace CADability
             return true;
         }
 
+        /// <summary>
+        /// Determines whether the given 2d points are almost identical, i.e. the distance of the points is less than
+        /// <see cref="eps"/>.
+        /// </summary>
+        /// <param name="p1">first point</param>
+        /// <param name="p2">second point</param>
+        /// <returns>true: almost identical, false: different</returns>
         public static bool IsEqual(GeoPoint2D p1, GeoPoint2D p2)
         {
             return Geometry.Dist(p1, p2) < eps;
         }
 
+        /// <summary>
+        /// Determines whether the two vectors are almost identical, i.e. the sum of the absolute differences of their
+        /// components is less than <see cref="eps"/>. Unlike <see cref="SameDirection(GeoVector, GeoVector, bool)"/> this
+        /// compares the vectors themselves including their lengths, not only their directions.
+        /// </summary>
+        /// <param name="v1">first vector</param>
+        /// <param name="v2">second vector</param>
+        /// <returns>true: almost identical, false: different</returns>
         public static bool IsEqual(GeoVector v1, GeoVector v2)
         {
             return (Math.Abs(v1.x - v2.x) + Math.Abs(v1.y - v2.y) + Math.Abs(v1.z - v2.z)) < eps;
         }
 
+        /// <summary>
+        /// Determines whether the two 2d vectors are almost identical, i.e. the sum of the absolute differences of their
+        /// components is less than <see cref="eps"/>. Unlike <see cref="SameDirection(GeoVector2D, GeoVector2D, bool)"/> this
+        /// compares the vectors themselves including their lengths, not only their directions.
+        /// </summary>
+        /// <param name="v1">first vector</param>
+        /// <param name="v2">second vector</param>
+        /// <returns>true: almost identical, false: different</returns>
         public static bool IsEqual(GeoVector2D v1, GeoVector2D v2)
         {
             return (Math.Abs(v1.x - v2.x) + Math.Abs(v1.y - v2.y)) < eps;
         }
 
+        /// <summary>
+        /// Determines whether the two angles are almost identical, i.e. their difference is less than <see cref="epsa"/>.
+        /// The wrap-around at 2*pi is taken into account, so an angle slightly below 2*pi equals an angle slightly above 0.
+        /// </summary>
+        /// <param name="a1">first angle</param>
+        /// <param name="a2">second angle</param>
+        /// <returns>true: almost identical, false: different</returns>
         public static bool IsEqual(Angle a1, Angle a2)
         {
             double a = Math.Abs(a1.Radian - a2.Radian);
             return a < epsa || Math.PI * 2.0 - a < epsa;
         }
+        /// <summary>
+        /// Determines whether the two values are almost identical, i.e. their difference is less than <see cref="eps"/>.
+        /// Intended for lengths and coordinates; for angles use <see cref="IsEqual(Angle, Angle)"/>, which compares with
+        /// <see cref="epsa"/>.
+        /// </summary>
+        /// <param name="d1">first value</param>
+        /// <param name="d2">second value</param>
+        /// <returns>true: almost identical, false: different</returns>
         public static bool IsEqual(double d1, double d2)
         {
             return Math.Abs(d1 - d2) < eps;
@@ -122,6 +171,14 @@ namespace CADability
                 return cl / (v1.Length * v2.Length) < epsa;
             }
         }
+        /// <summary>
+        /// Determines whether the two vectors point in the same direction: they must be parallel within <see cref="epsa"/>
+        /// and have the same orientation. <see cref="SameDirection(GeoVector, GeoVector, bool)"/> in contrast also accepts
+        /// opposite vectors. The lengths of the vectors do not matter; the result is false if one of them is the nullvector.
+        /// </summary>
+        /// <param name="v1">first vector</param>
+        /// <param name="v2">second vector</param>
+        /// <returns>true: same direction and orientation, false otherwise</returns>
         public static bool SameNotOppositeDirection(GeoVector v1, GeoVector v2)
         {
             GeoVector cross = v1 ^ v2;
@@ -151,10 +208,26 @@ namespace CADability
             }
             return (f > 0.0) && (cl / (v1.Length * v2.Length) < epsa);
         }
+        /// <summary>
+        /// Determines whether the two vectors point in opposite directions: they must be parallel within <see cref="epsa"/>
+        /// and have opposite orientation. Same as <see cref="SameNotOppositeDirection(GeoVector, GeoVector)"/> with the
+        /// second vector reversed.
+        /// </summary>
+        /// <param name="v1">first vector</param>
+        /// <param name="v2">second vector</param>
+        /// <returns>true: opposite directions, false otherwise</returns>
         public static bool OppositeDirection(GeoVector v1, GeoVector v2)
         {
             return SameNotOppositeDirection(v1, -v2);
         }
+        /// <summary>
+        /// Determines whether the two 2d vectors point in opposite directions: they must be parallel within <see cref="epsa"/>
+        /// and have opposite orientation. Same as <see cref="SameNotOppositeDirection(GeoVector2D, GeoVector2D, bool)"/> with
+        /// the second vector reversed.
+        /// </summary>
+        /// <param name="v1">first vector</param>
+        /// <param name="v2">second vector</param>
+        /// <returns>true: opposite directions, false otherwise</returns>
         public static bool OppositeDirection(GeoVector2D v1, GeoVector2D v2)
         {
             return SameNotOppositeDirection(v1, -v2, false);
@@ -179,18 +252,45 @@ namespace CADability
                 return cl / (v1.Length * v2.Length) < epsa;
             }
         }
+        /// <summary>
+        /// Determines whether the two 2d vectors point in the same direction with the same orientation: their angles (see
+        /// <see cref="GeoVector2D.Angle"/>) differ by less than <see cref="epsa"/>.
+        /// <see cref="SameDirection(GeoVector2D, GeoVector2D, bool)"/> in contrast also accepts opposite vectors.
+        /// </summary>
+        /// <param name="v1">first vector</param>
+        /// <param name="v2">second vector</param>
+        /// <param name="VectorsAreNormalized">not used, the lengths of the vectors do not matter</param>
+        /// <returns>true: same direction and orientation, false otherwise</returns>
         public static bool SameNotOppositeDirection(GeoVector2D v1, GeoVector2D v2, bool VectorsAreNormalized)
         {
             Angle a1 = new Angle(v1);
             Angle a2 = new Angle(v2);
             return IsEqual(a1, a2);
         }
+        /// <summary>
+        /// Determines whether the two vectors are almost perpendicular, i.e. the cosine of the angle between them is less
+        /// than <see cref="epsa"/>. Returns true if one of the vectors is shorter than <see cref="eps"/>, because a nullvector
+        /// has no direction.
+        /// </summary>
+        /// <param name="v1">first vector</param>
+        /// <param name="v2">second vector</param>
+        /// <param name="VectorsAreNormalized">not used, the vectors are normalized internally</param>
+        /// <returns>true: perpendicular, false: not perpendicular</returns>
         public static bool IsPerpendicular(GeoVector v1, GeoVector v2, bool VectorsAreNormalized)
         {
             if (v1.Length < eps) return true; // oder was?
             if (v2.Length < eps) return true; // oder was?
             return Math.Abs(v1 * v2) / (v1.Length * v2.Length) < epsa;
         }
+        /// <summary>
+        /// Determines whether the two 2d vectors are almost perpendicular, i.e. the cosine of the angle between them is less
+        /// than <see cref="epsa"/>. Returns true if one of the vectors is shorter than <see cref="eps"/>, because a nullvector
+        /// has no direction.
+        /// </summary>
+        /// <param name="v1">first vector</param>
+        /// <param name="v2">second vector</param>
+        /// <param name="VectorsAreNormalized">not used, the vectors are normalized internally</param>
+        /// <returns>true: perpendicular, false: not perpendicular</returns>
         public static bool IsPerpendicular(GeoVector2D v1, GeoVector2D v2, bool VectorsAreNormalized)
         {
             if (v1.Length < eps) return true; // oder was?
@@ -207,22 +307,50 @@ namespace CADability
         {
             return v.Length < eps;
         }
+        /// <summary>
+        /// Determines whether the vector is almost normalized, i.e. its length differs from 1.0 by less than <see cref="eps"/>.
+        /// </summary>
+        /// <param name="v">the vector to test</param>
+        /// <returns>true if the length is almost 1.0, false otherwise</returns>
         public static bool IsNormedVector(GeoVector v)
         {
             return Math.Abs(v.Length - 1.0) < eps;
         }
+        /// <summary>
+        /// Determines whether the length of the given 2d vector is almost 0, i.e. the length is less than <see cref="eps"/>.
+        /// </summary>
+        /// <param name="v">the vector to test</param>
+        /// <returns>true if null-vector, false otherwise</returns>
         public static bool IsNullVector(GeoVector2D v)
         {
             return v.Length < eps;
         }
+        /// <summary>
+        /// Determines whether the sweep angle is almost 0, i.e. its absolute value is less than <see cref="epsa"/>.
+        /// </summary>
+        /// <param name="sw">the sweep angle to test</param>
+        /// <returns>true if almost 0, false otherwise</returns>
         public static bool IsNull(SweepAngle sw)
         {
             return Math.Abs((double)sw) < epsa;
         }
+        /// <summary>
+        /// Determines whether the angle is almost 0, i.e. its value is less than <see cref="epsa"/>. Since an
+        /// <see cref="Angle"/> is always in the range [0, 2*pi), an angle slightly below 2*pi is not considered null; use
+        /// <see cref="IsEqual(Angle, Angle)"/> with 0.0 when that case matters.
+        /// </summary>
+        /// <param name="a">the angle to test</param>
+        /// <returns>true if almost 0, false otherwise</returns>
         public static bool IsNull(Angle a)
         {
             return Math.Abs((double)a) < epsa;
         }
+        /// <summary>
+        /// Determines whether the value is almost 0, i.e. its absolute value is less than <see cref="eps"/>. Intended for
+        /// lengths and coordinates; for angles use <see cref="IsNull(Angle)"/> or <see cref="IsNull(SweepAngle)"/>.
+        /// </summary>
+        /// <param name="l">the value to test</param>
+        /// <returns>true if almost 0, false otherwise</returns>
         public static bool IsNull(double l)
         {
             return Math.Abs(l) < eps;
@@ -264,6 +392,16 @@ namespace CADability
             //if (l1>l2) return SameDirection(v1/l1,pl.Normal,true);
             //else return SameDirection(v2/l2,pl.Normal,true);
         }
+        /// <summary>
+        /// Determines whether the point lies on the line segment from <paramref name="startPoint"/> to
+        /// <paramref name="endPoint"/>: its distance to the line must be less than <see cref="eps"/> and it must lie between
+        /// the two end points (within <see cref="eps"/>). Points on the extension of the segment are not on the line; use
+        /// <see cref="IsPointOnAxis(GeoPoint, Axis)"/> for the infinite line.
+        /// </summary>
+        /// <param name="testPoint">the point to test</param>
+        /// <param name="startPoint">start point of the segment</param>
+        /// <param name="endPoint">end point of the segment</param>
+        /// <returns>true, if the point is on the segment</returns>
         public static bool IsPointOnLine(GeoPoint testPoint, GeoPoint startPoint, GeoPoint endPoint)
         {
             if (Math.Abs(Geometry.DistPL(testPoint, startPoint, endPoint)) < eps)
@@ -293,6 +431,15 @@ namespace CADability
             }
             return true;
         }
+        /// <summary>
+        /// Determines whether the 2d point lies on the line segment from <paramref name="startPoint"/> to
+        /// <paramref name="endPoint"/>: its distance to the line must be less than <see cref="eps"/> and it must lie between
+        /// the two end points (within <see cref="eps"/>). Points on the extension of the segment are not on the line.
+        /// </summary>
+        /// <param name="testPoint">the point to test</param>
+        /// <param name="startPoint">start point of the segment</param>
+        /// <param name="endPoint">end point of the segment</param>
+        /// <returns>true, if the point is on the segment</returns>
         public static bool IsPointOnLine(GeoPoint2D testPoint, GeoPoint2D startPoint, GeoPoint2D endPoint)
         {
             if (Math.Abs(Geometry.DistPL(testPoint, startPoint, endPoint)) < eps)
@@ -301,6 +448,14 @@ namespace CADability
             }
             return false;
         }
+        /// <summary>
+        /// Determines whether the two axes describe the same infinite line: the location of each axis lies on the other axis
+        /// within <see cref="eps"/> and the directions are parallel within <see cref="epsa"/>. Opposite orientations count
+        /// as the same axis. Like <see cref="Axis.SameGeometry(Axis)"/>, but tests both locations.
+        /// </summary>
+        /// <param name="a1">first axis</param>
+        /// <param name="a2">second axis</param>
+        /// <returns>true, if both axes are the same line</returns>
         public static bool SameAxis(Axis a1, Axis a2)
         {
             return Geometry.DistPL(a1.Location,a2)<eps && Geometry.DistPL(a2.Location, a1) < eps && SameDirection(a1.Direction, a2.Direction, false);

@@ -13,7 +13,9 @@ using Point = System.Drawing.Point;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Moves (or copies) the selected objects by a translation. The user enters the translation vector, either directly
+    /// or by a start point and an end point, and decides whether the originals are moved or copies are created.
+    /// While the action runs, a copy of the objects follows the mouse. Menu id: "MoveObjects".
     /// </summary>
     public class MoveObjects : ConstructAction
     {
@@ -115,6 +117,7 @@ namespace CADability.Actions
             copyObject = val;
         }
 
+        /// <inheritdoc/>
         public override void OnSetAction()
         {
             //			base.ActiveObject = block;
@@ -161,11 +164,13 @@ namespace CADability.Actions
         }
 
 
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "MoveObjects";
         }
 
+        /// <inheritdoc/>
         public override void OnDone()
         {
             // ist die Shift Taste gehalten, so werden Kopien gemacht, d.h. der die Elemente

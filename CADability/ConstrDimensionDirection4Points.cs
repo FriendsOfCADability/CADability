@@ -3,7 +3,9 @@
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of an angular dimension between two directions, each given by two points: the user picks the two points
+    /// of the first direction, the two points of the second direction and finally the location of the dimension line.
+    /// The dimension lies in the active drawing plane. Menu id: "Constr.Dimension.Direction.4Points".
     /// </summary>
     internal class ConstrDimensionDirection4Points : ConstructAction
     {

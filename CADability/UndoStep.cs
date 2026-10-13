@@ -3,7 +3,9 @@
 namespace CADability
 {
     /// <summary>
-    /// 
+    /// Collects <see cref="ReversibleChange"/> objects that belong to one undo step, to be undone together
+    /// with <see cref="Perform"/>. The <see cref="UndoRedoSystem"/> groups the changes with its own frames
+    /// and does not use this class.
     /// </summary>
 
     public class UndoStep

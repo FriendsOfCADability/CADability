@@ -14,6 +14,11 @@ using Point = System.Drawing.Point;
 
 namespace CADability
 {
+    /// <summary>
+    /// An <see cref="IPaintTo3D"/> implementation which writes the triangles it is given to an ASCII STL file instead of displaying
+    /// them: the faces are triangulated with the precision passed to the constructor and each triangle is written with its normal;
+    /// curves, points and text are ignored. Used by <see cref="Project.ExportToSTL"/>; dispose it to close the file.
+    /// </summary>
     public class PaintToSTL : IDisposable, IPaintTo3D
     {
         string fileName;

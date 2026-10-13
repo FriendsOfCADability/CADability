@@ -3,6 +3,9 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
 
+// The classes in this file wrap Win32 and OpenGL entry points and constants one to one; their documentation is
+// the Windows and OpenGL reference, not CADability's. CS1591 (no doc comment) is therefore not reported here.
+#pragma warning disable CS1591
 namespace CADability
 {
 
@@ -13,6 +16,10 @@ namespace CADability
      * Wenn etwas fehlt, einfach von dort kopieren
      */
 
+    /// <summary>
+    /// P/Invoke declarations of the kernel32 functions and structures CADability uses (memory and system information).
+    /// Taken from the Tao framework; the members are documented in the Windows API reference.
+    /// </summary>
     public class Kernel
     {
         // --- Fields ---
@@ -238,13 +245,13 @@ namespace CADability
             ///         This member is one of the following values:
             ///     </para>
             ///     <para>
-            ///         <see cref="WinNt.PROCESSOR_INTEL_386" />
+            ///         <c>PROCESSOR_INTEL_386</c>
             ///     </para>
             ///     <para>
-            ///         <see cref="WinNt.PROCESSOR_INTEL_486" />
+            ///         <c>PROCESSOR_INTEL_486</c>
             ///     </para>
             ///     <para>
-            ///         <see cref="WinNt.PROCESSOR_INTEL_PENTIUM" />
+            ///         <c>PROCESSOR_INTEL_PENTIUM</c>
             ///     </para>
             /// </summary>
             public int ProcessorType;
@@ -269,17 +276,17 @@ namespace CADability
             ///     </para>
             ///     <para>
             ///         If <i>SystemInfoUnion.ProcessorArchitecture</i> is
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_INTEL" />, <i>ProcessorLevel</i>
+            ///         <c>PROCESSOR_ARCHITECTURE_INTEL</c>, <i>ProcessorLevel</i>
             ///         is defined by the CPU vendor.
             ///     </para>
             ///     <para>
             ///         If <i>SystemInfoUnion.ProcessorArchitecture</i> is
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_IA64" />, <i>ProcessorLevel</i> is
+            ///         <c>PROCESSOR_ARCHITECTURE_IA64</c>, <i>ProcessorLevel</i> is
             ///         set to 1.
             ///     </para>
             ///     <para>
             ///         If <i>SystemInfoUnion.ProcessorArchitecture</i> is
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_MIPS" />, <i>ProcessorLevel</i> is
+            ///         <c>PROCESSOR_ARCHITECTURE_MIPS</c>, <i>ProcessorLevel</i> is
             ///         of the form 00xx, where xx is an 8-bit implementation number (bits 8-15 of
             ///         the PRId register).  The member can be the following value:
             ///     </para>
@@ -297,7 +304,7 @@ namespace CADability
             ///     </para>
             ///     <para>
             ///         If <i>SystemInfoUnion.ProcessorArchitecture</i> is
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_ALPHA" />, <i>ProcessorLevel</i>
+            ///         <c>PROCESSOR_ARCHITECTURE_ALPHA</c>, <i>ProcessorLevel</i>
             ///         is of the form xxxx, where xxxx is a 16-bit processor version number (the
             ///         low-order 16 bits of a version number from the firmware).  The member can
             ///         be one of the following values:
@@ -324,7 +331,7 @@ namespace CADability
             ///     </para>
             ///     <para>
             ///         If <i>SystemInfoUnion.ProcessorArchitecture</i> is
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_PPC" />, <i>ProcessorLevel</i> is
+            ///         <c>PROCESSOR_ARCHITECTURE_PPC</c>, <i>ProcessorLevel</i> is
             ///         of the form xxxx, where xxxx is a 16-bit processor version number (the
             ///         high-order 16 bits of the Processor Version Register).  The member can be
             ///         one of the following values:
@@ -474,7 +481,7 @@ namespace CADability
             ///     </para>
             ///     <para>
             ///         <b>Windows Me/98/95:</b>  The system always sets this member to zero, the
-            ///         value defined for <see cref="WinNt.PROCESSOR_ARCHITECTURE_INTEL" />.
+            ///         value defined for <c>PROCESSOR_ARCHITECTURE_INTEL</c>.
             ///     </para>
             /// </summary>
             [FieldOffset(0)]
@@ -488,26 +495,26 @@ namespace CADability
             ///         values:
             ///     </para>
             ///     <para>
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_UNKNOWN" />
+            ///         <c>PROCESSOR_ARCHITECTURE_UNKNOWN</c>
             ///     </para>
             ///     <para>
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_INTEL" />
+            ///         <c>PROCESSOR_ARCHITECTURE_INTEL</c>
             ///     </para>
             ///     <para>
-            ///         <b>Windows NT 3.51:</b>  <see cref="WinNt.PROCESSOR_ARCHITECTURE_MIPS" />
-            ///     </para>
-            ///     <para>
-            ///         <b>Windows NT 4.0 and earlier:</b>
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_ALPHA" />
+            ///         <b>Windows NT 3.51:</b>  <c>PROCESSOR_ARCHITECTURE_MIPS</c>
             ///     </para>
             ///     <para>
             ///         <b>Windows NT 4.0 and earlier:</b>
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_PPC" />
+            ///         <c>PROCESSOR_ARCHITECTURE_ALPHA</c>
             ///     </para>
             ///     <para>
-            ///         <b>64-bit Windows:</b>  <see cref="WinNt.PROCESSOR_ARCHITECTURE_IA64" />,
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_IA32_ON_WIN64" />,
-            ///         <see cref="WinNt.PROCESSOR_ARCHITECTURE_AMD64" />
+            ///         <b>Windows NT 4.0 and earlier:</b>
+            ///         <c>PROCESSOR_ARCHITECTURE_PPC</c>
+            ///     </para>
+            ///     <para>
+            ///         <b>64-bit Windows:</b>  <c>PROCESSOR_ARCHITECTURE_IA64</c>,
+            ///         <c>PROCESSOR_ARCHITECTURE_IA32_ON_WIN64</c>,
+            ///         <c>PROCESSOR_ARCHITECTURE_AMD64</c>
             ///     </para>
             /// </summary>
             [FieldOffset(0)]
@@ -1199,20 +1206,20 @@ namespace CADability
         ///                 <description>Description</description>
         ///             </listheader>
         ///             <item>
-        ///                 <term><see cref="WinNt.PF_3DNOW_INSTRUCTIONS_AVAILABLE" /></term>
+        ///                 <term><c>PF_3DNOW_INSTRUCTIONS_AVAILABLE</c></term>
         ///                 <description>
         ///                     The 3D-Now instruction set is available.
         ///                 </description>
         ///             </item>
         ///             <item>
-        ///                 <term><see cref="WinNt.PF_COMPARE_EXCHANGE_DOUBLE" /></term>
+        ///                 <term><c>PF_COMPARE_EXCHANGE_DOUBLE</c></term>
         ///                 <description>
         ///                     The compare and exchange double operation is available (Pentium,
         ///                     MIPS, and Alpha).
         ///                 </description>
         ///             </item>
         ///             <item>
-        ///                 <term><see cref="WinNt.PF_FLOATING_POINT_EMULATED" /></term>
+        ///                 <term><c>PF_FLOATING_POINT_EMULATED</c></term>
         ///                 <description>
         ///                     <para>
         ///                         Floating-point operations are emulated using a software
@@ -1230,38 +1237,38 @@ namespace CADability
         ///                 </description>
         ///             </item>
         ///             <item>
-        ///                 <term><see cref="WinNt.PF_FLOATING_POINT_PRECISION_ERRATA" /></term>
+        ///                 <term><c>PF_FLOATING_POINT_PRECISION_ERRATA</c></term>
         ///                 <description>
         ///                     <b>Pentium:</b>  In rare circumstances, a floating-point precision
         ///                     error can occur.
         ///                 </description>
         ///             </item>
         ///             <item>
-        ///                 <term><see cref="WinNt.PF_MMX_INSTRUCTIONS_AVAILABLE" /></term>
+        ///                 <term><c>PF_MMX_INSTRUCTIONS_AVAILABLE</c></term>
         ///                 <description>
         ///                     The MMX instruction set is available.
         ///                 </description>
         ///             </item>
         ///             <item>
-        ///                 <term><see cref="WinNt.PF_PAE_ENABLED" /></term>
+        ///                 <term><c>PF_PAE_ENABLED</c></term>
         ///                 <description>
         ///                     The processor is PAE-enabled.
         ///                 </description>
         ///             </item>
         ///             <item>
-        ///                 <term><see cref="WinNt.PF_RDTSC_INSTRUCTION_AVAILABLE" /></term>
+        ///                 <term><c>PF_RDTSC_INSTRUCTION_AVAILABLE</c></term>
         ///                 <description>
         ///                     The RDTSC instruction is available.
         ///                 </description>
         ///             </item>
         ///             <item>
-        ///                 <term><see cref="WinNt.PF_XMMI_INSTRUCTIONS_AVAILABLE" /></term>
+        ///                 <term><c>PF_XMMI_INSTRUCTIONS_AVAILABLE</c></term>
         ///                 <description>
         ///                     The SSE instruction set is available.
         ///                 </description>
         ///             </item>
         ///             <item>
-        ///                 <term><see cref="WinNt.PF_XMMI64_INSTRUCTIONS_AVAILABLE" /></term>
+        ///                 <term><c>PF_XMMI64_INSTRUCTIONS_AVAILABLE</c></term>
         ///                 <description>
         ///                     The SSE2 instruction set is available.
         ///                 </description>
@@ -1733,6 +1740,11 @@ namespace CADability
     /// OpenGL wrapper methods and constants. See OpenGL documentation for more information.
     /// </summary>
 
+    /// <summary>
+    /// The OpenGL 1.x functions and constants, as P/Invoke declarations into opengl32.dll, taken from the Tao
+    /// framework. CADability.Forms paints with them (PaintToOpenGL). The members are documented in the OpenGL
+    /// reference; the names are the OpenGL names with the "gl" and "GL_" prefixes kept.
+    /// </summary>
     [CLSCompliant(false)]
     public static class Gl
     {
@@ -51879,9 +51891,17 @@ namespace CADability
         */
     }
 
+    /// <summary>
+    /// The OpenGL utility library (GLU) functions and constants CADability uses, as P/Invoke declarations into
+    /// glu32.dll, taken from the Tao framework. Documented in the OpenGL reference.
+    /// </summary>
     public static class Glu
     {
         private const CallingConvention CALLING_CONVENTION = CallingConvention.Winapi;
+        /// <summary>
+        /// Handle of a GLU NURBS renderer (<c>GLUnurbs*</c> in the C API), created by <see cref="gluNewNurbsRenderer"/>
+        /// and passed to the <c>gluNurbs...</c> functions.
+        /// </summary>
         [StructLayout(LayoutKind.Sequential)]
         public struct GLUnurbs
         {
@@ -51909,6 +51929,9 @@ namespace CADability
         public static extern void gluPickMatrix(double x, double y, double width, double height, [In] int[] viewport);
     }
 
+    /// <summary>
+    /// The user32 functions CADability needs for OpenGL: getting and releasing the device context of a window.
+    /// </summary>
     public static class User
     {
         private const CallingConvention CALLING_CONVENTION = CallingConvention.StdCall;
@@ -51919,6 +51942,10 @@ namespace CADability
         public static extern IntPtr GetDC(IntPtr windowHandle);
     }
 
+    /// <summary>
+    /// The wgl functions and constants of opengl32.dll that connect OpenGL to a Windows device context (rendering
+    /// contexts, pixel formats, font outlines), as P/Invoke declarations taken from the Tao framework.
+    /// </summary>
     public static class Wgl
     {
         private const CallingConvention CALLING_CONVENTION = CallingConvention.StdCall;

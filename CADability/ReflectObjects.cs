@@ -7,7 +7,9 @@ using System.Collections;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Action that mirrors the given objects. The user chooses the mirror by picking a point (reflection at that point), a
+    /// line or a plane; a boolean input decides whether the originals are kept (copy) or replaced. The mirrored objects are
+    /// shown as feedback while the input is made. Menu id: "ReflectObjects".
     /// </summary>
     public class ReflectObjects : ConstructAction
     {
@@ -107,6 +109,7 @@ namespace CADability.Actions
         }
 
 
+        /// <inheritdoc/>
         public override void OnSetAction()
         {
             base.ActiveObject = block;
@@ -150,11 +153,13 @@ namespace CADability.Actions
 
 
 
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "ReflectObjects";
         }
 
+        /// <inheritdoc/>
         public override void OnDone()
         {
             // ist die Shift Taste gehalten, so werden Kopien gemacht, d.h. der die Elemente

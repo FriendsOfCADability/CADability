@@ -92,6 +92,7 @@ namespace CADability
             this.ind = ind;
         }
 
+        /// <inheritdoc/>
         public override T this[int index]
         {
             get
@@ -104,6 +105,7 @@ namespace CADability
             }
 
         }
+        /// <inheritdoc/>
         public override int Length => a.GetLength(1);
     }
 
@@ -122,6 +124,7 @@ namespace CADability
             this.ind = ind;
         }
 
+        /// <inheritdoc/>
         public override T this[int index]
         {
             get
@@ -134,6 +137,7 @@ namespace CADability
             }
 
         }
+        /// <inheritdoc/>
         public override int Length => a.GetLength(0);
     }
 
@@ -151,6 +155,7 @@ namespace CADability
             rc = a.GetLength(1);
         }
 
+        /// <inheritdoc/>
         public override T this[int index]
         {
             get
@@ -163,6 +168,7 @@ namespace CADability
             }
 
         }
+        /// <inheritdoc/>
         public override int Length => a.GetLength(0) * a.GetLength(1);
     }
 
@@ -179,6 +185,7 @@ namespace CADability
             this.a = a;
         }
 
+        /// <inheritdoc/>
         public override T this[int index]
         {
             get
@@ -191,8 +198,15 @@ namespace CADability
             }
 
         }
+        /// <inheritdoc/>
         public override int Length => a.Length;
     }
+    /// <summary>
+    /// Adapter which exposes a <see cref="List{T}"/> as an <see cref="IArray{T}"/> without copying it, so that a list can be passed
+    /// to methods which take an <see cref="IArray{T}"/>, e.g. the fitting methods of <see cref="GaussNewtonMinimizer"/>. Reading and
+    /// writing by index goes straight through to the list. Internal helper, not an entry point of the API.
+    /// </summary>
+    /// <typeparam name="T">Element type of the list</typeparam>
     public class ListToIArray<T> : IArrayImpl<T>
     {
         List<T> a;
@@ -201,6 +215,7 @@ namespace CADability
             this.a = a;
         }
 
+        /// <inheritdoc/>
         public override T this[int index]
         {
             get
@@ -213,6 +228,7 @@ namespace CADability
             }
 
         }
+        /// <inheritdoc/>
         public override int Length => a.Count;
     }
 }

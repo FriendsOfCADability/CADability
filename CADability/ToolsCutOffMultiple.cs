@@ -6,7 +6,11 @@ using System;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Chamfers all corners of a path or polyline at once ("chamfer multiple"). The user selects the path, enters the
+    /// chamfer length and the chamfer angle and chooses how the length is measured: as the length cut off from the
+    /// first segment, as the length of the chamfer line itself, or as the distance of the chamfer from the corner
+    /// along the bisector. Every corner at which two adjacent segments lie in a common plane and the chamfer is
+    /// possible is replaced by a chamfer line; the result replaces the original path. Menu id: "ToolsCutOffMultiple".
     /// </summary>
     internal class ToolsCutOffMultiple : ConstructAction
     {

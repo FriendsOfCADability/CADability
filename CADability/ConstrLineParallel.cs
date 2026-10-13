@@ -6,7 +6,11 @@ using MouseEventArgs = CADability.Substitutes.MouseEventArgs;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a line parallel to an existing line at a given distance. The user selects a line (segments of
+    /// polylines and paths are accepted as single lines) and enters the distance; the side on which the parallel is
+    /// created is chosen by the mouse position or by switching to the other solution. The new line has the same
+    /// length as the original and lies in the plane through the original line perpendicular to the active drawing plane.
+    /// Menu id: "Constr.Line.ParallelDist".
     /// </summary>
     internal class ConstrLineParallel : ConstructAction
     {

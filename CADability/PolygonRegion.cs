@@ -6,7 +6,7 @@ namespace CADability
 {
     /// <summary>
     /// Turns a set of closed polygons that may intersect themselves and each other into
-    /// non intersecting outline/hole groups, which is what <see cref="CDTriangulation"/> needs.
+    /// non intersecting outline/hole groups, which is what a constrained (Delaunay) triangulation needs.
     /// The input follows the usual convention: counterclockwise loops are outlines, clockwise
     /// loops are holes; the region described by the input is the set of points with a winding
     /// number of 1 or more.

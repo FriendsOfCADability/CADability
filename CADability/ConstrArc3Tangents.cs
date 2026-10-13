@@ -6,7 +6,11 @@ using System.Collections;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a circular arc which is tangent to three curves. The user picks the three tangent objects (polylines and
+    /// paths are decomposed into their single elements); the radius is computed and only displayed. The arc spans between two of
+    /// the three tangent points. Which part of the circle is used and which of the possible circles is taken is chosen with the
+    /// multi-solution mechanism, starting with the solution closest to the pick positions. Started with the menu id
+    /// "Constr.Arc.ThreeTangents".
     /// </summary>
     internal class ConstrArc3Tangents : ConstructAction
     {

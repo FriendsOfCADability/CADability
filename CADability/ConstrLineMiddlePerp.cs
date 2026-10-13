@@ -5,7 +5,11 @@ using System.Collections;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of the perpendicular bisector of a line: the new line starts at the midpoint of the picked
+    /// line and runs perpendicular to it in the active drawing plane. The user picks the line (only
+    /// <see cref="Line"/> objects are accepted) and enters the length; the side on which the new line is drawn
+    /// follows the mouse position and can be switched with the next/previous solution commands. Started
+    /// with the action id "Constr.Line.MiddlePerp" (menu command "MenuId.Constr.Line.MiddlePerp").
     /// </summary>
     internal class ConstrLineMiddlePerp : ConstructAction
     {

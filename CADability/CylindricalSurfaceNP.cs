@@ -28,6 +28,17 @@ namespace CADability.GeoObject
 		int id;
 		static int idcnt = 0;
 #endif
+		/// <summary>
+		/// Creates the cylinder from its coordinate system: <paramref name="xAxis"/> and <paramref name="yAxis"/> are perpendicular to
+		/// <paramref name="zAxis"/>, have the same length, which is the radius, and span the u/v plane through
+		/// <paramref name="location"/>; <paramref name="zAxis"/> is the axis of the cylinder and its length is the length of the
+		/// usable part, which starts at <paramref name="location"/>. The normals point outward when the three vectors form a
+		/// right-handed system, inward otherwise (see <see cref="OutwardOriented"/>).
+		/// </summary>
+		/// <param name="location">the center of the circle at the start of the usable part</param>
+		/// <param name="xAxis">the direction of u in the u/v plane, with the radius as length</param>
+		/// <param name="yAxis">the direction of v in the u/v plane, perpendicular to <paramref name="xAxis"/>, with the radius as length</param>
+		/// <param name="zAxis">the axis of the cylinder, with the length of the usable part as length</param>
 		public CylindricalSurfaceNP(GeoPoint location, GeoVector xAxis, GeoVector yAxis, GeoVector zAxis)
 		{
 #if DEBUG
@@ -38,6 +49,17 @@ namespace CADability.GeoObject
 			this.yAxis = yAxis;
 			this.zAxis = zAxis;
 		}
+		/// <summary>
+		/// Creates a cylinder with the given radius about the axis through <paramref name="center"/> in direction
+		/// <paramref name="axis"/>, whose usable part is the smallest interval along the axis that contains all of
+		/// <paramref name="orientedCurves"/>, typically the edges of the face that is going to use the surface.
+		/// <see cref="CylindricalSurface.GetNonPeriodicSurface(ICurve[])"/> uses this to replace a periodic cylinder.
+		/// </summary>
+		/// <param name="center">a point on the axis</param>
+		/// <param name="radius">the radius of the cylinder</param>
+		/// <param name="axis">the direction of the axis</param>
+		/// <param name="outwardOriented">true when the normals shall point away from the axis, false when they shall point to the axis (a hole)</param>
+		/// <param name="orientedCurves">curves on the cylinder (e.g. the edges of a face) that define the extent of the usable part along the axis</param>
 		public CylindricalSurfaceNP(GeoPoint center, double radius, GeoVector axis, bool outwardOriented, ICurve[] orientedCurves)
 		{
 #if DEBUG
@@ -71,6 +93,7 @@ namespace CADability.GeoObject
 			zAxis.Length = (maxpos - minpos) * axis.Length;
 		}
 
+		/// <inheritdoc/>
 		public override ICurve FixedU(double u, double vmin, double vmax)
 		{
 			if (Math.Abs(u) < xAxis.Length * 1e-6)
@@ -94,6 +117,7 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <inheritdoc/>
 		public override ICurve FixedV(double v, double umin, double umax)
 		{
 			Line2D l2d = new Line2D(new GeoPoint2D(umin, v), new GeoPoint2D(umax, v));
@@ -123,6 +147,7 @@ namespace CADability.GeoObject
 				return e;
 			}
 		}
+		/// <inheritdoc/>
 		public override ICurve Make3dCurve(ICurve2D curve2d)
 		{
 			if (curve2d is Line2D l2d)
@@ -180,6 +205,7 @@ namespace CADability.GeoObject
 			}
 			return base.Make3dCurve(curve2d);
 		}
+		/// <inheritdoc/>
 		public override ICurve2D GetProjectedCurve(ICurve curve, double precision)
 		{
 #if DEBUG
@@ -238,10 +264,12 @@ namespace CADability.GeoObject
 			return base.GetProjectedCurve(curve, precision);
 		}
 
+		/// <inheritdoc/>
 		public override ISurface GetModified(ModOp m)
 		{
 			return new CylindricalSurfaceNP(m * location, m * xAxis, m * yAxis, m * zAxis);
 		}
+		/// <inheritdoc/>
 		public override void Modify(ModOp m)
 		{
 			boxedSurfaceEx = null;
@@ -251,6 +279,7 @@ namespace CADability.GeoObject
 			yAxis = m * yAxis;
 			zAxis = m * zAxis;
 		}
+		/// <inheritdoc/>
 		public override GeoPoint PointAt(GeoPoint2D uv)
 		{
 			double l = Math.Sqrt(uv.x * uv.x + uv.y * uv.y);
@@ -267,6 +296,7 @@ namespace CADability.GeoObject
 			double a = Math.Atan2(uv.y, uv.x);
 			return location + Math.Cos(a) * xAxis + Math.Sin(a) * yAxis + z * zAxis;
 		}
+		/// <inheritdoc/>
 		public override double MaxDist(GeoPoint2D sp, GeoPoint2D ep, out GeoPoint2D mp)
 		{
 			GeoPoint sp3d = PointAt(sp);
@@ -275,6 +305,7 @@ namespace CADability.GeoObject
 			mp = PositionOf(sp3d + u2 * (ep3d - sp3d));
 			return xAxis.Length - d;
 		}
+		/// <inheritdoc/>
 		public override GeoVector UDirection(GeoPoint2D uv)
 		{
 			double l2 = uv.x * uv.x + uv.y * uv.y;
@@ -285,6 +316,7 @@ namespace CADability.GeoObject
 			return (-(uv.x * (r - l)) / l32) * zAxis - (uv.x) / l2 * zAxis - (uv.x * uv.y) / l32 * yAxis + 1 / l * xAxis - (uv.x * uv.x) / l32 * xAxis;
 		}
 
+		/// <inheritdoc/>
 		public override GeoVector VDirection(GeoPoint2D uv)
 		{
 			double l2 = uv.x * uv.x + uv.y * uv.y;
@@ -294,6 +326,7 @@ namespace CADability.GeoObject
 			double r = xAxis.Length;
 			return (-(uv.y * (r - l)) / l32) * zAxis - (uv.y) / l2 * zAxis + 1 / l * yAxis - (uv.y * uv.y) / l32 * yAxis - (uv.x * uv.y) / l32 * xAxis;
 		}
+		/// <inheritdoc/>
 		public override void Derivation2At(GeoPoint2D uv, out GeoPoint p, out GeoVector du, out GeoVector dv, out GeoVector duu, out GeoVector dvv, out GeoVector duv)
 		{   // from maxima and common sub expression
 			double u = uv.x;
@@ -311,6 +344,7 @@ namespace CADability.GeoObject
 			dvv = sc1 + 3.0 * sqr(v) * uvl * zAxis / uv52 - zl + 3.0 * sqr(v) * zAxis / sqr(sqr(v) + sqr(u)) - u * yAxis / uv32 + 3.0 * u * sqr(v) * yAxis / uv52 - 3.0 * v * xAxis / uv32 + 3.0 * cube(v) * xAxis / uv52;
 			duv = 3.0 * u * v * uvl * zAxis / uv52 + 3.0 * u * v * zAxis / sqr(sqr(v) + sqr(u)) - v * yAxis / uv32 + 3.0 * sqr(u) * v * yAxis / uv52 - u * xAxis / uv32 + 3.0 * u * sqr(v) * xAxis / uv52;
 		}
+		/// <inheritdoc/>
 		public override GeoPoint2D PositionOf(GeoPoint p)
 		{
 			double r = xAxis.Length;
@@ -319,6 +353,7 @@ namespace CADability.GeoObject
 			v2d.Length = r / v.z;
 			return new GeoPoint2D(v2d.x, v2d.y);
 		}
+		/// <inheritdoc/>
 		public override GeoPoint2D[] PerpendicularFoot(GeoPoint fromHere)
 		{
 			GeoPoint onAxis = Geometry.DropPL(fromHere, location, zAxis);
@@ -326,6 +361,7 @@ namespace CADability.GeoObject
 			toHere.Length = xAxis.Length;
 			return new GeoPoint2D[] { PositionOf(onAxis + toHere), PositionOf(onAxis - toHere) };
 		}
+		/// <inheritdoc/>
 		public override ModOp2D ReverseOrientation()
 		{   // flip x and y axis, keep z axis, left handed system
 			GeoVector tmp = xAxis;
@@ -334,8 +370,11 @@ namespace CADability.GeoObject
 			return new ModOp2D(0, 1, 0, 1, 0, 0);
 
 		}
+		/// <inheritdoc/>
 		public override bool IsUPeriodic => false;
+		/// <inheritdoc/>
 		public override bool IsVPeriodic => false;
+		/// <inheritdoc/>
 		public override bool SameGeometry(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, double precision, out ModOp2D firstToSecond)
 		{
 			if (other is CylindricalSurfaceNP cnp)
@@ -350,6 +389,7 @@ namespace CADability.GeoObject
 			}
 			return base.SameGeometry(thisBounds, other, otherBounds, precision, out firstToSecond);
 		}
+		/// <inheritdoc/>
 		public override double IsParallel(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds)
 		{
 			if (other is ICylinder c)
@@ -362,6 +402,7 @@ namespace CADability.GeoObject
 			return double.MaxValue;
 		}
 
+		/// <inheritdoc/>
 		public override Polynom GetImplicitPolynomial()
 		{
 			if (implicitPolynomial == null)
@@ -378,6 +419,10 @@ namespace CADability.GeoObject
 			return implicitPolynomial;
 		}
 
+		/// <summary>
+		/// Writes the location and the three axes for the JSON serialization (<see cref="IJsonSerialize"/>).
+		/// </summary>
+		/// <param name="data">receives the properties</param>
 		public void GetObjectData(IJsonWriteData data)
 		{
 			data.AddProperty("Location", location);
@@ -385,7 +430,16 @@ namespace CADability.GeoObject
 			data.AddProperty("YAxis", yAxis);
 			data.AddProperty("ZAxis", zAxis);
 		}
+		/// <summary>
+		/// Empty constructor for the JSON deserialization (<see cref="IJsonSerialize"/>); the data is set by
+		/// <see cref="SetObjectData(IJsonReadData)"/>.
+		/// </summary>
 		protected CylindricalSurfaceNP() { } // for JSON
+		/// <summary>
+		/// Reads the data written by <see cref="GetObjectData(IJsonWriteData)"/> for the JSON deserialization
+		/// (<see cref="IJsonSerialize"/>).
+		/// </summary>
+		/// <param name="data">provides the properties</param>
 		public void SetObjectData(IJsonReadData data)
 		{
 			location = data.GetProperty<GeoPoint>("Location");
@@ -393,6 +447,12 @@ namespace CADability.GeoObject
 			yAxis = data.GetProperty<GeoVector>("YAxis");
 			zAxis = data.GetProperty<GeoVector>("ZAxis");
 		}
+		/// <summary>
+		/// Constructor for the legacy binary deserialization (<see cref="System.Runtime.Serialization.ISerializable"/>). Files are
+		/// written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
+		/// </summary>
+		/// <param name="info">the data of the object</param>
+		/// <param name="context">the source of the deserialization</param>
 		protected CylindricalSurfaceNP(SerializationInfo info, StreamingContext context)
 		{
 			location = (GeoPoint)info.GetValue("Location", typeof(GeoPoint));
@@ -407,6 +467,7 @@ namespace CADability.GeoObject
 			info.AddValue("YAxis", yAxis);
 			info.AddValue("ZAxis", zAxis);
 		}
+		/// <inheritdoc/>
 		public override void GetSafeParameterSteps(double umin, double umax, double vmin, double vmax, out double[] intu, out double[] intv)
 		{   // here we want to provide parameter steps so that there are invalid patches, which are completely outside the annulus.
 			// The boxed surface ignores patches which return false for "IsInside" for all its vertices. And with this segmentation, 
@@ -429,6 +490,7 @@ namespace CADability.GeoObject
 			intu = usteps.ToArray();
 			intv = vsteps.ToArray();
 		}
+		/// <inheritdoc/>
 		public override IDualSurfaceCurve[] GetPlaneIntersection(PlaneSurface pl, double umin, double umax, double vmin, double vmax, double precision)
 		{
 			if (Precision.IsPerpendicular(pl.Normal, zAxis, false))
@@ -480,10 +542,12 @@ namespace CADability.GeoObject
 			}
 			return new IDualSurfaceCurve[0];
 		}
+		/// <inheritdoc/>
 		public override bool IsVanishingProjection(Projection p, double umin, double umax, double vmin, double vmax)
 		{
 			return Precision.SameDirection(p.Direction, zAxis, false);
 		}
+		/// <inheritdoc/>
 		public override ICurve2D[] GetTangentCurves(GeoVector direction, double umin, double umax, double vmin, double vmax)
 		{
 			if (Precision.SameDirection(direction, zAxis, false))
@@ -502,11 +566,20 @@ namespace CADability.GeoObject
 			}
 			return res.ToArray();
 		}
+		/// <summary>
+		/// Returns a new cylinder with the same axis, radius and orientation whose usable part along the axis is the smallest
+		/// interval that contains <paramref name="curves"/>, see
+		/// <see cref="CylindricalSurfaceNP(GeoPoint, double, GeoVector, bool, ICurve[])"/>. Called e.g. when faces are merged and
+		/// the edges of the result must fit into the domain of the surface.
+		/// </summary>
+		/// <param name="curves">curves on the cylinder (e.g. edges) that the domain must contain</param>
+		/// <returns>the adapted surface; this surface is not modified</returns>
 		public ISurface AdaptToCurves(IEnumerable<ICurve> curves)
 		{
 			return new CylindricalSurfaceNP(this.location, xAxis.Length, zAxis, this.OutwardOriented, curves.ToArray());
 		}
 
+		/// <inheritdoc/>
 		public bool IsInside(GeoPoint2D uv)
 		{
 			double r = xAxis.Length;
@@ -514,21 +587,25 @@ namespace CADability.GeoObject
 			return l <= r && l >= r / 2;
 		}
 
+		/// <inheritdoc/>
 		public double[] Clip(ICurve2D curve)
 		{
 			SimpleShape ss = new SimpleShape(Border.MakeCircle(GeoPoint2D.Origin, xAxis.Length), Border.MakeCircle(GeoPoint2D.Origin, xAxis.Length / 2.0));
 			return ss.Clip(curve, true);
 		}
+		/// <inheritdoc/>
 		public override void GetNaturalBounds(out double umin, out double umax, out double vmin, out double vmax)
 		{
 			double r = xAxis.Length;
 			umin = vmin = -r;
 			umax = vmax = r;
 		}
+		/// <inheritdoc/>
 		public override ISurface Clone()
 		{
 			return new CylindricalSurfaceNP(location, xAxis, yAxis, zAxis);
 		}
+		/// <inheritdoc/>
 		public override void CopyData(ISurface copyFrom)
 		{
 			if (copyFrom is CylindricalSurfaceNP cnp)
@@ -539,7 +616,9 @@ namespace CADability.GeoObject
 				zAxis = cnp.zAxis;
 			}
 		}
+		/// <inheritdoc/>
 		public override bool UvChangesWithModification => true;
+		/// <inheritdoc/>
 		public override ICurve[] Intersect(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds)
 		{
 			if (other is PlaneSurface ps)
@@ -588,8 +667,13 @@ namespace CADability.GeoObject
 		}
 		bool ISurfaceWithRadius.IsModifiable => true;
 
+		/// <summary>
+		/// True when the normals of the surface point away from the axis, i.e. when the x, y and z axes form a right-handed
+		/// system; false when they point to the axis (the surface of a hole).
+		/// </summary>
 		public bool OutwardOriented => (xAxis ^ yAxis) * zAxis > 0; // left-handed system
 
+		/// <inheritdoc/>
 		public override IPropertyEntry GetPropertyEntry(IFrame frame)
 		{
 			List<IPropertyEntry> se = new List<IPropertyEntry>();
@@ -618,6 +702,7 @@ namespace CADability.GeoObject
 			return new GroupProperty("CylindricalSurface", se.ToArray());
 		}
 
+		/// <inheritdoc/>
 		public GeoPoint RestrictedPointAt(GeoPoint2D uv)
 		{
 			double l = Math.Sqrt(uv.x * uv.x + uv.y * uv.y);

@@ -15,7 +15,7 @@ namespace CADability
             /// </summary>
             public Node[] subNode;
             /// <summary>
-            /// Set of <see cref="INDimTreeInsertable"/> objects in this NDimTree
+            /// Set of objects (of type <typeparamref name="T"/>) in this NDimTree
             /// This set is the contents of the leaf of the tree. If it is null, the tree has been subdevided and subTree containst the branches.
             /// Implemented as a set, because it is faster to unite with another set
             /// </summary>

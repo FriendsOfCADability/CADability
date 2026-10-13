@@ -3,7 +3,10 @@
 namespace CADability.UserInterface
 {
     /// <summary>
-    /// 
+    /// Property page entry used by <see cref="CADability.Actions.ConstructAction.CurveInput"/>: shows the curves that
+    /// are currently under the cursor (or have been selected) as sub entries, one of which is the selected curve.
+    /// Selecting another sub entry raises <see cref="SelectionChangedEvent"/>, which lets the user choose among
+    /// several candidate curves.
     /// </summary>
     internal class CurvesProperty : IShowPropertyImpl
     {
@@ -57,9 +60,7 @@ namespace CADability.UserInterface
             }
         }
         #region IShowPropertyImpl Overrides
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -77,10 +78,7 @@ namespace CADability.UserInterface
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -88,10 +86,7 @@ namespace CADability.UserInterface
                 return curves.Length;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get

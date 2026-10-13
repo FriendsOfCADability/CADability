@@ -8,6 +8,15 @@ using static CADability.Actions.ConstructAction;
 
 namespace CADability.Actions
 {
+    /// <summary>
+    /// Interactive parametric modification of a solid: the distance between two sets of faces of a shell is changed by moving the
+    /// faces of one set, or both sets symmetrically, along the direction of the distance, e.g. to change the distance of a hole from
+    /// a side face or the position of the axis of a cylindrical face. The faces, the direction and the current distance are
+    /// determined when the action is created from the context menu of the selected faces ("MenuId.FaceDistance",
+    /// "MenuId.AxisPosition"); the user enters the new distance, may add more faces to move in either direction and may add a named
+    /// <see cref="ParametricDistanceProperty"/> to the shell to keep the distance adjustable. When finished, the solid is replaced in
+    /// the model by the modified one. Its id is "Constr.Parametrics.DistanceTo".
+    /// </summary>
     public class ParametricsDistanceAction : ConstructAction
     {
         private GeoPoint point1; // the first point of the line defining the distance
@@ -124,10 +133,12 @@ namespace CADability.Actions
             this.point1 = point1;
         }
 
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "Constr.Parametrics.DistanceTo";
         }
+        /// <inheritdoc/>
         public override bool OnCommand(string MenuId)
         {
             switch (MenuId)
@@ -138,6 +149,7 @@ namespace CADability.Actions
             }
             return false;
         }
+        /// <inheritdoc/>
         public override void OnSetAction()
         {
             base.TitleId = "Constr.Parametrics.DistanceTo";
@@ -306,6 +318,7 @@ namespace CADability.Actions
             Refresh();
         }
 
+        /// <inheritdoc/>
         public override void OnDone()
         {
             if (validResult && ActiveObject != null)
@@ -341,6 +354,7 @@ namespace CADability.Actions
             ActiveObject = null;
             base.OnDone();
         }
+        /// <inheritdoc/>
         public override void OnRemoveAction()
         {
             if (shell.Layer != null) shell.Layer.Transparency = 0; // make the layer opaque again

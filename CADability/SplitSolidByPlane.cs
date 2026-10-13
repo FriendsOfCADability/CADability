@@ -2,6 +2,12 @@
 
 namespace CADability.Actions
 {
+    /// <summary>
+    /// Interactive splitting of a solid by a plane: the user defines the plane (initially the drawing plane) with a
+    /// <see cref="ConstructAction.PlaneInput"/>, which is shown as a feedback rectangle, and when the action is finished the solid is
+    /// replaced in the model by the solids on both sides of the plane (see <see cref="BRepOperation.SplitByPlane"/>). Created with the
+    /// solid to split and started by its context menu command "MenuId.SplitByPlane"; its id is "Constr.SplitSolidByPlane".
+    /// </summary>
     public class SplitSolidByPlane : ConstructAction
     {
         private Plane plane; // die zentrale Ebene
@@ -34,6 +40,7 @@ namespace CADability.Actions
             RecalcFeedbackPolyLine();
             return true;
         }
+        /// <inheritdoc/>
         public override void OnSetAction()
         {
             //            base.ActiveObject = Polyline.Construct();
@@ -57,26 +64,31 @@ namespace CADability.Actions
             RecalcFeedbackPolyLine();
             base.Frame.SnapMode |= SnapPointFinder.SnapModes.SnapToFaceSurface;
         }
+        /// <inheritdoc/>
         public override void OnActivate(Action OldActiveAction, bool SettingAction)
         {
             base.FeedBack.Add(feedBackplane);
             base.OnActivate(OldActiveAction, SettingAction);
         }
+        /// <inheritdoc/>
         public override void OnInactivate(Action NewActiveAction, bool RemovingAction)
         {
             base.FeedBack.Remove(feedBackplane);
             base.OnInactivate(NewActiveAction, RemovingAction);
         }
+        /// <inheritdoc/>
         public override void OnRemoveAction()
         {
             base.OnRemoveAction();
             base.Frame.SnapMode &= ~SnapPointFinder.SnapModes.SnapToFaceSurface;
         }
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "Constr.SplitSolidByPlane";
         }
 
+        /// <inheritdoc/>
         public override void OnDone()
         {
             if (base.ActiveObject != null)

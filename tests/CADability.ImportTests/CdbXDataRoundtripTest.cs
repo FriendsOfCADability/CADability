@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using CADability;
 using CADability.DXF;
@@ -63,6 +64,80 @@ namespace CADability.ImportTests
             AssertSameXData(fromDxf, again);
         }
 
+        // Points (1010, 1011) are GeoPoints, displacements and directions (1012, 1013) GeoVectors, binary data
+        // a byte array and a layer reference (1003) the name of the layer. A GeoPoint is written as the array of
+        // its coordinates and came back as a list of doubles, ACadSharp's own point type was not written at all (#373).
+        [TestMethod]
+        public void cdb_keeps_xdata_points_binary_data_and_layer_names()
+        {
+            ExtendedEntityData xData = PointXData();
+            xData.Data.Add(new KeyValuePair<XDataCode, object>(XDataCode.BinaryData, new byte[] { 1, 2, 255 }));
+            xData.Data.Add(new KeyValuePair<XDataCode, object>(XDataCode.LayerName, "0"));
+            Line line = MakeLine();
+            line.UserData.Add("ACAD", xData);
+
+            AssertSameXData(xData, XDataOf(JsonRoundtrip(line), "ACAD"));
+        }
+
+        // The DXF export writes a point as a point (group codes 1010, 1020 and 1030, and the same for 1011 to 1013),
+        // not as the string of the point, and the import reads it back as GeoPoint or GeoVector.
+        [TestMethod]
+        public void dxf_export_writes_xdata_points()
+        {
+            Line line = MakeLine();
+            line.UserData.Add("ACAD", PointXData());
+            string file = Export(line, "points");
+
+            HashSet<string> groupCodes = new HashSet<string>(File.ReadAllLines(file).Select(l => l.Trim()));
+            foreach (string code in new[] { "1010", "1020", "1030", "1011", "1021", "1031", "1012", "1022", "1032", "1013", "1023", "1033" })
+                Assert.IsTrue(groupCodes.Contains(code), "group code " + code + " in the DXF file");
+            AssertSameXData(PointXData(), XDataOf(ReimportSingleObject(file), "ACAD"));
+        }
+
+        // The DWG export writes the same records through ACadSharp's DwgWriter.
+        [TestMethod]
+        public void dwg_export_writes_xdata_points()
+        {
+            Line line = MakeLine();
+            line.UserData.Add("ACAD", PointXData());
+            AssertSameXData(PointXData(), XDataOf(ReimportSingleObject(Export(line, "points", "dwg")), "ACAD"));
+        }
+
+        // netDxf split a point into three records X, Y and Z with double values, which older cdb files still hold.
+        // The export writes them as one point.
+        [TestMethod]
+        public void netdxf_point_triples_are_exported_as_points()
+        {
+            ExtendedEntityData xData = new ExtendedEntityData { ApplicationName = "ACAD" };
+            xData.Data.Add(new KeyValuePair<XDataCode, object>(XDataCode.RealX, 1.0));
+            xData.Data.Add(new KeyValuePair<XDataCode, object>(XDataCode.RealY, 2.0));
+            xData.Data.Add(new KeyValuePair<XDataCode, object>(XDataCode.RealZ, 3.0));
+            xData.Data.Add(new KeyValuePair<XDataCode, object>(XDataCode.WorldDirectionX, 0.0));
+            xData.Data.Add(new KeyValuePair<XDataCode, object>(XDataCode.WorldDirectionY, 0.0));
+            xData.Data.Add(new KeyValuePair<XDataCode, object>(XDataCode.WorldDirectionZ, 1.0));
+            Line line = MakeLine();
+            line.UserData.Add("ACAD", xData);
+
+            ExtendedEntityData back = XDataOf(ReimportSingleObject(Export(line, "triples")), "ACAD");
+
+            ExtendedEntityData expected = new ExtendedEntityData { ApplicationName = "ACAD" };
+            expected.Data.Add(new KeyValuePair<XDataCode, object>(XDataCode.RealX, new GeoPoint(1, 2, 3)));
+            expected.Data.Add(new KeyValuePair<XDataCode, object>(XDataCode.WorldDirectionX, new GeoVector(0, 0, 1)));
+            AssertSameXData(expected, back);
+        }
+
+        private static ExtendedEntityData PointXData()
+        {
+            ExtendedEntityData xData = new ExtendedEntityData { ApplicationName = "ACAD" };
+            xData.Data.Add(new KeyValuePair<XDataCode, object>(XDataCode.String, "points"));
+            xData.Data.Add(new KeyValuePair<XDataCode, object>(XDataCode.RealX, new GeoPoint(1.5, -2.25, 3)));
+            xData.Data.Add(new KeyValuePair<XDataCode, object>(XDataCode.WorldSpacePositionX, new GeoPoint(10, 20, 30)));
+            xData.Data.Add(new KeyValuePair<XDataCode, object>(XDataCode.WorldSpaceDisplacementX, new GeoVector(0.5, 0.25, 0.125)));
+            xData.Data.Add(new KeyValuePair<XDataCode, object>(XDataCode.WorldDirectionX, new GeoVector(0, 0, 1)));
+            xData.Data.Add(new KeyValuePair<XDataCode, object>(XDataCode.Real, 2.5));
+            return xData;
+        }
+
         // What DXF.Import.SetUserData makes of AutoCAD's annotative data on a dimension
         private static ExtendedEntityData AnnotativeXData()
         {
@@ -81,7 +156,8 @@ namespace CADability.ImportTests
             for (int i = 0; i < expected.Data.Count; i++)
             {
                 Assert.AreEqual(expected.Data[i].Key, actual.Data[i].Key, "group code of record " + i);
-                Assert.AreEqual(expected.Data[i].Value, actual.Data[i].Value, "value of record " + i);
+                if (expected.Data[i].Value is byte[] bytes) CollectionAssert.AreEqual(bytes, actual.Data[i].Value as byte[], "value of record " + i);
+                else Assert.AreEqual(expected.Data[i].Value, actual.Data[i].Value, "value of record " + i);
             }
         }
 
@@ -109,18 +185,18 @@ namespace CADability.ImportTests
             return xData;
         }
 
-        private string Export(IGeoObject geoObject, string suffix)
+        private string Export(IGeoObject geoObject, string suffix, string format = "dxf")
         {
             Project project = Project.CreateSimpleProject();
             project.GetModel(0).Add(geoObject.Clone());
-            string file = this.TestContext.TestName + "_" + suffix + ".dxf";
-            Assert.IsTrue(project.Export(file, "dxf"), "export must succeed");
+            string file = this.TestContext.TestName + "_" + suffix + "." + format;
+            Assert.IsTrue(project.Export(file, format), "export must succeed");
             return file;
         }
 
         private static IGeoObject ReimportSingleObject(string file)
         {
-            Project project = Project.ReadFromFile(file, "dxf");
+            Project project = Project.ReadFromFile(file, System.IO.Path.GetExtension(file).TrimStart('.'));
             Assert.IsNotNull(project);
             Model model = project.GetActiveModel();
             Assert.AreEqual(1, model.AllObjects.Count, "one entity expected after re-import");

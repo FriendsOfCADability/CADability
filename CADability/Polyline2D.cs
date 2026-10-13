@@ -8,8 +8,16 @@ using System.Runtime.Serialization;
 namespace CADability.Curve2D
 {
 
+    /// <summary>
+    /// Thrown by the constructor of <see cref="Polyline2D"/> when the polyline cannot be built, i.e. when fewer than two distinct
+    /// vertices are given. <see cref="Polyline2D.MakePolyline2D"/> returns null in that case instead.
+    /// </summary>
     public class Polyline2DException : ApplicationException
     {
+        /// <summary>
+        /// Creates the exception with the given message.
+        /// </summary>
+        /// <param name="msg">the message describing the failure</param>
         public Polyline2DException(string msg)
             : base(msg)
         {
@@ -25,6 +33,13 @@ namespace CADability.Curve2D
     {
         private GeoPoint2D[] vertex;
         private double length;
+        /// <summary>
+        /// Constructs the polyline through the given vertices in their order. Consecutive vertices closer than
+        /// <see cref="Precision.eps"/> are merged into one. The polyline is closed when the last vertex coincides with the first, so
+        /// a closed outline must repeat its first vertex at the end.
+        /// </summary>
+        /// <param name="vertex">the vertices, at least two distinct ones</param>
+        /// <exception cref="Polyline2DException">when fewer than two distinct vertices remain</exception>
         public Polyline2D(GeoPoint2D[] vertex)
         {
             if (vertex.Length < 2) throw new Polyline2DException("Constructing Polyline2D with less than two points");
@@ -44,6 +59,12 @@ namespace CADability.Curve2D
             if (pnts.Count < 2) throw new Polyline2DException("Constructing Polyline2D with less than two points");
             this.vertex = pnts.ToArray();
         }
+        /// <summary>
+        /// Creates the polyline through the given vertices like the constructor, but returns null instead of throwing when fewer
+        /// than two distinct vertices are given.
+        /// </summary>
+        /// <param name="vertex">the vertices</param>
+        /// <returns>the polyline, or null</returns>
         public static Polyline2D MakePolyline2D(GeoPoint2D[] vertex)
         {   // analog zum Konstruktor, nur ohne exception
             if (vertex.Length < 2) return null;
@@ -61,6 +82,15 @@ namespace CADability.Curve2D
             if (pnts.Count < 2) return null;
             return new Polyline2D(pnts.ToArray());
         }
+        /// <summary>
+        /// Creates a closed regular polygon with <paramref name="numberOfVertices"/> corners: <paramref name="vertex"/> is the first
+        /// corner, the others are obtained by rotating it about <paramref name="center"/> counterclockwise in steps of
+        /// 360/<paramref name="numberOfVertices"/> degrees; the last vertex repeats the first.
+        /// </summary>
+        /// <param name="center">center of the polygon</param>
+        /// <param name="vertex">the first corner; its distance from the center is the circumradius</param>
+        /// <param name="numberOfVertices">number of corners, at least 3</param>
+        /// <returns>the polygon</returns>
         public static Polyline2D MakePolygon(GeoPoint2D center, GeoPoint2D vertex, int numberOfVertices)
         {
             GeoPoint2D[] vtx = new GeoPoint2D[numberOfVertices + 1];
@@ -110,19 +140,35 @@ namespace CADability.Curve2D
             if (angle.Radian != 0.0) res = res.GetModified(ModOp2D.Rotate(center, angle)) as Polyline2D;
             return res;
         }
+        /// <summary>
+        /// Replaces all vertices. The array is used directly (not copied) and is not checked for duplicate points; the cached
+        /// length is reset.
+        /// </summary>
+        /// <param name="vertices">the new vertices, at least two</param>
         public void SetVertices(GeoPoint2D[] vertices)
         {
             vertex = vertices;
             length = 0.0;
         }
+        /// <summary>
+        /// Returns the vertex with the given index.
+        /// </summary>
+        /// <param name="index">index from 0 to <see cref="VertexCount"/>-1</param>
+        /// <returns>the vertex</returns>
         public GeoPoint2D GetVertex(int index)
         {
             return vertex[index];
         }
+        /// <summary>
+        /// The number of vertices. For a closed polyline the repeated first vertex at the end counts as well.
+        /// </summary>
         public int VertexCount
         {
             get { return vertex.Length; }
         }
+        /// <summary>
+        /// The vertices in their order, as a copy of the internal array; use <see cref="SetVertices"/> to change them.
+        /// </summary>
         public GeoPoint2D[] Vertex
         {
             get
@@ -130,6 +176,11 @@ namespace CADability.Curve2D
                 return (GeoPoint2D[])vertex.Clone();
             }
         }
+        /// <summary>
+        /// Applies the modification (translation, rotation, scaling, reflection...) to all vertices in place. Unlike
+        /// <see cref="GetModified"/> it changes this polyline instead of returning a modified copy.
+        /// </summary>
+        /// <param name="m">the modification to apply</param>
         public void Modify(ModOp2D m) // gehört das nicht in das ICurve Interface?
         {
             for (int i = 0; i < vertex.Length; ++i)
@@ -137,48 +188,35 @@ namespace CADability.Curve2D
                 vertex[i] = m * vertex[i];
             }
         }
+        /// <inheritdoc/>
         public override ICurve2D GetModified(ModOp2D m)
         {
             Polyline2D res = this.Clone() as Polyline2D;
             res.Modify(m);
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Clone ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D Clone()
         {
             Polyline2D res = new Polyline2D(vertex);
             res.UserData.CloneFrom(this.UserData);
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.CloneReverse (bool)"/>
-        /// </summary>
-        /// <param name="reverse"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D CloneReverse(bool reverse)
         {
             Polyline2D res = (Polyline2D)this.Clone();
             if (reverse) res.Reverse();
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Copy (ICurve2D)"/>
-        /// </summary>
-        /// <param name="toCopyFrom"></param>
+        /// <inheritdoc/>
         public override void Copy(ICurve2D toCopyFrom)
         {
             Polyline2D c = toCopyFrom as Polyline2D;
             this.vertex = (GeoPoint2D[])c.vertex.Clone();
             UserData.CloneFrom(c.UserData);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.AddToGraphicsPath (System.Drawing.Drawing2D.GraphicsPath, bool)"/>
-        /// </summary>
-        /// <param name="path"></param>
-        /// <param name="forward"></param>
+        /// <inheritdoc/>
         public override void AddToGraphicsPath(System.Drawing.Drawing2D.GraphicsPath path, bool forward)
         {
             if (forward)
@@ -196,11 +234,7 @@ namespace CADability.Curve2D
                 }
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.DirectionAt (double)"/>
-        /// </summary>
-        /// <param name="Position"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoVector2D DirectionAt(double Position)
         {	// normiert auf 0 bis 1
             double tot = Length * Position;
@@ -211,11 +245,7 @@ namespace CADability.Curve2D
             }
             return vertex[vertex.Length - 1] - vertex[vertex.Length - 2];
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Distance (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double Distance(GeoPoint2D p)
         {
             double mindist = double.MaxValue;
@@ -235,6 +265,7 @@ namespace CADability.Curve2D
             }
             return mindist;
         }
+        /// <inheritdoc/>
         public override GeoVector2D EndDirection
         {
             get
@@ -242,6 +273,7 @@ namespace CADability.Curve2D
                 return vertex[vertex.Length - 1] - vertex[vertex.Length - 2];
             }
         }
+        /// <inheritdoc/>
         public override GeoPoint2D EndPoint
         {
             get
@@ -254,11 +286,7 @@ namespace CADability.Curve2D
                 length = -1;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.GetAreaFromPoint (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double GetAreaFromPoint(GeoPoint2D p)
         {
             double area = 0.0;
@@ -270,18 +298,12 @@ namespace CADability.Curve2D
             }
             return area;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.GetExtendedHitTest ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IQuadTreeInsertable GetExtendedHitTest()
         {
             return new InfinitePath2D(this);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.GetExtent ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingRect GetExtent()
         {
             BoundingRect res = BoundingRect.EmptyBoundingRect;
@@ -291,12 +313,7 @@ namespace CADability.Curve2D
             }
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.HitTest (ref BoundingRect, bool)"/>
-        /// </summary>
-        /// <param name="Rect"></param>
-        /// <param name="IncludeControlPoints"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(ref BoundingRect Rect, bool IncludeControlPoints)
         {
             ClipRect clr = new ClipRect(Rect);
@@ -308,11 +325,7 @@ namespace CADability.Curve2D
             }
             return false;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Intersect (ICurve2D)"/>
-        /// </summary>
-        /// <param name="IntersectWith"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2DWithParameter[] Intersect(ICurve2D IntersectWith)
         {
             ArrayList res = new ArrayList();
@@ -336,17 +349,13 @@ namespace CADability.Curve2D
             }
             return (GeoPoint2DWithParameter[])res.ToArray(typeof(GeoPoint2DWithParameter));
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Intersect (GeoPoint2D, GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="StartPoint"></param>
-        /// <param name="EndPoint"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2DWithParameter[] Intersect(GeoPoint2D StartPoint, GeoPoint2D EndPoint)
         {
             Line2D lp = new Line2D(StartPoint, EndPoint);
             return Intersect(lp);
         }
+        /// <inheritdoc/>
         public override double[] GetSelfIntersections()
         {
             List<double> res = new List<double>();
@@ -374,15 +383,12 @@ namespace CADability.Curve2D
             }
             return res.ToArray();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.IsParameterOnCurve (double)"/>
-        /// </summary>
-        /// <param name="par"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool IsParameterOnCurve(double par)
         {
             return base.IsParameterOnCurve(par);
         }
+        /// <inheritdoc/>
         public override double Length
         {
             get
@@ -398,6 +404,7 @@ namespace CADability.Curve2D
                 return length;
             }
         }
+        /// <inheritdoc/>
         public override double Sweep
         {
             get
@@ -410,11 +417,7 @@ namespace CADability.Curve2D
                 return sweep;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.MakeGeoObject (Plane)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override CADability.GeoObject.IGeoObject MakeGeoObject(Plane p)
         {
             Polyline pl = Polyline.Construct();
@@ -426,6 +429,7 @@ namespace CADability.Curve2D
             pl.SetPoints(pp, false); // ggf. besseren Test auf geschlossen
             return pl;
         }
+        /// <inheritdoc/>
         public override GeoVector2D MiddleDirection
         {
             get
@@ -433,11 +437,7 @@ namespace CADability.Curve2D
                 return DirectionAt(0.5);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.MinDistance (ICurve2D)"/>
-        /// </summary>
-        /// <param name="Other"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double MinDistance(ICurve2D Other)
         {
             double mindist = double.MaxValue;
@@ -451,14 +451,7 @@ namespace CADability.Curve2D
             }
             return mindist;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Parallel (double, bool, double, double)"/>
-        /// </summary>
-        /// <param name="Dist"></param>
-        /// <param name="approxSpline"></param>
-        /// <param name="precision"></param>
-        /// <param name="roundAngle"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D Parallel(double Dist, bool approxSpline, double precision, double roundAngle)
         {
             Line2D[] subcurves = new Line2D[vertex.Length - 1];
@@ -471,11 +464,7 @@ namespace CADability.Curve2D
             Path2D p2d = new Path2D(subcurves);
             return p2d.Parallel(Dist, approxSpline, precision, roundAngle);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.PerpendicularFoot (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="FromHere"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D[] PerpendicularFoot(GeoPoint2D FromHere)
         {
             ArrayList res = new ArrayList();
@@ -497,11 +486,7 @@ namespace CADability.Curve2D
             }
             return (GeoPoint2D[])res.ToArray(typeof(GeoPoint2D));
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.PointAt (double)"/>
-        /// </summary>
-        /// <param name="Position"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D PointAt(double Position)
         {
             double tot = Length * Position;
@@ -518,11 +503,7 @@ namespace CADability.Curve2D
             }
             return vertex[vertex.Length - 1]; // der letzte Punkt
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.PositionOf (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double PositionOf(GeoPoint2D p)
         {
             double mindist = double.MaxValue;
@@ -597,12 +578,7 @@ namespace CADability.Curve2D
                 return 0.0; // kommt nie vor
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Project (Plane, Plane)"/>
-        /// </summary>
-        /// <param name="fromPlane"></param>
-        /// <param name="toPlane"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D Project(Plane fromPlane, Plane toPlane)
         {
             GeoPoint2D[] v = new GeoPoint2D[vertex.Length];
@@ -612,9 +588,7 @@ namespace CADability.Curve2D
             }
             return new Polyline2D(v);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Reverse ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void Reverse()
         {
             for (int i = 0; i < vertex.Length / 2; ++i)
@@ -624,11 +598,7 @@ namespace CADability.Curve2D
                 vertex[vertex.Length - i - 1] = tmp;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Move (double, double)"/>
-        /// </summary>
-        /// <param name="dx"></param>
-        /// <param name="dy"></param>
+        /// <inheritdoc/>
         public override void Move(double dx, double dy)
         {
             GeoVector2D offset = new GeoVector2D(dx, dy);
@@ -637,11 +607,7 @@ namespace CADability.Curve2D
                 vertex[i] = vertex[i] + offset;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Split (double)"/>
-        /// </summary>
-        /// <param name="Position"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D[] Split(double Position)
         {
             int ind = -1;
@@ -699,6 +665,7 @@ namespace CADability.Curve2D
             if (pl2 == null) return new ICurve2D[] { pl1 };
             return new ICurve2D[] { pl1, pl2 };
         }
+        /// <inheritdoc/>
         public override GeoVector2D StartDirection
         {
             get
@@ -706,6 +673,7 @@ namespace CADability.Curve2D
                 return vertex[1] - vertex[0];
             }
         }
+        /// <inheritdoc/>
         public override GeoPoint2D StartPoint
         {
             get
@@ -717,32 +685,17 @@ namespace CADability.Curve2D
                 vertex[0] = value;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.TangentPoints (GeoPoint2D, GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="FromHere"></param>
-        /// <param name="CloseTo"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D[] TangentPoints(GeoPoint2D FromHere, GeoPoint2D CloseTo)
         {
             return new GeoPoint2D[0];
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.TangentPointsToAngle (Angle, GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="ang"></param>
-        /// <param name="CloseTo"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D[] TangentPointsToAngle(Angle ang, GeoPoint2D CloseTo)
         {
             return new GeoPoint2D[0];
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Trim (double, double)"/>
-        /// </summary>
-        /// <param name="StartPos"></param>
-        /// <param name="EndPos"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D Trim(double StartPos, double EndPos)
         {
             if ((EndPos - StartPos) < (1.0 / vertex.Length))
@@ -791,20 +744,12 @@ namespace CADability.Curve2D
                 TrimOff(0.0, PositionOf(endpoint));
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Approximate (bool, double)"/>
-        /// </summary>
-        /// <param name="linesOnly"></param>
-        /// <param name="maxError"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D Approximate(bool linesOnly, double maxError)
         {
             return Clone();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.GetArea ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double GetArea()
         {
             double res = 0.0;
@@ -817,6 +762,7 @@ namespace CADability.Curve2D
             }
             return res / 2.0;
         }
+        /// <inheritdoc/>
         public override ICurve2D GetFused(ICurve2D toFuseWith, double precision)
         {
             if (toFuseWith is Line2D)
@@ -968,6 +914,10 @@ namespace CADability.Curve2D
             }
             return null;
         }
+        /// <summary>
+        /// Returns the segments of the polyline as individual <see cref="Line2D"/> objects, one for each pair of consecutive vertices.
+        /// </summary>
+        /// <returns>the lines in the order of the polyline</returns>
         public ICurve2D[] GetSubCurves()
         {
             Line2D[] subcurves = new Line2D[vertex.Length - 1];
@@ -990,10 +940,11 @@ namespace CADability.Curve2D
             vertex = (GeoPoint2D[])info.GetValue("Vertex", typeof(GeoPoint2D[]));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Vertex", vertex, typeof(GeoPoint2D[]));

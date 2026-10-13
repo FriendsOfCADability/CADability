@@ -111,13 +111,14 @@ namespace CADability
         PaintCapabilities Capabilities { get; }
 
         /// <summary>
-        /// Will be called before any other paint methods are called. May be called multiple times after <see cref="Init"/> has been called
+        /// Will be called before any other paint methods are called. May be called multiple times after the implementation has been initialized (its <c>Init</c> method has been called)
         /// </summary>
         void MakeCurrent();
         /// <summary>
         /// Sets the color for the next paint methods, if lockColor == 1: the color is kept unchanged until lockColor==-1 is called, lockColor==0: normal color setting
         /// </summary>
         /// <param name="color">The color to use for drawing</param>
+        /// <param name="lockColor">1: lock the color, it is kept until SetColor is called with -1; -1: unlock the color; 0: normal color setting</param>
         void SetColor(Color color, int lockColor = 0);
         /// <summary>
         /// Never use this color for drawing (because it is the background color)
@@ -151,6 +152,7 @@ namespace CADability
         /// </summary>
         /// <param name="points"></param>
         /// <param name="size"></param>
+        /// <param name="pointSymbol">the <see cref="PointSymbol"/> (dot, cross, circle etc.) to draw at each point</param>
         void Points(GeoPoint[] points, float size, PointSymbol pointSymbol);
         /// <summary>
         /// Draw a set of solid-filled triangles with the current color.
@@ -194,7 +196,7 @@ namespace CADability
         /// <summary>
         /// Draws a rectangular bitmap at the provided <paramref name="location"/> with <paramref name="directionWidth"/>
         /// specifying the direction of the lower edge of the bitmap and <paramref name="directionHeight"/>
-        /// specifying the direction of the left edge of the bitmap. <see cref="PrepareBitmap"/> must be called 
+        /// specifying the direction of the left edge of the bitmap. <see cref="PrepareBitmap(Bitmap, int, int)"/> must be called 
         /// before this method is called.
         /// </summary>
         /// <param name="bitmap">The bitmap to draw</param>
@@ -269,7 +271,7 @@ namespace CADability
         void DisplayIcon(GeoPoint p, Bitmap icon);
         /// <summary>
         /// Displays the provided bitmap at the provided location. The bitmap always faces the viewer.
-        /// <see cref="PrepareBitmap"/> has been called or must be called prior to this method.
+        /// <see cref="PrepareBitmap(Bitmap, int, int)"/> has been called or must be called prior to this method.
         /// </summary>
         /// <param name="p">Where to Paint</param>
         /// <param name="bitmap">Th ebitmap to paint</param>
@@ -402,6 +404,10 @@ namespace CADability
 
     public class PaintTo3D
     {
+        /// <summary>
+        /// Selects what <see cref="IPaintTo3D.PaintFaces"/> paints: FacesOnly (the triangulated faces, with a small depth offset to the
+        /// back), CurvesOnly (curves and edges, with a small depth offset to the front) or All (both).
+        /// </summary>
         public enum PaintMode { FacesOnly, CurvesOnly, All }
         public static void PaintHandle(IPaintTo3D paintTo3D, int x, int y, int width, Color color)
         {
@@ -579,6 +585,13 @@ namespace CADability
     }
 
 
+    /// <summary>
+    /// A display list of an <see cref="IPaintTo3D"/> implementation: a recorded sequence of paint calls which can be painted again
+    /// quickly with <see cref="IPaintTo3D.List"/> or <see cref="IPaintTo3D.SelectedList"/>. It is created by recording the calls between
+    /// <see cref="IPaintTo3D.OpenList"/> and <see cref="IPaintTo3D.CloseList"/> or by combining lists with
+    /// <see cref="IPaintTo3D.MakeList"/>; the model keeps one list per layer for its faces and one for its curves. Dispose it when it is
+    /// no longer needed to free the resources of the graphics system.
+    /// </summary>
     public interface IPaintTo3DList
     {
         string Name { get; set; }
@@ -642,6 +655,7 @@ namespace CADability
         /// <param name="viewDirection">direction of view</param>
         /// <param name="width">of the bitmap</param>
         /// <param name="height">of the bitmap</param>
+        /// <param name="extent">the extent to show in the bitmap; if null, the extent of the objects is used</param>
         /// <returns></returns>
         public static Bitmap PaintToBitmap(GeoObjectList list, GeoVector viewDirection, int width, int height, BoundingCube? extent = null)
         {

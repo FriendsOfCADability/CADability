@@ -177,7 +177,7 @@ namespace CADability.GeoObject
         internal Flags flags;
         private Edge[] edges; // secondary data, not serialized
         /// <summary>
-        /// Returns all the edges of this Shell. Each egde is unique in the array
+        /// Returns all the edges of all shells of this solid. Each edge is unique in the array
         /// but may belong to two different faces.
         /// </summary>
         public Edge[] Edges
@@ -204,16 +204,41 @@ namespace CADability.GeoObject
             }
         }
         #region polymorph construction
+        /// <summary>
+        /// Signature of <see cref="Constructor"/>.
+        /// </summary>
+        /// <returns>the new solid</returns>
         public delegate Solid ConstructionDelegate();
+        /// <summary>
+        /// When set, <see cref="Construct"/> calls this delegate instead of creating a <see cref="Solid"/>, so that an
+        /// application can substitute a derived class for every solid CADability creates (also when reading files).
+        /// </summary>
         public static ConstructionDelegate Constructor;
+        /// <summary>
+        /// Creates an empty solid, or an instance of the class <see cref="Constructor"/> provides. Set its shell with
+        /// <see cref="SetShell"/>, or use <see cref="MakeSolid"/>, which does both.
+        /// </summary>
+        /// <returns>the new solid</returns>
         public static Solid Construct()
         {
             if (Constructor != null) return Constructor();
             return new Solid();
         }
+        /// <summary>
+        /// Signature of <see cref="Constructed"/>.
+        /// </summary>
+        /// <param name="justConstructed">the solid whose constructor has just run</param>
         public delegate void ConstructedDelegate(Solid justConstructed);
+        /// <summary>
+        /// When set, this delegate is called at the end of the <see cref="Solid"/> constructor for every new solid, e.g. to
+        /// attach user data to it.
+        /// </summary>
         public static ConstructedDelegate Constructed;
         #endregion
+        /// <summary>
+        /// Creates an empty solid without shells. Not for direct use: call <see cref="Construct"/>, which honours
+        /// <see cref="Constructor"/>, and set the shell afterwards.
+        /// </summary>
         protected Solid()
             : base()
         {
@@ -231,6 +256,9 @@ namespace CADability.GeoObject
                 return shells;
             }
         }
+        /// <summary>
+        /// The outer shell of the solid, i.e. <see cref="Shells"/>[0].
+        /// </summary>
         public Shell Shell => Shells[0];
         private void OnWillChange(IGeoObject Sender, GeoObjectChange Change)
         {
@@ -246,6 +274,12 @@ namespace CADability.GeoObject
                 FireDidChange(Change);
             }
         }
+        /// <summary>
+        /// Sets the (outer) shell of this solid, replacing all previous shells. The shell must be closed (no
+        /// <see cref="Shell.OpenEdges"/>) and oriented outward to form a valid solid; this is not checked here.
+        /// The solid becomes the owner of the shell.
+        /// </summary>
+        /// <param name="sh">the shell that bounds the solid</param>
         public void SetShell(Shell sh)
         {
             if (shells != null)
@@ -277,6 +311,12 @@ namespace CADability.GeoObject
                 shells[i].DidChangeEvent += new ChangeDelegate(OnDidChange);
             }
         }
+        /// <summary>
+        /// Removes <paramref name="sh"/> from this solid, if it is the outer shell (the first one): the solid is left without
+        /// shells and no longer listens to the change events of the shell. The change is undoable (it is the reverse of
+        /// <see cref="SetShell"/>). Other shells are ignored.
+        /// </summary>
+        /// <param name="sh">the shell to remove</param>
         protected void RemoveShell(Shell sh)
         {
             if (Shells.Length > 0 && sh == Shells[0])
@@ -290,6 +330,13 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Creates a solid bound by the given closed shell (see <see cref="SetShell"/>). The solid takes the colour of the
+        /// shell. Shells come from the modelling methods in <see cref="Make3D"/> (e.g. <see cref="Make3D.SewFaces"/>) or from
+        /// the imports; check <see cref="Shell.OpenEdges"/> to make sure the shell is closed before making a solid of it.
+        /// </summary>
+        /// <param name="sh">the closed shell</param>
+        /// <returns>the solid</returns>
         public static Solid MakeSolid(Shell sh)
         {
             Solid res = Solid.Construct();
@@ -297,6 +344,12 @@ namespace CADability.GeoObject
             res.colorDef = sh.ColorDef;
             return res;
         }
+        /// <summary>
+        /// Replaces the faces of the shell <paramref name="sh"/>, which must be one of the shells of this solid, so that the
+        /// change can be undone. Used by the modelling actions to apply the result of a boolean operation to the solid.
+        /// </summary>
+        /// <param name="sh">the shell to modify</param>
+        /// <param name="faces">the new faces of the shell</param>
         public void SetFaces(Shell sh, Face[] faces)
         {   // nur wg. Undo
             Face[] clonedFaces = (Face[])sh.Faces.Clone();
@@ -328,6 +381,9 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// The <see cref="Name"/> of the solid, or an empty string when it has none.
+        /// </summary>
         public string NameOrEmpty
         {
             get
@@ -365,19 +421,12 @@ namespace CADability.GeoObject
             return v;
         }
         #region IGeoObject Members
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetShowProperties (IFrame)"/>
-        /// </summary>
-        /// <param name="Frame"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IPropertyEntry GetShowProperties(IFrame Frame)
         {
             return new ShowPropertySolid(this, Frame);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Modify (ModOp)"/>
-        /// </summary>
-        /// <param name="m"></param>
+        /// <inheritdoc/>
         public override void Modify(ModOp m)
         {
             // wir gehen hier davon aus, dass die einzelnen Shells voneinander unabhängig sind,
@@ -399,10 +448,7 @@ namespace CADability.GeoObject
             }
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Clone ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IGeoObject Clone()
         {
             // auch hier gehen wir von unabhängigen Shells aus, die keine gemeinsamen Faces oder Edges haben
@@ -421,10 +467,7 @@ namespace CADability.GeoObject
             res.name = name;
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.CopyGeometry (IGeoObject)"/>
-        /// </summary>
-        /// <param name="ToCopyFrom"></param>
+        /// <inheritdoc/>
         public override void CopyGeometry(IGeoObject ToCopyFrom)
         {
             Solid cc = ToCopyFrom as Solid;
@@ -440,10 +483,7 @@ namespace CADability.GeoObject
                 }
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.FindSnapPoint (SnapPointFinder)"/>
-        /// </summary>
-        /// <param name="spf"></param>
+        /// <inheritdoc/>
         public override void FindSnapPoint(SnapPointFinder spf)
         {
             foreach (Shell shell in shells)
@@ -451,10 +491,7 @@ namespace CADability.GeoObject
                 shell.FindSnapPoint(spf);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingCube GetBoundingCube()
         {
             BoundingCube res = BoundingCube.EmptyBoundingCube;
@@ -464,11 +501,7 @@ namespace CADability.GeoObject
             }
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3DList (IPaintTo3D, ICategorizedDislayLists)"/>
-        /// </summary>
-        /// <param name="paintTo3D"></param>
-        /// <param name="lists"></param>
+        /// <inheritdoc/>
         public override void PaintTo3DList(IPaintTo3D paintTo3D, ICategorizedDislayLists lists)
         {   // wenn einzelne Faces verschiedene layer haben, dann...?
             if (Layer != null && Layer.Transparency > 0)
@@ -477,12 +510,21 @@ namespace CADability.GeoObject
                 lists.Add(Layer, true, true, this); // in PaintTo3D wirds dann richtig gemacht
             // paintTo3D.PaintSurfaces und paintTo3D.PaintEdges muss richtig eingestellt und zweimal aufgerufen werden
         }
-        public delegate bool PaintTo3DDelegate(Solid toPaint, IPaintTo3D paintTo3D);
-        public static PaintTo3DDelegate OnPaintTo3D;
         /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3D (IPaintTo3D)"/>
+        /// Signature of <see cref="OnPaintTo3D"/>.
         /// </summary>
-        /// <param name="paintTo3D"></param>
+        /// <param name="toPaint">the solid being painted</param>
+        /// <param name="paintTo3D">the paint interface to paint to</param>
+        /// <returns>true if the handler has painted the solid and the default painting is to be skipped, false to let
+        /// CADability paint the solid</returns>
+        public delegate bool PaintTo3DDelegate(Solid toPaint, IPaintTo3D paintTo3D);
+        /// <summary>
+        /// Static hook called at the beginning of <see cref="PaintTo3D(IPaintTo3D)"/> for every solid. Set it to replace or
+        /// extend the way solids are displayed; when the handler returns true, the default painting of the shells is skipped.
+        /// Null by default.
+        /// </summary>
+        public static PaintTo3DDelegate OnPaintTo3D;
+        /// <inheritdoc/>
         public override void PaintTo3D(IPaintTo3D paintTo3D)
         {
             // hier könnte man noch das "Culling" einschalten
@@ -492,10 +534,7 @@ namespace CADability.GeoObject
                 shells[i].PaintTo3D(paintTo3D);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PrepareDisplayList (double)"/>
-        /// </summary>
-        /// <param name="precision"></param>
+        /// <inheritdoc/>
         public override void PrepareDisplayList(double precision)
         {
             for (int i = 0; i < Shells.Length; ++i)
@@ -503,6 +542,7 @@ namespace CADability.GeoObject
                 shells[i].PrepareDisplayList(precision);
             }
         }
+        /// <inheritdoc/>
         public override Style.EDefaultFor PreferredStyle
         {
             get
@@ -510,12 +550,7 @@ namespace CADability.GeoObject
                 return Style.EDefaultFor.Solids;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (Projection, ExtentPrecision)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="extentPrecision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingRect GetExtent(Projection projection, ExtentPrecision extentPrecision)
         {
             BoundingRect res = BoundingRect.EmptyBoundingRect;
@@ -525,12 +560,7 @@ namespace CADability.GeoObject
             }
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetQuadTreeItem (Projection, ExtentPrecision)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="extentPrecision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IQuadTreeInsertableZ GetQuadTreeItem(Projection projection, ExtentPrecision extentPrecision)
         {
             QuadTreeCollection res = new QuadTreeCollection(this, projection);
@@ -540,6 +570,7 @@ namespace CADability.GeoObject
             }
             return res;
         }
+        /// <inheritdoc/>
         public override Layer Layer
         {
             get
@@ -558,6 +589,7 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <inheritdoc/>
         public override IGeoObject[] OwnedItems
         {
             get
@@ -565,6 +597,7 @@ namespace CADability.GeoObject
                 return Shells;
             }
         }
+        /// <inheritdoc/>
         public override string Description
         {
             get
@@ -578,21 +611,12 @@ namespace CADability.GeoObject
         }
         #endregion
         #region IOctTreeInsertable members
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (double)"/>
-        /// </summary>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingCube GetExtent(double precision)
         {
             return GetBoundingCube();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
-        /// </summary>
-        /// <param name="cube"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(ref BoundingCube cube, double precision)
         {
             foreach (Shell sh in Shells)
@@ -609,13 +633,7 @@ namespace CADability.GeoObject
             // Edges braucht man doch nicht auch noch, oder?
             return false;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection, BoundingRect, bool)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="rect"></param>
-        /// <param name="onlyInside"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(Projection projection, BoundingRect rect, bool onlyInside)
         {
             if (onlyInside)
@@ -635,12 +653,7 @@ namespace CADability.GeoObject
                 return false;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection.PickArea, bool)"/>
-        /// </summary>
-        /// <param name="area"></param>
-        /// <param name="onlyInside"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(Projection.PickArea area, bool onlyInside)
         {
             if (onlyInside)
@@ -660,13 +673,7 @@ namespace CADability.GeoObject
                 return false;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Position (GeoPoint, GeoVector, double)"/>
-        /// </summary>
-        /// <param name="fromHere"></param>
-        /// <param name="direction"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double Position(GeoPoint fromHere, GeoVector direction, double precision)
         {
             double res = double.MaxValue;
@@ -704,6 +711,9 @@ namespace CADability.GeoObject
             // END DEBUG
         }
 #endif
+        /// <summary>
+        /// Forwards <see cref="Shell.FreeCachedMemory"/> to all shells of this solid. Currently nothing is released.
+        /// </summary>
         public void FreeCachedMemory()
         {
             for (int i = 0; i < shells.Length; i++)
@@ -712,7 +722,10 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
-        /// Unites the two solids and returns the union. If the solids are disjunct, null is returned.
+        /// Unites the two solids and returns the union as a new solid; the operands are not modified. If the solids are
+        /// disjunct (they do not overlap, touch or intersect), null is returned. Only the outer shell of each solid takes
+        /// part in the operation, cavities (further entries of <see cref="Shells"/>) are ignored. The result has no layer or
+        /// colour, use <see cref="Project.SetDefaults"/> or <see cref="IGeoObject.CopyAttributes"/> to set them.
         /// </summary>
         /// <param name="solid1">first solid</param>
         /// <param name="solid2">second solid</param>
@@ -731,12 +744,15 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
-        /// Returns the intersection of two solids, i.e. those parts that are common to both solids. If the
-        /// solids are disjunct, an empty array is returned. There may be more than one solid body as a restult.
+        /// Returns the intersection of two solids, i.e. those parts that are common to both solids, as new solids; the
+        /// operands are not modified. If the solids are disjunct or only touch, an empty array is returned. There may be
+        /// more than one solid as a result. Only the outer shell of each solid takes part in the operation, cavities
+        /// (further entries of <see cref="Shells"/>) are ignored. The result has no layer or colour, use
+        /// <see cref="Project.SetDefaults"/> or <see cref="IGeoObject.CopyAttributes"/> to set them.
         /// </summary>
         /// <param name="solid1">first solid</param>
         /// <param name="solid2">second solid</param>
-        /// <returns>array of common parts</returns>
+        /// <returns>array of common parts, empty when there are none</returns>
         static public Solid[] Intersect(Solid solid1, Solid solid2)
         {
             // hier fehlt noch der Löcherkäse: Solids mit mehreren Shells
@@ -750,13 +766,16 @@ namespace CADability.GeoObject
             return sres;
         }
         /// <summary>
-        /// Returns the difference of two solids. The second solid is removed from the first solid. If the
-        /// solids are disjunct, (a clone of the) the first solid is returned. If the second solid contains the
-        /// first solid, an empty array is returned.
+        /// Returns the difference of two solids as new solids: the second solid is removed from the first solid; the
+        /// operands are not modified. If the solids are disjunct, a copy of the first solid is returned. If the second
+        /// solid contains the first solid, an empty array is returned. Subtracting may split the first solid into
+        /// several parts. Only the outer shell of each solid takes part in the operation, cavities (further entries of
+        /// <see cref="Shells"/>) are ignored. The result has no layer or colour, use <see cref="Project.SetDefaults"/>
+        /// or <see cref="IGeoObject.CopyAttributes"/> to set them.
         /// </summary>
         /// <param name="first">first solid</param>
-        /// <param name="second">second solid</param>
-        /// <returns>the difference</returns>
+        /// <param name="second">second solid, which is subtracted</param>
+        /// <returns>the difference, one or more solids, or an empty array</returns>
         static public Solid[] Subtract(Solid first, Solid second)
         {
             // hier fehlt noch der Löcherkäse: Solids mit mehreren Shells
@@ -770,10 +789,7 @@ namespace CADability.GeoObject
             if (sres.Length == 1 && bro.Unchanged) sres[0].flags |= Flags.unchanged;
             return sres;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Decompose ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoObjectList Decompose()
         {
             Shell[] shells = this.Shells;
@@ -802,6 +818,13 @@ namespace CADability.GeoObject
             }
             return simplified;
         }
+        /// <summary>
+        /// Splits the solid by a plane and returns the parts on both sides as new solids; this solid is not modified.
+        /// A plane that does not cut the solid returns a single copy of it. Only the outer shell takes part, cavities
+        /// are ignored.
+        /// </summary>
+        /// <param name="pln">the plane</param>
+        /// <returns>the parts of the solid</returns>
         public Solid[] SplitByPlane(Plane pln)
         {
             BRepOperation brepOp = new BRepOperation(Shells[0], pln);
@@ -814,6 +837,13 @@ namespace CADability.GeoObject
             }
             return res;
         }
+        /// <summary>
+        /// Returns the points where the (infinite) line through <paramref name="location"/> with the given direction crosses
+        /// the faces of this solid, in no particular order.
+        /// </summary>
+        /// <param name="location">a point on the line</param>
+        /// <param name="direction">direction of the line</param>
+        /// <returns>the intersection points, empty when the line misses the solid</returns>
         public GeoPoint[] GetLineIntersection(GeoPoint location, GeoVector direction)
         {
             List<GeoPoint> result = new List<GeoPoint>();
@@ -843,6 +873,11 @@ namespace CADability.GeoObject
         }
 
         #region ISerializable Members
+        /// <summary>
+        /// Constructor required by deserialization
+        /// </summary>
+        /// <param name="info">SerializationInfo</param>
+        /// <param name="context">StreamingContext</param>
         protected Solid(SerializationInfo info, StreamingContext context)
             : base(context)
         {
@@ -888,6 +923,7 @@ namespace CADability.GeoObject
             info.AddValue("ColorDef", colorDef);
             info.AddValue("Name", name);
         }
+        /// <inheritdoc/>
         public override void SetObjectData(IJsonReadData data)
         {
             base.SetObjectData(data);
@@ -897,6 +933,7 @@ namespace CADability.GeoObject
             flags = data.GetPropertyOrDefault<Flags>("Flags");
             data.RegisterForSerializationDoneCallback(this);
         }
+        /// <inheritdoc/>
         public override void GetObjectData(IJsonWriteData data)
         {
             base.GetObjectData(data);
@@ -932,6 +969,10 @@ namespace CADability.GeoObject
         #endregion
         #region IColorDef Members
         private ColorDef colorDef;
+        /// <summary>
+        /// The color of this solid. Setting it sets the same color on all shells of the solid (and hence on their faces);
+        /// the change is undoable and raises the change events.
+        /// </summary>
         public ColorDef ColorDef
         {
             get => colorDef;
@@ -1076,6 +1117,12 @@ namespace CADability.GeoObject
             }
         }
 
+        /// <summary>
+        /// Returns true when the other solid has the same shells, faces and edges with the same geometry (within
+        /// <see cref="Precision.eps"/>) as this solid. Attributes like layer and colour are not compared.
+        /// </summary>
+        /// <param name="other">the solid to compare with</param>
+        /// <returns>true when the geometry is the same</returns>
         public bool SameGeometry(Solid other)
         {
             if (this.Shells.Length != other.Shells.Length) return false;
@@ -1226,11 +1273,25 @@ namespace CADability.GeoObject
             return res.ToArray();
         }
     }
+    /// <summary>
+    /// Command handler for the entries of the context menu of a <see cref="Solid"/> that apply a boolean operation to the
+    /// solid and all other solids whose extent overlaps it: "MenuId.Solid.RemoveFromAll" subtracts the solid from the
+    /// others, "MenuId.Solid.RemoveAll" subtracts the others from the solid, "MenuId.Solid.UniteWithAll" unites them all,
+    /// "MenuId.Solid.IntersectWithAll" keeps the common part and "MenuId.Solid.SplitWithAll" splits the solids into the
+    /// fragments made by their mutual intersections. The results replace the original solids in their owner (model or
+    /// block) within a single undo frame. Created by the solid when its context menu is built.
+    /// </summary>
     public class BRepOpWith : ICommandHandler
     {
         private Solid solid;
         private List<Solid> other;
         private IFrame frame;
+        /// <summary>
+        /// Creates the handler for <paramref name="solid"/> and the solids <paramref name="other"/> it interacts with.
+        /// </summary>
+        /// <param name="solid">the solid whose context menu is shown</param>
+        /// <param name="other">the other solids, those whose extent overlaps the extent of <paramref name="solid"/></param>
+        /// <param name="frame">the frame, whose project provides the undo frame</param>
         public BRepOpWith(Solid solid, List<Solid> other, IFrame frame)
         {
             this.solid = solid;

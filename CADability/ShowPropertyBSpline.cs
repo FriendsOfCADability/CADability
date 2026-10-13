@@ -168,6 +168,7 @@ namespace CADability.UserInterface
         }
         #region PropertyEntryImpl Overrides
 
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -188,7 +189,9 @@ namespace CADability.UserInterface
                 return subEntries;
             }
         }
+        /// <inheritdoc/>
         public override PropertyEntryType Flags => PropertyEntryType.ContextMenu | PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -199,6 +202,7 @@ namespace CADability.UserInterface
                 return items.ToArray();
             }
         }
+        /// <inheritdoc/>
         public override void Added(IPropertyPage propertyPage)
         {	// die events müssen in Added angemeldet und in Removed wieder abgemeldet werden,
             bSpline.DidChangeEvent += new ChangeDelegate(OnGeoObjectDidChange);
@@ -212,6 +216,7 @@ namespace CADability.UserInterface
             attributeProperties = bSpline.GetAttributeProperties(Frame);
             propertyPage.Refresh(this);
         }
+        /// <inheritdoc/>
         public override void Removed(IPropertyPage propertyPage)
         {
             bSpline.DidChangeEvent -= new ChangeDelegate(OnGeoObjectDidChange);

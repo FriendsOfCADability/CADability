@@ -24,7 +24,11 @@ namespace CADability
      */
 
     /// <summary>
-    /// Internal: ein Kante, gegeben durch zwei Oberflächen und ein Array von 3d/2d/2d Punkten
+    /// The intersection curve of two surfaces for which no exact analytic description exists, typically the 3d curve of an
+    /// <see cref="Edge"/> between two faces. It is defined by the two surfaces and an array of base points, each given in 3d
+    /// and in the 2d parameter space of both surfaces; between the base points the curve is interpolated and, where needed,
+    /// refined by intersecting the surfaces again. The 2d curves on the two surfaces are provided by the nested
+    /// <see cref="ProjectedCurve"/> class.
     /// </summary>
     [Serializable()]
     public class InterpolatedDualSurfaceCurve : GeneralCurve, IDualSurfaceCurve, IJsonSerialize, IExportStep, IJsonSerializeDone, IDeserializationCallback, IOrientation
@@ -101,6 +105,12 @@ namespace CADability
         static int idcnt = 0;
         int id;
 #endif
+        /// <summary>
+        /// The 2d curve of an <see cref="InterpolatedDualSurfaceCurve"/> in the parameter space of one of its two surfaces, returned by
+        /// <see cref="InterpolatedDualSurfaceCurve.CurveOnSurface1"/> and <see cref="InterpolatedDualSurfaceCurve.CurveOnSurface2"/>. It
+        /// has no geometry of its own but is evaluated from the base points and surfaces of the 3d curve, so it always stays consistent
+        /// with it; it serves as the 2d curve of an <see cref="Edge"/> on the faces of the intersected surfaces.
+        /// </summary>
         [Serializable()]
         public class ProjectedCurve : GeneralCurve2D, ISerializable, IJsonSerialize
         {
@@ -132,6 +142,7 @@ namespace CADability
                 BSpline2D res = base.ToBspline(0.0);
                 return res;
             }
+            /// <inheritdoc/>
             protected override void GetTriangulationBasis(out GeoPoint2D[] points, out GeoVector2D[] directions, out double[] parameters)
             {
                 List<GeoPoint2D> lpoint = new List<GeoPoint2D>();
@@ -211,6 +222,7 @@ namespace CADability
                 directions = ldirections.ToArray();
                 parameters = lparameters.ToArray();
             }
+            /// <inheritdoc/>
             public override GeoVector2D DirectionAt(double par)
             {
                 GeoPoint2D uv1, uv2;
@@ -300,6 +312,7 @@ namespace CADability
                     }
                 }
             }
+            /// <inheritdoc/>
             public override GeoPoint2D PointAt(double par)
             {
                 GeoPoint2D uv1, uv2;
@@ -309,6 +322,7 @@ namespace CADability
                 if (onSurface1) return uv1;
                 else return uv2;
             }
+            /// <inheritdoc/>
             public override double PositionOf(GeoPoint2D p)
             {   // in die 3d Situation übersetzen, demit die periodischen Flächen keine Probleme machen
                 GeoPoint p3d;
@@ -318,6 +332,7 @@ namespace CADability
                 if (reversed) return 1 - res;
                 else return res;
             }
+            /// <inheritdoc/>
             public override GeoPoint2D StartPoint
             {
                 get
@@ -348,6 +363,7 @@ namespace CADability
                     base.StartPoint = value;
                 }
             }
+            /// <inheritdoc/>
             public override GeoPoint2D EndPoint
             {
                 get
@@ -378,6 +394,7 @@ namespace CADability
                     base.EndPoint = value;
                 }
             }
+            /// <inheritdoc/>
             public override GeoVector2D StartDirection
             {
                 get
@@ -385,6 +402,7 @@ namespace CADability
                     return DirectionAt(0.0);
                 }
             }
+            /// <inheritdoc/>
             public override GeoVector2D EndDirection
             {
                 get
@@ -392,6 +410,7 @@ namespace CADability
                     return DirectionAt(1.0);
                 }
             }
+            /// <inheritdoc/>
             public override ICurve2D Trim(double StartPos, double EndPos)
             {
                 double sp = StartPos;
@@ -403,11 +422,13 @@ namespace CADability
                 res.ClearTriangulation();
                 return res;
             }
+            /// <inheritdoc/>
             public override void Reverse()
             {
                 reversed = !reversed;
                 base.ClearTriangulation();
             }
+            /// <inheritdoc/>
             public override ICurve2D Clone()
             {
                 ProjectedCurve res = new ProjectedCurve(curve3d.Clone() as InterpolatedDualSurfaceCurve, onSurface1);
@@ -416,6 +437,7 @@ namespace CADability
                 res.UserData.CloneFrom(UserData);
                 return res;
             }
+            /// <inheritdoc/>
             public override ICurve2D CloneReverse(bool reverse)
             {
                 ProjectedCurve res = new ProjectedCurve(curve3d.Clone() as InterpolatedDualSurfaceCurve, onSurface1);
@@ -425,6 +447,7 @@ namespace CADability
                 res.UserData.CloneFrom(UserData);
                 return res;
             }
+            /// <inheritdoc/>
             public override ICurve2D GetModified(ModOp2D m)
             {
                 // das geht ja eigentlich nicht, denn diese Kurve ist ja gegeben durch die 3d Kurve, und kann nicht einfach woandershin verschoben werden
@@ -442,6 +465,7 @@ namespace CADability
                 res.UserData.CloneFrom(UserData);
                 return res;
             }
+            /// <inheritdoc/>
             public override bool IsClosed
             {
                 get
@@ -449,6 +473,7 @@ namespace CADability
                     return false; // sollte nie geschlossen sein, oder?
                 }
             }
+            /// <inheritdoc/>
             public override void Move(double x, double y)
             {
                 ISurface surface;
@@ -529,6 +554,7 @@ namespace CADability
             }
 #endif
 
+            /// <inheritdoc/>
             public override void Copy(ICurve2D toCopyFrom)
             {
                 ProjectedCurve pc = toCopyFrom as ProjectedCurve;
@@ -570,6 +596,7 @@ namespace CADability
                 ClearTriangulation();
             }
 
+            /// <inheritdoc/>
             public override bool TryPointDeriv2At(double position, out GeoPoint2D point, out GeoVector2D deriv, out GeoVector2D deriv2)
             {
                 point = GeoPoint2D.Origin;
@@ -1382,6 +1409,7 @@ namespace CADability
                 return new ProjectedCurve(this, false);
             }
         }
+        /// <inheritdoc/>
         protected override void InvalidateSecondaryData()
         {
             base.InvalidateSecondaryData();
@@ -1601,10 +1629,7 @@ namespace CADability
         }
 #endif
         #region IGeoObject override
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingCube GetBoundingCube()
         {
             BoundingCube res = new BoundingCube();
@@ -1614,10 +1639,7 @@ namespace CADability
             }
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Modify (ModOp)"/>
-        /// </summary>
-        /// <param name="m"></param>
+        /// <inheritdoc/>
         public override void Modify(ModOp m)
         {
             surface1 = surface1.GetModified(m);
@@ -1632,11 +1654,7 @@ namespace CADability
             InvalidateSecondaryData();
             if (approxPolynom != null) approxPolynom = approxPolynom.GetModified(m);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (double)"/>
-        /// </summary>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingCube GetExtent(double precision)
         {
             BoundingCube res = BoundingCube.EmptyBoundingCube;
@@ -1697,13 +1715,7 @@ namespace CADability
         //        return false;
         //    }
         //}
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Position (GeoPoint, GeoVector, double)"/>
-        /// </summary>
-        /// <param name="fromHere"></param>
-        /// <param name="direction"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double Position(GeoPoint fromHere, GeoVector direction, double precision)
         {   // vorläufig mal auf die Polylinien beziehen
             double res = double.MaxValue;
@@ -1715,18 +1727,12 @@ namespace CADability
             }
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3D (IPaintTo3D)"/>
-        /// </summary>
-        /// <param name="paintTo3D"></param>
+        /// <inheritdoc/>
         public override void PaintTo3D(IPaintTo3D paintTo3D)
         {
             base.PaintTo3D(paintTo3D);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.CopyGeometry (IGeoObject)"/>
-        /// </summary>
-        /// <param name="ToCopyFrom"></param>
+        /// <inheritdoc/>
         public override void CopyGeometry(IGeoObject ToCopyFrom)
         {
             InterpolatedDualSurfaceCurve other = ToCopyFrom as InterpolatedDualSurfaceCurve;
@@ -1736,6 +1742,7 @@ namespace CADability
             surface2 = other.surface2;
             InvalidateSecondaryData();
         }
+        /// <inheritdoc/>
         public override void FindSnapPoint(SnapPointFinder spf)
         {
             if (!spf.Accept(this)) return;
@@ -1766,6 +1773,7 @@ namespace CADability
         }
         #endregion
         #region ICurve Members
+        /// <inheritdoc/>
         public override GeoPoint StartPoint
         {
             get
@@ -1781,6 +1789,7 @@ namespace CADability
                 InvalidateSecondaryData();
             }
         }
+        /// <inheritdoc/>
         public override GeoPoint EndPoint
         {
             get
@@ -2303,6 +2312,7 @@ namespace CADability
                 if (d2 < d0) uv.y -= vperiod;
             }
         }
+        /// <inheritdoc/>
         public override GeoVector StartDirection
         {
             get
@@ -2312,6 +2322,7 @@ namespace CADability
                 return v;
             }
         }
+        /// <inheritdoc/>
         public override GeoVector EndDirection
         {
             get
@@ -2321,6 +2332,7 @@ namespace CADability
                 return v;
             }
         }
+        /// <inheritdoc/>
         public override GeoVector DirectionAt(double Position)
         {
             GeoPoint2D uv1, uv2;
@@ -2350,6 +2362,7 @@ namespace CADability
             //}
             //// die Länge muss der Änderung im Segment entsprechen, das ist wichtig für die Newtonverfahren
         }
+        /// <inheritdoc/>
         public override GeoPoint PointAt(double Position)
         {
             GeoPoint2D uv1, uv2;
@@ -2391,10 +2404,12 @@ namespace CADability
             return res;
         }
 #endif
+        /// <inheritdoc/>
         public override double PositionAtLength(double position)
         {
             throw new Exception("The method or operation is not implemented.");
         }
+        /// <inheritdoc/>
         public override double PositionOf(GeoPoint p)
         {
             double ppos = TetraederHull.PositionOf(p);
@@ -2449,10 +2464,12 @@ namespace CADability
             }
             return res / (basePoints.Length - 1);*/
         }
+        /// <inheritdoc/>
         public override double PositionOf(GeoPoint p, double prefer)
         {
             throw new Exception("The method or operation is not implemented.");
         }
+        /// <inheritdoc/>
         public override double PositionOf(GeoPoint p, Plane pl)
         {
             throw new Exception("The method or operation is not implemented.");
@@ -2460,6 +2477,7 @@ namespace CADability
         // Length: GeneralCurve.Length measures the curve between the base points, which are the parameters
         // returned by GetBasePoints. The sum of the distances of the base points, which was used here, is too
         // short (0.65% for a bore of radius 5 through a tube of radius 30, divided into 8 edges)
+        /// <inheritdoc/>
         public override ICurve[] Split(double Position)
         {
             List<SurfacePoint> l1 = new List<SurfacePoint>();
@@ -2521,6 +2539,7 @@ namespace CADability
 #endif
         }
 
+        /// <inheritdoc/>
         public override ICurve[] Split(double Position1, double Position2)
         {
             GeoPoint2D uv1, uv2;
@@ -2572,6 +2591,7 @@ namespace CADability
             InterpolatedDualSurfaceCurve dsc2 = new InterpolatedDualSurfaceCurve(surface1.Clone(), surface2.Clone(), l2.ToArray());
             return new ICurve[] { dsc1, dsc2 };
         }
+        /// <inheritdoc/>
         public override bool IsClosed
         {
             get
@@ -2579,12 +2599,14 @@ namespace CADability
                 return Precision.IsEqual(StartPoint, EndPoint);
             }
         }
+        /// <inheritdoc/>
         public override void Reverse()
         {
             Array.Reverse(basePoints);
             forwardOriented = !forwardOriented;
             InvalidateSecondaryData();
         }
+        /// <inheritdoc/>
         public override void Trim(double StartPos, double EndPos)
         {
             // if (StartPos <= 0 && EndPos >= 1) return; ; // nichts zu tun
@@ -2629,6 +2651,7 @@ namespace CADability
             basePoints = spl.ToArray();
             InvalidateSecondaryData();
         }
+        /// <inheritdoc/>
         public override IGeoObject Clone()
         {
             // BRepIntersection createNewEdges erwartet, dass die surfaces erhalten bleiben, also nicht gecloned werden
@@ -2684,6 +2707,7 @@ namespace CADability
                 else throw new ApplicationException("Wrong surfaces in InterpolatedDualSurfaceCurve.SetSurfaces");
             }
         }
+        /// <inheritdoc/>
         public override ICurve CloneModified(ModOp m)
         {
             SurfacePoint[] sp = basePoints.Clone() as SurfacePoint[];
@@ -2694,6 +2718,7 @@ namespace CADability
             InterpolatedDualSurfaceCurve ipdsc = new InterpolatedDualSurfaceCurve(surface1.GetModified(m), surface2.GetModified(m), sp, forwardOriented);
             return ipdsc;
         }
+        /// <inheritdoc/>
         public override PlanarState GetPlanarState()
         {
             GeoPoint[] bp = new GeoPoint[basePoints.Length];
@@ -2709,6 +2734,7 @@ namespace CADability
             return PlanarState.NonPlanar;
             throw new Exception("The method or operation is not implemented.");
         }
+        /// <inheritdoc/>
         public override Plane GetPlane()
         {
             if (surface1 is PlaneSurface) return (surface1 as PlaneSurface).Plane;
@@ -2722,6 +2748,7 @@ namespace CADability
             bool isLinear;
             return Plane.FromPoints(bp, out maxDist, out isLinear);
         }
+        /// <inheritdoc/>
         public override bool IsInPlane(Plane p)
         {
             if (surface1 is PlaneSurface) return (surface1 as PlaneSurface).Plane.SamePlane(p);
@@ -2732,10 +2759,12 @@ namespace CADability
             }
             return true;
         }
+        /// <inheritdoc/>
         public override CADability.Curve2D.ICurve2D GetProjectedCurve(Plane p)
         {
             return base.GetProjectedCurve(p);
         }
+        /// <inheritdoc/>
         public override string Description
         {
             get
@@ -2743,6 +2772,7 @@ namespace CADability
                 return StringTable.GetString("GeneralCurve.Description");
             }
         }
+        /// <inheritdoc/>
         public override bool IsComposed
         {
             get
@@ -2750,6 +2780,7 @@ namespace CADability
                 return false;
             }
         }
+        /// <inheritdoc/>
         public override ICurve[] SubCurves
         {
             get { throw new Exception("The method or operation is not implemented."); }
@@ -2818,6 +2849,7 @@ namespace CADability
             //CurveOnSurface1 ... werden ja jedesmal neu berechnet. oder
         }
 
+        /// <inheritdoc/>
         public override ICurve Approximate(bool linesOnly, double maxError)
         {
 #if DEBUG
@@ -2843,14 +2875,17 @@ namespace CADability
                 return alf.Approx;
             }
         }
+        /// <inheritdoc/>
         public override double[] TangentPosition(GeoVector direction)
         {
             throw new Exception("The method or operation is not implemented.");
         }
+        /// <inheritdoc/>
         public override double[] GetSelfIntersections()
         {
             throw new Exception("The method or operation is not implemented.");
         }
+        /// <inheritdoc/>
         public override bool SameGeometry(ICurve other, double precision)
         {
             if ((StartPoint | other.StartPoint) < precision && (EndPoint | other.EndPoint) < precision)
@@ -2872,6 +2907,7 @@ namespace CADability
             }
             return false;
         }
+        /// <inheritdoc/>
         protected override double[] GetBasePoints()
         {
             double[] res = new double[basePoints.Length];
@@ -2906,10 +2942,11 @@ namespace CADability
         }
 
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
@@ -2921,6 +2958,7 @@ namespace CADability
             CheckSurfaceParameters();
 #endif
         }
+        /// <inheritdoc/>
         public override void GetObjectData(IJsonWriteData data)
         {
             base.GetObjectData(data);
@@ -2930,6 +2968,7 @@ namespace CADability
             data.AddProperty("ForwardOriented", forwardOriented);
         }
 
+        /// <inheritdoc/>
         public override void SetObjectData(IJsonReadData data)
         {
             base.SetObjectData(data);

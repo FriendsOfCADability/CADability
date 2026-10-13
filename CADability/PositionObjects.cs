@@ -6,7 +6,12 @@ using System.Collections;
 namespace CADability
 {
     /// <summary>
-    /// 
+    /// Static helper methods that align and distribute a list of objects as seen in a <see cref="Projection"/>:
+    /// align the left, right, top or bottom edges or the centers of their 2d extents to the last object of the
+    /// list, center them on the origin or on a page, space them evenly in horizontal or vertical direction,
+    /// or scale them to the same width or height. The objects are moved parallel to the drawing plane of
+    /// the projection and each call is one undo step. Used by the align commands of
+    /// <see cref="CADability.Actions.SelectObjectsAction"/>.
     /// </summary>
     internal class PositionObjects
     {

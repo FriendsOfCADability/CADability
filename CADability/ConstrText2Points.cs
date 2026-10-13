@@ -5,7 +5,11 @@ using CADability.UserInterface;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a <see cref="Text"/> object whose base line is given by two points. The user enters
+    /// the start point and the second point; the text is centered between them, its base line follows the
+    /// direction of the two points and keeps its length (and so the text size), the third input edits the
+    /// text string and its font properties. The text of the last construction is the default for the next
+    /// one. Started with the action id "Constr.Text.2Points" (menu command "MenuId.Constr.Text.2Points").
     /// </summary>
     internal class ConstrText2Points : ConstructAction
     {

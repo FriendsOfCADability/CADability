@@ -5,7 +5,12 @@ using System.Collections;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a line with a given direction that is tangential to a curve. The user picks the
+    /// tangent object (circle, arc, ellipse or any other planar curve), enters the length and the direction
+    /// (as an angle) of the line and chooses whether the tangent point is the start point or the middle of
+    /// the line. Of several tangent points the one closest to the pick position is used. The end point of
+    /// the line becomes the default start point of the next construction. Started with the action id
+    /// "Constr.Line.TangentAngle" (menu command "MenuId.Constr.Line.TangentAngle").
     /// </summary>
     internal class ConstrLineTangentAngle : ConstructAction
     {

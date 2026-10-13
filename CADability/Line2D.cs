@@ -14,6 +14,12 @@ namespace CADability.Curve2D
     {
         private GeoPoint2D startPoint;
         private GeoPoint2D endPoint;
+        /// <summary>
+        /// Constructs the line from <paramref name="StartPoint"/> to <paramref name="EndPoint"/>. The points may coincide, but a
+        /// line of zero length has no direction and some operations (e.g. <see cref="Parallel"/>) then throw a <see cref="Curve2DException"/>.
+        /// </summary>
+        /// <param name="StartPoint">start point of the line</param>
+        /// <param name="EndPoint">end point of the line</param>
         public Line2D(GeoPoint2D StartPoint, GeoPoint2D EndPoint)
         {
             startPoint = StartPoint;
@@ -37,6 +43,7 @@ namespace CADability.Curve2D
             ClipRect clr = new ClipRect(clippedBy);
             clr.ClipLine(ref startPoint, ref endPoint);
         }
+        /// <inheritdoc/>
         public override string ToString()
         {
             return "Line2D: (" + startPoint.DebugString + ") (" + endPoint.DebugString + ")";
@@ -47,6 +54,7 @@ namespace CADability.Curve2D
             interpol = new GeoPoint2D[] { startPoint, endPoint };
             interparam = new double[] { 0.0, 1.0 };
         }
+        /// <inheritdoc/>
         public override GeoPoint2D StartPoint
         {
             get
@@ -58,6 +66,7 @@ namespace CADability.Curve2D
                 startPoint = value;
             }
         }
+        /// <inheritdoc/>
         public override GeoPoint2D EndPoint
         {
             get
@@ -69,6 +78,7 @@ namespace CADability.Curve2D
                 endPoint = value;
             }
         }
+        /// <inheritdoc/>
         public override GeoVector2D StartDirection
         {
             get
@@ -77,6 +87,7 @@ namespace CADability.Curve2D
                 return v;
             }
         }
+        /// <inheritdoc/>
         public override GeoVector2D EndDirection
         {
             get
@@ -84,6 +95,7 @@ namespace CADability.Curve2D
                 return StartDirection;
             }
         }
+        /// <inheritdoc/>
         public override GeoVector2D MiddleDirection
         {
             get
@@ -91,26 +103,19 @@ namespace CADability.Curve2D
                 return StartDirection;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.DirectionAt (double)"/>
-        /// </summary>
-        /// <param name="Position"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override GeoVector2D DirectionAt(double Position)
         {
             return StartDirection;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.PointAt (double)"/>
-        /// </summary>
-        /// <param name="Position"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override GeoPoint2D PointAt(double Position)
         {
             double dx = endPoint.x - startPoint.x;
             double dy = endPoint.y - startPoint.y;
             return new GeoPoint2D(startPoint.x + Position * dx, startPoint.y + Position * dy);
         }
+        /// <inheritdoc/>
         public override bool TryPointDeriv2At(double position, out GeoPoint2D point, out GeoVector2D deriv, out GeoVector2D deriv2)
         {
             point = PointAt(position);
@@ -118,11 +123,7 @@ namespace CADability.Curve2D
             deriv2 = GeoVector2D.NullVector;
             return true;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.PositionOf (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override double PositionOf(GeoPoint2D p)
         {
             double dx = endPoint.x - startPoint.x;
@@ -130,6 +131,7 @@ namespace CADability.Curve2D
             if (Math.Abs(dx) > Math.Abs(dy)) return (p.x - startPoint.x) / dx;
             else return (p.y - startPoint.y) / dy;
         }
+        /// <inheritdoc/>
         public override double Length
         {
             get
@@ -137,22 +139,15 @@ namespace CADability.Curve2D
                 return Geometry.Dist(startPoint, endPoint);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.GetAreaFromPoint (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override double GetAreaFromPoint(GeoPoint2D p)
         {   // gesucht ist die vom Punkt p durch die Linie aufgespannte Fläche
             // mit Vorzeichen (gegen Uhrzeigersinn ist positiv)
             return ((startPoint.x - p.x) * (endPoint.y - p.y) - (startPoint.y - p.y) * (endPoint.x - p.x)) / 2.0;
         }
+        /// <inheritdoc/>
         public override double Sweep { get { return 0.0; } }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Split (double)"/>
-        /// </summary>
-        /// <param name="Position"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override ICurve2D[] Split(double Position)
         {
             if (Position <= 0.0 || Position >= 1.0)
@@ -169,10 +164,7 @@ namespace CADability.Curve2D
                 return res;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.GetExtent ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override BoundingRect GetExtent()
         {
             BoundingRect res = BoundingRect.EmptyBoundingRect;
@@ -180,22 +172,13 @@ namespace CADability.Curve2D
             res.MinMax(endPoint);
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.HitTest (ref BoundingRect, bool)"/>
-        /// </summary>
-        /// <param name="Rect"></param>
-        /// <param name="IncludeControlPoints"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override bool HitTest(ref BoundingRect Rect, bool IncludeControlPoints)
         {
             ClipRect clr = new ClipRect(Rect);
             return clr.LineHitTest(startPoint, endPoint);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Distance (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override double Distance(GeoPoint2D p)
         {   // welcher Abstand ist hier gefragt? Die Parallelenkonstruktion erwartet den
             // Abstand von der unendlichen Linie. Braucht jemand was anderes?
@@ -212,11 +195,7 @@ namespace CADability.Curve2D
             else return Geometry.Dist(p, startPoint);
             //			}
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.MinDistance (ICurve2D)"/>
-        /// </summary>
-        /// <param name="Other"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override double MinDistance(ICurve2D Other)
         {
             if (Other is Line2D)
@@ -309,26 +288,14 @@ namespace CADability.Curve2D
                 return base.MinDistance(Other);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Trim (double, double)"/>
-        /// </summary>
-        /// <param name="StartPos"></param>
-        /// <param name="EndPos"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override ICurve2D Trim(double StartPos, double EndPos)
         {
             GeoPoint2D newStartPoint = PointAt(StartPos);
             GeoPoint2D newEndPoint = PointAt(EndPos);
             return new Line2D(newStartPoint, newEndPoint);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Parallel (double, bool, double, double)"/>
-        /// </summary>
-        /// <param name="Dist"></param>
-        /// <param name="approxSpline"></param>
-        /// <param name="precision"></param>
-        /// <param name="roundAngle"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override ICurve2D Parallel(double Dist, bool approxSpline, double precision, double roundAngle)
         {
             ICurve2D res = Clone();
@@ -350,11 +317,7 @@ namespace CADability.Curve2D
             }
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Intersect (ICurve2D)"/>
-        /// </summary>
-        /// <param name="IntersectWith"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override GeoPoint2DWithParameter[] Intersect(ICurve2D IntersectWith)
         {   // gesucht sind alle Schnittpunkte, also auch in der Verlängerung!
             Line2D l2d = IntersectWith as Line2D;
@@ -438,61 +401,36 @@ namespace CADability.Curve2D
             }
             return base.Intersect(IntersectWith);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.PerpendicularFoot (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="FromHere"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override GeoPoint2D[] PerpendicularFoot(GeoPoint2D FromHere)
         {
             GeoPoint2D f = Geometry.DropPL(FromHere, startPoint, endPoint);
             return new GeoPoint2D[] { f };
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.TangentPoints (GeoPoint2D, GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="FromHere"></param>
-        /// <param name="CloseTo"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override GeoPoint2D[] TangentPoints(GeoPoint2D FromHere, GeoPoint2D CloseTo)
         {
             return new GeoPoint2D[0];
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.TangentPointsToAngle (Angle, GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="ang"></param>
-        /// <param name="CloseTo"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override GeoPoint2D[] TangentPointsToAngle(Angle ang, GeoPoint2D CloseTo)
         {
             return new GeoPoint2D[0];
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Intersect (GeoPoint2D, GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="StartPoint"></param>
-        /// <param name="EndPoint"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override GeoPoint2DWithParameter[] Intersect(GeoPoint2D StartPoint, GeoPoint2D EndPoint)
         {
             Line2D lp = new Line2D(StartPoint, EndPoint);
             return Intersect(lp);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Reverse ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void Reverse()
         {
             GeoPoint2D p = startPoint;
             startPoint = endPoint;
             endPoint = p;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Move (double, double)"/>
-        /// </summary>
-        /// <param name="dx"></param>
-        /// <param name="dy"></param>
+        /// <inheritdoc/>
         public override void Move(double dx, double dy)
         {
             startPoint.x += dx;
@@ -500,11 +438,7 @@ namespace CADability.Curve2D
             endPoint.x += dx;
             endPoint.y += dy;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.GetModified (ModOp2D)"/>
-        /// </summary>
-        /// <param name="m"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D GetModified(ModOp2D m)
         {   // allgemeine Lösung, wird für Kreis und Ellipse übernommen
             Line2D res = Clone() as Line2D;
@@ -512,21 +446,14 @@ namespace CADability.Curve2D
             res.endPoint = m * endPoint;
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Clone ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D Clone()
         {
             Line2D res = new Line2D(StartPoint, EndPoint);
             res.UserData.CloneFrom(this.UserData);
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.CloneReverse (bool)"/>
-        /// </summary>
-        /// <param name="reverse"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override ICurve2D CloneReverse(bool reverse)
         {
             ICurve2D res = this.Clone();
@@ -534,10 +461,7 @@ namespace CADability.Curve2D
             res.UserData.CloneFrom(this.UserData);
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Copy (ICurve2D)"/>
-        /// </summary>
-        /// <param name="toCopyFrom"></param>
+        /// <inheritdoc/>
         public override void Copy(ICurve2D toCopyFrom)
         {
             Line2D c = toCopyFrom as Line2D;
@@ -545,11 +469,7 @@ namespace CADability.Curve2D
             endPoint = c.endPoint;
             UserData.CloneFrom(c.UserData);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.MakeGeoObject (Plane)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override IGeoObject MakeGeoObject(Plane p)
         {
             Line l = Line.Construct();
@@ -557,23 +477,14 @@ namespace CADability.Curve2D
             l.EndPoint = p.ToGlobal(endPoint);
             return l;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Project (Plane, Plane)"/>
-        /// </summary>
-        /// <param name="fromPlane"></param>
-        /// <param name="toPlane"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override ICurve2D Project(Plane fromPlane, Plane toPlane)
         {
             Line2D l = new Line2D(toPlane.Project(fromPlane.ToGlobal(startPoint)), toPlane.Project(fromPlane.ToGlobal(endPoint)));
             if (l.Length > Precision.eps) return l;
             else return null;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.AddToGraphicsPath (System.Drawing.Drawing2D.GraphicsPath, bool)"/>
-        /// </summary>
-        /// <param name="path"></param>
-        /// <param name="forward"></param>
+        /// <inheritdoc/>
 		public override void AddToGraphicsPath(System.Drawing.Drawing2D.GraphicsPath path, bool forward)
         {
             if (forward)
@@ -585,38 +496,22 @@ namespace CADability.Curve2D
                 path.AddLine((float)endPoint.x, (float)endPoint.y, (float)startPoint.x, (float)startPoint.y);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.GetExtendedHitTest ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override IQuadTreeInsertable GetExtendedHitTest()
         {
             return new InfiniteLine2D(startPoint, endPoint);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Approximate (bool, double)"/>
-        /// </summary>
-        /// <param name="linesOnly"></param>
-        /// <param name="maxError"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override ICurve2D Approximate(bool linesOnly, double maxError)
         {
             return Clone();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.GetArea ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double GetArea()
         {
             return (startPoint.x * endPoint.y - startPoint.y * endPoint.x) / 2.0;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.GetFused (ICurve2D, double)"/>
-        /// </summary>
-        /// <param name="toFuseWith"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D GetFused(ICurve2D toFuseWith, double precision)
         {
             if (toFuseWith is Line2D)
@@ -688,22 +583,34 @@ namespace CADability.Curve2D
             endPoint = (GeoPoint2D)info.GetValue("EndPoint", typeof(GeoPoint2D));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("StartPoint", startPoint);
             info.AddValue("EndPoint", endPoint);
         }
+        /// <summary>
+        /// Creates an empty line for the JSON deserialization (<see cref="IJsonSerialize"/>); the data is set by <see cref="SetObjectData"/>.
+        /// </summary>
         protected Line2D() { } // needed for IJsonSerialize
+        /// <summary>
+        /// Writes the start point and the end point for the JSON serialization (<see cref="IJsonSerialize.GetObjectData(IJsonWriteData)"/>).
+        /// </summary>
+        /// <param name="data">receives the data</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("StartPoint", startPoint);
             data.AddProperty("EndPoint", endPoint);
         }
 
+        /// <summary>
+        /// Reads the start point and the end point from the JSON serialization (<see cref="IJsonSerialize.SetObjectData(IJsonReadData)"/>).
+        /// </summary>
+        /// <param name="data">the data to read from</param>
         public void SetObjectData(IJsonReadData data)
         {
             startPoint = data.GetProperty<GeoPoint2D>("StartPoint");
@@ -737,21 +644,13 @@ namespace CADability.Curve2D
         }
         #region IQuadTreeInsertable Members
 
-        /// <summary>
-        /// Implements <see cref="CADability.IQuadTreeInsertable.GetExtent ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public BoundingRect GetExtent()
         {
             return BoundingRect.EmptyBoundingRect; // sollte nie aufgerufen werden
         }
 
-        /// <summary>
-        /// Implements <see cref="CADability.IQuadTreeInsertable.HitTest (ref BoundingRect, bool)"/>
-        /// </summary>
-        /// <param name="Rect"></param>
-        /// <param name="IncludeControlPoints"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public bool HitTest(ref BoundingRect Rect, bool IncludeControlPoints)
         {   // die 4 Eckpunkte des Rechtecks werden in das System gebracht, in dem die Linie
             // die X-Achse ist. Wenn alle positiv oder alle negativ sind, dann nicht getroffen.
@@ -816,21 +715,13 @@ namespace CADability.Curve2D
         }
         #region IQuadTreeInsertable Members
 
-        /// <summary>
-        /// Implements <see cref="CADability.IQuadTreeInsertable.GetExtent ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public BoundingRect GetExtent()
         {
             return BoundingRect.EmptyBoundingRect; // sollte nie aufgerufen werden
         }
 
-        /// <summary>
-        /// Implements <see cref="CADability.IQuadTreeInsertable.HitTest (ref BoundingRect, bool)"/>
-        /// </summary>
-        /// <param name="Rect"></param>
-        /// <param name="IncludeControlPoints"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public bool HitTest(ref BoundingRect Rect, bool IncludeControlPoints)
         {
             switch (direction)

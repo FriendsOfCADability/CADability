@@ -38,10 +38,29 @@ namespace CADability
 #24=MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION(' ',(%5),#17);
      */
 
+    /// <summary>
+    /// Implemented by the objects (solids, shells, faces, curves, blocks...) and the surfaces that can be written to a
+    /// STEP file by <see cref="ExportStep"/>.
+    /// </summary>
     public interface IExportStep
     {
+        /// <summary>
+        /// Writes the STEP entities for this object with <see cref="ExportStep.WriteDefinition"/> and returns the number
+        /// of the entity that represents the object.
+        /// </summary>
+        /// <param name="export">the export to write to</param>
+        /// <param name="topLevel">true when the object is written as an object of the model, false when it is written as
+        /// part of another object (e.g. a face of a shell, or an edge's curve)</param>
+        /// <returns>the number of the STEP entity</returns>
         int Export(ExportStep export, bool topLevel);
     }
+    /// <summary>
+    /// Writes the active model of a project to a STEP file (ISO 10303-21, AP214). Solids are written as
+    /// <c>MANIFOLD_SOLID_BREP</c>, open shells as <c>SHELL_BASED_SURFACE_MODEL</c>, curves as <c>GEOMETRIC_CURVE_SET</c>,
+    /// blocks as assemblies of their contents; the colours of the objects become <c>STYLED_ITEM</c>s and the names of
+    /// solids and blocks are kept. Objects that do not implement <see cref="IExportStep"/> (e.g. text and dimensions)
+    /// are skipped. <see cref="Project.Export"/> with the format "step" uses this class.
+    /// </summary>
     public class ExportStep
     {
         readonly string header =
@@ -73,11 +92,29 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
 
         private StreamWriter stream;
         private int currentItem { get; set; }
+        /// <summary>
+        /// The precision written to the file as the <c>UNCERTAINTY_MEASURE_WITH_UNIT</c>, 1e-6 by default: two points
+        /// closer than this are the same point for a reader of the file.
+        /// </summary>
         public double Precision { get; internal set; }
 
+        /// <summary>
+        /// The numbers of the <c>VERTEX_POINT</c> entities already written, so that a vertex shared by several edges is
+        /// written only once. Filled while writing.
+        /// </summary>
         public Dictionary<Vertex, int> VertexToDefInd;
+        /// <summary>
+        /// The numbers of the <c>EDGE_CURVE</c> entities already written, so that an edge shared by two faces is written
+        /// only once. Filled while writing.
+        /// </summary>
         public Dictionary<Edge, int> EdgeToDefInd;
+        /// <summary>
+        /// The numbers of the <c>STYLED_ITEM</c> entities written for each colour. Filled while writing.
+        /// </summary>
         public Dictionary<ColorDef, int> StyledItems;
+        /// <summary>
+        /// Creates an export with the default <see cref="Precision"/>. Each instance writes one file or byte array.
+        /// </summary>
         public ExportStep()
         {
             VertexToDefInd = new Dictionary<Vertex, int>();
@@ -86,6 +123,11 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
             Precision = 1e-6;
         }
 
+        /// <summary>
+        /// Writes the active model of the project as a STEP file into memory, see <see cref="WriteToFile"/>.
+        /// </summary>
+        /// <param name="pr">the project to export</param>
+        /// <returns>the contents of the STEP file</returns>
         public byte[] WriteToByteArray(Project pr)
         {
             var memoryStream = new MemoryStream();
@@ -133,6 +175,12 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
             return memoryStream.ToArray();
         }
 
+        /// <summary>
+        /// Writes the active model of the project to a STEP file. The file is created or overwritten; the name of the
+        /// project's file and the current date go into the header.
+        /// </summary>
+        /// <param name="fileName">Path of the STEP file to write</param>
+        /// <param name="pr">the project to export</param>
         public void WriteToFile(string fileName, Project pr)
         {
 
@@ -177,6 +225,13 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
             stream.WriteLine(footer); //.Replace("%3", lst.ToString()).Replace("%5", ssi.ToString()));
             stream.Close();
         }
+        /// <summary>
+        /// Writes one entity instance <c>#n=s;</c> to the file and returns its number n. The numbers are assigned in sequence;
+        /// <see cref="IExportStep.Export"/> implementations write the entities they refer to first and use the returned numbers
+        /// as <c>#n</c> references in their own definition.
+        /// </summary>
+        /// <param name="s">the entity, e.g. <c>CARTESIAN_POINT('',(0.,0.,0.))</c>, without the leading <c>#n=</c> and the trailing semicolon</param>
+        /// <returns>the number of the entity</returns>
         public int WriteDefinition(string s)
         {
             int nr = currentItem;
@@ -184,6 +239,12 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
             stream.WriteLine("#" + nr.ToString() + "=" + s + ";"); // maybe split the line when s is too long?
             return nr;
         }
+        /// <summary>
+        /// Formats a number the way STEP requires it: invariant culture and always with a decimal point (<c>1.</c>, <c>1.5E-5</c>),
+        /// because a number without a point is read as an integer.
+        /// </summary>
+        /// <param name="d">the number</param>
+        /// <returns>the text of the number for use in an entity</returns>
         public string ToString(double d)
         {
             string res = d.ToString("G", CultureInfo.InvariantCulture);
@@ -195,6 +256,14 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
             }
             return res;
         }
+        /// <summary>
+        /// Writes an <c>AXIS2_PLACEMENT_3D</c>, the coordinate system that elementary surfaces, circles and ellipses are defined
+        /// in, together with its point and its two directions. The directions are normalized before they are written.
+        /// </summary>
+        /// <param name="location">the origin of the placement</param>
+        /// <param name="normal">the axis (z direction) of the placement</param>
+        /// <param name="xdir">the reference direction (x direction) of the placement; should be perpendicular to <paramref name="normal"/></param>
+        /// <returns>the number of the placement entity</returns>
         public int WriteAxis2Placement3d(GeoPoint location, GeoVector normal, GeoVector xdir)
         {
             int nl = (location as IExportStep).Export(this, false);
@@ -202,6 +271,13 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
             int nx = (xdir.Normalized as IExportStep).Export(this, false);
             return WriteDefinition("AXIS2_PLACEMENT_3D('',#" + nl.ToString() + ",#" + n.ToString() + ",#" + nx.ToString() + ")");
         }
+        /// <summary>
+        /// Writes an <c>AXIS1_PLACEMENT</c>, an axis given by a point and a direction as used by <c>SURFACE_OF_REVOLUTION</c>,
+        /// together with its point and direction. The direction is normalized before it is written.
+        /// </summary>
+        /// <param name="location">a point on the axis</param>
+        /// <param name="normal">the direction of the axis</param>
+        /// <returns>the number of the placement entity</returns>
         public int WriteAxis1Placement3d(GeoPoint location, GeoVector normal)
         {
             int nl = (location as IExportStep).Export(this, false);

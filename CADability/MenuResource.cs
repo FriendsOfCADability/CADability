@@ -20,6 +20,11 @@ namespace CADability.UserInterface
         Func<string, bool> onCommand;
         Func<string, CommandState, bool> onUpdateCommand;
         Action<MenuWithHandler, bool> onSelected;
+        /// <summary>
+        /// Sets a handler that processes the command when this menu item is clicked. It receives the menu id and returns
+        /// true if it handled the command. Setting it makes this item its own <see cref="Target"/>; a handler set here
+        /// takes precedence over the target. Write-only.
+        /// </summary>
         public Func<string, bool> OnCommand
         {
             set
@@ -28,6 +33,11 @@ namespace CADability.UserInterface
                 onCommand = value;
             }
         }
+        /// <summary>
+        /// Sets a handler that updates the <see cref="CommandState"/> (enabled, checked) of this menu item before it is
+        /// shown. It receives the menu id and the state to modify and returns true if it handled the request. Setting it
+        /// makes this item its own <see cref="Target"/>. Write-only.
+        /// </summary>
         public Func<string, CommandState, bool> OnUpdateCommand
         {
             set
@@ -36,6 +46,11 @@ namespace CADability.UserInterface
                 onUpdateCommand = value;
             }
         }
+        /// <summary>
+        /// Sets a handler that is notified when this menu item is highlighted (second argument true) or loses the
+        /// highlight (false), e.g. to show a preview in the view. Setting it makes this item its own <see cref="Target"/>.
+        /// Write-only.
+        /// </summary>
         public Action<MenuWithHandler, bool> OnSelected
         {
             set
@@ -45,6 +60,10 @@ namespace CADability.UserInterface
             }
         }
 
+        /// <summary>
+        /// Creates an empty menu item without id, text and image. Set <see cref="ID"/>, <see cref="Text"/> and
+        /// <see cref="Target"/> (or the <c>OnXxx</c> handlers) before use.
+        /// </summary>
         public MenuWithHandler()
         {
             ImageIndex = -1;
@@ -62,16 +81,59 @@ namespace CADability.UserInterface
             if (resourceId == null) Text = StringTable.GetString(menuId, StringTable.Category.label);
             else Text = StringTable.GetString(resourceId, StringTable.Category.label);
         }
+        /// <summary>
+        /// The id of the menu item, e.g. "MenuId.Edit.Cut". It is passed to <see cref="ICommandHandler.OnCommand"/> when
+        /// the item is clicked. Null for a main menu, "SEPARATOR" for a separator.
+        /// </summary>
         public string ID { get; set; }
+        /// <summary>
+        /// The text displayed for the item, usually looked up in the <see cref="StringTable"/> by the id. "-" for a separator.
+        /// </summary>
         public string Text { get; set; }
+        /// <summary>
+        /// Index of the item's image in the application's button image list, or -1 (the default) for no image. Loaded
+        /// from the "IconNr" attribute of the menu resource.
+        /// </summary>
         public int ImageIndex { get; set; }
+        /// <summary>
+        /// True when the menu resource marks the item with the flag "NotSticky", meant for toolbar buttons that must not
+        /// stay pressed. CADability itself does not evaluate it.
+        /// </summary>
         public bool NotSticky { get; set; }
+        /// <summary>
+        /// The "Position" attribute of the item in the menu resource, meant for ordering when menus are merged; 0 if not
+        /// given. CADability itself does not evaluate it.
+        /// </summary>
         public int Position { get; set; }
+        /// <summary>
+        /// The <see cref="ICommandHandler"/> that receives the click on this item (<see cref="ICommandHandler.OnCommand"/>),
+        /// the request for its state (<see cref="ICommandHandler.OnUpdateCommand"/>) and the highlight notification
+        /// (<see cref="ICommandHandler.OnSelected"/>). Menus loaded with
+        /// <see cref="MenuResource.LoadMenuDefinition(string, bool, ICommandHandler)"/> get the handler passed there.
+        /// </summary>
         public ICommandHandler Target { get; set; }
+        /// <summary>
+        /// The items of the sub-menu that opens from this item, or null when the item is a simple command.
+        /// </summary>
         public MenuWithHandler[] SubMenus { get; set; }
+        /// <summary>
+        /// True when the menu resource marks the item with MdiList="true" (a Windows.Forms concept for listing the open
+        /// MDI windows). Not used by CADability.
+        /// </summary>
         public bool MdiList { get; internal set; }
+        /// <summary>
+        /// The keyboard shortcut of the item as given by the "Shortcut" attribute of the menu resource, as the name of a
+        /// value of the <see cref="CADability.Substitutes.Shortcut"/> enumeration (e.g. "CtrlC"), or null. The platform
+        /// specific menu converts it to a key combination.
+        /// </summary>
         public string Shortcut { get; internal set; }
+        /// <summary>
+        /// True when the shortcut is to be displayed next to the menu text; set together with <see cref="Shortcut"/>.
+        /// </summary>
         public bool ShowShortcut { get; internal set; }
+        /// <summary>
+        /// A new menu item that represents a separator line (id "SEPARATOR", text "-"). Each access returns a new instance.
+        /// </summary>
         public static MenuWithHandler Separator
         {
             get
@@ -131,7 +193,7 @@ namespace CADability.UserInterface
         /// <summary>
         /// Replaces the standard menu resource by the provided XML document
         /// </summary>
-        /// <param name="XmlStream">The document</param>
+        /// <param name="XmlMenuDocument">The document</param>
         static public void SetMenuResource(XmlDocument XmlMenuDocument)
         {
             mMenuDocument = XmlMenuDocument;
@@ -216,12 +278,12 @@ namespace CADability.UserInterface
             }
         }
         /// <summary>
-        /// Loads a MainMenu from the menu resource with the provided name. For the unmodified standard resource
-        /// the menuname will be "SDI Menu"
+        /// Creates a flat context menu from the provided menu ids. The text of each entry is looked up in the
+        /// <see cref="StringTable"/> with the menu id as resource id, all entries use the provided command handler.
         /// </summary>
-        /// <param name="MenuName">Name of the menu to load</param>
-        /// <param name="frame">Frame which handles the menu commands</param>
-        /// <returns></returns>
+        /// <param name="menuIDs">Ids of the menu entries</param>
+        /// <param name="Handler">Command handler which handles the menu commands</param>
+        /// <returns>The menu entries</returns>
         static public MenuWithHandler[] CreateContextMenuWithHandler(string[] menuIDs, ICommandHandler Handler)
         {
             MenuWithHandler[] res = new MenuWithHandler[menuIDs.Length];
@@ -235,6 +297,14 @@ namespace CADability.UserInterface
             }
             return res;
         }
+        /// <summary>
+        /// Loads a menu from the menu resource with the provided name. For the unmodified standard resource
+        /// the name of the main menu will be "SDI Menu"
+        /// </summary>
+        /// <param name="MenuName">Name of the menu to load: the "Name" attribute of a "MainMenu" node or the "MenuId" attribute of a "Popup" node</param>
+        /// <param name="main">true to load a main menu, false to load a popup (context) menu</param>
+        /// <param name="handler">Command handler which handles the menu commands</param>
+        /// <returns>The menu entries</returns>
         static public MenuWithHandler[] LoadMenuDefinition(string MenuName, bool main, ICommandHandler handler)
         {
             List<MenuWithHandler> result = new List<MenuWithHandler>();
@@ -272,6 +342,12 @@ namespace CADability.UserInterface
             XmlNode MenuNode = mMenuDocument.SelectSingleNode("Menus//Popup[@MenuId='" + MenuName + "']");
             return MenuNode != null;
         }
+        /// <summary>
+        /// Returns the ids of the menu items directly contained in the popup menu <paramref name="MenuName"/> of the menu
+        /// resource, in the order of their definition. Nested popups are not included.
+        /// </summary>
+        /// <param name="MenuName">Id of the popup menu</param>
+        /// <returns>The menu ids; an empty array if there is no such popup</returns>
         static public string[] GetPopupItems(string MenuName)
         {
             XmlNode MenuNode = mMenuDocument.SelectSingleNode("Menus//Popup[@MenuId='" + MenuName + "']");
@@ -454,6 +530,12 @@ namespace CADability.UserInterface
                 if (newitem.Text != null && newitem.Text.Length > 0) MenuItems.Add(newitem);
             }
         }
+        /// <summary>
+        /// Returns the image index (the "IconNr" attribute) of the menu item or popup menu with the given id, as used for
+        /// the toolbar buttons.
+        /// </summary>
+        /// <param name="MenuID">Id of the menu item or popup menu</param>
+        /// <returns>The image index, or -1 if there is no such item or it has no icon</returns>
         static public int FindImageIndex(string MenuID)
         {
             XmlNode MenuNode = mMenuDocument.SelectSingleNode("Menus//MenuItem[@MenuId='" + MenuID + "']");

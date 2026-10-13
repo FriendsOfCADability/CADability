@@ -36,6 +36,11 @@ namespace CADability.Attribute
             linePattern = pr.LinePatternList.Current;
             colorDef = pr.ColorList.Current;
         }
+        /// <summary>
+        /// Creates a line hatch style with all values zero: no line distance, angle 0, a single set of lines and no
+        /// colour, line width or line pattern. Set at least <see cref="LineDistance"/> and <see cref="LineAngle"/> before
+        /// the style is used; a hatch style created from the control center gets sensible defaults instead.
+        /// </summary>
         public HatchStyleLines()
         {
             // 
@@ -95,10 +100,12 @@ namespace CADability.Attribute
             }
             return res;
         }
+        /// <inheritdoc/>
         public override IShowProperty GetShowProperty()
         {
             return null;
         }
+        /// <inheritdoc/>
         public override HatchStyle Clone()
         {
             HatchStyleLines res = new HatchStyleLines();
@@ -138,6 +145,11 @@ namespace CADability.Attribute
             get { return marginOffset; }
             set { marginOffset = value; }
         }
+        /// <summary>
+        /// The number of sets of parallel lines that are generated. The first set runs at <see cref="LineAngle"/>, each
+        /// further set is turned by <see cref="Offset"/> against the previous one, so 2 with an offset of 90° gives a
+        /// cross hatch. Values below 1 are treated as 1.
+        /// </summary>
         public int Number
         {
             get
@@ -149,6 +161,10 @@ namespace CADability.Attribute
                 number = value;
             }
         }
+        /// <summary>
+        /// The angle between two consecutive sets of lines, only relevant when <see cref="Number"/> is greater than 1.
+        /// The i-th set runs at <see cref="LineAngle"/> plus i times this angle.
+        /// </summary>
         public SweepAngle Offset
         {
             get
@@ -160,6 +176,10 @@ namespace CADability.Attribute
                 offset = value;
             }
         }
+        /// <summary>
+        /// The same value as <see cref="Offset"/> typed as an <see cref="Angle"/>, so that the control center can edit it
+        /// with an <see cref="AngleProperty"/>, which finds the property by its name via reflection. Internal use.
+        /// </summary>
         protected Angle AOffset // we need AOffset to be able to manipulate Offset as an AngleProperty
         {
             get
@@ -171,6 +191,10 @@ namespace CADability.Attribute
                 offset = value;
             }
         }
+        /// <summary>
+        /// When true, every second line is reversed so that consecutive lines run in opposite directions (a zigzag).
+        /// This makes no difference to the display, but matters when the lines are used as tool paths.
+        /// </summary>
         public bool Alternate
         {
             get
@@ -225,10 +249,7 @@ namespace CADability.Attribute
             }
         }
         #region IShowProperty Members
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -294,9 +315,9 @@ namespace CADability.Attribute
             }
         }
         /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Removed"/>
+        /// Overrides <see cref="IShowPropertyImpl.Removed(IPropertyPage)"/>
         /// </summary>
-        /// <param name="propertyPage">the IPropertyTreeView from which it was removed</param>
+        /// <param name="pp">the <see cref="IPropertyPage"/> from which it was removed</param>
         public override void Removed(IPropertyPage pp)
         {
             subItems = null;
@@ -374,10 +395,11 @@ namespace CADability.Attribute
             }
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public new void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);

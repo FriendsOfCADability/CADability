@@ -6,7 +6,10 @@ using System.Collections;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a circle which is tangent to three curves. The user picks the three tangent objects (polylines and paths
+    /// are decomposed into their single elements); the radius is computed and only displayed. Among the possible solutions the
+    /// one closest to the pick positions is chosen, the others can be selected with the multi-solution mechanism. Started with
+    /// the menu id "Constr.Circle.ThreeTangents".
     /// </summary>
     internal class ConstrCircle3Tangents : ConstructAction
     {

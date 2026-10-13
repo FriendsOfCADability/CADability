@@ -79,8 +79,11 @@ namespace CADability
         {
             this = (Angle)d;
         }
+        /// <summary>
+        /// The value of this angle in radians. A value that is set is reduced modulo 2*pi.
+        /// </summary>
         /// <value>
-        /// Zugriff auf das Bogenmaß
+        /// The angle in radians.
         /// </value>
         public double Radian
         {
@@ -94,8 +97,11 @@ namespace CADability
                 a = Math.IEEERemainder(value, 2.0 * Math.PI);
             }
         }
+        /// <summary>
+        /// The value of this angle in degrees. A value that is set is converted to radians and reduced modulo 360°.
+        /// </summary>
         /// <value>
-        /// Zugriff auf das Gradmaß
+        /// The angle in degrees.
         /// </value>
         public double Degree
         {
@@ -196,12 +202,13 @@ namespace CADability
         }
         
         /// <summary>
-        /// Liefert true, wenn der im Parameter gegebene TestWinkel von diesem Winkel
-        /// ausgehend mit dem SweepAngle überstrichen wird.
+        /// Determines whether the angle <paramref name="test"/> lies within the range that is swept when starting
+        /// at this angle and turning by the sweep angle <paramref name="sa"/> (counterclockwise for a positive,
+        /// clockwise for a negative sweep angle). The limits of the range count as inside.
         /// </summary>
-        /// <param name="sa">Überstreichnung</param>
-        /// <param name="test">zu Testende Winkelposition</param>
-        /// <returns></returns>
+        /// <param name="sa">the sweep, starting at this angle</param>
+        /// <param name="test">the angle to test</param>
+        /// <returns>true if <paramref name="test"/> is within the swept range</returns>
         public bool Sweeps(SweepAngle sa, Angle test)
         {
             double t = test;
@@ -319,10 +326,11 @@ namespace CADability
             a = (double)info.GetValue("A", typeof(double));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("A", a, a.GetType());
@@ -411,8 +419,12 @@ namespace CADability
         {
             a = d;
         }
+        /// <summary>
+        /// The value of this sweep angle in radians, positive for a counterclockwise and negative for a clockwise sweep.
+        /// A value that is set is reduced to the range -2*pi to 2*pi.
+        /// </summary>
         /// <value>
-        /// Zugriff auf das Bogenmaß
+        /// The sweep angle in radians.
         /// </value>
         public double Radian
         {
@@ -423,12 +435,16 @@ namespace CADability
             set
             {
                 a = Math.IEEERemainder(value, 4.0 * Math.PI);
-                if (a < 2.0 * Math.PI) a += 4.0 * Math.PI;
+                if (a < -2.0 * Math.PI) a += 4.0 * Math.PI;
                 if (a > 2.0 * Math.PI) a -= 4.0 * Math.PI;
             }
         }
+        /// <summary>
+        /// The value of this sweep angle in degrees, positive for a counterclockwise and negative for a clockwise sweep.
+        /// A value that is set is converted to radians and reduced to the range -360° to 360°.
+        /// </summary>
         /// <value>
-        /// Zugriff auf das Gradmaß
+        /// The sweep angle in degrees.
         /// </value>
         public double Degree
         {
@@ -442,11 +458,11 @@ namespace CADability
             }
         }
         /// <summary>
-        /// Cast Operator, der ein double in einen Winkel umwandelt. Es wird das
-        /// modulo 2*pi berechnet
+        /// Casts a double (in radians) to a sweep angle. The value is reduced to the range -2*pi to 2*pi,
+        /// so a full turn in either direction is preserved.
         /// </summary>
-        /// <param name="v">double Wert</param>
-        /// <returns>Winkel</returns>
+        /// <param name="v">the sweep angle in radians</param>
+        /// <returns>the sweep angle</returns>
         public static implicit operator SweepAngle(double v)
         {
             SweepAngle res;
@@ -471,12 +487,10 @@ namespace CADability
             return res;
         }
         /// <summary>
-        /// Cast Operator, der einen Winkel in ein double umwandelt. Ergebnis ist das Bogenmaß 
-        /// des Winkels.
-        /// Es werden keine Berechnungen vorgenommen
+        /// Casts a sweep angle to a double. The result is the sweep angle in radians as it is, without any conversion.
         /// </summary>
-        /// <param name="ang">der Winkel</param>
-        /// <returns>double als Ergebnis</returns>
+        /// <param name="ang">the sweep angle</param>
+        /// <returns>the sweep angle in radians</returns>
         public static implicit operator double(SweepAngle ang)
         {
             return ang.a;
@@ -556,10 +570,11 @@ namespace CADability
             a = (double)info.GetValue("A", typeof(double));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("A", a, a.GetType());

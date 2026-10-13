@@ -3,7 +3,10 @@ using System.Collections.Generic;
 namespace CADability
 {
     /// <summary>
-    /// Eine Art Dictionary double->int, wobei das double unscharf ist, also ein Intervall mit maximaler Breite
+    /// Counts how often double values occur, treating values that differ by less than a given precision as the same:
+    /// a kind of dictionary double to int whose keys are fuzzy, i.e. intervals of at most the given width. An optional
+    /// period makes values that differ by a multiple of the period equal (e.g. angles). Enumerating the counter yields
+    /// the center of each interval together with its count. Used to compute the signature of a shape.
     /// </summary>
     internal class RangeCounter : IEnumerable<KeyValuePair<double, int>>, IEnumerator<KeyValuePair<double, int>>
     {

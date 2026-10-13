@@ -27,9 +27,10 @@ namespace CADability.Shapes
          */
 
         /// <summary>
-        /// Für das Integer Koordinatensystem. Das hat den Zweck, Hash-Tabellen für horizontale und vertikale Schnitte zu ermöglichen
-        /// und exakt gleiche Ergebnisse für die gemeinsame Seite eines Quadrates zu liefern, egal aus welchem Quadrat man rechnet.
-        /// Die Breite der Quadrate ist imme eine Zweierpotenz. x, y und w sind immer positiv
+        /// A square of the quadtree in the integer coordinate system (lower left corner x, y and width w). The integer system
+        /// makes it possible to keep hash tables of the intersections with horizontal and vertical lines and to get exactly the
+        /// same results for the common side of two adjacent squares, no matter from which square the computation is started.
+        /// The width of a square is always a power of two; x, y and w are always positive.
         /// </summary>
         struct quad
         {
@@ -205,11 +206,13 @@ namespace CADability.Shapes
             }
         }
         /// <summary>
-        /// Ein Quadrat des Quadtrees, wenn nicht unterteilt, dann enthält es von jedem Border nur ein Segment mit definierten Eintritts und Austrittspunkt.
-        /// Tangentiale Schnitte sind nicht erlaubt, dann muss der ganze Quadtree anders positioniert werden.
-        /// Enthält maximal einen Schnittpunkt der beiden Border.
+        /// A square of the quadtree. If it is not subdivided (a leaf), it contains at most one segment of each border with a well
+        /// defined entry and exit point on the sides of the square, and at most one intersection point of the two borders.
+        /// Tangential intersections with the sides are not allowed; if they occur, the whole quadtree has to be positioned
+        /// differently (see <see cref="CriticalPosition"/>).
         ///
-        /// Integer Koordinatensystem: so kann man einfache Hash-Tabellen machen, in denen für horizontale und vertikale Linien die Schnittpunkte erfasst werden
+        /// The square is located in the integer coordinate system, which allows simple hash tables that record the intersection
+        /// points of the borders with the horizontal and vertical lines of the quadtree.
         /// </summary>
         class Node
         {
@@ -233,9 +236,12 @@ namespace CADability.Shapes
                 enter1 = leave1 = enter2 = leave2 = -1;
             }
             /// <summary>
-            /// Fügt die beiden Border in diesen Quadranten ein. Wenn es ein Problem gibt (tangentiale Schitte, Schnittpunkt der Border genau auf der Kante) dann wird false geliefet.
+            /// Inserts the two borders into this square: collects the intersections of both borders with the four sides, subdivides
+            /// the square if a border enters or leaves it more than once or if more than one intersection point of the borders lies
+            /// inside, and otherwise determines the entry and exit points of each border. If there is a problem (a tangential
+            /// intersection with a side, an odd number of side intersections, an intersection point of the borders exactly on an edge)
+            /// a <see cref="CriticalPosition"/> exception is thrown, which makes the caller rebuild the quadtree at a slightly shifted position.
             /// </summary>
-            /// <returns></returns>
             public void Init()
             {
                 intersection[] left1 = borderQuadTree.GetIntersections(quad, side.left, true);
@@ -304,13 +310,17 @@ namespace CADability.Shapes
                 }
             }
             /// <summary>
-            /// Setzt die fullInsideBdr1/2 für Quadrate, die die betreffende Border nicht enthalten
+            /// Sets the flag fullInsideBdr1 or fullInsideBdr2 for the squares which are not crossed by the respective border, i.e.
+            /// decides whether such a square lies completely inside or completely outside of that border. The decision is propagated
+            /// through the corner values: squares that are crossed by the border determine the state of their corners from their
+            /// entry and exit points, squares that are not crossed take the state of any already known corner and pass it on to all
+            /// of their corners. Recurses into the sub-squares.
             /// </summary>
-            /// <param name="border1"></param>
-            /// <param name="v0"></param>
-            /// <param name="v1"></param>
-            /// <param name="v2"></param>
-            /// <param name="v3"></param>
+            /// <param name="border1">true: evaluate the first border, false: the second border</param>
+            /// <param name="v0">State of the upper right corner: 0 outside, 1 inside, 2 unknown; updated on return</param>
+            /// <param name="v1">State of the upper left corner (see <paramref name="v0"/>)</param>
+            /// <param name="v2">State of the lower left corner (see <paramref name="v0"/>)</param>
+            /// <param name="v3">State of the lower right corner (see <paramref name="v0"/>)</param>
             public void setInside(bool border1, ref int v0, ref int v1, ref int v2, ref int v3)
             {   // v0..v3: (Quadrantennummer) von rechts oben (0) bis rechts unten(3): 0: außerhalb, 1: innerhalb, 2: unbekannt
                 // wird nur ausgeführt um fullInsideBdr1/2 zu setzen, welches nur bei fehlen entsprechender enter/leave Päärchen verwendet wird.
@@ -367,11 +377,14 @@ namespace CADability.Shapes
                 }
             }
             /// <summary>
-            /// Sammelt die für die gegebene Operation relevanten Abschnitte der beiden Borders zusammen
+            /// Collects the parts of the two borders which are relevant for the given operation: for the union the parts of each
+            /// border lying outside of the other border, for the intersection (common) the parts lying inside, for the subtraction
+            /// the parts of the first border outside of the second and the parts of the second border inside the first. The parts
+            /// are given as parameter intervals on the respective border. Recurses into the sub-squares.
             /// </summary>
-            /// <param name="bdr1parts"></param>
-            /// <param name="bdr2parts"></param>
-            /// <param name="op"></param>
+            /// <param name="bdr1parts">Receives the parameter intervals of the first border</param>
+            /// <param name="bdr2parts">Receives the parameter intervals of the second border</param>
+            /// <param name="op">The boolean operation to perform</param>
             public void collectIntervals(interval bdr1parts, interval bdr2parts, op op)
             {
                 if (subTree != null)

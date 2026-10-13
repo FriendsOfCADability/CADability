@@ -23,9 +23,29 @@ namespace CADability.UserInterface
         private int internalValue; // der interne Wert, wenn nicht auf ein anderes Objekt bezogen
         private string settingName; // wenn in einem Setting verwendet, so ist hier der Name des Wertes
         private Dictionary<int, string> specialValues;
+        /// <summary>
+        /// Handler signature of <see cref="SetIntEvent"/>.
+        /// </summary>
+        /// <param name="sender">The property entry whose value has been changed</param>
+        /// <param name="newValue">The new value</param>
         public delegate void SetIntDelegate(IntegerProperty sender, int newValue);
+        /// <summary>
+        /// Handler signature of <see cref="GetIntEvent"/>.
+        /// </summary>
+        /// <param name="sender">The property entry asking for the value</param>
+        /// <returns>The current value</returns>
         public delegate int GetIntDelegate(IntegerProperty sender);
+        /// <summary>
+        /// When a handler is attached, the entry asks it for the current value instead of reading the reflected property of the connected
+        /// object or the internal <see cref="IntegerValue"/>. Called whenever the display is refreshed (<see cref="IntChanged"/>,
+        /// <see cref="Refresh"/>) and before a new value is set.
+        /// </summary>
         public event GetIntDelegate GetIntEvent;
+        /// <summary>
+        /// Raised by <see cref="SetInt(int)"/> with the new value when the user has changed it (by typing, with the spin button or from
+        /// the context menu of the special values), so that the owner can take it over. When a handler is attached, the reflected property
+        /// of the connected object is not set.
+        /// </summary>
         public event SetIntDelegate SetIntEvent;
         private void Initialize(object objectWithInt, string propertyName, string resourceId)
         {
@@ -49,11 +69,24 @@ namespace CADability.UserInterface
             }
             IntChanged();
         }
+        /// <summary>
+        /// Creates an entry that reads and writes the value through reflection on a property of the owning object. When no property with
+        /// exactly that name exists, the first property whose name ends with <paramref name="propertyName"/> (ignoring case) is used.
+        /// </summary>
+        /// <param name="objectWithInt">The object that owns the value</param>
+        /// <param name="propertyName">Name of a public property of type int on <paramref name="objectWithInt"/></param>
+        /// <param name="resourceId">Resource id of the label text and the tooltip, or null to keep the default</param>
         public IntegerProperty(object objectWithInt, string propertyName, string resourceId)
         {
             Initialize(objectWithInt, propertyName, resourceId);
             NotifyOnLostFocusOnly = false;
         }
+        /// <summary>
+        /// Creates an entry that holds the value itself; it is accessed through <see cref="IntegerValue"/>, or through
+        /// <see cref="GetIntEvent"/> and <see cref="SetIntEvent"/> when handlers are attached.
+        /// </summary>
+        /// <param name="initialValue">The initial value of the entry</param>
+        /// <param name="resourceId">Resource id of the label text and the tooltip, or null to keep the default</param>
         public IntegerProperty(int initialValue, string resourceId)
         {
             IsSetting = false;
@@ -62,12 +95,25 @@ namespace CADability.UserInterface
             text = initialValue.ToString();
             NotifyOnLostFocusOnly = false;
         }
+        /// <summary>
+        /// Creates an entry for a value of the <see cref="Settings"/>: the value is held in <see cref="IntegerValue"/> and saved together
+        /// with the setting name.
+        /// </summary>
+        /// <param name="resourceId">Resource id of the label text and the tooltip</param>
+        /// <param name="settingName">The name under which the value is addressed in the settings</param>
         public IntegerProperty(string resourceId, string settingName)
         {
             this.settingName = settingName;
             Initialize(this, "IntegerValue", resourceId);
             NotifyOnLostFocusOnly = false;
         }
+        /// <summary>
+        /// Defines the range of the value and whether a spin button (up/down arrows) is displayed next to the value. The range is stored
+        /// but currently not enforced when a value is entered.
+        /// </summary>
+        /// <param name="min">Smallest allowed value</param>
+        /// <param name="max">Largest allowed value</param>
+        /// <param name="showupdown">true to display the spin button</param>
         public void SetMinMax(int min, int max, bool showupdown)
         {
             minValue = min;
@@ -77,11 +123,23 @@ namespace CADability.UserInterface
             //numericUpDown.Maximum = max;
             //numericUpDown.Increment = 1;
         }
+        /// <summary>
+        /// Defines a special value that is displayed by a text instead of the number (e.g. "automatic" for 0). All special values are
+        /// offered in the context menu of the entry; selecting one sets the value.
+        /// </summary>
+        /// <param name="val">The value</param>
+        /// <param name="resourceId">Resource id of the text displayed for <paramref name="val"/>; a leading "!" of the string resource
+        /// is removed</param>
         public void AddSpecialValue(int val, string resourceId)
         {
             if (specialValues == null) specialValues = new Dictionary<int, string>();
             specialValues[val] = resourceId;
         }
+        /// <summary>
+        /// The value held by the entry itself: it is the value displayed when no object and no <see cref="GetIntEvent"/> is connected, and
+        /// the value saved when the entry is a setting. Setting it updates the display but does not notify an owner; use
+        /// <see cref="SetInt(int)"/> for that.
+        /// </summary>
         public int IntegerValue
         {
             get { return internalValue; }
@@ -91,9 +149,7 @@ namespace CADability.UserInterface
                 SetText(internalValue);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.Refresh ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void Refresh()
         {
             internalValue = GetInt();
@@ -111,6 +167,9 @@ namespace CADability.UserInterface
             }
             SetText(internalValue);
         }
+        /// <summary>
+        /// Without functionality: was meant to restrict the input to the spin button, always returns false.
+        /// </summary>
         public bool UpDownOnly
         {
             set
@@ -123,6 +182,11 @@ namespace CADability.UserInterface
                 return false;
             }
         }
+        /// <summary>
+        /// Converts the entry to its <see cref="IntegerValue"/>.
+        /// </summary>
+        /// <param name="ip">The entry</param>
+        /// <returns>The value held by the entry</returns>
         public static explicit operator int(IntegerProperty ip) { return ip.IntegerValue; }
         private void SetText(int d)
         {
@@ -136,6 +200,12 @@ namespace CADability.UserInterface
             }
             propertyPage?.Refresh(this);
         }
+        /// <summary>
+        /// Transfers a new value to the owner: raises <see cref="SetIntEvent"/> or, when no handler is attached, sets the reflected property
+        /// of the connected object. Does nothing when the value equals the current one. The displayed text is not updated here but by the
+        /// following <see cref="Refresh"/> or <see cref="IntChanged"/>. Called when the user edits the value and by the settings.
+        /// </summary>
+        /// <param name="d">The new value</param>
         public void SetInt(int d)
         {
             if (d == internalValue)
@@ -169,6 +239,9 @@ namespace CADability.UserInterface
                 }
             }
         }
+        /// <summary>
+        /// Without functionality: set to false by every constructor and never evaluated, the value is transferred with every change.
+        /// </summary>
         public bool NotifyOnLostFocusOnly { get; set; }
         private int GetInt()
         {
@@ -188,7 +261,8 @@ namespace CADability.UserInterface
         }
 
         /// <summary>
-        /// Der Besitzer dieses Objektes muss GeoPointChanged aufrufen, um eine neue Anzeige zu erzwingen.
+        /// Must be called by the owner of this property when the integer value has been changed from outside (not by
+        /// the user editing this property) to update the displayed value.
         /// </summary>
         public void IntChanged()
         {
@@ -211,6 +285,7 @@ namespace CADability.UserInterface
         }
 
         #region IShowPropertyImpl Overrides
+        /// <inheritdoc/>
         public override PropertyEntryType Flags
         {
             get
@@ -223,6 +298,7 @@ namespace CADability.UserInterface
                 return res;
             }
         }
+        /// <inheritdoc/>
         public override string Value
         {
             get
@@ -252,10 +328,12 @@ namespace CADability.UserInterface
             return success;
         }
         private int valueBeforeEdit;
+        /// <inheritdoc/>
         public override void StartEdit(bool editValue)
         {
             valueBeforeEdit = internalValue;
         }
+        /// <inheritdoc/>
         public override bool EditTextChanged(string newValue)
         {
             using (Frame.Project.Undo.ContextFrame(this))
@@ -263,6 +341,7 @@ namespace CADability.UserInterface
                 return Decode(newValue);
             }
         }
+        /// <inheritdoc/>
         public override void EndEdit(bool aborted, bool modified, string newValue)
         {
             if (aborted)
@@ -276,6 +355,7 @@ namespace CADability.UserInterface
             Frame.Project.Undo.ClearContext();
             Refresh(); // because of SetText
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -285,9 +365,7 @@ namespace CADability.UserInterface
                 return MenuResource.CreateContextMenuWithHandler(menuIDs, this);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.UnSelected ()"/>
-        /// </summary>
+        // Overrides IShowPropertyImpl.UnSelected()
         //public override void UnSelected()
         //{
         //    if (minValue != maxValue)
@@ -328,10 +406,11 @@ namespace CADability.UserInterface
         }
 
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("InternalValue", internalValue, internalValue.GetType());
@@ -339,7 +418,16 @@ namespace CADability.UserInterface
             info.AddValue("SettingName", settingName, typeof(string)); // kann auch null sein
             info.AddValue("SpecialValues", specialValues, typeof(Dictionary<int, string>));
         }
+        /// <summary>
+        /// Parameterless constructor for the JSON deserialization (<see cref="IJsonSerialize"/>); the state is restored by
+        /// <see cref="SetObjectData(IJsonReadData)"/>.
+        /// </summary>
         protected IntegerProperty() { } // needed for IJsonSerialize
+        /// <summary>
+        /// Writes the value, the resource id, the setting name and the special values for the JSON serialization
+        /// (<see cref="IJsonSerialize"/>); used when this entry is part of the settings.
+        /// </summary>
+        /// <param name="data">Receives the data</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("InternalValue", internalValue);
@@ -348,6 +436,12 @@ namespace CADability.UserInterface
             if (specialValues != null) data.AddProperty("SpecialValues", specialValues);
         }
 
+        /// <summary>
+        /// Restores the value, the resource id, the setting name and the special values from the JSON serialization
+        /// (<see cref="IJsonSerialize"/>) and registers for the <see cref="IJsonSerializeDone"/> callback, which reconnects the entry to
+        /// its own <see cref="IntegerValue"/>.
+        /// </summary>
+        /// <param name="data">The data to read from</param>
         public void SetObjectData(IJsonReadData data)
         {
             internalValue = data.GetProperty<int>("InternalValue");
@@ -397,11 +491,13 @@ namespace CADability.UserInterface
         }
         void ICommandHandler.OnSelected(MenuWithHandler selectedMenuItem, bool selected) { }
 
+        /// <inheritdoc/>
         protected override string ValueToText(int val)
         {
             return val.ToString();
         }
 
+        /// <inheritdoc/>
         protected override bool TextToValue(string input, out int val)
         {
             return int.TryParse(input, out val);

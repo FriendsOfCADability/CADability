@@ -5,7 +5,9 @@ using System.Collections;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a <see cref="BSpline"/> that passes through a sequence of points. The user enters any number of
+    /// points (points can also be inserted into or removed from the list) and chooses whether the spline is open or
+    /// closed; the degree is taken from the setting "Constr.BSpline.Degree" (default 3). Menu id: "Constr.BSpline".
     /// </summary>
     internal class ConstrBSplinePoints : ConstructAction, IIndexedGeoPoint
     {

@@ -8,6 +8,14 @@ using System.Text.RegularExpressions;
 
 namespace CADability.Actions
 {
+    /// <summary>
+    /// Interactive parametric modification of a solid: a set of faces of a shell (e.g. a hole or a boss) is moved so that it is
+    /// centered between other faces, edges or vertices of the shell which the user picks; a ratio other than 0.5 places it at that
+    /// fraction of the distance. Optionally a named <see cref="ParametricCenterProperty"/> is added to the shell so that the relation
+    /// is kept when other parametrics are applied. Created with the faces to center and started from the context menu of the
+    /// selected faces ("MenuId.Center"); when finished, the solid is replaced in the model by the modified one. Its id is
+    /// "Constr.Parametrics.Center".
+    /// </summary>
     public class ParametricsCenterAction : ConstructAction
     {
         public Shell shell; // the shell beeing manipulated by this action
@@ -26,6 +34,7 @@ namespace CADability.Actions
         private Parametric parametric;
         private bool validResult = false;
 
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "Constr.Parametrics.Center";
@@ -39,6 +48,7 @@ namespace CADability.Actions
             centerOntoObjects = new HashSet<object>();
         }
 
+        /// <inheritdoc/>
         public override void OnSetAction()
         {
             base.TitleId = "Constr.Parametrics.Center";
@@ -84,6 +94,7 @@ namespace CADability.Actions
             FeedBack.SelectOutline = false;
 
         }
+        /// <inheritdoc/>
         public override void OnDone()
         {
             if (validResult)

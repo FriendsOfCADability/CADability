@@ -95,6 +95,7 @@ namespace CADability.UserInterface
         }
 
         #region IShowPropertyImpl Overrides
+        /// <inheritdoc/>
         public override void Added(IPropertyPage pp)
         {
             // The events must be registered in Added and deregistered in Removed,  
@@ -118,6 +119,7 @@ namespace CADability.UserInterface
             }
             propertyPage.Refresh(this);
         }
+        /// <inheritdoc/>
         public override void Removed(IPropertyPage pp)
         {
             line.DidChangeEvent -= OnGeoObjectDidChange;
@@ -125,7 +127,9 @@ namespace CADability.UserInterface
             line.UserData.UserDataRemovedEvent -= OnUserDataAdded;
             base.Removed(pp);
         }
+        /// <inheritdoc/>
         public override PropertyEntryType Flags => PropertyEntryType.ContextMenu | PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -136,6 +140,7 @@ namespace CADability.UserInterface
                 return items.ToArray();
             }
         }
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -159,6 +164,7 @@ namespace CADability.UserInterface
                 return subEntries;
             }
         }
+        /// <inheritdoc/>
         public override void Opened(bool isOpen)
         {
             // Used to show or hide the hotspots when the sub-properties  

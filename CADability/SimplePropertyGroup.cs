@@ -39,11 +39,9 @@ namespace CADability.UserInterface
             subentries.Clear();
         }
         #region IPropertyEntry Members
+        /// <inheritdoc/>
         public override PropertyEntryType Flags => PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get

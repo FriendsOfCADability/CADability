@@ -7,14 +7,16 @@
     public class ModelsProperty : IShowPropertyImpl, ICommandHandler
     {
         private Project project;
+        /// <summary>
+        /// Creates the entry for the models of <paramref name="project"/>.
+        /// </summary>
+        /// <param name="project">The project whose models are listed</param>
         public ModelsProperty(Project project)
         {
             this.project = project;
             base.resourceIdInternal = "Models";
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -33,6 +35,7 @@
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get 
@@ -41,10 +44,7 @@
             }
         }
         IShowProperty[] subEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -52,10 +52,7 @@
                 return SubEntries.Length;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get
@@ -71,6 +68,9 @@
                 return subEntries;
             }
         }
+        /// <summary>
+        /// The project whose models are listed by this entry.
+        /// </summary>
         public Project Project
         {
             get
@@ -78,6 +78,7 @@
                 return project;
             }
         }
+        /// <inheritdoc/>
         public override void Refresh()
         {
             subEntries = null;

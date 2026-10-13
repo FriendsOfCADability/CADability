@@ -6,7 +6,10 @@ using System.Collections;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a circle that is tangent to two curves and passes through a point. The user picks the two curves
+    /// (polylines and paths are decomposed into their segments) and the point; the curves and the point must lie in a common
+    /// plane. Of the possible solutions the one closest to the pick positions is shown, the others can be selected with the
+    /// "next solution" command. The radius is shown as a read-only value. Menu id: "Constr.Circle.PointTwoTangents".
     /// </summary>
     internal class ConstrCirclePoint2Tangents : ConstructAction
     {

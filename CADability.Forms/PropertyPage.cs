@@ -191,7 +191,7 @@ namespace CADability.Forms
         }
         /// <summary>
         /// Splits the label text into the visible text portion and the shortcut parts.
-        /// The shortcut syntax is expected to appear at the end of the label in the format [[<modifier1><modifier2><key>]].
+        /// The shortcut syntax is expected to appear at the end of the label in the format [[&lt;modifier1&gt;&lt;modifier2&gt;&lt;key&gt;]].
         /// Each modifier is optional and must be one of 's', 'c' or 'a' (for Shift, Ctrl, Alt respectively).
         /// The key should be an uppercase letter. If any component is missing, '\0' is returned for it.
         /// </summary>

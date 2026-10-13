@@ -3,7 +3,8 @@
 namespace CADability.UserInterface
 {
     /// <summary>
-    /// 
+    /// Property entry that groups the property entries of several views (<see cref="IView"/>) of a project under one
+    /// title in the property grid and provides the context menu for managing the views ("MenuId.ViewProperty").
     /// </summary>
 
     public class MultiViewProperty : IShowPropertyImpl
@@ -11,6 +12,12 @@ namespace CADability.UserInterface
         private IView[] condorViews;
         private IFrame frame;
         private IShowProperty[] subEntries;
+        /// <summary>
+        /// Creates the entry for the given views; their property entries (<see cref="IView.GetShowProperties(IFrame)"/>)
+        /// become the sub entries.
+        /// </summary>
+        /// <param name="condorViews">The views to show</param>
+        /// <param name="frame">The frame the views belong to; its project handles the context menu</param>
         public MultiViewProperty(IView[] condorViews, IFrame frame)
         {
             this.condorViews = condorViews;
@@ -18,6 +25,7 @@ namespace CADability.UserInterface
             base.resourceIdInternal = "MultiViewProperty";
         }
         #region IShowProperty Members
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -25,6 +33,7 @@ namespace CADability.UserInterface
                 return ShowPropertyLabelFlags.Selectable | ShowPropertyLabelFlags.ContextMenu;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -43,10 +52,7 @@ namespace CADability.UserInterface
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -54,10 +60,7 @@ namespace CADability.UserInterface
                 return condorViews.Length;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get
@@ -73,6 +76,7 @@ namespace CADability.UserInterface
                 return subEntries;
             }
         }
+        /// <inheritdoc/>
         public override void Removed(IPropertyTreeView propertyTreeView)
         {
             base.Removed(propertyTreeView);

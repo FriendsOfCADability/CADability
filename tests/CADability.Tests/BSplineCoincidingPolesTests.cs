@@ -459,6 +459,48 @@ namespace CADability.Tests
         /// Reads the first SPLINE of a DXF file directly from its group codes, without the import, which splits the
         /// spline at its corners.
         /// </summary>
+        /// <summary>
+        /// The corners of a chain of Bézier segments (every inner knot has the multiplicity of the degree), from its
+        /// poles: the tangent at the end of a segment runs along the last two different poles, the tangent at the start
+        /// of the next one along its first two. A knot point is a corner where these directions differ, or where a
+        /// neighbouring pole coincides with it, so that the derivative vanishes on that side.
+        /// </summary>
+        private static int CountCorners(BSpline bezierChain)
+        {
+            GeoPoint[] poles = bezierChain.Poles;
+            int degree = bezierChain.Degree, corners = 0;
+            for (int j = degree; j < poles.Length - 1; j += degree)
+            {
+                GeoVector incoming = GeoVector.NullVector, outgoing = GeoVector.NullVector;
+                for (int k = j - 1; k >= j - degree && incoming.Length < 1e-9; k--) incoming = poles[j] - poles[k];
+                for (int k = j + 1; k <= j + degree && outgoing.Length < 1e-9; k++) outgoing = poles[k] - poles[j];
+                bool vanishes = (poles[j] | poles[j - 1]) < 1e-9 || (poles[j + 1] | poles[j]) < 1e-9;
+                if (vanishes || !Precision.SameDirection(incoming, outgoing, false) || incoming * outgoing <= 0.0) corners++;
+            }
+            return corners;
+        }
+
+        /// <summary>
+        /// Two cubic Bézier segments in one spline (the inner knot has the multiplicity of the degree, the usual form of
+        /// DXF and STEP splines). Where they meet smoothly there is no corner, so extruding the spline gives one face;
+        /// a kink between them is a corner and gives two.
+        /// </summary>
+        [DataTestMethod]
+        [DataRow(true, DisplayName = "smooth")]
+        [DataRow(false, DisplayName = "kink")]
+        public void BezierSegmentsAreSplitOnlyAtCorners(bool smooth)
+        {
+            // the first segment ends in the direction (10, -10, 0); the second starts in the same direction or at a right angle to it
+            GeoPoint[] poles = { new GeoPoint(0, 0, 0), new GeoPoint(10, 10, 0), new GeoPoint(20, 10, 0), new GeoPoint(30, 0, 0),
+                smooth ? new GeoPoint(40, -10, 0) : new GeoPoint(40, 10, 0), new GeoPoint(50, -10, 0), new GeoPoint(60, 0, 0) };
+            BSpline spline = BSpline.Construct();
+            Assert.IsTrue(spline.SetData(3, poles, null, new double[] { 0, 1, 2 }, new int[] { 4, 3, 4 }, false));
+            Assert.AreEqual(smooth ? 1 : 2, spline.SplitAtCorners().Length, "pieces");
+            IGeoObject extruded = Make3D.Extrude(spline, new GeoVector(0, 0, 5), null);
+            int faces = extruded is Shell shell ? shell.Faces.Length : extruded is Face ? 1 : -1;
+            Assert.AreEqual(smooth ? 1 : 2, faces, "extruded faces");
+        }
+
         private static BSpline ReadSpline(string file)
         {
             string[] lines = System.IO.File.ReadAllLines(file);
@@ -547,10 +589,13 @@ namespace CADability.Tests
             // closed and planar as in the file; periodic (2) was only declared, the knots are clamped
             Assert.AreEqual(1 | 8, SplineFlags(exported), "flags");
 
-            // what is done with such a contour: the operations split the spline at its 26 inner corners, the straight
-            // Bézier segments become planar faces
+            // what is done with such a contour: the operations split the spline at its corners, the straight Bézier
+            // segments become planar faces. 20 of the 26 inner knots are corners, at the other 6 two curved segments
+            // meet smoothly (same tangent, no coinciding poles), so they stay one piece
+            int corners = CountCorners(original);
+            Assert.AreEqual(20, corners, "corners of the spline, from its poles");
             Shell side = (Shell)Make3D.Extrude(spline.Clone(), new GeoVector(0, 0, 10), project);
-            Assert.AreEqual(27, side.Faces.Length, "extruded faces");
+            Assert.AreEqual(corners + 1, side.Faces.Length, "extruded faces");
             Assert.AreEqual(579.2681 * 10, side.Faces.Sum(TriangulatedArea), 1.0, "extruded area");
             Solid rotated = Make3D.Rotate(spline.Clone(), new Axis(GeoPoint.Origin, GeoVector.YAxis), SweepAngle.Full, 0, project) as Solid;
             Assert.IsNotNull(rotated, "rotating the closed contour gives a solid");
@@ -558,10 +603,10 @@ namespace CADability.Tests
             Assert.AreEqual(1701045.81, rotated.Volume(0.01), 1e-4 * 1701045.81, "rotated volume");
             Face face = Face.MakeFace(new GeoObjectList(spline.Clone()));
             Assert.IsNotNull(face);
-            Assert.AreEqual(27, face.AllEdges.Length, "the edges of the face are the smooth pieces");
+            Assert.AreEqual(corners + 1, face.AllEdges.Length, "the edges of the face are the smooth pieces");
             Assert.AreEqual(4326.3974, face.Area.Area, 1e-3, "face area");
             Solid solid = (Solid)Make3D.Extrude(face, new GeoVector(0, 0, 10), project);
-            Assert.AreEqual(29, solid.Shells[0].Faces.Length, "faces of the solid");
+            Assert.AreEqual(corners + 3, solid.Shells[0].Faces.Length, "faces of the solid");
             Assert.AreEqual(0, solid.Shells[0].OpenEdges.Length, "open edges");
             Assert.AreEqual(43263.974, solid.Volume(0.001), 1e-2, "volume");
             // the spline in the model is not changed by these operations

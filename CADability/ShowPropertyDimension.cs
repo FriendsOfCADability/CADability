@@ -14,7 +14,11 @@ using Point = System.Drawing.Point;
 namespace CADability.UserInterface
 {
     /// <summary>
-    /// 
+    /// The property page entry of a <see cref="Dimension"/>. Depending on the dimension type it shows the dimension
+    /// points, the position and direction of the dimension line, the texts (dimension text, tolerances, prefix and
+    /// postfixes) and text positions of each segment, and for radius, diameter and angle dimensions the center, the
+    /// radius and the start and end angles. The points, text positions and angles are also displayed as hot spots
+    /// that can be dragged in the view.
     /// </summary>
     internal class ShowPropertyDimension : PropertyEntryImpl, IDisplayHotSpots, IIndexedGeoPoint, ICommandHandler, IGeoObjectShowProperty
     {
@@ -185,10 +189,7 @@ namespace CADability.UserInterface
                 postfixAlt[i].OnSetValue = value => dimension.SetPostfixAlt(currentIndex, value);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="PropertyEntryImpl.Added"/>
-        /// </summary>
-        /// <param name="page"></param>
+        /// <inheritdoc/>
         public override void Added(IPropertyPage page)
         {
             dimension.DidChangeEvent += DimensionDidChange;

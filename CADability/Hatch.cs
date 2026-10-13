@@ -52,7 +52,17 @@ namespace CADability.GeoObject
             if (Constructor != null) return Constructor();
             return new Hatch();
         }
+        /// <summary>
+        /// Signature of the handlers of the <see cref="Constructed"/> event.
+        /// </summary>
+        /// <param name="justConstructed">The hatch that has just been created</param>
         public delegate void ConstructedDelegate(Hatch justConstructed);
+        /// <summary>
+        /// Raised from the constructor whenever a hatch is created, by <see cref="Construct"/> as well as when a hatch is
+        /// read from a file. The handler gets the new hatch; when it was created by <see cref="Construct"/>, its
+        /// <see cref="Plane"/>, <see cref="CompoundShape"/> and <see cref="HatchStyle"/> are not set yet. Lets an application
+        /// attach to every hatch without deriving from the class.
+        /// </summary>
         public static event ConstructedDelegate Constructed;
         #endregion
         /// <summary>
@@ -63,7 +73,18 @@ namespace CADability.GeoObject
             needsRecalc = false;
             if (Constructed != null) Constructed(this);
         }
+        /// <summary>
+        /// Signature of the handler for <see cref="OnRecalc"/>.
+        /// </summary>
+        /// <param name="toRecalc">The hatch whose contents (hatch lines etc.) are to be computed</param>
+        /// <returns>The objects that make up the hatch, or null to let the <see cref="HatchStyle"/> generate them</returns>
         public delegate GeoObjectList RecalcDelegate(Hatch toRecalc);
+        /// <summary>
+        /// Hook to replace the generation of the hatch contents: when set, <see cref="Recalc"/> calls this delegate and uses
+        /// the returned objects as the contents of the hatch instead of what
+        /// <see cref="CADability.Attribute.HatchStyle.GenerateContent"/> produces. Returning null falls back to the hatch
+        /// style. Applies to all hatches. Null by default.
+        /// </summary>
         public static RecalcDelegate OnRecalc;
         /// <summary>
         /// After the <see cref="HatchStyle"/>, the <see cref="CompoundShape"/> or the <see cref="HatchStyle"/> has been modified
@@ -104,6 +125,7 @@ namespace CADability.GeoObject
                 Recalc();
             }
         }
+        /// <inheritdoc/>
         public override ColorDef ColorDef
         {
             get
@@ -119,6 +141,10 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// The 2d shape (outline and holes, in the coordinate system of <see cref="Plane"/>) that is filled by
+        /// this hatch. Setting it marks the hatch lines for recalculation.
+        /// </summary>
         /// <value>
         /// The shape (<see cref="CADability.Shapes.CompoundShape"/>, bounding curves and holes) which is handled by this object
         /// </value>
@@ -146,6 +172,7 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <inheritdoc/>
         public override Layer Layer
         {
             get
@@ -162,6 +189,7 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <inheritdoc/>
         public override Style Style
         {
             get
@@ -185,6 +213,7 @@ namespace CADability.GeoObject
             get { return plane; }
             set { plane = value; needsRecalc = true; }
         }
+        /// <inheritdoc/>
         public override IGeoObject[] OwnedItems
         {
             get
@@ -193,10 +222,7 @@ namespace CADability.GeoObject
                 return base.OwnedItems;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Decompose ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoObjectList Decompose()
         {
             if (needsRecalc) Recalc();
@@ -310,23 +336,29 @@ namespace CADability.GeoObject
             if (Attribute == hatchStyle) return true;
             return base.IsAttributeUsed(Attribute);
         }
-        public new delegate bool PaintTo3DDelegate(Hatch toPaint, IPaintTo3D paintTo3D);
-        public new static PaintTo3DDelegate OnPaintTo3D;
         /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3DList (IPaintTo3D, ICategorizedDislayLists)"/>
+        /// Signature of the handler for <see cref="OnPaintTo3D"/>. Hides <see cref="Block.PaintTo3DDelegate"/> in order to
+        /// pass the hatch.
         /// </summary>
-        /// <param name="paintTo3D"></param>
-        /// <param name="lists"></param>
+        /// <param name="toPaint">The hatch that is about to be painted</param>
+        /// <param name="paintTo3D">The paint interface to paint to</param>
+        /// <returns>true if the handler has painted the hatch itself and the default painting must be skipped, false to let
+        /// the hatch paint its contents as usual</returns>
+        public new delegate bool PaintTo3DDelegate(Hatch toPaint, IPaintTo3D paintTo3D);
+        /// <summary>
+        /// Hook to replace the painting of hatches: when set, <see cref="PaintTo3D"/> calls this delegate and does nothing
+        /// more if it returns true. It is not consulted for a solid hatch on a paint interface that can fill paths, which is
+        /// painted as a filled path directly. Hides <see cref="Block.OnPaintTo3D"/>, which is not used for hatches. Null by default.
+        /// </summary>
+        public new static PaintTo3DDelegate OnPaintTo3D;
+        /// <inheritdoc/>
         public override void PaintTo3DList(IPaintTo3D paintTo3D, ICategorizedDislayLists lists)
         {
             if (this.compoundShape == null) return;
             if (needsRecalc) Recalc();
             base.PaintTo3DList(paintTo3D, lists);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3D (IPaintTo3D)"/>
-        /// </summary>
-        /// <param name="paintTo3D"></param>
+        /// <inheritdoc/>
         public override void PaintTo3D(IPaintTo3D paintTo3D)
         {
             if (this.compoundShape == null) return;
@@ -366,28 +398,19 @@ namespace CADability.GeoObject
                 if (!ps) paintTo3D.PaintFaces(CADability.PaintTo3D.PaintMode.CurvesOnly);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (Projection, ExtentPrecision)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="extentPrecision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingRect GetExtent(Projection projection, ExtentPrecision extentPrecision)
         {
             if (compoundShape == null) return BoundingRect.EmptyBoundingRect;
             return compoundShape.Project(this.plane, projection.ProjectionPlane).GetExtent();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetQuadTreeItem (Projection, ExtentPrecision)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="extentPrecision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IQuadTreeInsertableZ GetQuadTreeItem(Projection projection, ExtentPrecision extentPrecision)
         {
             ConditionalRecalc();
             return base.GetQuadTreeItem(projection, extentPrecision);
         }
+        /// <inheritdoc/>
         public override Style.EDefaultFor PreferredStyle
         {
             get
@@ -395,10 +418,7 @@ namespace CADability.GeoObject
                 return Style.EDefaultFor.Curves;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingCube GetBoundingCube()
         {
             ConditionalRecalc();
@@ -406,11 +426,7 @@ namespace CADability.GeoObject
         }
         #endregion
         #region IOctTreeInsertable members
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (double)"/>
-        /// </summary>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingCube GetExtent(double precision)
         {
             BoundingCube res = BoundingCube.EmptyBoundingCube;
@@ -425,12 +441,7 @@ namespace CADability.GeoObject
             }
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
-        /// </summary>
-        /// <param name="cube"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(ref BoundingCube cube, double precision)
         {
             if (base.Count == 0) Recalc();
@@ -448,13 +459,7 @@ namespace CADability.GeoObject
                 return false;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection, BoundingRect, bool)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="rect"></param>
-        /// <param name="onlyInside"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(Projection projection, BoundingRect rect, bool onlyInside)
         {
             CompoundShape cs = compoundShape.Project(plane, projection.ProjectionPlane);
@@ -474,13 +479,7 @@ namespace CADability.GeoObject
                 }
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Position (GeoPoint, GeoVector, double)"/>
-        /// </summary>
-        /// <param name="fromHere"></param>
-        /// <param name="direction"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double Position(GeoPoint fromHere, GeoVector direction, double precision)
         {
             GeoPoint p = plane.Intersect(fromHere, direction);
@@ -504,10 +503,11 @@ namespace CADability.GeoObject
         }
 
         /// <summary>
-        /// Implements ISerializable:GetObjectData
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info"></param>
-        /// <param name="context"></param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             ConditionalRecalc();
@@ -516,6 +516,12 @@ namespace CADability.GeoObject
             info.AddValue("HatchStyle", hatchStyle);
             info.AddValue("Plane", plane);
         }
+        /// <summary>
+        /// Implements <see cref="IJsonSerialize.GetObjectData"/>: writes the data of the block
+        /// (<see cref="Block.GetObjectData(IJsonWriteData)"/>) followed by the shape, the hatch style and the plane of the
+        /// hatch. The contents are brought up to date first. Hides the base method so that the interface is bound to this one.
+        /// </summary>
+        /// <param name="data">receives the data</param>
         new public void GetObjectData(IJsonWriteData data)
         {
             ConditionalRecalc();
@@ -525,6 +531,12 @@ namespace CADability.GeoObject
             data.AddProperty("Plane", plane);
         }
 
+        /// <summary>
+        /// Implements <see cref="IJsonSerialize.SetObjectData"/>: reads the data of the block
+        /// (<see cref="Block.SetObjectData(IJsonReadData)"/>) followed by the shape, the hatch style and the plane of the
+        /// hatch. Hides the base method so that the interface is bound to this one.
+        /// </summary>
+        /// <param name="data">provides the data</param>
         new public void SetObjectData(IJsonReadData data)
         {
             base.SetObjectData(data);

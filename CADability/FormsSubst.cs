@@ -11,11 +11,16 @@ using Point = System.Drawing.Point;
 // MouseEventArgs, MouseButtons, Keys, 
 // MessageBox, Clipboard, IDataObject, Control.ModifierKeys
 
-/// <summary>
-/// Simple substitues for Windows.Forms enum and simple data objects. Copy of the Windows.Forms code.
-/// </summary>
+// Simple substitutes for Windows.Forms enum and simple data objects. Copy of the Windows.Forms code.
+// They have the members and values of their Windows.Forms originals, so CS1591 (no doc comment) is not reported here.
+#pragma warning disable CS1591
 namespace CADability.Substitutes
 {
+    /// <summary>
+    /// The mouse buttons, with the values of System.Windows.Forms.MouseButtons. CADability's kernel does not
+    /// reference Windows.Forms, so the views and actions use this substitute; CADability.Forms converts the
+    /// Windows.Forms values to it.
+    /// </summary>
     [Flags]
     public enum MouseButtons
     {
@@ -27,6 +32,10 @@ namespace CADability.Substitutes
         XButton2 = 16777216
     }
 
+    /// <summary>
+    /// The data of a mouse event (button, click count, position in pixels of the view, wheel delta), the substitute
+    /// for System.Windows.Forms.MouseEventArgs that the views and actions receive.
+    /// </summary>
     public struct MouseEventArgs
     {
         public MouseButtons Button { get; set; }
@@ -37,6 +46,10 @@ namespace CADability.Substitutes
         public Point Location { get; set; }
     }
 
+    /// <summary>
+    /// The data of a key event, the substitute for System.Windows.Forms.KeyEventArgs: the key with its modifiers
+    /// (<see cref="Keys"/>) and the flags that tell the sender the key was handled.
+    /// </summary>
     public class KeyEventArgs
     {
         public KeyEventArgs(Keys keyData)
@@ -54,12 +67,19 @@ namespace CADability.Substitutes
         public bool SuppressKeyPress { get; set; }
     }
 
+    /// <summary>
+    /// The data of a paint event, the substitute for System.Windows.Forms.PaintEventArgs: the graphics to paint
+    /// with and the rectangle that needs painting.
+    /// </summary>
     public class PaintEventArgs 
     {
         public Rectangle ClipRectangle { get; set; }
         public Graphics Graphics { get; set; }
     }
 
+    /// <summary>
+    /// The state of a check box, with the values of System.Windows.Forms.CheckState.
+    /// </summary>
     public enum CheckState
     {
         Unchecked = 0,
@@ -67,6 +87,10 @@ namespace CADability.Substitutes
         Indeterminate = 2
     }
 
+    /// <summary>
+    /// The keys of the keyboard and the modifier flags, with the values of System.Windows.Forms.Keys. A key event
+    /// carries a key code combined with the modifiers (<see cref="Shift"/>, <see cref="Control"/>, <see cref="Alt"/>).
+    /// </summary>
     [Flags]
     public enum Keys
     {
@@ -266,6 +290,10 @@ namespace CADability.Substitutes
         Alt = 262144
     }
 
+    /// <summary>
+    /// The buttons a message box shows, with the values of System.Windows.Forms.MessageBoxButtons; used by
+    /// <see cref="CADability.UserInterface.IUIService.ShowMessageBox"/>.
+    /// </summary>
     public enum MessageBoxButtons
     {
         OK = 0,
@@ -276,6 +304,10 @@ namespace CADability.Substitutes
         RetryCancel = 5
     }
 
+    /// <summary>
+    /// The result of a dialog, with the values of System.Windows.Forms.DialogResult; returned by the dialogs of
+    /// <see cref="CADability.UserInterface.IUIService"/>.
+    /// </summary>
     public enum DialogResult
     {
         None = 0,
@@ -288,6 +320,9 @@ namespace CADability.Substitutes
         No = 7
     }
 
+    /// <summary>
+    /// The effects of a drag and drop operation, with the values of System.Windows.Forms.DragDropEffects.
+    /// </summary>
     [Flags]
     public enum DragDropEffects
     {
@@ -299,6 +334,11 @@ namespace CADability.Substitutes
         Link = 4
     }
 
+    /// <summary>
+    /// The data of a drag and drop event, the substitute for System.Windows.Forms.DragEventArgs: the dragged data,
+    /// the position, the allowed effects and the effect the receiver chooses (<see cref="Effect"/>, which raises
+    /// <see cref="EffectChanged"/> so that the Windows.Forms side can pass it on).
+    /// </summary>
     public class DragEventArgs : EventArgs
     {
         public object Data { get; set; } //IDataObject
@@ -319,10 +359,20 @@ namespace CADability.Substitutes
                 EffectChanged?.Invoke(this);
             }
         }
+        /// <summary>
+        /// Handler of <see cref="EffectChanged"/>.
+        /// </summary>
+        /// <param name="e">The arguments whose <see cref="Effect"/> changed</param>
         public delegate void ChangedDelegate(DragEventArgs e);
+        /// <summary>
+        /// Raised when <see cref="Effect"/> is set, e.g. by the drop target during a drag operation.
+        /// </summary>
         public event ChangedDelegate EffectChanged;
     }
 
+    /// <summary>
+    /// Keyboard shortcuts for menu items, with the values of System.Windows.Forms.Shortcut.
+    /// </summary>
     public enum Shortcut
     {
         None = 0,

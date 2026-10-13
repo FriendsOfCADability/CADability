@@ -9,7 +9,11 @@ using System.Runtime.Serialization;
 namespace CADability.Curve2D
 {
     /// <summary>
-    /// 
+    /// A full circle in 2d space, given by its center and radius. The circle is a closed curve; its normalized parameter runs
+    /// from 0.0 at the point in direction of the positive x-axis once around the circle, counterclockwise by default and clockwise
+    /// if the circle was created with a negative radius or has been reversed. Circular arcs are represented by the derived class
+    /// <see cref="Arc2D"/>. Circles occur as projections of 3d circles (<see cref="Ellipse"/>) onto a plane and in the parameter
+    /// space of surfaces.
     /// </summary>
     [Serializable()]
     public class Circle2D : GeneralCurve2D, ISerializable
@@ -17,31 +21,41 @@ namespace CADability.Curve2D
         private GeoPoint2D center;
         private double radius;
         internal bool counterClock; // nur bei Vollkreis die Richtung (Bogen hat sweep)
+        /// <summary>
+        /// Constructs a full circle with the given center and radius. The circle runs counterclockwise; a negative
+        /// <paramref name="radius"/> yields a clockwise circle with the absolute value as radius.
+        /// </summary>
+        /// <param name="center">center of the circle</param>
+        /// <param name="radius">radius; a negative value selects the clockwise direction</param>
         public Circle2D(GeoPoint2D center, double radius)
         {
             this.center = center;
             this.radius = Math.Abs(radius);
             counterClock = radius > 0.0;
         }
+        /// <summary>
+        /// The center of the circle. Setting it moves the circle; radius and direction are kept.
+        /// </summary>
         public GeoPoint2D Center
         {
             get { return center; }
             set { center = value; }
         }
+        /// <summary>
+        /// The radius of the circle, positive. Setting it scales the circle about its center; the new value must be positive, the
+        /// direction is not derived from its sign here (unlike in the constructor).
+        /// </summary>
         public double Radius
         {
             get { return radius; }
             set { radius = value; }
         }
+        /// <inheritdoc/>
         public override string ToString()
         {
             return "Circle2D: (" + center.ToString() + ") " + radius.ToString();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Intersect (ICurve2D)"/>
-        /// </summary>
-        /// <param name="IntersectWith"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2DWithParameter[] Intersect(ICurve2D IntersectWith)
         {
             Circle2D c2d = IntersectWith as Circle2D;
@@ -83,21 +97,12 @@ namespace CADability.Curve2D
             }
             return base.Intersect(IntersectWith); // der allgemeine Fall
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Intersect (GeoPoint2D, GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="StartPoint"></param>
-        /// <param name="EndPoint"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2DWithParameter[] Intersect(GeoPoint2D StartPoint, GeoPoint2D EndPoint)
         {
             return Intersect(new Line2D(StartPoint, EndPoint));
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.PositionOf (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double PositionOf(GeoPoint2D p)
         {
             double res = Math.Atan2(p.y - center.y, p.x - center.x);
@@ -105,28 +110,21 @@ namespace CADability.Curve2D
             if (!counterClock) res = 2.0 * Math.PI - res;
             return res / (2.0 * Math.PI);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.PointAt (double)"/>
-        /// </summary>
-        /// <param name="Position"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D PointAt(double Position)
         {
             Angle a = Position * 2.0 * Math.PI;
             if (!counterClock) a = 2.0 * Math.PI - a.Radian;
             return new GeoPoint2D(center, radius, a);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.DirectionAt (double)"/>
-        /// </summary>
-        /// <param name="Position"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoVector2D DirectionAt(double Position)
         {
             GeoVector2D r = (Math.PI * 2.0) * (PointAt(Position) - Center); // introduced factor (31.1.18) because of HelicalSurface, NewtonLineIntersection
             if (counterClock) return r.ToLeft();
             else return r.ToRight();
         }
+        /// <inheritdoc/>
         public override bool TryPointDeriv2At(double position, out GeoPoint2D point, out GeoVector2D deriv, out GeoVector2D deriv2)
         {
             double par = position * 2.0 * Math.PI;
@@ -153,6 +151,7 @@ namespace CADability.Curve2D
                 interpol[i] = PointAt(interparam[i]);
             }
         }
+        /// <inheritdoc/>
         public override GeoPoint2D StartPoint
         {
             get
@@ -167,6 +166,7 @@ namespace CADability.Curve2D
                 }
             }
         }
+        /// <inheritdoc/>
         public override GeoPoint2D EndPoint
         {
             get
@@ -181,6 +181,7 @@ namespace CADability.Curve2D
                 }
             }
         }
+        /// <inheritdoc/>
         public override GeoVector2D EndDirection
         {
             get
@@ -188,6 +189,7 @@ namespace CADability.Curve2D
                 return GeoVector2D.YAxis;
             }
         }
+        /// <inheritdoc/>
         public override GeoVector2D StartDirection
         {
             get
@@ -196,23 +198,18 @@ namespace CADability.Curve2D
                 else return -GeoVector2D.YAxis;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Reverse ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void Reverse()
         {
             counterClock = !counterClock;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Move (double, double)"/>
-        /// </summary>
-        /// <param name="dx"></param>
-        /// <param name="dy"></param>
+        /// <inheritdoc/>
         public override void Move(double dx, double dy)
         {
             center.x += dx;
             center.y += dy;
         }
+        /// <inheritdoc/>
         public override ICurve2D GetModified(ModOp2D m)
         {
             // the modified curve must start at the modified start point and run in the same direction as the modified circle:
@@ -257,12 +254,7 @@ namespace CADability.Curve2D
             }
             return new EllipseArc2D(c, majorAxis, minorAxis, startPar, sign * sweep, left, right, bottom, top);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.TangentPoints (GeoPoint2D, GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="FromHere"></param>
-        /// <param name="CloseTo"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D[] TangentPoints(GeoPoint2D FromHere, GeoPoint2D CloseTo)
         {
             GeoPoint2D center2 = new GeoPoint2D(FromHere, center); // auf der Mitte
@@ -275,6 +267,7 @@ namespace CADability.Curve2D
             }
             return res;
         }
+		/// <inheritdoc/>
 		public override GeoPoint2D[] TangentPointsToAngle(Angle ang, GeoPoint2D CloseTo)
 		{
 			GeoPoint2D[] res = Geometry.IntersectLC(center + radius * new GeoVector2D(ang).ToLeft(), center + radius * new GeoVector2D(ang).ToRight(), center, radius);
@@ -286,14 +279,7 @@ namespace CADability.Curve2D
 			}
 			return res;
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Parallel (double, bool, double, double)"/>
-		/// </summary>
-		/// <param name="Dist"></param>
-		/// <param name="approxSpline"></param>
-		/// <param name="precision"></param>
-		/// <param name="roundAngle"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override ICurve2D Parallel(double Dist, bool approxSpline, double precision, double roundAngle)
         {
             // berücksichtigt die Richtung
@@ -301,16 +287,13 @@ namespace CADability.Curve2D
             res.UserData.CloneFrom(this.UserData);
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Distance (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double Distance(GeoPoint2D p)
         {
             double d = Geometry.Dist(p, center);
             return Math.Abs(d - radius);
         }
+        /// <inheritdoc/>
         public override double Length
         {
             get
@@ -318,6 +301,7 @@ namespace CADability.Curve2D
                 return Radius * 2.0 * Math.PI;
             }
         }
+        /// <inheritdoc/>
         public override double Sweep
         {
             get
@@ -326,20 +310,12 @@ namespace CADability.Curve2D
                 else return SweepAngle.FullReverse;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.GetExtent ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingRect GetExtent()
         {
             return new BoundingRect(center, radius, radius);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.HitTest (ref BoundingRect, bool)"/>
-        /// </summary>
-        /// <param name="Rect"></param>
-        /// <param name="IncludeControlPoints"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(ref BoundingRect Rect, bool IncludeControlPoints)
         {
             ClipRect clr = new ClipRect(Rect);
@@ -349,10 +325,7 @@ namespace CADability.Curve2D
             if (clr.ArcHitTest(center, radius, 3, new GeoPoint2D(center.x, center.y - radius), new GeoPoint2D(center.x + radius, center.y))) return true;
             return false;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Clone ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D Clone()
         {
             Circle2D res = new Circle2D(center, radius);
@@ -360,11 +333,7 @@ namespace CADability.Curve2D
             res.UserData.CloneFrom(this.UserData);
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.CloneReverse (bool)"/>
-        /// </summary>
-        /// <param name="reverse"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D CloneReverse(bool reverse)
         {
             Circle2D res = new Circle2D(center, radius);
@@ -373,10 +342,7 @@ namespace CADability.Curve2D
             res.UserData.CloneFrom(this.UserData);
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Copy (ICurve2D)"/>
-        /// </summary>
-        /// <param name="toCopyFrom"></param>
+        /// <inheritdoc/>
         public override void Copy(ICurve2D toCopyFrom)
         {
             Circle2D c = toCopyFrom as Circle2D;
@@ -384,12 +350,7 @@ namespace CADability.Curve2D
             radius = c.radius;
             UserData.CloneFrom(c.UserData);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Trim (double, double)"/>
-        /// </summary>
-        /// <param name="StartPos"></param>
-        /// <param name="EndPos"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D Trim(double StartPos, double EndPos)
         {
             if (StartPos < EndPos)
@@ -404,11 +365,7 @@ namespace CADability.Curve2D
                 return new Arc2D(center, radius, PointAt(StartPos), PointAt(EndPos), counterClock);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Split (double)"/>
-        /// </summary>
-        /// <param name="Position"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D[] Split(double Position)
         {
             if (Position > 0.0 && Position < 1.0)
@@ -417,22 +374,14 @@ namespace CADability.Curve2D
             }
             return new ICurve2D[] { Clone() };
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.PerpendicularFoot (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="FromHere"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D[] PerpendicularFoot(GeoPoint2D FromHere)
         {
             if (Precision.IsEqual(FromHere, center)) return new GeoPoint2D[0];
             Angle a = new Angle(FromHere, center);
             return new GeoPoint2D[] { new GeoPoint2D(center, radius, a), new GeoPoint2D(center, radius, a + SweepAngle.Opposite) };
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.MinDistance (ICurve2D)"/>
-        /// </summary>
-        /// <param name="Other"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double MinDistance(ICurve2D Other)
         {
             if (Other is Line2D)
@@ -494,11 +443,7 @@ namespace CADability.Curve2D
                 return base.MinDistance(Other);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.MakeGeoObject (Plane)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IGeoObject MakeGeoObject(Plane p)
         {
             Plane ploc = p;
@@ -509,23 +454,14 @@ namespace CADability.Curve2D
             if (!counterClock) (e as ICurve).Reverse();
             return e;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Project (Plane, Plane)"/>
-        /// </summary>
-        /// <param name="fromPlane"></param>
-        /// <param name="toPlane"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D Project(Plane fromPlane, Plane toPlane)
         {
             Ellipse e = Ellipse.Construct();
             e.SetCirclePlaneCenterRadius(fromPlane, fromPlane.ToGlobal(Center), Radius);
             return e.GetProjectedCurve(toPlane);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.AddToGraphicsPath (System.Drawing.Drawing2D.GraphicsPath, bool)"/>
-        /// </summary>
-        /// <param name="path"></param>
-        /// <param name="forward"></param>
+        /// <inheritdoc/>
         public override void AddToGraphicsPath(System.Drawing.Drawing2D.GraphicsPath path, bool forward)
         {	// forward oder nicht ist doch egal, oder?
             // im Modus "System.Drawing.Drawing2D.FillMode.Alternate" scheint es egal zu sein,
@@ -540,12 +476,7 @@ namespace CADability.Curve2D
                 path.AddArc((float)(Center.x - Radius), (float)(Center.y - Radius), (float)(2 * Radius),
                     (float)(2 * Radius), 0.0f, -360.0f);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Approximate (bool, double)"/>
-        /// </summary>
-        /// <param name="linesOnly"></param>
-        /// <param name="maxError"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D Approximate(bool linesOnly, double maxError)
         {
             if (linesOnly)
@@ -557,20 +488,13 @@ namespace CADability.Curve2D
                 return Clone();
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.GetArea ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double GetArea()
         {
             if (counterClock) return radius * radius * Math.PI;
             else return -(radius * radius * Math.PI);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.GetAreaFromPoint (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double GetAreaFromPoint(GeoPoint2D p)
         {
             // The swept area of a CLOSED curve does not depend on where it is seen from - that is the
@@ -585,6 +509,7 @@ namespace CADability.Curve2D
             GeoPoint2D sp = StartPoint, ep = EndPoint;
             return GetArea() - (p.x * (ep.y - sp.y) - p.y * (ep.x - sp.x)) / 2.0;
         }
+        /// <inheritdoc/>
         public override bool IsClosed
         {
             get
@@ -592,12 +517,7 @@ namespace CADability.Curve2D
                 return true;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.GetFused (ICurve2D, double)"/>
-        /// </summary>
-        /// <param name="toFuseWith"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D GetFused(ICurve2D toFuseWith, double precision)
         {
             if (toFuseWith is Circle2D)
@@ -614,11 +534,7 @@ namespace CADability.Curve2D
             }
             return null;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.TangentPointsToAngle (GeoVector2D)"/>
-        /// </summary>
-        /// <param name="direction"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double[] TangentPointsToAngle(GeoVector2D direction)
         {
             double[] res = new double[2];
@@ -646,10 +562,11 @@ namespace CADability.Curve2D
             }
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Center", center);

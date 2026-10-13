@@ -56,26 +56,89 @@ namespace CADability
     /// <param name="Processed">Set to true, if you have processed this command and no further action is required, leave unmodified if CADability should process this command</param>
     public delegate void ProcessCommandDelegate(string MenuId, ref bool Processed);
     /// <summary>
-    /// 
+    /// Delegate for the <see cref="IFrame.UpdateCommandEvent"/>, which is raised when the user interface wants to know the
+    /// state (enabled, checked) of the menu item or toolbar button with the given id. A handler sets the flags in
+    /// <paramref name="CommandState"/> and sets <paramref name="Processed"/> to true to prevent the frame from determining
+    /// the state itself.
     /// </summary>
-    /// <param name="MenuId"></param>
-    /// <param name="CommandState"></param>
-    /// <param name="Processed"></param>
+    /// <param name="MenuId">Id of the menu item or command</param>
+    /// <param name="CommandState">The state to fill in</param>
+    /// <param name="Processed">Set to true when the handler has determined the state</param>
     public delegate void UpdateCommandDelegate(string MenuId, CommandState CommandState, ref bool Processed);
+    /// <summary>
+    /// Delegate for notifications about a menu item or toolbar button becoming active or inactive. Currently not used by CADability.
+    /// </summary>
+    /// <param name="MenuId">The id of the menu item (see MenuResource.xml)</param>
+    /// <param name="Active">true if the item became active, false if it became inactive</param>
     public delegate void UIEventHandler(string MenuId, bool Active);
+    /// <summary>
+    /// Delegate for the <see cref="IFrame.ProjectClosedEvent"/>, which is raised before the project in the frame is replaced by another one.
+    /// </summary>
+    /// <param name="theProject">The project that is being closed (null when there was no project)</param>
+    /// <param name="theFrame">The frame in which the project was open</param>
     public delegate void ProjectClosedDelegate(Project theProject, IFrame theFrame);
+    /// <summary>
+    /// Delegate for the <see cref="IFrame.ProjectOpenedEvent"/>, which is raised when a project has been set in the frame,
+    /// before its views are connected and displayed.
+    /// </summary>
+    /// <param name="theProject">The project that has been opened</param>
+    /// <param name="theFrame">The frame in which the project is open</param>
     public delegate void ProjectOpenedDelegate(Project theProject, IFrame theFrame);
+    /// <summary>
+    /// Delegate for the <see cref="IFrame.ViewsChangedEvent"/>, which is raised when views are created or removed, e.g. when a project is opened.
+    /// </summary>
+    /// <param name="theFrame">The frame whose views changed; <see cref="IFrame.AllViews"/> returns the current views</param>
     public delegate void ViewsChangedDelegate(IFrame theFrame);
+    /// <summary>
+    /// Delegate for the <see cref="IFrame.ControlCenterCreatedEvent"/>, which is raised when the control center (properties explorer)
+    /// is assigned to the frame.
+    /// </summary>
+    /// <param name="controlCenter">The control center that has been created</param>
     public delegate void ControlCenterCreatedDelegate(IControlCenter controlCenter);
+    /// <summary>
+    /// Delegate for the <see cref="IFrame.ActionStartedEvent"/>, which is raised when an action is started via
+    /// <see cref="IFrame.SetAction"/>, after <see cref="Action.OnSetAction"/> has been called and before the action is activated.
+    /// </summary>
+    /// <param name="action">The action that has been started</param>
     public delegate void ActionStartedDelegate(Action action);
+    /// <summary>
+    /// Delegate for the <see cref="IFrame.ActionTerminatedEvent"/>, which is raised when an action has been removed from the action
+    /// stack, after <see cref="Action.OnRemoveAction"/> has been called.
+    /// </summary>
+    /// <param name="action">The action that has terminated</param>
     public delegate void ActionTerminatedDelegate(Action action);
 
 
+    /// <summary>
+    /// The application frame: the central object that holds the open <see cref="Project"/>, its views, the stack of running
+    /// actions, the control center (properties explorer) and the user interface services, and that routes menu commands and
+    /// settings. Actions, views and property entries reach the rest of the application through this interface. The kernel
+    /// provides the implementation <see cref="FrameImpl"/>, from which the concrete application derives (e.g. <c>CadFrame</c>
+    /// in CADability.Forms). The current frame is also available as <see cref="FrameImpl.MainFrame"/>.
+    /// </summary>
     public interface IFrame
     {
+        /// <summary>
+        /// The control center (properties explorer) of the application: the tab control that shows the property pages "Action",
+        /// "Project", "Global" and "View". May be null when the application runs without a properties explorer.
+        /// </summary>
         IControlCenter ControlCenter { get; }
+        /// <summary>
+        /// Returns the property page of the control center with the given name. The names of the standard pages are "Action",
+        /// "Project", "Global" and "View".
+        /// </summary>
+        /// <param name="Name">Name of the property page</param>
+        /// <returns>The property page, or null if there is no such page or no control center</returns>
         IPropertyPage GetPropertyDisplay(string Name);
+        /// <summary>
+        /// The property entry that opened the context menu which is currently displayed or being processed. Property entries set
+        /// this before they show their context menu, so that the command handler can find out which entry a command refers to.
+        /// </summary>
         IPropertyEntry ContextMenuSource { get; set; }
+        /// <summary>
+        /// The user interface services of the application: message boxes, file and color dialogs, clipboard access, progress bar and
+        /// similar functions that the kernel needs but cannot provide itself (see <see cref="IUIService"/>).
+        /// </summary>
         IUIService UIService { get; }
         /// <summary>
         /// Returns the currently active view
@@ -93,6 +156,11 @@ namespace CADability
         /// Returns the project that is open in this frame
         /// </summary>
         Project Project { get; }
+        /// <summary>
+        /// The stack of running actions. The views forward their mouse events to it and it distributes menu commands to the actions.
+        /// For starting and terminating actions <see cref="SetAction"/>, <see cref="RemoveActiveAction"/> and <see cref="ActiveAction"/>
+        /// are usually sufficient.
+        /// </summary>
         ActionStack ActionStack { get; }
         /// <summary>
         /// Starts the provided action. The currently active action will either be aborted or
@@ -150,7 +218,22 @@ namespace CADability
         /// (set the enabled and check flags).
         /// </summary>
         event UpdateContextMenuDelegate UpdateContextMenuEvent;
+        /// <summary>
+        /// Raises the <see cref="ProcessContextMenuEvent"/>. Called by the command handlers of context menus (e.g. the selection)
+        /// before they execute a context menu command, so that the application can intercept the command.
+        /// </summary>
+        /// <param name="target">The command handler to which the command is targeted</param>
+        /// <param name="MenuId">The menu id of the command (see MenuResource.xml)</param>
+        /// <param name="Processed">Set to true by a handler that has processed the command</param>
         void ProcessContextMenu(ICommandHandler target, string MenuId, ref bool Processed);
+        /// <summary>
+        /// Raises the <see cref="UpdateContextMenuEvent"/>. Called by the command handlers of context menus before a context menu is
+        /// displayed, so that the application can set the enabled and checked state of the commands.
+        /// </summary>
+        /// <param name="target">The command handler to which the command is targeted</param>
+        /// <param name="MenuId">The menu id of the command (see MenuResource.xml)</param>
+        /// <param name="CommandState">The state (enabled, checked) of the command, which the handlers may modify</param>
+        /// <param name="Processed">Set to true by a handler that has provided the state</param>
         void UpdateContextMenu(ICommandHandler target, string MenuId, CommandState CommandState, ref bool Processed);
         /// <summary>
         /// Brings the property page with the <paramref name="Name"/> to front (in the tab control)
@@ -255,8 +338,23 @@ namespace CADability
         /// Notification that a <see cref="Action"/> terminated
         /// </summary>
         event ActionTerminatedDelegate ActionTerminatedEvent;
+        /// <summary>
+        /// Raises the <see cref="ActionStartedEvent"/>. Called by the <see cref="CADability.ActionStack"/> when an action is set;
+        /// there is no need to call it from elsewhere.
+        /// </summary>
+        /// <param name="Action">The action that has been started</param>
         void RaiseActionStartedEvent(Action Action);
+        /// <summary>
+        /// Raises the <see cref="ActionTerminatedEvent"/>. Called by the <see cref="CADability.ActionStack"/> when an action is removed;
+        /// there is no need to call it from elsewhere.
+        /// </summary>
+        /// <param name="Action">The action that has terminated</param>
         void RaiseActionTerminatedEvent(Action Action);
+        /// <summary>
+        /// Updates the list of most recently used files in the file menu of the application. The frame calls it after a file has been
+        /// opened or saved. The implementation in <see cref="FrameImpl"/> does nothing; the application overrides it to fill its menu.
+        /// </summary>
+        /// <param name="mruFiles">The full names of the most recently used files</param>
         void UpdateMRUMenu(string[] mruFiles);
     }
 
@@ -281,6 +379,7 @@ namespace CADability
         // private PropertyPage symbolProperties; // no more symbol library, nobody uses it
         private string[] mruFiles; // the list of most recently used files
         private Make3D.SolidModellingMode solidModellingMode = Make3D.SolidModellingMode.unchanged;
+        /// <inheritdoc/>
         public Make3D.SolidModellingMode SolidModellingMode { get { return solidModellingMode; } set { solidModellingMode = value; } }
         private static double mouseWheelZoomFactor
         {   // this mechanism delays reading the global settings
@@ -290,7 +389,17 @@ namespace CADability
             }
         }
         private ICanvas canvas;
+        /// <summary>
+        /// The frame that was created last; there is usually only one frame in an application. Objects that have no access to a frame
+        /// but need its services, e.g. the active view or the <see cref="IFrame.UIService"/>, use it. May be null when no frame exists
+        /// (e.g. in tests); it is reset by <see cref="Dispose"/>.
+        /// </summary>
         public static IFrame MainFrame; // there is usually only one frame and sometimes we need services like the active view or the UIServices that we can get from here
+        /// <summary>
+        /// Creates a frame without project, control center and canvas: creates the action stack, loads the global settings and the
+        /// list of most recently used files and registers the frame as <see cref="MainFrame"/>. The derived class sets the
+        /// <see cref="ControlCenter"/>, the <see cref="Project"/> and the views afterwards.
+        /// </summary>
         public FrameImpl()
         {
             MainFrame = this;
@@ -306,18 +415,36 @@ namespace CADability
             Settings.GlobalSettings.SetValue("Experimental.ParallelOcttree", true);
             snapMode = (SnapPointFinder.SnapModes)Settings.GlobalSettings.GetIntValue("KeepState.SnapMode", 0);
         }
+        /// <summary>
+        /// Creates a frame that displays its views on the given canvas and its properties in the given control center. The control
+        /// center is connected to the frame and its standard property pages are created. A project has to be set afterwards.
+        /// </summary>
+        /// <param name="cc">The control center (properties explorer) of the application</param>
+        /// <param name="canvas">The canvas on which the views are displayed</param>
         public FrameImpl(IControlCenter cc, ICanvas canvas) : this()
         {
             cc.Frame = this;
             ControlCenter = cc;
             this.canvas = canvas;
         }
+        /// <summary>
+        /// Creates a frame with the given control center, opens the given project in it and makes the given model view the active
+        /// view. No canvas is involved in this configuration.
+        /// </summary>
+        /// <param name="pr">The project to open in the frame</param>
+        /// <param name="modelView">The view that becomes the active view</param>
+        /// <param name="cc">The control center (properties explorer) of the application</param>
         public FrameImpl(Project pr, ModelView modelView, IControlCenter cc) : this()
         {
             ControlCenter = cc;
             Project = pr;
             ActiveView = modelView;
         }
+        /// <summary>
+        /// Creates a frame that displays its views on the given canvas but has no control center, so no property pages are shown.
+        /// A project has to be set afterwards.
+        /// </summary>
+        /// <param name="canvas">The canvas on which the views are displayed</param>
         public FrameImpl(ICanvas canvas) : this()
         {
             this.canvas = canvas;
@@ -393,7 +520,16 @@ namespace CADability
                 ViewsChangedEvent?.Invoke(this);
             }
         }
+        /// <summary>
+        /// The user interface services (see <see cref="IFrame.UIService"/>). Must be provided by the derived class, which usually
+        /// implements <see cref="IUIService"/> itself and returns <c>this</c>.
+        /// </summary>
         public abstract IUIService UIService { get; }
+        /// <summary>
+        /// All views currently open in the frame: the model views, followed by the layout views, the GDI views and the animated
+        /// views (layout and GDI views do not exist in the WebAssembly build). The array is a snapshot; adding or removing views
+        /// does not change it.
+        /// </summary>
         public IView[] AllViews
         {
             get
@@ -415,6 +551,10 @@ namespace CADability
             }
         }
         private IView activeView;
+        /// <summary>
+        /// The view that currently has the focus and receives the commands and the mouse input. Setting it shows the view on the
+        /// canvas and updates the "View" page of the control center.
+        /// </summary>
         public IView ActiveView
         {
             get
@@ -431,6 +571,13 @@ namespace CADability
                 }
             }
         }
+        /// <summary>
+        /// Adds a view to the frame and to the project: a <see cref="ModelView"/> is registered under its name, an
+        /// <see cref="AnimatedView"/>, a GDI view or a layout view in the corresponding list of the project. The "View" page of the
+        /// control center is updated. Views of other types are ignored. The view does not become the active view; set
+        /// <see cref="ActiveView"/> for that.
+        /// </summary>
+        /// <param name="toAdd">The view to add</param>
         public void AddView(IView toAdd)
         {
             if (toAdd is ModelView)
@@ -463,6 +610,12 @@ namespace CADability
             }
 #endif
         }
+        /// <summary>
+        /// Removes a view from the frame and from the project, the counterpart of <see cref="AddView"/>. The "View" page of the
+        /// control center is updated. Views of unknown types are ignored. If the removed view was the active view, the caller has
+        /// to set another <see cref="ActiveView"/>.
+        /// </summary>
+        /// <param name="toRemove">The view to remove</param>
         public void RemoveView(IView toRemove)
         {
             if (toRemove is AnimatedView)
@@ -498,6 +651,11 @@ namespace CADability
         //public Control DisplayArea => throw new NotImplementedException();
 
         private IControlCenter controlCenter;
+        /// <summary>
+        /// The control center (properties explorer) of the application. Setting it raises <see cref="ControlCenterCreatedEvent"/>,
+        /// creates the standard property pages "Action", "Project", "Global" and "View", fills the global settings into the "Global"
+        /// page and the current project into the "Project" page, and brings the "Action" page to front.
+        /// </summary>
         public IControlCenter ControlCenter
         {
             get { return controlCenter; }
@@ -630,8 +788,17 @@ namespace CADability
         }
 
 
+        /// <summary>
+        /// The menu id of the command that is currently being executed by <see cref="OnCommand"/>. An action started by that command
+        /// reads it in <see cref="Action.OnSetAction"/> to remember the menu id it was started with.
+        /// </summary>
         public string CurrentMenuId { get; set; }
 
+        /// <summary>
+        /// The objects currently selected by the <see cref="SelectObjectsAction"/>. Getting the value returns null when another action
+        /// is active. Setting the value changes the selection of the select action, even when it is not the active action (e.g. while
+        /// a context menu action runs on top of it); when there is no select action on the stack, nothing happens.
+        /// </summary>
         public GeoObjectList SelectedObjects
         {
             get
@@ -657,37 +824,65 @@ namespace CADability
         }
 
 
+        /// <summary>
+        /// Not implemented, throws a <see cref="NotImplementedException"/>. Remnant of the Windows Forms based implementation.
+        /// </summary>
         public bool DesignMode => throw new NotImplementedException();
 
         IPropertyEntry IFrame.ContextMenuSource { get; set; }
 
+        /// <inheritdoc/>
         public event ProcessCommandDelegate ProcessCommandEvent;
+        /// <inheritdoc/>
         public event UpdateCommandDelegate UpdateCommandEvent;
+        /// <inheritdoc/>
         public event ProjectClosedDelegate ProjectClosedEvent;
+        /// <inheritdoc/>
         public event ProjectOpenedDelegate ProjectOpenedEvent;
+        /// <inheritdoc/>
         public event ViewsChangedDelegate ViewsChangedEvent;
+        /// <inheritdoc/>
         public event ProcessContextMenuDelegate ProcessContextMenuEvent;
+        /// <inheritdoc/>
         public event UpdateContextMenuDelegate UpdateContextMenuEvent;
+        /// <inheritdoc/>
         public event SettingChangedDelegate SettingChangedEvent;
+        /// <inheritdoc/>
         public event ControlCenterCreatedDelegate ControlCenterCreatedEvent;
+        /// <inheritdoc/>
         public event ActionStartedDelegate ActionStartedEvent;
+        /// <inheritdoc/>
         public event ActionTerminatedDelegate ActionTerminatedEvent;
 
+        /// <summary>
+        /// Not implemented in this class, throws a <see cref="NotImplementedException"/> (see <see cref="IFrame.AssureModelView"/>).
+        /// </summary>
         public void AssureModelView()
         {
             throw new NotImplementedException();
         }
 
+        /// <summary>
+        /// Not implemented, throws a <see cref="NotImplementedException"/>. Remnant of the focus handling of the old property tree view.
+        /// </summary>
+        /// <param name="inThisView">The property tree view in which the focus changed</param>
+        /// <param name="thisItem">The entry that got or lost the focus</param>
+        /// <param name="gotFocus">true if the entry got the focus, false if it lost it</param>
         public void FocusChanged(IPropertyTreeView inThisView, IShowProperty thisItem, bool gotFocus)
         {
             throw new NotImplementedException();
         }
 
+        /// <summary>
+        /// Returns the name of the currently selected property page of the control center. This implementation always returns "Action".
+        /// </summary>
+        /// <returns>The name of the active property page</returns>
         public string GetActivePropertyDisplay()
         {
             return "Action";
         }
 
+        /// <inheritdoc/>
         public bool GetBooleanSetting(string Name, bool Default)
         {
             object s = GetSetting(Name);
@@ -697,6 +892,7 @@ namespace CADability
             }
             return Default;
         }
+        /// <inheritdoc/>
         public double GetDoubleSetting(string Name, double Default)
         {
             object s = GetSetting(Name);
@@ -713,6 +909,7 @@ namespace CADability
             }
             return Default;
         }
+        /// <inheritdoc/>
         public int GetIntSetting(string Name, int Default)
         {
             object s = GetSetting(Name);
@@ -729,6 +926,7 @@ namespace CADability
             }
             return Default;
         }
+        /// <inheritdoc/>
         public Color GetColorSetting(string Name, Color Default)
         {
             object s = GetSetting(Name);
@@ -739,6 +937,7 @@ namespace CADability
             }
             return Default;
         }
+        /// <inheritdoc/>
         public string GetStringSetting(string Name, string Default)
         {
             object s = GetSetting(Name);
@@ -749,15 +948,34 @@ namespace CADability
             return Default;
         }
 
+        /// <summary>
+        /// Gets the value of the setting with the given name. This implementation reads the global settings only
+        /// (<see cref="Settings.GlobalSettings"/>); project specific settings are not consulted.
+        /// </summary>
+        /// <param name="Name">The name of the setting, e.g. "Approximate.Precision"</param>
+        /// <returns>The value of the setting, or null if there is no such setting</returns>
         public object GetSetting(string Name)
         {   // is there anything else but GlobalSettings? There was the idea about local settings, but I think it is never used.
             return Settings.GlobalSettings.GetValue(Name);
         }
 
+        /// <summary>
+        /// Not implemented, throws a <see cref="NotImplementedException"/>. Mouse wheel events are handled by the views and the action stack.
+        /// </summary>
+        /// <param name="e">The mouse event arguments</param>
+        /// <returns>Does not return</returns>
         public bool PreProcessMouseWheel(MouseEventArgs e)
         {
             throw new NotImplementedException();
         }
+        /// <summary>
+        /// Gives the active action the first chance to process a key before the control center sees it: Escape, Delete, Enter and Tab
+        /// are forwarded to <see cref="Action.OnEscape(object)"/>, <see cref="Action.OnDelete(object)"/>,
+        /// <see cref="Action.OnEnter(object)"/> and <see cref="Action.OnTab(object)"/> (Ctrl+Tab is left to the control center for
+        /// switching between property pages). When the action does not handle the key, it is passed on to
+        /// <see cref="IControlCenter.PreProcessKeyDown"/>. The application calls this from the key down event of its main window.
+        /// </summary>
+        /// <param name="e">The key event arguments; <c>Handled</c> is set when the key has been processed</param>
         public virtual void PreProcessKeyDown(KeyEventArgs e)
         {
             // it is difficult to find an order of processing: 
@@ -786,10 +1004,19 @@ namespace CADability
             }
             if (!e.Handled) ControlCenter.PreProcessKeyDown(e);
         }
+        /// <summary>
+        /// Updates the list of most recently used files in the file menu (see <see cref="IFrame.UpdateMRUMenu"/>). Does nothing in
+        /// this class; the application overrides it to fill its menu.
+        /// </summary>
+        /// <param name="mruFiles">The full names of the most recently used files</param>
         public virtual void UpdateMRUMenu(string[] mruFiles)
         {
         }
 
+        /// <summary>
+        /// Shuts the frame down: removes all actions from the action stack, saves and releases the global settings, disconnects from
+        /// the project and clears <see cref="MainFrame"/> if it refers to this frame. Call it when the application closes.
+        /// </summary>
         public void Dispose()
         {
             while (ActiveAction != null)
@@ -806,25 +1033,19 @@ namespace CADability
             }
             if (MainFrame == this) MainFrame = null;
         }
+        /// <inheritdoc/>
         public ActionStack ActionStack => actionStack;
-        /// <summary>
-        /// Implements <see cref="IFrame.SetAction"/>.
-        /// </summary>
-        /// <param name="Action"></param>
+        /// <inheritdoc/>
         public void SetAction(Action Action)
         {
             actionStack.SetAction(Action);
         }
-        /// <summary>
-        /// Implements <see cref="IFrame.RemoveActiveAction"/>.
-        /// </summary>
+        /// <inheritdoc/>
         public void RemoveActiveAction()
         {
             actionStack.RemoveActiveAction();
         }
-        /// <summary>
-        /// Implements <see cref="IFrame.ActiveAction"/>.
-        /// </summary>
+        /// <inheritdoc/>
         public Action ActiveAction
         {
             get { return actionStack.ActiveAction; }
@@ -848,6 +1069,17 @@ namespace CADability
             ActionTerminatedEvent?.Invoke(action);
         }
 
+        /// <summary>
+        /// Selects the property page with the given name in the control center. Selecting an entry, opening it and showing its
+        /// context menu are not implemented in this class, so <paramref name="resourceId"/>, <paramref name="openEntry"/> and
+        /// <paramref name="popupCOntextMenu"/> have no effect and the method always returns false
+        /// (see <see cref="IFrame.SetControlCenterFocus"/>).
+        /// </summary>
+        /// <param name="tabPageName">Name of the property page: "Action", "Project", "Global" or "View"</param>
+        /// <param name="resourceId">Resource id of an entry, ignored</param>
+        /// <param name="openEntry">Ignored</param>
+        /// <param name="popupCOntextMenu">Ignored</param>
+        /// <returns>Always false</returns>
         public bool SetControlCenterFocus(string tabPageName, string resourceId, bool openEntry, bool popupCOntextMenu)
         {
             if (controlCenter != null)
@@ -885,6 +1117,7 @@ namespace CADability
             return false;
         }
 
+        /// <inheritdoc/>
         public void ShowPropertyDisplay(string Name)
         {
             ControlCenter?.ShowPropertyPage(Name);
@@ -896,6 +1129,14 @@ namespace CADability
         }
 
 #region handling menu commands
+        /// <summary>
+        /// Executes a menu command. The command is offered in this order to the <see cref="ProcessCommandEvent"/> handlers, the
+        /// commands handled by the frame itself (file, view, snap mode and similar commands), the <see cref="Project"/>, the actions
+        /// on the action stack (topmost first) and finally the active view. <see cref="CurrentMenuId"/> is set to the command before
+        /// it is executed. Override it to handle additional commands of the application.
+        /// </summary>
+        /// <param name="MenuId">The id of the menu command (see MenuResource.xml)</param>
+        /// <returns>true if the command was handled, false otherwise</returns>
         public virtual bool OnCommand(string MenuId)
         {
             CurrentMenuId = MenuId; // ist das hier die richtige Stelle?
@@ -1707,9 +1948,6 @@ namespace CADability
                 case "MenuId.Measure.Vector.DirectionTwoPoints":
                     SetAction(new CADability.Actions.ConstructDirectionTwoPoints(null));
                     return true;
-                case "MenuId.Measure":
-                    SetAction(new Measure());
-                    return true;
                 case "MenuId.RoundMultiple":
                     SetAction(new ToolsRoundMultiple());
                     return true;
@@ -1759,6 +1997,14 @@ namespace CADability
         {
             return modelViews.Count > 0;
         }
+        /// <summary>
+        /// Determines the state (enabled, checked) of a menu item or toolbar button. The request is offered in the same order as in
+        /// <see cref="OnCommand"/>: the <see cref="UpdateCommandEvent"/> handlers, the frame itself, the project, the actions on the
+        /// action stack and finally the active view.
+        /// </summary>
+        /// <param name="MenuId">The id of the menu command (see MenuResource.xml)</param>
+        /// <param name="CommandState">The state to fill in</param>
+        /// <returns>true if the state was determined, false otherwise</returns>
         public virtual bool OnUpdateCommand(string MenuId, CommandState CommandState)
         {
             // 1. let the user decide
@@ -2299,7 +2545,15 @@ namespace CADability
                 projectProperties.Add(project, true);
             }
         }
+        /// <summary>
+        /// Delegate for the <see cref="FileNameChangedEvent"/>.
+        /// </summary>
+        /// <param name="NewProjectName">The file name of the project, or null when the project has not been saved yet</param>
         public delegate void FileNameChangedDelegate(string NewProjectName);
+        /// <summary>
+        /// Raised when the file name of the project changes: when a project is opened or created, or when it is saved under a new
+        /// name. The application uses it to update the title of its window.
+        /// </summary>
         public event FileNameChangedDelegate FileNameChangedEvent;
         /// <summary>
         /// Find a View with the provided name.
@@ -2610,46 +2864,82 @@ namespace CADability
                 Settings.GlobalSettings.SetValue("KeepState.SnapMode", (int)snapMode);
             }
         }
+        /// <summary>
+        /// Toggles <see cref="SnapPointFinder.SnapModes.SnapToGridPoint"/> in the <see cref="SnapMode"/> and stores the new snap mode in the
+        /// global settings. Called by the corresponding menu command.
+        /// </summary>
         public void OnSnapGrid()
         {
             snapMode ^= SnapPointFinder.SnapModes.SnapToGridPoint;
             Settings.GlobalSettings.SetValue("KeepState.SnapMode", (int)snapMode);
         }
+        /// <summary>
+        /// Toggles <see cref="SnapPointFinder.SnapModes.AdjustOrtho"/> in the <see cref="SnapMode"/> and stores the new snap mode in the
+        /// global settings. Called by the corresponding menu command.
+        /// </summary>
         public void OnSnapOrtho()
         {
             snapMode ^= SnapPointFinder.SnapModes.AdjustOrtho;
             Settings.GlobalSettings.SetValue("KeepState.SnapMode", (int)snapMode);
         }
+        /// <summary>
+        /// Toggles <see cref="SnapPointFinder.SnapModes.SnapToObjectSnapPoint"/> in the <see cref="SnapMode"/> and stores the new snap mode in the
+        /// global settings. Called by the corresponding menu command.
+        /// </summary>
         public void OnSnapSnapPoint()
         {
             snapMode ^= SnapPointFinder.SnapModes.SnapToObjectSnapPoint;
             Settings.GlobalSettings.SetValue("KeepState.SnapMode", (int)snapMode);
         }
+        /// <summary>
+        /// Toggles <see cref="SnapPointFinder.SnapModes.SnapToObjectPoint"/> in the <see cref="SnapMode"/> and stores the new snap mode in the
+        /// global settings. Called by the corresponding menu command.
+        /// </summary>
         public void OnSnapObjectPoint()
         {
             snapMode ^= SnapPointFinder.SnapModes.SnapToObjectPoint;
             Settings.GlobalSettings.SetValue("KeepState.SnapMode", (int)snapMode);
         }
+        /// <summary>
+        /// Toggles <see cref="SnapPointFinder.SnapModes.SnapToDropPoint"/> in the <see cref="SnapMode"/> and stores the new snap mode in the
+        /// global settings. Called by the corresponding menu command.
+        /// </summary>
         public void OnSnapDropPoint()
         {
             snapMode ^= SnapPointFinder.SnapModes.SnapToDropPoint;
             Settings.GlobalSettings.SetValue("KeepState.SnapMode", (int)snapMode);
         }
+        /// <summary>
+        /// Toggles <see cref="SnapPointFinder.SnapModes.SnapToObjectCenter"/> in the <see cref="SnapMode"/> and stores the new snap mode in the
+        /// global settings. Called by the corresponding menu command.
+        /// </summary>
         public void OnSnapCenter()
         {
             snapMode ^= SnapPointFinder.SnapModes.SnapToObjectCenter;
             Settings.GlobalSettings.SetValue("KeepState.SnapMode", (int)snapMode);
         }
+        /// <summary>
+        /// Toggles <see cref="SnapPointFinder.SnapModes.SnapToTangentPoint"/> in the <see cref="SnapMode"/> and stores the new snap mode in the
+        /// global settings. Called by the corresponding menu command.
+        /// </summary>
         public void OnSnapTangentPoint()
         {
             snapMode ^= SnapPointFinder.SnapModes.SnapToTangentPoint;
             Settings.GlobalSettings.SetValue("KeepState.SnapMode", (int)snapMode);
         }
+        /// <summary>
+        /// Toggles <see cref="SnapPointFinder.SnapModes.SnapToIntersectionPoint"/> in the <see cref="SnapMode"/> and stores the new snap mode in the
+        /// global settings. Called by the corresponding menu command.
+        /// </summary>
         public void OnSnapIntersections()
         {
             snapMode ^= SnapPointFinder.SnapModes.SnapToIntersectionPoint;
             Settings.GlobalSettings.SetValue("KeepState.SnapMode", (int)snapMode);
         }
+        /// <summary>
+        /// Toggles <see cref="SnapPointFinder.SnapModes.SnapToFaceSurface"/> in the <see cref="SnapMode"/> and stores the new snap mode in the
+        /// global settings. Called by the corresponding menu command.
+        /// </summary>
         public void OnSnapSurface()
         {
             snapMode ^= SnapPointFinder.SnapModes.SnapToFaceSurface;
@@ -2659,7 +2949,17 @@ namespace CADability
 #endregion
 
 
+        /// <summary>
+        /// Delegate for handling a drag and drop event of the canvas. Currently not used by CADability.
+        /// </summary>
+        /// <param name="e">The drag event arguments</param>
+        /// <returns>true if the event was handled</returns>
         public delegate bool DragDropDelegate(DragEventArgs e);
+        /// <summary>
+        /// Delegate for providing the objects contained in data dragged onto the canvas. Currently not used by CADability.
+        /// </summary>
+        /// <param name="e">The drag event arguments</param>
+        /// <returns>The objects contained in the dragged data, or null</returns>
         public delegate GeoObjectList DragGetDataDelegate(DragEventArgs e);
         void ControlCenterCreated(IControlCenter cc)
         {

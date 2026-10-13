@@ -83,9 +83,7 @@ namespace CADability.Actions
         }
         #endregion
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnSetAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void OnSetAction()
         {
             base.TitleId = "Construct.DistanceOfCurve";
@@ -104,6 +102,7 @@ namespace CADability.Actions
             else base.SetInput(curveInput);
             base.OnSetAction();
         }
+        /// <inheritdoc/>
         public override void OnRemoveAction()
         {
             base.OnRemoveAction();
@@ -112,17 +111,12 @@ namespace CADability.Actions
 				lengthProperty.Select();
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.GetID ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override string GetID()
         {
             return "Construct.DistanceOfCurve";
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnDone ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void OnDone()
         {
             succeeded = true;

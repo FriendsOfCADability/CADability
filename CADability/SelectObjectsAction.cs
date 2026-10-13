@@ -26,11 +26,10 @@ namespace CADability.Actions
 
 
 	/// <summary>
-	/// Diese Klasse fasst die Settings für das Markieren zusammen. Im einzelnen sind das:
-	/// Select.HandleSize, 
-	/// Select.FrameColor, 
-	/// Select.HandleColor, 
-	/// Select.UseFrame
+	/// Groups the settings for selecting objects (the "Select" settings node): the size of the handles, the colors of the
+	/// selection frame, the handles, the selected objects, the focused object and the feedback, the width and transparency of the
+	/// selection display, whether to select the topmost object, the drag width, whether to use the frame with handles, and
+	/// whether to use fast feedback.
 	/// </summary>
 	[Serializable]
 	class SelectObjectsSettings : Settings, IDeserializationCallback, IJsonSerialize, IJsonSerializeDone
@@ -250,7 +249,42 @@ namespace CADability.Actions
 	public class SelectObjectsAction : Action
 	{
 		private enum Mode { NoAction, TestDragRect, DragRect, DragWidth, DragHeight, DragSize, DragMove, DragRotate, DragObjectProperty, TestHotSpot }
-		public enum CursorPosition { EmptySpace, OverObject, OverSelectedObject, OverHandleLB, OverHandleLM, OverHandleLT, OverHandleMB, OverHandleMM, OverHandleMT, OverHandleRB, OverHandleRM, OverHandleRT, OverFixPoint, OverHotSpot }
+		/// <summary>
+		/// What is under the mouse cursor while the selection action waits for a click. It determines the cursor shape and
+		/// what dragging with the left button does: open a selection rectangle, move, resize or stretch the selected objects
+		/// by the handles of the selection frame, or drag a hotspot.
+		/// </summary>
+		public enum CursorPosition
+		{
+			/// <summary>Nothing under the cursor; dragging opens a selection rectangle.</summary>
+			EmptySpace,
+			/// <summary>Over an object that is not selected; dragging opens a selection rectangle.</summary>
+			OverObject,
+			/// <summary>Over an object that is already selected; dragging opens a selection rectangle.</summary>
+			OverSelectedObject,
+			/// <summary>Over the handle at the lower left corner of the selection frame; dragging resizes the selection.</summary>
+			OverHandleLB,
+			/// <summary>Over the handle in the middle of the left edge of the selection frame; dragging changes the width.</summary>
+			OverHandleLM,
+			/// <summary>Over the handle at the upper left corner of the selection frame; dragging resizes the selection.</summary>
+			OverHandleLT,
+			/// <summary>Over the handle in the middle of the bottom edge of the selection frame; dragging changes the height.</summary>
+			OverHandleMB,
+			/// <summary>Over the handle in the center of the selection frame; dragging moves the selection.</summary>
+			OverHandleMM,
+			/// <summary>Over the handle in the middle of the top edge of the selection frame; dragging changes the height.</summary>
+			OverHandleMT,
+			/// <summary>Over the handle at the lower right corner of the selection frame; dragging resizes the selection.</summary>
+			OverHandleRB,
+			/// <summary>Over the handle in the middle of the right edge of the selection frame; dragging changes the width.</summary>
+			OverHandleRM,
+			/// <summary>Over the handle at the upper right corner of the selection frame; dragging resizes the selection.</summary>
+			OverHandleRT,
+			/// <summary>Over the fix point of the selection. Currently never detected.</summary>
+			OverFixPoint,
+			/// <summary>Over a hotspot of a selected object (see <see cref="IHotSpot"/>); dragging modifies the corresponding property.</summary>
+			OverHotSpot
+		}
 		private Mode mode; // der Zustand, in dem sich die Aktion gerade befindet
 		private CursorPosition lastCursorPosition; // die letzte gemessene Cursorposition, wird in den DragXxx Modi nicht berechnet
 		private Point downPoint; // Position des letzten MouseDown
@@ -352,8 +386,8 @@ namespace CADability.Actions
 		/// <summary>
 		/// Method definition of the <see cref="BeforeShowContextMenuEvent"/>
 		/// </summary>
-		/// <param name="selected">The object on which the click occurred.</param>
-		/// <param name="vw">The <see cref="IView">view</see> in which the click happend</param>
+		/// <param name="selectedObjects">The currently selected objects for which the context menu is going to be displayed</param>
+		/// <param name="cm">The menu items of the context menu which is about to be displayed. The handler may modify them</param>
 		public delegate void BeforeShowContextMenuDelegate(GeoObjectList selectedObjects, MenuWithHandler[] cm);
 		/// <summary>
 		/// Event raised before context menue is displayed, you can modify it here.
@@ -1000,8 +1034,8 @@ namespace CADability.Actions
 		/// Implements <see cref="Action.OnInactivate"/>. If you override this method
 		/// don't forget to call the bas implementation.
 		/// </summary>
-		/// <param name="NewActiveAction"><paramref name="Action.OnInactivate.NewActiveAction"/></param>
-		/// <param name="RemovingAction"><paramref name="Action.OnInactivate.RemovingAction"/></param>
+		/// <param name="NewActiveAction">the action that will become active</param>
+		/// <param name="RemovingAction">true: if called because the action is removed, false: if called when a new action is set on top of this action</param>
 		public override void OnInactivate(Action NewActiveAction, bool RemovingAction)
 		{
 			bool RemoveProperty = true;
@@ -1309,8 +1343,8 @@ namespace CADability.Actions
 		/// Implements <see cref="Action.OnMouseMove"/>. If you override this method
 		/// don't forget to call the bas implementation.
 		/// </summary>
-		/// <param name="e"><paramref name="Action.OnMouseMove.e"/></param>
-		/// <param name="vw"><paramref name="Action.OnMouseMove.vw"/></param>
+		/// <param name="e">MouseEventArgs of the call</param>
+		/// <param name="vw">the IView which contains the mouse</param>
 		public override void OnMouseMove(MouseEventArgs e, IView vw)
 		{
 			if (FilterMouseMessagesEvent != null)
@@ -1474,8 +1508,8 @@ namespace CADability.Actions
 		/// Implements <see cref="Action.OnMouseUp"/>. If you override this method
 		/// don't forget to call the bas implementation.
 		/// </summary>
-		/// <param name="e"><paramref name="Action.OnMouseUp.e"/></param>
-		/// <param name="vw"><paramref name="Action.OnMouseUp.vw"/></param>
+		/// <param name="e">MouseEventArgs of the call</param>
+		/// <param name="vw">the IView which contains the mouse</param>
 		public override void OnMouseUp(MouseEventArgs e, IView vw)
 		{
 			if (FilterMouseMessagesEvent != null)
@@ -1619,8 +1653,8 @@ namespace CADability.Actions
 		/// Implements <see cref="Action.OnMouseDown"/>. If you override this method
 		/// don't forget to call the bas implementation.
 		/// </summary>
-		/// <param name="e"><paramref name="Action.OnMouseDown.e"/></param>
-		/// <param name="vw"><paramref name="Action.OnMouseDown.vw"/></param>
+		/// <param name="e">MouseEventArgs of the call</param>
+		/// <param name="vw">the IView which contains the mouse</param>
 		public override void OnMouseDown(MouseEventArgs e, IView vw)
 		{
 			if (FilterMouseMessagesEvent != null)
@@ -1731,9 +1765,7 @@ namespace CADability.Actions
 				mode = Mode.NoAction;
 			}
 		}
-		/// <summary>
-		/// Implements <see cref="Action.GetID"/>.
-		/// </summary>
+		/// <inheritdoc/>
 		public override string GetID()
 		{
 			return "SelectObjects";
@@ -1883,7 +1915,7 @@ namespace CADability.Actions
 			selectedObjectsProperty.Refresh();
 		}
 		/// <summary>
-		/// Implements <see cref="Action.OnDelete"/>. This implementation initiates the menu command "MenuId.Object.Delete".
+		/// Implements <see cref="Action.OnDelete()"/>. This implementation initiates the menu command "MenuId.Object.Delete".
 		/// </summary>
 		public override bool OnDelete()
 		{
@@ -2384,6 +2416,7 @@ namespace CADability.Actions
 		/// Overrides <see cref="ICommandHandler.OnUpdateCommand"/>. See <see cref="ICommandHandler.OnUpdateCommand"/> for more information.
 		/// </summary>
 		/// <param name="MenuId"></param>
+		/// <param name="CommandState">the command state to manipulate</param>
 		/// <returns></returns>
 		public override bool OnUpdateCommand(string MenuId, CommandState CommandState)
 		{

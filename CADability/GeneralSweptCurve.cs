@@ -16,6 +16,13 @@ namespace CADability
      * Wie sehen die 2. Ableitungen aus?
      */
 
+    /// <summary>
+    /// A movement in space parameterized by u: <see cref="GetPosition"/> returns the rigid transformation for parameter u,
+    /// <see cref="GetCurve"/> the path a point takes between two parameters, <see cref="StartDirection"/> the direction of the
+    /// movement at its start. Implemented by <see cref="LinearMovement"/>, <see cref="RotationMovement"/>, <see cref="CurveMovement"/>
+    /// and <see cref="ModifiedMovement"/>, intended for defining swept surfaces by moving a curve. Experimental, not used by the
+    /// kernel yet.
+    /// </summary>
     public interface IMovement
     {
         ModOp GetPosition(double u);
@@ -24,6 +31,10 @@ namespace CADability
         bool IsPeriodic { get; }
     }
 
+    /// <summary>
+    /// An <see cref="IMovement"/> which applies a fixed transformation after another movement, i.e. the original movement seen in
+    /// a transformed coordinate system. Nested modifications are collapsed into a single transformation.
+    /// </summary>
     public class ModifiedMovement : IMovement
     {
         ModOp append;
@@ -69,6 +80,10 @@ namespace CADability
         #endregion
     }
 
+    /// <summary>
+    /// An <see cref="IMovement"/> which translates in the direction from a start point to an end point; the parameter u is the
+    /// distance moved and the path of a point is a <see cref="Line"/>.
+    /// </summary>
     public class LinearMovement : IMovement
     {
         GeoPoint startPoint;
@@ -108,6 +123,10 @@ namespace CADability
         #endregion
     }
 
+    /// <summary>
+    /// An <see cref="IMovement"/> which rotates about an <see cref="Axis"/>; the parameter u is the angle in radians and the path of a
+    /// point is a circular arc (<see cref="Ellipse"/>). The movement is periodic.
+    /// </summary>
     public class RotationMovement : IMovement
     {
         Axis axis;
@@ -152,6 +171,11 @@ namespace CADability
         #endregion
     }
 
+    /// <summary>
+    /// An <see cref="IMovement"/> which follows a 2d curve on a surface: for each parameter u the moving coordinate system is placed
+    /// at the point of the 2d curve on the surface with its x-axis along the curve and its z-axis along the surface normal, so that
+    /// a moved object stays aligned with the surface. The path of a point is a <see cref="GeneralCurve"/> evaluated from the movement.
+    /// </summary>
     [Serializable]
     public class CurveMovement : IMovement, ISerializable
     {
@@ -444,7 +468,6 @@ namespace CADability
         /// <param name="toSweep"></param>
         /// <param name="along"></param>
         /// <param name="normal"></param>
-        /// <param name="usedArea"></param>
         public GeneralSweptCurve(ICurve toSweep, ICurve along, GeoVector normal) : base()
         {
             if (normal.IsNullVector())
@@ -602,40 +625,25 @@ namespace CADability
             }
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.FixedU (double, double, double)"/>
-        /// </summary>
-        /// <param name="u"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve FixedU(double u, double vmin, double vmax)
         {
             return new FixedUCurve(this, u, vmin, vmax);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.FixedV (double, double, double)"/>
-        /// </summary>
-        /// <param name="u"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve FixedV(double u, double umin, double umax)
         {
             ICurve res = toSweep.CloneModified(modOpAt(u));
             res.Trim(umin, umax);
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetModified (ModOp)"/>
-        /// </summary>
-        /// <param name="m"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ISurface GetModified(ModOp m)
         {
             return new GeneralSweptCurve(toSweep.CloneModified(m), along.CloneModified(m), m * normal);
         }
 
+        /// <inheritdoc/>
         public override GeoVector UDirection(GeoPoint2D uv)
         {
             GeoVector deriv1 = along.DirectionAt(uv.y);
@@ -647,6 +655,7 @@ namespace CADability
             GeoVector dbg = modOpAt(uv.y) * toSweep.DirectionAt(uv.x);
             return udir;
         }
+        /// <inheritdoc/>
         public override GeoVector VDirection(GeoPoint2D uv)
         {
             /* p0 ist der Punkt, der verschoben wird (liegt irgendwo auf toSweep) und die Kurve in vdirection erzeugt
@@ -729,20 +738,24 @@ namespace CADability
             return res;
 
         }
+        /// <inheritdoc/>
         public override GeoPoint PointAt(GeoPoint2D uv)
         {
             return modOpAt(uv.y) * toSweep.PointAt(uv.x);
         }
+        /// <inheritdoc/>
         public override void DerivationAt(GeoPoint2D uv, out GeoPoint location, out GeoVector du, out GeoVector dv)
         {
             location = PointAt(uv);
             du = UDirection(uv);
             dv = VDirection(uv);
         }
+        /// <inheritdoc/>
         public override void Derivation2At(GeoPoint2D uv, out GeoPoint location, out GeoVector du, out GeoVector dv, out GeoVector duu, out GeoVector dvv, out GeoVector duv)
         {
             throw new NotImplementedException("Derivation2At must be implemented");
         }
+        /// <inheritdoc/>
         public override void GetNaturalBounds(out double umin, out double umax, out double vmin, out double vmax)
         {
             umin = 0.0;
@@ -750,6 +763,7 @@ namespace CADability
             vmin = 0.0;
             vmax = 1.0; 
         }
+        /// <inheritdoc/>
         public override bool IsUPeriodic
         {
             get
@@ -757,6 +771,7 @@ namespace CADability
                 return toSweep.IsClosed;
             }
         }
+        /// <inheritdoc/>
         public override bool IsVPeriodic
         {
             get
@@ -764,6 +779,7 @@ namespace CADability
                 return along.IsClosed;
             }
         }
+        /// <inheritdoc/>
         public override double UPeriod
         {
             get
@@ -771,6 +787,7 @@ namespace CADability
                 return 1.0;
             }
         }
+        /// <inheritdoc/>
         public override double VPeriod
         {
             get
@@ -778,6 +795,7 @@ namespace CADability
                 return 1.0;
             }
         }
+        /// <inheritdoc/>
         public override ICurve Make3dCurve(ICurve2D curve2d)
         {
             if (curve2d is Line2D && Math.Abs(curve2d.StartPoint.y - curve2d.EndPoint.y) < Precision.eps)
@@ -794,12 +812,14 @@ namespace CADability
             if (Curve3dOfProjected<GeneralSweptCurve>(curve2d) is ICurve onThisSurface) return onThisSurface;
             return base.Make3dCurve(curve2d);
         }
+        /// <inheritdoc/>
         public override ModOp2D ReverseOrientation()
         {
             boxedSurfaceEx = null;
             along.Reverse();
             return ModOp2D.Translate(1, 0) * ModOp2D.Scale(-1, 1);
         }
+        /// <inheritdoc/>
         public override IPropertyEntry GetPropertyEntry(IFrame frame)
         {
             return new GroupProperty("GeneralSweptCurve", new IPropertyEntry[0]);
@@ -865,6 +885,11 @@ namespace CADability
             }
         }
 #endif
+        /// <summary>
+        /// The parameter curve of a <see cref="GeneralSweptCurve"/> surface for a fixed u, i.e. the path which the point of the swept
+        /// curve at u takes along the sweep (the v direction) between vmin and vmax; returned by <see cref="GeneralSweptCurve.FixedU"/>.
+        /// Cloning and some other operations are not implemented.
+        /// </summary>
         [Serializable]
         public class FixedUCurve : GeneralCurve, ISerializable
         {
@@ -880,21 +905,25 @@ namespace CADability
                 this.u = u;
                 this.parent = parent;
             }
+            /// <inheritdoc/>
             public override IGeoObject Clone()
             {
                 throw new NotImplementedException();
             }
 
+            /// <inheritdoc/>
             public override void CopyGeometry(IGeoObject ToCopyFrom)
             {
                 throw new NotImplementedException();
             }
 
+            /// <inheritdoc/>
             public override GeoVector DirectionAt(double Position)
             {
                 return parent.VDirection(new GeoPoint2D(u, Position));
             }
 
+            /// <inheritdoc/>
             public override void Modify(ModOp m)
             {
                 throw new NotImplementedException();
@@ -903,11 +932,13 @@ namespace CADability
             {
                 return vmin + pos * (vmax - vmin);
             }
+            /// <inheritdoc/>
             public override GeoPoint PointAt(double Position)
             {
                 return parent.modOpAt(pos(Position)) * parent.toSweep.PointAt(u);
             }
 
+            /// <inheritdoc/>
             public override void Reverse()
             {
                 double tmp = vmax;
@@ -915,16 +946,19 @@ namespace CADability
                 vmin = tmp;
             }
 
+            /// <inheritdoc/>
             public override ICurve[] Split(double Position)
             {
                 throw new NotImplementedException();
             }
 
+            /// <inheritdoc/>
             public override void Trim(double StartPos, double EndPos)
             {
                 throw new NotImplementedException();
             }
 
+            /// <inheritdoc/>
             protected override double[] GetBasePoints()
             {
 
@@ -949,6 +983,10 @@ namespace CADability
 
         }
     }
+    /// <summary>
+    /// A <see cref="GeneralSweptCurve"/> surface which sweeps an elliptical or circular arc along a curve; <see cref="Debug"/> creates
+    /// a test instance with a semicircle. Experimental, not used by the kernel.
+    /// </summary>
     public class SweptArc : GeneralSweptCurve
     {
         public SweptArc(Ellipse toSweep, ICurve along) : base(toSweep, along)

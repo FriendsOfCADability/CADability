@@ -3,7 +3,10 @@
 namespace CADability.UserInterface
 {
     /// <summary>
-    /// 
+    /// A hotspot (see <see cref="IHotSpot"/>) which stands for a property entry that has no position of its own, e.g. a length:
+    /// it is displayed at the position set by its owner and, when the user drags it, starts a <see cref="GeneralGeoPointAction"/>
+    /// and reports the new positions via <see cref="PositionChangedEvent"/>, so that the owner can update its property. Used e.g.
+    /// for the width and height hotspots of a rectangular polyline.
     /// </summary>
 
     public class ShowPropertyHotSpot : IHotSpot
@@ -11,6 +14,11 @@ namespace CADability.UserInterface
         private IPropertyEntry showProperty;
         private GeoPoint position;
         private IFrame frame;
+        /// <summary>
+        /// Signature of the handlers of <see cref="PositionChangedEvent"/>: called with each new position while the user drags the
+        /// hotspot.
+        /// </summary>
+        /// <param name="newPosition">The new position of the hotspot in world coordinates</param>
         public delegate void PositionChangedDelegate(GeoPoint newPosition);
         public event PositionChangedDelegate PositionChangedEvent;
         public ShowPropertyHotSpot(IPropertyEntry showProperty, IFrame frame)
@@ -24,10 +32,7 @@ namespace CADability.UserInterface
             set { position = value; }
         }
 #region IHotSpot Members
-        /// <summary>
-        /// Implements <see cref="CADability.IHotSpot.GetHotspotPosition ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public GeoPoint GetHotspotPosition()
         {
             return position;
@@ -43,9 +48,7 @@ namespace CADability.UserInterface
                 // TODO:  Add ShowPropertyHotSpot.IsSelected setter implementation
             }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.IHotSpot.StartDrag ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public void StartDrag(IFrame frame)
         {
             if (PositionChangedEvent != null)

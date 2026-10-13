@@ -17,6 +17,12 @@ namespace CADability.Attribute
     {
         IAttributeList attributeList;
         Filter filter;
+        /// <summary>
+        /// Creates the group of check boxes for the entries of an attribute list.
+        /// </summary>
+        /// <param name="resourceId">resource id of the label and the tooltip of the group, e.g. "Filter.LayerList"</param>
+        /// <param name="attributeList">the list whose entries are shown, one check box per entry</param>
+        /// <param name="filter">the filter whose set of accepted attributes is displayed and modified</param>
         public CheckedAttributes(string resourceId, IAttributeList attributeList, Filter filter)
         {
             base.resourceIdInternal = resourceId;
@@ -35,9 +41,7 @@ namespace CADability.Attribute
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -45,10 +49,7 @@ namespace CADability.Attribute
                 return ShowPropertyLabelFlags.ContextMenu | ShowPropertyLabelFlags.Selectable;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -57,10 +58,7 @@ namespace CADability.Attribute
             }
         }
         IShowProperty[] subEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get
@@ -79,12 +77,24 @@ namespace CADability.Attribute
                 return subEntries;
             }
         }
+        /// <summary>
+        /// Tells whether the attribute with the given name is accepted by the filter. The check boxes call it by
+        /// reflection to determine their state.
+        /// </summary>
+        /// <param name="name">the name of an attribute of the list</param>
+        /// <returns>true when the filter accepts the attribute, false when it does not or no attribute with that name exists</returns>
         public bool GetChecked(string name)
         {
             INamedAttribute na = attributeList.Find(name);
             if (na != null) return filter.Contains(na);
             return false;
         }
+        /// <summary>
+        /// Adds the attribute with the given name to or removes it from the attributes accepted by the filter. The check
+        /// boxes call it by reflection when the user toggles them. Does nothing when no attribute with that name exists.
+        /// </summary>
+        /// <param name="name">the name of an attribute of the list</param>
+        /// <param name="check">true: accept the attribute, false: do not accept it</param>
         public void SetChecked(string name, bool check)
         {
             INamedAttribute na = attributeList.Find(name);
@@ -101,16 +111,19 @@ namespace CADability.Attribute
             }
         }
         List<IPropertyPage> propertyPages = new List<IPropertyPage>(); // the same filter is in the project and in the action propertypage
+        /// <inheritdoc/>
         public override void Added(IPropertyPage pp)
         {
             base.Added(pp);
             propertyPages.Add(pp);
         }
+        /// <inheritdoc/>
         public override void Removed(IPropertyPage pp)
         {
             base.Removed(pp);
             propertyPages.Remove(pp);
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -131,6 +144,13 @@ namespace CADability.Attribute
             }
         }
         #region ICommandHandler Members
+        /// <summary>
+        /// Handles the commands of the context menu of the group: "MenuId.AttributeFilter.SelectAll" accepts all
+        /// attributes of the list and "MenuId.AttributeFilter.SelectNone" accepts none; the check boxes are refreshed.
+        /// Override it to handle additional menu items.
+        /// </summary>
+        /// <param name="MenuId">the id of the menu item</param>
+        /// <returns>true when the command was handled</returns>
         virtual public bool OnCommand(string MenuId)
         {
             switch (MenuId)
@@ -165,6 +185,13 @@ namespace CADability.Attribute
             return false;
         }
 
+        /// <summary>
+        /// Updates the state of a menu item before the context menu is shown. The menu items of this group have no
+        /// state, so it returns false; override it to set the state of additional menu items.
+        /// </summary>
+        /// <param name="MenuId">the id of the menu item</param>
+        /// <param name="CommandState">receives the enabled and checked state</param>
+        /// <returns>true when the state was set</returns>
         virtual public bool OnUpdateCommand(string MenuId, CommandState CommandState)
         {
             // TODO:  Add CheckedAttributes.OnUpdateCommand implementation
@@ -202,9 +229,7 @@ namespace CADability.Attribute
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -212,10 +237,7 @@ namespace CADability.Attribute
                 return ShowPropertyLabelFlags.ContextMenu | ShowPropertyLabelFlags.Selectable;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -224,10 +246,7 @@ namespace CADability.Attribute
             }
         }
         CheckProperty[] subEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get
@@ -393,7 +412,7 @@ namespace CADability.Attribute
     /// This class filters <see cref="IGeoObject"/>s according to their attributes or other properties.
     /// A <see cref="Project"/> contains a <see cref="FilterList"/> which contains Filters. The task of a filter
     /// is to decide, whether a IGeoObject is accepted by this filter or not. The <see cref="FilterList"/> is
-    /// used by the <see cref="SelectObjectsAction"/> to decide, whether an object may be selected or not.
+    /// used by the <see cref="CADability.Actions.SelectObjectsAction"/> to decide, whether an object may be selected or not.
     /// Filters may also be used for other purposes. In this standard implementation the attributes of a IGeoObject
     /// and the type of the object are used to accept or reject an object. 
     /// You may derive a class from this Filter class and handle the static <see cref="Constructor"/> delegate
@@ -688,9 +707,7 @@ namespace CADability.Attribute
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -700,10 +717,7 @@ namespace CADability.Attribute
                 return res;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -712,10 +726,7 @@ namespace CADability.Attribute
             }
         }
         IShowProperty[] subEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get
@@ -759,9 +770,11 @@ namespace CADability.Attribute
                 acceptedTypes.Remove(type);
             }
         }
+        /// <inheritdoc/>
         public override void StartEdit(bool editValue)
         {   // nothing to do here
         }
+        /// <inheritdoc/>
         public override void EndEdit(bool aborted, bool modified, string newValue)
         {
             if (!aborted && !string.IsNullOrWhiteSpace(newValue))
@@ -773,7 +786,9 @@ namespace CADability.Attribute
                 catch (NameAlreadyExistsException) { }
             }
         }
+        /// <inheritdoc/>
         public override string LabelText { get => Name; set => Name = value; }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -781,16 +796,14 @@ namespace CADability.Attribute
                 return MenuResource.LoadMenuDefinition("MenuId.Filter", false, this);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Added"/>
-        /// </summary>
-        /// <param name="propertyTreeView"></param>
+        /// <inheritdoc/>
         public override void Added(IPropertyPage propertyTreeView)
         {
             base.Added(propertyTreeView);
             base.LabelText = name;
             base.resourceIdInternal = "FilterName";
         }
+        /// <inheritdoc/>
         public override void LabelChanged(string NewText)
         {
             try
@@ -828,10 +841,11 @@ namespace CADability.Attribute
             isActive = (bool)info.GetValue("IsActive", typeof(bool));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public virtual void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("AcceptedLayers", acceptedLayers);

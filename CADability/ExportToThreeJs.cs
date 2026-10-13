@@ -10,15 +10,33 @@ using System.Runtime.Serialization.Json;
 
 namespace CADability
 {
+    /// <summary>
+    /// Thrown by <see cref="ExportToThreeJs.ToJSON"/> when an object of the model could not be converted, e.g. because its
+    /// triangulation failed. <see cref="ExportToThreeJsException.GeoObject"/> is the object in question.
+    /// </summary>
     public class ExportToThreeJsException : ApplicationException
     {
+        /// <summary>
+        /// The object of the model that could not be exported.
+        /// </summary>
         public IGeoObject GeoObject;
+        /// <summary>
+        /// Creates the exception for the object <paramref name="go"/>.
+        /// </summary>
+        /// <param name="go">the object that could not be exported</param>
         public ExportToThreeJsException(IGeoObject go)
         {
             GeoObject = go;
         }
     }
 
+    /// <summary>
+    /// Converts a <see cref="Model"/> into a JSON description for a three.js based viewer: solids, shells and faces become
+    /// triangle meshes, curves become polylines (approximated with the given precision), text objects keep their font, position
+    /// and string, and the contents of blocks are merged into one entity. Colours come from the <see cref="IColorDef"/> of the
+    /// objects, and the primitive entries of <see cref="IGeoObject.UserData"/> are included. Create an instance with the model,
+    /// set <see cref="ExportEdges"/> and <see cref="ExportUserData"/> as needed and call <see cref="ToJSON"/>.
+    /// </summary>
     public class ExportToThreeJs
     {
         [DataContract]
@@ -112,8 +130,20 @@ namespace CADability
         private JsonEntities jsonEntities;
         private double precision;
         private Model model;
+        /// <summary>
+        /// When true, the edges of solids, shells and faces are exported as lines in addition to the triangles. False by default.
+        /// </summary>
         public bool ExportEdges;
+        /// <summary>
+        /// Intended to export text as triangles instead of as text entities. Currently not evaluated: text is always exported as a
+        /// text entity with location, directions, font and string. False by default.
+        /// </summary>
         public bool ExportTextAsTriangles;
+        /// <summary>
+        /// Creates the exporter for the model <paramref name="m"/>. Nothing is converted until <see cref="ToJSON"/> is called.
+        /// </summary>
+        /// <param name="m">the model to export</param>
+        /// <param name="precision">the maximum distance, in model units, between the exact geometry and the triangles or polylines that approximate it</param>
         public ExportToThreeJs(Model m, double precision)
         {
             jsonEntities = new JsonEntities
@@ -347,6 +377,15 @@ namespace CADability
             return jf;
         }
 
+        /// <summary>
+        /// Converts all objects of the model and returns the JSON text: an object with an <c>entities</c> array, where each entity
+        /// has <c>faces</c> (vertices, triangle indices and colour), <c>lines</c>, <c>text</c> and <c>userData</c>. Each call
+        /// appends the objects of the model again, so call it once per instance.
+        /// </summary>
+        /// <param name="escapeQuote">true to remove backslashes and escape the double quotes, so that the result can be embedded as a
+        /// string literal in a script or html page; false for the plain JSON</param>
+        /// <returns>the JSON text</returns>
+        /// <exception cref="ExportToThreeJsException">when an object of the model cannot be converted</exception>
         public string ToJSON(bool escapeQuote = true)
         {
             foreach (IGeoObject go in model)
@@ -368,6 +407,10 @@ namespace CADability
             }
         }
 
+        /// <summary>
+        /// When true (the default), the entries of the objects' <see cref="IGeoObject.UserData"/> whose values are primitive types,
+        /// strings or Guids are written into the <c>userData</c> of the entity; other entries are skipped.
+        /// </summary>
         public bool ExportUserData;
     }
 }

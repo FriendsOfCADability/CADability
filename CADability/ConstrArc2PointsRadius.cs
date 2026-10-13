@@ -5,9 +5,13 @@ using System.Collections;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a circular arc through two points with a given radius or diameter. The user picks the start and the
+    /// end point of the arc and enters the radius or the diameter (the setting "Formatting.Radius" decides which of the two
+    /// is the primary input, the other one is optional; both can also be picked with the mouse). The mouse position decides
+    /// on which side of the chord the arc lies, and the four possible solutions can be cycled through with the "next
+    /// solution" command. The centre is shown as a read-only value. The arc lies in the active drawing plane.
+    /// Menu id: "Constr.Arc.2PointsRadius".
     /// </summary>
-    /// 
     // die verschiedenen Möglichkeiten bei Tastatureingabe!
 
     internal class ConstrArc2PointsRadius : ConstructAction

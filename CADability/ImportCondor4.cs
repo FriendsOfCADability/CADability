@@ -14,6 +14,10 @@ namespace CADability
 {
 
 
+    /// <summary>
+    /// Exception of the import of Condor 4 files (the predecessor of CADability). The import itself is no longer part of the
+    /// library; only this exception class remains and it is not thrown anywhere.
+    /// </summary>
     public class ImportCondor4Exception : ApplicationException
     {
         public ImportCondor4Exception(string msg)

@@ -4,7 +4,12 @@ using System.Collections;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a radius or a diameter dimension (<see cref="Dimension.EDimType.DimRadius"/> or
+    /// <see cref="Dimension.EDimType.DimDiameter"/>) of a circle or circular arc; the constructor argument
+    /// selects which one. The user picks the circle (other curves under the cursor are ignored) and then the
+    /// position of the dimension line, which is projected into the plane of the circle. <see cref="GetID"/>
+    /// returns "Constr.Dimension.Arc.Radius" or "Constr.Dimension.Arc.Diameter" accordingly (menu commands
+    /// "MenuId.Constr.Radius.Dimension" and "MenuId.Constr.Diameter.Dimension").
     /// </summary>
     internal class ConstrDimensionArc : ConstructAction
     {

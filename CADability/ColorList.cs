@@ -15,9 +15,9 @@ namespace CADability.Attribute
 {
 
     /// <summary>
-    /// Eine Tabelle von benannten Farben. Die Tabelle ist serialisierbar und wird gewöhnlich
-    /// in einem "Settings" Objekt gespeichert. Die Tabelle kann in der EigenschaftenAnzeige
-    /// interaktiv manipuliert werden.
+    /// A table of named colours (<see cref="ColorDef"/> objects). The table is serializable and is usually kept in a
+    /// <see cref="Project"/> or in the global <see cref="Settings"/>. It can be edited interactively in the property grid,
+    /// where it also handles the context menu commands for its entries.
     /// </summary>
     [Serializable()]
     public class ColorList : PropertyEntryImpl, ISerializable,
@@ -31,12 +31,29 @@ namespace CADability.Attribute
         internal string menuResourceId;
 
         private ColorDef current;
-        public enum StaticFlags { allowNone = 0x00, allowFromParent = 0x01, allowFromStyle = 0x02, allowAll = 0x03, allowUndefined = 0x04 };
+        /// <summary>
+        /// Flags that say which of the special, non-RGB entries a colour selection may offer in addition to the named colours
+        /// of the list (see <see cref="Usage"/> and <see cref="ColorSelectionProperty"/>). Not every object may use every
+        /// kind of colour: only objects inside a <see cref="Block"/> can take the colour of their parent, for example.
+        /// </summary>
+        public enum StaticFlags
+        {
+            /// <summary>Only the named colours of the list.</summary>
+            allowNone = 0x00,
+            /// <summary>The placeholder <see cref="ColorDef.CDfromParent"/> ("of the block") is offered as well.</summary>
+            allowFromParent = 0x01,
+            /// <summary>The placeholder <see cref="ColorDef.CDfromStyle"/> ("of the style") is offered as well.</summary>
+            allowFromStyle = 0x02,
+            /// <summary>Both placeholders are offered (<see cref="allowFromParent"/> and <see cref="allowFromStyle"/>); this does not include <see cref="allowUndefined"/>.</summary>
+            allowAll = 0x03,
+            /// <summary>The selection offers an additional "undefined" entry, which stands for no colour (null).</summary>
+            allowUndefined = 0x04
+        };
         // nicht alle referentiellen ColorDef können von allen Objekte benutzt werder
         // allowAll ist nicht allow undefined
         private StaticFlags staticFlags;
         /// <summary>
-        /// Erzeugt eine leere ColorList.
+        /// Creates an empty ColorList.
         /// </summary>
         public ColorList()
         {
@@ -45,6 +62,12 @@ namespace CADability.Attribute
         }
 
 
+        /// <summary>
+        /// Creates a colour list with the colours defined by the string resource "ColorList.Default" (red, green and blue in
+        /// the standard resources); the first colour is the current one. Used for the global settings when no colour list has
+        /// been saved yet.
+        /// </summary>
+        /// <returns>the default colour list</returns>
         public static ColorList GetDefault()
         {
             ColorList res = new ColorList();
@@ -97,22 +120,22 @@ namespace CADability.Attribute
             }
             return res;
         }
+        /// <summary>
+        /// The <see cref="Project"/> or <see cref="Settings"/> that holds this list. It is set by the owner when the list is
+        /// added to it; the list asks it before removing a colour (see <see cref="RemoveAt(int)"/>) and forwards changes of
+        /// its colours to it.
+        /// </summary>
         public IAttributeListContainer Owner
         {
             get { return owner; }
             set { owner = value; }
         }
         /// <summary>
-        /// Liefert den Index zu dem gegebenen Namen.
+        /// Adds a color, or overwrites an existing one if the name already exists.
         /// </summary>
-        /// <param name="Name">Der Name der gesuchten Farbe.</param>
-        /// <returns>Index der gesuchten Farbe oder -1, wenn keine Farbe mit diesem Namen in der Tabelle existiert.</returns>
-        /// <summary>
-        /// Fügt eine Farbe hinzu, oder überschreibt eine bestehende, wenn der Name bereits existiert.
-        /// </summary>
-        /// <param name="Name">Bezeichnung der Farbe.</param>
-        /// <param name="Color">RGB (oder auch ARGB) Wert der Farbe.</param>
-        /// <returns>Index des neuen oder veränderten Eintrags.</returns>
+        /// <param name="Name">Name of the color.</param>
+        /// <param name="Color">RGB (or ARGB) value of the color.</param>
+        /// <returns>Index of the new or modified entry.</returns>
         public int AddColor(string Name, Color Color)
         {
             int ind = IndexOf(Name);
@@ -138,6 +161,12 @@ namespace CADability.Attribute
             if (propertyPage != null) propertyPage.OpenSubEntries(this, false); // zuklappen
         }
 
+        /// <summary>
+        /// Adds a <see cref="ColorDef"/> to the end of the list and makes this list its parent. The first colour added becomes
+        /// the current colour. Raises the <see cref="DidModifyEvent"/>.
+        /// </summary>
+        /// <param name="cd">the colour to add</param>
+        /// <exception cref="NameAlreadyExistsException">when the list already contains an entry with the same name</exception>
         public void Add(ColorDef cd)
         {
             if (IndexOf(cd.Name) >= 0)
@@ -154,9 +183,10 @@ namespace CADability.Attribute
             if (ind >= 0) RemoveAt(ind);
         }
         /// <summary>
-        /// Entfernt die Farbe mit dem gegebenen Index.
+        /// Removes the colour at the given index. If the list belongs to a project or to the settings, the owner is asked first
+        /// and may refuse the removal (e.g. when the colour is still in use). Raises the <see cref="DidModifyEvent"/>.
         /// </summary>
-        /// <param name="Index">Der Index.</param>
+        /// <param name="Index">Index of the colour to remove</param>
         public void RemoveAt(int Index)
         {
             if (owner != null)
@@ -169,10 +199,10 @@ namespace CADability.Attribute
             if (DidModifyEvent != null) DidModifyEvent(this, null);
         }
         /// <summary>
-        /// Liefert den Namen zu dem gegebenen Index.
+        /// Returns the index of the given name.
         /// </summary>
-        /// <param name="Index">Der Index.</param>
-        /// <returns>Der Name.</returns>
+        /// <param name="Name">The name of the color to look for.</param>
+        /// <returns>Index of the color or -1, if there is no color with this name in the table.</returns>
         public int IndexOf(string Name)
         {
             int i;
@@ -189,6 +219,11 @@ namespace CADability.Attribute
                     return i;
             return -1;
         }
+        /// <summary>
+        /// Returns the name of the given index.
+        /// </summary>
+        /// <param name="Index">The index.</param>
+        /// <returns>The name.</returns>
         public string GetName(int Index)
         {
             if (Index < namedColors.Count)
@@ -208,6 +243,13 @@ namespace CADability.Attribute
             }
             return null;
         }
+        /// <summary>
+        /// Tells whether the given index addresses one of the static placeholder entries (<see cref="ColorDef.CDfromParent"/>,
+        /// <see cref="ColorDef.CDfromStyle"/>), which follow the named colours in the indexing of <see cref="GetName(int)"/>
+        /// and the indexer when enabled by <see cref="Usage"/>. Those entries cannot be renamed or recoloured.
+        /// </summary>
+        /// <param name="idx">the index to test</param>
+        /// <returns>true for an index beyond the named colours</returns>
         public bool IsStatic(int idx)
         {
             if (idx >= namedColors.Count && idx < namedColors.Count + 3)
@@ -224,6 +266,10 @@ namespace CADability.Attribute
             if (val - offset < namedColors.Count) return true;
             return false;
         }
+        /// <summary>
+        /// The index of the current colour (see <see cref="Current"/>) in the indexing of <see cref="GetName(int)"/>. Setting
+        /// it makes the entry at that index current; an index outside the valid range is ignored.
+        /// </summary>
         public int CurrentIndex
         {
             get { return IndexOf(current.Name); }
@@ -233,6 +279,11 @@ namespace CADability.Attribute
                 current = this[value];
             }
         }
+        /// <summary>
+        /// The current colour: the colour that newly constructed objects get (see <see cref="Project.SetDefaults(IGeoObject)"/>),
+        /// shown in bold in the control center. When no current colour has been set, the first colour of the list is used.
+        /// Setting a ColorDef that is not yet in the list adds it; null is ignored.
+        /// </summary>
         public ColorDef Current
         {
             get
@@ -255,10 +306,10 @@ namespace CADability.Attribute
             }
         }
         /// <summary>
-        /// Liefert die Farbe zu dem gegebenen Index.
+        /// Returns the RGB colour of the entry at the given index. For an index outside the list the colour blue is returned.
         /// </summary>
-        /// <param name="Index">Der Index.</param>
-        /// <returns>Die Farbe.</returns>
+        /// <param name="Index">Index of the entry</param>
+        /// <returns>The colour</returns>
         public Color GetColor(int Index)
         {
             if (Index < 0 || Index >= namedColors.Count)
@@ -266,11 +317,11 @@ namespace CADability.Attribute
             return ((ColorDef)namedColors[Index]).Color;
         }
         /// <summary>
-        /// Liefert das ColorDef Objekt zu dem gegebenen Index. Den Index zu einem Namen 
-        /// bekommt man mit der Methode <seealso cref="IndexOf"/>.
+        /// Returns the <see cref="ColorDef"/> object at the given index. The index of a name can be found with the
+        /// <seealso cref="IndexOf"/> method.
         /// </summary>
-        /// <param name="Index">Der Index des gesuchten Objektes</param>
-        /// <returns></returns>
+        /// <param name="Index">Index of the requested object</param>
+        /// <returns>The ColorDef at that index</returns>
         /*public ColorDef this[int Index]
         {
             string name = GetName(Index);
@@ -286,6 +337,13 @@ namespace CADability.Attribute
             }
         }
 
+        /// <summary>
+        /// Returns the first named colour of the list whose <see cref="ColorDef.Color"/> equals the given colour. Note that
+        /// the equality of <c>Color</c> also compares whether it is a known (named) colour, so e.g. <c>Color.Red</c> does not
+        /// match an entry created from the values (255, 0, 0).
+        /// </summary>
+        /// <param name="rgb">the colour value to look for</param>
+        /// <returns>the ColorDef, or null when no entry has this colour</returns>
         public ColorDef FindColor(Color rgb)
         {
             foreach (ColorDef cd in namedColors)
@@ -294,6 +352,15 @@ namespace CADability.Attribute
             }
             return null;
         }
+        /// <summary>
+        /// Returns the named colour with the given name; when there is none, a new <see cref="ColorDef"/> with that name and
+        /// the given colour value is added to the list and returned. The colour value of an existing entry is left as it is
+        /// (see <see cref="CreateOrModify(string, Color)"/>). This is the usual way to get a colour for an object:
+        /// <c>project.ColorList.CreateOrFind("red", Color.Red)</c>.
+        /// </summary>
+        /// <param name="Name">the name of the colour; null for a new, automatically named entry (see <see cref="GetNewName()"/>)</param>
+        /// <param name="Color">the colour value for a newly created entry</param>
+        /// <returns>the existing or newly created ColorDef</returns>
         public ColorDef CreateOrFind(string Name, Color Color)
         {
             if (Name == null) Name = GetNewName();
@@ -304,6 +371,13 @@ namespace CADability.Attribute
             Add(cd);
             return cd;
         }
+        /// <summary>
+        /// Returns the named colour with the given name, setting its colour value to <paramref name="Color"/>; when there is
+        /// none, a new <see cref="ColorDef"/> with that name and colour is added to the list and returned.
+        /// </summary>
+        /// <param name="Name">the name of the colour</param>
+        /// <param name="Color">the colour value</param>
+        /// <returns>the existing (modified) or newly created ColorDef</returns>
         public ColorDef CreateOrModify(string Name, Color Color)
         {
             ColorDef res = Find(Name);
@@ -317,11 +391,7 @@ namespace CADability.Attribute
             Add(cd);
             return cd;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Attribute.IAttributeList.Find (string)"/>
-        /// </summary>
-        /// <param name="Name"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public ColorDef Find(string Name)
         {
             for (int i = 0; i < namedColors.Count; ++i)
@@ -341,6 +411,11 @@ namespace CADability.Attribute
                     return ColorDef.CDfromStyle;
             return null;
         }
+        /// <summary>
+        /// Returns the index of the given ColorDef object in the list.
+        /// </summary>
+        /// <param name="cd">the ColorDef to look for (compared by reference)</param>
+        /// <returns>the index, or -1 when the object is not in this list</returns>
         public int FindIndex(ColorDef cd)
         {
             for (int i = 0; i < namedColors.Count; ++i)
@@ -350,6 +425,13 @@ namespace CADability.Attribute
             return -1;
         }
 
+        /// <summary>
+        /// Returns the entry following the entry with the given name, to cycle through the colours of the list: after the
+        /// last named colour comes <see cref="ColorDef.CDfromStyle"/> when <see cref="Usage"/> allows it, then the first
+        /// entry again. Not used by CADability itself.
+        /// </summary>
+        /// <param name="Name">the name of the current entry</param>
+        /// <returns>the next ColorDef; the first entry when the name is not found</returns>
         public ColorDef GetNextColorDef(string Name)
         {
             for (int i = 0; i < namedColors.Count - 1; ++i)
@@ -369,10 +451,11 @@ namespace CADability.Attribute
             return namedColors[0] as ColorDef;
         }
         /// <summary>
-        /// Verändert den Namen bei gegebenem Index. 
+        /// Changes the name of the entry at the given index. The change is rejected when the new name is already used by
+        /// another entry of the list. Raises the <see cref="DidModifyEvent"/>.
         /// </summary>
-        /// <param name="Index">Index des zu verändernden Wertes.</param>
-        /// <param name="Name">Neuer Name.</param>
+        /// <param name="Index">Index of the entry to change</param>
+        /// <param name="Name">The new name</param>
         public void SetName(int Index, string Name)
         {
             if (Index < namedColors.Count)
@@ -385,15 +468,20 @@ namespace CADability.Attribute
             }
         }
         /// <summary>
-        /// Verändert die Farbe bei gegebenem Index. 
+        /// Changes the RGB colour of the entry at the given index. Raises the <see cref="DidModifyEvent"/>.
         /// </summary>
-        /// <param name="Index">Index des zu verändernden Wertes.</param>
-        /// <param name="Color">Neuer Farbwert.</param>
+        /// <param name="Index">Index of the entry to change</param>
+        /// <param name="Color">The new colour value</param>
         public void SetColor(int Index, Color Color)
         {
             ((ColorDef)namedColors[Index]).Color = Color;
             if (DidModifyEvent != null) DidModifyEvent(null, null);
         }
+        /// <summary>
+        /// The names of all entries in the order of the list, followed by the names of the placeholders
+        /// <see cref="ColorDef.CDfromParent"/> and <see cref="ColorDef.CDfromStyle"/> when <see cref="Usage"/> allows them.
+        /// This is the list of choices of a <see cref="ColorSelectionProperty"/>.
+        /// </summary>
         public string[] Names
         {
             get
@@ -415,11 +503,24 @@ namespace CADability.Attribute
             }
         }
 
+        /// <summary>
+        /// Controls whether the placeholders <see cref="ColorDef.CDfromParent"/> and <see cref="ColorDef.CDfromStyle"/> are
+        /// visible through <see cref="Names"/>, <see cref="Find(string)"/>, <see cref="IndexOf(string)"/>,
+        /// <see cref="GetName(int)"/> and the indexer, as if they were entries at the end of the list. A
+        /// <see cref="ColorSelectionProperty"/> sets this temporarily to the flags it was constructed with.
+        /// </summary>
         public StaticFlags Usage
         {
             get => staticFlags;
             set => staticFlags = value;
         }
+        /// <summary>
+        /// Builds a name that is not yet used in the list: <paramref name="startWith"/> followed by a number that is one
+        /// greater than the highest number any existing name with this prefix ends with (e.g. "Color3" when "Color1" and
+        /// "Color2" exist).
+        /// </summary>
+        /// <param name="startWith">the prefix of the name</param>
+        /// <returns>the new name</returns>
         public string GetNewName(string startWith)
         {
             string NewColorName = startWith;
@@ -443,6 +544,11 @@ namespace CADability.Attribute
             NewColorName += MaxNr.ToString();
             return NewColorName;
         }
+        /// <summary>
+        /// Builds a name for a new colour from the string resource "ColorList.NewColorName" ("Color" in the English
+        /// resources) and a number, see <see cref="GetNewName(string)"/>. Used when a colour is created without a name.
+        /// </summary>
+        /// <returns>the new name</returns>
         public string GetNewName()
         {
             return GetNewName(StringTable.GetString("ColorList.NewColorName"));
@@ -480,6 +586,7 @@ namespace CADability.Attribute
 
         #region PropertyEntry Members
 
+        /// <inheritdoc/>
         public override PropertyEntryType Flags
         {
             get
@@ -487,10 +594,7 @@ namespace CADability.Attribute
                 return PropertyEntryType.ContextMenu | PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -506,6 +610,7 @@ namespace CADability.Attribute
                 return subItems;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -529,10 +634,11 @@ namespace CADability.Attribute
             resourceIdInternal = "ColorList";
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("NamedColors", namedColors, namedColors.GetType());
@@ -552,12 +658,20 @@ namespace CADability.Attribute
 
         #region INotifyModification Members
 
+        /// <summary>
+        /// Raised when a colour is added, removed, renamed or recoloured through the methods of this list
+        /// (<see cref="INotifyModification"/>). Changes made directly on a <see cref="ColorDef"/> are forwarded to the
+        /// <see cref="Owner"/> instead.
+        /// </summary>
         public event CADability.DidModifyDelegate DidModifyEvent;
 
         #endregion
 
         #region ICollection Members
 
+        /// <summary>
+        /// Implements <see cref="ICollection.IsSynchronized"/>. The list is not synchronized, the value is false.
+        /// </summary>
         public bool IsSynchronized
         {
             get
@@ -566,6 +680,9 @@ namespace CADability.Attribute
             }
         }
 
+        /// <summary>
+        /// The number of named colours in the list; the placeholders enabled by <see cref="Usage"/> are not counted.
+        /// </summary>
         public int Count
         {
             get
@@ -574,11 +691,19 @@ namespace CADability.Attribute
             }
         }
 
+        /// <summary>
+        /// Copies the named colours, in the order of the list, to the given array (<see cref="ICollection.CopyTo(Array, int)"/>).
+        /// </summary>
+        /// <param name="array">the destination array, which must be large enough</param>
+        /// <param name="index">the index in <paramref name="array"/> at which copying begins</param>
         public void CopyTo(Array array, int index)
         {
             namedColors.CopyTo(array, index);
         }
 
+        /// <summary>
+        /// An object that can be used to lock the list for synchronized access (<see cref="ICollection.SyncRoot"/>).
+        /// </summary>
         public object SyncRoot
         {
             get
@@ -591,6 +716,11 @@ namespace CADability.Attribute
 
         #region IEnumerable Members
 
+        /// <summary>
+        /// Enumerates the named colours in the order of the list, so <c>foreach (ColorDef cd in colorList)</c> can be used.
+        /// The placeholders enabled by <see cref="Usage"/> are not included.
+        /// </summary>
+        /// <returns>an enumerator over the <see cref="ColorDef"/> objects</returns>
         public IEnumerator GetEnumerator()
         {
             return namedColors.GetEnumerator();
@@ -795,6 +925,11 @@ namespace CADability.Attribute
         }
         void ICommandHandler.OnSelected(MenuWithHandler selectedMenuItem, bool selected) { }
 
+        /// <summary>
+        /// Callback of the JSON serialization (<see cref="IJsonSerializeDone"/>): after all objects have been read, the back
+        /// references of the colours to this list, which are not stored in the file, are restored.
+        /// </summary>
+        /// <param name="jsonSerialize">the serializer</param>
         public void SerializationDone(JsonSerialize jsonSerialize)
         {
             foreach (ColorDef cd in namedColors)
@@ -803,12 +938,21 @@ namespace CADability.Attribute
             }
         }
 
+        /// <summary>
+        /// Writes the colours and the current colour for the JSON serialization (<see cref="IJsonSerialize"/>).
+        /// </summary>
+        /// <param name="data">receives the data</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("NamedColors", namedColors);
             data.AddProperty("Current", current);
         }
 
+        /// <summary>
+        /// Restores the colours and the current colour from the JSON data written by <see cref="GetObjectData(IJsonWriteData)"/>
+        /// (<see cref="IJsonSerialize"/>).
+        /// </summary>
+        /// <param name="data">the data to read from</param>
         public void SetObjectData(IJsonReadData data)
         {
             namedColors = data.GetProperty<ArrayList>("NamedColors");

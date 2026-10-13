@@ -12,11 +12,32 @@ using System.Linq;
 namespace CADability.GeoObject
 {
     /// <summary>
-    /// A class with static methods to create and combine <see cref="Solid"/>s, <see cref="Shell"/>s or <see cref="Face"/>s.
+    /// Static methods to create and combine <see cref="Solid"/>s, <see cref="Shell"/>s and <see cref="Face"/>s: primitives
+    /// (<see cref="MakeBox"/>, <see cref="MakeCylinder"/>, <see cref="MakeCone"/>, <see cref="MakeSphere"/>, <see cref="MakeTorus"/>),
+    /// extrusions and sweeps (<see cref="MakePrism"/>, <see cref="MakeRevolution(IGeoObject, GeoPoint, GeoVector, double, Project)"/>,
+    /// <see cref="MakePipe(IGeoObject, Path, Project)"/>, <see cref="MakeRuledSolid"/>, <see cref="MakeRuledShell"/>), boolean operations
+    /// (<see cref="Union(Solid, Solid)"/>, <see cref="Difference(Solid, Solid)"/>, <see cref="Intersection(Solid, Solid)"/>),
+    /// fillets and chamfers (<see cref="MakeFillet"/>, <see cref="MakeChamfer"/>) and sewing faces to shells and solids
+    /// (<see cref="SewFaces"/>, <see cref="SewFacesAndShells"/>).
+    /// <para>
+    /// Methods with a <see cref="Project"/> parameter give the result the project's current layer, colour and other default
+    /// attributes (<see cref="Project.SetDefaults"/>) when the project is not null. No method adds its result to a model,
+    /// that is left to the caller (<see cref="Model.Add(IGeoObject)"/>).
+    /// </para>
+    /// <para>
+    /// Some members are left over from an implementation on top of an external modelling kernel and throw
+    /// <see cref="NotImplementedException"/>; they are marked obsolete, name the replacement where one exists, and will
+    /// be removed in the next minor version.
+    /// </para>
     /// </summary>
 
     public class Make3D
     {
+        /// <summary>
+        /// How the construct actions for primitives (box, cylinder, cone, sphere, torus) combine the new solid with the solids
+        /// already in the model: <see cref="unite"/> adds it to the solids it overlaps, <see cref="subtract"/> removes it from
+        /// them, and <see cref="unchanged"/> adds it as a separate object. Set by the user via <see cref="IFrame.SolidModellingMode"/>.
+        /// </summary>
         public enum SolidModellingMode { unite, subtract, unchanged };
         internal static Make3D MakeFace(Path path)
         {
@@ -54,17 +75,25 @@ namespace CADability.GeoObject
             throw new NotImplementedException();
         }
         /// <summary>
-        /// PRELIMINARY: Creates a solid as an offset to the provided <paramref name="solid"/>. Positiv values for <paramref name="offset"/>
-        /// expand the solid, negative values contract it. Might be changed in future, especially the result 
-        /// will be an array, because contracting might produce several solids.
+        /// Not implemented, throws <see cref="NotImplementedException"/>. Intended to create a solid as an offset to
+        /// <paramref name="solid"/>: positive values of <paramref name="offset"/> expand the solid, negative values contract it.
         /// </summary>
         /// <param name="solid">Solid to expand or contract</param>
         /// <param name="offset">Offset for the operation</param>
         /// <returns>The resulting solid</returns>
+        [Obsolete("Not implemented, throws NotImplementedException; use Shell.GetOffset. Will be removed in the next minor version.")]
         public static Solid MakeOffset(Solid solid, double offset)
         {
             throw new NotImplementedException();
         }
+        /// <summary>
+        /// Not implemented, throws <see cref="NotImplementedException"/>. Intended to create the offset of a shell, see
+        /// <see cref="MakeOffset(Solid, double)"/>.
+        /// </summary>
+        /// <param name="shell">Shell to offset</param>
+        /// <param name="offset">Offset for the operation</param>
+        /// <returns>The resulting shell</returns>
+        [Obsolete("Not implemented, throws NotImplementedException; use Shell.GetOffset. Will be removed in the next minor version.")]
         public static IGeoObject MakeOffset(Shell shell, double offset)
         {
             throw new NotImplementedException();
@@ -78,9 +107,9 @@ namespace CADability.GeoObject
         /// <param name="faceShellOrPath">object to rotate</param>
         /// <param name="location">a point on the axis</param>
         /// <param name="direction">direction of the axis</param>
-        /// <param name="sweep">amount to rotate (2*Math.PI is a full rotation)</param>
-        /// <param name="project">the <see cref="Project"/> to set default styles for the result</param>
-        /// <returns>the created solid or shell</returns>
+        /// <param name="sweep">amount to rotate in radians (2*Math.PI is a full rotation)</param>
+        /// <param name="project">the <see cref="Project"/> to set default styles for the result, may be null</param>
+        /// <returns>the created solid or shell, or null</returns>
         public static IGeoObject MakeRevolution(IGeoObject faceShellOrPath, GeoPoint location, GeoVector direction, double sweep, Project project)
         {
             Axis axis = new Axis(location, direction);
@@ -98,6 +127,17 @@ namespace CADability.GeoObject
             if (res != null && project != null) project.SetDefaults(res);
             return res;
         }
+        /// <summary>
+        /// Not implemented, always returns null. Use <see cref="MakePrismMiter(SimpleShape, GeoPoint, GeoVector, GeoVector, GeoVector, GeoVector)"/>.
+        /// </summary>
+        /// <param name="outline">2d shape to be extruded</param>
+        /// <param name="path">Points of the polygonal path along which the profile was to be extruded</param>
+        /// <param name="topDirection">The "up" direction of the profile</param>
+        /// <param name="mainDirection">Direction of the prism</param>
+        /// <param name="startMiter">Direction of the connecting profile at the starting point</param>
+        /// <param name="endMiter">Direction of the connecting profile at the ending point</param>
+        /// <returns>null</returns>
+        [Obsolete("Not implemented, always returns null; use MakePrismMiter(SimpleShape, GeoPoint, GeoVector, GeoVector, GeoVector, GeoVector). Will be removed in the next minor version.")]
         public static Solid MakePrismMiter(SimpleShape outline, GeoPoint[] path, GeoVector topDirection, GeoVector mainDirection, GeoVector startMiter, GeoVector endMiter)
         {
             return null;
@@ -292,14 +332,17 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
-        /// Creates a <see cref="Solid"/>, a <see cref="Shell"/> or a <see cref="Face"/> by moving a <see cref="Path"/>, a <see cref="Face"/>
-        /// or a <see cref="Shell"/> along a given vector. Moving a path yields a face or a shell, moving a face or a shell
-        /// returns a <see cref="Solid"/>. Moving a different type of <see cref="IGeoObject"/> returns null.
+        /// Creates a <see cref="Solid"/> or a <see cref="Shell"/> by moving a closed planar curve or a <see cref="Face"/> along a
+        /// vector (extrusion). A closed planar curve (a <see cref="Path"/>, a <see cref="Polyline"/>, a circle...) yields the shell
+        /// of the side faces when <paramref name="pathToShell"/> is true, and a closed solid with bottom and top face when it is
+        /// false. A face yields the solid between the face and its moved copy; the face may be curved. An open or non-planar
+        /// curve, a shell, or any other <see cref="IGeoObject"/> returns null.
         /// </summary>
-        /// <param name="faceShellOrPath">object to move</param>
-        /// <param name="vect">vector along which the object is to be moved</param>
-        /// <param name="project">the <see cref="Project"/> to set default styles for the result</param>
-        /// <returns>the created solid, face or shell</returns>
+        /// <param name="faceShellOrPath">the closed planar curve or the face to move</param>
+        /// <param name="extrusion">direction and length of the extrusion</param>
+        /// <param name="project">the <see cref="Project"/> to set default styles for the result, may be null</param>
+        /// <param name="pathToShell">true: a curve yields the open shell of the side faces, false: a curve yields a closed solid</param>
+        /// <returns>the created solid or shell, or null</returns>
         public static IGeoObject MakePrism(IGeoObject faceShellOrPath, GeoVector extrusion, Project project, bool pathToShell = true)
         {
             // ohne OpenCascade einige Fälle implementieren. Ziel ist es alle Fälle ohne OpenCascade zu implementieren
@@ -642,91 +685,103 @@ namespace CADability.GeoObject
             return sle;
         }
         /// <summary>
-        /// Returns the union of the two given <see cref="Solid"/>s. If the solids are disjunct, null will be returned
+        /// Returns the union of the two given <see cref="Solid"/>s, same as <see cref="Solid.Unite"/>. If the solids are
+        /// disjunct, null will be returned.
         /// </summary>
         /// <param name="s1">first solid</param>
         /// <param name="s2">second solid</param>
-        /// <param name="project">the project to find attributes</param>
         /// <returns>union of the two solids or null</returns>
         public static Solid Union(Solid s1, Solid s2)
         {
             return Solid.Unite(s1, s2);
         }
         /// <summary>
-        /// Returns the difference of the two given <see cref="Solid"/>s. If the solids are disjunct, null will be returned.
-        /// s2 will be subtracted from s1.
+        /// Returns the difference of the two given <see cref="Solid"/>s, same as <see cref="Solid.Subtract"/>: <paramref name="s2"/>
+        /// is subtracted from <paramref name="s1"/>. The result may consist of several solids. If the solids are disjunct,
+        /// a copy of <paramref name="s1"/> is returned, if <paramref name="s2"/> contains <paramref name="s1"/> the array is empty.
         /// </summary>
         /// <param name="s1">first solid</param>
-        /// <param name="s2">second solid</param>
-        /// <param name="project">the project to find attributes</param>
-        /// <returns>difference of the two solids or null</returns>
+        /// <param name="s2">second solid, which is subtracted</param>
+        /// <returns>difference of the two solids</returns>
         public static Solid[] Difference(Solid s1, Solid s2)
         {
             return Solid.Subtract(s1, s2);
         }
         /// <summary>
-        /// Returns the remains of a shell when a solid is subtracted.
+        /// Not implemented, throws <see cref="NotImplementedException"/>. Intended to return the remains of a shell when a solid
+        /// is subtracted.
         /// </summary>
         /// <param name="shl">Shell to be modified</param>
         /// <param name="sld">Solid which is subtracted</param>
-        /// <returns>One ore more shells</returns>
+        /// <returns>One or more shells</returns>
+        [Obsolete("Not implemented, throws NotImplementedException. Will be removed in the next minor version.")]
         public static Shell[] Difference(Shell shl, Solid sld)
         {
             throw new NotImplementedException();
         }
         /// <summary>
-        /// Returns the remains of a face when a solid is subtracted.
+        /// Not implemented, throws <see cref="NotImplementedException"/>. Intended to return the remains of a face when a solid
+        /// is subtracted.
         /// </summary>
         /// <param name="fce">Face to be modified</param>
         /// <param name="sld">Solid which is subtracted</param>
-        /// <returns>One ore more faces</returns>
+        /// <returns>One or more faces</returns>
+        [Obsolete("Not implemented, throws NotImplementedException. Will be removed in the next minor version.")]
         public static Face[] Difference(Face fce, Solid sld)
         {
             throw new NotImplementedException();
         }
+        /// <summary>
+        /// Not implemented, throws <see cref="NotImplementedException"/>. Intended to split a solid by a face.
+        /// Use <see cref="Solid.SplitByPlane"/> to split a solid by a plane.
+        /// </summary>
+        /// <param name="sld">Solid to be split</param>
+        /// <param name="fce">Face which splits the solid</param>
+        /// <returns>The parts of the solid</returns>
+        [Obsolete("Not implemented, throws NotImplementedException; use Solid.SplitByPlane to split a solid by a plane. Will be removed in the next minor version.")]
         public static Solid[] Difference(Solid sld, Face fce)
         {
             throw new NotImplementedException();
         }
         /// <summary>
-        /// Connects the two wires with a ruled surface. The two wires must have the same number of segments.
-        /// Each segment of the first path is connected with the segment with the same index of the second path.
-        /// Both pathes must be closed. A solid is returned bound by the faces of the two pathes and the ruled
-        /// surfaces. If there is an error null will be returned
+        /// Connects the two closed paths with ruled surfaces and returns the solid bound by the planar faces of the two paths
+        /// and the ruled surfaces (a loft between two profiles). Each segment of the first path is connected with the segment
+        /// with the same index of the second path, so both paths need the same number of segments; a path with a single
+        /// segment is split into as many segments as the other path has. Two lines are connected by a plane, two coaxial
+        /// circles by a cylinder or a cone, other pairs by a <see cref="RuledSurface"/>, see <see cref="MakeRuledSurface"/>.
+        /// Returns null when the paths cannot be connected to a solid (different number of segments, an open path, a path
+        /// that does not bound a planar face, or a surface that cannot be built).
         /// </summary>
-        /// <param name="firstPath">the first path</param>
-        /// <param name="secondPath">teh second path</param>
-        /// <param name="project">the project to find attributes</param>
-        /// <returns>the generated solid or null</returns>
+        /// <param name="firstPath">the first path, closed</param>
+        /// <param name="secondPath">the second path, closed</param>
+        /// <param name="project">the <see cref="Project"/> to set default styles for the result, may be null</param>
+        /// <returns>the generated solid, or null</returns>
         public static Solid MakeRuledSolid(Path firstPath, Path secondPath, Project project)
         {
-            IGeoObject res = MakeRuledShellX(firstPath, secondPath, true, project);
-            if (res is Solid) return res as Solid;
-
-            throw new NotImplementedException();
+            return MakeRuledShellX(firstPath, secondPath, true, project) as Solid;
         }
         /// <summary>
-        /// Connects the two wires with a ruled surface. The two wires must have the same number of segments.
-        /// Each segment of the first path is connected with the segment with the same index of the second path.
-        /// The pathes may be open or closed. the ruled surfaces will be returned as a shell.
-        /// If there is an error null will be returned
+        /// Connects the two paths with ruled surfaces and returns them as a <see cref="Shell"/>, without the faces of the paths.
+        /// Each segment of the first path is connected with the segment with the same index of the second path, so both
+        /// paths need the same number of segments; a path with a single segment is split into as many segments as the other
+        /// path has. The paths may be open or closed. Returns null when the paths cannot be connected (different number of
+        /// segments or a failing surface).
         /// </summary>
         /// <param name="firstPath">the first path</param>
-        /// <param name="secondPath">teh second path</param>
-        /// <param name="project">the project to find attributes</param>
-        /// <returns>the generated shell or null</returns>
+        /// <param name="secondPath">the second path</param>
+        /// <param name="project">the <see cref="Project"/> to set default styles for the result, may be null</param>
+        /// <returns>the generated shell, or null</returns>
         public static IGeoObject MakeRuledShell(Path firstPath, Path secondPath, Project project)
         {
             try
             {
-                IGeoObject res = MakeRuledShellX(firstPath, secondPath, false, project);
-                if (res != null) return res;
+                return MakeRuledShellX(firstPath, secondPath, false, project);
             }
             catch (Exception ex)
             {
                 if (ex is ThreadAbortException) throw (ex);
+                return null;
             }
-            throw new NotImplementedException();
         }
         internal static IGeoObject MakeRuledShellX(Path firstPath, Path secondPath, bool makeSolid, Project project) // ersetzt später obiges
         {
@@ -900,6 +955,15 @@ namespace CADability.GeoObject
             return shell;
         }
 
+        /// <summary>
+        /// Returns the surface that connects the two curves with straight lines. Two lines in a common plane give a
+        /// <see cref="PlaneSurface"/>, two circles or circular arcs on a common axis a <see cref="CylindricalSurface"/> (same
+        /// radius) or a <see cref="ConicalSurface"/> (different radii, same start and end angle), two curves in a common plane
+        /// a <see cref="PlaneSurface"/>, and every other pair a <see cref="RuledSurface"/>.
+        /// </summary>
+        /// <param name="curve1">the first curve</param>
+        /// <param name="curve2">the second curve</param>
+        /// <returns>the surface</returns>
         public static ISurface MakeRuledSurface(ICurve curve1, ICurve curve2)
         {
             if (curve1 is Line && curve2 is Line)
@@ -949,6 +1013,20 @@ namespace CADability.GeoObject
             return new RuledSurface(curve1, curve2);
         }
 
+        /// <summary>
+        /// Sweeps a profile along a path (extrusion along a curve). The profile is a closed planar curve, a <see cref="Face"/>
+        /// or a <see cref="Shell"/>; a closed planar curve is first turned into a planar face, so the result is a solid
+        /// whose cross section is the profile. The open edges of the profile are extruded along each segment of
+        /// <paramref name="along"/> (see <see cref="ExtrudeCurveToFace(ICurve, ICurve)"/>), a planar profile that the path
+        /// crosses is first moved to the start of the path, and the profile and its moved copy close the ends unless the path
+        /// is closed and smooth. The path should be smooth; at sharp bends the segments overlap instead of being mitred.
+        /// Returns null for an open curve or when the faces of the result cannot be sewed to a single shell; throws
+        /// <see cref="NotImplementedException"/> for a profile of another type.
+        /// </summary>
+        /// <param name="faceShellOrPath">the profile: a closed planar curve, a face or a shell</param>
+        /// <param name="along">the path to sweep along</param>
+        /// <param name="project">the <see cref="Project"/> to set default styles for the result, may be null</param>
+        /// <returns>the created solid or null</returns>
         public static IGeoObject MakePipe(IGeoObject faceShellOrPath, Path along, Project project)
         {
             faceShellOrPath = SplitSplinesAtCorners(faceShellOrPath);
@@ -1073,11 +1151,15 @@ namespace CADability.GeoObject
         /// <summary>
         /// Extrude a curve along another curve. E.g. if you extrude a circle along a line (which is perpendicular to the cirle plane) you will get a cylindrical face.
         /// If the curve <paramref name="along"/> is planar, the curve <paramref name="toExtrude"/> will be only rotated around the plane's normal (and moved of course),
-        /// If the curve <paramref name="along"/> is not planar, there is no well difined way how to rotate the curve <paramref name="toExtrude"/>.
+        /// If the curve <paramref name="along"/> is not planar, there is no well defined way how to rotate the curve <paramref name="toExtrude"/>.
+        /// Two lines give a planar face, a circle along a line perpendicular to its plane a cylindrical face, a line along a
+        /// circle a cylindrical, planar or conical face (depending on the direction of the line relative to the axis of the
+        /// circle), a circle along a circle around an axis in its plane a toroidal face; other combinations give a face on a
+        /// swept surface. Returns null when no surface can be built (e.g. a line extruded along itself).
         /// </summary>
-        /// <param name="toExtrude"></param>
-        /// <param name="along"></param>
-        /// <returns></returns>
+        /// <param name="toExtrude">the curve to extrude, it becomes an edge of the face</param>
+        /// <param name="along">the curve to extrude along, its start point should be on <paramref name="toExtrude"/></param>
+        /// <returns>the face or null</returns>
         public static Face ExtrudeCurveToFace(ICurve toExtrude, ICurve along)
         {
             if (along.GetPlanarState() == PlanarState.UnderDetermined) // a line or a linear spline
@@ -1323,6 +1405,14 @@ namespace CADability.GeoObject
                 return res;
             }
         }
+        /// <summary>
+        /// Creates a planar <see cref="Face"/> bound by the closed planar <paramref name="path"/>. A path that consists of a
+        /// single closed curve (a circle) is split into two halves first, so that the face has two edges. Returns null when
+        /// the path is not planar.
+        /// </summary>
+        /// <param name="path">the closed planar outline</param>
+        /// <param name="project">the <see cref="Project"/> to set default styles for the result, may be null</param>
+        /// <returns>the face or null</returns>
         public static Face MakeFace(Path path, Project project)
         {
             return MakeFace(path, project, true) as Face;
@@ -1335,6 +1425,7 @@ namespace CADability.GeoObject
         /// <param name="plane"></param>
         /// <param name="path"></param>
         /// <param name="numTurns"></param>
+        /// <param name="rightHanded">true for a right handed thread, false for a left handed thread</param>
         /// <returns></returns>
         internal static Solid MakeHelicalSolid(GeoPoint2D axisLocation, GeoVector2D axisDirection, Plane plane, Path2D path, double numTurns, bool rightHanded)
         {
@@ -1413,6 +1504,7 @@ namespace CADability.GeoObject
         /// <param name="plane">The plane, in which path and axisLocation are defined</param>
         /// <param name="path">The profile of the thread</param>
         /// <param name="numTurns">Number of turns</param>
+        /// <param name="rightHanded">true for a right handed thread, false for a left handed thread</param>
         /// <returns>A Solid with the thread</returns>
         internal static Solid MakeHelicalSolid(GeoPoint2D axisLocation, Plane plane, Path2D path, double numTurns, bool rightHanded)
         {
@@ -1776,10 +1868,28 @@ namespace CADability.GeoObject
             e4.RecalcCurve3D();
             return face;
         }
+        /// <summary>
+        /// Not implemented, throws <see cref="NotImplementedException"/>. Use <see cref="Face.GetPlaneIntersection(PlaneSurface)"/>,
+        /// <see cref="Shell.GetPlaneIntersection(PlaneSurface)"/> or <see cref="Solid.GetPlaneIntersection(PlaneSurface)"/> to intersect with a plane.
+        /// </summary>
+        /// <param name="faces">faces to intersect</param>
+        /// <param name="plane">the plane</param>
+        /// <returns>nothing, throws</returns>
+        [Obsolete("Not implemented, throws NotImplementedException; use GetPlaneIntersection of Face, Shell or Solid. Will be removed in the next minor version.")]
         public static Make3D PlaneIntersection(Face[] faces, Plane plane)
         {
             throw new NotImplementedException();
         }
+        /// <summary>
+        /// Rounds the given edges of a shell with a fillet of the given radius. The edges must belong to the same shell, must
+        /// be connected (form a path) and no more than three edges may meet in a vertex. The shell itself is not modified,
+        /// the rounded copy is returned. The caller replaces the shell, or the solid it belongs to, by the result (the
+        /// "fillet" action does that with undo).
+        /// </summary>
+        /// <param name="edges">the edges to round, all of the same shell</param>
+        /// <param name="radius">the radius of the fillet</param>
+        /// <param name="affectedShell">receives the shell the edges belong to, or null when the first edge does not belong to a shell</param>
+        /// <returns>a new shell with the fillets, or null when the rounding failed</returns>
         public static Shell MakeFillet(Edge[] edges, double radius, out Shell affectedShell)
         {
             Shell sh = edges[0].PrimaryFace.Owner as Shell;
@@ -1792,6 +1902,19 @@ namespace CADability.GeoObject
             affectedShell = null;
             return null;
         }
+        /// <summary>
+        /// Chamfers (bevels) the given edges of a shell. The edges must belong to <paramref name="primaryFace"/>, must be
+        /// connected (form a path) and only two edges may have a common vertex. The chamfer is <paramref name="primaryDist"/>
+        /// wide on the primary face and <paramref name="secondaryDist"/> wide on the other face of each edge; equal distances
+        /// give a 45° chamfer. The shell itself is not modified, the chamfered copy is returned. The caller replaces the shell,
+        /// or the solid it belongs to, by the result (the "chamfer" action does that with undo).
+        /// </summary>
+        /// <param name="primaryFace">the face all edges belong to</param>
+        /// <param name="edges">the edges to chamfer</param>
+        /// <param name="primaryDist">distance of the chamfer from the edge on <paramref name="primaryFace"/></param>
+        /// <param name="secondaryDist">distance of the chamfer from the edge on the other face</param>
+        /// <param name="affectedShellsOrSolids">receives the shell the face belongs to, or null when the face does not belong to a shell</param>
+        /// <returns>an array with the new shell, or null when the chamfer failed</returns>
         public static IGeoObject[] MakeChamfer(Face primaryFace, Edge[] edges, double primaryDist, double secondaryDist, out IGeoObject[] affectedShellsOrSolids)
         {
             Shell sh = primaryFace.Owner as Shell;
@@ -1805,11 +1928,12 @@ namespace CADability.GeoObject
             return null;
         }
         /// <summary>
-        /// Takes all faces and shells from the given list and tries to sew them together. When two or more faces have
-        /// common edges they are connected to shells. Shells with no free edges are converted to solids.
+        /// Takes all faces and shells from the given list and sews them together with <see cref="SewFaces"/>: faces with
+        /// common edges are connected to shells. Other objects in the list are ignored. Returns null when the list contains
+        /// less than two faces (counting the faces of the shells).
         /// </summary>
         /// <param name="select">faces and shells to sew</param>
-        /// <returns>resulting objects</returns>
+        /// <returns>the resulting shells, or null</returns>
         public static GeoObjectList SewFacesAndShells(GeoObjectList select)
         {
             List<Face> faces = new List<GeoObject.Face>();
@@ -1825,6 +1949,17 @@ namespace CADability.GeoObject
             }
             else return null;
         }
+        /// <summary>
+        /// Sews the faces together: edges of different faces with the same geometry become one edge shared by both faces,
+        /// and each set of faces connected this way is returned as a <see cref="Shell"/>. The faces are modified (their
+        /// edges and vertices are replaced), connections to faces not in the array are cut first. The shells are oriented
+        /// outward. A shell without open edges (<see cref="Shell.OpenEdges"/>) bounds a volume and can be turned into a
+        /// solid with <see cref="Solid.MakeSolid"/>. This is how the primitives of this class and the STL import build their
+        /// solids.
+        /// </summary>
+        /// <param name="faces">the faces to sew</param>
+        /// <param name="edgesArUnambiguous">currently unused</param>
+        /// <returns>the shells, one per connected set of faces</returns>
         public static Shell[] SewFaces(Face[] faces, bool edgesArUnambiguous = false)
         {
 #if DEBUG
@@ -2004,12 +2139,25 @@ namespace CADability.GeoObject
             }
         }
 
+        /// <summary>
+        /// Not implemented, throws <see cref="NotImplementedException"/> (left over from an implementation on top of an
+        /// external modelling kernel, there is no way to create a Make3D instance). Use the static methods.
+        /// </summary>
+        /// <param name="project">the project to set default styles</param>
+        /// <returns>nothing, throws</returns>
+        [Obsolete("Not implemented, throws NotImplementedException; use the static methods of Make3D. Will be removed in the next minor version.")]
         public IGeoObject GetShape(Project project)
         {
             IGeoObject[] res = GetShapes(project);
             if (res.Length >= 1) return res[0];
             return null;
         }
+        /// <summary>
+        /// Not implemented, throws <see cref="NotImplementedException"/>, see <see cref="GetShape"/>.
+        /// </summary>
+        /// <param name="project">the project to set default styles</param>
+        /// <returns>nothing, throws</returns>
+        [Obsolete("Not implemented, throws NotImplementedException; use the static methods of Make3D. Will be removed in the next minor version.")]
         public IGeoObject[] GetShapes(Project project)
         {
             throw new NotImplementedException();
@@ -2075,25 +2223,48 @@ namespace CADability.GeoObject
             throw new NotImplementedException();
         }
         /// <summary>
-        /// Returns the intersection of the two given <see cref="Solid"/>s. If the solids are disjunct, null will be returned.
-        /// s1 and s2 will be intersected, the common solid is returned, which may consist of several solids
+        /// Returns the intersection of the two given <see cref="Solid"/>s, same as <see cref="Solid.Intersect"/>: the parts
+        /// common to both solids, as new solids. If the solids are disjunct or only touch, the array is empty.
         /// </summary>
-        /// <param name="s1">first solid</param>
-        /// <param name="s2">second solid</param>
-        /// <param name="project">the project to find attributes</param>
-        /// <returns>intersection of the two solids or null</returns>
+        /// <param name="solid1">first solid</param>
+        /// <param name="solid2">second solid</param>
+        /// <returns>the common parts, empty when there are none</returns>
         public static Solid[] Intersection(Solid solid1, Solid solid2)
         {
-            throw new NotImplementedException();
+            return Solid.Intersect(solid1, solid2);
         }
+        /// <summary>
+        /// Not implemented, throws <see cref="NotImplementedException"/>.
+        /// </summary>
+        /// <param name="shell1">the shell</param>
+        /// <param name="solid2">the solid</param>
+        /// <returns>nothing, throws</returns>
+        [Obsolete("Not implemented, throws NotImplementedException. Will be removed in the next minor version.")]
         public static Shell[] Intersection(Shell shell1, Solid solid2)
         {
             throw new NotImplementedException();
         }
+        /// <summary>
+        /// Not implemented, throws <see cref="NotImplementedException"/>. Use <see cref="Face.Intersect(Face)"/> for the intersection curves of two faces.
+        /// </summary>
+        /// <param name="face1">the first face</param>
+        /// <param name="face2">the second face</param>
+        /// <returns>nothing, throws</returns>
+        [Obsolete("Not implemented, throws NotImplementedException; use Face.Intersect(Face). Will be removed in the next minor version.")]
         public static IGeoObject[] Intersection(Face face1, Face face2)
         {
             throw new NotImplementedException();
         }
+        /// <summary>
+        /// Creates a box (a parallelepiped): the corner <paramref name="location"/> and the three edges that start there. The
+        /// vectors need not be perpendicular or of equal length. When they do not form a right handed system,
+        /// <paramref name="directionX"/> and <paramref name="directionY"/> are exchanged so that the faces are oriented outward.
+        /// </summary>
+        /// <param name="location">a corner of the box</param>
+        /// <param name="directionX">first edge starting at the corner</param>
+        /// <param name="directionY">second edge starting at the corner</param>
+        /// <param name="directionZ">third edge starting at the corner</param>
+        /// <returns>the box</returns>
         static public Solid MakeBox(GeoPoint location, GeoVector directionX, GeoVector directionY, GeoVector directionZ)
         {
             // the three provided vectors must be in a right handed system
@@ -2200,6 +2371,16 @@ namespace CADability.GeoObject
             return Solid.MakeSolid(shell);
         }
 #else
+        /// <summary>
+        /// Creates a cylinder with the centre of the bottom circle at <paramref name="location"/>. The length of
+        /// <paramref name="directionX"/> is the radius, its direction is where the seam of the lateral surface starts, and
+        /// <paramref name="directionZ"/> is the axis, its length the height. <paramref name="directionX"/> must be
+        /// perpendicular to <paramref name="directionZ"/>. The lateral surface is split into two half faces.
+        /// </summary>
+        /// <param name="location">centre of the bottom circle</param>
+        /// <param name="directionX">radius vector, perpendicular to the axis</param>
+        /// <param name="directionZ">axis, its length is the height</param>
+        /// <returns>the cylinder</returns>
         static public Solid MakeCylinder(GeoPoint location, GeoVector directionX, GeoVector directionZ)
         {
             GeoVector directionY = directionZ ^ directionX;
@@ -2271,6 +2452,14 @@ namespace CADability.GeoObject
             //return shp as Solid;
         }
 #endif
+        /// <summary>
+        /// Creates the lateral surface of a cylinder as an open shell of two half faces, without bottom and top. The
+        /// parameters are those of <see cref="MakeCylinder"/>.
+        /// </summary>
+        /// <param name="location">centre of the bottom circle</param>
+        /// <param name="directionX">radius vector, perpendicular to the axis</param>
+        /// <param name="directionZ">axis, its length is the height</param>
+        /// <returns>the open shell</returns>
         static public Shell MakeCylinderShell(GeoPoint location, GeoVector directionX, GeoVector directionZ)
         {
             GeoVector directionY = directionZ ^ directionX;
@@ -2338,9 +2527,9 @@ namespace CADability.GeoObject
         /// <param name="location">location of the cone</param>
         /// <param name="directionX">startpoint of edge</param>
         /// <param name="directionZ">axis of the cone</param>
-        /// <param name="radius1">radius at location</param>
-        /// <param name="radius2">radius at location + directionZ</param>
-        /// <returns></returns>
+        /// <param name="radius1">radius at location, 0 for a pointed cone</param>
+        /// <param name="radius2">radius at location + directionZ, 0 for a pointed cone</param>
+        /// <returns>the cone, or null when both radii are equal (use <see cref="MakeCylinder"/>) or the faces cannot be sewed</returns>
         static public Solid MakeCone(GeoPoint location, GeoVector directionX, GeoVector directionZ, double radius1, double radius2)
         {
             if (radius1 == radius2) return null;
@@ -2381,6 +2570,12 @@ namespace CADability.GeoObject
             if (sh.Length == 1) return Solid.MakeSolid(sh[0]);
             return null;
         }
+        /// <summary>
+        /// Creates a sphere. The surface is split into two half faces at the seam in the plane x == 0 of the sphere.
+        /// </summary>
+        /// <param name="location">centre of the sphere</param>
+        /// <param name="radius">radius of the sphere</param>
+        /// <returns>the sphere, or null when the faces cannot be sewed</returns>
         static public Solid MakeSphere(GeoPoint location, double radius)
         {
             SphericalSurface ss = new SphericalSurface(location, radius * GeoVector.XAxis, radius * GeoVector.YAxis, radius * GeoVector.ZAxis);
@@ -2392,6 +2587,14 @@ namespace CADability.GeoObject
             if (sh.Length == 1) return Solid.MakeSolid(sh[0]);
             return null;
         }
+        /// <summary>
+        /// Creates a torus (a ring). The surface is split into four faces.
+        /// </summary>
+        /// <param name="location">centre of the torus</param>
+        /// <param name="normal">axis of the torus, the normal of the plane of the ring</param>
+        /// <param name="radius1">major radius, the distance from the centre to the centre line of the tube</param>
+        /// <param name="radius2">minor radius, the radius of the tube; must be smaller than <paramref name="radius1"/></param>
+        /// <returns>the torus, or null when the faces cannot be sewed</returns>
         static public Solid MakeTorus(GeoPoint location, GeoVector normal, double radius1, double radius2)
         {
             GeoVector other;
@@ -2465,19 +2668,23 @@ namespace CADability.GeoObject
             return res;
         }
         /// <summary>
-        /// INTERN! Macht aus einer Kurve und einer Richtung ein Face. Es entstehen 4 Edges: 0: die Kurve curve selbst, 1: Endpunkt
-        /// der Kurve plus extrusion, 2: versetzte rükwärtige Kurve, 3: inverse zu 1, endet am Startpunkt von curve. Evtl. können
-        /// einige der Edges bereits existieren und sollen dann verwendet werden, so spart man sich das nachträgliche zusammenfügen 
-        /// einzelner Faces zu einer Shell. Die Parameter forward0 bis forward3 geben an, ob die 3D Kurve in der Edge die
-        /// richtige Richtung hat oder nicht.
+        /// Makes a face from a curve and an extrusion vector. The face gets four edges: 0: the curve itself, 1: from the end
+        /// point of the curve along the extrusion, 2: the moved curve, backwards, 3: the inverse of 1, ending at the start
+        /// point of the curve. Some of these edges may already exist and are then used, which saves sewing the single faces
+        /// to a shell afterwards. The parameters forward0 to forward3 tell whether the 3d curve of the existing edge runs in
+        /// the direction described above or not.
         /// </summary>
-        /// <param name="curve"></param>
-        /// <param name="extrusion"></param>
-        /// <param name="edge0"></param>
-        /// <param name="edge1"></param>
-        /// <param name="edge2"></param>
-        /// <param name="edge3"></param>
-        /// <returns></returns>
+        /// <param name="curve">the curve to extrude</param>
+        /// <param name="extrusion">direction and length of the extrusion</param>
+        /// <param name="edge0">existing edge for the curve itself, or null</param>
+        /// <param name="edge1">existing edge from the end point of the curve along the extrusion, or null</param>
+        /// <param name="edge2">existing edge for the moved curve, or null</param>
+        /// <param name="edge3">existing edge from the moved start point back to the start point of the curve, or null</param>
+        /// <param name="forward0">true when the 3d curve of <paramref name="edge0"/> runs in the direction of <paramref name="curve"/></param>
+        /// <param name="forward1">true when the 3d curve of <paramref name="edge1"/> runs in the direction of the extrusion</param>
+        /// <param name="forward2">true when the 3d curve of <paramref name="edge2"/> runs against the direction of <paramref name="curve"/></param>
+        /// <param name="forward3">true when the 3d curve of <paramref name="edge3"/> runs against the direction of the extrusion</param>
+        /// <returns>the face, or null when the surface cannot be built</returns>
         static Face ExtrudeCurveToFace(ICurve curve, GeoVector extrusion,
             Edge edge0, Edge edge1, Edge edge2, Edge edge3,
             bool forward0, bool forward1, bool forward2, bool forward3)
@@ -2701,6 +2908,21 @@ namespace CADability.GeoObject
             return null;
         }
 
+        /// <summary>
+        /// Rotates a <see cref="Face"/>, a <see cref="Path"/> or a curve around <paramref name="axis"/> to make a solid or a
+        /// shell: a face, or a closed planar path or curve (which is made a face first), yields a <see cref="Solid"/>; an
+        /// open or not planar path or curve yields the <see cref="Shell"/> of the rotated curves. The rotation starts at
+        /// <paramref name="offset"/> from the current position of the object and sweeps <paramref name="rotation"/>; a full
+        /// rotation (2*Math.PI) gives a closed shape without start and end faces. Splines in a path are split at their
+        /// corners, so that each resulting face is smooth. Returns null for other kinds of objects and when the construction
+        /// fails. See also <see cref="MakeRevolution(IGeoObject, GeoPoint, GeoVector, double, Project)"/>.
+        /// </summary>
+        /// <param name="faceShellPathCurve">the face, path or curve to rotate</param>
+        /// <param name="axis">the axis of rotation</param>
+        /// <param name="rotation">the angle to sweep, 2*Math.PI for a full rotation</param>
+        /// <param name="offset">the angle, measured from the current position of the object, at which the rotation starts</param>
+        /// <param name="project">currently not used, may be null</param>
+        /// <returns>the solid or shell, or null</returns>
         static public IGeoObject Rotate(IGeoObject faceShellPathCurve, Axis axis, SweepAngle rotation, SweepAngle offset, Project project)
         {
             return Rotate(faceShellPathCurve, axis, rotation, offset, project, false);
@@ -2727,7 +2949,9 @@ namespace CADability.GeoObject
                 pth.Set(crvs);
                 faceShellPathCurve = pth;
             }
-            faceShellPathCurve = SplitSplinesAtCorners(faceShellPathCurve);
+            // a path or curve is split at the corners of its splines, so that each face of the result is smooth. The
+            // path made from a face is not: its curves must stay the edges of the face, which give the side edges below
+            if (originalFace == null) faceShellPathCurve = SplitSplinesAtCorners(faceShellPathCurve);
             if (faceShellPathCurve is Ellipse && !(faceShellPathCurve as Ellipse).IsArc)
             {
                 Path pth = Path.Construct();
@@ -3157,6 +3381,13 @@ namespace CADability.GeoObject
             }
             return null;
         }
+        /// <summary>
+        /// Not functional: reads the header of the STL file and then throws <see cref="NotImplementedException"/>. Use the
+        /// class <see cref="CADability.ImportSTL"/> to import STL files.
+        /// </summary>
+        /// <param name="fileName">the file to read</param>
+        /// <returns>nothing, throws</returns>
+        /// <exception cref="NotImplementedException">always</exception>
         static public Solid[] ImportSTL(string fileName)
         {
             using (BinaryReader reader = new BinaryReader(File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.Read)))
@@ -3186,15 +3417,43 @@ namespace CADability.GeoObject
             }
             throw new NotImplementedException();
         }
+        /// <summary>
+        /// Was meant to return the type of a file readable by the external DTK import library, which is not part of this
+        /// distribution. Always returns the string "error: dtk is not installed".
+        /// </summary>
+        /// <param name="filename">ignored</param>
+        /// <returns>"error: dtk is not installed"</returns>
         static public string GetDtkFileType(string filename)
         {
             return "error: dtk is not installed";
         }
 
+        /// <summary>
+        /// Was meant to import a file via the external DTK import library, which is not part of this distribution. Always
+        /// throws <see cref="NotImplementedException"/>.
+        /// </summary>
+        /// <param name="filename">the file to import</param>
+        /// <param name="pr">the project to set default styles for the result</param>
+        /// <param name="useProgress">true: show the progress of the import</param>
+        /// <param name="makeCompounds">true: combine the imported objects into blocks according to the structure of the file</param>
+        /// <returns>nothing, throws</returns>
+        /// <exception cref="NotImplementedException">always</exception>
+        [Obsolete("Not implemented, throws NotImplementedException; the DTK import library is not part of CADability. Will be removed in the next minor version.")]
         static public IGeoObject[] ImportDtk(string filename, Project pr, bool useProgress = false, bool makeCompounds = false)
         {
             throw new NotImplementedException();
         }
+        /// <summary>
+        /// Intended to cut a shell with a closed path: the path (made planar first, if necessary) is extruded through the
+        /// extent of the shell and the part of the shell inside that prism is returned, or, if several parts result, the one
+        /// closest to the path. Currently not functional: it relies on <see cref="Intersection(Shell, Solid)"/>, which is not
+        /// implemented and throws <see cref="NotImplementedException"/>.
+        /// </summary>
+        /// <param name="path">the closed path that delimits the part to keep</param>
+        /// <param name="shell">the shell to cut</param>
+        /// <returns>null when the path cannot be made planar or no prism can be made from it, otherwise throws</returns>
+        /// <exception cref="NotImplementedException">from <see cref="Intersection(Shell, Solid)"/></exception>
+        [Obsolete("Not functional, throws NotImplementedException unless the path cannot be made planar. Will be removed in the next minor version.")]
         static public Shell Curtail(Path path, Shell shell)
         {
             path.Flatten();
@@ -3237,6 +3496,7 @@ namespace CADability.GeoObject
             return null;
         }
 #if DEBUG
+        [Obsolete("Not implemented, throws NotImplementedException. Will be removed in the next minor version.")]
         static public Shell[] RemoveBoundaryOffset(Shell shell, double dist)
         {
             throw new NotImplementedException();
@@ -3331,16 +3591,16 @@ namespace CADability.GeoObject
 
         //}
 
-        /// <summary>
-        /// Checks whether the two provided solids have overlapping faces. If this is the case, one of the
-        /// two faces or both faces are split in a way that the modified solids have common, identical
-        /// faces which have the same outlines
-        /// </summary>
-        /// <param name="s1">The first solid</param>
-        /// <param name="s2">The second solid</param>
-        /// <param name="splittedOnS1">Splitted faces on s1</param>
-        /// <param name="splittedOnS2">Splitted faces on s2</param>
-        /// <returns>Returns true if common overlapping faces were found.</returns>
+        ////// <summary>
+        ////// Checks whether the two provided solids have overlapping faces. If this is the case, one of the
+        ////// two faces or both faces are split in a way that the modified solids have common, identical
+        ////// faces which have the same outlines
+        ////// </summary>
+        ////// <param name="s1">The first solid</param>
+        ////// <param name="s2">The second solid</param>
+        ////// <param name="splittedOnS1">Splitted faces on s1</param>
+        ////// <param name="splittedOnS2">Splitted faces on s2</param>
+        ////// <returns>Returns true if common overlapping faces were found.</returns>
         ////static public bool SplitCommonFace(Solid s1, Solid s2, out Face[] splittedOnS1, out Face[] splittedOnS2)
         ////{
         ////    List<Face> sps1 = new List<Face>();
@@ -3396,11 +3656,12 @@ namespace CADability.GeoObject
         ////    return splittingDone;
         ////}
         /// <summary>
-        /// Copies all Userdata from Faces in <paramref name="copyFrom"/ to Faces in <paramref name="addTo"/>
-        /// when the faces shaer common parts, i.e. are on the same surface
+        /// Copies the <see cref="IGeoObject.UserData"/> of the faces of the solids in <paramref name="copyFrom"/> to the faces
+        /// of the solids in <paramref name="addTo"/> that lie on the same surface and share a common part with them. Used
+        /// after a boolean operation to carry the user data of the operands over to the faces of the result.
         /// </summary>
-        /// <param name="copyFrom"></param>
-        /// <param name="addTo"></param>
+        /// <param name="copyFrom">solids whose faces carry the user data</param>
+        /// <param name="addTo">solids whose faces receive the user data</param>
         public static void CloneFaceUserData(Solid[] copyFrom, Solid[] addTo)
         {
             OctTree<Face> original = new OctTree<Face>(copyFrom[0].GetExtent(Precision.eps), Precision.eps);

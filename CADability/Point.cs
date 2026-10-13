@@ -59,21 +59,49 @@ namespace CADability.GeoObject
         private ColorDef colorDef;
         private string name;
         #region polymorph construction
+        /// <summary>
+        /// Delegate for the construction of a Point.
+        /// </summary>
+        /// <returns>A Point or Point derived class</returns>
         public delegate Point ConstructionDelegate();
+        /// <summary>
+        /// Provide a delegate here if you want your Point derived class to be created each time CADability creates a point.
+        /// </summary>
         public static ConstructionDelegate Constructor;
+        /// <summary>
+        /// The only way to create a point: there are no public constructors. Calls <see cref="Constructor"/> when one is
+        /// registered, otherwise creates a <see cref="Point"/>. The new point has <see cref="Size"/> 3 and no symbol
+        /// (<see cref="PointSymbol.Empty"/>); set <see cref="Location"/> and <see cref="Symbol"/> afterwards.
+        /// </summary>
+        /// <returns>the new point</returns>
         public static Point Construct()
         {
             if (Constructor != null) return Constructor();
             return new Point();
         }
+        /// <summary>
+        /// Handler for <see cref="Constructed"/>.
+        /// </summary>
+        /// <param name="justConstructed">the point that was just created</param>
         public delegate void ConstructedDelegate(Point justConstructed);
+        /// <summary>
+        /// Raised from the constructor whenever a point is created, be it by <see cref="Construct"/>, by cloning or by
+        /// deserialization, before its data is set. An application can use it to attach data of its own to every point.
+        /// </summary>
         public static event ConstructedDelegate Constructed;
         #endregion
+        /// <summary>
+        /// Protected constructor: sets <see cref="Size"/> to 3 and raises <see cref="Constructed"/>. Use
+        /// <see cref="Construct"/> to create a point.
+        /// </summary>
         protected Point()
         {
             size = 3.0;
             if (Constructed != null) Constructed(this);
         }
+        /// <summary>
+        /// The position of the point in world coordinates. Setting it raises the change events and is undoable.
+        /// </summary>
         public GeoPoint Location
         {
             get => location;
@@ -85,6 +113,11 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// The symbol with which the point is displayed: a dot, plus, cross or line, optionally combined with a square or
+        /// circle around it, see <see cref="PointSymbol"/>. Setting it raises the change events and is undoable. The symbol
+        /// is also available as the named attribute "PointSymbol" (<see cref="GetNamedAttribute"/>).
+        /// </summary>
         public PointSymbol Symbol
         {
             get => symbol;
@@ -96,6 +129,11 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// The size of the displayed symbol, nominally in pixels: the symbol does not scale with the view. Default is 3.
+        /// The current renderers draw symbols of a fixed size and do not evaluate the value. Setting it raises the change
+        /// events and is undoable.
+        /// </summary>
         public double Size
         {
             get => size;
@@ -107,6 +145,10 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// An optional name of the point, shown and editable in the property grid; null when not set. Setting it raises the
+        /// change events as a change of an attribute and is undoable.
+        /// </summary>
         public string Name
         {
             get
@@ -122,10 +164,7 @@ namespace CADability.GeoObject
             }
         }
         #region IGeoObjectImpl overrides
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Clone ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IGeoObject Clone()
         {
             Point res = Construct();
@@ -137,10 +176,7 @@ namespace CADability.GeoObject
             res.CopyAttributes(this);
             return res;
         }
-        /// <summary>
-        /// Implements the <see cref="IGeoObjectImpl.CopyGeometry"/> method.
-        /// </summary>
-        /// <param name="ToCopyFrom"></param>
+        /// <inheritdoc/>
         public override void CopyGeometry(IGeoObject ToCopyFrom)
         {
             using (new Changing(this))
@@ -151,10 +187,7 @@ namespace CADability.GeoObject
                 this.colorDef = ((Point)ToCopyFrom).colorDef;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.FindSnapPoint (SnapPointFinder)"/>
-        /// </summary>
-        /// <param name="spf"></param>
+        /// <inheritdoc/>
         public override void FindSnapPoint(SnapPointFinder spf)
         {
             if (!spf.Accept(this)) return;
@@ -163,10 +196,7 @@ namespace CADability.GeoObject
                 spf.Check(location, this, SnapPointFinder.DidSnapModes.DidSnapToObjectSnapPoint);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingCube GetBoundingCube()
         {
             BoundingCube res = BoundingCube.EmptyBoundingCube;
@@ -179,11 +209,7 @@ namespace CADability.GeoObject
         //			result.MinMax(projection.ProjectUnscaled(location));
         //			return result;
         //		}
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetShowProperties (IFrame)"/>
-        /// </summary>
-        /// <param name="Frame"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IPropertyEntry GetShowProperties(IFrame Frame)
         {
             return new ShowPropertyPoint(this, Frame);
@@ -199,10 +225,7 @@ namespace CADability.GeoObject
         //			return l<=Rect;
         //		}
         //
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Modify (ModOp)"/>
-        /// </summary>
-        /// <param name="m"></param>
+        /// <inheritdoc/>
         public override void Modify(ModOp m)
         {
             using (new Changing(this, "Location", location))
@@ -218,11 +241,7 @@ namespace CADability.GeoObject
         //			else color = System.Drawing.Color.Black;
         //			PaintTo.DisplaySymbolW(location,size,symbol,color);
         //		}
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetAttributeProperties (IFrame)"/>
-        /// </summary>
-        /// <param name="Frame"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IPropertyEntry[] GetAttributeProperties(IFrame Frame)
         {
             List<IPropertyEntry> res = new List<IPropertyEntry>();
@@ -230,12 +249,20 @@ namespace CADability.GeoObject
             res.Add(new PointSymbolSelectionProperty(this, "Point.PointSymbol"));
             return res.ToArray();
         }
-        public delegate bool PaintTo3DDelegate(Point toPaint, IPaintTo3D paintTo3D);
-        public static PaintTo3DDelegate OnPaintTo3D;
         /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PrePaintTo3D (IPaintTo3D)"/>
+        /// Handler for <see cref="OnPaintTo3D"/>.
         /// </summary>
-        /// <param name="paintTo3D"></param>
+        /// <param name="toPaint">the point being painted</param>
+        /// <param name="paintTo3D">the paint interface to paint to; the color of the point has already been set</param>
+        /// <returns>true if the handler painted the point itself and the default painting is to be skipped, false to let
+        /// the point paint itself as usual</returns>
+        public delegate bool PaintTo3DDelegate(Point toPaint, IPaintTo3D paintTo3D);
+        /// <summary>
+        /// Hook to replace the painting of points: when set, <see cref="PaintTo3D"/> calls it after setting the color and
+        /// does nothing more when it returns true. The hook is static, so it applies to every point of the process.
+        /// </summary>
+        public static PaintTo3DDelegate OnPaintTo3D;
+        /// <inheritdoc/>
         public override void PrePaintTo3D(IPaintTo3D paintTo3D)
         {
             paintTo3D.PreparePointSymbol(this.symbol);
@@ -261,14 +288,12 @@ namespace CADability.GeoObject
             paintTo3D.Points(new GeoPoint[] { location }, (float)size, symbol);
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PrepareDisplayList (double)"/>
-        /// </summary>
-        /// <param name="precision"></param>
+        /// <inheritdoc/>
         public override void PrepareDisplayList(double precision)
         {
             // nichts zu tun
         }
+        /// <inheritdoc/>
         public override Style.EDefaultFor PreferredStyle
         {
             get
@@ -276,16 +301,12 @@ namespace CADability.GeoObject
                 return Style.EDefaultFor.Curves;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetQuadTreeItem (Projection, ExtentPrecision)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="extentPrecision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IQuadTreeInsertableZ GetQuadTreeItem(Projection projection, ExtentPrecision extentPrecision)
         {
             return new QuadTreePoint(this, projection);
         }
+        /// <inheritdoc/>
         public override string[] CustomAttributeKeys
         {
             get
@@ -295,11 +316,7 @@ namespace CADability.GeoObject
                 return res.ToArray();
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetNamedAttribute (string)"/>
-        /// </summary>
-        /// <param name="name"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override INamedAttribute GetNamedAttribute(string name)
         {
             if (name == "PointSymbol") return new PointSymbolAttribute();
@@ -307,53 +324,27 @@ namespace CADability.GeoObject
         }
         #endregion
         #region IOctTreeInsertable members
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (double)"/>
-        /// </summary>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingCube GetExtent(double precision)
         {
             return GetBoundingCube();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
-        /// </summary>
-        /// <param name="cube"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(ref BoundingCube cube, double precision)
         {
             return cube.Contains(location);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection, BoundingRect, bool)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="rect"></param>
-        /// <param name="onlyInside"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(Projection projection, BoundingRect rect, bool onlyInside)
         {
             return projection.ProjectUnscaled(location) <= rect;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection.PickArea, bool)"/>
-        /// </summary>
-        /// <param name="area"></param>
-        /// <param name="onlyInside"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(Projection.PickArea area, bool onlyInside)
         {
             return BoundingCube.UnitBoundingCube.Contains(area.ToUnitBox * location);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Position (GeoPoint, GeoVector, double)"/>
-        /// </summary>
-        /// <param name="fromHere"></param>
-        /// <param name="direction"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double Position(GeoPoint fromHere, GeoVector direction, double precision)
         {
             GeoPoint p = Geometry.DropPL(location, fromHere, direction);
@@ -362,6 +353,11 @@ namespace CADability.GeoObject
         }
         #endregion
         #region IColorDef Members
+        /// <summary>
+        /// The color of the point, see <see cref="IColorDef.ColorDef"/>. Setting it raises the change events as a change of
+        /// an attribute and is undoable; setting null is ignored. A color with <see cref="ColorDef.ColorSource.fromParent"/>
+        /// is replaced by the corresponding color of the <see cref="Block"/> the point belongs to.
+        /// </summary>
         public ColorDef ColorDef
         {
             get
@@ -406,10 +402,11 @@ namespace CADability.GeoObject
             if (Constructed != null) Constructed(this);
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
@@ -419,6 +416,7 @@ namespace CADability.GeoObject
             info.AddValue("Size", size);
             info.AddValue("Name", name);
         }
+        /// <inheritdoc/>
         public override void GetObjectData(IJsonWriteData data)
         {
             base.GetObjectData(data);
@@ -428,6 +426,7 @@ namespace CADability.GeoObject
             data.AddProperty("Size", size);
             data.AddProperty("Name", name);
         }
+        /// <inheritdoc/>
         public override void SetObjectData(IJsonReadData data)
         {
             base.SetObjectData(data);
@@ -438,6 +437,7 @@ namespace CADability.GeoObject
             name = data.GetProperty<string>("Name");
         }
 
+        /// <inheritdoc/>
         public override BoundingRect GetExtent(Projection projection, ExtentPrecision extentPrecision)
         {
             return new BoundingRect(projection.ProjectUnscaled(location));

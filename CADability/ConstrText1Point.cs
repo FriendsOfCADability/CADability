@@ -5,7 +5,10 @@ using CADability.UserInterface;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a <see cref="Text"/> object placed at a single point. The user picks the location of the text and edits
+    /// the text string and its properties (font, size, alignment) in the control center. The new text takes over the settings of
+    /// the last text constructed, or uses the default text with the directions of the active drawing plane for the first one.
+    /// Started with the menu id "Constr.Text.1Point".
     /// </summary>
     internal class ConstrText1Point : ConstructAction
     {

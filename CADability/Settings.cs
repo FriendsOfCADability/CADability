@@ -81,10 +81,11 @@ namespace CADability
             }
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             // sollte nicht drankommen
@@ -94,11 +95,15 @@ namespace CADability
     }
 
     /// <summary>
-    /// Exception Klasse für die Methoden der Klasse Settings
+    /// Exception thrown by the methods of the <see cref="Settings"/> class, e.g. when a setting is accessed with an invalid name.
     /// </summary>
 
     public class SettingsException : System.Exception
     {
+        /// <summary>
+        /// Creates the exception with the given message.
+        /// </summary>
+        /// <param name="Info">The message (<see cref="Exception.Message"/>)</param>
         public SettingsException(string Info)
             : base(Info)
         {
@@ -109,8 +114,17 @@ namespace CADability
     /// A setting has been changed
     /// </summary>
     public delegate void SettingChangedDelegate(string Name, object NewValue);
+    /// <summary>
+    /// Implemented by objects that can be values of a <see cref="Settings"/> object and can be changed interactively,
+    /// e.g. <see cref="BooleanProperty"/>, <see cref="ColorSetting"/>, <see cref="MultipleChoiceSetting"/> and Settings
+    /// itself (for sub settings). The containing Settings object subscribes to the event to notice changes of its values
+    /// and forwards them as its own <see cref="Settings.SettingChangedEvent"/>.
+    /// </summary>
     public interface ISettingChanged
     {
+        /// <summary>
+        /// Raised when the value has been changed. The handler receives the name of the setting and the new value.
+        /// </summary>
         event SettingChangedDelegate SettingChangedEvent;
     }
     /// <summary>
@@ -121,10 +135,31 @@ namespace CADability
     public delegate void ValueChangedDelegate(object sender, object NewValue);
 
 
+    /// <summary>
+    /// Lets the application control where the global settings (<see cref="Settings.GlobalSettings"/>) are stored: attach a
+    /// handler to <see cref="GetGlobalSettingsFileName"/> before the settings are first used to provide the file name, or
+    /// set <see cref="neverSaveGlobalSettings"/> to suppress saving. Without a handler the file
+    /// "CADability.GlobalSettings.json" in the current directory is used if it exists there and the directory is
+    /// writable, otherwise the same file in the local application data folder (or in "My Documents" if that is not
+    /// available).
+    /// </summary>
     public class SettingsGlobalFileName
     {
+        /// <summary>
+        /// Delegate for <see cref="GetGlobalSettingsFileName"/>.
+        /// </summary>
+        /// <returns>The full path of the global settings file, or null to use the default location</returns>
         public delegate string GetGlobalSettingsFileNameDelegate();
+        /// <summary>
+        /// Queried for the name of the global settings file when the global settings are loaded or saved. Attach a handler
+        /// before <see cref="Settings"/> is first used (the first access loads the settings), e.g. at application start. If no
+        /// handler is attached or it returns null, the default location is used (see the class description).
+        /// </summary>
         static public event GetGlobalSettingsFileNameDelegate GetGlobalSettingsFileName;
+        /// <summary>
+        /// When true, <see cref="Settings.SaveGlobalSettings()"/> does nothing, so the global settings are never written to
+        /// disk, e.g. for tests or when running from a read-only location. Default is false.
+        /// </summary>
         static public bool neverSaveGlobalSettings = false;
         internal static string GetName()
         {
@@ -176,6 +211,11 @@ namespace CADability
         private ArrayList sortedEntries; // enthält (Name,Value)-Paare, MasterDaten
         private bool modified;
         private bool deserialized; // leider notwendig um das deserialisieren und den callback in eine vernünftige ordnung zu bringen
+        /// <summary>
+        /// Internal state: the name (key) of this Settings object within the Settings object that contains it as sub settings,
+        /// null for a root object like the global settings. It qualifies the names passed to
+        /// <see cref="SettingChangedEvent"/> ("mainkey.subkey").
+        /// </summary>
         protected string myName; // Name dieses Settings, wenn in einem anderen Setting anthalten
         private static Settings globalSettings;
         /// <summary>
@@ -195,6 +235,11 @@ namespace CADability
                 globalSettings = value;
             }
         }
+        /// <summary>
+        /// Writes the global settings (<see cref="GlobalSettings"/>) in JSON format to the given file, overwriting an existing
+        /// file. <see cref="SaveGlobalSettings()"/> uses the standard file.
+        /// </summary>
+        /// <param name="FileName">The name of the file to write</param>
         public static void SaveGlobalSettings(string FileName)
         {
             Stream stream = File.Open(FileName, FileMode.Create);
@@ -202,6 +247,11 @@ namespace CADability
             js.ToStream(stream, GlobalSettings);
             stream.Close();
         }
+        /// <summary>
+        /// Writes the global settings to the global settings file (see <see cref="SettingsGlobalFileName"/>), unless
+        /// <see cref="SettingsGlobalFileName.neverSaveGlobalSettings"/> is set. The frame calls it when it is disposed, so
+        /// that changes made in the control center persist.
+        /// </summary>
         public static void SaveGlobalSettings()
         {
             //Assembly ThisAssembly = Assembly.GetExecutingAssembly();
@@ -211,6 +261,15 @@ namespace CADability
             InitGlobalSettingsFileName();
             SaveGlobalSettings(GlobalSettingsFileName);
         }
+        /// <summary>
+        /// Reads the global settings from the given JSON file and makes them the <see cref="GlobalSettings"/>, disposing the
+        /// previous ones. The active language of the <see cref="StringTable"/> is set from the "Language" setting of the file
+        /// before the file is read a second time, so that language dependent choices are built correctly. Exceptions (file
+        /// not found, invalid content) are propagated. Normally the settings are loaded automatically when
+        /// <see cref="GlobalSettings"/> is first used, which falls back to default settings if the file cannot be read and
+        /// adds settings that are missing in the file; this method alone does not add them.
+        /// </summary>
+        /// <param name="FileName">The name of the file to read</param>
         public static void LoadGlobalSettings(string FileName)
         {
             Stream stream = null;
@@ -314,6 +373,10 @@ namespace CADability
             }
             AddMissingSettings();
         }
+        /// <summary>
+        /// Obsolete, does nothing. It remains from the time when CADability used OpenCascade as its geometry kernel.
+        /// </summary>
+        /// <param name="allow">Not used</param>
         public static void AllowOpenCascadeMultiThreading(bool allow)
         {
         }
@@ -762,6 +825,10 @@ namespace CADability
             // Application.ApplicationExit -= new EventHandler(GlobalSettings.OnApplicationExit);
             GlobalSettings = null;
         }
+        /// <summary>
+        /// Creates an empty settings object. Sub settings are created automatically by
+        /// <see cref="AddSetting(string, object)"/> with a dotted name; the deserialization also uses this constructor.
+        /// </summary>
         public Settings()
         {
             entries = new Hashtable();
@@ -777,6 +844,11 @@ namespace CADability
         //    }
         //}
 
+        /// <summary>
+        /// Creates an empty settings object with the given resource id, which determines the label and the tooltip when the
+        /// settings are shown in the control center (see <see cref="IShowPropertyImpl.resourceIdInternal"/>).
+        /// </summary>
+        /// <param name="ResourceID">The resource id for the <see cref="StringTable"/></param>
         public Settings(string ResourceID)
         {
             entries = new Hashtable();
@@ -785,6 +857,19 @@ namespace CADability
             resourceIdInternal = ResourceID;
         }
 
+        /// <summary>
+        /// Adds a setting with the given name and value, replacing an existing setting of that name. A name of the form
+        /// "mainkey.subkey" puts the value into the sub settings "mainkey", which are created if necessary. Values that
+        /// implement <see cref="ISettingChanged"/> are observed so that their changes raise <see cref="SettingChangedEvent"/>,
+        /// attribute lists (<see cref="IAttributeList"/>) get this object as their owner. Raises
+        /// <see cref="SettingChangedEvent"/> with the new value and marks the settings as modified. The settings keep the
+        /// order in which they were added, which is the order of display in the control center.
+        /// </summary>
+        /// <param name="Name">The name (key) of the setting, dotted for sub settings</param>
+        /// <param name="Value">The value. An object implementing <see cref="IShowProperty"/> (e.g. <see cref="BooleanProperty"/>,
+        /// <see cref="IntegerProperty"/>, <see cref="DoubleProperty"/>, <see cref="ColorSetting"/>,
+        /// <see cref="MultipleChoiceSetting"/>) is shown and can be edited in the control center; a plain value (bool, int,
+        /// double, string) is only accessible by code</param>
         public void AddSetting(string Name, object Value)
         {
             string[] Parts = Name.Split(new Char[] { '.' }, 2); // beim 1. Punkt auftrennen
@@ -821,6 +906,12 @@ namespace CADability
 
             if (SettingChangedEvent != null) SettingChangedEvent(Name, Value);
         }
+        /// <summary>
+        /// Removes the setting with the given name (dotted names address sub settings). Raises
+        /// <see cref="SettingChangedEvent"/> with a null value before the setting is removed. Nothing happens if there is
+        /// no such setting.
+        /// </summary>
+        /// <param name="Name">The name of the setting</param>
         public void RemoveSetting(string Name)
         {
             //TODO: fehlt noch events entfernen
@@ -851,6 +942,11 @@ namespace CADability
                 }
             }
         }
+        /// <summary>
+        /// Checks whether a setting with the given name exists (dotted names address sub settings).
+        /// </summary>
+        /// <param name="Name">The name of the setting</param>
+        /// <returns>true if the setting exists</returns>
         public bool ContainsSetting(string Name)
         {
             string[] Parts = Name.Split(new Char[] { '.' }, 2); // beim 1. Punkt auftrennen
@@ -872,6 +968,14 @@ namespace CADability
             }
             return false;
         }
+        /// <summary>
+        /// Changes the order of the settings, which is the order of display in the control center: the setting
+        /// <paramref name="toMove"/> is placed directly before or after the setting <paramref name="moveTo"/>. Both names
+        /// must be direct entries of this settings object (not dotted); if one of them does not exist, nothing happens.
+        /// </summary>
+        /// <param name="toMove">The name of the setting to move</param>
+        /// <param name="moveTo">The name of the setting that marks the new position</param>
+        /// <param name="setBefore">true to place it before <paramref name="moveTo"/>, false to place it after</param>
         public void RearrangeSetting(string toMove, string moveTo, bool setBefore)
         {
             Pair sourcePair = null;
@@ -912,6 +1016,15 @@ namespace CADability
             }
             return -1;
         }
+        /// <summary>
+        /// Returns the value of the setting with the given name. A dotted name ("mainkey.subkey") addresses a setting in the
+        /// sub settings "mainkey". The value is the object as it was added: a plain value or a property object like
+        /// <see cref="BooleanProperty"/>; the typed methods <see cref="GetBoolValue(string, bool)"/>,
+        /// <see cref="GetIntValue(string, int)"/>, <see cref="GetDoubleValue(string, double)"/> and
+        /// <see cref="GetStringValue(string, string)"/> unwrap it.
+        /// </summary>
+        /// <param name="Name">The name of the setting</param>
+        /// <returns>The value, or null if there is no such setting</returns>
         public object GetValue(string Name)
         {
             // wenn der Name mit Punkten getrennt ist, so handelt es sich um SubSettings
@@ -924,6 +1037,13 @@ namespace CADability
             }
             return null;
         }
+        /// <summary>
+        /// Returns the setting with the given name as a double. The setting may be stored as a double or as a
+        /// <see cref="DoubleProperty"/>.
+        /// </summary>
+        /// <param name="name">The name of the setting (dotted for sub settings)</param>
+        /// <param name="defaultValue">The value to return if the setting does not exist or has another type</param>
+        /// <returns>The value of the setting or <paramref name="defaultValue"/></returns>
         public double GetDoubleValue(string name, double defaultValue)
         {
             object o = GetValue(name);
@@ -934,6 +1054,13 @@ namespace CADability
 
             return defaultValue;
         }
+        /// <summary>
+        /// Returns the setting with the given name as an int. The setting may be stored as an int, a double (truncated), an
+        /// <see cref="IntegerProperty"/> or a <see cref="MultipleChoiceSetting"/> (the index of the current selection).
+        /// </summary>
+        /// <param name="name">The name of the setting (dotted for sub settings)</param>
+        /// <param name="defaultValue">The value to return if the setting does not exist or has another type</param>
+        /// <returns>The value of the setting or <paramref name="defaultValue"/></returns>
         public int GetIntValue(string name, int defaultValue)
         {
             object o = GetValue(name);
@@ -951,6 +1078,13 @@ namespace CADability
 		            return defaultValue;
             }
         }
+        /// <summary>
+        /// Returns the setting with the given name as a bool. The setting may be stored as a bool or as a
+        /// <see cref="BooleanProperty"/>.
+        /// </summary>
+        /// <param name="name">The name of the setting (dotted for sub settings)</param>
+        /// <param name="defaultValue">The value to return if the setting does not exist or has another type</param>
+        /// <returns>The value of the setting or <paramref name="defaultValue"/></returns>
         public bool GetBoolValue(string name, bool defaultValue)
         {
             object o = GetValue(name);
@@ -964,6 +1098,13 @@ namespace CADability
 		            return defaultValue;
             }
         }
+        /// <summary>
+        /// Returns the setting with the given name as a string. A <see cref="StringProperty"/> yields its text, any other
+        /// existing value is converted with ToString().
+        /// </summary>
+        /// <param name="name">The name of the setting (dotted for sub settings)</param>
+        /// <param name="defaultValue">The value to return if the setting does not exist</param>
+        /// <returns>The value of the setting or <paramref name="defaultValue"/></returns>
         public string GetStringValue(string name, string defaultValue)
         {
             object o = GetValue(name);
@@ -973,13 +1114,19 @@ namespace CADability
 	            return o.ToString();
             return defaultValue;
         }
+        /// <summary>
+        /// Returns the names of all settings, one entry per setting in display order; the entries of a sub settings object
+        /// follow its own entry with dotted names (e.g. "Snap.Circle30"), so every entry is a valid name for
+        /// <see cref="GetValue(string)"/>. <see cref="Dispose"/> uses it to unsubscribe from all settings.
+        /// </summary>
+        /// <returns>One name per setting</returns>
         public string[] GetAllKeys()
         {
             List<string> res = new List<string>();
             for (int i = 0; i < sortedEntries.Count; i++)
             {
                 Pair p = sortedEntries[i] as Pair;
-                res.Add(p.Name + " (" + p.Value.ToString() + ")");
+                res.Add(p.Name);
                 if (p.Value is Settings settings)
                 {
                     string[] sub = settings.GetAllKeys();
@@ -991,6 +1138,17 @@ namespace CADability
             }
             return res.ToArray();
         }
+        /// <summary>
+        /// Sets the value of the setting with the given name (dotted names address sub settings, which are created if
+        /// necessary). A setting that does not exist is added (<see cref="AddSetting(string, object)"/>). If the existing
+        /// setting is a property object (<see cref="BooleanProperty"/>, <see cref="IntegerProperty"/>,
+        /// <see cref="DoubleProperty"/>, <see cref="ColorSetting"/>, <see cref="MultipleChoiceSetting"/>), the plain value
+        /// (bool, int, double, <see cref="Color"/>, index of the selection) is set into that object, otherwise the value is
+        /// replaced. A null value is ignored. Raises <see cref="SettingChangedEvent"/> and marks the settings as modified.
+        /// </summary>
+        /// <param name="name">The name of the setting</param>
+        /// <param name="newValue">The new value</param>
+        /// <exception cref="SettingsException">if the type of the new value does not fit the existing setting, or the name is invalid</exception>
         public void SetValue(string name, object newValue)
         {
             SetValue(name, newValue, false);
@@ -1080,20 +1238,25 @@ namespace CADability
             }
         }
         /// <summary>
-        /// Wandelt das im Parameter gegebene Objekt in den Typ bool um. Werte vom Typ bool können
-        /// auf zwei Arten in den Settings gespeichert sein: einmal als primitiver bool Typ und einmal als
-        /// Booleanproperty Typ. Letzterer hat noch Informationen, wie er interaktiv durch den
-        /// Anwender in einem ShowProperty Control geändert werden kann. Wenn das gegebene Objekt
-        /// einen anderen Typ hat, dann gibt es eine InvalidCastException.
+        /// Converts the given object into a bool. Values of type bool can be stored in the settings in two ways: as a primitive
+        /// bool and as a <see cref="BooleanProperty"/>, which additionally knows how it can be changed interactively by the user
+        /// in a property grid. If the given object has another type, an InvalidCastException is thrown.
         /// </summary>
-        /// <param name="TheValue">ein Objekt, gewöhnlich aus den Einstellungen</param>
-        /// <returns>der bool Wert des Objektes</returns>
+        /// <param name="TheValue">An object, usually taken from the settings</param>
+        /// <returns>The bool value of the object</returns>
         public static bool GetBoolValue(object TheValue)
         {
             if (TheValue.GetType() == typeof(bool)) return (bool)TheValue;
             if (TheValue.GetType() == typeof(BooleanProperty)) return (bool)(BooleanProperty)TheValue;
             throw new InvalidCastException("Settings.GetBoolValue: type of parameter is invalid");
         }
+        /// <summary>
+        /// Converts an object taken from the settings into an int. An int, an <see cref="IntegerProperty"/> and a
+        /// <see cref="MultipleChoiceSetting"/> (the index of the current selection) are accepted; any other object is cast to
+        /// int, which throws an <see cref="InvalidCastException"/> when that is not possible.
+        /// </summary>
+        /// <param name="TheValue">An object, usually taken from the settings</param>
+        /// <returns>The int value of the object</returns>
         public static int GetIntValue(object TheValue)
         {
             if (TheValue.GetType() == typeof(int)) return (int)TheValue;
@@ -1101,6 +1264,13 @@ namespace CADability
             if (TheValue.GetType() == typeof(MultipleChoiceSetting)) return (TheValue as MultipleChoiceSetting).CurrentSelection;
             else return (int)TheValue; // auf die Gefahr hin, dass der cast nicht geht
         }
+        /// <summary>
+        /// Converts an object taken from the settings into a double. A double and a <see cref="DoubleProperty"/> are
+        /// accepted; any other object is cast to double, which throws an <see cref="InvalidCastException"/> when that is
+        /// not possible.
+        /// </summary>
+        /// <param name="theValue">An object, usually taken from the settings</param>
+        /// <returns>The double value of the object</returns>
         public static double GetDoubleValue(object theValue)
         {
             if (theValue is double value) 
@@ -1109,12 +1279,23 @@ namespace CADability
 	            return property.GetDouble();
             return (double)theValue;
         }
+        /// <summary>
+        /// Returns the sub settings (the group) with the given name, e.g. "Snap" or "Printing" for groups of the global
+        /// settings. Dotted names address nested groups.
+        /// </summary>
+        /// <param name="Name">The name of the group</param>
+        /// <returns>The sub settings, or null if there is no such setting or it is not a Settings object</returns>
         public Settings GetSubSetting(string Name)
         {
             object o = GetValue(Name);
             if (o is Settings settings) return settings;
             return null;
         }
+        /// <summary>
+        /// Whether the settings have been changed since they were loaded or saved. All modifying methods and the changes
+        /// made in the control center set it; writing the settings resets it. The global settings are saved when the frame
+        /// is disposed, regardless of this flag.
+        /// </summary>
         public bool Modified
         {
             get
@@ -1128,6 +1309,10 @@ namespace CADability
             }
         }
         private IShowProperty[] ShowProperties; // die Anzeige wird hier lokal gehalten, um die TabIndizes setzen zu können
+        /// <summary>
+        /// Discards the cached property entries of this settings object and refreshes its display in the control center, if
+        /// it is shown there. Call it after adding or removing settings while the settings are displayed.
+        /// </summary>
         public void RefreshSubentries()
         {
             ShowProperties = null;
@@ -1160,10 +1345,7 @@ namespace CADability
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -1171,10 +1353,7 @@ namespace CADability
                 return SubEntries.Length;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get
@@ -1199,6 +1378,7 @@ namespace CADability
                 return ShowProperties;
             }
         }
+        /// <inheritdoc/>
         public override void Added(IPropertyPage propertyTreeView)
         {
             if (ShowProperties != null)
@@ -1214,6 +1394,7 @@ namespace CADability
             }
             base.Added(propertyTreeView);
         }
+        /// <inheritdoc/>
         public override void Removed(IPropertyPage propertyTreeView)
         {
             if (ShowProperties != null)
@@ -1229,6 +1410,12 @@ namespace CADability
             base.Removed(propertyTreeView);
 
         }
+        /// <summary>
+        /// Releases the global settings: if this object is the <see cref="GlobalSettings"/>, it unsubscribes from the events of
+        /// its values and sets <see cref="GlobalSettings"/> to null, so that they are reloaded from the file on the next
+        /// access. For other settings objects it does nothing. The frame calls it when it is disposed, after saving the
+        /// settings.
+        /// </summary>
         public void Dispose()
         {
             if (GlobalSettings == this)
@@ -1245,6 +1432,7 @@ namespace CADability
                 GlobalSettings = null;
             }
         }
+        /// <inheritdoc/>
         public override string HelpLink
         {
             get
@@ -1288,10 +1476,11 @@ namespace CADability
             deserialized = false;
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("SortedEntries", sortedEntries, sortedEntries.GetType());
@@ -1299,6 +1488,12 @@ namespace CADability
             info.AddValue("Name", myName, typeof(string));
             modified = false;
         }
+        /// <summary>
+        /// Implements <see cref="IJsonSerialize.GetObjectData(IJsonWriteData)"/>: writes the settings as name/value pairs in
+        /// display order (sub settings recursively), the resource id and the name of this settings object. Resets
+        /// <see cref="Modified"/>.
+        /// </summary>
+        /// <param name="data">Receives the data</param>
         public virtual void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("SortedEntries", sortedEntries);
@@ -1307,6 +1502,12 @@ namespace CADability
             modified = false;
         }
 
+        /// <summary>
+        /// Implements <see cref="IJsonSerialize.SetObjectData(IJsonReadData)"/>: reads the data written by
+        /// <see cref="GetObjectData(IJsonWriteData)"/> and registers for <see cref="SerializationDone(JsonSerialize)"/>,
+        /// where the lookup table and the event subscriptions are built.
+        /// </summary>
+        /// <param name="data">The data to read from</param>
         public virtual void SetObjectData(IJsonReadData data)
         {
             sortedEntries = data.GetProperty<ArrayList>("SortedEntries");
@@ -1314,6 +1515,11 @@ namespace CADability
             myName = data.GetProperty<string>("Name");
             data.RegisterForSerializationDoneCallback(this);
         }
+        /// <summary>
+        /// Implements <see cref="IJsonSerializeDone.SerializationDone(JsonSerialize)"/>: called when all objects of the file
+        /// have been read; completes the deserialization (<see cref="OnDeserialization()"/>).
+        /// </summary>
+        /// <param name="jsonSerialize">The serializer</param>
         public virtual void SerializationDone(JsonSerialize jsonSerialize)
         {
             OnDeserialization();
@@ -1321,6 +1527,12 @@ namespace CADability
 
         #endregion
         #region IDeserializationCallback Members
+        /// <summary>
+        /// Completes the deserialization (binary or JSON): builds the lookup table of the settings from the stored ordered
+        /// list (or, for very old files, the list from the table), subscribes to the change events of the values, makes this
+        /// object the owner of the attribute lists it contains and resets <see cref="Modified"/>. Does nothing when called
+        /// a second time.
+        /// </summary>
         protected void OnDeserialization()
         {
             if (deserialized) return;
@@ -1395,6 +1607,12 @@ namespace CADability
 
         #region ISettingChanged Members
 
+        /// <summary>
+        /// Raised when a setting has been added, removed or changed, by the methods of this class or interactively in the
+        /// control center. The handler receives the name of the setting, qualified with the names of the sub settings
+        /// ("mainkey.subkey"), and the new value (null when the setting was removed). CADability itself listens to this
+        /// event of the <see cref="GlobalSettings"/>, e.g. the frame and the views.
+        /// </summary>
         public event CADability.SettingChangedDelegate SettingChangedEvent;
 
         #endregion
@@ -1474,6 +1692,11 @@ namespace CADability
                 }
             }
         }
+        /// <summary>
+        /// The colours (<see cref="CADability.Attribute.ColorList"/>) stored in these settings under the key "ColorList", or null if
+        /// there is none. The global settings contain the default attribute lists, which a new <see cref="Project"/> clones
+        /// as its initial lists.
+        /// </summary>
         public ColorList ColorList
         {
             get
@@ -1481,6 +1704,11 @@ namespace CADability
                 return GetValue("ColorList") as ColorList;
             }
         }
+        /// <summary>
+        /// The layers (<see cref="CADability.Attribute.LayerList"/>) stored in these settings under the key "LayerList", or null if
+        /// there is none. The global settings contain the default attribute lists, which a new <see cref="Project"/> clones
+        /// as its initial lists.
+        /// </summary>
         public LayerList LayerList
         {
             get
@@ -1488,6 +1716,11 @@ namespace CADability
                 return GetValue("LayerList") as LayerList;
             }
         }
+        /// <summary>
+        /// The hatch styles (<see cref="CADability.Attribute.HatchStyleList"/>) stored in these settings under the key "HatchStyleList", or null if
+        /// there is none. The global settings contain the default attribute lists, which a new <see cref="Project"/> clones
+        /// as its initial lists.
+        /// </summary>
         public HatchStyleList HatchStyleList
         {
             get
@@ -1495,6 +1728,11 @@ namespace CADability
                 return GetValue("HatchStyleList") as HatchStyleList;
             }
         }
+        /// <summary>
+        /// The dimension styles (<see cref="CADability.Attribute.DimensionStyleList"/>) stored in these settings under the key "DimensionStyleList", or null if
+        /// there is none. The global settings contain the default attribute lists, which a new <see cref="Project"/> clones
+        /// as its initial lists.
+        /// </summary>
         public DimensionStyleList DimensionStyleList
         {
             get
@@ -1502,6 +1740,11 @@ namespace CADability
                 return GetValue("DimensionStyleList") as DimensionStyleList;
             }
         }
+        /// <summary>
+        /// The line widths (<see cref="CADability.Attribute.LineWidthList"/>) stored in these settings under the key "LineWidthList", or null if
+        /// there is none. The global settings contain the default attribute lists, which a new <see cref="Project"/> clones
+        /// as its initial lists.
+        /// </summary>
         public LineWidthList LineWidthList
         {
             get
@@ -1509,6 +1752,11 @@ namespace CADability
                 return GetValue("LineWidthList") as LineWidthList;
             }
         }
+        /// <summary>
+        /// The line patterns (<see cref="CADability.Attribute.LinePatternList"/>) stored in these settings under the key "LinePatternList", or null if
+        /// there is none. The global settings contain the default attribute lists, which a new <see cref="Project"/> clones
+        /// as its initial lists.
+        /// </summary>
         public LinePatternList LinePatternList
         {
             get
@@ -1516,6 +1764,11 @@ namespace CADability
                 return GetValue("LinePatternList") as LinePatternList;
             }
         }
+        /// <summary>
+        /// The styles (<see cref="CADability.Attribute.StyleList"/>) stored in these settings under the key "StyleList", or null if
+        /// there is none. The global settings contain the default attribute lists, which a new <see cref="Project"/> clones
+        /// as its initial lists.
+        /// </summary>
         public StyleList StyleList
         {
             get

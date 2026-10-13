@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -70,6 +70,13 @@ namespace CADability.DXF
         /// </summary>
         private List<(Attribute.DimensionStyle pristine, Attribute.DimensionStyle used)> importedDimensionStyles;
 
+        /// <summary>
+        /// Reads the DXF file <paramref name="fileName"/> with ACadSharp. The file is read into memory first; when its OBJECTS
+        /// section, which holds no geometry, is malformed, the file is read again without that section. Nothing is converted yet:
+        /// get <see cref="Project"/> to convert the drawing. Reading errors propagate as the exceptions of ACadSharp. DWG files are
+        /// read by <see cref="CADability.Project.ReadFromFile(string, string)"/> with the format "dwg".
+        /// </summary>
+        /// <param name="fileName">path of the DXF file</param>
         public Import(string fileName)
             : this(fileName, null)
         {
@@ -409,6 +416,12 @@ namespace CADability.DXF
             model.Name = "*Paper_Space";
         }
 
+        /// <summary>
+        /// Converts the drawing into a new <see cref="CADability.Project"/> and returns it. The model space becomes the first
+        /// model of the project; a non-empty paper space is added as a second model named "*Paper_Space" (and shown instead when
+        /// the model space is empty). Layers and the other table entries become attributes of the project. Each access converts
+        /// the drawing again, so keep the result. Returns null when no document was read.
+        /// </summary>
         public Project Project { get => CreateProject(); }
 
         private Project CreateProject()
@@ -767,13 +780,29 @@ namespace CADability.DXF
                 foreach (var record in kvp.Value.Records)
                 {
                     XDataCode code = (XDataCode)(int)record.Code;
-                    object value = record.RawValue;
-                    xdata.Data.Add(new KeyValuePair<XDataCode, object>(code, value));
+                    xdata.Data.Add(new KeyValuePair<XDataCode, object>(code, XDataValue(record)));
                 }
                 go.UserData.Add(entryName, xdata);
             }
+        }
 
-
+        /// <summary>
+        /// The value of an XData record as <see cref="ExtendedEntityData"/> keeps it: ACadSharp's raw value, except that
+        /// a point (1010, 1011) becomes a <see cref="GeoPoint"/>, a displacement or direction (1012, 1013) a
+        /// <see cref="GeoVector"/> and a layer reference (1003) the name of the layer. So no type of ACadSharp reaches
+        /// the public data, and the values survive a cdb file, which could not write ACadSharp's point (#373).
+        /// </summary>
+        private object XDataValue(ACadSharp.XData.ExtendedDataRecord record)
+        {
+            switch (record)
+            {
+                case ACadSharp.XData.ExtendedDataCoordinate c: return GeoPoint(c.Value);
+                case ACadSharp.XData.ExtendedDataWorldCoordinate w: return GeoPoint(w.Value);
+                case ACadSharp.XData.ExtendedDataDisplacement d: return GeoVector(d.Value);
+                case ACadSharp.XData.ExtendedDataDirection d: return GeoVector(d.Value);
+                case ACadSharp.XData.ExtendedDataLayer l: return l.ResolveReference(doc)?.Name ?? (object)l.Value;
+                default: return record.RawValue;
+            }
         }
 
         /// <summary>

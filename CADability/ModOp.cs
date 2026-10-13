@@ -42,9 +42,9 @@ namespace CADability
     }
 
     /// <summary>
-    /// Ein "Objekt-Wrapper" um die ModOp. Manchmal ist es sinnvoll in Klassen eine
-    /// ModOp zu halten, die ggf. noch nicht berechnet, also null ist. Hierzu dient diese
-    /// interne Klasse.
+    /// A reference type wrapper around the value type <see cref="ModOp"/>. It is used where a class needs to hold a
+    /// ModOp that may not have been computed yet, so that the field can be null (e.g. the cached transformations of a
+    /// <see cref="CoordSys"/>).
     /// </summary>
     internal class ModOpRef
     {
@@ -124,6 +124,13 @@ namespace CADability
             this.Matrix11 = v2.y;
             this.Matrix12 = loc.y;
         }
+        /// <summary>
+        /// Creates a modification from an array of coefficients. A 2*2 array is taken as the linear part (rotation, scaling,
+        /// shearing) without translation; an array with at least 2 rows and 3 columns is taken as the full 2*3 homogeneous
+        /// matrix, where the first index is the row, the second the column and the third column holds the translation.
+        /// Any other shape yields the <see cref="Null"/> modification.
+        /// </summary>
+        /// <param name="m">the coefficients as [row, column]</param>
         public ModOp2D(double[,] m)
         {
             if (m.GetLength(0) == 2 && m.GetLength(1) == 2)
@@ -202,6 +209,14 @@ namespace CADability
                     Matrix10 == 0.0;
             }
         }
+        /// <summary>
+        /// Checks whether this modification is the identity within a tolerance: the origin and the points (1,0) and (0,1)
+        /// are transformed and none of them may move farther than <paramref name="precision"/>. In contrast to
+        /// <see cref="IsIdentity"/> this tolerates rounding errors, e.g. in a modification computed as the product of a
+        /// transformation and its inverse.
+        /// </summary>
+        /// <param name="precision">maximum distance the test points may move</param>
+        /// <returns>true, if the modification moves none of the test points farther than <paramref name="precision"/></returns>
         public bool IsAlmostIdentity(double precision)
         {
             if ((GeoPoint2D.Origin | this * GeoPoint2D.Origin) > precision) return false;
@@ -209,6 +224,13 @@ namespace CADability
             if ((new GeoPoint2D(0, 1) | this * new GeoPoint2D(0, 1)) > precision) return false;
             return true;
         }
+        /// <summary>
+        /// True, if this modification preserves angles, i.e. it is composed of translation, rotation, uniform scaling and
+        /// possibly a reflection (a reflection is included when the <see cref="Determinant"/> is negative). The images of the
+        /// x- and y-axis must be perpendicular and of equal length within the angular precision <see cref="Precision.epsa"/>.
+        /// 2d curves like <see cref="Curve2D.Circle2D"/> use it to decide whether they stay circles under the modification
+        /// or must become ellipses.
+        /// </summary>
         public bool IsIsogonal
         {
             get
@@ -257,6 +279,10 @@ namespace CADability
                 return res;
             }
         }
+        /// <summary>
+        /// True, if all coefficients are zero, i.e. this is the <see cref="Null"/> modification. Used to test whether a
+        /// ModOp2D has been initialized at all, because a zero matrix does not occur as a real modification.
+        /// </summary>
         public bool IsNull
         {
             get
@@ -292,12 +318,6 @@ namespace CADability
             return res;
         }
         /// <summary>
-        /// Creates a rotation about a fixpoint
-        /// </summary>
-        /// <param name="Center">the fixpoint</param>
-        /// <param name="Rotation">the rotation angle</param>
-        /// <returns>resulting modification</returns>
-        /// <summary>
         /// The reflection about the line through <paramref name="axisPoint"/> with the direction
         /// <paramref name="axisDirection"/>. Points on that line stay where they are.
         /// </summary>
@@ -319,6 +339,12 @@ namespace CADability
             res.Matrix12 = axisPoint.y - (res.Matrix10 * axisPoint.x + res.Matrix11 * axisPoint.y);
             return res;
         }
+        /// <summary>
+        /// Creates a rotation about a fixpoint
+        /// </summary>
+        /// <param name="Center">the fixpoint</param>
+        /// <param name="Rotation">the rotation angle</param>
+        /// <returns>resulting modification</returns>
         public static ModOp2D Rotate(GeoPoint2D Center, SweepAngle Rotation)
         {
             ModOp2D res;
@@ -346,6 +372,11 @@ namespace CADability
             res.Matrix12 = 0.0;
             return res;
         }
+        /// <summary>
+        /// Creates a uniform scaling about the origin.
+        /// </summary>
+        /// <param name="factor">scaling factor for both axes</param>
+        /// <returns>resulting modification</returns>
         public static ModOp2D Scale(double factor)
         {
             ModOp2D res;
@@ -357,6 +388,13 @@ namespace CADability
             res.Matrix12 = 0.0;
             return res;
         }
+        /// <summary>
+        /// Creates a scaling about the origin with different factors in x and y. Unless both factors have the same absolute
+        /// value the result is not isogonal (see <see cref="IsIsogonal"/>), i.e. circles become ellipses.
+        /// </summary>
+        /// <param name="factorx">scaling factor in x-direction</param>
+        /// <param name="factory">scaling factor in y-direction</param>
+        /// <returns>resulting modification</returns>
         public static ModOp2D Scale(double factorx, double factory)
         {
             ModOp2D res;
@@ -368,10 +406,25 @@ namespace CADability
             res.Matrix12 = 0.0;
             return res;
         }
+        /// <summary>
+        /// Creates a uniform scaling about the given fixpoint: <paramref name="center"/> stays where it is, all other points
+        /// move away from it (factor &gt; 1) or towards it (factor &lt; 1).
+        /// </summary>
+        /// <param name="center">the fixpoint of the scaling</param>
+        /// <param name="factor">scaling factor for both axes</param>
+        /// <returns>resulting modification</returns>
         public static ModOp2D Scale(GeoPoint2D center, double factor)
         {
             return ModOp2D.Translate(center.x, center.y) * ModOp2D.Scale(factor) * ModOp2D.Translate(-center.x, -center.y);
         }
+        /// <summary>
+        /// Creates a scaling about the given fixpoint with different factors in x and y. <paramref name="center"/> stays
+        /// where it is.
+        /// </summary>
+        /// <param name="center">the fixpoint of the scaling</param>
+        /// <param name="factorx">scaling factor in x-direction</param>
+        /// <param name="factory">scaling factor in y-direction</param>
+        /// <returns>resulting modification</returns>
         public static ModOp2D Scale(GeoPoint2D center, double factorx, double factory)
         {
             return ModOp2D.Translate(center.x, center.y) * ModOp2D.Scale(factorx, factory) * ModOp2D.Translate(-center.x, -center.y);
@@ -596,6 +649,10 @@ namespace CADability
             double[,] mat = m.Matrix;
             return new ModOp2D(mat[0, 0], mat[0, 1], mat[0, 3], mat[1, 0], mat[1, 1], mat[1, 3]);
         }
+        /// <summary>
+        /// Converts this modification to a GDI+ <see cref="System.Drawing.Drawing2D.Matrix"/> with the same coefficients
+        /// (in single precision), e.g. to apply it when drawing with GDI+.
+        /// </summary>
         /// <value>
         /// Returns the <see cref="System.Drawing.Drawing2D.Matrix"/> object equivalent to this
         /// modification.
@@ -607,6 +664,11 @@ namespace CADability
                 return new System.Drawing.Drawing2D.Matrix((float)Matrix00, (float)Matrix10, (float)Matrix01, (float)Matrix11, (float)Matrix02, (float)Matrix12);
             }
         }
+        /// <summary>
+        /// Returns the 3-dimensional modification that performs this 2-dimensional modification in the xy-plane and leaves
+        /// the z-coordinate unchanged. The counterpart of <see cref="ModOp.To2D"/>.
+        /// </summary>
+        /// <returns>the corresponding <see cref="ModOp"/></returns>
         public ModOp To3D()
         {
             return new ModOp(Matrix00, Matrix01, 0.0, Matrix02, Matrix10, Matrix11, 0.0, Matrix12, 0.0, 0.0, 1.0, 0.0);
@@ -631,6 +693,13 @@ namespace CADability
                     throw (new ModOpException(ModOpException.tExceptionType.InvalidParameter));
             }
         }
+        /// <summary>
+        /// Gets or sets a single coefficient of the 2*3 matrix: <paramref name="i"/> is the row (0 or 1), <paramref name="j"/>
+        /// the column (0 to 2), column 2 being the translation. Indices outside the matrix throw a <see cref="ModOpException"/>.
+        /// </summary>
+        /// <param name="i">row index</param>
+        /// <param name="j">column index</param>
+        /// <returns>the coefficient</returns>
         public double this[int i, int j]
         {
             get
@@ -715,7 +784,17 @@ namespace CADability
     [Serializable()]
     public struct Matrix4 : ISerializable
     {
+        /// <summary>
+        /// The 4*4 homogeneous matrix (MathNet dense matrix). It is null for a default constructed Matrix4, which counts as
+        /// invalid (see <see cref="IsValid"/>); multiplying a point or vector with an invalid Matrix4 returns it unchanged.
+        /// Exposed for direct access, the usual way is to use the operators and <see cref="Matrix"/>.
+        /// </summary>
         public Matrix<double> hm;
+        /// <summary>
+        /// Creates a Matrix4 as a copy of the given 4*4 matrix. Null yields the identity matrix. Throws an
+        /// <see cref="ApplicationException"/> when the matrix does not have 4 rows and 4 columns.
+        /// </summary>
+        /// <param name="hm">the 4*4 matrix to copy, or null for the identity</param>
         public Matrix4(Matrix<double> hm)
         {
             if (hm == null)
@@ -728,13 +807,22 @@ namespace CADability
                 this.hm = (Matrix)hm.Clone();
             }
         }
+        /// <summary>
+        /// Creates a Matrix4 from an array of coefficients, which must be 4*4 ([row, column]).
+        /// </summary>
+        /// <param name="m">the coefficients</param>
         public Matrix4(double[,] m)
         {
             hm = DenseMatrix.OfArray(m);
         }
+        /// <summary>
+        /// Creates a Matrix4 from an affine modification: the 3*4 coefficients of <see cref="ModOp.Matrix"/> completed
+        /// by the row (0,0,0,1), as <see cref="ModOp.ToMatrix"/> returns them.
+        /// </summary>
+        /// <param name="m">the modification</param>
         public Matrix4(ModOp m)
         {
-            this.hm = DenseMatrix.OfArray(m.Matrix); // new Matrix(m);
+            this.hm = m.ToMatrix();
         }
         /// <summary>
         /// Modifies the given point by this modification.
@@ -751,6 +839,13 @@ namespace CADability
             double z = (m.hm[2, 0] * p.x + m.hm[2, 1] * p.y + m.hm[2, 2] * p.z + m.hm[2, 3]) / d;
             return new GeoPoint(x, y, z);
         }
+        /// <summary>
+        /// Transforms the given vector by this matrix: the translation (fourth column) is ignored, the perspective division
+        /// by the resulting homogeneous coordinate is applied. An invalid matrix returns the vector unchanged.
+        /// </summary>
+        /// <param name="m">the matrix</param>
+        /// <param name="v">the vector</param>
+        /// <returns>the transformed vector</returns>
         public static GeoVector operator *(Matrix4 m, GeoVector v)
         {
             if (m.hm == null) return v; // so you don't need to check
@@ -760,22 +855,42 @@ namespace CADability
             double z = (m.hm[2, 0] * v.x + m.hm[2, 1] * v.y + m.hm[2, 2] * v.z) / d;
             return new GeoVector(x, y, z);
         }
+        /// <summary>
+        /// Combines two matrices into one by the ordinary matrix product: the result applies <paramref name="r"/> first
+        /// and <paramref name="l"/> afterwards. Both matrices must be valid.
+        /// </summary>
+        /// <param name="l">the left factor, applied second</param>
+        /// <param name="r">the right factor, applied first</param>
+        /// <returns>the product</returns>
         public static Matrix4 operator *(Matrix4 l, Matrix4 r)
         {
             if (l.hm == null || r.hm == null) return new Matrix4((double[,])null);
             Matrix4 res = new Matrix4((Matrix)(l.hm * r.hm));
             return res;
         }
+        /// <summary>
+        /// Returns the inverse of this matrix, e.g. to transform screen coordinates back into the model (see
+        /// <see cref="Projection"/>). The matrix must be valid and regular (<see cref="Determinant"/> not zero).
+        /// </summary>
+        /// <returns>the inverse matrix</returns>
         public Matrix4 GetInverse()
         {
             Matrix<double> inv = hm.Inverse();
             if (inv != null) return new Matrix4(inv);
             else return new Matrix4((double[,])null);
         }
+        /// <summary>
+        /// Returns the coefficients of the matrix as a 4*4 array ([row, column]).
+        /// </summary>
+        /// <param name="m">the matrix</param>
+        /// <returns>the coefficients</returns>
         public static explicit operator double[,](Matrix4 m)
         {
             return m.hm.ToArray();
         }
+        /// <summary>
+        /// The underlying 4*4 matrix as a MathNet dense matrix, e.g. to combine it with other matrices.
+        /// </summary>
         public Matrix Matrix
         {
             get
@@ -797,6 +912,9 @@ namespace CADability
             info.AddValue("Matrix", (double[,])hm.ToArray());
         }
         #endregion
+        /// <summary>
+        /// The determinant of the 4*4 matrix. It is zero when the matrix is singular and cannot be inverted.
+        /// </summary>
         public double Determinant
         {
             get
@@ -804,6 +922,9 @@ namespace CADability
                 return hm.Determinant();
             }
         }
+        /// <summary>
+        /// True, if this Matrix4 holds a matrix. A default constructed Matrix4 holds none and is invalid.
+        /// </summary>
         public bool IsValid
         {
             get
@@ -818,16 +939,15 @@ namespace CADability
     /// You can apply such a modification to <see cref="GeoPoint"/>s or <see cref="GeoVector"/>s
     /// or you can use it for GeoObjects <see cref="GeoObject.IGeoObject.Modify"/>.
     /// If you want to move, rotate, scale reflect or generally modify a GeoObject you will need this class.
-    /// Use the static methods to create ModOps that do a required modification (like <see cref="Rotate"/>, <see cref="Translate"/> etc.
+    /// Use the static methods to create ModOps that do a required modification (like <see cref="Rotate(GeoVector, SweepAngle)"/>, <see cref="Translate(GeoVector)"/> etc.
     /// </summary>
     [Serializable()]
     [JsonVersion(serializeAsStruct = true, version = 1)]
     public struct ModOp : ISerializable, IJsonSerialize
     {
         /// <summary>
-        /// Die homogene Matrix, die die Modifikationsoperation darstellt.
-        /// Sie hat drei Zeilen und vier Spalten. Die vierte Zeile hätte immer
-        /// den Wert (0,0,0,1) und wird nicht in den Daten dargestellt.
+        /// The homogeneous matrix that represents the modification. It has three rows and four columns (the first
+        /// index is the row, the second the column); the fourth row would always be (0,0,0,1) and is not stored.
         /// </summary>
         private double Matrix00, Matrix01, Matrix02, Matrix03, Matrix10, Matrix11, Matrix12, Matrix13, Matrix20, Matrix21, Matrix22, Matrix23;
         private double ScalingFactor;
@@ -928,6 +1048,11 @@ namespace CADability
             }
         }
 
+        /// <summary>
+        /// Returns this modification as a 4*4 MathNet matrix: the 3*4 matrix of the modification completed by the row
+        /// (0,0,0,1). Used to combine the modification with a perspective matrix (see <see cref="Matrix4"/>).
+        /// </summary>
+        /// <returns>the 4*4 matrix</returns>
         public Matrix ToMatrix()
         {
             double[,] A = new double[4, 4];
@@ -991,6 +1116,13 @@ namespace CADability
             ScalingFactor = m00;
             mode = ModificationMode.Other;
         }
+        /// <summary>
+        /// Creates a modification from an array of coefficients. A 3*3 array is taken as the linear part (rotation, scaling,
+        /// shearing) without translation; an array with at least 3 rows and 4 columns is taken as the full 3*4 homogeneous
+        /// matrix, where the first index is the row, the second the column and the fourth column holds the translation.
+        /// Any other shape yields the identity.
+        /// </summary>
+        /// <param name="m">the coefficients as [row, column]</param>
         public ModOp(double[,] m)
         {
             if (m.GetLength(0) == 3 && m.GetLength(1) == 3)
@@ -1037,6 +1169,12 @@ namespace CADability
                 mode = ModificationMode.Identity;
             }
         }
+        /// <summary>
+        /// Creates a modification from an array of coefficients (see <see cref="ModOp(double[,])"/>) and a translation.
+        /// The translation replaces a fourth column of <paramref name="m"/> if there is one.
+        /// </summary>
+        /// <param name="m">the coefficients of the linear part as [row, column]</param>
+        /// <param name="trans">the translation</param>
         public ModOp(double[,] m, GeoVector trans) : this(m)
         {
             Matrix03 = trans.x;
@@ -1092,7 +1230,7 @@ namespace CADability
         /// <summary>
         /// Modifies the given 3 dimensional vector and returns the 2d vector, omitting the z-coordinate
         /// </summary>
-        /// <param name="p">the vector to project</param>
+        /// <param name="v">the vector to project</param>
         /// <returns>the resulting vector</returns>
         internal GeoVector2D Project(GeoVector v)
         {
@@ -1203,6 +1341,15 @@ namespace CADability
             //double ay = Math.Atan2(Axis.z, Math.Sqrt(sqr(Axis.y) + sqr(Axis.x))); // rotate by -ay to end up as x-axis
             //return ModOp.Rotate(2, az) * ModOp.Rotate(1, -ay) * ModOp.Rotate(0, Rotation) * ModOp.Rotate(1, ay) * ModOp.Rotate(2, -az);
         }
+        /// <summary>
+        /// Creates a rotation about an axis through the origin, with the rotation angle given by its sine and cosine
+        /// instead of the angle itself (see <see cref="Rotate(GeoVector, SweepAngle)"/>). Convenient when sine and cosine
+        /// are already known, e.g. from a cross and a dot product of two vectors.
+        /// </summary>
+        /// <param name="Axis">direction of the axis, need not be normalized</param>
+        /// <param name="sin">sine of the rotation angle</param>
+        /// <param name="cos">cosine of the rotation angle</param>
+        /// <returns>the resulting modification</returns>
         public static ModOp Rotate(GeoVector Axis, double sin, double cos)
         {
             // siehe http://mathworld.wolfram.com/RodriguesRotationFormula.html
@@ -1229,7 +1376,7 @@ namespace CADability
         /// <summary>
         /// Creates a rotation around the fixpoint that moves the vector <paramref name="from"/> to the vector <paramref name="to"/>.
         /// </summary>
-        /// <param name="FixPoint">Fixpoint for the rotation</param>
+        /// <param name="fixPoint">Fixpoint for the rotation</param>
         /// <param name="from">Source vector</param>
         /// <param name="to">Destination vector</param>
         /// <returns>The modification that performs the rotation</returns>
@@ -1357,7 +1504,7 @@ namespace CADability
         /// <summary>
         /// Constructs a ModOp, that performs a reflection about the given point
         /// </summary>
-        /// <param name="pln">point for reflection</param>
+        /// <param name="center">point for reflection</param>
         /// <returns>resulting transformation</returns>
         public static ModOp ReflectPoint(GeoPoint center)
         {
@@ -1691,6 +1838,19 @@ namespace CADability
             }
             throw new NotImplementedException();
         }
+        /// <summary>
+        /// Constructs the modification that maps the coordinate system given by the origin <paramref name="srcLoc"/> and the
+        /// three axis vectors <paramref name="src"/> onto the coordinate system given by <paramref name="dstLoc"/> and
+        /// <paramref name="dst"/>: <paramref name="srcLoc"/> goes to <paramref name="dstLoc"/> and each vector of
+        /// <paramref name="src"/> to the corresponding vector of <paramref name="dst"/>. The result is in general an affine
+        /// transformation (it may contain scaling and shearing). Both arrays must contain exactly three vectors and the
+        /// source vectors must be linearly independent, otherwise a <see cref="ModOpException"/> is thrown.
+        /// </summary>
+        /// <param name="srcLoc">origin of the source system</param>
+        /// <param name="src">the three axis vectors of the source system</param>
+        /// <param name="dstLoc">origin of the destination system</param>
+        /// <param name="dst">the three axis vectors of the destination system</param>
+        /// <returns>the resulting modification</returns>
         public static ModOp Fit(GeoPoint srcLoc, GeoVector[] src, GeoPoint dstLoc, GeoVector[] dst)
         {
             return Translate(dstLoc - GeoPoint.Origin) * Fit(src, dst) * Translate(GeoPoint.Origin - srcLoc);
@@ -1905,6 +2065,10 @@ namespace CADability
                 return true;
             }
         }
+        /// <summary>
+        /// True, if none of the coefficients is NaN. A ModOp becomes invalid when it was computed from degenerated input,
+        /// e.g. a fit through coincident points.
+        /// </summary>
         public bool IsValid
         {
             get
@@ -1936,6 +2100,12 @@ namespace CADability
                 Matrix23 = value.z;
             }
         }
+        /// <summary>
+        /// Returns the 2-dimensional modification that this modification performs in the xy-plane: the x- and y-rows of
+        /// the matrix including their translation, the z-coordinate is ignored. Only meaningful for modifications that map
+        /// the xy-plane onto itself. The counterpart of <see cref="ModOp2D.To3D"/>.
+        /// </summary>
+        /// <returns>the corresponding <see cref="ModOp2D"/></returns>
         public ModOp2D To2D()
         {
             return new ModOp2D(Matrix00, Matrix01, Matrix03, Matrix10, Matrix11, Matrix13);
@@ -2034,6 +2204,14 @@ namespace CADability
         {
             return m.ScalingFactor * d;
         }
+        /// <summary>
+        /// Returns the plane transformed by the modification. Location and direction vectors of the plane are transformed
+        /// and the coordinate system of the result is orthonormalized again (see <see cref="Plane.Modify(ModOp)"/>). The
+        /// given plane is not changed.
+        /// </summary>
+        /// <param name="m">modification</param>
+        /// <param name="pln">plane</param>
+        /// <returns>modified plane</returns>
         public static Plane operator *(ModOp m, Plane pln)
         {
             Plane res = new Plane(pln);
@@ -2081,6 +2259,11 @@ namespace CADability
             info.AddValue("ScalingFactor", ScalingFactor, typeof(double));
             info.AddValue("Mode", mode, typeof(ModificationMode));
         }
+        /// <summary>
+        /// Constructor required by JSON deserialization. Reads the values written by
+        /// <see cref="GetObjectData(IJsonWriteData)"/>.
+        /// </summary>
+        /// <param name="data">the stored values</param>
         public ModOp(IJsonReadStruct data)
         {
             Matrix00 = data.GetValue<double>();
@@ -2099,11 +2282,21 @@ namespace CADability
             mode = data.GetValue<ModificationMode>();
         }
 
+        /// <summary>
+        /// Implements <see cref="IJsonSerialize.GetObjectData(IJsonWriteData)"/>: writes the twelve matrix coefficients,
+        /// the scaling factor and the mode as a list of values.
+        /// </summary>
+        /// <param name="data">the JSON writer</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddValues(Matrix00, Matrix01, Matrix02, Matrix03, Matrix10, Matrix11, Matrix12, Matrix13, Matrix20, Matrix21, Matrix22, Matrix23, ScalingFactor, mode);
         }
 
+        /// <summary>
+        /// Implements <see cref="IJsonSerialize.SetObjectData(IJsonReadData)"/>. Does nothing, because a ModOp is serialized
+        /// as a struct and read back by the <see cref="ModOp(IJsonReadStruct)"/> constructor.
+        /// </summary>
+        /// <param name="data">not used</param>
         public void SetObjectData(IJsonReadData data)
         {
         }
@@ -2142,6 +2335,15 @@ namespace CADability
         //    }
         //}
 
+        /// <summary>
+        /// Gets or sets a single coefficient of the 3*4 matrix: <paramref name="i"/> is the row (0 to 2), <paramref name="j"/>
+        /// the column (0 to 3), column 3 being the translation. Indices outside the matrix throw a <see cref="ModOpException"/>.
+        /// Setting a coefficient does not update the internally cached kind of the modification or its scaling factor, so
+        /// prefer the static construction methods or <see cref="ModOp(double[,])"/> to build a modification.
+        /// </summary>
+        /// <param name="i">row index</param>
+        /// <param name="j">column index</param>
+        /// <returns>the coefficient</returns>
         public double this[int i, int j]
         {
             get

@@ -6,7 +6,12 @@ using System;
 namespace CADability.Actions
 {
 	/// <summary>
-	/// 
+	/// Tool which "channels" a corner: the corner formed by two curves is replaced by a concave circular arc with the given radius
+	/// whose center is the (possibly extrapolated) intersection point of the curves. The user picks the first curve (if it is a
+	/// path or a polyline, the corner next to the pick position is used and no second object is needed), otherwise a second curve,
+	/// and enters the radius; the arc runs between the intersections of the circle around the corner with the two curves, and the
+	/// curves are trimmed to the ends of the arc. The counterpart <see cref="ToolsRoundOff"/> rounds a corner with a tangential
+	/// arc (fillet). Started with the menu id "ToolsRoundIn".
 	/// </summary>
 	internal class ToolsRoundIn : ConstructAction
 	{
@@ -390,9 +395,7 @@ namespace CADability.Actions
 		//		}
 
 
-		/// <summary>
-		/// Overrides <see cref="CADability.Actions.ConstructAction.OnSetAction ()"/>
-		/// </summary>
+		/// <inheritdoc/>
 		public override void OnSetAction()
 		{
 			base.ActiveObject = null;
@@ -422,26 +425,19 @@ namespace CADability.Actions
 			base.ShowActiveObject = false;
 			base.OnSetAction();
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.Actions.ConstructAction.OnRemoveAction ()"/>
-		/// </summary>
+		/// <inheritdoc/>
 		public override void OnRemoveAction()
 		{
 			base.OnRemoveAction();
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.Actions.Action.GetID ()"/>
-		/// </summary>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override string GetID()
 		{
 			return "ToolsRoundIn";
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.Actions.ConstructAction.OnDone ()"/>
-		/// </summary>
+		/// <inheritdoc/>
 		public override void OnDone()
 		{
 			if (base.ActiveObject != null)

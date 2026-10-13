@@ -254,6 +254,8 @@ namespace CADability.DXF
                 for (int i = 0; i < entities.Length; i++)
                 {
                     entities[i].IsInvisible = !geoObject.IsVisible;
+                    // each DIMENSION of a chain, or the INSERT of its picture, stands for the whole dimension
+                    if (geoObject is GeoObject.Dimension) SetUserData(entities[i], geoObject);
                     if (geoObject.Layer == null) continue;
                     entities[i].Layer = GetOrCreateLayer(geoObject.Layer);
                 }
@@ -860,7 +862,11 @@ namespace CADability.DXF
         /// </summary>
         private Entity[] ExportDimension(GeoObject.Dimension dim)
         {
-            if (dim.DimensionStyle == null) return null;
+            if (dim.DimensionStyle == null)
+            {   // CADability cannot draw it either
+                System.Diagnostics.Trace.WriteLine("dxf: dimension without a dimension style not exported");
+                return null;
+            }
             List<Entity> result = new List<Entity>();
             if (dimensionsAsDimension)
             {

@@ -727,6 +727,32 @@ Dimensions
         }
 
         /// <summary>
+        /// The XData of a dimension is written to what stands for it in the file, the INSERT of its
+        /// picture or each DIMENSION of a chain (#416, finding 7). The export set only the layer and
+        /// the visibility of these entities, because a dimension may become several.
+        /// </summary>
+        [TestMethod]
+        public void export_dimension_writes_its_xdata()
+        {
+            Project project = MakeProjectWithDimension(new GeoPoint(0, 0, 0), new GeoPoint(40, 0, 0), new GeoPoint(100, 0, 0));
+            Dimension dim = (Dimension)project.GetActiveModel()[0];
+            CADability.DXF.ExtendedEntityData xData = new CADability.DXF.ExtendedEntityData { ApplicationName = "DIMTEST" };
+            xData.Data.Add(new System.Collections.Generic.KeyValuePair<CADability.DXF.XDataCode, object>(CADability.DXF.XDataCode.String, "measured"));
+            dim.UserData.Add("DIMTEST", xData);
+
+            foreach (int selection in new[] { 0, 1 }) // "As Block", "As Dimension" (a chain of two DIMENSIONs)
+            {
+                ACadSharp.CadDocument doc = WithChoice("DxfDwg.ExportDimension", selection, () => ExportAndRead(project));
+                ACadSharp.Entities.Entity[] written = selection == 0
+                    ? doc.Entities.OfType<ACadSharp.Entities.Insert>().ToArray()
+                    : doc.Entities.OfType<ACadSharp.Entities.Dimension>().ToArray();
+                Assert.AreEqual(selection == 0 ? 1 : 2, written.Length, "selection " + selection);
+                foreach (ACadSharp.Entities.Entity e in written)
+                    Assert.IsTrue(e.ExtendedData.Any(kv => kv.Key.Name == "DIMTEST"), "selection " + selection + ": the XData");
+            }
+        }
+
+        /// <summary>
         /// The full round trip: what is written is read back as a dimension, with its measured
         /// value intact. The picture contains the measurement text, which needs GDI.
         /// </summary>

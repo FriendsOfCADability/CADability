@@ -123,19 +123,38 @@ namespace CADability
         void RegisterForSerializationDoneCallback(IJsonSerializeDone toCall);
     }
     /// <summary>
-    /// Interface to feedback the reading/writing progress.
+    /// Receives the progress of <see cref="JsonSerialize.FromStream(Stream, IJsonProgress)"/> and
+    /// <see cref="JsonSerialize.ToStream(Stream, object, IJsonProgress, bool)"/>. The progress runs from 0 to 100 percent in
+    /// phases: each phase sets the size of its steps with <see cref="SetStepIncrement"/> and then reports the steps it has
+    /// done with <see cref="DoStep"/>. Reading parses the text (15 percent, a step per character), calls
+    /// OnDeserialization (5 percent) and SerializationDone (80 percent); writing does a step per <see cref="IGeoObject"/>,
+    /// so the caller sets the step size before writing.
     /// </summary>
     public interface IJsonProgress
     {
+        /// <summary>
+        /// Starts a new phase at the current position, in which each step advances the progress by
+        /// <paramref name="increment"/> percent.
+        /// </summary>
+        /// <param name="increment">percent per step</param>
         void SetStepIncrement(double increment);
+        /// <summary>
+        /// Reports that <paramref name="doneSteps"/> more steps of the current phase are done.
+        /// </summary>
+        /// <param name="doneSteps">number of steps done since the last call</param>
         void DoStep(int doneSteps = 1);
+        /// <summary>
+        /// Reading or writing is finished; a progress display can be hidden. <see cref="JsonSerialize"/> does not call it,
+        /// the caller does.
+        /// </summary>
         void SetCompleted();
     }
     /// <summary>
     /// CADability's own JSON serializer, which writes and reads graphs of <see cref="IJsonSerialize"/> objects (a <see cref="Project"/>
-    /// with all its models, objects and attributes) to and from a stream: <see cref="ToStream"/> writes, <see cref="FromStream"/>
-    /// reads. Each object is written once and referenced afterwards, so shared objects and cycles are preserved; types are stored by
-    /// name and resolved when reading, where the <see cref="ResolveType"/> event lets an application map renamed types.
+    /// with all its models, objects and attributes) to and from a stream: <see cref="ToStream(Stream, object, bool)"/> writes,
+    /// <see cref="FromStream(Stream)"/> reads. Each object is written once and referenced afterwards, so shared objects and
+    /// cycles are preserved; types are stored by name and resolved when reading, where the <see cref="ResolveType"/> event lets
+    /// an application map renamed types.
     /// <see cref="Project.ReadFromFile(string)"/> and <see cref="Project.WriteToFile"/> use it for the ".cdb" project files.
     /// </summary>
     public class JsonSerialize : IJsonWriteData
@@ -222,6 +241,7 @@ namespace CADability
                         {   // return string in quotes
                             int ind = currentline.IndexOf('"', actind + 1);
                             while (ind >= 0 && ind < currentline.Length - 1 && currentline[ind - 1] == '\\') ind = currentline.IndexOf('"', ind + 1); // skip \" in a string
+                            if (ind < 0) return etoken.eof; // the file ends inside the string
                             start = actind + 1;
                             length = ind - start + 1 - 1;
                             line = currentline;
@@ -736,6 +756,13 @@ namespace CADability
         {
             return FromStream(stream, null);
         }
+        /// <summary>
+        /// Reads the objects from <paramref name="stream"/> like <see cref="FromStream(Stream)"/> and reports the progress to
+        /// <paramref name="progress"/>.
+        /// </summary>
+        /// <param name="stream">the stream to read</param>
+        /// <param name="progress">receives the progress, may be null</param>
+        /// <returns>the first object of the stream</returns>
         public object FromStream(Stream stream, IJsonProgress progress)
         {
             this.progress = progress;
@@ -1167,6 +1194,15 @@ namespace CADability
         {
             return ToStream(stream, toSerialize, null, closeStream);
         }
+        /// <summary>
+        /// Writes <paramref name="toSerialize"/> and all objects it refers to like <see cref="ToStream(Stream, object, bool)"/>
+        /// and does a step of <paramref name="progress"/> for every <see cref="IGeoObject"/> written.
+        /// </summary>
+        /// <param name="stream">the stream to write to</param>
+        /// <param name="toSerialize">the root object</param>
+        /// <param name="progress">receives the progress, may be null</param>
+        /// <param name="closeStream">true: close <paramref name="stream"/> when done</param>
+        /// <returns>true</returns>
         public bool ToStream(Stream stream, object toSerialize, IJsonProgress progress, bool closeStream = true)
         {
             this.progress = progress;

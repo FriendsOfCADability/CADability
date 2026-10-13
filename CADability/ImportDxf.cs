@@ -73,17 +73,38 @@ namespace CADability.DXF
         /// <summary>
         /// Reads the DXF file <paramref name="fileName"/> with ACadSharp. The file is read into memory first; when its OBJECTS
         /// section, which holds no geometry, is malformed, the file is read again without that section. Nothing is converted yet:
-        /// get <see cref="Project"/> to convert the drawing. Reading errors propagate as the exceptions of ACadSharp. DWG files are
-        /// read by <see cref="CADability.Project.ReadFromFile(string, string)"/> with the format "dwg".
+        /// get <see cref="Project"/> to convert the drawing. Reading errors propagate as the exceptions of ACadSharp. A DWG file
+        /// is recognized by its content and read with the DWG reader, whatever the extension of the file name.
         /// </summary>
-        /// <param name="fileName">path of the DXF file</param>
+        /// <param name="fileName">path of the DXF or DWG file</param>
         public Import(string fileName)
             : this(fileName, null)
         {
         }
+        /// <summary>
+        /// Reads the DXF or DWG file <paramref name="fileName"/> like <see cref="Import(string)"/> and reports the progress of
+        /// reading the file here and of converting it later in <see cref="Project"/> to <paramref name="progress"/>. Reading
+        /// takes the first 60 percent, converting the model space and the paper space 20 percent each.
+        /// <see cref="IDxfProgress.SetCompleted"/> is called when the conversion is done or when reading or converting fails.
+        /// </summary>
+        /// <param name="fileName">path of the DXF or DWG file</param>
+        /// <param name="progress">receives the progress, may be null</param>
         public Import(string fileName, IDxfProgress progress)
         {
             this.progress = progress;
+            try
+            {
+                Read(fileName);
+            }
+            catch
+            {
+                SetProcessCompleted();
+                throw;
+            }
+        }
+
+        private void Read(string fileName)
+        {
             SetProgressStepIncrement(30);
             ACadVersion version = GetDrawingVersion(fileName, out bool isDwg);
             byte[] raw;
@@ -427,6 +448,18 @@ namespace CADability.DXF
         private Project CreateProject()
         {
             if (doc == null) return null;
+            try
+            {
+                return ConvertDocument();
+            }
+            finally
+            {
+                SetProcessCompleted();
+            }
+        }
+
+        private Project ConvertDocument()
+        {
             project = Project.CreateSimpleProject();
             blockTable = new Dictionary<string, GeoObject.Block>();
             layerColorTable = new Dictionary<string, ColorDef>();
@@ -467,7 +500,6 @@ namespace CADability.DXF
                 }
             }
             doc = null;
-            SetProcessCompleted();
             return project;
         }
 
@@ -2726,12 +2758,26 @@ namespace CADability.DXF
     }
 
     /// <summary>
-    /// Interface to feedback the import progress.
+    /// Receives the progress of a DXF or DWG import, see <see cref="Import(string, IDxfProgress)"/>. The progress runs
+    /// from 0 to 100 percent in phases: each phase sets the size of its steps with <see cref="SetStepIncrement"/> and
+    /// then reports the steps it has done with <see cref="DoStep"/>.
     /// </summary>
     public interface IDxfProgress
     {
+        /// <summary>
+        /// Starts a new phase at the current position, in which each step advances the progress by
+        /// <paramref name="increment"/> percent.
+        /// </summary>
+        /// <param name="increment">percent per step</param>
         void SetStepIncrement(double increment);
+        /// <summary>
+        /// Reports that <paramref name="doneSteps"/> more steps of the current phase are done.
+        /// </summary>
+        /// <param name="doneSteps">number of steps done since the last call</param>
         void DoStep(int doneSteps = 1);
+        /// <summary>
+        /// The import is finished or has failed; a progress display can be hidden.
+        /// </summary>
         void SetCompleted();
-}
+    }
 }

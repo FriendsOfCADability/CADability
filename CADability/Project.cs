@@ -1253,45 +1253,67 @@ namespace CADability
             }
             if (FileName != null && FileName.Length > 0)
             {
-                UIProgessBar progress = new UIProgessBar("saving cdb file");
-                int geoObjCount = CountGeoOjects(GetActiveModel()); //Count the IGeoObjects in the drawing.
-                progress.SetStepIncrement(100.0 / geoObjCount); //Progress bar show the sawing of the IGeoObjects.
-                fileName = FileName;
-                Stream stream = File.Open(FileName, FileMode.Create);
-                JsonSerialize js = new JsonSerialize();
-                js.ToStream(stream, this, progress, false);
-                stream.Close();
-                isModified = false;
-                progress.SetCompleted();
+                UIProgressBar progress = new UIProgressBar("saving cdb file");
+                try
+                {
+                    // JsonSerialize.ToStream does a step for every IGeoObject it writes
+                    progress.SetStepIncrement(100.0 / Math.Max(1, CountSerializedGeoObjects()));
+                    fileName = FileName;
+                    using (Stream stream = File.Open(FileName, FileMode.Create))
+                    {
+                        JsonSerialize js = new JsonSerialize();
+                        js.ToStream(stream, this, progress, false);
+                    }
+                    isModified = false;
+                }
+                finally
+                {
+                    progress.SetCompleted();
+                }
             }
             return true;
         }
 
-        private int CountGeoOjects(IEnumerable geoObjects)
+        /// <summary>
+        /// Counts the <see cref="IGeoObject"/>s which <see cref="JsonSerialize.ToStream(Stream, object, IJsonProgress, bool)"/>
+        /// writes for this project: the objects of all models and of the symbol list together with the objects they contain.
+        /// Every object is counted once, as it is written once.
+        /// </summary>
+        internal int CountSerializedGeoObjects()
         {
-            int count = 0;
-            foreach (IGeoObject geo in geoObjects)
+            HashSet<IGeoObject> counted = new HashSet<IGeoObject>();
+            for (int i = 0; i < GetModelCount(); ++i)
             {
-                if (geo is Block bl)
-                {
-                    count += CountGeoOjects(bl.Children);
-                }
-                else if (geo is Solid so)
-                {
-                    count += CountGeoOjects(so.Shells);
-                }
-                else if (geo is Shell sh)
-                {
-                    count += CountGeoOjects(sh.Faces);
-                    foreach (Edge e in sh.Edges)
-                    {
-                        if (e.Curve3D != null)
-                            count++;
-                    }
-                }
-                count++;
+                foreach (IGeoObject geo in GetModel(i)) CountGeoObjects(geo, counted);
             }
-            return count;
+            foreach (IGeoObject geo in symbolList) CountGeoObjects(geo, counted);
+            return counted.Count;
+        }
+
+        private static void CountGeoObjects(IGeoObject geo, HashSet<IGeoObject> counted)
+        {
+            if (geo == null || !counted.Add(geo)) return;
+            switch (geo)
+            {
+                case Block block: // also Hatch
+                    foreach (IGeoObject child in block.Children) CountGeoObjects(child, counted);
+                    break;
+                case BlockRef blockRef:
+                    CountGeoObjects(blockRef.ReferencedBlock, counted);
+                    break;
+                case GeoObject.Path path:
+                    foreach (ICurve curve in path.Curves) CountGeoObjects(curve as IGeoObject, counted);
+                    break;
+                case Solid solid:
+                    foreach (Shell shell in solid.Shells) CountGeoObjects(shell, counted);
+                    break;
+                case Shell shell:
+                    foreach (Face face in shell.Faces) CountGeoObjects(face, counted);
+                    break;
+                case Face face:
+                    foreach (Edge edge in face.AllEdges) CountGeoObjects(edge.Curve3D as IGeoObject, counted);
+                    break;
+            }
         }
 
         /// <summary>
@@ -1635,7 +1657,7 @@ namespace CADability
         /// <summary>
         /// Creates a new project reading the data from the given stream using binary deserialization.
         /// This method is obsolete but kept for backward compatibility to read legacy binary format files.
-        /// Use <see cref="ReadFromJson"/> for new code.
+        /// Use <see cref="ReadFromJson(Stream)"/> for new code.
         /// </summary>
         /// <param name="stream">Stream to read from</param>
         /// <returns>The deserialized Project or null if deserialization fails</returns>
@@ -1778,10 +1800,22 @@ namespace CADability
                 //if (dlg.ShowDialog()!=DialogResult.OK) return null;
                 //FileName = dlg.FileName;
             }
-            Project res = null;
-            using (FileStream stream = File.Open(FileName, FileMode.Open, System.IO.FileAccess.Read))
+            UIProgressBar progress = useProgress ? new UIProgressBar("reading cdb file") : null;
+            try
             {
-                UIProgessBar progress = useProgress ? new UIProgessBar("reading cdb file") : null;
+                return ReadCdbFile(FileName, useProgress, progress);
+            }
+            finally
+            {
+                if (progress != null) progress.SetCompleted();
+            }
+        }
+
+        private static Project ReadCdbFile(string FileName, bool useProgress, IJsonProgress progress)
+        {
+            Project res = null;
+            using (FileStream stream = File.Open(FileName, FileMode.Open, System.IO.FileAccess.Read, FileShare.Read))
+            {
                 int firstByte = stream.ReadByte();
                 stream.Seek(0, SeekOrigin.Begin);
                 if (firstByte == 123)
@@ -1837,7 +1871,6 @@ namespace CADability
                 {
                     res.fileName = FileName;
                 }
-                if (progress != null) progress.SetCompleted();
                 return res;
             }
         }
@@ -1847,7 +1880,19 @@ namespace CADability
         /// </summary>
         /// <param name="stream">The Stream containing JSON serialized project data</param>
         /// <returns>The deserialized Project or null if deserialization fails</returns>
-        public static Project ReadFromJson(Stream stream, IJsonProgress progress = null)
+        public static Project ReadFromJson(Stream stream)
+        {
+            return ReadFromJson(stream, null);
+        }
+
+        /// <summary>
+        /// Reads a Project from a JSON formatted stream like <see cref="ReadFromJson(Stream)"/> and reports the progress of
+        /// reading to <paramref name="progress"/>.
+        /// </summary>
+        /// <param name="stream">The Stream containing JSON serialized project data</param>
+        /// <param name="progress">receives the progress, may be null</param>
+        /// <returns>The deserialized Project or null if deserialization fails</returns>
+        public static Project ReadFromJson(Stream stream, IJsonProgress progress)
         {
             // Create a new JsonSerialize instance to handle deserialization
             JsonSerialize js = new JsonSerialize();
@@ -1894,17 +1939,17 @@ namespace CADability
             if (res != null) res.WriteToFile(FileName); // und gleich wieder rausschreiben, denn an den konvertierten Objekten hängt die falsche DLL
             return res;
         }
-        private static Project ImportDXF(string filename)
+        private static Project ImportDXF(string filename, bool useProgress)
         {
-            CADability.DXF.Import import = new DXF.Import(filename, new UIProgessBar("import dxf"));
+            CADability.DXF.Import import = new DXF.Import(filename, useProgress ? new UIProgressBar("import dxf") : null);
             return import.Project;
         }
 
-        private static Project ImportDWG(string filename)
+        private static Project ImportDWG(string filename, bool useProgress)
         {
             try
             {
-                CADability.DXF.Import import = new DXF.Import(filename, new UIProgessBar("import dwg"));
+                CADability.DXF.Import import = new DXF.Import(filename, useProgress ? new UIProgressBar("import dwg") : null);
                 return import.Project;
             }
             catch (Exception ex)
@@ -1949,8 +1994,8 @@ namespace CADability
             switch (Format)
             {
                 case "cdb": return ReadFromFile(FileName, useProgress);
-                case "dxf": return ImportDXF(FileName);
-                case "dwg": return ImportDWG(FileName);
+                case "dxf": return ImportDXF(FileName, useProgress);
+                case "dwg": return ImportDWG(FileName, useProgress);
                 case "step":
                 case "stp":
                     ImportStep importStep = new ImportStep();
@@ -3067,33 +3112,33 @@ namespace CADability
         #endregion
 
         /// <summary>
-        /// It shows the progress bar during reading/writting a drawing file.
+        /// It shows the progress bar during reading/writing a drawing file.
         /// </summary>
-        private class UIProgessBar : DXF.IDxfProgress, IJsonProgress
+        private class UIProgressBar : DXF.IDxfProgress, IJsonProgress
         {
             string _text = null; //Text in the progress bar.
             double _increment = 1; //Increment value of the progress bar for each executed step. When all steps are completed it is 100.
-            double _offset = 0; //Progress bar offset value >=0 <100. Used if reading/writting is done in more than one phase.
+            double _offset = 0; //Progress bar offset value >=0 <100. Used if reading/writing is done in more than one phase.
             int _step = 0; //Current step value.
             double _currentPercentualPosition = 0; //Current position of the progress bar.
 
 
-            public UIProgessBar(string text)
+            public UIProgressBar(string text)
             {
                 _text = text;
-    }
+            }
 
             public void SetStepIncrement(double increment)
             {
                 _step = 0;
                 _increment = increment;
                 _offset = _currentPercentualPosition;
-}
+            }
 
             public void DoStep(int doneSteps = 1)
             {
                 _step += doneSteps;
-                double percentual = Math.Round(_offset + _increment * _step, 1);
+                double percentual = Math.Min(100, Math.Round(_offset + _increment * _step, 1));
                 if (percentual > _currentPercentualPosition) //Without this import will be slower.
                 {
                     FrameImpl.MainFrame?.UIService.ShowProgressBar(true, percentual, _text);

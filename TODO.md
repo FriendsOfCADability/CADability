@@ -122,6 +122,28 @@ Fixed from the list below: the export dialog writes DWG through ACadSharp
 and no longer offers HTML, which nothing wrote; the settings `DxfDwg.Format`
 and `DxfDwg.Text`, which were read nowhere, are removed.
 
+Fixed in the review before 1.6.0: #373 (XData points are `GeoPoint`s,
+displacements and directions `GeoVector`s and layer references the name of
+the layer, so no ACadSharp type is in `ExtendedEntityData.Data`; points,
+binary data and layer names survive a cdb file; the DXF export writes points
+as points, merges the X/Y/Z triples of the netDxf era into one point and
+takes a database handle as the `ulong` the import gives). Also: a helix from a
+file of 1.5.0 or earlier is read with an empty `UserData` instead of null
+(`HelicalCurve` did not write its base attributes before, and
+`IGeoObjectImpl.SetObjectData` took the missing entry for null);
+`Make3D.Rotate` of a face whose edge is a spline with corners no longer runs
+out of the face's edges (`IndexOutOfRangeException`), the path of a face is
+not split; a spline in Bézier form (every inner knot with the multiplicity of
+the degree) is split only at real corners, where the tangents differ or the
+derivative vanishes on one side, so extruding or rotating it or making a face
+from it gives one face per smooth piece and not one per segment; the
+intersection circle of a sphere is split at the seam wherever the domain of
+the face lies (the seam was looked for at the natural bounds, which are the
+used area of a face or unbounded, so a face straddling the seam got a part
+that jumped by the period); `Shell.CloseOpenEdges` no longer dereferences the
+curve of a pole edge; `IGeoObjectImpl.UniqueIdCounter` is incremented with
+`Interlocked`, like the hash code counters of #389.
+
 Closed as not reproducible: #265 (the STEP round trip gives an identical solid
 on master and on the commit from the time of the report, 0fb61554).
 
@@ -195,6 +217,22 @@ None left: all of them have been fixed.
   `Triangulation.FlipToDelaunay` leaves them, because a ruling is exact and the
   other diagonal is not. A criterion for how well the triangles cover the
   surface, rather than how far their edges are from it, would catch them.
+- [ ] The DXF writer of ACadSharp writes every handle reference of XData,
+  a layer reference (1003) included, as a database handle (1005), see
+  `DxfSectionWriterBase.writeExtendedData`. The export therefore writes a
+  layer name as the handle of the layer, which comes back as a handle, not
+  as a name (#373 left this as it is). A database handle (1005) refers to
+  the document the XData came from; ACadSharp writes 0 when no object of the
+  exported document has it.
+- [ ] `Make3D.Rotate` of a face whose spline edge has straight pieces along
+  and across the axis (a quadratic spline around three sides of a rectangle
+  with doubled poles at the corners, closed by a line) ends in a
+  `PlaneException` from `Plane.Intersect` in
+  `SurfaceOfRevolution.GetLineIntersection`, called by
+  `Shell.AssertOutwardOrientation` while sewing. Found with the first
+  version of `MakeRevolutionTests.FaceWithACornerSplineEdgeGivesASolid`; not
+  investigated further, the surface of revolution of such a meridian has
+  planar and cylindrical parts.
 
 ## Documentation
 

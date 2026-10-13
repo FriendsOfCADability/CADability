@@ -15051,15 +15051,18 @@ namespace CADability.GeoObject
         /// <summary>
         /// Computes the principal curvatures of the surface at <paramref name="uv"/> (the eigenvalues of the Weingarten map) and returns
         /// them as curves: a circle with the radius of curvature, lying in the plane of the normal and the principal direction, or a line
-        /// in the principal direction when the curvature is 0. The implementation is marked as untested in the code: at present the second
-        /// result is also stored in <paramref name="minCurvature"/> and <paramref name="maxCurvature"/> stays null.
+        /// in the principal direction when the curvature is 0. <paramref name="minCurvature"/> belongs to the principal direction with
+        /// the smaller curvature (by absolute value), <paramref name="maxCurvature"/> to the one with the larger; for a cylinder these
+        /// are the line along the axis and the circle of the cross section, for a sphere two circles of the same radius.
         /// </summary>
         /// <param name="surface">The surface</param>
         /// <param name="uv">The position in the parameter space</param>
-        /// <param name="minCurvature">The curvature circle (or line) of a principal direction; null when it could not be computed</param>
-        /// <param name="maxCurvature">Intended as the curvature circle of the other principal direction, currently always null</param>
+        /// <param name="minCurvature">The curvature circle (or line) of the principal direction with the smaller curvature; null when no real
+        /// eigenvalue was found</param>
+        /// <param name="maxCurvature">The curvature circle (or line) of the principal direction with the larger curvature; null when fewer
+        /// than two real eigenvalues were found</param>
         public static void MinMaxCurvature(ISurface surface, GeoPoint2D uv, out ICurve minCurvature, out ICurve maxCurvature)
-        {   // to be tested
+        {
             surface.Derivation2At(uv, out GeoPoint location, out GeoVector du, out GeoVector dv, out GeoVector duu, out GeoVector dvv, out GeoVector duv);
             Matrix I = DenseMatrix.Create(2, 2, 0);
             I[0, 0] = du * du;
@@ -15068,55 +15071,39 @@ namespace CADability.GeoObject
             GeoVector n = (du ^ dv).Normalized;
             Matrix II = DenseMatrix.Create(2, 2, 0);
             II[0, 0] = duu * n;
-            II[0, 1] = I[1, 0] = duv * n;
+            II[0, 1] = II[1, 0] = duv * n;
             II[1, 1] = dvv * n;
             Matrix S = (Matrix)I.Inverse().Multiply(II); // Weingarten
             Evd<double> evd = S.Evd();
             Vector<System.Numerics.Complex> eigenValues = evd.EigenValues;
             Matrix eigenVectors = (Matrix)evd.EigenVectors;
             minCurvature = maxCurvature = null;
-            if (eigenValues.Count > 0)
+            List<KeyValuePair<double, ICurve>> found = new List<KeyValuePair<double, ICurve>>(); // |curvature| -> curve
+            for (int i = 0; i < eigenValues.Count && i < 2; i++)
             {
-                if (eigenValues[0].Imaginary == 0.0)
+                if (eigenValues[i].Imaginary != 0.0) continue;
+                GeoVector dir = eigenVectors[0, i] * du + eigenVectors[1, i] * dv;
+                double curvature = eigenValues[i].Real;
+                ICurve curve;
+                if (curvature != 0.0)
                 {
-                    GeoVector dir = eigenVectors[0, 0] * du + eigenVectors[1, 0] * dv;
-                    if (eigenValues[0].Real != 0.0)
-                    {
-                        double rad = 1.0 / eigenValues[0].Real;
-                        GeoPoint cnt = location + rad * n;
-                        Ellipse elli = Ellipse.Construct();
-                        elli.SetCirclePlaneCenterRadius(new Plane(cnt, n, dir), cnt, Math.Abs(rad));
-                        minCurvature = elli;
-                    }
-                    else
-                    {
-                        Line line = Line.Construct();
-                        line.SetTwoPoints(location, location + dir);
-                        minCurvature = line;
-                    }
+                    double rad = 1.0 / curvature;
+                    GeoPoint cnt = location + rad * n;
+                    Ellipse elli = Ellipse.Construct();
+                    elli.SetCirclePlaneCenterRadius(new Plane(cnt, n, dir), cnt, Math.Abs(rad));
+                    curve = elli;
                 }
-            }
-            if (eigenValues.Count > 1) // what about a double eigenvalue?
-            {
-                if (eigenValues[1].Imaginary == 0.0)
+                else
                 {
-                    GeoVector dir = eigenVectors[0, 1] * du + eigenVectors[1, 1] * dv;
-                    if (eigenValues[1].Real != 0.0)
-                    {
-                        double rad = 1.0 / eigenValues[1].Real;
-                        GeoPoint cnt = location + rad * n;
-                        Ellipse elli = Ellipse.Construct();
-                        elli.SetCirclePlaneCenterRadius(new Plane(cnt, n, dir), cnt, Math.Abs(rad));
-                        minCurvature = elli;
-                    }
-                    else
-                    {
-                        Line line = Line.Construct();
-                        line.SetTwoPoints(location, location + dir);
-                        minCurvature = line;
-                    }
+                    Line line = Line.Construct();
+                    line.SetTwoPoints(location, location + dir);
+                    curve = line;
                 }
+                found.Add(new KeyValuePair<double, ICurve>(Math.Abs(curvature), curve));
             }
+            found.Sort((a, b) => a.Key.CompareTo(b.Key));
+            if (found.Count > 0) minCurvature = found[0].Value;
+            if (found.Count > 1) maxCurvature = found[1].Value;
         }
 
         /// <summary>

@@ -2495,11 +2495,16 @@ namespace CADability.Curve2D
         internal GeoVector2D DerivationAt(double Position)
         {
             double u = startParam + Position * (endParam - startParam);
-            GeoPoint2D pnt, dir;
-            if (nubs != null) nubs.CurveDeriv1(u, out pnt, out dir);
-            else nubs.CurveDeriv1(u, out pnt, out dir);
-            GeoVector2D res = dir.ToVector();
-            return res;
+            if (nubs != null)
+            {
+                nubs.CurveDeriv1(u, out GeoPoint2D pnt, out GeoPoint2D dir);
+                return dir.ToVector();
+            }
+            else
+            {
+                nurbs.CurveDeriv1(u, out GeoPoint2DH pnth, out GeoPoint2DH dirh);
+                return dirh;
+            }
         }
 
         /// <inheritdoc/>

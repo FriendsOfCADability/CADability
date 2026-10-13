@@ -1563,7 +1563,7 @@ namespace CADability.GeoObject
         {
             if (Faces.Length != other.Faces.Length) return false;
             if (Vertices.Length != other.Vertices.Length) return false;
-            if (edges.Length != other.Edges.Length) return false;
+            if (Edges.Length != other.Edges.Length) return false;
             // now remains the hard work, which has still to be implemented
             double precision = this.GetExtent(0.0).Size * 1e-3;
             if (Math.Abs(Volume(precision) - other.Volume(precision)) > precision) return false; // this is the lazy version. We would have to at least fit all vertices

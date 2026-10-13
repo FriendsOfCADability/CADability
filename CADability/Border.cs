@@ -1513,11 +1513,14 @@ namespace CADability.Shapes
 		{
 			ICurve2D[] segments = new ICurve2D[numberOfSides];
 			double step = Math.PI * 2.0 / numberOfSides;
-			GeoPoint2D lastPoint = center + radius * GeoVector2D.XAxis;
+			GeoPoint2D firstPoint = center + radius * GeoVector2D.XAxis;
+			GeoPoint2D lastPoint = firstPoint;
 			for (int i = 0; i < numberOfSides; ++i)
 			{
-				segments[i] = new Line2D(lastPoint, center + radius * GeoVector2D.FromAngle(i * step));
-				lastPoint = segments[i].EndPoint;
+				// the last segment ends exactly at the first vertex, so that the polygon is closed
+				GeoPoint2D nextPoint = (i == numberOfSides - 1) ? firstPoint : center + radius * GeoVector2D.FromAngle((i + 1) * step);
+				segments[i] = new Line2D(lastPoint, nextPoint);
+				lastPoint = nextPoint;
 			}
 			return new Border(segments);
 		}
@@ -5144,21 +5147,25 @@ namespace CADability.Shapes
 			}
 		}
 		/// <summary>
-		/// Intended to append a segment that may also fit reversed: it tries <see cref="AddSegment"/> and was meant to
-		/// reverse the segment when its end point rather than its start point connects to the chain. The reversal is not
-		/// implemented: a segment that does not connect with its start point is silently dropped.
+		/// Appends a segment that need not connect exactly. A segment whose start point connects to the chain is appended
+		/// as by <see cref="AddSegment"/>. When its end point is closer to the end of the chain than its start point, the
+		/// segment is reversed first (in place). When there is still a gap between the chain and the segment, a
+		/// <see cref="Line2D"/> bridging the gap is inserted before it, so the chain stays connected whatever is passed in.
 		/// </summary>
 		/// <param name="ToAdd">The segment to append</param>
 		public void Connect(ICurve2D ToAdd)
 		{
 			if (!AddSegment(ToAdd))
 			{
-				double prec = precision;
-				if (prec < 0.0) prec = (currentExtent.Width + currentExtent.Height) * 1e-8;
-				double ds = Geometry.Dist(segment[segment.Count - 1].EndPoint, ToAdd.StartPoint);
-				double de = Geometry.Dist(segment[segment.Count - 1].EndPoint, ToAdd.EndPoint);
-				if (ds < de)
-				{
+				GeoPoint2D lastEnd = segment[segment.Count - 1].EndPoint;
+				double ds = Geometry.Dist(lastEnd, ToAdd.StartPoint);
+				double de = Geometry.Dist(lastEnd, ToAdd.EndPoint);
+				if (de < ds) ToAdd.Reverse();
+				if (!AddSegment(ToAdd))
+				{   // a gap remains between the chain and the (now correctly oriented) segment: bridge it with a line
+					AddSegment(new Line2D(lastEnd, ToAdd.StartPoint));
+					segment.Add(ToAdd);
+					currentExtent.MinMax(ToAdd.GetExtent());
 				}
 			}
 		}

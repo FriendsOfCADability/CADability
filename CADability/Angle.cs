@@ -435,7 +435,7 @@ namespace CADability
             set
             {
                 a = Math.IEEERemainder(value, 4.0 * Math.PI);
-                if (a < 2.0 * Math.PI) a += 4.0 * Math.PI;
+                if (a < -2.0 * Math.PI) a += 4.0 * Math.PI;
                 if (a > 2.0 * Math.PI) a -= 4.0 * Math.PI;
             }
         }

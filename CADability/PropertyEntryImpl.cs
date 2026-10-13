@@ -396,26 +396,29 @@ namespace CADability.UserInterface
         #region dumy implementation of IShowProperty. Will be removed when IShowProperty is eliminated. dumy is always null
         /// <summary>
         /// Implementation of <see cref="IShowProperty.StateChangedEvent"/> for code that still uses the older interface:
-        /// a handler added here is called whenever <see cref="PropertyEntryChangedStateEvent"/> is raised. The remove
-        /// accessor cannot find the forwarding delegate again, so a handler added here stays subscribed.
+        /// a handler added here is called whenever <see cref="PropertyEntryChangedStateEvent"/> is raised, and removing
+        /// the handler removes the forwarder that was added for it.
         /// </summary>
         public event StateChangedDelegate StateChangedEvent
         {
             add
             {
-                this.PropertyEntryChangedStateEvent += delegate (IPropertyEntry sender, StateChangedArgs args)
-                {
-                    value(this, args);
-                };
+                if (value == null) return;
+                PropertyEntryChangedStateDelegate forwarder = (sender, args) => value(this, args);
+                if (stateChangedForwarders == null) stateChangedForwarders = new List<KeyValuePair<StateChangedDelegate, PropertyEntryChangedStateDelegate>>();
+                stateChangedForwarders.Add(new KeyValuePair<StateChangedDelegate, PropertyEntryChangedStateDelegate>(value, forwarder));
+                this.PropertyEntryChangedStateEvent += forwarder;
             }
             remove
             {
-                this.PropertyEntryChangedStateEvent -= delegate (IPropertyEntry sender, StateChangedArgs args)
-                {
-                    value(this, args);
-                };
+                if (value == null || stateChangedForwarders == null) return;
+                int i = stateChangedForwarders.FindLastIndex(p => p.Key.Equals(value));
+                if (i < 0) return;
+                this.PropertyEntryChangedStateEvent -= stateChangedForwarders[i].Value;
+                stateChangedForwarders.RemoveAt(i);
             }
         }
+        private List<KeyValuePair<StateChangedDelegate, PropertyEntryChangedStateDelegate>> stateChangedForwarders; // handler -> forwarder, for the remove accessor
         string IShowProperty.LabelText => Label;
         string IShowProperty.HelpLink => ((IShowProperty)dumy).HelpLink;
         string IShowProperty.InfoText => ((IShowProperty)dumy).InfoText;

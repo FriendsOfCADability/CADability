@@ -1115,18 +1115,18 @@ namespace CADability
             return defaultValue;
         }
         /// <summary>
-        /// Returns a description of all settings, one entry per setting in display order: the name followed by the value in
-        /// parentheses, sub settings recursively with their dotted names. Intended for diagnostics; because of the appended
-        /// value the entries are not valid names for <see cref="GetValue(string)"/>.
+        /// Returns the names of all settings, one entry per setting in display order; the entries of a sub settings object
+        /// follow its own entry with dotted names (e.g. "Snap.Circle30"), so every entry is a valid name for
+        /// <see cref="GetValue(string)"/>. <see cref="Dispose"/> uses it to unsubscribe from all settings.
         /// </summary>
-        /// <returns>One string per setting</returns>
+        /// <returns>One name per setting</returns>
         public string[] GetAllKeys()
         {
             List<string> res = new List<string>();
             for (int i = 0; i < sortedEntries.Count; i++)
             {
                 Pair p = sortedEntries[i] as Pair;
-                res.Add(p.Name + " (" + p.Value.ToString() + ")");
+                res.Add(p.Name);
                 if (p.Value is Settings settings)
                 {
                     string[] sub = settings.GetAllKeys();

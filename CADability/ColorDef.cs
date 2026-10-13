@@ -297,7 +297,7 @@ namespace CADability.Attribute
                     {
                         if (ColorWillChangeEvent != null) ColorWillChangeEvent(this, new ChangeEventArgs("ColorDef.Source", source));
                         source = value;
-                        if (ColorDidChangeEvent != null) ColorWillChangeEvent(this, new ChangeEventArgs("ColorDef.Source", source));
+                        if (ColorDidChangeEvent != null) ColorDidChangeEvent(this, new ChangeEventArgs("ColorDef.Source", source));
                     }
                 }
             }

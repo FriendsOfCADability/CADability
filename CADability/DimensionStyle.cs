@@ -319,6 +319,8 @@ namespace CADability.Attribute
             res.symbolPlacement = symbolPlacement;
             res.fillColor = fillColor;
             res.fixedLayer = fixedLayer;
+            res.angleText = angleText;
+            res.userData = userData?.Clone();
             return res;
         }
         internal void Update(bool AddMissingToList)
@@ -1283,7 +1285,7 @@ namespace CADability.Attribute
                 bool OldValue = DimBreakDimLine;
                 if (value) geoFlags |= EGeoFlag.DimBreakDimLine;
                 else geoFlags &= ~EGeoFlag.DimBreakDimLine;
-                FireDidChange("DimBreakDimLine ", value, OldValue);
+                FireDidChange("DimBreakDimLine", value, OldValue);
             }
         }
         /// <summary>

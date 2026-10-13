@@ -655,7 +655,7 @@ namespace CADability
             double r = (facesToModify[0].Surface as ISurfaceWithRadius).Radius;
             GeoPoint2D cnt2d = facesToModify[0].Area.GetExtent().GetCenter();
             SurfaceHelper.MinMaxCurvature(facesToModify[0].Surface, cnt2d, out ICurve minCurvature, out ICurve maxCurvature);
-            if (minCurvature is Ellipse elli)
+            if (maxCurvature is Ellipse elli) // the circle of the smaller radius: the cross section of a cylinder, the minor circle of a torus
             {
                 if (useDiameter)
                 {
@@ -767,6 +767,7 @@ namespace CADability
             this.forwardFaces = new List<Face>(forwardFaces);
             this.affectedObjects = new List<object>(affectedObjects);
             this.mode = mode;
+            this.axis = axis;
             GetAngleVectors(out GeoPoint location, out GeoVector fromHere, out GeoVector toHere);
             Value = new Angle(fromHere, toHere);
         }
@@ -852,12 +853,24 @@ namespace CADability
         {
             if (axis is Edge edge)
             {
+                Face toRotate = null, reference = null;
                 if (forwardFaces.Contains(edge.PrimaryFace) && backwardFaces.Contains(edge.SecondaryFace))
                 {
-                    (Axis axis, GeoVector fh, GeoVector th) = Actions.ParametricsAngleAction.GetRotationAxis(edge.PrimaryFace, edge.SecondaryFace, Axis.InvalidAxis, edge);
+                    toRotate = edge.PrimaryFace;
+                    reference = edge.SecondaryFace;
+                }
+                else if (forwardFaces.Contains(edge.SecondaryFace) && backwardFaces.Contains(edge.PrimaryFace))
+                {
+                    toRotate = edge.SecondaryFace;
+                    reference = edge.PrimaryFace;
+                }
+                if (toRotate != null)
+                {
+                    (Axis rotationAxis, GeoVector fh, GeoVector th) = Actions.ParametricsAngleAction.GetRotationAxis(toRotate, reference, Axis.InvalidAxis, edge);
                     fromHere = fh;
                     toHere = th;
-                    location = axis.Location;
+                    location = rotationAxis.Location;
+                    return;
                 }
             }
             location = GeoPoint.Invalid;

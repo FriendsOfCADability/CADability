@@ -816,14 +816,13 @@ namespace CADability
             hm = DenseMatrix.OfArray(m);
         }
         /// <summary>
-        /// Creates a Matrix4 from the coefficients of an affine modification. Note that <see cref="ModOp.Matrix"/> has
-        /// only three rows, so the result holds a 3*4 matrix without the row (0,0,0,1) and is not usable with the operators
-        /// of this struct; use <see cref="ModOp.ToMatrix"/> to get a proper 4*4 matrix.
+        /// Creates a Matrix4 from an affine modification: the 3*4 coefficients of <see cref="ModOp.Matrix"/> completed
+        /// by the row (0,0,0,1), as <see cref="ModOp.ToMatrix"/> returns them.
         /// </summary>
         /// <param name="m">the modification</param>
         public Matrix4(ModOp m)
         {
-            this.hm = DenseMatrix.OfArray(m.Matrix); // new Matrix(m);
+            this.hm = m.ToMatrix();
         }
         /// <summary>
         /// Modifies the given point by this modification.

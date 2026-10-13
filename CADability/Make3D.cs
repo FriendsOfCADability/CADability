@@ -2875,6 +2875,35 @@ namespace CADability.GeoObject
             return go;
         }
         /// <summary>
+        /// A planar face whose edges include splines with corners, made again with these splines split at their corners
+        /// (see <see cref="BSpline.SplitAtCorners"/>), with the attributes of <paramref name="face"/>. Rotating or extruding a
+        /// face makes a surface from each of its edges, and a kink inside an edge would be a kink inside that surface
+        /// (#416). Other faces are returned unchanged.
+        /// </summary>
+        internal static Face SplitEdgesAtCorners(Face face)
+        {
+            if (!(face.Surface is PlaneSurface)) return face;
+            if (!face.AllEdges.Any(e => e.Curve3D is BSpline b && b.CornerParameters().Count > 0)) return face;
+            List<List<ICurve2D>> loops = new List<List<ICurve2D>>();
+            IEnumerable<Edge[]> edgeLoops = new[] { face.OutlineEdges }.Concat(Enumerable.Range(0, face.HoleCount).Select(i => face.HoleEdges(i)));
+            foreach (Edge[] edgeLoop in edgeLoops)
+            {
+                List<ICurve2D> loop = new List<ICurve2D>();
+                foreach (Edge edge in edgeLoop)
+                {
+                    if (edge.Curve3D == null) return face; // a pole, nothing to split here
+                    ICurve curve = edge.Curve3D.Clone();
+                    if (!edge.Forward(face)) curve.Reverse();
+                    ICurve[] parts = curve is BSpline bsp ? bsp.SplitAtCorners() : new ICurve[] { curve };
+                    foreach (ICurve part in parts) loop.Add(face.Surface.GetProjectedCurve(part, 0.0));
+                }
+                loops.Add(loop);
+            }
+            Face res = Face.MakeFace(face.Surface.Clone(), loops);
+            res.CopyAttributes(face);
+            return res;
+        }
+        /// <summary>
         /// Extrudes the provided object <paramref name="faceShellPathCurve"/> along the <paramref name="extension"/>.
         /// </summary>
         /// <param name="faceShellPathCurve">Object to extrude, may be a <see cref="Face"/>, <see cref="Shell"/>, <see cref="Path"/> or <see cref="ICurve"/> object</param>
@@ -2948,7 +2977,7 @@ namespace CADability.GeoObject
             }
             else if (faceShellPathCurve is Face face)
             {
-                Shell shell = MakeBrutePrism(face, extension);
+                Shell shell = MakeBrutePrism(SplitEdgesAtCorners(face), extension); // each edge gives a side face, which must be smooth
                 if (shell != null)
                 {
                     if (shell.OpenEdges.Length == 0)
@@ -2993,6 +3022,8 @@ namespace CADability.GeoObject
         /// </summary>
         private static IGeoObject Rotate(IGeoObject faceShellPathCurve, Axis axis, SweepAngle rotation, SweepAngle offset, Project project, bool pathAsShell)
         {
+            // a face made with edges that are split at the corners of their splines, so that each face of the result is smooth
+            if (faceShellPathCurve is Face face) faceShellPathCurve = SplitEdgesAtCorners(face);
             Face originalFace = faceShellPathCurve as Face;
             if (faceShellPathCurve is Face)
             {
@@ -3009,7 +3040,8 @@ namespace CADability.GeoObject
                 faceShellPathCurve = pth;
             }
             // a path or curve is split at the corners of its splines, so that each face of the result is smooth. The
-            // path made from a face is not: its curves must stay the edges of the face, which give the side edges below
+            // path made from a face is not: its curves must stay the edges of the face, which give the side edges below,
+            // so the face has been made with split edges above
             if (originalFace == null) faceShellPathCurve = SplitSplinesAtCorners(faceShellPathCurve);
             if (faceShellPathCurve is Ellipse && !(faceShellPathCurve as Ellipse).IsArc)
             {

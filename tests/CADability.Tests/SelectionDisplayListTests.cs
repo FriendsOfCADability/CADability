@@ -101,5 +101,37 @@ namespace CADability.Tests
             Assert.AreEqual(1, paint.Count("OpenList"), "an unchanged selection is painted from its display list");
             Assert.AreEqual(2, paint.Count("SelectedList"));
         }
+
+        /// <summary>
+        /// #416, finding 17: with two views of different models the selection compared the display list precision of the
+        /// model of the view that was painted, so it was made again on every other repaint. The precision of the model of
+        /// the selected objects decides now; the other view does not show the selection anyway.
+        /// </summary>
+        [TestMethod]
+        public void the_selection_is_kept_while_views_of_another_model_are_painted()
+        {
+            Project project = Project.CreateSimpleProject();
+            Model model = project.GetActiveModel();
+            Model other = new Model();
+            Line line = Line.TwoPoints(new GeoPoint(0, 0, 0), new GeoPoint(10, 5, 0));
+            model.Add(line);
+            model.displayListPrecision = 0.5;
+            other.displayListPrecision = 1.0;
+
+            (IFrame frame, Fake _) = Create<IFrame>();
+            SelectObjectsAction action = new SelectObjectsAction(frame);
+            typeof(SelectObjectsAction).GetField("selectedObjects", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(action, new GeoObjectList(line));
+            (IView view, Fake viewFake) = Create<IView>();
+            viewFake.Model = model;
+            (IView otherView, Fake otherViewFake) = Create<IView>();
+            otherViewFake.Model = other;
+            (IPaintTo3D paintTo3D, Fake paintFake) = Create<IPaintTo3D>();
+            paintFake.Capabilities = PaintCapabilities.ZoomIndependentDisplayList;
+
+            foreach (IView v in new[] { view, otherView, view, otherView, view })
+                onRepaintSelect.Invoke(action, new object[] { System.Drawing.Rectangle.Empty, v, paintTo3D });
+            Assert.AreEqual(1, paintFake.Count("OpenList"), "the selection is made once");
+            Assert.AreEqual(3, paintFake.Count("SelectedList"), "and shown in the three repaints of the view of its model");
+        }
     }
 }

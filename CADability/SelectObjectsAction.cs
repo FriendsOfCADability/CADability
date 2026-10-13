@@ -547,7 +547,11 @@ namespace CADability.Actions
 				}
 				if ((PaintToSelect.Capabilities & PaintCapabilities.ZoomIndependentDisplayList) != 0)
 				{
-					double modelPrecision = View.Model != null ? View.Model.displayListPrecision : 0.0;
+					// the selection is only shown in views of the model of the selected objects, so its precision decides,
+					// not the one of the model of this view: with two views of different models the list was made again
+					// on every other repaint
+					Model selectionModel = (selectedObjects.Count > 0 ? GetGeoObjectModel(selectedObjects[0]) : null) ?? View.Model;
+					double modelPrecision = selectionModel != null ? selectionModel.displayListPrecision : 0.0;
 					if (modelPrecision != displayListModelPrecision) displayList = null;
 					if (displayList == null)
 					{

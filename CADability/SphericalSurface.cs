@@ -986,13 +986,12 @@ namespace CADability.GeoObject
 			if (other.IsUPeriodic || other.IsVPeriodic) periodic.Add((other, otherBounds));
 			foreach ((ISurface surface, BoundingRect bounds) in periodic)
 			{
-				// each function changes its sign where the circle has to be split: the seam, where u (or v) jumps by the
-				// period, and the four lines of the bounds
-				surface.GetNaturalBounds(out double umin, out double umax, out double vmin, out double vmax);
+				// the seam, where u (or v) jumps by the period, is wherever the surface places it; the natural bounds say
+				// nothing about it, they are the used area of a face or unbounded
+				if (surface.IsUPeriodic) splits.AddRange(SeamCrossings(circle, surface, n, true));
+				if (surface.IsVPeriodic) splits.AddRange(SeamCrossings(circle, surface, n, false));
+				// each function changes its sign where the circle crosses one of the four lines of the bounds
 				List<Func<GeoPoint2D, double>> crossings = new List<Func<GeoPoint2D, double>>();
-				// u is in [umin, umin + period), it jumps at the seam, where u - (umin + period / 2) changes its sign by a jump
-				if (surface.IsUPeriodic) crossings.Add(uv => uv.x - (double.IsInfinity(umin) ? 0.0 : umin) - surface.UPeriod / 2.0);
-				if (surface.IsVPeriodic) crossings.Add(uv => uv.y - (double.IsInfinity(vmin) ? 0.0 : vmin) - surface.VPeriod / 2.0);
 				if (!bounds.IsEmpty() && !bounds.IsInfinite)
 				{
 					foreach (double ub in new[] { bounds.Left, bounds.Right })
@@ -1038,8 +1037,10 @@ namespace CADability.GeoObject
 			}
 			splits.Add(0.0);
 			splits.Add(1.0);
+			// a whole circle would have a closed 2d curve: halve it when no split lies inside (a split at the start
+			// point, e.g. the seam the circle now starts at, is found at 0 or at 1)
+			if (!splits.Exists(s => s > 1e-6 && s < 1.0 - 1e-6)) splits.Add(0.5);
 			splits.Sort();
-			if (splits.Count <= 3) splits.Insert(1, 0.5); // a whole circle would have a closed 2d curve
 			List<IDualSurfaceCurve> res = new List<IDualSurfaceCurve>();
 			for (int i = 0; i < splits.Count - 1; i++)
 			{
@@ -1054,6 +1055,46 @@ namespace CADability.GeoObject
 				res.Add(new DualSurfaceCurve(part, this, c2d1, other, c2d2));
 			}
 			return res.ToArray();
+		}
+		/// <summary>
+		/// The parameters where <paramref name="circle"/> crosses the seam of the periodic <paramref name="surface"/> in u
+		/// (or in v): between two of <paramref name="n"/> consecutive points of the circle the parameter jumps by about the
+		/// period there. The jump is located by bisection; where neither half of an interval jumps any more, the parameter
+		/// only changes fast but continuously (close to a pole), and the split there is harmless.
+		/// </summary>
+		private static List<double> SeamCrossings(Ellipse circle, ISurface surface, int n, bool inU)
+		{
+			double period = inU ? surface.UPeriod : surface.VPeriod;
+			double Par(double t)
+			{
+				GeoPoint2D uv = surface.PositionOf(circle.PointAt(t - Math.Floor(t)));
+				return inU ? uv.x : uv.y;
+			}
+			bool Jumps(double p1, double p2) => Math.Abs(p2 - p1) > period / 2.0;
+			List<double> res = new List<double>();
+			// the samples are offset by half a step, so that the last interval wraps around the start point of the
+			// circle: the seam may pass right through it, and the parameter of that point is on either side of the seam
+			double t1 = 0.5 / n, p1 = Par(t1);
+			for (int i = 1; i <= n; i++)
+			{
+				double t2 = (i + 0.5) / n, p2 = Par(t2);
+				if (Jumps(p1, p2))
+				{
+					double ta = t1, tb = t2, pa = p1, pb = p2;
+					for (int j = 0; j < 50; j++)
+					{
+						double tm = (ta + tb) / 2.0, pm = Par(tm);
+						if (Jumps(pa, pm)) { tb = tm; pb = pm; }
+						else if (Jumps(pm, pb)) { ta = tm; pa = pm; }
+						else break;
+					}
+					double t = (ta + tb) / 2.0;
+					res.Add(t - Math.Floor(t));
+				}
+				t1 = t2;
+				p1 = p2;
+			}
+			return res;
 		}
 		/// <summary>
 		/// The 2d curve of a part of the intersection circle on <paramref name="sphere"/>. The parts start and end on the seam

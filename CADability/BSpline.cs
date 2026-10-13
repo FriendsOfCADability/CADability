@@ -3149,23 +3149,33 @@ namespace CADability.GeoObject
             return (this as ICurve).GetPlane();
         }
         /// <summary>
-        /// The parameters of the inner knots where the curve may have a corner: knots with a multiplicity of at least the
-        /// degree, which leaves the curve only continuous, and knots where the first derivative vanishes, typically
-        /// because poles coincide (issue 173).
+        /// The parameters of the inner knots where the curve has a corner: knots where the first derivative vanishes,
+        /// typically because poles coincide (issue 173), and knots with a multiplicity of at least the degree, which
+        /// leaves the curve only continuous, when the tangents of the two sides differ there or the derivative vanishes
+        /// on one side. Two Bézier segments that meet smoothly, the usual form of DXF and STEP splines, are no corner.
         /// </summary>
         internal List<double> CornerParameters()
         {
             List<double> res = new List<double>();
             double negligible = NegligibleDerivative();
+            // close to a side where the derivative vanishes, the derivative is about singularOffset times smaller than
+            // elsewhere, so this threshold is far from both (as in BSpline2D.CornerKnots)
+            double singularOffset = (endParam - startParam) * 1e-8;
+            double vanishingSide = 1e5 * negligible;
             for (int i = 0; i < knots.Length; i++)
             {
                 if (knots[i] <= startParam || knots[i] >= endParam) continue;
-                if (multiplicities[i] >= degree) res.Add(knots[i]);
-                else
+                PointDirAtParam(knots[i], out _, out GeoVector dir);
+                if (dir.Length <= negligible)
                 {
-                    PointDirAtParam(knots[i], out _, out GeoVector dir);
-                    if (dir.Length <= negligible) res.Add(knots[i]);
+                    res.Add(knots[i]);
+                    continue;
                 }
+                if (multiplicities[i] < degree) continue; // the tangent is continuous there
+                PointDirAtParam(knots[i] - singularOffset, out _, out GeoVector dirBefore);
+                PointDirAtParam(knots[i] + singularOffset, out _, out GeoVector dirAfter);
+                bool vanishes = dirBefore.Length <= vanishingSide || dirAfter.Length <= vanishingSide;
+                if (vanishes || !Precision.SameDirection(dirBefore, dirAfter, false) || dirBefore * dirAfter <= 0.0) res.Add(knots[i]);
             }
             return res;
         }

@@ -782,7 +782,7 @@ namespace CADability.Attribute
             }
         }
         /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Added"/>
+        /// Overrides <see cref="IShowPropertyImpl.Added(IPropertyPage)"/>
         /// </summary>
         /// <param name="propertyTreeView"></param>
         public override void Added(IPropertyPage propertyTreeView)

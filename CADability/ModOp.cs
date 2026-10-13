@@ -818,7 +818,7 @@ namespace CADability
     /// You can apply such a modification to <see cref="GeoPoint"/>s or <see cref="GeoVector"/>s
     /// or you can use it for GeoObjects <see cref="GeoObject.IGeoObject.Modify"/>.
     /// If you want to move, rotate, scale reflect or generally modify a GeoObject you will need this class.
-    /// Use the static methods to create ModOps that do a required modification (like <see cref="Rotate"/>, <see cref="Translate"/> etc.
+    /// Use the static methods to create ModOps that do a required modification (like <see cref="Rotate(GeoVector, SweepAngle)"/>, <see cref="Translate(GeoVector)"/> etc.
     /// </summary>
     [Serializable()]
     [JsonVersion(serializeAsStruct = true, version = 1)]

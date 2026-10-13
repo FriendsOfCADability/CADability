@@ -21,7 +21,7 @@ namespace CADability.GeoObject
         /// recorded volume of the two NURBS shells of DifferenceBug15 sat 1.6e-4 and 7.6e-4 away from the value
         /// the sequence converges to - more than the 1e-4 the baselines are compared with, which is exactly why
         /// that case kept showing up in the diff. Four times finer brings the residual movement to about 1e-5.
-        /// Quadrics were never the problem: the 3/4 sag correction in <see cref="Shell.SignedVolume"/> is tuned
+        /// Quadrics were never the problem: the 3/4 sag correction in <see cref="Shell.SignedVolume(IEnumerable{Face}, double, GeoPoint)"/> is tuned
         /// for them and DifferenceBug9 was within 3e-6 even at size/1000.
         /// </para>
         /// </summary>
@@ -747,7 +747,7 @@ namespace CADability.GeoObject
         /// <para>
         /// The face itself will not say: <c>orientedOutward</c> is private and the surface of a face may be
         /// stored reversed. The triangulation is the right reference anyway, because it is what
-        /// <see cref="Shell.SignedVolume"/> reads the orientation from - so both agree on the sign of every
+        /// <see cref="Shell.SignedVolume(IEnumerable{Face}, double, GeoPoint)"/> reads the orientation from - so both agree on the sign of every
         /// face by construction, and a shell that comes out negative there comes out negative here.
         /// </para>
         /// <para>
@@ -785,13 +785,13 @@ namespace CADability.GeoObject
 
         /// <summary>
         /// What one face contributes when its parameter domain cannot be used as the region to integrate over:
-        /// exactly what <see cref="Shell.SignedVolume"/> would have made of it, tetrahedra over the flat
+        /// exactly what <see cref="Shell.SignedVolume(IEnumerable{Face}, double, GeoPoint)"/> would have made of it, tetrahedra over the flat
         /// triangles plus the 3/4 sag correction.
         /// <para>
         /// Going through SignedVolume rather than summing the tetrahedra here is the point. The sag correction
         /// is what makes that sum usable on a curved face, so dropping it would leave the fallback WORSE than
         /// the method this replaces - and a fallback that loses against the thing it falls back from is not a
-        /// fallback. This way the value can only ever improve on <see cref="Shell.SignedVolume"/>, never
+        /// fallback. This way the value can only ever improve on <see cref="Shell.SignedVolume(IEnumerable{Face}, double, GeoPoint)"/>, never
         /// regress below it.
         /// </para>
         /// <para>

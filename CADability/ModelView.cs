@@ -1658,7 +1658,7 @@ namespace CADability
 			canvas?.Invalidate();
 		}
 		/// <summary>
-		/// Overrides <see cref="IShowPropertyImpl.Added"/>
+		/// Overrides <see cref="IShowPropertyImpl.Added(IPropertyPage)"/>
 		/// </summary>
 		/// <param name="page"></param>
 		public override void Added(IPropertyPage page)
@@ -1672,7 +1672,7 @@ namespace CADability
 			project.ModelsChangedEvent += OnModelsChanged;
 		}
 		/// <summary>
-		/// Overrides <see cref="IShowPropertyImpl.Removed"/>
+		/// Overrides <see cref="IShowPropertyImpl.Removed(IPropertyPage)"/>
 		/// </summary>
 		/// <param name="page">the IPropertyTreeView from which it was removed</param>
 		public override void Removed(IPropertyPage page)

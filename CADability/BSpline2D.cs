@@ -3375,7 +3375,7 @@ namespace CADability.Curve2D
         /// <see cref="Shapes.Border.Area"/>, which sums its segments, keeps its meaning.
         /// <para>
         /// This is the route taken whenever <see cref="ExplicitPCurve2D"/> cannot supply the area: for a
-        /// RATIONAL curve, where <see cref="ExplicitPCurve2D.Area"/> has no closed form and returns zero,
+        /// RATIONAL curve, where <see cref="ExplicitPCurve2D.Area()"/> has no closed form and returns zero,
         /// and for a curve whose exact area the plausibility check against the chord polygon rejects.
         /// Both used to fall through to the base class, which takes the area of <c>Approximate(false, 0.0)</c>
         /// - an arc approximation with no defined accuracy. Measured against a reference integration that

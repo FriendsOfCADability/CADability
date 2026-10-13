@@ -1625,7 +1625,7 @@ namespace CADability
         /// The knot span that contains <paramref name="u"/>, i.e. the index i with
         /// knots[i] &lt;= u &lt; knots[i+1] (NURBS book p. 68, A2.1), clamped to the range the curve is
         /// defined on. The span returned is never empty: an empty one would make
-        /// <see cref="BasisFunsU"/> divide by zero.
+        /// <see cref="BasisFunsU(int, double, int, out double[])"/> divide by zero.
         /// </summary>
         /// <param name="knots">the knot vector to search</param>
         /// <param name="degree">the degree, which is also the index of the first usable span</param>

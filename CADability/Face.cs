@@ -7445,7 +7445,7 @@ namespace CADability.GeoObject
         /// Returns the smallest distance from the provided point to the face. It will be the distance to
         /// a perpendicular footpoint on the face. If there is no such perpendicular footpoint
         /// double.MaxValue will be returned. This method does not compute the distance to edges or vertices.
-        /// If you need those distances use <see cref="ICurve.PositionOf"/> and <see cref="ICurve.PointAt"/>.
+        /// If you need those distances use <see cref="ICurve.PositionOf(GeoPoint)"/> and <see cref="ICurve.PointAt"/>.
         /// </summary>
         /// <param name="fromHere">Point from which the distance is calculated</param>
         /// <returns>The signed distance, positive is to the outside, negative to the inside</returns>

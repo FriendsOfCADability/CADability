@@ -217,7 +217,7 @@ namespace CADability
         }
 
         /// <summary>
-        /// Determins whether two GeoPoints are exactly equal. Use <see cref="Precision.IsEqual"/>
+        /// Determins whether two GeoPoints are exactly equal. Use <see cref="Precision.IsEqual(GeoPoint, GeoPoint)"/>
         /// if you need more control over precision.
         /// </summary>
         /// <param name="p1">first point</param>
@@ -228,7 +228,7 @@ namespace CADability
             return p1.x == p2.x && p1.y == p2.y && p1.z == p2.z;
         }
         /// <summary>
-        /// Determins whether two GeoPoints are not equal. Use <see cref="Precision.IsEqual"/>
+        /// Determins whether two GeoPoints are not equal. Use <see cref="Precision.IsEqual(GeoPoint, GeoPoint)"/>
         /// if you need more control over precision.
         /// </summary>
         /// <param name="p1">first point</param>
@@ -575,7 +575,7 @@ namespace CADability
             z = Math.Sin(latitude);
         }
         /// <summary>
-        /// Returns true, if this vector is exactly the nullvector. Use <see cref="Precision.IsNullVector"/>
+        /// Returns true, if this vector is exactly the nullvector. Use <see cref="Precision.IsNullVector(GeoVector)"/>
         /// if you need more control over precision.
         /// </summary>
         /// <returns>true if nullvector</returns>
@@ -588,7 +588,7 @@ namespace CADability
             return !double.IsNaN(x);
         }
         /// <summary>
-        /// Determines whether this vector and the othe vector are perpendicular. Use <see cref="Precision.IsPerpendicular"/>
+        /// Determines whether this vector and the othe vector are perpendicular. Use <see cref="Precision.IsPerpendicular(GeoVector, GeoVector, bool)"/>
         /// if you need more control over precision.
         /// </summary>
         /// <param name="other">other vector</param>
@@ -649,7 +649,7 @@ namespace CADability
             return new GeoVector(-v.x, -v.y, -v.z);
         }
         /// <summary>
-        /// Determins whether the given vectors are exactly equal. Use <see cref="Precision.SameDirection"/>
+        /// Determins whether the given vectors are exactly equal. Use <see cref="Precision.SameDirection(GeoVector, GeoVector, bool)"/>
         /// if you need more control over precision.
         /// </summary>
         /// <param name="v1">first operand</param>
@@ -660,7 +660,7 @@ namespace CADability
             return (v1.x == v2.x && v1.y == v2.y && v1.z == v2.z);
         }
         /// <summary>
-        /// Determins whether the given vectors are not exactly equal. Use <see cref="Precision.SameDirection"/>
+        /// Determins whether the given vectors are not exactly equal. Use <see cref="Precision.SameDirection(GeoVector, GeoVector, bool)"/>
         /// if you need more control over precision.
         /// </summary>
         /// <param name="v1">first operand</param>
@@ -1601,7 +1601,7 @@ namespace CADability
             return new GeoVector2D(-x, -y);
         }
         /// <summary>
-        /// Returns true, if this vector is exactly the nullvector. Use <see cref="Precision.IsNullVector"/>
+        /// Returns true, if this vector is exactly the nullvector. Use <see cref="Precision.IsNullVector(GeoVector2D)"/>
         /// if you need more control over precision.
         /// </summary>
         /// <returns>true if nullvector</returns>

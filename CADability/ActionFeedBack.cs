@@ -204,7 +204,7 @@ namespace CADability.Actions
             OnFeedBackChanged(fb);
         }
         /// <summary>
-        /// Adds a GeoObject to the list of displayed objects. In contrary to <see cref="Add"/> the object is displayed
+        /// Adds a GeoObject to the list of displayed objects. In contrary to <see cref="Add(IFeedBack)"/> the object is displayed
         /// in the select color and the select display mode.
         /// </summary>
         /// <param name="feedBackObject">Object to add</param>

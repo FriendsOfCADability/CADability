@@ -196,7 +196,7 @@ namespace CADability
         /// <summary>
         /// Draws a rectangular bitmap at the provided <paramref name="location"/> with <paramref name="directionWidth"/>
         /// specifying the direction of the lower edge of the bitmap and <paramref name="directionHeight"/>
-        /// specifying the direction of the left edge of the bitmap. <see cref="PrepareBitmap"/> must be called 
+        /// specifying the direction of the left edge of the bitmap. <see cref="PrepareBitmap(Bitmap, int, int)"/> must be called 
         /// before this method is called.
         /// </summary>
         /// <param name="bitmap">The bitmap to draw</param>
@@ -271,7 +271,7 @@ namespace CADability
         void DisplayIcon(GeoPoint p, Bitmap icon);
         /// <summary>
         /// Displays the provided bitmap at the provided location. The bitmap always faces the viewer.
-        /// <see cref="PrepareBitmap"/> has been called or must be called prior to this method.
+        /// <see cref="PrepareBitmap(Bitmap, int, int)"/> has been called or must be called prior to this method.
         /// </summary>
         /// <param name="p">Where to Paint</param>
         /// <param name="bitmap">Th ebitmap to paint</param>

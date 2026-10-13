@@ -34,7 +34,7 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Added"/>
+        /// Overrides <see cref="IShowPropertyImpl.Added(IPropertyPage)"/>
         /// </summary>
         /// <param name="page"></param>
         public override void Added(IPropertyPage page)

@@ -55,7 +55,7 @@ namespace CADability.UserInterface
             }
         }
         /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Selected"/>
+        /// Overrides <see cref="IShowPropertyImpl.Selected()"/>
         /// </summary>
         public override void Selected()
         {

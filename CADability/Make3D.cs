@@ -15,8 +15,8 @@ namespace CADability.GeoObject
     /// Static methods to create and combine <see cref="Solid"/>s, <see cref="Shell"/>s and <see cref="Face"/>s: primitives
     /// (<see cref="MakeBox"/>, <see cref="MakeCylinder"/>, <see cref="MakeCone"/>, <see cref="MakeSphere"/>, <see cref="MakeTorus"/>),
     /// extrusions and sweeps (<see cref="MakePrism"/>, <see cref="MakeRevolution(IGeoObject, GeoPoint, GeoVector, double, Project)"/>,
-    /// <see cref="MakePipe"/>, <see cref="MakeRuledSolid"/>, <see cref="MakeRuledShell"/>), boolean operations
-    /// (<see cref="Union"/>, <see cref="Difference(Solid, Solid)"/>; the intersection is <see cref="Solid.Intersect"/>),
+    /// <see cref="MakePipe(IGeoObject, Path, Project)"/>, <see cref="MakeRuledSolid"/>, <see cref="MakeRuledShell"/>), boolean operations
+    /// (<see cref="Union(Solid, Solid)"/>, <see cref="Difference(Solid, Solid)"/>; the intersection is <see cref="Solid.Intersect"/>),
     /// fillets and chamfers (<see cref="MakeFillet"/>, <see cref="MakeChamfer"/>) and sewing faces to shells and solids
     /// (<see cref="SewFaces"/>, <see cref="SewFacesAndShells"/>).
     /// <para>

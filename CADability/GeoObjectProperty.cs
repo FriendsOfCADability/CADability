@@ -322,7 +322,7 @@ namespace CADability.UserInterface
             set => base.LabelText = value;
         }
         /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Selected"/>
+        /// Overrides <see cref="IShowPropertyImpl.Selected()"/>
         /// </summary>
         public override void Selected()
         {

@@ -181,7 +181,7 @@ namespace CADability.GeoObject
         #region IShowPropertyImpl Overrides
         public override PropertyEntryType Flags => PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries | PropertyEntryType.ContextMenu | PropertyEntryType.Selectable;
         /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Added"/>
+        /// Overrides <see cref="IShowPropertyImpl.Added(IPropertyPage)"/>
         /// </summary>
         /// <param name="propertyTreeView"></param>
         public override void Added(IPropertyPage propertyTreeView)
@@ -2088,7 +2088,7 @@ namespace CADability.GeoObject
         /// direction does not modify the <see cref="GlyphDirection"/> of the text, so you usually will have to change both.
         /// It also affects the aspect ratio of the text, which is defined by the length of the line direction
         /// and the length of the glyph direction. To simply rotate a text better use <see cref="IGeoObject.Modify"/>
-        /// with a <see cref="ModOp.Rotate"/> rotation.
+        /// with a <see cref="ModOp.Rotate(GeoPoint, GeoVector, SweepAngle)"/> rotation.
         /// </summary>
         public GeoVector LineDirection
         {

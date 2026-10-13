@@ -288,7 +288,7 @@ namespace CADability.Attribute
         /// <param name="newValue"></param>
         void SetTopLevel(ColorDef newValue);
         /// <summary>
-        /// Same as <see cref="SetTopLevel"/>, but also overwrites the color of child objects if it is null. Child objects that already have colors remain unchanged.
+        /// Same as <see cref="SetTopLevel(ColorDef)"/>, but also overwrites the color of child objects if it is null. Child objects that already have colors remain unchanged.
         /// </summary>
         /// <param name="newValue"></param>
         /// <param name="overwriteChildNullColor"></param>

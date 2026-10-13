@@ -14,7 +14,7 @@ namespace CADability.UserInterface
     /// string IDs. All language dependent user interface texts are processed here.
     /// CADability contains an XML file as a primary string resource, containing all user 
     /// interface texts in German and English language.
-    /// You can Add more strings and more languages by calling <see cref="AddStrings"/>,
+    /// You can Add more strings and more languages by calling <see cref="AddStrings(XmlDocument)"/>,
     /// or by simply providing an XML file named "CADability.StringTable.xxx.xml" (where xxx
     /// stands for any language or application specific abbreviation) in the directory where
     /// CADability.dll is located.

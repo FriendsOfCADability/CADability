@@ -282,7 +282,7 @@ namespace CADability.UserInterface
         /// is loaded from the <see cref="StringTable"/> with the ID resourceId+".Label" the 
         /// tooltip text is loaded with the id resourceId+".ShortInfo" or resourceId+".DetailedInfo".
         /// You may extend the StringTable and ues your own resourceId values according to this scheme. (see
-        /// <see cref="StringTable.AddStrings"/>)
+        /// <see cref="StringTable.AddStrings(System.Xml.XmlDocument)"/>)
         /// </summary>
         protected string resourceIdInternal;
         private bool hidden; // default: false!
@@ -442,7 +442,7 @@ namespace CADability.UserInterface
         }
         /// <summary>
         /// Implementation of <see cref="IShowProperty.LabelText"/>, returns either
-        /// <see cref="labelTextInternal"/> (if not null) or <see cref="StringTable.GetString"/>(resourceId+".Label")
+        /// <see cref="labelTextInternal"/> (if not null) or <see cref="StringTable.GetString(string)"/>(resourceId+".Label")
         /// Whe set, <see cref="labelTextInternal"/> is set.
         /// </summary>
         public virtual string LabelText
@@ -459,8 +459,8 @@ namespace CADability.UserInterface
         }
         /// <summary>
         /// Implementation of <see cref="IShowProperty.InfoText"/>, returns 
-        /// <see cref="StringTable.GetString"/>(resourceId+".DetailedInfo") or 
-        /// <see cref="StringTable.GetString"/>(resourceId+".ShortInfo")
+        /// <see cref="StringTable.GetString(string)"/>(resourceId+".DetailedInfo") or 
+        /// <see cref="StringTable.GetString(string)"/>(resourceId+".ShortInfo")
         /// </summary>
         public virtual string InfoText
         {

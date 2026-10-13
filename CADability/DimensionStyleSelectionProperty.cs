@@ -79,7 +79,7 @@ namespace CADability.UserInterface
             if (DimensionStyleChangedEvent != null) DimensionStyleChangedEvent(sel);
         }
         /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Added"/>
+        /// Overrides <see cref="IShowPropertyImpl.Added(IPropertyPage)"/>
         /// </summary>
         /// <param name="propertyTreeView"></param>
         public override void Added(IPropertyPage propertyTreeView)
@@ -88,7 +88,7 @@ namespace CADability.UserInterface
             if (toWatch != null) toWatch.DidChangeEvent += new ChangeDelegate(GeoObjectDidChange);
         }
         /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Removed"/>
+        /// Overrides <see cref="IShowPropertyImpl.Removed(IPropertyPage)"/>
         /// </summary>
         /// <param name="propertyTreeView">the IPropertyTreeView from which it was removed</param>
         public override void Removed(IPropertyPage propertyTreeView)

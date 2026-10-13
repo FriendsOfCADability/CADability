@@ -111,7 +111,7 @@ namespace CADability
             Top = r.Top;
         }
         /// <summary>
-        /// Returns an empty BoundingRect which is convenient as a start for the <see cref="MinMax"/> method.
+        /// Returns an empty BoundingRect which is convenient as a start for the <see cref="MinMax(GeoPoint2D)"/> method.
 		/// </summary>
 		static public BoundingRect EmptyBoundingRect = new BoundingRect(System.Double.MaxValue, System.Double.MaxValue, System.Double.MinValue, System.Double.MinValue);
         static public BoundingRect InfinitBoundingRect = new BoundingRect(System.Double.MinValue, System.Double.MinValue, System.Double.MaxValue, System.Double.MaxValue);

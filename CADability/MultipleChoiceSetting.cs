@@ -9,7 +9,7 @@ namespace CADability
     /// It represents a setting defined by a name and a value.
     /// This setting can be displayed and modified in the control center. 
     /// It is represented as a combo box. The label left of the combo box is given
-    /// by the resourceId <see cref="StringTable.GetString"/>, the values are
+    /// by the resourceId <see cref="StringTable.GetString(string)"/>, the values are
     /// </summary>
     [Serializable()]
     public class MultipleChoiceSetting : MultipleChoiceProperty, ISerializable, ISettingChanged, IJsonSerialize

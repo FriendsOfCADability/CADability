@@ -152,7 +152,7 @@ namespace CADability.Curve2D
 		/// <summary>
 		/// Returns the distance of the specified point to this curve. If this curve
 		/// can be extended (e.g. a line or an arc) this method will return the distance to
-		/// the extended curve. If you need the distance to the unextended curve use <see cref="MinDistance"/>.
+		/// the extended curve. If you need the distance to the unextended curve use <see cref="MinDistance(GeoPoint2D)"/>.
 		/// </summary>
 		/// <param name="p">Point to compute the distance to</param>
 		/// <returns>the distance</returns>

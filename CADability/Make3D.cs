@@ -745,12 +745,13 @@ namespace CADability.GeoObject
         }
         /// <summary>
         /// Connects the two closed paths with ruled surfaces and returns the solid bound by the planar faces of the two paths
-        /// and the ruled surfaces (a loft between two profiles). Each segment of the first path is connected with the segment
-        /// with the same index of the second path, so both paths need the same number of segments; a path with a single
-        /// segment is split into as many segments as the other path has. Two lines are connected by a plane, two coaxial
-        /// circles by a cylinder or a cone, other pairs by a <see cref="RuledSurface"/>, see <see cref="MakeRuledSurface"/>.
-        /// Returns null when the paths cannot be connected to a solid (different number of segments, an open path, a path
-        /// that does not bound a planar face, or a surface that cannot be built).
+        /// and the ruled surfaces (a loft between two profiles). Splines are split at their corners first. Each segment of the
+        /// first path is connected with the segment with the same index of the second path. When the numbers of segments
+        /// differ, a path with a single segment is split into as many segments as the other path has, otherwise both paths
+        /// are split where the other one has a vertex at the same relative length. Two lines are connected by a plane, two
+        /// coaxial circles by a cylinder or a cone, other pairs by a <see cref="RuledSurface"/>, see <see cref="MakeRuledSurface"/>.
+        /// Returns null when the paths cannot be connected to a solid (an open path, a path that does not bound a planar
+        /// face, or a surface that cannot be built).
         /// </summary>
         /// <param name="firstPath">the first path, closed</param>
         /// <param name="secondPath">the second path, closed</param>
@@ -762,10 +763,8 @@ namespace CADability.GeoObject
         }
         /// <summary>
         /// Connects the two paths with ruled surfaces and returns them as a <see cref="Shell"/>, without the faces of the paths.
-        /// Each segment of the first path is connected with the segment with the same index of the second path, so both
-        /// paths need the same number of segments; a path with a single segment is split into as many segments as the other
-        /// path has. The paths may be open or closed. Returns null when the paths cannot be connected (different number of
-        /// segments or a failing surface).
+        /// The segments are paired as in <see cref="MakeRuledSolid"/>. The paths may be open or closed. Returns null when the
+        /// paths cannot be connected (a failing surface).
         /// </summary>
         /// <param name="firstPath">the first path</param>
         /// <param name="secondPath">the second path</param>
@@ -787,6 +786,9 @@ namespace CADability.GeoObject
         {
             firstPath.Flatten(); // Flatten hopefully removes too short segments
             secondPath.Flatten(); // and splits polylines to its segments
+            // a ruled face between a spline with a corner and another curve would have a kink inside (#411)
+            firstPath = (Path)SplitSplinesAtCorners(firstPath);
+            secondPath = (Path)SplitSplinesAtCorners(secondPath);
             if (firstPath.CurveCount != secondPath.CurveCount)
             {   // if one of the paths has only a single segment, we split it, so there are the same number of segments
                 // We could also split it according to the length
@@ -813,12 +815,14 @@ namespace CADability.GeoObject
                     secondPath.Set(splitted);
                 }
                 else
-                {   // two path with different number of segments
-                    // we would need a general rule how to split the paths
-                    // if the user needs more control, she should split the two paths in part so we always have a single segment path for firstPath or second path
-                    // (firstPath as ICurve).PositionAtLength(0);
-                    // (firstPath as ICurve).Split()
-                    return null;
+                {   // two paths with different numbers of segments: pair them by their position along the paths (#411)
+                    double[] firstVertices = RelativeVertexPositions(firstPath);
+                    double[] secondVertices = RelativeVertexPositions(secondPath);
+                    ICurve[] firstSplitted = SplitAtRelativeLengths(firstPath, firstVertices, secondVertices);
+                    ICurve[] secondSplitted = SplitAtRelativeLengths(secondPath, secondVertices, firstVertices);
+                    if (firstSplitted.Length != secondSplitted.Length) return null;
+                    firstPath.Set(firstSplitted);
+                    secondPath.Set(secondSplitted);
                 }
             }
             if (firstPath.IsClosed && firstPath.Count == 1)
@@ -2783,6 +2787,61 @@ namespace CADability.GeoObject
             res.area = null;
             SimpleShape dbg = res.Area;
             return res;
+        }
+        /// <summary>
+        /// Two vertices of the two paths of a ruled shell closer than this, relative to the lengths of the paths, are taken as
+        /// the same position, see <see cref="SplitAtRelativeLengths"/>.
+        /// </summary>
+        private const double RelativeVertexTolerance = 1e-4;
+        /// <summary>
+        /// The positions of the inner vertices of <paramref name="path"/>, as its length from the start point to the vertex
+        /// divided by the length of the path.
+        /// </summary>
+        private static double[] RelativeVertexPositions(Path path)
+        {
+            double total = path.Length;
+            double[] res = new double[path.CurveCount - 1];
+            double length = 0.0;
+            for (int i = 0; i < res.Length; ++i)
+            {
+                length += path.Curve(i).Length;
+                res[i] = length / total;
+            }
+            return res;
+        }
+        /// <summary>
+        /// The curves of <paramref name="path"/>, split where the other path has a vertex at the same relative length
+        /// (<paramref name="otherVertices"/>, see <see cref="RelativeVertexPositions"/>), unless <paramref name="path"/> has a
+        /// vertex there itself (<paramref name="ownVertices"/>). Splitting both paths so gives two paths with their vertices at
+        /// the same relative lengths, whose curves can be paired by index.
+        /// </summary>
+        private static ICurve[] SplitAtRelativeLengths(Path path, double[] ownVertices, double[] otherVertices)
+        {
+            double total = path.Length;
+            List<double> splitAt = otherVertices.Where(o => o > RelativeVertexTolerance && o < 1.0 - RelativeVertexTolerance
+                && !ownVertices.Any(v => Math.Abs(v - o) < RelativeVertexTolerance)).ToList();
+            List<ICurve> res = new List<ICurve>();
+            double start = 0.0; // the relative length at the start of the current curve
+            for (int i = 0; i < path.CurveCount; ++i)
+            {
+                ICurve curve = path.Curve(i);
+                double length = curve.Length;
+                double end = start + length / total;
+                List<double> positions = new List<double> { 0.0 };
+                foreach (double rel in splitAt)
+                {
+                    if (rel > start && rel < end) positions.Add(curve.PositionAtLength((rel - start) * total));
+                }
+                positions.Add(1.0);
+                for (int j = 0; j < positions.Count - 1; ++j)
+                {
+                    ICurve part = curve.Clone();
+                    if (positions.Count > 2) part.Trim(positions[j], positions[j + 1]);
+                    res.Add(part);
+                }
+                start = end;
+            }
+            return res.ToArray();
         }
         /// <summary>
         /// A spline with corners as a path of its smooth pieces (see <see cref="BSpline.SplitAtCorners"/>), also inside a

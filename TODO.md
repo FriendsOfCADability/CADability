@@ -197,9 +197,6 @@ None left: all of them have been fixed.
   curve, and `BSpline` has no place to keep them.
 - [ ] `BSpline.IsClosed` means periodic, so a closed spline with clamped knots
   (start point equal to end point) counts as open.
-- [ ] `Make3D.MakeRuledShell`/`MakeRuledSolid` pair the curves of the two paths
-  by index and do not split splines at their corners, so a ruled face can get a
-  kink inside.
 - [ ] The triangulation of a ruled surface between two splines
   (`Make3D.MakeRuledShell`) overestimates its area by up to 3.7 % at a
   precision of a thousandth of its size: long thin triangles along the rulings

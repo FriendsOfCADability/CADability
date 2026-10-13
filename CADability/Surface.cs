@@ -8689,7 +8689,7 @@ namespace CADability.GeoObject
             public ParEpi()
             {
 #if DEBUG
-                id = idCounter++;
+                id = System.Threading.Interlocked.Increment(ref idCounter) - 1;
 #endif
             }
             #region IOctTreeInsertable Members
@@ -12689,7 +12689,7 @@ namespace CADability.GeoObject
             public int id;
             public LinkedIntersectionPoint()
             {
-                id = idCounter++;
+                id = System.Threading.Interlocked.Increment(ref idCounter) - 1;
             }
             public override int GetHashCode()
             {

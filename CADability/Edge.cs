@@ -76,7 +76,6 @@ namespace CADability
 #if DEBUG
         public int stepDefiningIndex;
 #endif
-        private static string lockStatic = ""; // a private static object to assure each instance has a unique id
         private static int idCounter = 0;
         public int id;
         public ICurve curve;
@@ -102,10 +101,7 @@ namespace CADability
             this.vertex2 = null;
             this.forward = true;
             this.createdEdges = new List<Edge>(1); // empty list, so that clones use the same list
-            lock (lockStatic)
-            {
-                this.id = System.Threading.Interlocked.Increment(ref idCounter) - 1;
-            }
+            this.id = System.Threading.Interlocked.Increment(ref idCounter) - 1; // a unique id on every thread
             locker = new Locker(this);
         }
         public StepEdgeDescriptor(ICurve curve, Vertex vertex1, Vertex vertex2, bool forward)
@@ -115,10 +111,7 @@ namespace CADability
             this.vertex2 = vertex2;
             this.forward = forward;
             this.createdEdges = new List<Edge>(1); // empty list, so that clones use the same list
-            lock (lockStatic)
-            {
-                id = System.Threading.Interlocked.Increment(ref idCounter) - 1;
-            }
+            id = System.Threading.Interlocked.Increment(ref idCounter) - 1;
             locker = new Locker(this);
         }
         public StepEdgeDescriptor(StepEdgeDescriptor toClone, Vertex vertex1, Vertex vertex2, bool forward)
@@ -131,10 +124,7 @@ namespace CADability
 #if DEBUG
             this.stepDefiningIndex = toClone.stepDefiningIndex;
 #endif
-            lock (lockStatic)
-            {
-                id = System.Threading.Interlocked.Increment(ref idCounter) - 1;
-            }
+            id = System.Threading.Interlocked.Increment(ref idCounter) - 1;
             locker = toClone.locker;
         }
         public StepEdgeDescriptor(Edge edge, bool forward)
@@ -145,10 +135,7 @@ namespace CADability
             vertex1 = edge.Vertex1;
             vertex2 = edge.Vertex2;
             this.forward = forward;
-            lock (lockStatic)
-            {
-                id = System.Threading.Interlocked.Increment(ref idCounter) - 1;
-            }
+            id = System.Threading.Interlocked.Increment(ref idCounter) - 1;
             locker = new Locker(this);
         }
         internal void MakeVertices()

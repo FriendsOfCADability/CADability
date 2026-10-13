@@ -30,7 +30,7 @@ namespace CADability.GeoObject
 	/// <see cref="SphericalSurfaceNP"/> describes the same geometry with a non-periodic parameter system.
 	/// </summary>
 	[Serializable()]
-	public class SphericalSurface : ISurfaceImpl, ISerializable, IDeserializationCallback, IExportStep, ISphere
+	public class SphericalSurface : ISurfaceImpl, ISerializable, IDeserializationCallback, IExportStep, ISphere, IJsonSerialize
 	{
 		// Die Kugel ist so beschaffen, dass sie lediglich durch eine ModOp definiert ist.
 		// Die Einheitskugel steht im Ursprung mit Radius 1, u beschreibt einen Breitenkreis, v einen Längenkreis
@@ -1300,6 +1300,33 @@ namespace CADability.GeoObject
 		#region IDeserializationCallback Members
 		void IDeserializationCallback.OnDeserialization(object sender)
 		{
+			toUnit = toSphere.GetInverse();
+		}
+		#endregion
+		#region IJsonSerialize Members
+		/// <summary>
+		/// Empty constructor for the JSON deserialization (<see cref="IJsonSerialize"/>); the data is set by <see cref="SetObjectData(IJsonReadData)"/>.
+		/// </summary>
+		protected SphericalSurface() : base(null)
+		{
+			// empty constructor for Json
+		}
+		/// <summary>
+		/// Writes the data of this surface for the JSON serialization (<see cref="IJsonSerialize"/>).
+		/// </summary>
+		/// <param name="data">Receives the data</param>
+		public void GetObjectData(IJsonWriteData data)
+		{
+			data.AddProperty("ToSphere", toSphere);
+		}
+		/// <summary>
+		/// Restores this surface from the JSON data written by <see cref="GetObjectData(IJsonWriteData)"/> (<see cref="IJsonSerialize"/>).
+		/// Other writers may add more properties (e.g. "Domain"), which are ignored, as for the other analytic surfaces.
+		/// </summary>
+		/// <param name="data">The data to read</param>
+		public void SetObjectData(IJsonReadData data)
+		{
+			toSphere = data.GetProperty<ModOp>("ToSphere");
 			toUnit = toSphere.GetInverse();
 		}
 		#endregion

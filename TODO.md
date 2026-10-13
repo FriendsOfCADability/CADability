@@ -177,13 +177,6 @@ None left: all of them have been fixed.
   have `Path2D` curves, and these faces triangulate to a slightly smaller area
   than the same faces in the differences; not yet investigated further.
 
-- [ ] `tests/CADability.Tests/Files/CDB/Volumes.cdb.json` cannot be read by
-  the JSON reader of this repository: it stores `SphericalSurface`,
-  `LayerList` and others in `IJsonSerialize` form (`$TypeVersion` 0), probably
-  written by ShapeIt, but here these classes only implement `ISerializable`.
-  `VolumesMatchAnalytic` and `IntegratedVolumeMatchesAnalyticOnEveryMesh` end
-  in a `NullReferenceException` in `JsonSerialize.SerializationInfoFromJsonData`
-  whenever the file is actually read.
 - [ ] `Face.MakeRegularSurface` no longer simplifies exact rational NURBS
   cylinders, cones, spheres and tori, because it maps the edges with the
   reparametrisation of `NurbsSurface.GetSimpleSurface`, which cannot follow a

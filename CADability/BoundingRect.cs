@@ -11,8 +11,9 @@ namespace CADability
     /// BoundingRect is an axis oriented rectangle or a 2-dimensional bounding box. It is implemented as a "struct" (value type)
     /// so assignements always make a copy.
     /// </summary>
+    [JsonVersion(serializeAsStruct = true, version = 1)]
     [Serializable()]
-    public struct BoundingRect : IQuadTreeInsertable, IComparable<BoundingRect>, ISerializable, IEquatable<BoundingRect>
+    public struct BoundingRect : IQuadTreeInsertable, IComparable<BoundingRect>, ISerializable, IEquatable<BoundingRect>, IJsonSerialize
     {
         /// <summary>
         /// The left limit (minimum x). It is <see cref="double.MaxValue"/> for the <see cref="EmptyBoundingRect"/>.
@@ -929,6 +930,35 @@ namespace CADability
             info.AddValue("Right", Right);
             info.AddValue("Bottom", Bottom);
             info.AddValue("Top", Top);
+        }
+        /// <summary>
+        /// Constructor for the JSON deserialization of a BoundingRect that was written as a struct by
+        /// <see cref="GetObjectData(IJsonWriteData)"/>.
+        /// </summary>
+        /// <param name="data">the stored values</param>
+        internal BoundingRect(IJsonReadStruct data)
+        {
+            Left = data.GetValue<double>();
+            Bottom = data.GetValue<double>();
+            Right = data.GetValue<double>();
+            Top = data.GetValue<double>();
+        }
+        /// <summary>
+        /// Implements <see cref="IJsonSerialize.GetObjectData(IJsonWriteData)"/>: writes the four limits as a list of values
+        /// in the order left, bottom, right, top.
+        /// </summary>
+        /// <param name="data">receives the values</param>
+        public void GetObjectData(IJsonWriteData data)
+        {
+            data.AddValues(Left, Bottom, Right, Top);
+        }
+        /// <summary>
+        /// Implements <see cref="IJsonSerialize.SetObjectData(IJsonReadData)"/>. Does nothing, because a BoundingRect is
+        /// serialized as a struct and read back by a constructor taking the stored values.
+        /// </summary>
+        /// <param name="data">not used</param>
+        public void SetObjectData(IJsonReadData data)
+        {
         }
 
         internal BoundingRect GetModified(ModOp2D m)

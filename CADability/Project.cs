@@ -2731,7 +2731,12 @@ namespace CADability
         void IJsonSerializeDone.SerializationDone(JsonSerialize jsonSerialize)
         {
             foreach (IAttributeList list in attributeLists.Values)
+            {
+                // a list may complete itself in its own callback (the LayerList sorts its layers by name there),
+                // which has to happen before the lists are updated below
+                jsonSerialize.InvokeSerializationDoneCallback(list);
                 list.Owner = this;
+            }
             if (ColorList == null)
             {
                 AttributeListContainer.CloneAttributeList(Settings.GlobalSettings, this, "ColorList", true);
@@ -2771,9 +2776,6 @@ namespace CADability
             {
                 l.project = this;
             }
-#endif
-#if DEBUG
-            IShowProperty[] dbg = namedValues.SubEntries;
 #endif
         }
         #endregion

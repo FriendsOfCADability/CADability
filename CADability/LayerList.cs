@@ -17,7 +17,7 @@ namespace CADability.Attribute
     /// </summary>
     [Serializable]
     public class LayerList : PropertyEntryImpl, INotifyModification, ISerializable,
-        ICollection, IAttributeList, ICommandHandler, IDeserializationCallback
+        ICollection, IAttributeList, ICommandHandler, IDeserializationCallback, IJsonSerialize, IJsonSerializeDone
     {
         private Layer[] unsortedEntries;
         private SortedList entries;
@@ -317,6 +317,14 @@ namespace CADability.Attribute
         #region IDeserializationCallback Members
         void IDeserializationCallback.OnDeserialization(object sender)
         {
+            RestoreEntries();
+        }
+        /// <summary>
+        /// Builds the sorted <see cref="entries"/> from the array that was read and sets the back references of the
+        /// layers to this list, which are not stored in the file.
+        /// </summary>
+        private void RestoreEntries()
+        {
             if (unsortedEntries != null)
             {   // entries als SortedList sollte so nicht mehr verwendet werden, besser
                 // Set<DimensionStyle,EqualityComparer>
@@ -336,6 +344,43 @@ namespace CADability.Attribute
                     l.Parent = this;
                 }
             }
+        }
+        #endregion
+        #region IJsonSerialize Members
+        /// <summary>
+        /// Writes the layers and the current layer for the JSON serialization (<see cref="IJsonSerialize"/>).
+        /// </summary>
+        /// <param name="data">receives the data</param>
+        public void GetObjectData(IJsonWriteData data)
+        {
+            Layer[] layerArray = new Layer[entries.Count];
+            for (int i = 0; i < entries.Count; i++)
+            {
+                layerArray[i] = (Layer)entries.GetByIndex(i);
+            }
+            data.AddProperty("Entries", layerArray);
+            data.AddProperty("Current", current);
+        }
+        /// <summary>
+        /// Restores the layers and the current layer from the JSON data written by <see cref="GetObjectData(IJsonWriteData)"/>
+        /// (<see cref="IJsonSerialize"/>). The layers may still be empty here, so the list, which is sorted by their names,
+        /// is built in <see cref="SerializationDone(JsonSerialize)"/>.
+        /// </summary>
+        /// <param name="data">the data to read from</param>
+        public void SetObjectData(IJsonReadData data)
+        {
+            unsortedEntries = data.GetProperty<Layer[]>("Entries");
+            current = data.GetPropertyOrDefault<Layer>("Current");
+            data.RegisterForSerializationDoneCallback(this);
+        }
+        /// <summary>
+        /// Callback of the JSON serialization (<see cref="IJsonSerializeDone"/>): after all objects have been read, the
+        /// layers have their names and the sorted list is built.
+        /// </summary>
+        /// <param name="jsonSerialize">the serializer</param>
+        public void SerializationDone(JsonSerialize jsonSerialize)
+        {
+            RestoreEntries();
         }
         #endregion
         #region ICollection Members

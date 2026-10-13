@@ -13,7 +13,7 @@ namespace CADability
 	/// added via the context menu, renamed and removed.
 	/// </summary>
 	[Serializable]
-	internal class NamedValuesProperty : IShowPropertyImpl, ICommandHandler, ISerializable
+	internal class NamedValuesProperty : IShowPropertyImpl, ICommandHandler, ISerializable, IJsonSerialize
 	{
 		private Hashtable namedValues;
 		public NamedValuesProperty()
@@ -364,6 +364,25 @@ namespace CADability
 			info.AddValue("NamedValues", namedValues);
 		}
 
+		#endregion
+		#region IJsonSerialize Members
+		/// <summary>
+		/// Writes the named values for the JSON serialization (<see cref="IJsonSerialize"/>).
+		/// </summary>
+		/// <param name="data">receives the data</param>
+		public void GetObjectData(IJsonWriteData data)
+		{
+			data.AddProperty("NamedValues", namedValues);
+		}
+		/// <summary>
+		/// Restores the named values from the JSON data written by <see cref="GetObjectData(IJsonWriteData)"/>
+		/// (<see cref="IJsonSerialize"/>). Data without named values gives an empty table.
+		/// </summary>
+		/// <param name="data">the data to read from</param>
+		public void SetObjectData(IJsonReadData data)
+		{
+			namedValues = data.GetPropertyOrDefault<Hashtable>("NamedValues") ?? new Hashtable();
+		}
 		#endregion
 	}
 }

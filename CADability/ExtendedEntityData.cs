@@ -66,10 +66,10 @@ namespace CADability.DXF
             }
         }
 
-        // JSON only knows numbers and strings, so every integer comes back as a double and a
-        // control string as a one character string. Give them back the types the DXF/DWG import
-        // stores, because the DXF export only accepts those: it wrote a 16 bit integer that
-        // had been read back from a cdb file as 0.
+        // JSON only knows numbers, strings and arrays, so every integer comes back as a double, a
+        // control string as a one character string and a point as a list of its coordinates. Give
+        // them back the types the DXF/DWG import stores, because the DXF export only accepts those:
+        // it wrote a 16 bit integer that had been read back from a cdb file as 0.
         private static object RestoreValueType(XDataCode code, object value)
         {
             switch (code)
@@ -81,15 +81,48 @@ namespace CADability.DXF
                     if (value is double d32) return (int)d32;
                     break;
                 case XDataCode.LayerName:
+                    // the name of the layer since 1.6.0, the handle of the layer in older files
+                    if (value is double layerHandle) return (ulong)layerHandle;
+                    break;
                 case XDataCode.DatabaseHandle:
-                    // ACadSharp gives both as the handle of the referenced object
+                    // ACadSharp gives it as the handle of the referenced object
                     if (value is double handle) return (ulong)handle;
                     break;
                 case XDataCode.ControlString:
                     if (value is string s && s.Length == 1) return s[0];
                     break;
+                case XDataCode.RealX:
+                case XDataCode.WorldSpacePositionX:
+                    // a GeoPoint is written as the array of its coordinates (#373)
+                    if (TryCoordinates(value, out double[] p)) return new GeoPoint(p[0], p[1], p[2]);
+                    break;
+                case XDataCode.WorldSpaceDisplacementX:
+                case XDataCode.WorldDirectionX:
+                    if (TryCoordinates(value, out double[] v)) return new GeoVector(v[0], v[1], v[2]);
+                    break;
+                case XDataCode.BinaryData:
+                    if (value is List<object> numbers)
+                    {
+                        byte[] bytes = new byte[numbers.Count];
+                        for (int i = 0; i < bytes.Length; i++) bytes[i] = numbers[i] is double b ? (byte)b : (byte)0;
+                        return bytes;
+                    }
+                    break;
             }
             return value;
+        }
+
+        private static bool TryCoordinates(object value, out double[] coordinates)
+        {
+            coordinates = null;
+            if (!(value is List<object> list) || list.Count != 3) return false;
+            coordinates = new double[3];
+            for (int i = 0; i < 3; i++)
+            {
+                if (!(list[i] is double d)) return false;
+                coordinates[i] = d;
+            }
+            return true;
         }
     }
 }

@@ -736,13 +736,29 @@ namespace CADability.DXF
                 foreach (var record in kvp.Value.Records)
                 {
                     XDataCode code = (XDataCode)(int)record.Code;
-                    object value = record.RawValue;
-                    xdata.Data.Add(new KeyValuePair<XDataCode, object>(code, value));
+                    xdata.Data.Add(new KeyValuePair<XDataCode, object>(code, XDataValue(record)));
                 }
                 go.UserData.Add(entryName, xdata);
             }
+        }
 
-
+        /// <summary>
+        /// The value of an XData record as <see cref="ExtendedEntityData"/> keeps it: ACadSharp's raw value, except that
+        /// a point (1010, 1011) becomes a <see cref="GeoPoint"/>, a displacement or direction (1012, 1013) a
+        /// <see cref="GeoVector"/> and a layer reference (1003) the name of the layer. So no type of ACadSharp reaches
+        /// the public data, and the values survive a cdb file, which could not write ACadSharp's point (#373).
+        /// </summary>
+        private object XDataValue(ACadSharp.XData.ExtendedDataRecord record)
+        {
+            switch (record)
+            {
+                case ACadSharp.XData.ExtendedDataCoordinate c: return GeoPoint(c.Value);
+                case ACadSharp.XData.ExtendedDataWorldCoordinate w: return GeoPoint(w.Value);
+                case ACadSharp.XData.ExtendedDataDisplacement d: return GeoVector(d.Value);
+                case ACadSharp.XData.ExtendedDataDirection d: return GeoVector(d.Value);
+                case ACadSharp.XData.ExtendedDataLayer l: return l.ResolveReference(doc)?.Name ?? (object)l.Value;
+                default: return record.RawValue;
+            }
         }
 
         /// <summary>

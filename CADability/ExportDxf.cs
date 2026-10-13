@@ -246,7 +246,7 @@ namespace CADability.DXF
                 {
                     AppId appId = GetOrCreateAppId(xData.ApplicationName);
                     ExtendedData extData = new ExtendedData();
-                    foreach (var item in xData.Data)
+                    foreach (var item in MergedCoordinates(xData.Data))
                     {
                         ExtendedDataRecord record = CreateXDataRecord(item.Key, item.Value);
                         if (record != null)
@@ -332,7 +332,36 @@ namespace CADability.DXF
             return appId;
         }
 
-        private static ExtendedDataRecord CreateXDataRecord(XDataCode code, object value)
+        /// <summary>
+        /// The records with the point records of the netDxf era merged: netDxf split a point into the three records
+        /// X, Y and Z (1010/1020/1030, and the same for 1011 to 1013) with double values, which are still found in
+        /// cdb files written by older versions. The import keeps a point as one GeoPoint or GeoVector (#373).
+        /// </summary>
+        private static IEnumerable<KeyValuePair<XDataCode, object>> MergedCoordinates(List<KeyValuePair<XDataCode, object>> data)
+        {
+            for (int i = 0; i < data.Count; i++)
+            {
+                XDataCode code = data[i].Key;
+                if (IsCoordinateX(code) && data[i].Value is double x && i + 2 < data.Count
+                    && data[i + 1].Key == code + 10 && data[i + 1].Value is double y
+                    && data[i + 2].Key == code + 20 && data[i + 2].Value is double z)
+                {
+                    object point = code == XDataCode.RealX || code == XDataCode.WorldSpacePositionX
+                        ? (object)new GeoPoint(x, y, z) : new GeoVector(x, y, z);
+                    yield return new KeyValuePair<XDataCode, object>(code, point);
+                    i += 2;
+                }
+                else yield return data[i];
+            }
+        }
+
+        private static bool IsCoordinateX(XDataCode code)
+        {
+            return code == XDataCode.RealX || code == XDataCode.WorldSpacePositionX
+                || code == XDataCode.WorldSpaceDisplacementX || code == XDataCode.WorldDirectionX;
+        }
+
+        private ExtendedDataRecord CreateXDataRecord(XDataCode code, object value)
         {
             try
             {
@@ -358,9 +387,35 @@ namespace CADability.DXF
                     case XDataCode.BinaryData:
                         return value is byte[] bytes ? new ExtendedDataBinaryChunk(bytes) : null;
                     case XDataCode.DatabaseHandle:
-                        string hStr = value?.ToString() ?? "";
-                        ulong hVal = ulong.TryParse(hStr, System.Globalization.NumberStyles.HexNumber, null, out ulong hParsed) ? hParsed : 0;
+                        // the import gives the handle as ulong; a string is read as the hexadecimal handle DXF writes.
+                        // The handle refers to an object of the document the XData came from, ACadSharp writes 0
+                        // when no object of this document has it.
+                        ulong hVal = value is ulong h ? h
+                            : ulong.TryParse(value?.ToString() ?? "", System.Globalization.NumberStyles.HexNumber, null, out ulong hParsed) ? hParsed : 0;
                         return new ExtendedDataHandle(hVal);
+                    case XDataCode.LayerName:
+                        // the import gives the name of the layer (a handle of the import document in older cdb files,
+                        // which refers to nothing here). ACadSharp writes the reference as the handle of the layer (1005).
+                        if (value is string layerName && doc.Layers.TryGetValue(layerName, out ACadSharp.Tables.Layer layer))
+                            return new ExtendedDataLayer(layer.Handle);
+                        return null;
+                    case XDataCode.RealX:
+                        return value is GeoPoint p10 ? new ExtendedDataCoordinate(ToXYZ(p10)) : null;
+                    case XDataCode.WorldSpacePositionX:
+                        return value is GeoPoint p11 ? new ExtendedDataWorldCoordinate(ToXYZ(p11)) : null;
+                    case XDataCode.WorldSpaceDisplacementX:
+                        return value is GeoVector v12 ? new ExtendedDataDisplacement(ToXYZ(v12)) : null;
+                    case XDataCode.WorldDirectionX:
+                        return value is GeoVector v13 ? new ExtendedDataDirection(ToXYZ(v13)) : null;
+                    case XDataCode.RealY:
+                    case XDataCode.RealZ:
+                    case XDataCode.WorldSpacePositionY:
+                    case XDataCode.WorldSpacePositionZ:
+                    case XDataCode.WorldSpaceDisplacementY:
+                    case XDataCode.WorldSpaceDisplacementZ:
+                    case XDataCode.WorldDirectionY:
+                    case XDataCode.WorldDirectionZ:
+                        return null; // only meaningful as part of a point, see MergedCoordinates
                     case XDataCode.ControlString:
                         // { = opening (isClosing=false), } = closing (isClosing=true)
                         string cs = value?.ToString() ?? "";

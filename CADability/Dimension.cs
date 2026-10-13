@@ -2511,6 +2511,7 @@ namespace CADability.GeoObject
             catch (Exception e)
             {
                 if (e is ThreadAbortException) throw (e);
+                System.Diagnostics.Trace.WriteLine("Dimension.GetBoundingCube: the dimension could not be drawn: " + e.Message);
             }
             BoundingCube res = BoundingCube.EmptyBoundingCube;
             for (int i = 0; i < list.Count; ++i)
@@ -2525,6 +2526,7 @@ namespace CADability.GeoObject
                 catch (Exception e)
                 {
                     if (e is ThreadAbortException) throw;
+                    System.Diagnostics.Trace.WriteLine("Dimension.GetBoundingCube: a " + list[i].GetType().Name + " of the dimension has no extent: " + e.Message);
                 }
             }
             return res;

@@ -211,15 +211,6 @@ None left: all of them have been fixed.
   as a name (#373 left this as it is). A database handle (1005) refers to
   the document the XData came from; ACadSharp writes 0 when no object of the
   exported document has it.
-- [ ] `Make3D.Rotate` of a face whose spline edge has straight pieces along
-  and across the axis (a quadratic spline around three sides of a rectangle
-  with doubled poles at the corners, closed by a line) ends in a
-  `PlaneException` from `Plane.Intersect` in
-  `SurfaceOfRevolution.GetLineIntersection`, called by
-  `Shell.AssertOutwardOrientation` while sewing. Found with the first
-  version of `MakeRevolutionTests.FaceWithACornerSplineEdgeGivesASolid`; not
-  investigated further, the surface of revolution of such a meridian has
-  planar and cylindrical parts.
 
 ## Documentation
 

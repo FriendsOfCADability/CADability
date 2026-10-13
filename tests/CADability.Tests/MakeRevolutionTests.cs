@@ -208,5 +208,49 @@ namespace CADability.Tests
             }
             Assert.AreEqual(2 * Math.PI * Math.Abs(moment), solid.Volume(0.01), 1e-3 * 2 * Math.PI * Math.Abs(moment), "volume");
         }
+
+        /// <summary>
+        /// #416, finding 11: a face whose spline edge runs around three sides of a rectangle, with doubled poles at the
+        /// corners, so its straight pieces lie across, along and across the axis. Rotating it threw a PlaneException:
+        /// <list type="bullet">
+        /// <item><see cref="SurfaceOfRevolution.PositionOf"/> intersected the meridian with the plane through the point
+        /// perpendicular to the axis, which contains a whole straight piece across the axis, so the points of the planar
+        /// rings got the parameter of the corner. The surface of revolution got the domain of the cylindrical part only.</item>
+        /// <item><see cref="SurfaceOfRevolution.GetLineIntersection"/> intersected a line perpendicular to the axis with a
+        /// plane perpendicular to the axis, which the line lies in.</item>
+        /// </list>
+        /// The result is the ring between the radii 10 and 20, 10 high.
+        /// </summary>
+        [TestMethod]
+        public void FaceWithASplineAroundARectangleGivesARing()
+        {
+            GeoPoint c0 = new GeoPoint(10, 0, 0), c1 = new GeoPoint(20, 0, 0), c2 = new GeoPoint(20, 0, 10), c3 = new GeoPoint(10, 0, 10);
+            GeoPoint[] poles = { c0, new GeoPoint(c0, c1), c1, c1, new GeoPoint(c1, c2), c2, c2, new GeoPoint(c2, c3), c3 };
+            double[] knots = Enumerable.Range(0, poles.Length - 1).Select(i => (double)i).ToArray();
+            int[] multiplicities = Enumerable.Repeat(1, knots.Length).ToArray();
+            multiplicities[0] = multiplicities[knots.Length - 1] = 3;
+            BSpline spline = BSpline.Construct();
+            Assert.IsTrue(spline.SetData(2, poles, null, knots, multiplicities, false));
+            Plane xz = new Plane(GeoPoint.Origin, GeoVector.XAxis, GeoVector.ZAxis);
+            ICurve2D outline = (spline as ICurve).GetProjectedCurve(xz);
+            ICurve2D closing = new Line2D(outline.EndPoint, outline.StartPoint);
+            Face face = Face.MakeFace(new PlaneSurface(xz), new System.Collections.Generic.List<System.Collections.Generic.List<ICurve2D>>
+                { new System.Collections.Generic.List<ICurve2D> { outline, closing } });
+
+            Solid solid = Revolve(face, 2 * Math.PI) as Solid;
+            Assert.IsNotNull(solid, "rotating the face gives a solid");
+            Assert.AreEqual(0, solid.Shells[0].OpenEdgesExceptPoles.Length, "open edges");
+            double ring = Math.PI * (20 * 20 - 10 * 10) * 10;
+            Assert.AreEqual(ring, ShellMetrics.IntegratedVolume(solid.Shells[0], 0.01), 1e-6 * ring, "volume");
+            // every point of the faces of revolution is found again, also on the planar rings
+            foreach (Face side in solid.Shells[0].Faces.Where(f => f.Surface is SurfaceOfRevolution))
+            {
+                foreach (GeoPoint p in new[] { new GeoPoint(0, 15, 0), new GeoPoint(0, -15, 10), new GeoPoint(-20, 0, 5), new GeoPoint(12, -12, 0) })
+                {
+                    GeoPoint2D uv = side.Surface.PositionOf(p);
+                    Assert.IsTrue((side.Surface.PointAt(uv) | p) < 1e-6, $"PositionOf {p} gives {side.Surface.PointAt(uv)}");
+                }
+            }
+        }
     }
 }

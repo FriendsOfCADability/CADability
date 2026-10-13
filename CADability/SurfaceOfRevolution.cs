@@ -204,6 +204,58 @@ namespace CADability.GeoObject
         {
             if (curveToRotate != null)
             {
+                GeoPoint2D res = PositionOfByPlaneIntersection(p);
+                double dist = res.IsValid ? PointAt(res) | p : double.MaxValue;
+                if (!(dist <= Precision.eps) && MeridianPlane(out Plane meridian))
+                {   // The plane through p perpendicular to the axis meets the curve in a single point only where the curve
+                    // runs across that plane. A piece of the curve lying in the plane (a meridian with a straight piece
+                    // perpendicular to the axis, whose surface is a planar ring) gives no or a wrong point (#416).
+                    GeoPoint2D inMeridian = PositionInMeridianPlane(p, meridian);
+                    if (inMeridian.IsValid && (PointAt(inMeridian) | p) < dist) res = inMeridian;
+                }
+                return res;
+            }
+            return PositionOfByPlaneIntersection(p);
+        }
+        /// <summary>
+        /// The plane of <see cref="curveToRotate"/> when it is planar and contains the axis, which is the usual case.
+        /// </summary>
+        private bool MeridianPlane(out Plane meridian)
+        {
+            meridian = Plane.XYPlane;
+            if (curveToRotate.GetPlanarState() != PlanarState.Planar) return false;
+            meridian = curveToRotate.GetPlane();
+            return Math.Abs(meridian.Distance(axisLocation)) < Precision.eps && Precision.IsPerpendicular(meridian.Normal, axisDirection, false);
+        }
+        /// <summary>
+        /// The parameters of <paramref name="p"/> found by turning it back into the plane of the curve (on either side of the
+        /// axis) and taking the closest point of the curve there.
+        /// </summary>
+        private GeoPoint2D PositionInMeridianPlane(GeoPoint p, Plane meridian)
+        {
+            Plane perp = new Plane(axisLocation, axisDirection);
+            GeoVector2D toP = perp.Project(p).ToVector();
+            GeoVector inPlane = axisDirection ^ meridian.Normal; // perpendicular to the axis, in the plane of the curve
+            GeoPoint2D res = GeoPoint2D.Invalid;
+            double mindist = double.MaxValue;
+            foreach (GeoVector side in new[] { inPlane, -inPlane })
+            {
+                double angle = toP.IsNullVector() ? 0.0 : new SweepAngle(perp.Project(axisLocation + side).ToVector(), toP).Radian;
+                foreach (double u in new[] { angle, -angle })
+                {
+                    GeoPoint back = ModOp.Rotate(axisLocation, axisDirection, (SweepAngle)(-u)) * p;
+                    double v = curveToRotate.PositionToParameter(curveToRotate.PositionOf(back));
+                    GeoPoint2D uv = new GeoPoint2D(u, v);
+                    double d = PointAt(uv) | p;
+                    if (d < mindist) { res = uv; mindist = d; }
+                }
+            }
+            return res;
+        }
+        private GeoPoint2D PositionOfByPlaneIntersection(GeoPoint p)
+        {
+            if (curveToRotate != null)
+            {
                 if (curveToRotate.GetPlanarState() == PlanarState.Planar)
                 {
                     Plane cpln = curveToRotate.GetPlane();
@@ -881,8 +933,9 @@ namespace CADability.GeoObject
         /// <inheritdoc/>
         public override GeoPoint2D[] GetLineIntersection(GeoPoint startPoint, GeoVector direction)
         {
-            if (curveToRotate != null && curveToRotate is IExplicitPCurve3D expcrv)
-            {
+            if (curveToRotate != null && curveToRotate is IExplicitPCurve3D expcrv && !Precision.IsPerpendicular(axisDirection, direction, false))
+            {   // A line perpendicular to the axis lies in the plane through each intersection point perpendicular to the axis,
+                // which is used below to get the point on the line, so it takes the general implementation.
                 // brute force: get quadric of hyperboloid defined by the line rotating around the axis
                 GeoPoint[] samples = new GeoPoint[12];
                 samples[0] = startPoint;

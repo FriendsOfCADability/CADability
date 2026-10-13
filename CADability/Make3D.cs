@@ -16,7 +16,7 @@ namespace CADability.GeoObject
     /// (<see cref="MakeBox"/>, <see cref="MakeCylinder"/>, <see cref="MakeCone"/>, <see cref="MakeSphere"/>, <see cref="MakeTorus"/>),
     /// extrusions and sweeps (<see cref="MakePrism"/>, <see cref="MakeRevolution(IGeoObject, GeoPoint, GeoVector, double, Project)"/>,
     /// <see cref="MakePipe(IGeoObject, Path, Project)"/>, <see cref="MakeRuledSolid"/>, <see cref="MakeRuledShell"/>), boolean operations
-    /// (<see cref="Union(Solid, Solid)"/>, <see cref="Difference(Solid, Solid)"/>; the intersection is <see cref="Solid.Intersect"/>),
+    /// (<see cref="Union(Solid, Solid)"/>, <see cref="Difference(Solid, Solid)"/>, <see cref="Intersection(Solid, Solid)"/>),
     /// fillets and chamfers (<see cref="MakeFillet"/>, <see cref="MakeChamfer"/>) and sewing faces to shells and solids
     /// (<see cref="SewFaces"/>, <see cref="SewFacesAndShells"/>).
     /// <para>
@@ -26,7 +26,8 @@ namespace CADability.GeoObject
     /// </para>
     /// <para>
     /// Some members are left over from an implementation on top of an external modelling kernel and throw
-    /// <see cref="NotImplementedException"/>; their documentation says so.
+    /// <see cref="NotImplementedException"/>; they are marked obsolete, name the replacement where one exists, and will
+    /// be removed in the next minor version.
     /// </para>
     /// </summary>
 
@@ -80,6 +81,7 @@ namespace CADability.GeoObject
         /// <param name="solid">Solid to expand or contract</param>
         /// <param name="offset">Offset for the operation</param>
         /// <returns>The resulting solid</returns>
+        [Obsolete("Not implemented, throws NotImplementedException; use Shell.GetOffset. Will be removed in the next minor version.")]
         public static Solid MakeOffset(Solid solid, double offset)
         {
             throw new NotImplementedException();
@@ -91,6 +93,7 @@ namespace CADability.GeoObject
         /// <param name="shell">Shell to offset</param>
         /// <param name="offset">Offset for the operation</param>
         /// <returns>The resulting shell</returns>
+        [Obsolete("Not implemented, throws NotImplementedException; use Shell.GetOffset. Will be removed in the next minor version.")]
         public static IGeoObject MakeOffset(Shell shell, double offset)
         {
             throw new NotImplementedException();
@@ -134,6 +137,7 @@ namespace CADability.GeoObject
         /// <param name="startMiter">Direction of the connecting profile at the starting point</param>
         /// <param name="endMiter">Direction of the connecting profile at the ending point</param>
         /// <returns>null</returns>
+        [Obsolete("Not implemented, always returns null; use MakePrismMiter(SimpleShape, GeoPoint, GeoVector, GeoVector, GeoVector, GeoVector). Will be removed in the next minor version.")]
         public static Solid MakePrismMiter(SimpleShape outline, GeoPoint[] path, GeoVector topDirection, GeoVector mainDirection, GeoVector startMiter, GeoVector endMiter)
         {
             return null;
@@ -710,6 +714,7 @@ namespace CADability.GeoObject
         /// <param name="shl">Shell to be modified</param>
         /// <param name="sld">Solid which is subtracted</param>
         /// <returns>One or more shells</returns>
+        [Obsolete("Not implemented, throws NotImplementedException. Will be removed in the next minor version.")]
         public static Shell[] Difference(Shell shl, Solid sld)
         {
             throw new NotImplementedException();
@@ -721,6 +726,7 @@ namespace CADability.GeoObject
         /// <param name="fce">Face to be modified</param>
         /// <param name="sld">Solid which is subtracted</param>
         /// <returns>One or more faces</returns>
+        [Obsolete("Not implemented, throws NotImplementedException. Will be removed in the next minor version.")]
         public static Face[] Difference(Face fce, Solid sld)
         {
             throw new NotImplementedException();
@@ -732,6 +738,7 @@ namespace CADability.GeoObject
         /// <param name="sld">Solid to be split</param>
         /// <param name="fce">Face which splits the solid</param>
         /// <returns>The parts of the solid</returns>
+        [Obsolete("Not implemented, throws NotImplementedException; use Solid.SplitByPlane to split a solid by a plane. Will be removed in the next minor version.")]
         public static Solid[] Difference(Solid sld, Face fce)
         {
             throw new NotImplementedException();
@@ -742,43 +749,39 @@ namespace CADability.GeoObject
         /// with the same index of the second path, so both paths need the same number of segments; a path with a single
         /// segment is split into as many segments as the other path has. Two lines are connected by a plane, two coaxial
         /// circles by a cylinder or a cone, other pairs by a <see cref="RuledSurface"/>, see <see cref="MakeRuledSurface"/>.
-        /// Throws <see cref="NotImplementedException"/> when the paths cannot be connected (different number of segments,
-        /// an open path, or a path that does not bound a planar face).
+        /// Returns null when the paths cannot be connected to a solid (different number of segments, an open path, a path
+        /// that does not bound a planar face, or a surface that cannot be built).
         /// </summary>
         /// <param name="firstPath">the first path, closed</param>
         /// <param name="secondPath">the second path, closed</param>
         /// <param name="project">the <see cref="Project"/> to set default styles for the result, may be null</param>
-        /// <returns>the generated solid</returns>
+        /// <returns>the generated solid, or null</returns>
         public static Solid MakeRuledSolid(Path firstPath, Path secondPath, Project project)
         {
-            IGeoObject res = MakeRuledShellX(firstPath, secondPath, true, project);
-            if (res is Solid) return res as Solid;
-
-            throw new NotImplementedException();
+            return MakeRuledShellX(firstPath, secondPath, true, project) as Solid;
         }
         /// <summary>
         /// Connects the two paths with ruled surfaces and returns them as a <see cref="Shell"/>, without the faces of the paths.
         /// Each segment of the first path is connected with the segment with the same index of the second path, so both
         /// paths need the same number of segments; a path with a single segment is split into as many segments as the other
-        /// path has. The paths may be open or closed. Throws <see cref="NotImplementedException"/> when the paths cannot be
-        /// connected (different number of segments or a failing surface).
+        /// path has. The paths may be open or closed. Returns null when the paths cannot be connected (different number of
+        /// segments or a failing surface).
         /// </summary>
         /// <param name="firstPath">the first path</param>
         /// <param name="secondPath">the second path</param>
         /// <param name="project">the <see cref="Project"/> to set default styles for the result, may be null</param>
-        /// <returns>the generated shell</returns>
+        /// <returns>the generated shell, or null</returns>
         public static IGeoObject MakeRuledShell(Path firstPath, Path secondPath, Project project)
         {
             try
             {
-                IGeoObject res = MakeRuledShellX(firstPath, secondPath, false, project);
-                if (res != null) return res;
+                return MakeRuledShellX(firstPath, secondPath, false, project);
             }
             catch (Exception ex)
             {
                 if (ex is ThreadAbortException) throw (ex);
+                return null;
             }
-            throw new NotImplementedException();
         }
         internal static IGeoObject MakeRuledShellX(Path firstPath, Path secondPath, bool makeSolid, Project project) // ersetzt später obiges
         {
@@ -1872,6 +1875,7 @@ namespace CADability.GeoObject
         /// <param name="faces">faces to intersect</param>
         /// <param name="plane">the plane</param>
         /// <returns>nothing, throws</returns>
+        [Obsolete("Not implemented, throws NotImplementedException; use GetPlaneIntersection of Face, Shell or Solid. Will be removed in the next minor version.")]
         public static Make3D PlaneIntersection(Face[] faces, Plane plane)
         {
             throw new NotImplementedException();
@@ -2141,6 +2145,7 @@ namespace CADability.GeoObject
         /// </summary>
         /// <param name="project">the project to set default styles</param>
         /// <returns>nothing, throws</returns>
+        [Obsolete("Not implemented, throws NotImplementedException; use the static methods of Make3D. Will be removed in the next minor version.")]
         public IGeoObject GetShape(Project project)
         {
             IGeoObject[] res = GetShapes(project);
@@ -2152,6 +2157,7 @@ namespace CADability.GeoObject
         /// </summary>
         /// <param name="project">the project to set default styles</param>
         /// <returns>nothing, throws</returns>
+        [Obsolete("Not implemented, throws NotImplementedException; use the static methods of Make3D. Will be removed in the next minor version.")]
         public IGeoObject[] GetShapes(Project project)
         {
             throw new NotImplementedException();
@@ -2217,15 +2223,15 @@ namespace CADability.GeoObject
             throw new NotImplementedException();
         }
         /// <summary>
-        /// Not implemented, throws <see cref="NotImplementedException"/>. Use <see cref="Solid.Intersect"/> for the intersection
-        /// of two solids.
+        /// Returns the intersection of the two given <see cref="Solid"/>s, same as <see cref="Solid.Intersect"/>: the parts
+        /// common to both solids, as new solids. If the solids are disjunct or only touch, the array is empty.
         /// </summary>
         /// <param name="solid1">first solid</param>
         /// <param name="solid2">second solid</param>
-        /// <returns>nothing, throws</returns>
+        /// <returns>the common parts, empty when there are none</returns>
         public static Solid[] Intersection(Solid solid1, Solid solid2)
         {
-            throw new NotImplementedException();
+            return Solid.Intersect(solid1, solid2);
         }
         /// <summary>
         /// Not implemented, throws <see cref="NotImplementedException"/>.
@@ -2233,6 +2239,7 @@ namespace CADability.GeoObject
         /// <param name="shell1">the shell</param>
         /// <param name="solid2">the solid</param>
         /// <returns>nothing, throws</returns>
+        [Obsolete("Not implemented, throws NotImplementedException. Will be removed in the next minor version.")]
         public static Shell[] Intersection(Shell shell1, Solid solid2)
         {
             throw new NotImplementedException();
@@ -2243,6 +2250,7 @@ namespace CADability.GeoObject
         /// <param name="face1">the first face</param>
         /// <param name="face2">the second face</param>
         /// <returns>nothing, throws</returns>
+        [Obsolete("Not implemented, throws NotImplementedException; use Face.Intersect(Face). Will be removed in the next minor version.")]
         public static IGeoObject[] Intersection(Face face1, Face face2)
         {
             throw new NotImplementedException();
@@ -3430,6 +3438,7 @@ namespace CADability.GeoObject
         /// <param name="makeCompounds">true: combine the imported objects into blocks according to the structure of the file</param>
         /// <returns>nothing, throws</returns>
         /// <exception cref="NotImplementedException">always</exception>
+        [Obsolete("Not implemented, throws NotImplementedException; the DTK import library is not part of CADability. Will be removed in the next minor version.")]
         static public IGeoObject[] ImportDtk(string filename, Project pr, bool useProgress = false, bool makeCompounds = false)
         {
             throw new NotImplementedException();
@@ -3444,6 +3453,7 @@ namespace CADability.GeoObject
         /// <param name="shell">the shell to cut</param>
         /// <returns>null when the path cannot be made planar or no prism can be made from it, otherwise throws</returns>
         /// <exception cref="NotImplementedException">from <see cref="Intersection(Shell, Solid)"/></exception>
+        [Obsolete("Not functional, throws NotImplementedException unless the path cannot be made planar. Will be removed in the next minor version.")]
         static public Shell Curtail(Path path, Shell shell)
         {
             path.Flatten();
@@ -3486,6 +3496,7 @@ namespace CADability.GeoObject
             return null;
         }
 #if DEBUG
+        [Obsolete("Not implemented, throws NotImplementedException. Will be removed in the next minor version.")]
         static public Shell[] RemoveBoundaryOffset(Shell shell, double dist)
         {
             throw new NotImplementedException();

@@ -1948,9 +1948,6 @@ namespace CADability
                 case "MenuId.Measure.Vector.DirectionTwoPoints":
                     SetAction(new CADability.Actions.ConstructDirectionTwoPoints(null));
                     return true;
-                case "MenuId.Measure":
-                    SetAction(new Measure());
-                    return true;
                 case "MenuId.RoundMultiple":
                     SetAction(new ToolsRoundMultiple());
                     return true;

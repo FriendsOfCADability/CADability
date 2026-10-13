@@ -132,11 +132,12 @@ namespace CADability.Attribute
         /// </summary>
         public enum ESymbolPlacement { DimInside, DimOutside, DimAutomatic };
         /// <summary>
-        /// Style of the text font; see <see cref="FontFlags"/> and the boolean properties <see cref="DimensionStyle.DimFontBold"/>, <see cref="DimensionStyle.DimFontItalic"/>,
-        /// <see cref="DimensionStyle.DimFontUnderline"/> and <see cref="DimensionStyle.DimFontStrikeOut"/>. The members are declared as consecutive values rather than
-        /// single bits, and the font style is not applied by the current <see cref="Dimension"/> layout, which only uses <see cref="TextFont"/>.
+        /// Style of the text font as a combination of bits; see <see cref="FontFlags"/> and the boolean properties <see cref="DimensionStyle.DimFontBold"/>,
+        /// <see cref="DimensionStyle.DimFontItalic"/>, <see cref="DimensionStyle.DimFontUnderline"/> and <see cref="DimensionStyle.DimFontStrikeOut"/>. The font
+        /// style is not applied by the current <see cref="Dimension"/> layout, which only uses <see cref="TextFont"/>, and it is not written to files.
         /// </summary>
-        public enum EFontFlag { DimFontBold, DimFontItalic, DimFontUnderline, DimFontStrikeOut };
+        [Flags]
+        public enum EFontFlag { DimFontBold = 1, DimFontItalic = 2, DimFontUnderline = 4, DimFontStrikeOut = 8 };
 
         private string name;
         private string textPrefix;
@@ -1844,8 +1845,8 @@ namespace CADability.Attribute
         }
 
         /// <summary>
-        /// The dimension text is bold (<see cref="EFontFlag.DimFontBold"/>). The font style is not applied by the current layout; and since
-        /// <see cref="EFontFlag.DimFontBold"/> has the value 0, this property always reads false. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// The dimension text is bold (<see cref="EFontFlag.DimFontBold"/>). Stored, but the font style is not applied by the current
+        /// layout. Setting it raises <see cref="PropertyChangedEvent"/>.
         /// </summary>
         public bool DimFontBold
         {
@@ -1899,7 +1900,7 @@ namespace CADability.Attribute
         }
         /// <summary>
         /// The dimension text is struck out (<see cref="EFontFlag.DimFontStrikeOut"/>). Stored, but the font style is not applied by the
-        /// current layout; note that the value of <see cref="EFontFlag.DimFontStrikeOut"/> overlaps the italic and underline values. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// current layout. Setting it raises <see cref="PropertyChangedEvent"/>.
         /// </summary>
         public bool DimFontStrikeOut
         {

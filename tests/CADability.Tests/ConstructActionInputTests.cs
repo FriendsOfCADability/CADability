@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using CADability.Actions;
 using CADability.UserInterface;
 
@@ -89,6 +89,28 @@ namespace CADability.Tests
             Assert.AreEqual(0, mode.Choice);
             Assert.AreEqual("x", property.Value);
             CollectionAssert.AreEqual(new int[] { 0 }, reported, "the new selection is reported");
+        }
+
+        /// <summary>
+        /// The default choice, with which the next instance of the action starts, follows the selected entry when its
+        /// index moves (#416, finding 2), not only when the selection is lost.
+        /// </summary>
+        [TestMethod]
+        public void the_default_choice_follows_the_selected_entry()
+        {
+            TestAction action = new TestAction();
+            ConstructAction.MultipleChoiceInput mode = new ConstructAction.MultipleChoiceInput("Test.Mode", new string[] { "a", "b", "c" }, 1);
+            mode.DefaultChoice = new ConstructAction.DefaultInteger();
+            mode.DefaultChoice.Integer = 1; // the action starts with "b"
+            action.SetInput(mode);
+            Build(action, mode);
+
+            mode.SetChoices(new string[] { "x", "y", "b" }); // "b" is kept, its index moves from 1 to 2
+            Assert.AreEqual(2, mode.Choice);
+            Assert.AreEqual(2, mode.DefaultChoice.Integer, "the default follows b");
+
+            mode.SetChoices(new string[] { "p", "q" }); // "b" is gone
+            Assert.AreEqual(0, mode.DefaultChoice.Integer);
         }
 
         [TestMethod]

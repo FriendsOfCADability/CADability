@@ -3979,6 +3979,9 @@ namespace CADability.Actions
 				bool selectionLost = newChoice < 0;
 				if (selectionLost) newChoice = 0;
 				Choice = newChoice;
+				// also when the selected text was kept: its index may have moved, and the next instance of the action
+				// starts with the index stored here
+				if (DefaultChoice != null) DefaultChoice.Integer = newChoice;
 				if (multipleChoiceProperty != null)
 				{
 					multipleChoiceProperty.Choices = directValues;
@@ -3987,7 +3990,6 @@ namespace CADability.Actions
 				}
 				if (selectionLost)
 				{
-					if (DefaultChoice != null) DefaultChoice.Integer = newChoice;
 					SetChoiceEvent?.Invoke(newChoice);
 					constructAction?.RefreshDependantProperties();
 				}

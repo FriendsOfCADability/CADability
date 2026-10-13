@@ -408,7 +408,9 @@ namespace CADability.GeoObject
             return res.ToArray();
         }
         /// <summary>
-        /// Returns the volume of this solid. the calculation is based on a triangulation with at least the provided <paramref name="precision"/>.
+        /// Returns the volume of this solid. The calculation is based on a triangulation of the faces with the provided
+        /// <paramref name="precision"/> (see <see cref="Face.GetTriangulation"/>: the edges deviate by up to that value, the
+        /// triangles inside the faces by about five times that value).
         /// </summary>
         /// <param name="precision">The precision of the triangulation</param>
         public double Volume(double precision)

@@ -351,7 +351,8 @@ namespace CADability.GeoObject
         /// triangulation of the faces. The shell must be closed, otherwise the result is meaningless. The sign follows the
         /// orientation: positive for an outward oriented shell, negative for an inward oriented one (a cavity).
         /// </summary>
-        /// <param name="precision">precision of the triangulation, which limits the precision of the result</param>
+        /// <param name="precision">precision of the triangulation, which limits the precision of the result: the edges deviate
+        /// by up to this value, the triangles inside the faces by about five times this value (see <see cref="Face.GetTriangulation"/>)</param>
         /// <returns>the signed volume</returns>
         public double Volume(double precision)
         {

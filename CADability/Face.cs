@@ -6381,8 +6381,7 @@ namespace CADability.GeoObject
                 }
                 // double dbga = this.area.Area;
 #endif
-                Triangulation t = new Triangulation(polylines.ToArray(), surface, precision * 5.0, 0.17);
-                // precision*5: inside the face we don't need the same hight precision as on the bounds
+                Triangulation t = new Triangulation(polylines.ToArray(), surface, precision * InteriorPrecisionFactor, 0.17);
                 if (!t.innerIntersection)
                 {
                     GeoPoint2D[] tmpTriUv;
@@ -6481,7 +6480,7 @@ namespace CADability.GeoObject
                         GeoPoint2D[] tmpTriUv;
                         GeoPoint[] tmpTriPoint;
                         int[] tmpTriInd;
-                        t = new Triangulation(multiPolyLines[i], surface, precision, 0.17);
+                        t = new Triangulation(multiPolyLines[i], surface, precision * InteriorPrecisionFactor, 0.17);
                         if (!t.innerIntersection)
                         {
                             t.GetSimpleTriangles(out tmpTriUv, out tmpTriPoint, out tmpTriInd, true);
@@ -6621,7 +6620,8 @@ namespace CADability.GeoObject
         /// index following its last point, so the points of loop i are those from edgeIndizes[i-1] (0 for the first loop) to
         /// edgeIndizes[i]-1. All arrays are empty when the outline of the face has no area.
         /// </summary>
-        /// <param name="precision">maximum deviation of the polygons from the edges and of the triangles from the surface</param>
+        /// <param name="precision">maximum deviation of the polygons from the edges; the triangles inside the face may deviate from
+        /// the surface by about five times this value, as in <see cref="GetTriangulation"/></param>
         /// <param name="noInnerPoints">true: the boundary polygons are triangulated as they are; false: triangles whose edges
         /// deviate too much from the surface are subdivided, which adds points inside the face</param>
         /// <param name="trianglePoint">the 3d points of the triangles</param>
@@ -6811,7 +6811,7 @@ namespace CADability.GeoObject
                     esum += polylines[j].Length;
                     edgeIndizes[j] = esum;
                 }
-                Triangulation t = new Triangulation(polylines.ToArray(), surface, precision * 5.0, 0.17);
+                Triangulation t = new Triangulation(polylines.ToArray(), surface, precision * InteriorPrecisionFactor, 0.17);
                 // Genauigkeit für innere Punkte nur halbsoviel wie für den Rand, dort fallen die Knicke nicht so auf
                 GeoPoint2D[] innerPoints = null;
                 if (surface is NurbsSurface)
@@ -6873,7 +6873,7 @@ namespace CADability.GeoObject
                             GeoPoint2D[] tmpTriUv;
                             GeoPoint[] tmpTriPoint;
                             int[] tmpTriInd;
-                            Triangulation t = new Triangulation(multiPolyLines[i], surface, precision, 0.17);
+                            Triangulation t = new Triangulation(multiPolyLines[i], surface, precision * InteriorPrecisionFactor, 0.17);
                             GeoPoint2D[] innerPoints = null;
                             if (surface is NurbsSurface)
                             {
@@ -7014,6 +7014,14 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// The triangulation (<see cref="GetTriangulation"/>, <see cref="GetSimpleTriangulation"/>) approximates the edges of a
+        /// face with the requested precision, but lets the triangles inside the face deviate from the surface by up to this
+        /// factor times the precision: the deviation of a chord grows with the square of its length, so a tighter bound would
+        /// need about five times as many triangles on doubly curved faces, which the display does not need. A caller that
+        /// needs about the same deviation inside the face passes the precision divided by this factor.
+        /// </summary>
+        internal const double InteriorPrecisionFactor = 5.0;
         internal void AssureTriangles(double precision)
         {
             lock (lockTriangulationRecalc)
@@ -8803,12 +8811,17 @@ namespace CADability.GeoObject
         #endregion
 
         /// <summary>
-        /// Returns the triangulation of this face to the provided precision.
+        /// Returns the triangulation of this face to the provided precision: the edges are approximated within
+        /// <paramref name="precision"/>, the triangles inside the face may deviate from the surface by about five times
+        /// <paramref name="precision"/>, because the display does not need more. To keep the deviation inside the face close
+        /// to a value, pass a fifth of it (the triangulation checks a few points per triangle, so this is not a strict bound). The triangulation is cached and reused for every later request down to half the
+        /// precision it was made with, so it may be up to twice as coarse as requested; a fresh copy of the face
+        /// (<see cref="Clone()"/>) is triangulated anew.
         /// <paramref name="trianglePoint"/> and <paramref name="triangleUVPoint"/> are two arrays of the same length specifying the
         /// vertices of the triangle in 3d or 2d surface coordinates. <paramref name="triangleIndex"/> is a list of indizes to
         /// trianglePoint and triangleUVPoint where each triple of indices describes one triangle. The length of triangleIndex is a multiple of 3.
         /// </summary>
-        /// <param name="precision">Required precision</param>
+        /// <param name="precision">Maximum deviation of the edges, a fifth of the deviation allowed inside the face</param>
         /// <param name="trianglePoint">Resulting 3d points</param>
         /// <param name="triangleUVPoint">Resulting 2d points</param>
         /// <param name="triangleIndex">Triangle indizes</param>

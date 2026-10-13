@@ -76,6 +76,24 @@ namespace CADability.Tests
             Assert.AreEqual(read.GetActiveModel().AllObjects.Count, again.GetActiveModel().AllObjects.Count);
         }
 
+        /// <summary>
+        /// The colours and layers read from JSON belong to their list again: renaming one to the name of another is
+        /// refused by the list, as for a list that was built in code. The ColorList used to miss its callback after
+        /// reading, so its colours had no list and accepted a duplicate name.
+        /// </summary>
+        [TestMethod]
+        public void ColorsAndLayersBelongToTheirListAfterReading()
+        {
+            Project project = Project.CreateSimpleProject();
+            Assert.IsTrue(project.ColorList.Count >= 2 && project.LayerList.Count >= 2, "the default lists have at least two entries");
+            Project again = RoundTrip(project);
+
+            ColorList colors = again.ColorList;
+            Assert.ThrowsException<NameAlreadyExistsException>(() => colors[0].Name = colors[1].Name, "a colour must not take the name of another one");
+            LayerList layers = again.LayerList;
+            Assert.ThrowsException<NameAlreadyExistsException>(() => layers[0].Name = layers[1].Name, "a layer must not take the name of another one");
+        }
+
         [TestMethod]
         public void NamedValuesSurviveARoundTrip()
         {

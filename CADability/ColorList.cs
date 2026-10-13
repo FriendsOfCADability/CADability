@@ -957,6 +957,7 @@ namespace CADability.Attribute
         {
             namedColors = data.GetProperty<ArrayList>("NamedColors");
             current = data.GetProperty<ColorDef>("Current");
+            data.RegisterForSerializationDoneCallback(this);
         }
 
         #endregion

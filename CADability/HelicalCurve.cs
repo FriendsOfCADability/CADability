@@ -53,6 +53,10 @@ namespace CADability.GeoObject
             if (Constructor != null) return Constructor();
             return new HelicalCurve();
         }
+        /// <summary>
+        /// Signature of the handlers of the <see cref="Constructed"/> event.
+        /// </summary>
+        /// <param name="justConstructed">The helical curve that has just been created</param>
         public delegate void ConstructedDelegate(HelicalCurve justConstructed);
         public static event ConstructedDelegate Constructed;
         #endregion
@@ -313,6 +317,7 @@ namespace CADability.GeoObject
         #endregion
 
         #region IGeoObjectImpl overrides
+        /// <inheritdoc/>
         public override IGeoObject Clone()
         {
             HelicalCurve res = Construct();
@@ -324,6 +329,7 @@ namespace CADability.GeoObject
             res.CopyAttributes(this);
             return res;
         }
+        /// <inheritdoc/>
         public override void CopyGeometry(IGeoObject ToCopyFrom)
         {
             HelicalCurve other = ToCopyFrom as HelicalCurve;
@@ -489,6 +495,7 @@ namespace CADability.GeoObject
                 return Precision.IsEqual(StartPoint, EndPoint);
             }
         }
+        /// <inheritdoc/>
         public override bool IsSingular
         {
             get { return Length < Precision.eps; }
@@ -692,6 +699,7 @@ namespace CADability.GeoObject
         #endregion
 
         #region IJsonSerialize Members
+        /// <inheritdoc/>
         public override void GetObjectData(IJsonWriteData data)
         {
             base.GetObjectData(data); // layer, style, user data and attributes
@@ -705,6 +713,7 @@ namespace CADability.GeoObject
             if (LineWidth != null) data.AddProperty("LineWidth", LineWidth);
             if (LinePattern != null) data.AddProperty("LinePattern", LinePattern);
         }
+        /// <inheritdoc/>
         public override void SetObjectData(IJsonReadData data)
         {
             base.SetObjectData(data);

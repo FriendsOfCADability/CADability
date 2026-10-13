@@ -125,6 +125,11 @@ namespace CADability
                     return bounds;
                 }
             }
+            /// <summary>
+            /// The matrix that maps world coordinates into the unit box [0,1]x[0,1]x[0,1] of this pick area: a point lies inside
+            /// the pick area exactly when its image lies inside <see cref="BoundingCube.UnitBoundingCube"/>. The hit tests of the
+            /// geometric objects use it to decide whether they are picked.
+            /// </summary>
             public Matrix4 ToUnitBox
             {
                 get
@@ -139,6 +144,11 @@ namespace CADability
             {
                 get { return frontCenter; }
             }
+            /// <summary>
+            /// The normalized view direction through the center of the pick area, pointing from the viewer into the model.
+            /// Together with <see cref="FrontCenter"/> it defines the beam through the center of the picked rectangle, which is
+            /// used to sort picked objects by their distance from the viewer.
+            /// </summary>
             public GeoVector Direction
             {
                 get
@@ -300,6 +310,10 @@ namespace CADability
         {
             return new Projection(this);
         }
+        /// <summary>
+        /// Creates a new parallel projection looking down onto the xy-plane from above, with the y axis of the model pointing
+        /// upwards on the screen. Same as <c>new Projection(StandardProjection.FromTop)</c>.
+        /// </summary>
         public static Projection FromTop { get { return new Projection(StandardProjection.FromTop); } }
         /// <summary>
         /// Returns a PickArea, <paramref name="viewRect"/> is in window coordinates
@@ -421,6 +435,19 @@ namespace CADability
             }
             catch (CoordSysException) { } // ungültige Richtungen
         }
+        /// <summary>
+        /// Changes the view direction like <see cref="SetDirection(GeoVector, GeoVector, BoundingCube)"/>, but animated: the projection
+        /// is interpolated from the current to the new direction over about half a second, repainting <paramref name="ctrl"/> for each
+        /// step (the animation is driven by the <see cref="ICanvas.OnPaintDone"/> event and this method returns immediately).
+        /// At the end the view either shows the whole <paramref name="model"/> (<paramref name="zoomTotal"/>) or keeps
+        /// <paramref name="fixPoint"/> at its current position on the screen. Used by the standard view commands of the frame.
+        /// </summary>
+        /// <param name="viewDirection">The new view direction</param>
+        /// <param name="TopDirection">The direction in the model that points upwards on the screen when the animation is finished</param>
+        /// <param name="model">The model shown in the view, needed to compute the extent for zoom total</param>
+        /// <param name="zoomTotal">true: zoom to the extent of the model at the end; false: keep <paramref name="fixPoint"/> in place</param>
+        /// <param name="ctrl">The canvas that displays the view and is repainted during the animation</param>
+        /// <param name="fixPoint">The point in world coordinates that keeps its position on the screen; if invalid, <paramref name="zoomTotal"/> is assumed</param>
         public void SetDirectionAnimated(GeoVector viewDirection, GeoVector TopDirection, Model model, bool zoomTotal, ICanvas ctrl, GeoPoint fixPoint)
         {
             if (!fixPoint.IsValid) zoomTotal = true;
@@ -597,6 +624,10 @@ namespace CADability
             get { return showHiddenLines; }
             set { showHiddenLines = value; }
         }
+        /// <summary>
+        /// Display hint for the paint interface: true to display faces as filled (shaded) areas, false to display only their
+        /// edges (wireframe display). The views expose it as a property of the view.
+        /// </summary>
         public bool ShowFaces
         {
             get { return showFaces; }
@@ -610,6 +641,11 @@ namespace CADability
             get { return showDrawingPlane; }
             set { showDrawingPlane = value; }
         }
+        /// <summary>
+        /// The precision in world units at which curved objects are approximated (triangulated) when they are displayed or picked
+        /// with this projection, i.e. the maximum allowed distance between the approximation and the exact geometry. The views set
+        /// it to a fraction of the model extent (typically 1/1000 of its size); 0.0 means that it has not been determined yet.
+        /// </summary>
         public double Precision
         {
             get
@@ -638,6 +674,15 @@ namespace CADability
             SetPlacement(new RectangleF(Destination.X, Destination.Y, Destination.Width, Destination.Height), Source);
         }
 
+        /// <summary>
+        /// Sets the 2d placement (scaling and offset) of the projection so that the <paramref name="Source"/> rectangle fits into the
+        /// <paramref name="Destination"/> rectangle and is centered in it; the aspect ratio is preserved. For a perspective projection
+        /// the source rectangle is taken in the 2d system of the <see cref="ProjectionPlane"/> and the current placement is adjusted
+        /// accordingly. Same as <see cref="SetPlacement(Rectangle, BoundingRect)"/> with a floating point destination.
+        /// Raises <see cref="ProjectionChangedEvent"/>.
+        /// </summary>
+        /// <param name="Destination">the destination rectangle in pixels, usually the client rectangle of the control</param>
+        /// <param name="Source">the source rectangle in the 2d world coordinates of the projection plane</param>
         public void SetPlacement(RectangleF Destination, BoundingRect Source)
         {
             // Höhe und Breite==0 soll einen Fehler liefern!
@@ -674,6 +719,14 @@ namespace CADability
             }
         }
 
+        /// <summary>
+        /// Sets the 2d placement directly. The placement maps the unscaled 2d projection to pixel coordinates as
+        /// x' = factor * x + dx and y' = -factor * y + dy (see <see cref="GetPlacement(out double, out double, out double)"/>).
+        /// Raises <see cref="ProjectionChangedEvent"/>.
+        /// </summary>
+        /// <param name="factor">the scaling factor (pixels per unit of the 2d world coordinate system)</param>
+        /// <param name="dx">the offset in x (pixels)</param>
+        /// <param name="dy">the offset in y (pixels)</param>
         public void SetPlacement(double factor, double dx, double dy)
         {
             placementFactor = factor;
@@ -695,6 +748,10 @@ namespace CADability
             dx = placementX;
             dy = placementY;
         }
+        /// <summary>
+        /// The scaling factor of the 2d placement, i.e. the number of pixels per unit of the 2d world coordinate system.
+        /// Same as <see cref="WorldToDeviceFactor"/>.
+        /// </summary>
         public double PlacementFactor
         {
             get
@@ -702,12 +759,26 @@ namespace CADability
                 return placementFactor;
             }
         }
+        /// <summary>
+        /// Shifts the 2d placement by the given number of pixels, i.e. scrolls the view without changing the scaling.
+        /// Raises <see cref="ProjectionChangedEvent"/>.
+        /// </summary>
+        /// <param name="dx">the horizontal offset in pixels (positive moves the content to the right)</param>
+        /// <param name="dy">the vertical offset in pixels (positive moves the content downwards)</param>
         public void MovePlacement(double dx, double dy)
         {
             placementX += dx;
             placementY += dy;
             SetCoefficients();
         }
+        /// <summary>
+        /// Returns a new projection in which the modification <paramref name="ToPrepend"/> is applied to the model before it is
+        /// projected, so that objects appear as if they were transformed by it. Only the 2d aspects (scaling and translation) of the
+        /// modification are handled correctly; it is used to display a block reference that is being dragged during drag and drop.
+        /// This projection is not modified.
+        /// </summary>
+        /// <param name="ToPrepend">The modification to apply before the projection</param>
+        /// <returns>The combined projection</returns>
         public Projection PrependModOp(ModOp ToPrepend)
         {   // dieses wird verwendet während DragAndDrop für die Darstellung des gezogenen BlockRefs
             // Die implementierung berücksichtigt nur die 2D Aspekte, ist somit bestimmt nicht logisch,
@@ -722,6 +793,12 @@ namespace CADability
             res.SetCoefficients();
             return res;
         }
+        /// <summary>
+        /// Replaces the unscaled parallel projection (the <see cref="ModOp"/> that maps world coordinates to the 2d coordinate system
+        /// of the projection plane, see <see cref="UnscaledProjection"/>) and makes this a parallel projection. The placement
+        /// (scaling and offset) is kept. Raises <see cref="ProjectionChangedEvent"/>.
+        /// </summary>
+        /// <param name="unscaledProjection">The new projection, usually derived from the current <see cref="UnscaledProjection"/></param>
         public void SetUnscaledProjection(ModOp unscaledProjection)
         {
             this.unscaledProjection = unscaledProjection;
@@ -747,15 +824,33 @@ namespace CADability
                 return unscaledProjection.Project(p);
             }
         }
+        /// <summary>
+        /// Projects the given vector into 2d without applying the scaling and the placement, i.e. the result is in the 2d world
+        /// coordinate system of the projection plane. Uses the parallel projection only.
+        /// </summary>
+        /// <param name="v">the vector to project (model coordinates)</param>
+        /// <returns>the projected vector in the 2d world coordinate system</returns>
         public GeoVector2D ProjectUnscaled(GeoVector v)
         {
             return unscaledProjection.Project(v);
         }
+        /// <summary>
+        /// Returns the 3d point in the <see cref="ProjectionPlane"/> that corresponds to the given point of the 2d world coordinate
+        /// system. This is the inverse of <see cref="ProjectUnscaled(GeoPoint)"/> for points in the projection plane.
+        /// </summary>
+        /// <param name="p">the point in the 2d world coordinate system</param>
+        /// <returns>the point in model coordinates, located in the projection plane</returns>
         public GeoPoint UnProjectUnscaled(GeoPoint2D p)
         {
             // return inverseProjection * new GeoPoint(p);
             return ProjectionPlane.ToGlobal(p);
         }
+        /// <summary>
+        /// Returns the 3d vector parallel to the <see cref="ProjectionPlane"/> that corresponds to the given vector of the 2d world
+        /// coordinate system. This is the inverse of <see cref="ProjectUnscaled(GeoVector)"/> for vectors in the projection plane.
+        /// </summary>
+        /// <param name="v">the vector in the 2d world coordinate system</param>
+        /// <returns>the vector in model coordinates, parallel to the projection plane</returns>
         public GeoVector UnProjectUnscaled(GeoVector2D v)
         {
             // return inverseProjection * new GeoPoint(p);
@@ -784,10 +879,24 @@ namespace CADability
             //    (right - placementX) / placementFactor,
             //    -(top - placementY) / placementFactor);
         }
+        /// <summary>
+        /// Returns the extent of the given object as seen in this projection, in the 2d world coordinate system of the projection
+        /// plane. Same as <see cref="IGeoObject.GetExtent(Projection, ExtentPrecision)"/> with <see cref="ExtentPrecision.Raw"/>,
+        /// so the result is a quick estimate that may be somewhat larger than the exact extent.
+        /// </summary>
+        /// <param name="go">the object</param>
+        /// <returns>the 2d extent of the object</returns>
         public BoundingRect GetExtent(CADability.GeoObject.IGeoObject go)
         {
             return go.GetExtent(this, CADability.GeoObject.ExtentPrecision.Raw);
         }
+        /// <summary>
+        /// Converts a rectangle in the 2d world coordinate system of the projection plane to a rectangle in pixel coordinates
+        /// (y growing downwards) by applying the 2d placement. The result is enlarged by two pixels on each side, which makes it
+        /// suited for invalidating the area of an object. Only the placement is considered, so it is intended for parallel projections.
+        /// </summary>
+        /// <param name="r">the rectangle in the 2d world coordinate system</param>
+        /// <returns>the rectangle in pixel coordinates</returns>
         public Rectangle DeviceRect(BoundingRect r)
         {
             Rectangle res = new Rectangle((int)Math.Round(r.Left * placementFactor + placementX),
@@ -797,6 +906,13 @@ namespace CADability
             res.Inflate(2, 2);
             return res;
         }
+        /// <summary>
+        /// Converts a position in pixel coordinates of the window (origin at the top left, y growing downwards) to the corresponding
+        /// point in the 2d world coordinate system of the <see cref="ProjectionPlane"/>. Works for both parallel and perspective
+        /// projection; inverse of <see cref="World2DToWindow(GeoPoint2D)"/>.
+        /// </summary>
+        /// <param name="p">the position in pixel coordinates</param>
+        /// <returns>the point in the 2d world coordinate system</returns>
         public GeoPoint2D PointWorld2D(System.Drawing.Point p)
         {
             if (!openGlMatrix.IsValid) Initialize();
@@ -806,13 +922,32 @@ namespace CADability
             // für Parallelprojektion gilt einfacher:
             // return new GeoPoint2D((p.X - placementX) / placementFactor, -(p.Y - placementY) / placementFactor);
         }
+        /// <summary>
+        /// Same as <see cref="PointWorld2D(System.Drawing.Point)"/> for a floating point pixel position; the position is truncated
+        /// to whole pixels.
+        /// </summary>
+        /// <param name="pf">the position in pixel coordinates</param>
+        /// <returns>the point in the 2d world coordinate system</returns>
         public GeoPoint2D PointWorld2D(PointF pf)
         {
             System.Drawing.Point p = new System.Drawing.Point((int)(pf.X), (int)(pf.Y));
             return PointWorld2D(p);
         }
+        /// <summary>
+        /// The length in units of the 2d world coordinate system that corresponds to one pixel; the reciprocal of
+        /// <see cref="WorldToDeviceFactor"/>. Use it to give objects a fixed size on the screen regardless of the zoom.
+        /// </summary>
         public double DeviceToWorldFactor { get { return 1.0 / placementFactor; } }
+        /// <summary>
+        /// The number of pixels that correspond to one unit of the 2d world coordinate system, i.e. the scaling of the 2d placement
+        /// (same as <see cref="PlacementFactor"/>). The larger the value, the further the view is zoomed in.
+        /// </summary>
         public double WorldToDeviceFactor { get { return placementFactor; } }
+        /// <summary>
+        /// The parallel projection without scaling and placement as a <see cref="ModOp"/>: it maps world coordinates to a coordinate
+        /// system whose x and y components are the 2d world coordinates of the projection plane and whose z component is the signed
+        /// distance from that plane. Not meaningful for a perspective projection.
+        /// </summary>
         public ModOp UnscaledProjection
         {
             get
@@ -820,6 +955,11 @@ namespace CADability
                 return unscaledProjection;
             }
         }
+        /// <summary>
+        /// The inverse of <see cref="UnscaledProjection"/>: maps points and vectors of the 2d world coordinate system (extended by a z
+        /// component) back to model coordinates. E.g. the images of the x and y axis are the horizontal and vertical direction of
+        /// the view in model coordinates. Not meaningful for a perspective projection.
+        /// </summary>
         public ModOp InverseProjection
         {
             get
@@ -827,6 +967,12 @@ namespace CADability
                 return inverseProjection;
             }
         }
+        /// <summary>
+        /// The view direction in model coordinates, pointing from the viewer into the model; for a parallel projection all points
+        /// are projected along this direction. Setting the value has no effect; use
+        /// <see cref="SetDirection(GeoVector, GeoVector, BoundingCube)"/> or
+        /// <see cref="SetPerspective(GeoPoint, GeoVector, Rectangle, BoundingCube)"/> to change the direction.
+        /// </summary>
         public GeoVector Direction
         {
             get
@@ -854,6 +1000,13 @@ namespace CADability
             }
         }
         private Plane? projectionPlane;
+        /// <summary>
+        /// The plane whose 2d coordinate system is the "2d world coordinate system" of this projection. For a parallel projection it
+        /// is the plane through the origin perpendicular to <see cref="Direction"/>, with its axes along the horizontal and vertical
+        /// direction of the view. For a perspective projection it is the plane perpendicular to the view direction in the middle of
+        /// the displayed frustum, its origin being the point where the line through the world origin in view direction hits it.
+        /// Not to be confused with the <see cref="DrawingPlane"/>, in which objects are constructed.
+        /// </summary>
         public Plane ProjectionPlane
         {
             get
@@ -883,6 +1036,11 @@ namespace CADability
                 return projectionPlane.Value;
             }
         }
+        /// <summary>
+        /// The 4x4 matrix of the perspective projection without scaling and placement, which maps world coordinates to the normalized
+        /// cube of the paint interface. Only valid when <see cref="IsPerspective"/> is true; it is computed by
+        /// <see cref="SetPerspective(GeoPoint, GeoVector, Rectangle, BoundingCube)"/>.
+        /// </summary>
         public Matrix4 PerspectiveProjection
         {
             get
@@ -890,6 +1048,10 @@ namespace CADability
                 return perspectiveProjection;
             }
         }
+        /// <summary>
+        /// The settings of the grid displayed in the drawing plane (spacing, appearance, visibility). The <see cref="CADability.Grid"/>
+        /// object is shared with clones of this projection; modify its properties to change the grid.
+        /// </summary>
         public Grid Grid
         {
             get { return grid; } // da es eine Klasse ist, genügt das get
@@ -907,12 +1069,25 @@ namespace CADability
             GeoPoint pogl = openGlMatrix * p;
             return new PointF((float)((pogl.x + 1) / 2 * clientRect.Width + clientRect.Left), (float)(clientRect.Bottom - (pogl.y + 1) / 2 * clientRect.Height));
         }
+        /// <summary>
+        /// Projects the given point into pixel coordinates of the view (origin at the top left, y growing downwards), including the
+        /// scaling and the placement. Works for both parallel and perspective projection. Same as <see cref="ProjectF(GeoPoint)"/>,
+        /// but returns a <see cref="GeoPoint2D"/>.
+        /// </summary>
+        /// <param name="p">the point to project (model coordinates)</param>
+        /// <returns>the projected point in pixel coordinates</returns>
         public GeoPoint2D Project(GeoPoint p)
         {
             // return new PointF((float)(Matrix00 * p.x + Matrix01 * p.y + Matrix02 * p.z + Matrix03), (float)(Matrix10 * p.x + Matrix11 * p.y + Matrix12 * p.z + Matrix13));
             GeoPoint pogl = openGlMatrix * p;
             return new GeoPoint2D((float)((pogl.x + 1) / 2 * clientRect.Width + clientRect.Left), (float)(clientRect.Bottom - (pogl.y + 1) / 2 * clientRect.Height));
         }
+        /// <summary>
+        /// Projects the given point into pixel coordinates (y growing downwards) using the linear coefficients of the parallel
+        /// projection combined with the placement. Faster than <see cref="Project(GeoPoint)"/>, but valid for parallel projections only.
+        /// </summary>
+        /// <param name="p">the point to project (model coordinates)</param>
+        /// <returns>the projected point in pixel coordinates</returns>
         public GeoPoint2D Project2D(GeoPoint p)
         {
             return new GeoPoint2D((Matrix00 * p.x + Matrix01 * p.y + Matrix02 * p.z + Matrix03), (Matrix10 * p.x + Matrix11 * p.y + Matrix12 * p.z + Matrix13));
@@ -1011,10 +1186,29 @@ namespace CADability
                 SetCoefficients(); // jetzt mit Verschiebung
             }
         }
+        /// <summary>
+        /// Makes this a perspective (central) projection: the viewer is located at <paramref name="fromHere"/> and looks in direction
+        /// <paramref name="dir"/>. The near and far clipping planes are derived from <paramref name="modelExtent"/>, the aspect ratio
+        /// from <paramref name="clientRect"/>. The view direction is placed in the center of the window; the previous scaling (zoom)
+        /// is kept. Raises <see cref="ProjectionChangedEvent"/>.
+        /// </summary>
+        /// <param name="fromHere">The position of the viewer (center of the projection) in world coordinates</param>
+        /// <param name="dir">The view direction</param>
+        /// <param name="clientRect">The client rectangle of the window in pixels</param>
+        /// <param name="modelExtent">The extent of the model, used to determine the depth range of the view</param>
         public void SetPerspective(GeoPoint fromHere, GeoVector dir, Rectangle clientRect, BoundingCube modelExtent)
         {
             SetPerspective(fromHere, dir, clientRect, modelExtent, GeoPoint.Origin, false);
         }
+        /// <summary>
+        /// Makes this a perspective (central) projection like <see cref="SetPerspective(GeoPoint, GeoVector, Rectangle, BoundingCube)"/>,
+        /// but shifts the placement so that <paramref name="fixPoint"/> keeps the position on the screen it had before the call.
+        /// </summary>
+        /// <param name="fromHere">The position of the viewer (center of the projection) in world coordinates</param>
+        /// <param name="dir">The view direction</param>
+        /// <param name="clientRect">The client rectangle of the window in pixels</param>
+        /// <param name="modelExtent">The extent of the model, used to determine the depth range of the view</param>
+        /// <param name="fixPoint">The point in world coordinates that keeps its position on the screen</param>
         public void SetPerspective(GeoPoint fromHere, GeoVector dir, Rectangle clientRect, BoundingCube modelExtent, GeoPoint fixPoint)
         {
             SetPerspective(fromHere, dir, clientRect, modelExtent, fixPoint, true);
@@ -1180,10 +1374,19 @@ namespace CADability
                 }
             }
         }
+        /// <summary>
+        /// Sets the client rectangle (in pixels) of the window this projection is displayed in, without recomputing the projection.
+        /// Usually the client rectangle is provided by the paint interface via
+        /// <see cref="GetOpenGLProjection(int, int, int, int, BoundingCube)"/>.
+        /// </summary>
+        /// <param name="clr">The client rectangle of the window</param>
         public void SetClientRect(Rectangle clr)
         {
             this.clientRect = clr;
         }
+        /// <summary>
+        /// The width in pixels of the client rectangle of the window this projection is displayed in (0 when it has not been set).
+        /// </summary>
         public int Width
         {
             get
@@ -1191,6 +1394,9 @@ namespace CADability
                 return clientRect.Width;
             }
         }
+        /// <summary>
+        /// The height in pixels of the client rectangle of the window this projection is displayed in (0 when it has not been set).
+        /// </summary>
         public int Height
         {
             get
@@ -1198,6 +1404,18 @@ namespace CADability
                 return clientRect.Height;
             }
         }
+        /// <summary>
+        /// Returns the 4x4 projection matrix for the paint interface, which maps world coordinates to the normalized cube used by
+        /// OpenGL (x and y in the range [-1, 1], assuming a viewport that covers the whole window). The window size and the model
+        /// extent are stored in the projection; when they differ from the previous call, the projection is recomputed so that the
+        /// whole <paramref name="extend"/> fits into the depth range, and <see cref="ProjectionChangedEvent"/> is raised.
+        /// </summary>
+        /// <param name="left">left edge of the viewport in pixels (usually 0)</param>
+        /// <param name="right">right edge of the viewport in pixels (usually the width of the window)</param>
+        /// <param name="bottom">bottom edge of the viewport in pixels (usually 0)</param>
+        /// <param name="top">top edge of the viewport in pixels (usually the height of the window)</param>
+        /// <param name="extend">the extent of the model in world coordinates</param>
+        /// <returns>the projection matrix as a 4x4 array</returns>
         public double[,] GetOpenGLProjection(int left, int right, int bottom, int top, BoundingCube extend)
         {
             if (clientRect.Width != right - left || clientRect.Height != top - bottom || !this.extent.Equals(extend))
@@ -1379,6 +1597,12 @@ namespace CADability
             */
         }
         #region Funktionen im Zusammenhang mit DrawingPlane
+        /// <summary>
+        /// The drawing plane of the view: the plane in which objects are constructed when a mouse position is converted to a 3d point
+        /// (see <see cref="DrawingPlanePoint(System.Drawing.Point)"/>) and in which the <see cref="Grid"/> is displayed. Setting it
+        /// does not raise <see cref="ProjectionChangedEvent"/>. When the view direction changes so that the drawing plane would be
+        /// seen edge on, the plane is replaced by one perpendicular to the new direction.
+        /// </summary>
         public Plane DrawingPlane
         {
             get { return drawingPlane; }
@@ -1479,11 +1703,24 @@ namespace CADability
             GeoPoint pogl = openGlMatrix * p;
             return new GeoPoint2D((pogl.x + 1) / 2 * clientRect.Width + clientRect.Left, clientRect.Bottom - (pogl.y + 1) / 2 * clientRect.Height);
         }
+        /// <summary>
+        /// Converts a point of the 2d world coordinate system of the <see cref="ProjectionPlane"/> to pixel coordinates of the window
+        /// (origin at the top left, y growing downwards). Works for both parallel and perspective projection; inverse of
+        /// <see cref="PointWorld2D(System.Drawing.Point)"/>.
+        /// </summary>
+        /// <param name="p">the point in the 2d world coordinate system</param>
+        /// <returns>the position in pixel coordinates</returns>
         public GeoPoint2D World2DToWindow(GeoPoint2D p)
         {
             GeoPoint pp = ProjectionPlane.ToGlobal(p);
             return WorldToWindow(pp);
         }
+        /// <summary>
+        /// Converts a rectangle of the 2d world coordinate system of the <see cref="ProjectionPlane"/> to a rectangle in pixel
+        /// coordinates of the window. Works for both parallel and perspective projection.
+        /// </summary>
+        /// <param name="br">the rectangle in the 2d world coordinate system</param>
+        /// <returns>the rectangle in pixel coordinates</returns>
         public RectangleF World2DToWindow(BoundingRect br)
         {
             GeoPoint ul = ProjectionPlane.ToGlobal(br.GetUpperLeft());
@@ -1508,7 +1745,25 @@ namespace CADability
             GeoPoint res = inverseOpenGLMatrix * pogl;
             return res;
         }
+        /// <summary>
+        /// Selects the kind of arrow made by <see cref="MakeArrow(GeoPoint, GeoPoint, Plane, ArrowMode)"/>:
+        /// <see cref="ArrowMode.circleArrow"/> is an arrow with a circle at its start point and a head at its end point,
+        /// <see cref="ArrowMode.twoArrows"/> is intended for an arrow with heads at both ends. The current implementation
+        /// makes the same arrow for both modes.
+        /// </summary>
         public enum ArrowMode { circleArrow, twoArrows }
+        /// <summary>
+        /// Makes the objects of a feedback arrow from <paramref name="p1"/> to <paramref name="p2"/>, as used by interactive actions
+        /// to visualize a distance or an offset: a line, a circle at <paramref name="p1"/> and a triangular head at <paramref name="p2"/>.
+        /// Circle and head are faces in the plane through the line that is oriented like <paramref name="plane"/>; their size is
+        /// about 1% of the display size, so the arrow looks the same at any zoom level. Returns an empty list when
+        /// <paramref name="plane"/> is invalid or the two points coincide.
+        /// </summary>
+        /// <param name="p1">start point of the arrow</param>
+        /// <param name="p2">end point of the arrow (position of the head)</param>
+        /// <param name="plane">a plane that determines the orientation of the circle and the head, usually the <see cref="ProjectionPlane"/> or the <see cref="DrawingPlane"/></param>
+        /// <param name="mode">the kind of arrow, see <see cref="ArrowMode"/></param>
+        /// <returns>the objects of the arrow, ready to be displayed as feedback</returns>
         public GeoObjectList MakeArrow(GeoPoint p1, GeoPoint p2, Plane plane, ArrowMode mode)
         {
             GeoObjectList res = new GeoObjectList();

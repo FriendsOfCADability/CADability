@@ -404,6 +404,10 @@ namespace CADability
 
     public class PaintTo3D
     {
+        /// <summary>
+        /// Selects what <see cref="IPaintTo3D.PaintFaces"/> paints: FacesOnly (the triangulated faces, with a small depth offset to the
+        /// back), CurvesOnly (curves and edges, with a small depth offset to the front) or All (both).
+        /// </summary>
         public enum PaintMode { FacesOnly, CurvesOnly, All }
         public static void PaintHandle(IPaintTo3D paintTo3D, int x, int y, int width, Color color)
         {
@@ -581,6 +585,13 @@ namespace CADability
     }
 
 
+    /// <summary>
+    /// A display list of an <see cref="IPaintTo3D"/> implementation: a recorded sequence of paint calls which can be painted again
+    /// quickly with <see cref="IPaintTo3D.List"/> or <see cref="IPaintTo3D.SelectedList"/>. It is created by recording the calls between
+    /// <see cref="IPaintTo3D.OpenList"/> and <see cref="IPaintTo3D.CloseList"/> or by combining lists with
+    /// <see cref="IPaintTo3D.MakeList"/>; the model keeps one list per layer for its faces and one for its curves. Dispose it when it is
+    /// no longer needed to free the resources of the graphics system.
+    /// </summary>
     public interface IPaintTo3DList
     {
         string Name { get; set; }

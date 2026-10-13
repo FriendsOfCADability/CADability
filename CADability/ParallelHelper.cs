@@ -5,6 +5,12 @@ using System.Threading;
 
 namespace CADability
 {
+    /// <summary>
+    /// Helper for code running in parallel: <see cref="LockMultipleObjects"/> acquires the monitors of several objects and releases
+    /// them when the returned object is disposed. All callers must pass the objects in the same order (e.g. sorted by an id),
+    /// because the locks are taken in the given order and no deadlock avoidance is done. Used when the faces of a STEP file are
+    /// built in parallel. Internal helper, not an entry point of the API.
+    /// </summary>
     public class ParallelHelper
     {
 #if DEBUG

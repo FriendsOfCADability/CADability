@@ -1358,6 +1358,10 @@ namespace CADability
 
     public class FindPathThroughForbiddenArea
     {
+        /// <summary>
+        /// Thrown by <see cref="FindPath(GeoPoint2D, GeoPoint2D, double)"/> when no path exists, because the forbidden rectangles separate the start point from the end
+        /// point.
+        /// </summary>
         public class Impossible : ApplicationException
         {
             internal Impossible(string msg)

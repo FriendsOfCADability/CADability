@@ -12,11 +12,26 @@ using MathNet.Numerics.LinearAlgebra.Double;
 namespace CADability.Curve2D
 {
 
+	/// <summary>
+	/// Non-generic <see cref="IComparer"/> that orders <see cref="GeoPoint2DWithParameter"/> values by
+	/// <see cref="GeoPoint2DWithParameter.par1"/>, the parameter on the first curve of an intersection. Sorting the result of
+	/// <see cref="ICurve2D.Intersect(ICurve2D)"/> with it arranges the intersection points along the first curve. The generic
+	/// counterpart for a <see cref="List{T}"/> is <see cref="ICompareGeoPoint2DWithParameter1"/>.
+	/// </summary>
 	public class CompareGeoPoint2DWithParameter1 : IComparer
 	{
+		/// <summary>
+		/// Creates the comparer. It has no state.
+		/// </summary>
 		public CompareGeoPoint2DWithParameter1() { }
 		#region IComparer Members
 
+		/// <summary>
+		/// Compares two boxed <see cref="GeoPoint2DWithParameter"/> values by their <see cref="GeoPoint2DWithParameter.par1"/>.
+		/// </summary>
+		/// <param name="x">the first value, must be a <see cref="GeoPoint2DWithParameter"/></param>
+		/// <param name="y">the second value, must be a <see cref="GeoPoint2DWithParameter"/></param>
+		/// <returns>-1 if the parameter of <paramref name="x"/> is smaller, 1 if it is greater, 0 if both are equal</returns>
 		public int Compare(object x, object y)
 		{
 			GeoPoint2DWithParameter px = (GeoPoint2DWithParameter)x;
@@ -29,8 +44,16 @@ namespace CADability.Curve2D
 		#endregion
 	}
 
+	/// <summary>
+	/// Orders <see cref="GeoPoint2DWithParameter"/> values by <see cref="GeoPoint2DWithParameter.par1"/>, the parameter on the
+	/// first of the two curves of an intersection, so that the intersection points returned by <see cref="ICurve2D.Intersect(ICurve2D)"/>
+	/// can be sorted along the first curve. <see cref="ICompareGeoPoint2DWithParameter2"/> sorts along the second curve.
+	/// </summary>
 	public class ICompareGeoPoint2DWithParameter1 : IComparer<GeoPoint2DWithParameter>
 	{
+		/// <summary>
+		/// Creates the comparer. It has no state.
+		/// </summary>
 		public ICompareGeoPoint2DWithParameter1() { }
 		#region IComparer<GeoPoint2DWithParameter> Members
 
@@ -44,8 +67,16 @@ namespace CADability.Curve2D
 		#endregion
 	}
 
+	/// <summary>
+	/// Orders <see cref="GeoPoint2DWithParameter"/> values by <see cref="GeoPoint2DWithParameter.par2"/>, the parameter on the
+	/// second of the two curves of an intersection, so that the intersection points returned by <see cref="ICurve2D.Intersect(ICurve2D)"/>
+	/// can be sorted along the second curve. <see cref="ICompareGeoPoint2DWithParameter1"/> sorts along the first curve.
+	/// </summary>
 	public class ICompareGeoPoint2DWithParameter2 : IComparer<GeoPoint2DWithParameter>
 	{
+		/// <summary>
+		/// Creates the comparer. It has no state.
+		/// </summary>
 		public ICompareGeoPoint2DWithParameter2() { }
 		#region IComparer<GeoPoint2DWithParameter> Members
 
@@ -59,23 +90,62 @@ namespace CADability.Curve2D
 		#endregion
 	}
 
+	/// <summary>
+	/// A point in 2d together with its parameters on two curves, as returned by <see cref="ICurve2D.Intersect(ICurve2D)"/> and
+	/// <see cref="ICurve2D.Intersect(GeoPoint2D, GeoPoint2D)"/>: <see cref="p"/> is the intersection point, <see cref="par1"/> its
+	/// parameter on the curve the method was called on and <see cref="par2"/> its parameter on the other curve (or on the line
+	/// given by two points). The parameters are normalized (0.0 at the start point, 1.0 at the end point of the respective curve);
+	/// values outside that range denote a point on the extension of the curve.
+	/// </summary>
 	public struct GeoPoint2DWithParameter
 	{
+		/// <summary>
+		/// Creates the value from its three components.
+		/// </summary>
+		/// <param name="p">the point</param>
+		/// <param name="par1">the parameter of the point on the first curve</param>
+		/// <param name="par2">the parameter of the point on the second curve</param>
 		public GeoPoint2DWithParameter(GeoPoint2D p, double par1, double par2)
 		{
 			this.p = p;
 			this.par1 = par1;
 			this.par2 = par2;
 		}
+		/// <summary>
+		/// The point, usually an intersection point of the two curves.
+		/// </summary>
 		public GeoPoint2D p; // der Punkt, meist ein Schnittpunkt
+		/// <summary>
+		/// The normalized parameter of <see cref="p"/> on the first (par1) and on the second (par2) curve involved. A parameter below
+		/// 0.0 or above 1.0 denotes a point on the extension of that curve.
+		/// </summary>
 		public double par1, par2; // Parameter auf der 1. bzw. 2. beteiligten Kurve
 	}
 
 
+	/// <summary>
+	/// Exception thrown by operations on 2d curves (<see cref="ICurve2D"/>) that cannot be carried out, e.g. setting the
+	/// start point of a full circle or computing the parallel of a line with zero length. <see cref="ExceptionType"/> tells the
+	/// kind of failure.
+	/// </summary>
 	public class Curve2DException : System.ApplicationException
 	{
+		/// <summary>
+		/// The kind of failure a <see cref="Curve2DException"/> reports: <c>General</c> for an operation the curve does not support
+		/// (e.g. modifying the start point of a <see cref="Circle2D"/>), <c>LineIsNull</c> for a line of zero length, which has no
+		/// direction (e.g. in <see cref="Line2D.Parallel(double, bool, double, double)"/>), <c>InternalError</c> for an
+		/// inconsistency in the data of the curve itself.
+		/// </summary>
 		public enum Curve2DExceptionType { General, LineIsNull, InternalError };
+		/// <summary>
+		/// The kind of failure, as passed to the constructor.
+		/// </summary>
 		public Curve2DExceptionType ExceptionType;
+		/// <summary>
+		/// Creates the exception.
+		/// </summary>
+		/// <param name="message">the message describing the failure</param>
+		/// <param name="tp">the kind of failure, stored in <see cref="ExceptionType"/></param>
 		public Curve2DException(string message, Curve2DExceptionType tp)
 			: base(message)
 		{
@@ -83,6 +153,11 @@ namespace CADability.Curve2D
 		}
 	}
 
+	/// <summary>
+	/// Intended to select how the corners of a parallel (offset) curve are treated: <c>Standard</c> extends the offset segments
+	/// to their intersection, <c>RoundEdges</c> joins them with an arc. Not used by the library at present:
+	/// <see cref="ICurve2D.Parallel(double, bool, double, double)"/> decides this from its <c>roundAngle</c> parameter instead.
+	/// </summary>
 	public enum ParallelFlag { Standard = 0, RoundEdges = 1 }
 	/// <summary>
 	/// Interface for intersecting unbounded 2d curves such as infinite lines, parabolas and hyperbolas, which are not limited in
@@ -140,14 +215,51 @@ namespace CADability.Curve2D
 		/// <param name="p"></param>
 		/// <returns></returns>
 		double PositionOf(GeoPoint2D p);
+		/// <summary>
+		/// Converts an arc length, measured along the curve from the start point, into the normalized parameter of the point at
+		/// that length, so that <c>PositionAtLength(Length)</c> is 1.0. Used e.g. to cut a piece of a given length off a curve by
+		/// <see cref="Trim"/>.
+		/// </summary>
+		/// <param name="position">the arc length from the start point, in the units of the curve</param>
+		/// <returns>the normalized parameter (0.0 to 1.0) of the point at that length; a length beyond the end of the curve yields
+		/// 1.0 or a parameter greater than 1.0, depending on the type of the curve</returns>
 		double PositionAtLength(double position);
 		/// <summary>
 		/// Returns the length of the curve
 		/// </summary>
 		double Length { get; }
+		/// <summary>
+		/// Returns the signed area swept by the line from <paramref name="p"/> to the moving point of the curve as it runs from the
+		/// start point to the end point, i.e. the area enclosed by the segment from <paramref name="p"/> to <see cref="StartPoint"/>,
+		/// the curve and the segment from <see cref="EndPoint"/> back to <paramref name="p"/>. The area is positive when this loop
+		/// runs counterclockwise. Summed over the segments of a closed loop it gives the enclosed area, independent of
+		/// <paramref name="p"/>, with the sign telling the orientation of the loop; <see cref="CADability.Shapes.Border"/> and
+		/// <see cref="Face"/> use it this way.
+		/// </summary>
+		/// <param name="p">the reference point</param>
+		/// <returns>the signed area</returns>
 		double GetAreaFromPoint(GeoPoint2D p);
+		/// <summary>
+		/// Returns the signed area swept by the line from the origin to the moving point of the curve, i.e.
+		/// <see cref="GetAreaFromPoint(GeoPoint2D)"/> with the origin as reference point. For a closed curve this is the enclosed
+		/// area, positive when the curve runs counterclockwise, negative when it runs clockwise.
+		/// </summary>
+		/// <returns>the signed area</returns>
 		double GetArea();
+		/// <summary>
+		/// The total signed change of direction along the curve from the start point to the end point, in radians: positive for
+		/// turning to the left (counterclockwise), 0.0 for a line, the sweep angle for a circular arc, +2*pi or -2*pi for a full
+		/// circle. A <see cref="Path2D"/> also counts the kinks between its segments. The sum over the segments of a closed loop is
+		/// 2*pi for a counterclockwise and -2*pi for a clockwise loop, which is how <see cref="CADability.Shapes.Border"/> determines
+		/// its orientation.
+		/// </summary>
 		double Sweep { get; }
+		/// <summary>
+		/// Splits the curve at the given normalized parameter. The curve itself remains unchanged.
+		/// </summary>
+		/// <param name="Position">the parameter where to split</param>
+		/// <returns>two new curves, the part from 0.0 to <paramref name="Position"/> and the part from <paramref name="Position"/> to 1.0;
+		/// a single copy of the whole curve when <paramref name="Position"/> is not strictly between 0.0 and 1.0</returns>
 		ICurve2D[] Split(double Position);
 		/// <summary>
 		/// Returns the distance of the specified point to this curve. If this curve
@@ -171,9 +283,53 @@ namespace CADability.Curve2D
 		/// <param name="p">Point to compute the distance to</param>
 		/// <returns>the distance</returns>
 		double MinDistance(GeoPoint2D p);
+		/// <summary>
+		/// Returns a new curve of the same type which is the part of this curve between the two normalized parameters. The curve
+		/// itself remains unchanged. Normally <paramref name="StartPos"/> is less than <paramref name="EndPos"/>; for a closed curve
+		/// (<see cref="Circle2D"/>, <see cref="Ellipse2D"/>) reversed parameters select the part that runs across the start point of
+		/// the curve, for other curves the behaviour depends on the type (a <see cref="Line2D"/> or <see cref="Arc2D"/> returns the
+		/// part in reversed direction).
+		/// </summary>
+		/// <param name="StartPos">parameter of the start of the part</param>
+		/// <param name="EndPos">parameter of the end of the part</param>
+		/// <returns>the trimmed curve, or null when the result would be degenerate (e.g. an arc with zero sweep)</returns>
 		ICurve2D Trim(double StartPos, double EndPos);
+		/// <summary>
+		/// Returns the parallel (offset) curve at the distance <paramref name="Dist"/>. A positive distance offsets to the right of
+		/// the direction of the curve (for a counterclockwise arc: outward), a negative distance to the left. Curves which have no exact
+		/// parallel of their own type (e.g. <see cref="BSpline2D"/>) are first approximated by lines and arcs when
+		/// <paramref name="approxSpline"/> is true, and throw an exception otherwise. For composed curves (<see cref="Path2D"/>,
+		/// <see cref="Polyline2D"/>) the offset segments at a convex corner are joined by an arc when the inner angle of the corner
+		/// is less than <paramref name="roundAngle"/>, and are extended to their intersection otherwise. A line of zero length
+		/// throws a <see cref="Curve2DException"/>.
+		/// </summary>
+		/// <param name="Dist">the offset distance, positive to the right of the curve</param>
+		/// <param name="approxSpline">true to allow replacing the curve by an approximation of lines and arcs</param>
+		/// <param name="precision">the maximal deviation of that approximation</param>
+		/// <param name="roundAngle">corners with an inner angle (in radians) below this value are rounded by an arc, others are
+		/// extended to a sharp corner; 0.0 never rounds. A negative value is used with its absolute value and additionally removes
+		/// offset segments that fold back onto their predecessor</param>
+		/// <returns>the parallel curve</returns>
 		ICurve2D Parallel(double Dist, bool approxSpline, double precision, double roundAngle);
+		/// <summary>
+		/// Calculates the intersection points of this curve with another curve. Each result carries the point and its parameters
+		/// on both curves (<see cref="GeoPoint2DWithParameter.par1"/> on this curve, <see cref="GeoPoint2DWithParameter.par2"/> on
+		/// <paramref name="IntersectWith"/>). Depending on the types involved the result may also contain intersections on the
+		/// extensions of the curves (e.g. of two lines, or of the full circles of two arcs), recognizable by parameters outside
+		/// 0.0 to 1.0; use <see cref="IsParameterOnCurve"/> to filter them. The result is not sorted.
+		/// </summary>
+		/// <param name="IntersectWith">the other curve</param>
+		/// <returns>the intersection points, an empty array when there are none</returns>
 		GeoPoint2DWithParameter[] Intersect(ICurve2D IntersectWith);
+		/// <summary>
+		/// Calculates the intersection points of this curve with the line from <paramref name="StartPoint"/> to <paramref name="EndPoint"/>.
+		/// Same as <see cref="Intersect(ICurve2D)"/> with a <see cref="Line2D"/>: <see cref="GeoPoint2DWithParameter.par2"/> is the
+		/// parameter on that line (0.0 at <paramref name="StartPoint"/>, 1.0 at <paramref name="EndPoint"/>), and points on the
+		/// extension of the line or of this curve may be included.
+		/// </summary>
+		/// <param name="StartPoint">start point of the line</param>
+		/// <param name="EndPoint">end point of the line</param>
+		/// <returns>the intersection points, an empty array when there are none</returns>
 		GeoPoint2DWithParameter[] Intersect(GeoPoint2D StartPoint, GeoPoint2D EndPoint);
 		/// <summary>
 		/// Calculates the foot points of the perpendicular projection of the given point
@@ -219,13 +375,31 @@ namespace CADability.Curve2D
 		/// Reverses the direction of this curve
 		/// </summary>
 		void Reverse();
+		/// <summary>
+		/// Returns an independent copy of this curve of the same type. Modifying the copy does not affect this curve.
+		/// </summary>
+		/// <returns>the copy</returns>
 		ICurve2D Clone();
+		/// <summary>
+		/// Returns a copy of this curve (see <see cref="Clone"/>) which is reversed when <paramref name="reverse"/> is true, i.e.
+		/// start point and end point are exchanged and the parameter runs the other way round.
+		/// </summary>
+		/// <param name="reverse">true to reverse the copy, false to copy it as it is</param>
+		/// <returns>the copy</returns>
 		ICurve2D CloneReverse(bool reverse);
 		/// <summary>
 		/// Copies the data of the given object to this object. Both objects must be of the same type.
 		/// </summary>
 		/// <param name="toCopyFrom">Copies the data of this object</param>
 		void Copy(ICurve2D toCopyFrom);
+		/// <summary>
+		/// Creates the 3d object that corresponds to this curve placed in the plane <paramref name="p"/>: the 2d coordinates are
+		/// taken as coordinates in the coordinate system of the plane (see <see cref="Plane.ToGlobal(GeoPoint2D)"/>). A
+		/// <see cref="Line2D"/> yields a <see cref="Line"/>, a circle, arc or ellipse an <see cref="Ellipse"/>, a spline a
+		/// <see cref="BSpline"/>, a path a <see cref="Path"/> and so on.
+		/// </summary>
+		/// <param name="p">the plane to place the curve in</param>
+		/// <returns>the 3d curve as an <see cref="IGeoObject"/></returns>
 		IGeoObject MakeGeoObject(Plane p);
 		/// <summary>
 		/// The 2d-curve is assumed to reside in plane "fromPlane". It will be projected
@@ -235,6 +409,13 @@ namespace CADability.Curve2D
 		/// <param name="toPlane">the projection plane</param>
 		/// <returns>the projected curve</returns>
 		ICurve2D Project(Plane fromPlane, Plane toPlane);
+		/// <summary>
+		/// Appends this curve to a GDI+ <see cref="System.Drawing.Drawing2D.GraphicsPath"/>, which is used for drawing and printing
+		/// with GDI+.
+		/// </summary>
+		/// <param name="path">the path to append to</param>
+		/// <param name="forward">true to append the curve in its own direction, false to append it reversed (from the end point to
+		/// the start point)</param>
 		void AddToGraphicsPath(System.Drawing.Drawing2D.GraphicsPath path, bool forward);
 		/// <summary>
 		/// Determines, whether the given parameter denotes a point inside the bounds of the curve.
@@ -304,6 +485,11 @@ namespace CADability.Curve2D
 		/// <param name="m"></param>
 		/// <returns></returns>
 		ICurve2D GetModified(ModOp2D m);
+		/// <summary>
+		/// A container for arbitrary named data attached to this curve (see <see cref="CADability.UserData"/>), e.g. the edge a
+		/// curve stems from, which the border and face algorithms store there. It is created on first access; most implementations
+		/// copy it when the curve is cloned.
+		/// </summary>
 		UserData UserData { get; }
 		/// <summary>
 		/// Returnes a new curve of the same type which is the fusion of this curve with the provided curve, e.g. two
@@ -429,10 +615,29 @@ namespace CADability.Curve2D
 		private double[] interparam; // Parameterwerte an den Stützpunkten
 		private GeoPoint2D[] tringulation; // Dreiecks-Zwischenpunkte (einer weniger als interpol)
 		private ICurve2D baseApproximation;
+		/// <summary>
+		/// Creates an empty curve. The triangulation and the other cached data are built on first use.
+		/// </summary>
 		protected GeneralCurve2D()
 		{
 		}
+		/// <summary>
+		/// Helper for derived classes: the square of <paramref name="d"/>.
+		/// </summary>
+		/// <param name="d">the value</param>
+		/// <returns><paramref name="d"/> multiplied by itself</returns>
 		protected double sqr(double d) => d * d;
+		/// <summary>
+		/// Supplies the base points of the triangulation (see <see cref="MakeTriangulation"/>): a list of parameters, ascending from
+		/// 0.0 to 1.0, with the points and the directions of the curve at them. Between two consecutive base points the curve must
+		/// be free of kinks, and it should bend to one side only, so that the triangle spanned by the two points and their tangents
+		/// encloses that piece of the curve; the knots of a spline or the quadrant points of an arc are typical choices.
+		/// <see cref="GetInflectionPoints"/> and <see cref="Length"/> use the same basis to bracket their numerical work. The default
+		/// implementation takes the parameters 0.0, 0.25, 0.5, 0.75 and 1.0 with the normalized <see cref="DirectionAt"/>.
+		/// </summary>
+		/// <param name="points">the base points on the curve</param>
+		/// <param name="directions">the directions of the curve at the base points</param>
+		/// <param name="parameters">the normalized parameters of the base points, ascending</param>
 		protected virtual void GetTriangulationBasis(out GeoPoint2D[] points, out GeoVector2D[] directions, out double[] parameters)
 		{
 			GetTriangulationPoints(out points, out parameters);
@@ -527,6 +732,14 @@ namespace CADability.Curve2D
 			parameters = workParameters.ToArray();
 		}
 
+		/// <summary>
+		/// Builds the triangulation of the curve from the basis supplied by <see cref="GetTriangulationBasis"/>, after adding the
+		/// inflection points and halving segments that turn too far: for each pair of consecutive base points the intersection of
+		/// their tangents gives a third vertex, so that the triangle encloses that piece of the curve. The base implementations of
+		/// <see cref="HitTest"/>, <see cref="GetExtent"/>, <see cref="PositionOf(GeoPoint2D)"/>, <see cref="Intersect(ICurve2D)"/> and
+		/// <see cref="PerpendicularFoot"/> work on these triangles. It is called automatically when the triangulation is needed;
+		/// derived classes call <see cref="ClearTriangulation"/> when their geometry changes.
+		/// </summary>
 		protected void MakeTriangulation()
 		{   // ACHTUNG: Probleme sind hier Singularitäten und doppelte Punkte. Das muss noch überprüft werden
 			// am Besten mit bösartigen BSplines (mehrfach identische Pole)
@@ -625,6 +838,10 @@ namespace CADability.Curve2D
             dc.Add(baseApproximation, System.Drawing.Color.Cyan, 0);
 #endif
 		}
+		/// <summary>
+		/// Discards the cached triangulation, the cached approximation by arcs and the cached length, so that they are recomputed
+		/// on next use. Derived classes call it whenever their geometry changes (e.g. when a point is moved or the curve is reversed).
+		/// </summary>
 		protected void ClearTriangulation()
 		{
 			interpol = null;
@@ -634,11 +851,24 @@ namespace CADability.Curve2D
 			baseApproximation = null;
 			lengthValid = false;
 		}
+		/// <summary>
+		/// Tells whether the triangulation has already been computed (and not been cleared since).
+		/// </summary>
+		/// <returns>true if the triangulation exists</returns>
 		protected bool HasTriangulation()
 		{
 			return interpol != null;
 		}
 
+		/// <summary>
+		/// Returns copies of the data of the triangulation (see <see cref="MakeTriangulation"/>), computing it first when necessary.
+		/// The triangle with the index i is spanned by <paramref name="basisPoints"/>[i], <paramref name="basisPoints"/>[i+1] and
+		/// <paramref name="vertices"/>[i], so there is one vertex less than there are base points.
+		/// </summary>
+		/// <param name="basisPoints">the base points, which lie on the curve</param>
+		/// <param name="vertices">the third vertex of each triangle, the intersection of the tangents at its two base points</param>
+		/// <param name="directions">the normalized directions of the curve at the base points</param>
+		/// <param name="parameters">the normalized parameters of the base points</param>
 		virtual public void GetTriangulationPoints(out GeoPoint2D[] basisPoints, out GeoPoint2D[] vertices, out GeoVector2D[] directions, out double[] parameters)
 		{
 			if (interpol == null) MakeTriangulation();
@@ -705,6 +935,11 @@ namespace CADability.Curve2D
 #endif
 		#region ICurve2D Members
 
+		/// <summary>
+		/// The start point of the curve (see <see cref="ICurve2D.StartPoint"/>). This base implementation takes it from the first
+		/// base point of the triangulation; setting it only replaces that base point and leaves the underlying geometry unchanged,
+		/// which is acceptable for small corrections only. Curves with their own data override it.
+		/// </summary>
 		public virtual GeoPoint2D StartPoint
 		{
 			get
@@ -719,6 +954,11 @@ namespace CADability.Curve2D
 			}
 		}
 
+		/// <summary>
+		/// The end point of the curve (see <see cref="ICurve2D.EndPoint"/>). This base implementation takes it from the last
+		/// base point of the triangulation; setting it only replaces that base point and leaves the underlying geometry unchanged,
+		/// which is acceptable for small corrections only. Curves with their own data override it.
+		/// </summary>
 		public virtual GeoPoint2D EndPoint
 		{
 			get
@@ -733,6 +973,10 @@ namespace CADability.Curve2D
 			}
 		}
 
+		/// <summary>
+		/// The direction of the curve at the start point (see <see cref="ICurve2D.StartDirection"/>). This base implementation
+		/// returns the normalized direction at the first base point of the triangulation.
+		/// </summary>
 		public virtual GeoVector2D StartDirection
 		{
 			get
@@ -742,6 +986,10 @@ namespace CADability.Curve2D
 			}
 		}
 
+		/// <summary>
+		/// The direction of the curve at the end point (see <see cref="ICurve2D.EndDirection"/>). This base implementation
+		/// returns the normalized direction at the last base point of the triangulation.
+		/// </summary>
 		public virtual GeoVector2D EndDirection
 		{
 			get
@@ -751,6 +999,10 @@ namespace CADability.Curve2D
 			}
 		}
 
+		/// <summary>
+		/// The direction of the curve at the parameter 0.5 (see <see cref="ICurve2D.MiddleDirection"/>), computed by
+		/// <see cref="DirectionAt"/>.
+		/// </summary>
 		public virtual GeoVector2D MiddleDirection
 		{
 			get
@@ -921,6 +1173,17 @@ namespace CADability.Curve2D
 		{
 			return position / Length;
 		}
+		/// <summary>
+		/// Returns the point and the first two derivatives of the curve with respect to the normalized parameter at
+		/// <paramref name="position"/> (see <see cref="ICurve2D.TryPointDeriv2At"/>). This base implementation only provides the point
+		/// and <see cref="DirectionAt"/> as first derivative, sets the second derivative to the null vector and returns false; curves
+		/// that know their second derivative override it.
+		/// </summary>
+		/// <param name="position">the normalized parameter</param>
+		/// <param name="point">the point at the parameter</param>
+		/// <param name="deriv1">the first derivative at the parameter</param>
+		/// <param name="deriv2">the second derivative, the null vector when not available</param>
+		/// <returns>true if the second derivative is available, false otherwise</returns>
 		public virtual bool TryPointDeriv2At(double position, out GeoPoint2D point, out GeoVector2D deriv1, out GeoVector2D deriv2)
 		{
 			point = PointAt(position);
@@ -928,6 +1191,19 @@ namespace CADability.Curve2D
 			deriv2 = GeoVector2D.NullVector;
 			return false;
 		}
+		/// <summary>
+		/// Returns the point and the first three derivatives of the curve with respect to the normalized parameter at
+		/// <paramref name="position"/>. Used by Newton iterations that need the curvature and its change, e.g.
+		/// <see cref="Ellipse2D.NewtonPerpendicular"/>. This base implementation only provides the point and <see cref="DirectionAt"/>
+		/// as first derivative, sets the higher derivatives to the null vector and returns false; curves that know their derivatives
+		/// (e.g. <see cref="Ellipse2D"/>) override it.
+		/// </summary>
+		/// <param name="position">the normalized parameter</param>
+		/// <param name="point">the point at the parameter</param>
+		/// <param name="deriv1">the first derivative at the parameter</param>
+		/// <param name="deriv2">the second derivative, the null vector when not available</param>
+		/// <param name="deriv3">the third derivative, the null vector when not available</param>
+		/// <returns>true if the second and third derivative are available, false otherwise</returns>
 		public virtual bool TryPointDeriv3At(double position, out GeoPoint2D point, out GeoVector2D deriv1, out GeoVector2D deriv2, out GeoVector2D deriv3)
 		{
 			point = PointAt(position);
@@ -984,6 +1260,11 @@ namespace CADability.Curve2D
 			return baseApproximation.GetArea();
 		}
 
+		/// <summary>
+		/// The total signed change of direction along the curve in radians (see <see cref="ICurve2D.Sweep"/>). This base
+		/// implementation computes it from an approximation of the curve by circular arcs (<see cref="Approximate"/>), which is
+		/// cached; curves with a closed form override it.
+		/// </summary>
 		public virtual double Sweep
 		{
 			get
@@ -1993,6 +2274,15 @@ namespace CADability.Curve2D
 			return deriv1.x * deriv2.y - deriv1.y * deriv2.x;
 		}
 
+		/// <summary>
+		/// Finds the inflection points of the curve numerically (see <see cref="ICurve2D.GetInflectionPoints"/>): the intervals of the
+		/// triangulation basis (<see cref="GetTriangulationBasis"/>) are scanned for sign changes of the curvature numerator
+		/// x'*y'' - y'*x'', with the second derivative taken as a central difference of <see cref="DirectionAt"/>, and each sign change
+		/// is refined by Brent's root finding. Sign changes within the noise of an almost straight curve are ignored. Curves that know
+		/// their second derivative exactly override it (<see cref="BSpline2D"/> does).
+		/// </summary>
+		/// <returns>the normalized parameters of the inflection points in ascending order; empty for a line or a curve without
+		/// inflection points</returns>
 		public virtual double[] GetInflectionPoints()
 		{
 			// This used to read the inflection points back out of the triangulation, by comparing on which
@@ -2099,6 +2389,13 @@ namespace CADability.Curve2D
 			return bsp.MakeGeoObject(p);
 		}
 
+		/// <summary>
+		/// Converts this curve into a <see cref="BSpline2D"/>: a cubic spline interpolating up to 100 points of the curve, evenly
+		/// spaced in the parameter, where a point closer than 1% of the length of the curve to its predecessor is skipped. Used by
+		/// the base implementation of <see cref="MakeGeoObject"/>. Only the precision 0.0 is implemented.
+		/// </summary>
+		/// <param name="precision">must be 0.0; any other value returns null</param>
+		/// <returns>the spline, or null when the curve does not provide two distinct points</returns>
 		protected BSpline2D ToBspline(double precision)
 		{
 			if (interpol == null) MakeTriangulation();
@@ -2387,6 +2684,10 @@ namespace CADability.Curve2D
 			throw new ApplicationException("The method or operation is not implemented.");
 		}
 
+		/// <summary>
+		/// Tells whether the curve is closed (see <see cref="ICurve2D.IsClosed"/>). This base implementation tests whether
+		/// <see cref="StartPoint"/> and <see cref="EndPoint"/> coincide according to <see cref="Precision.IsEqual(GeoPoint2D, GeoPoint2D)"/>.
+		/// </summary>
 		public virtual bool IsClosed
 		{
 			get
@@ -2417,6 +2718,10 @@ namespace CADability.Curve2D
 		}
 
 		private UserData userData;
+		/// <summary>
+		/// The container for arbitrary named data attached to this curve (see <see cref="ICurve2D.UserData"/>). It is created on
+		/// first access and is written and read by the serialization of the curve.
+		/// </summary>
 		public virtual UserData UserData
 		{
 			get
@@ -2437,6 +2742,12 @@ namespace CADability.Curve2D
 
 		#region IQuadTreeInsertable Members
 
+		/// <summary>
+		/// Returns the bounding rectangle of the curve (see <see cref="IQuadTreeInsertable.GetExtent"/>). This base implementation
+		/// takes the base points of the triangulation and adds the points where the direction of the curve changes its sign in x
+		/// or y between two base points, found by a simple interpolation; the result may therefore be slightly imprecise.
+		/// </summary>
+		/// <returns>the extent</returns>
 		public virtual BoundingRect GetExtent()
 		{
 			if (interpol == null) MakeTriangulation();
@@ -2571,6 +2882,13 @@ namespace CADability.Curve2D
 			}
 			return false;
 		}
+		/// <summary>
+		/// Tests whether the curve touches or crosses the rectangle (see <see cref="IQuadTreeInsertable.HitTest"/>). This base
+		/// implementation tests the triangles of the triangulation and subdivides a hit triangle until the decision is certain.
+		/// </summary>
+		/// <param name="rect">the rectangle to test</param>
+		/// <param name="includeControlPoints">ignored by this implementation, there are no control points</param>
+		/// <returns>true if the curve and the rectangle have a point in common</returns>
 		public virtual bool HitTest(ref BoundingRect rect, bool includeControlPoints)
 		{
 			ClipRect clr = new ClipRect(rect);
@@ -2587,6 +2905,10 @@ namespace CADability.Curve2D
 			//return baseApproximation.HitTest(ref rect, includeControlPoints);
 		}
 
+		/// <summary>
+		/// The object this curve stands for in a quad tree (see <see cref="IQuadTreeInsertable.ReferencedObject"/>). This base
+		/// implementation does not support it and throws an exception.
+		/// </summary>
 		public virtual object ReferencedObject
 		{
 			get { throw new Exception("The method or operation is not implemented."); }
@@ -2595,6 +2917,11 @@ namespace CADability.Curve2D
 		#endregion
 
 		#region ISerializable Members
+		/// <summary>
+		/// Constructor for the legacy binary deserialization (<see cref="ISerializable"/>): restores the <see cref="UserData"/>.
+		/// </summary>
+		/// <param name="info">the serialized data</param>
+		/// <param name="context">the source of the deserialization</param>
 		protected GeneralCurve2D(SerializationInfo info, StreamingContext context)
 		{
 			userData = info.GetValue("UserData", typeof(UserData)) as UserData;
@@ -2609,10 +2936,20 @@ namespace CADability.Curve2D
 		{
 			info.AddValue("UserData", userData);
 		}
+		/// <summary>
+		/// Writes the <see cref="UserData"/> for the JSON serialization. Derived classes implementing <see cref="IJsonSerialize"/>
+		/// call it from their <see cref="IJsonSerialize.GetObjectData(IJsonWriteData)"/>.
+		/// </summary>
+		/// <param name="data">receives the data</param>
 		protected void JSonGetObjectData(IJsonWriteData data)
 		{
 			if (userData != null) data.AddProperty("UserData", userData);
 		}
+		/// <summary>
+		/// Reads the <see cref="UserData"/> from the JSON serialization. Derived classes implementing <see cref="IJsonSerialize"/>
+		/// call it from their <see cref="IJsonSerialize.SetObjectData(IJsonReadData)"/>.
+		/// </summary>
+		/// <param name="data">the data to read from</param>
 		protected void JSonSetObjectData(IJsonReadData data)
 		{
 			userData = data.GetPropertyOrDefault<UserData>("UserData");
@@ -2626,10 +2963,41 @@ namespace CADability.Curve2D
 
 	public interface ICurveTransformation2D
 	{
+		/// <summary>
+		/// Maps a point of the original 2d space to the transformed space.
+		/// </summary>
+		/// <param name="p">the point in the original space</param>
+		/// <returns>the transformed point</returns>
 		GeoPoint2D TransformPoint(GeoPoint2D p);
+		/// <summary>
+		/// Maps a point of the transformed space back to the original 2d space; the inverse of <see cref="TransformPoint(GeoPoint2D)"/>.
+		/// </summary>
+		/// <param name="p">the point in the transformed space</param>
+		/// <returns>the point in the original space</returns>
 		GeoPoint2D ReverseTransformPoint(GeoPoint2D p);
+		/// <summary>
+		/// Returns the transformed point of a curve of the original space at the normalized parameter <paramref name="par"/>, i.e.
+		/// <see cref="TransformPoint(GeoPoint2D)"/> applied to <c>curve.PointAt(par)</c>.
+		/// </summary>
+		/// <param name="curve">the curve in the original space</param>
+		/// <param name="par">the normalized parameter on the curve</param>
+		/// <returns>the transformed point</returns>
 		GeoPoint2D TransformPoint(ICurve2D curve, double par);
+		/// <summary>
+		/// Returns the first derivative (the direction) of the transformed curve at the normalized parameter <paramref name="par"/>,
+		/// i.e. the derivative of the composition of <paramref name="curve"/> and the transformation.
+		/// </summary>
+		/// <param name="curve">the curve in the original space</param>
+		/// <param name="par">the normalized parameter on the curve</param>
+		/// <returns>the direction of the transformed curve</returns>
 		GeoVector2D TransformDeriv1(ICurve2D curve, double par);
+		/// <summary>
+		/// Returns the second derivative of the transformed curve at the normalized parameter <paramref name="par"/>. Not every
+		/// implementation provides it; the one of the non-periodic cylindrical surface throws <see cref="NotImplementedException"/>.
+		/// </summary>
+		/// <param name="curve">the curve in the original space</param>
+		/// <param name="par">the normalized parameter on the curve</param>
+		/// <returns>the second derivative of the transformed curve</returns>
 		GeoVector2D TransformDeriv2(ICurve2D curve, double par);
 	}
 
@@ -2641,11 +3009,18 @@ namespace CADability.Curve2D
 	{
 		ICurve2D original;
 		ICurveTransformation2D transformation2D;
+		/// <summary>
+		/// Creates the transformed curve. The original curve is referenced, not copied; points and directions are computed from it
+		/// through the transformation on demand.
+		/// </summary>
+		/// <param name="original">the curve in the original space</param>
+		/// <param name="transformation2D">the transformation to apply</param>
 		public TransformedCurve2D(ICurve2D original, ICurveTransformation2D transformation2D)
 		{
 			this.original = original;
 			this.transformation2D = transformation2D;
 		}
+		/// <inheritdoc/>
 		protected override void GetTriangulationBasis(out GeoPoint2D[] points, out GeoVector2D[] directions, out double[] parameters)
 		{
 			if (original is GeneralCurve2D)
@@ -2690,10 +3065,12 @@ namespace CADability.Curve2D
 				}
 			}
 		}
+		/// <inheritdoc/>
 		public override GeoVector2D DirectionAt(double Position)
 		{
 			return transformation2D.TransformDeriv1(original, Position);
 		}
+		/// <inheritdoc/>
 		public override GeoPoint2D StartPoint
 		{
 			get
@@ -2705,6 +3082,7 @@ namespace CADability.Curve2D
 				original.StartPoint = transformation2D.ReverseTransformPoint(value);
 			}
 		}
+		/// <inheritdoc/>
 		public override GeoPoint2D EndPoint
 		{
 			get
@@ -2716,23 +3094,28 @@ namespace CADability.Curve2D
 				original.EndPoint = transformation2D.ReverseTransformPoint(value);
 			}
 		}
+		/// <inheritdoc/>
 		public override GeoPoint2D PointAt(double Position)
 		{
 			return transformation2D.TransformPoint(original, Position);
 		}
+		/// <inheritdoc/>
 		public override double PositionOf(GeoPoint2D p)
 		{
 			return original.PositionOf(transformation2D.ReverseTransformPoint(p));
 		}
 
+		/// <inheritdoc/>
 		public override ICurve2D Clone()
 		{
 			return new TransformedCurve2D(original.Clone(), transformation2D);
 		}
+		/// <inheritdoc/>
 		public override ICurve2D CloneReverse(bool reverse)
 		{
 			return new TransformedCurve2D(original.CloneReverse(reverse), transformation2D);
 		}
+		/// <inheritdoc/>
 		public override void Copy(ICurve2D toCopyFrom)
 		{
 			if (toCopyFrom is TransformedCurve2D)
@@ -2741,18 +3124,22 @@ namespace CADability.Curve2D
 				this.transformation2D = (toCopyFrom as TransformedCurve2D).transformation2D;
 			}
 		}
+		/// <inheritdoc/>
 		public override ICurve2D GetModified(ModOp2D m)
 		{
 			return new TransformedCurve2D(original.GetModified(m), transformation2D);
 		}
+		/// <inheritdoc/>
 		public override void Move(double x, double y)
 		{
 			original.Move(x, y);
 		}
+		/// <inheritdoc/>
 		public override void Reverse()
 		{
 			original.Reverse();
 		}
+		/// <inheritdoc/>
 		public override ICurve2D[] Split(double Position)
 		{
 			ICurve2D[] splitted = original.Split(Position);
@@ -2763,6 +3150,7 @@ namespace CADability.Curve2D
 			}
 			return res;
 		}
+		/// <inheritdoc/>
 		public override ICurve2D Trim(double StartPos, double EndPos)
 		{
 			ICurve2D c2d = original.Trim(StartPos, EndPos);
@@ -2770,6 +3158,7 @@ namespace CADability.Curve2D
 			return null;
 		}
 
+		/// <inheritdoc/>
 		public override bool TryPointDeriv2At(double position, out GeoPoint2D point, out GeoVector2D deriv, out GeoVector2D deriv2)
 		{
 			if (original.TryPointDeriv2At(position, out point, out deriv, out deriv2))

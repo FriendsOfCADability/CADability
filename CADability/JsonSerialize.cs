@@ -11,6 +11,13 @@ using System.Threading.Tasks;
 
 namespace CADability
 {
+    /// <summary>
+    /// Attribute for classes and structs serialized by <see cref="JsonSerialize"/>: <see cref="version"/> is the format version of
+    /// the type, which is available as <see cref="IJsonReadData.Version"/> when the object is read, so that
+    /// <see cref="IJsonSerialize.SetObjectData"/> can handle data written by older versions; <see cref="serializeAsStruct"/> makes the
+    /// object be written inline as a sequence of values (the type then needs a constructor taking an <see cref="IJsonReadStruct"/>)
+    /// instead of as a referenced object.
+    /// </summary>
     [System.AttributeUsage(System.AttributeTargets.Class | System.AttributeTargets.Struct)]
     public class JsonVersion : System.Attribute
     {
@@ -31,11 +38,22 @@ namespace CADability
             this.serializeAsStruct = serializeAsStruct;
         }
     }
+    /// <summary>
+    /// Intended for types which provide their assembly name and format version by code instead of by the <see cref="JsonVersion"/>
+    /// attribute. Not evaluated by <see cref="JsonSerialize"/>, currently unused.
+    /// </summary>
     public interface IJsonVersion
     {
         string GetAssemblyName();
         int GetTypeVersion(Type type);
     }
+    /// <summary>
+    /// Implemented by all objects which can be saved to and loaded from CADability's JSON based ".cdb" files by
+    /// <see cref="JsonSerialize"/>: <see cref="GetObjectData"/> writes the properties of the object to the provided
+    /// <see cref="IJsonWriteData"/>, <see cref="SetObjectData"/> reads them back. The type needs a parameterless constructor (it may
+    /// be non-public), which is called before <see cref="SetObjectData"/>; objects which need a second pass after all objects have
+    /// been read also implement <see cref="IJsonSerializeDone"/>.
+    /// </summary>
     public interface IJsonSerialize
     {
         void GetObjectData(IJsonWriteData data);
@@ -58,6 +76,13 @@ namespace CADability
         /// <param name="jsonSerialize"></param>
         void SerializationDone(JsonSerialize jsonSerialize);
     }
+    /// <summary>
+    /// The data an object receives in <see cref="IJsonSerialize.SetObjectData"/>: typed access by name to the properties which
+    /// <see cref="IJsonSerialize.GetObjectData"/> wrote. Reading a missing property throws, unless <see cref="HasProperty"/>,
+    /// <see cref="TryGetProperty{T}"/> or <see cref="GetPropertyOrDefault{T}"/> is used; <see cref="Version"/> is the
+    /// <see cref="JsonVersion"/> of the type with which the data was written. Referenced objects may not be completely read yet when
+    /// they are returned, see <see cref="IJsonSerializeDone"/>.
+    /// </summary>
     public interface IJsonReadData
     {
         bool HasProperty(string name);
@@ -73,10 +98,22 @@ namespace CADability
         void RegisterForSerializationDoneCallback(IJsonSerializeDone toCall);
         Dictionary<string, object>.Enumerator GetEnumerator();
     }
+    /// <summary>
+    /// The data passed to the constructor of a type which is serialized inline as a sequence of values (see
+    /// <see cref="JsonVersion.serializeAsStruct"/>, e.g. <see cref="ModOp"/> or <see cref="CoordSys"/>): each call of
+    /// <see cref="GetValue{T}"/> returns the next value in the order in which <see cref="IJsonWriteData.AddValue"/> or
+    /// <see cref="IJsonWriteData.AddValues"/> wrote them.
+    /// </summary>
     public interface IJsonReadStruct
     {
         T GetValue<T>() where T : struct;
     }
+    /// <summary>
+    /// The sink an object writes to in <see cref="IJsonSerialize.GetObjectData"/>: named properties (<see cref="AddProperty"/>) for
+    /// ordinary objects, or a sequence of unnamed values (<see cref="AddValue"/>, <see cref="AddValues"/>) for types serialized inline
+    /// (see <see cref="JsonVersion.serializeAsStruct"/>). Values may be primitive values, strings, arrays and lists of them and other
+    /// <see cref="IJsonSerialize"/> objects.
+    /// </summary>
     public interface IJsonWriteData
     {
         void AddProperty(string name, object value);
@@ -85,9 +122,23 @@ namespace CADability
         void AddHashTable(string v, Hashtable attributeLists);
         void RegisterForSerializationDoneCallback(IJsonSerializeDone toCall);
     }
+    /// <summary>
+    /// CADability's own JSON serializer, which writes and reads graphs of <see cref="IJsonSerialize"/> objects (a <see cref="Project"/>
+    /// with all its models, objects and attributes) to and from a stream: <see cref="ToStream"/> writes, <see cref="FromStream"/>
+    /// reads. Each object is written once and referenced afterwards, so shared objects and cycles are preserved; types are stored by
+    /// name and resolved when reading, where the <see cref="ResolveType"/> event lets an application map renamed types.
+    /// <see cref="Project.ReadFromFile(string)"/> and <see cref="Project.WriteToFile"/> use it for the ".cdb" project files.
+    /// </summary>
     public class JsonSerialize : IJsonWriteData
     {
         Dictionary<string, Assembly> loadedAssemblies = null;
+        /// <summary>
+        /// Signature of the handlers of <see cref="ResolveType"/>: asked for the <see cref="Type"/> to instantiate when a type name read
+        /// from a file cannot be resolved.
+        /// </summary>
+        /// <param name="typeName">The full name of the type as stored in the file</param>
+        /// <param name="assemblyName">The name of the assembly as stored in the file</param>
+        /// <returns>The type to use, or null if this handler does not know the type</returns>
         public delegate Type ResolveTypeDelegate(string typeName, string assemblyName);
         /// <summary>
         /// If a type cannot be resolved (maybe you changed the class name) on deserialization, you can return a type here.

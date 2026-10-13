@@ -4,21 +4,48 @@ using System.Runtime.Serialization;
 
 namespace CADability.GeoObject
 {
+    /// <summary>
+    /// A <see cref="CylindricalSurface"/> with a parameter space that has no seam: the (angle, axis position) system of the
+    /// cylinder is replaced by polar coordinates in a plane, u = r·cos(angle), v = r·sin(angle) with r = axis position − vmin.
+    /// vmin must lie below every axis position that is used, otherwise the mapping folds over. <see cref="Make3D"/> uses it for
+    /// extrusions whose end curves cross the seam of the periodic cylinder. <see cref="INonPeriodicSurfaceConversion"/> converts
+    /// points and 2d curves between the two parameter systems.
+    /// </summary>
     [Serializable()]
     public class NonPeriodicCylindricalSurface : CylindricalSurface, INonPeriodicSurfaceConversion, ISerializable, IDeserializationCallback
     {
         // Achtung: Helper geht von anderem uv-System aus
+        /// <summary>
+        /// Copy constructor: creates a surface with the same geometry and the same origin of the polar system as
+        /// <paramref name="toClone"/>.
+        /// </summary>
+        /// <param name="toClone">the surface to copy</param>
         public NonPeriodicCylindricalSurface(NonPeriodicCylindricalSurface toClone)
             : base(toClone)
         {
             this.vmin = toClone.vmin;
         }
+        /// <summary>
+        /// Creates the non-periodic version of <paramref name="toSubstitute"/> for faces whose v values (positions along the axis)
+        /// lie between <paramref name="vmin"/> and <paramref name="vmax"/>. The origin of the polar system is placed half the
+        /// interval below <paramref name="vmin"/>, so that all used points get a positive radius.
+        /// </summary>
+        /// <param name="toSubstitute">the periodic cylinder to replace</param>
+        /// <param name="vmin">the smallest v value of the periodic cylinder that will be used</param>
+        /// <param name="vmax">the largest v value of the periodic cylinder that will be used</param>
         public NonPeriodicCylindricalSurface(CylindricalSurface toSubstitute, double vmin, double vmax)
             : base(toSubstitute)
         {
             // vmin wird so bestimmt, dass es sicher kleiner ist als der zu erwartende v-Bereich
             this.vmin = vmin - (vmax - vmin) / 2.0;
         }
+        /// <summary>
+        /// Creates the surface from the transformation of the unit cylinder (see <see cref="CylindricalSurface"/>) and the v value
+        /// of the periodic cylinder that corresponds to the origin of the polar system; used by <see cref="GetModified(ModOp)"/>.
+        /// </summary>
+        /// <param name="toCylinder">maps the unit cylinder (radius 1, axis = z axis) to this cylinder</param>
+        /// <param name="vmin">the v value (position along the axis) of the periodic cylinder at the origin of the polar system; all used v values must be greater</param>
+        /// <param name="usedArea">the part of the non-periodic parameter space that is actually used, if known</param>
         public NonPeriodicCylindricalSurface(ModOp toCylinder, double vmin, BoundingRect? usedArea = null) 
             : base(toCylinder, usedArea)
         {
@@ -55,6 +82,7 @@ namespace CADability.GeoObject
             return new TransformedCurve2D(curve2d, new NonPeriodicTransformation(vmin));
         }
         #endregion
+        /// <inheritdoc/>
         public override string ToString()
         {
             return "NonPeriodicCylindricalSurface: " + "loc: " + Location.ToString() + "dirx: " + XAxis.ToString() + "diry: " + YAxis.ToString();
@@ -148,6 +176,7 @@ namespace CADability.GeoObject
             base.CopyData(CopyFrom);
             this.vmin = (CopyFrom as NonPeriodicCylindricalSurface).vmin;
         }
+        /// <inheritdoc/>
         public override bool IsUPeriodic
         {
             get
@@ -155,6 +184,7 @@ namespace CADability.GeoObject
                 return false;
             }
         }
+        /// <inheritdoc/>
         public override bool IsVPeriodic
         {
             get
@@ -270,6 +300,13 @@ namespace CADability.GeoObject
             #endregion
         }
         #region ISerializable Members
+        /// <summary>
+        /// Constructor for the legacy binary deserialization (<see cref="System.Runtime.Serialization.ISerializable"/>): reads the
+        /// cylinder from the base class and the origin of the polar system. Files are written in the JSON format now; the binary
+        /// format is still read.
+        /// </summary>
+        /// <param name="info">the data of the object</param>
+        /// <param name="context">the source of the deserialization</param>
         protected NonPeriodicCylindricalSurface(SerializationInfo info, StreamingContext context) : base(info, context)
         {
             vmin = info.GetDouble("Vmin");

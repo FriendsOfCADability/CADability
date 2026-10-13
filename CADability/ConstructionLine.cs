@@ -187,11 +187,13 @@ namespace CADability.GeoObject
             base.GetObjectData(info, context);
             info.AddValue("IsRay", isRay);
         }
+        /// <inheritdoc/>
         public override void GetObjectData(IJsonWriteData data)
         {
             base.GetObjectData(data);
             data.AddProperty("IsRay", isRay);
         }
+        /// <inheritdoc/>
         public override void SetObjectData(IJsonReadData data)
         {
             base.SetObjectData(data);

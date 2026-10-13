@@ -19,6 +19,17 @@ namespace CADability.GeoObject
         // only the part int the direction of the zAxis is used. the x and y system define the u,v system, the length of the zAxis with respect to the length of x and y axis
         // define the opening angle
         Polynom implicitPolynomial; // cached value for the implicit form of the surface
+        /// <summary>
+        /// Creates the half cone with the apex at <paramref name="location"/> that opens in direction <paramref name="zAxis"/> with
+        /// the given half opening angle. Only the directions of <paramref name="xAxis"/>, <paramref name="yAxis"/> and
+        /// <paramref name="zAxis"/> are used: the x and y axes are normalized and span the u/v plane perpendicular to the axis, the
+        /// z axis gets the length 1/tan(<paramref name="semiAngle"/>), which encodes the opening angle (see <see cref="OpeningAngle"/>).
+        /// </summary>
+        /// <param name="location">the apex of the cone</param>
+        /// <param name="xAxis">direction of u in the plane perpendicular to the axis</param>
+        /// <param name="yAxis">direction of v, perpendicular to <paramref name="xAxis"/> and <paramref name="zAxis"/></param>
+        /// <param name="zAxis">direction of the axis; only the half cone on this side of the apex is used</param>
+        /// <param name="semiAngle">half of the opening angle in radians (the angle between the axis and the surface lines)</param>
         public ConicalSurfaceNP(GeoPoint location, GeoVector xAxis, GeoVector yAxis, GeoVector zAxis, double semiAngle)
         {
             this.location = location;
@@ -29,6 +40,17 @@ namespace CADability.GeoObject
             this.yAxis.Length = 1.0;
             this.zAxis.Length = 1.0 / Math.Tan(semiAngle);
         }
+        /// <summary>
+        /// Creates the half cone with the apex at <paramref name="location"/> from a coordinate system in which the ratio of the
+        /// lengths of <paramref name="xAxis"/> (same length as <paramref name="yAxis"/>) and <paramref name="zAxis"/> is the tangent
+        /// of half the opening angle: the point at (u, v) is location + u·xAxis + v·yAxis + sqrt(u²+v²)·zAxis. The vectors are
+        /// scaled so that <paramref name="xAxis"/> gets the length 1. <see cref="ConicalSurface.GetNonPeriodicSurface(ICurve[])"/>
+        /// uses this to replace a periodic cone.
+        /// </summary>
+        /// <param name="location">the apex of the cone</param>
+        /// <param name="xAxis">direction of u in the plane perpendicular to the axis</param>
+        /// <param name="yAxis">direction of v, perpendicular to <paramref name="xAxis"/> and <paramref name="zAxis"/>, same length as <paramref name="xAxis"/></param>
+        /// <param name="zAxis">the axis; only the half cone on this side of the apex is used, and the length relative to <paramref name="xAxis"/> sets the opening angle</param>
         public ConicalSurfaceNP(GeoPoint location, GeoVector xAxis, GeoVector yAxis, GeoVector zAxis)
         {
             this.location = location;
@@ -37,10 +59,12 @@ namespace CADability.GeoObject
             this.yAxis = f * yAxis;
             this.zAxis = f * zAxis;
         }
+        /// <inheritdoc/>
         public override ISurface Clone()
         {
             return new ConicalSurfaceNP(location, xAxis, yAxis, zAxis);
         }
+        /// <inheritdoc/>
         public override void CopyData(ISurface copyFrom)
         {
             if (copyFrom is ConicalSurfaceNP cnp)
@@ -51,18 +75,22 @@ namespace CADability.GeoObject
                 zAxis = cnp.zAxis;
             }
         }
+        /// <inheritdoc/>
         public override ICurve FixedU(double u, double vMin, double vMax)
         {
             return Make3dCurve(new Line2D(new GeoPoint2D(u, vMin), new GeoPoint2D(u, vMax)));
         }
+        /// <inheritdoc/>
         public override ICurve FixedV(double v, double uMin, double uMax)
         {
             return Make3dCurve(new Line2D(new GeoPoint2D(uMin, v), new GeoPoint2D(uMax, v)));
         }
+        /// <inheritdoc/>
         public override ISurface GetModified(ModOp m)
         {   // m must be orthogonal
             return new ConicalSurfaceNP(m * location, m * xAxis, m * yAxis, m * zAxis);
         }
+        /// <inheritdoc/>
         public override void Modify(ModOp m)
         {
             location = m * location;
@@ -72,6 +100,7 @@ namespace CADability.GeoObject
             implicitPolynomial = null;
             boxedSurfaceEx = null;
         }
+        /// <inheritdoc/>
         public override ICurve Make3dCurve(ICurve2D curve2d)
         {
             if (curve2d is Line2D l2d)
@@ -128,6 +157,7 @@ namespace CADability.GeoObject
             }
             return base.Make3dCurve(curve2d);
         }
+        /// <inheritdoc/>
         public override ICurve2D GetProjectedCurve(ICurve curve, double precision)
         {
             if (curve is Line line)
@@ -168,6 +198,7 @@ namespace CADability.GeoObject
             }
             return base.GetProjectedCurve(curve, precision);
         }
+        /// <inheritdoc/>
         public override ICurve2D[] GetTangentCurves(GeoVector direction, double uMin, double uMax, double vMin, double vMax)
         {
             if (Precision.SameDirection(direction, zAxis, false))
@@ -185,6 +216,7 @@ namespace CADability.GeoObject
             
             return Array.Empty<ICurve2D>();
         }
+        /// <inheritdoc/>
         public override GeoPoint PointAt(GeoPoint2D uv)
         {
             //double vo = 0.0;
@@ -194,23 +226,27 @@ namespace CADability.GeoObject
             //double v = vf * uv.y * (l - vo) / l;
             return location + (Math.Sqrt(sqr(uv.y) + sqr(uv.x)) * zAxis) + uv.y * yAxis + uv.x * xAxis;
         }
+        /// <inheritdoc/>
         public override GeoPoint2D PositionOf(GeoPoint p)
         {
             GeoVector rb = Geometry.ReBase(p - location, xAxis, yAxis, zAxis);
             return new GeoPoint2D(rb.x, rb.y);
         }
+        /// <inheritdoc/>
         public override GeoVector UDirection(GeoPoint2D uv)
         {
             double u = uv.x;
             double v = uv.y;
             return u * zAxis / Math.Sqrt(sqr(v) + sqr(u)) + xAxis;
         }
+        /// <inheritdoc/>
         public override GeoVector VDirection(GeoPoint2D uv)
         {
             double u = uv.x;
             double v = uv.y;
             return v * zAxis / Math.Sqrt(sqr(v) + sqr(u)) + yAxis;
         }
+        /// <inheritdoc/>
         public override void DerivationAt(GeoPoint2D uv, out GeoPoint p, out GeoVector du, out GeoVector dv)
         {
             double u = uv.x;
@@ -220,6 +256,7 @@ namespace CADability.GeoObject
             du = u * zAxis / sc3 + xAxis;
             dv = v * zAxis / sc3 + yAxis;
         }
+        /// <inheritdoc/>
         public override void Derivation2At(GeoPoint2D uv, out GeoPoint p, out GeoVector du, out GeoVector dv, out GeoVector duu, out GeoVector dvv, out GeoVector duv)
         {
             double u = uv.x;
@@ -234,14 +271,19 @@ namespace CADability.GeoObject
             dvv = sc1 - sqr(v) * zAxis / sc2;
             duv = (-(u * v * zAxis)) / sc2;
         }
+        /// <inheritdoc/>
         public override ModOp2D ReverseOrientation()
         {   // flip x and y axis, keep z axis, left handed system
             (xAxis, yAxis) = (yAxis, xAxis);
             return new ModOp2D(0, 1, 0, 1, 0, 0);
         }
+        /// <inheritdoc/>
         public override bool IsUPeriodic => false;
+        /// <inheritdoc/>
         public override bool IsVPeriodic => false;
+        /// <inheritdoc/>
         public override bool UvChangesWithModification => true;
+        /// <inheritdoc/>
         public override bool SameGeometry(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, double precision, out ModOp2D firstToSecond)
         {
             if (other is ConicalSurfaceNP cnp)
@@ -256,8 +298,13 @@ namespace CADability.GeoObject
             }
             return base.SameGeometry(thisBounds, other, otherBounds, precision, out firstToSecond);
         }
+        /// <summary>
+        /// The full opening angle of the cone in radians, i.e. twice the angle between the axis and the surface lines. It is
+        /// derived from the lengths of the x and z axes of the coordinate system.
+        /// </summary>
         public double OpeningAngle => 2 * Math.Atan2(xAxis.Length, zAxis.Length);
 
+        /// <inheritdoc/>
         public override GeoPoint2D[] PerpendicularFoot(GeoPoint fromHere)
         {
             try
@@ -276,6 +323,7 @@ namespace CADability.GeoObject
                 return Array.Empty<GeoPoint2D>();
             }
         }
+        /// <inheritdoc/>
         public override Polynom GetImplicitPolynomial()
         {
             if (implicitPolynomial == null)
@@ -292,6 +340,13 @@ namespace CADability.GeoObject
             }
             return implicitPolynomial;
         }
+        /// <summary>
+        /// Evaluates an expanded form of the implicit equation of the cone at <paramref name="p"/>. Only used to check
+        /// <see cref="GetImplicitPolynomial"/> during development; the value is 0 for points on the cone and is not scaled to a
+        /// distance.
+        /// </summary>
+        /// <param name="p">the point to test</param>
+        /// <returns>the value of the implicit function at <paramref name="p"/></returns>
         public double DebugImplicit(GeoPoint p)
         {
             double sc22 = (2.0 * xAxis.z);
@@ -306,6 +361,7 @@ namespace CADability.GeoObject
             // z * (-2 * location_z * zAxis_z ^ 2 + (-2 * location_y * zAxis_y - 2 * location_x * zAxis_x) * zAxis_z + 2 * y * zAxis_y * zAxis_z + 2 * x * zAxis_x * zAxis_z + 2 * c * location_z) + z ^ 2 * (zAxis_z ^ 2 - c) + location_z ^ 2 * zAxis_z ^ 2 + y * (-2 * location_z * zAxis_y * zAxis_z - 2 * location_y * zAxis_y ^ 2 + 2 * x * zAxis_x * zAxis_y - 2 * location_x * zAxis_x * zAxis_y + 2 * c * location_y) + x * (-2 * location_z * zAxis_x * zAxis_z - 2 * location_y * zAxis_x * zAxis_y - 2 * location_x * zAxis_x ^ 2 + 2 * c * location_x) + (2 * location_y * location_z * zAxis_y + 2 * location_x * location_z * zAxis_x) * zAxis_z + y ^ 2 * (zAxis_y ^ 2 - c) + location_y ^ 2 * zAxis_y ^ 2 + 2 * location_x * location_y * zAxis_x * zAxis_y + x ^ 2 * (zAxis_x ^ 2 - c) + location_x ^ 2 * zAxis_x ^ 2 - c * location_z ^ 2 - c * location_y ^ 2 - c * location_x ^ 2
             return sqr(zAxis.z * (p.z - location.z) + zAxis.y * (p.y - location.y) + zAxis.x * (p.x - location.x)) - c * (sqr(p.z - location.z) + sqr(p.y - location.y) + sqr(p.x - location.x));
         }
+        /// <inheritdoc/>
         public override IPropertyEntry GetPropertyEntry(IFrame frame)
         {
             List<IPropertyEntry> se = new List<IPropertyEntry>();
@@ -334,7 +390,15 @@ namespace CADability.GeoObject
         Angle ICone.OpeningAngle { get => OpeningAngle; set => throw new NotImplementedException(); }
 
         #region IJsonSerialize
+        /// <summary>
+        /// Empty constructor for the JSON deserialization (<see cref="IJsonSerialize"/>); the data is set by
+        /// <see cref="SetObjectData(IJsonReadData)"/>.
+        /// </summary>
         protected ConicalSurfaceNP() { }
+        /// <summary>
+        /// Writes the apex and the three axes for the JSON serialization (<see cref="IJsonSerialize"/>).
+        /// </summary>
+        /// <param name="data">receives the properties</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("Location", location);
@@ -342,6 +406,11 @@ namespace CADability.GeoObject
             data.AddProperty("YAxis", yAxis);
             data.AddProperty("ZAxis", zAxis);
         }
+        /// <summary>
+        /// Reads the data written by <see cref="GetObjectData(IJsonWriteData)"/> for the JSON deserialization
+        /// (<see cref="IJsonSerialize"/>).
+        /// </summary>
+        /// <param name="data">provides the properties</param>
         public void SetObjectData(IJsonReadData data)
         {
             location = data.GetProperty<GeoPoint>("Location");
@@ -351,6 +420,12 @@ namespace CADability.GeoObject
         }
         #endregion
         #region ISerializable
+        /// <summary>
+        /// Constructor for the legacy binary deserialization (<see cref="System.Runtime.Serialization.ISerializable"/>). Files are
+        /// written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
+        /// </summary>
+        /// <param name="info">the data of the object</param>
+        /// <param name="context">the source of the deserialization</param>
         protected ConicalSurfaceNP(SerializationInfo info, StreamingContext context)
         {
             location = (GeoPoint)info.GetValue("Location", typeof(GeoPoint));

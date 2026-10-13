@@ -40,7 +40,9 @@ namespace CADability
             return cs.color;
         }
         #region IShowPropertyImpl Overrides
+        /// <inheritdoc/>
         public override string Label { get => StringTable.GetString(resourceIdInternal); }
+        /// <inheritdoc/>
         public override string Value
         {
             get
@@ -49,7 +51,9 @@ namespace CADability
             }
 
         }
+        /// <inheritdoc/>
         public override PropertyEntryType Flags => PropertyEntryType.Selectable|PropertyEntryType.ValueAsButton;
+        /// <inheritdoc/>
         public override void ButtonClicked(PropertyEntryButton button)
         {
             Color clr = Color;

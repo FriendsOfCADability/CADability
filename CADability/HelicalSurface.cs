@@ -32,6 +32,23 @@ namespace CADability.GeoObject
             this.curveEndParameter = curveEndParameter;
             this.curveParameterOffset = curveParameterOffset;
         }
+        /// <summary>
+        /// Creates the helical surface swept by <paramref name="basisCurve"/> revolving about the axis through
+        /// <paramref name="axisLocation"/> in direction <paramref name="axisDirection"/> while it advances <paramref name="pitch"/>
+        /// along the axis per full turn. The u parameter is the rotation angle in radians, the v parameter is the position on the
+        /// curve, running from <paramref name="curveStartParameter"/> at its start point to <paramref name="curveEndParameter"/> at
+        /// its end point. The curve is projected into a plane through the axis, which is given by <paramref name="axisRefPoint"/> or,
+        /// when that is not provided, by the end point of the curve that is farther from the axis.
+        /// </summary>
+        /// <param name="basisCurve">the curve to sweep; it is projected into the plane through the axis</param>
+        /// <param name="axisLocation">a point on the axis</param>
+        /// <param name="axisDirection">direction of the axis</param>
+        /// <param name="pitch">the distance along the axis for one full turn (2π in u)</param>
+        /// <param name="curveStartParameter">v value of the start point of the curve, usually 0</param>
+        /// <param name="curveEndParameter">v value of the end point of the curve, usually 1</param>
+        /// <param name="axisRefPoint">optional point that, together with the axis, defines the plane the curve is projected into</param>
+        /// <exception cref="SurfaceOfRevolutionException">when no plane through the axis can be determined, because both end points
+        /// of the curve lie on the axis and the curve is not planar</exception>
         public HelicalSurface(ICurve basisCurve, GeoPoint axisLocation, GeoVector axisDirection, double pitch, double curveStartParameter, double curveEndParameter, GeoPoint? axisRefPoint = null) : base()
         {
             this.curveEndParameter = curveEndParameter;
@@ -142,6 +159,10 @@ namespace CADability.GeoObject
                 return go as ICurve;
             }
         }
+        /// <summary>
+        /// The distance the curve advances along the axis during one full turn (u = 2π). A negative pitch reverses the handedness
+        /// of the helix.
+        /// </summary>
         public double Pitch
         {
             get
@@ -221,6 +242,7 @@ namespace CADability.GeoObject
                 return VDirection(new GeoPoint2D(0.0, uv.y)).Normalized ^ VDirection(new GeoPoint2D(Math.PI / 2.0, uv.y)).Normalized;
             }
         }
+        /// <inheritdoc/>
         public override void Derivation2At(GeoPoint2D uv, out GeoPoint location, out GeoVector du, out GeoVector dv, out GeoVector duu, out GeoVector dvv, out GeoVector duv)
         {
             double pos = GetPos(uv.y);
@@ -297,6 +319,7 @@ namespace CADability.GeoObject
                 this.curveEndParameter = cc.curveEndParameter;
             }
         }
+        /// <inheritdoc/>
         public override bool IsUPeriodic
         {
             get
@@ -304,6 +327,7 @@ namespace CADability.GeoObject
                 return false;
             }
         }
+        /// <inheritdoc/>
         public override bool IsVPeriodic
         {
             get
@@ -311,6 +335,7 @@ namespace CADability.GeoObject
                 return false;
             }
         }
+        /// <inheritdoc/>
         public override double UPeriod
         {
             get
@@ -318,6 +343,7 @@ namespace CADability.GeoObject
                 return 0.0;
             }
         }
+        /// <inheritdoc/>
         public override double VPeriod
         {
             get
@@ -354,6 +380,7 @@ namespace CADability.GeoObject
             //res.ThroughPoints(pnts, 3, false);
             //return res as ICurve;
         }
+        /// <inheritdoc/>
         public override bool Oriented
         {
             get
@@ -521,10 +548,12 @@ namespace CADability.GeoObject
             }
             return base.SameGeometry(thisBounds, other, otherBounds, precision, out firstToSecond);
         }
+        /// <inheritdoc/>
         public override ISurface GetOffsetSurface(double offset)
         {
             return base.GetOffsetSurface(offset);
         }
+        /// <inheritdoc/>
         public override void GetNaturalBounds(out double umin, out double umax, out double vmin, out double vmax)
         {
             umin = double.MinValue;
@@ -533,11 +562,18 @@ namespace CADability.GeoObject
             vmax = curveEndParameter;
         }
         #endregion
+        /// <inheritdoc/>
         public override IPropertyEntry GetPropertyEntry(IFrame frame)
         {
             return new GroupProperty("HelicalSurface", new IPropertyEntry[0]);
         }
         #region ISerializable Members
+        /// <summary>
+        /// Constructor for the legacy binary deserialization (<see cref="System.Runtime.Serialization.ISerializable"/>). Older files
+        /// without the curve parameter offset are read with an offset of 0.
+        /// </summary>
+        /// <param name="info">the data of the object</param>
+        /// <param name="context">the source of the deserialization</param>
         protected HelicalSurface(SerializationInfo info, StreamingContext context) : base()
         {
             basisCurve2D = info.GetValue("BasisCurve2D", typeof(ICurve2D)) as ICurve2D;
@@ -565,6 +601,11 @@ namespace CADability.GeoObject
             info.AddValue("CurveParameterOffset", curveParameterOffset, typeof(double));
         }
         #endregion
+        /// <summary>
+        /// Returns the parameter domain of one full turn of the complete curve: u from 0 to 2π, v from the start to the end
+        /// parameter of the curve. The surface itself is not bounded in u.
+        /// </summary>
+        /// <returns>the rectangle [0, 2π] × [curveStartParameter, curveEndParameter] in parameter space</returns>
         public BoundingRect GetMaximumExtent()
         {
             return new BoundingRect(0, curveStartParameter, Math.PI * 2.0, curveEndParameter);

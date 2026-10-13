@@ -191,6 +191,7 @@ namespace CADability.Actions
             block.Modify(m);
         }
 
+        /// <inheritdoc/>
         public override bool OnCommand(string MenuId)
         {
             switch (MenuId)
@@ -240,6 +241,7 @@ namespace CADability.Actions
             copyObject = val;
         }
 
+        /// <inheritdoc/>
         public override void OnSetAction()
         {
             //			base.ActiveObject = block;
@@ -402,16 +404,19 @@ namespace CADability.Actions
                 case 3: return SweepAngle.ToRight;
             }
         }
+        /// <inheritdoc/>
         public override void OnRemoveAction()
         {
             base.OnRemoveAction();
         }
 
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "RotateObjects";
         }
 
+        /// <inheritdoc/>
         public override void OnDone()
         {
             // ist die Shift Taste gehalten, so werden Kopien gemacht, d.h. der die Elemente

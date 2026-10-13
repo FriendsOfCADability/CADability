@@ -151,6 +151,14 @@ namespace CADability
         private ICurve secondCurve; // die Kurve am Ende des "Drahtes"
         private ModOp toUnit = ModOp.Null;
 
+        /// <summary>
+        /// Creates the ruled surface between <paramref name="firstCurve"/> (v = 0) and <paramref name="secondCurve"/> (v = 1). The
+        /// point at (u, v) is the linear interpolation between the points of the two curves at the same position u (0 to 1). The
+        /// curves are used as they are, not copied; they should run in the same sense (start point to start point), otherwise the
+        /// surface is twisted.
+        /// </summary>
+        /// <param name="firstCurve">the curve at v = 0</param>
+        /// <param name="secondCurve">the curve at v = 1</param>
         public RuledSurface(ICurve firstCurve, ICurve secondCurve)
         {
             this.firstCurve = firstCurve;
@@ -158,6 +166,9 @@ namespace CADability
 #if DEBUG
 #endif
         }
+        /// <summary>
+        /// The curve at v = 0. It is the object the surface works with, not a copy; do not modify it.
+        /// </summary>
         public ICurve FirstCurve
         {
             get
@@ -165,6 +176,9 @@ namespace CADability
                 return firstCurve;
             }
         }
+        /// <summary>
+        /// The curve at v = 1. It is the object the surface works with, not a copy; do not modify it.
+        /// </summary>
         public ICurve SecondCurve
         {
             get
@@ -430,6 +444,7 @@ namespace CADability
             }
             return base.Make3dCurve(curve2d);
         }
+        /// <inheritdoc/>
         public override bool IsUPeriodic
         {
             get
@@ -437,6 +452,7 @@ namespace CADability
                 return firstCurve.IsClosed && secondCurve.IsClosed;
             }
         }
+        /// <inheritdoc/>
         public override bool IsVPeriodic
         {
             get
@@ -444,6 +460,7 @@ namespace CADability
                 return false;
             }
         }
+        /// <inheritdoc/>
         public override double UPeriod
         {
             get
@@ -452,6 +469,7 @@ namespace CADability
                 else return 0.0;
             }
         }
+        /// <inheritdoc/>
         public override double VPeriod
         {
             get
@@ -459,6 +477,7 @@ namespace CADability
                 return 0.0;
             }
         }
+        /// <inheritdoc/>
         public override void GetSafeParameterSteps(double umin, double umax, double vmin, double vmax, out double[] intu, out double[] intv)
         {
             //base.GetSafeParameterSteps(umin, umax, vmin, vmax, out intu, out intv);
@@ -514,6 +533,7 @@ namespace CADability
         {   // in einer Richtung ist es immer liniear, es gibt also keine Beulen
             return new GeoPoint2D[0];
         }
+        /// <inheritdoc/>
         public override ModOp2D ReverseOrientation()
         {
             boxedSurfaceEx = null;
@@ -524,6 +544,7 @@ namespace CADability
 #if DEBUG
         public static int hitcount = 0;
 #endif
+        /// <inheritdoc/>
         public override void Intersect(ICurve curve, BoundingRect uvExtent, out GeoPoint[] ips, out GeoPoint2D[] uvOnFaces, out double[] uOnCurve3Ds)
         {
             if (curve is IExplicitPCurve3D && firstCurve is Line && secondCurve is Line)
@@ -737,6 +758,7 @@ namespace CADability
         //}
         private static ImplicitPSurface implicitUnitHyperbolic = new ImplicitPSurface(new Polynom(1, "xy", -1, "z"));
 
+        /// <inheritdoc/>
         public override GeoPoint2D[] GetLineIntersection(GeoPoint startPoint, GeoVector direction)
         {
             if (firstCurve is Line && secondCurve is Line)
@@ -793,6 +815,7 @@ namespace CADability
             }
             return base.GetLineIntersection(startPoint, direction);
         }
+        /// <inheritdoc/>
         public override bool SameGeometry(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, double precision, out ModOp2D firstToSecond)
         {
             if (other is RuledSurface)
@@ -815,6 +838,7 @@ namespace CADability
             }
             return base.SameGeometry(thisBounds, other, otherBounds, precision, out firstToSecond);
         }
+        /// <inheritdoc/>
         public override IPropertyEntry GetPropertyEntry(IFrame frame)
         {
             List<IPropertyEntry> se = new List<IPropertyEntry>();
@@ -830,6 +854,12 @@ namespace CADability
         }
         #endregion
         #region ISerializable Members
+        /// <summary>
+        /// Constructor for the legacy binary deserialization (<see cref="System.Runtime.Serialization.ISerializable"/>). Files are
+        /// written in the JSON format now; the binary format is still read.
+        /// </summary>
+        /// <param name="info">the data of the object</param>
+        /// <param name="context">the source of the deserialization</param>
         protected RuledSurface(SerializationInfo info, StreamingContext context)
         {
             firstCurve = info.GetValue("FirstCurve", typeof(ICurve)) as ICurve;

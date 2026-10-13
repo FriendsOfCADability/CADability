@@ -14,9 +14,21 @@ namespace CADability
     [Serializable()]
     public struct BoundingRect : IQuadTreeInsertable, IComparable<BoundingRect>, ISerializable, IEquatable<BoundingRect>
     {
+        /// <summary>
+        /// The left limit (minimum x). It is <see cref="double.MaxValue"/> for the <see cref="EmptyBoundingRect"/>.
+        /// </summary>
         public double Left;
+        /// <summary>
+        /// The right limit (maximum x). It is <see cref="double.MinValue"/> for the <see cref="EmptyBoundingRect"/>.
+        /// </summary>
         public double Right;
+        /// <summary>
+        /// The lower limit (minimum y). It is <see cref="double.MaxValue"/> for the <see cref="EmptyBoundingRect"/>.
+        /// </summary>
         public double Bottom;
+        /// <summary>
+        /// The upper limit (maximum y). It is <see cref="double.MinValue"/> for the <see cref="EmptyBoundingRect"/>.
+        /// </summary>
         public double Top;
         /// <summary>
         /// Creates a new BoundingRect with the provided center, half width and half height
@@ -114,7 +126,17 @@ namespace CADability
         /// Returns an empty BoundingRect which is convenient as a start for the <see cref="MinMax(GeoPoint2D)"/> method.
 		/// </summary>
 		static public BoundingRect EmptyBoundingRect = new BoundingRect(System.Double.MaxValue, System.Double.MaxValue, System.Double.MinValue, System.Double.MinValue);
+        /// <summary>
+        /// A rectangle that contains everything: its limits are <see cref="double.MinValue"/> and <see cref="double.MaxValue"/>.
+        /// <see cref="Width"/> and <see cref="Height"/> overflow to infinity, so use it only as a "no restriction" marker,
+        /// not in computations (see <see cref="HalfInfinitBoundingRect"/>).
+        /// </summary>
         static public BoundingRect InfinitBoundingRect = new BoundingRect(System.Double.MinValue, System.Double.MinValue, System.Double.MaxValue, System.Double.MaxValue);
+        /// <summary>
+        /// A rectangle that practically contains everything but, unlike <see cref="InfinitBoundingRect"/>, has finite
+        /// <see cref="Width"/> and <see cref="Height"/>: its limits are half of <see cref="double.MinValue"/> and
+        /// <see cref="double.MaxValue"/>. Use it where an unrestricted domain takes part in computations.
+        /// </summary>
         static public BoundingRect HalfInfinitBoundingRect = new BoundingRect(System.Double.MinValue / 2.0, System.Double.MinValue / 2.0, System.Double.MaxValue / 2.0, System.Double.MaxValue / 2.0);
 
         /// <summary>
@@ -471,6 +493,13 @@ namespace CADability
             if (p.x > r.Left && p.x < r.Right && p.y > r.Bottom && p.y < r.Top) return true;
             return false;
         }
+        /// <summary>
+        /// Checks whether the point is inside this rectangle, where the left and bottom limits count as inside and the right
+        /// and top limits as outside (half open intervals). With this convention a point in a grid of adjacent rectangles
+        /// belongs to exactly one of them.
+        /// </summary>
+        /// <param name="p">the point to test</param>
+        /// <returns>true, if Left &lt;= p.x &lt; Right and Bottom &lt;= p.y &lt; Top</returns>
         public bool ContainsLb(GeoPoint2D p)
         {   // die linke und untere Grenze werden mit einbezogen, die rechte obere nicht
             return p.x >= Left && p.x < Right && p.y >= Bottom && p.y < Top;
@@ -520,10 +549,22 @@ namespace CADability
         /// <param name="r">The rectangle to test with</param>
         /// <returns>true if outside</returns>
         public static bool operator >=(GeoPoint2D p, BoundingRect r) { return !(p < r); }
+        /// <summary>
+        /// True, if both rectangles have exactly the same limits.
+        /// </summary>
+        /// <param name="r1">first rectangle</param>
+        /// <param name="r2">second rectangle</param>
+        /// <returns>true, if equal</returns>
         public static bool operator ==(BoundingRect r1, BoundingRect r2)
         {
             return r1.Left == r2.Left && r1.Right == r2.Right && r1.Bottom == r2.Bottom && r1.Top == r2.Top;
         }
+        /// <summary>
+        /// True, if the rectangles differ in at least one limit.
+        /// </summary>
+        /// <param name="r1">first rectangle</param>
+        /// <param name="r2">second rectangle</param>
+        /// <returns>true, if not equal</returns>
         public static bool operator !=(BoundingRect r1, BoundingRect r2)
         {
             return r1.Left != r2.Left || r1.Right != r2.Right || r1.Bottom != r2.Bottom || r1.Top != r2.Top;
@@ -566,6 +607,10 @@ namespace CADability
                 return Top - Bottom;
             }
         }
+        /// <summary>
+        /// A measure of the size of the rectangle: the sum of the absolute values of <see cref="Width"/> and <see cref="Height"/>.
+        /// Mostly used to derive precision values relative to the size of the rectangle.
+        /// </summary>
         public double Size
         {
             get
@@ -586,6 +631,13 @@ namespace CADability
             double HalfHeight = rect.Height * Factor / 2.0;
             return new BoundingRect(Center, HalfWidth, HalfHeight);
         }
+        /// <summary>
+        /// Returns the rectangle that encloses the four vertices of <paramref name="rect"/> transformed by <paramref name="m"/>
+        /// (see <see cref="Modify(ModOp2D)"/>). The operand is not changed.
+        /// </summary>
+        /// <param name="m">the modification</param>
+        /// <param name="rect">the rectangle to transform</param>
+        /// <returns>the transformed rectangle</returns>
         public static BoundingRect operator *(ModOp2D m, BoundingRect rect)
         {
             BoundingRect res = new BoundingRect(rect);
@@ -602,6 +654,13 @@ namespace CADability
         {
             return new BoundingRect(rect.Left - offset, rect.Bottom - offset, rect.Right + offset, rect.Top + offset);
         }
+        /// <summary>
+        /// Returns the smallest rectangle that contains both rectangles (the union of their extents), like
+        /// <see cref="MinMax(BoundingRect)"/> but without changing the operands.
+        /// </summary>
+        /// <param name="r1">first rectangle</param>
+        /// <param name="r2">second rectangle</param>
+        /// <returns>the enclosing rectangle</returns>
         public static BoundingRect operator +(BoundingRect r1, BoundingRect r2)
         {
             BoundingRect res = r1;
@@ -632,6 +691,11 @@ namespace CADability
             Polyline2D p2d = new Polyline2D(new GeoPoint2D[] { new GeoPoint2D(Left, Bottom), new GeoPoint2D(Right, Bottom), new GeoPoint2D(Right, Top), new GeoPoint2D(Left, Top), new GeoPoint2D(Left, Bottom) });
             return new Border(p2d);
         }
+        /// <summary>
+        /// Converts this rectangle to a GDI+ <see cref="RectangleF"/> with (<see cref="Left"/>, <see cref="Bottom"/>) as its
+        /// location and <see cref="Width"/> and <see cref="Height"/> as its size, in single precision.
+        /// </summary>
+        /// <returns>the converted rectangle</returns>
         public RectangleF ToRectangleF()
         {
             return new RectangleF((float)Left, (float)Bottom, (float)(Width), (float)(Height));
@@ -660,6 +724,15 @@ namespace CADability
             return (uv.x >= Left && uv.x <= Right && uv.y >= Bottom && uv.y <= Top);
         }
 
+        /// <summary>
+        /// Checks whether the point is inside this rectangle enlarged by a tolerance. A positive <paramref name="eps"/> is
+        /// an absolute distance by which all four limits are moved outward; a negative <paramref name="eps"/> is taken as a
+        /// fraction of the width and height (e.g. -0.01 enlarges the rectangle by 1% of its width to the left and right
+        /// and by 1% of its height to the bottom and top).
+        /// </summary>
+        /// <param name="uv">the point to test</param>
+        /// <param name="eps">tolerance: absolute when positive, relative to the size of the rectangle when negative</param>
+        /// <returns>true, if the point is inside the enlarged rectangle (limits included)</returns>
         public bool ContainsEps(GeoPoint2D uv, double eps)
         {
             double dx, dy;
@@ -955,16 +1028,23 @@ namespace CADability
         }
         #endregion
 
+        /// <summary>
+        /// Implements <see cref="IEquatable{T}.Equals(T)"/>: true, if both rectangles have exactly the same limits.
+        /// </summary>
+        /// <param name="other">the rectangle to compare with</param>
+        /// <returns>true, if equal</returns>
         public bool Equals(BoundingRect other)
         {
             return Left.Equals(other.Left) && Right.Equals(other.Right) && Bottom.Equals(other.Bottom) && Top.Equals(other.Top);
         }
 
+        /// <inheritdoc/>
         public override bool Equals(object obj)
         {
             return obj is BoundingRect other && Equals(other);
         }
 
+        /// <inheritdoc/>
         public override int GetHashCode()
         {
             unchecked

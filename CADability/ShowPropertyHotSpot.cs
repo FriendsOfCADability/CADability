@@ -14,6 +14,11 @@ namespace CADability.UserInterface
         private IPropertyEntry showProperty;
         private GeoPoint position;
         private IFrame frame;
+        /// <summary>
+        /// Signature of the handlers of <see cref="PositionChangedEvent"/>: called with each new position while the user drags the
+        /// hotspot.
+        /// </summary>
+        /// <param name="newPosition">The new position of the hotspot in world coordinates</param>
         public delegate void PositionChangedDelegate(GeoPoint newPosition);
         public event PositionChangedDelegate PositionChangedEvent;
         public ShowPropertyHotSpot(IPropertyEntry showProperty, IFrame frame)

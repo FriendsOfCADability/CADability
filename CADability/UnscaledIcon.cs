@@ -54,6 +54,10 @@ namespace CADability.GeoObject
         /// </summary>
         public static event ConstructedDelegate Constructed;
         #endregion
+        /// <summary>
+        /// Protected constructor: raises <see cref="Constructed"/>. Use <see cref="Construct"/> to create an icon and
+        /// <see cref="Set"/> to define it.
+        /// </summary>
         protected Icon()
         {
             if (Constructed != null) Constructed(this);
@@ -75,6 +79,10 @@ namespace CADability.GeoObject
                 this.offsety = offsety;
             }
         }
+        /// <summary>
+        /// The point in world coordinates at which the icon is displayed: the pixel of the bitmap given by the offsets in
+        /// <see cref="Set"/> is placed at this point. Setting it raises the change events and is undoable.
+        /// </summary>
         public GeoPoint Location
         {
             get
@@ -187,6 +195,11 @@ namespace CADability.GeoObject
         }
         #endregion
         #region ISerializable Members
+        /// <summary>
+        /// Constructor required by deserialization
+        /// </summary>
+        /// <param name="info">SerializationInfo</param>
+        /// <param name="context">StreamingContext</param>
         protected Icon(SerializationInfo info, StreamingContext context)
         {
             bitmap = info.GetValue("Bitmap", typeof(Bitmap)) as Bitmap;

@@ -3,6 +3,9 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
 
+// The classes in this file wrap Win32 and OpenGL entry points and constants one to one; their documentation is
+// the Windows and OpenGL reference, not CADability's. CS1591 (no doc comment) is therefore not reported here.
+#pragma warning disable CS1591
 namespace CADability
 {
 
@@ -13,6 +16,10 @@ namespace CADability
      * Wenn etwas fehlt, einfach von dort kopieren
      */
 
+    /// <summary>
+    /// P/Invoke declarations of the kernel32 functions and structures CADability uses (memory and system information).
+    /// Taken from the Tao framework; the members are documented in the Windows API reference.
+    /// </summary>
     public class Kernel
     {
         // --- Fields ---
@@ -1733,6 +1740,11 @@ namespace CADability
     /// OpenGL wrapper methods and constants. See OpenGL documentation for more information.
     /// </summary>
 
+    /// <summary>
+    /// The OpenGL 1.x functions and constants, as P/Invoke declarations into opengl32.dll, taken from the Tao
+    /// framework. CADability.Forms paints with them (PaintToOpenGL). The members are documented in the OpenGL
+    /// reference; the names are the OpenGL names with the "gl" and "GL_" prefixes kept.
+    /// </summary>
     [CLSCompliant(false)]
     public static class Gl
     {
@@ -51879,9 +51891,17 @@ namespace CADability
         */
     }
 
+    /// <summary>
+    /// The OpenGL utility library (GLU) functions and constants CADability uses, as P/Invoke declarations into
+    /// glu32.dll, taken from the Tao framework. Documented in the OpenGL reference.
+    /// </summary>
     public static class Glu
     {
         private const CallingConvention CALLING_CONVENTION = CallingConvention.Winapi;
+        /// <summary>
+        /// Handle of a GLU NURBS renderer (<c>GLUnurbs*</c> in the C API), created by <see cref="gluNewNurbsRenderer"/>
+        /// and passed to the <c>gluNurbs...</c> functions.
+        /// </summary>
         [StructLayout(LayoutKind.Sequential)]
         public struct GLUnurbs
         {
@@ -51909,6 +51929,9 @@ namespace CADability
         public static extern void gluPickMatrix(double x, double y, double width, double height, [In] int[] viewport);
     }
 
+    /// <summary>
+    /// The user32 functions CADability needs for OpenGL: getting and releasing the device context of a window.
+    /// </summary>
     public static class User
     {
         private const CallingConvention CALLING_CONVENTION = CallingConvention.StdCall;
@@ -51919,6 +51942,10 @@ namespace CADability
         public static extern IntPtr GetDC(IntPtr windowHandle);
     }
 
+    /// <summary>
+    /// The wgl functions and constants of opengl32.dll that connect OpenGL to a Windows device context (rendering
+    /// contexts, pixel formats, font outlines), as P/Invoke declarations taken from the Tao framework.
+    /// </summary>
     public static class Wgl
     {
         private const CallingConvention CALLING_CONVENTION = CallingConvention.StdCall;

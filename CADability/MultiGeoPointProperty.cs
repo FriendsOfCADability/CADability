@@ -93,6 +93,10 @@ namespace CADability.UserInterface
                 displayZComponent = true;
             }
         }
+        /// <summary>
+        /// Whether the z coordinate of the points is displayed. Initialized from the setting "Formatting.Coordinate.ZValue"
+        /// and passed on to the <see cref="GeoPointProperty"/> sub entries when they are created.
+        /// </summary>
         public bool DisplayZComponent
         {
             get
@@ -104,6 +108,10 @@ namespace CADability.UserInterface
                 displayZComponent = value;
             }
         }
+        /// <summary>
+        /// Additional menu items which are inserted at the beginning of the context menu of each point entry (passed on as
+        /// <see cref="EditableProperty{T}.PrependContextMenu"/> to the sub entries when they are created), or null.
+        /// </summary>
         public MenuWithHandler[] PrependContextMenue
         {
             get
@@ -127,6 +135,7 @@ namespace CADability.UserInterface
                 if (gpp != null) gpp.Refresh();
             }
         }
+        /// <inheritdoc/>
         public override void Refresh()
         {
             if (propertyPage == null) return;
@@ -179,6 +188,11 @@ namespace CADability.UserInterface
         {
             if (propertyPage != null) propertyPage.OpenSubEntries(this, open);
         }
+        /// <summary>
+        /// Selects the sub entry of the point with the given index in the property page, provided this entry is displayed and
+        /// expanded. The construction actions use it to move the focus to the point currently being entered.
+        /// </summary>
+        /// <param name="index">Index of the point</param>
         public void SetFocusToIndex(int index)
         {
             if (propertyPage != null && subEntries != null && subEntries.Length > index)
@@ -191,6 +205,7 @@ namespace CADability.UserInterface
         }
         
 #region IShowPropertyImpl Overrides
+        /// <inheritdoc/>
         public override void Added(IPropertyPage propertyPage)
         {
             base.Added(propertyPage);
@@ -204,6 +219,7 @@ namespace CADability.UserInterface
                 }
             }
         }
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -241,6 +257,7 @@ namespace CADability.UserInterface
 
             }
         }
+        /// <inheritdoc/>
         public override PropertyEntryType Flags => PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
         #endregion
 

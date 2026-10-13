@@ -23,36 +23,71 @@ namespace CADability
     /// </summary>
     public class ImportSVG
     {
+        /// <summary>
+        /// A 2d point or vector in SVG user coordinates (single precision), as passed to the path related CreateXxx methods.
+        /// Addition and subtraction are provided for the relative path commands.
+        /// </summary>
         protected struct Vector2
         {
+            /// <summary>
+            /// Creates the vector with the given components.
+            /// </summary>
+            /// <param name="x">the x component</param>
+            /// <param name="y">the y component</param>
             public Vector2(float x, float y)
             {
                 this.x = x;
                 this.y = y;
             }
+            /// <summary>
+            /// The x and y coordinates in SVG user units.
+            /// </summary>
             public float x, y;
+            /// <summary>
+            /// Adds the components; used to turn the relative coordinates of a path command into absolute ones.
+            /// </summary>
+            /// <param name="v1">first summand</param>
+            /// <param name="v2">second summand</param>
+            /// <returns>the component-wise sum</returns>
             public static Vector2 operator +(Vector2 v1, Vector2 v2)
             {
                 return new Vector2(v1.x + v2.x, v1.y + v2.y);
             }
+            /// <summary>
+            /// Subtracts the components of <paramref name="v2"/> from <paramref name="v1"/>.
+            /// </summary>
+            /// <param name="v1">the minuend</param>
+            /// <param name="v2">the subtrahend</param>
+            /// <returns>the component-wise difference</returns>
             public static Vector2 operator -(Vector2 v1, Vector2 v2)
             {
                 return new Vector2(v1.x - v2.x, v1.y - v2.y);
             }
+            /// <inheritdoc/>
             public override bool Equals(object obj)
             {
                 if (obj is Vector2 v2) return x == v2.x && y == v2.y;
                 else return base.Equals(obj);
             }
+            /// <inheritdoc/>
             public override int GetHashCode()
             {
                 return x.GetHashCode() | y.GetHashCode();
             }
         }
         private readonly Stack<ModOp2D> _transformStack;
+        /// <summary>
+        /// The lists the created objects are collected in. The bottom entry collects the result of <see cref="Import(string)"/>;
+        /// <see cref="CreatePath"/> pushes a list for each sub-path and pops it when the sub-path is complete, so the CreateXxx
+        /// methods always add to the list on top (<c>listStack.Peek()</c>). Overriding methods should do the same.
+        /// </summary>
         public Stack<GeoObjectList> listStack;
         Dictionary<string, string> styles; // current element styles
         Dictionary<string, ColorDef> FillStyles = new Dictionary<string, ColorDef>();
+        /// <summary>
+        /// Creates an importer with the identity transformation and an empty result list. Call <see cref="Import(string)"/> to
+        /// read a file.
+        /// </summary>
         public ImportSVG()
         {
             _transformStack = new Stack<ModOp2D>();
@@ -215,11 +250,22 @@ namespace CADability
             }
         }
         #region Stubs für Gruppierung
+        /// <summary>
+        /// Called when a <c>g</c> element is entered, before its children are processed. Does nothing; override it to handle
+        /// group properties, e.g. to start a <see cref="Block"/> that collects the children, and override <see cref="ExitGroup"/>
+        /// to finish it.
+        /// </summary>
+        /// <param name="transform">the accumulated transformation of the group, including those of all enclosing elements</param>
+        /// <param name="styles">the style declarations of the group element (name to value, case-insensitive names); may be empty</param>
         protected virtual void EnterGroup(ModOp2D transform, Dictionary<string, string> styles)
         {
             // TODO: Gruppeneigenschaften verarbeiten
         }
 
+        /// <summary>
+        /// Called when a <c>g</c> element has been processed completely, after <see cref="EnterGroup"/> and the children. Does
+        /// nothing; override it together with <see cref="EnterGroup"/>.
+        /// </summary>
         protected virtual void ExitGroup()
         {
             // TODO: Gruppenschluss verarbeiten
@@ -232,30 +278,71 @@ namespace CADability
             listStack.Peek().Add(curve.GetModified(transform).MakeGeoObject(Plane.XYPlane));
         }
 
+        /// <summary>
+        /// Called for a <c>line</c> element, for the straight segments of a path and for its closing segment (<c>Z</c>). Creates a
+        /// <see cref="Line"/> in the x/y plane and adds it to the current list; override it to create something else.
+        /// </summary>
+        /// <param name="x1">x coordinate of the start point in SVG user units</param>
+        /// <param name="y1">y coordinate of the start point</param>
+        /// <param name="x2">x coordinate of the end point</param>
+        /// <param name="y2">y coordinate of the end point</param>
+        /// <param name="transform">the transformation from the local coordinates of the element to the coordinates of the drawing; it is applied to the curve before the curve is added</param>
         protected virtual void CreateLine(float x1, float y1, float x2, float y2, ModOp2D transform)
         {
             Line2D l2d = new Line2D(new GeoPoint2D(x1, y1), new GeoPoint2D(x2, y2));
             Add(l2d, transform);
         }
 
+        /// <summary>
+        /// Called for a <c>rect</c> element. Creates a closed <see cref="Polyline"/> through the four corners (rounded corners are
+        /// ignored) and adds it to the current list; override it to create something else.
+        /// </summary>
+        /// <param name="x">x coordinate of the corner with the smallest coordinates, in SVG user units</param>
+        /// <param name="y">y coordinate of that corner</param>
+        /// <param name="width">extent in x</param>
+        /// <param name="height">extent in y</param>
+        /// <param name="transform">the transformation from the local coordinates of the element to the coordinates of the drawing; it is applied to the curve before the curve is added</param>
         protected virtual void CreateRect(float x, float y, float width, float height, ModOp2D transform)
         {
             Polyline2D p2d = new Polyline2D(new GeoPoint2D[] { new GeoPoint2D(x, y), new GeoPoint2D(x + width, y), new GeoPoint2D(x + width, y + height), new GeoPoint2D(x, y + height), new GeoPoint2D(x, y) });
             Add(p2d, transform);
         }
 
+        /// <summary>
+        /// Called for a <c>circle</c> element. Creates a full circle (an <see cref="Ellipse"/>) and adds it to the current list;
+        /// override it to create something else.
+        /// </summary>
+        /// <param name="cx">x coordinate of the center in SVG user units</param>
+        /// <param name="cy">y coordinate of the center</param>
+        /// <param name="r">the radius</param>
+        /// <param name="transform">the transformation from the local coordinates of the element to the coordinates of the drawing; it is applied to the curve before the curve is added</param>
         protected virtual void CreateCircle(float cx, float cy, float r, ModOp2D transform)
         {
             Circle2D c2d = new Circle2D(new GeoPoint2D(cx, cy), r);
             Add(c2d, transform);
         }
 
+        /// <summary>
+        /// Called for an <c>ellipse</c> element. Creates an axis-parallel <see cref="Ellipse"/> and adds it to the current list;
+        /// override it to create something else.
+        /// </summary>
+        /// <param name="cx">x coordinate of the center in SVG user units</param>
+        /// <param name="cy">y coordinate of the center</param>
+        /// <param name="rx">the radius in x direction</param>
+        /// <param name="ry">the radius in y direction</param>
+        /// <param name="transform">the transformation from the local coordinates of the element to the coordinates of the drawing; it is applied to the curve before the curve is added</param>
         protected virtual void CreateEllipse(float cx, float cy, float rx, float ry, ModOp2D transform)
         {
             Ellipse2D e2d = new Ellipse2D(new GeoPoint2D(cx, cy), new GeoVector2D(rx, 0), new GeoVector2D(0, ry));
             Add(e2d, transform);
         }
 
+        /// <summary>
+        /// Called for a <c>polyline</c> element. Parses the <c>points</c> attribute (x/y pairs separated by commas or white space),
+        /// creates an open <see cref="Polyline"/> and adds it to the current list; override it to create something else.
+        /// </summary>
+        /// <param name="points">the <c>points</c> attribute of the element</param>
+        /// <param name="transform">the transformation from the local coordinates of the element to the coordinates of the drawing; it is applied to the curve before the curve is added</param>
         protected virtual void CreatePolyline(string points, ModOp2D transform)
         {
             var matches = Regex.Matches(points, @"(-?\d*\.?\d+(?:[eE][+-]?\d+)?)");
@@ -274,6 +361,13 @@ namespace CADability
             Add(pl2d, transform);
         }
 
+        /// <summary>
+        /// Called for a <c>polygon</c> element. Parses the <c>points</c> attribute (x/y pairs separated by commas or white space),
+        /// creates a closed <see cref="Polyline"/> (the first point is repeated at the end) and adds it to the current list;
+        /// override it to create something else.
+        /// </summary>
+        /// <param name="points">the <c>points</c> attribute of the element</param>
+        /// <param name="transform">the transformation from the local coordinates of the element to the coordinates of the drawing; it is applied to the curve before the curve is added</param>
         protected virtual void CreatePolygon(string points, ModOp2D transform)
         {
             var matches = Regex.Matches(points, @"(-?\d*\.?\d+(?:[eE][+-]?\d+)?)");
@@ -293,6 +387,16 @@ namespace CADability
             Add(pl2d, transform);
         }
 
+        /// <summary>
+        /// Called for the <c>C</c> and <c>S</c> commands of a path. Creates a cubic Bézier curve (a <see cref="BSpline"/> of degree
+        /// 3 with the four points as poles) and adds it to the current list. When a control point coincides with an end point or
+        /// with the other control point, the curve is quadratic and <see cref="CreateQuadraticBezier"/> is called instead.
+        /// </summary>
+        /// <param name="start">the current point, start of the curve</param>
+        /// <param name="control1">the first control point</param>
+        /// <param name="control2">the second control point</param>
+        /// <param name="end">the end point of the curve</param>
+        /// <param name="transform">the transformation from the local coordinates of the element to the coordinates of the drawing; it is applied to the curve before the curve is added</param>
         protected virtual void CreateCubicBezier(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, ModOp2D transform)
         {
             if (control2.x == end.x && control2.y == end.y) CreateQuadraticBezier(start, control1, end, transform);
@@ -306,6 +410,14 @@ namespace CADability
             }
         }
 
+        /// <summary>
+        /// Called for the <c>Q</c> and <c>T</c> commands of a path. Creates a quadratic Bézier curve (a <see cref="BSpline"/> of
+        /// degree 2 with the three points as poles) and adds it to the current list; override it to create something else.
+        /// </summary>
+        /// <param name="start">the current point, start of the curve</param>
+        /// <param name="control">the control point</param>
+        /// <param name="end">the end point of the curve</param>
+        /// <param name="transform">the transformation from the local coordinates of the element to the coordinates of the drawing; it is applied to the curve before the curve is added</param>
         protected virtual void CreateQuadraticBezier(Vector2 start, Vector2 control, Vector2 end, ModOp2D transform)
         {
             BSpline2D bsp2d = new BSpline2D(new GeoPoint2D[] { new GeoPoint2D(start.x, start.y), new GeoPoint2D(control.x, control.y), new GeoPoint2D(end.x, end.y) },
@@ -313,6 +425,20 @@ namespace CADability
             Add(bsp2d, transform);
         }
 
+        /// <summary>
+        /// Called for the <c>A</c> command of a path. Computes the center and the axes of the ellipse from the end point
+        /// parameterization of SVG (SVG 1.1, appendix F.6), creates the elliptical arc from <paramref name="start"/> to
+        /// <paramref name="end"/> and adds it to the current list. Radii that are too small to reach the end point are scaled up,
+        /// as the specification requires.
+        /// </summary>
+        /// <param name="start">the current point, start of the arc</param>
+        /// <param name="frx">the radius in x direction (before the rotation)</param>
+        /// <param name="fry">the radius in y direction (before the rotation)</param>
+        /// <param name="xAxisRotation">the rotation of the x axis of the ellipse in degrees</param>
+        /// <param name="largeArcFlag">true to take the arc of more than 180° of the two candidates</param>
+        /// <param name="sweepFlag">true to run in the direction of increasing angles (clockwise on the screen, as the y axis of SVG points downwards)</param>
+        /// <param name="end">the end point of the arc</param>
+        /// <param name="transform">the transformation from the local coordinates of the element to the coordinates of the drawing; it is applied to the curve before the curve is added</param>
         protected virtual void CreateEllipticalArc(Vector2 start, float frx, float fry, float xAxisRotation, bool largeArcFlag, bool sweepFlag, Vector2 end, ModOp2D transform)
         {
             double rx = frx;
@@ -371,6 +497,16 @@ namespace CADability
             Add(ea, transform);
         }
 
+        /// <summary>
+        /// Called for a <c>path</c> element. Parses the path data (the commands M, L, H, V, C, S, Q, T, A and Z, absolute and
+        /// relative) and calls <see cref="CreateLine"/>, <see cref="CreateCubicBezier"/>, <see cref="CreateQuadraticBezier"/> and
+        /// <see cref="CreateEllipticalArc"/> for the segments. The segments of each sub-path (started by M) are then joined to a
+        /// <see cref="Path"/>: when the element has a <c>fill</c> style, a planar <see cref="Face"/> in that colour is made from
+        /// the closed outline, and the path itself is added only when there is a <c>stroke</c> style too; without a fill the path
+        /// is added. Nothing is created for empty path data.
+        /// </summary>
+        /// <param name="data">the <c>d</c> attribute of the element</param>
+        /// <param name="transform">the transformation from the local coordinates of the element to the coordinates of the drawing; it is applied to the curve before the curve is added</param>
         protected virtual void CreatePath(string data, ModOp2D transform)
         {
             if (string.IsNullOrWhiteSpace(data))
@@ -616,6 +752,13 @@ namespace CADability
         {
             return string.IsNullOrEmpty(s) ? 0f : float.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
         }
+        /// <summary>
+        /// Converts an SVG colour value to a <see cref="System.Drawing.Color"/>: the <c>#rgb</c> and <c>#rrggbb</c> notations,
+        /// <c>rgb(r,g,b)</c> and <c>rgba(r,g,b,a)</c> with absolute or percent components, and the named colours of HTML.
+        /// </summary>
+        /// <param name="value">the colour text, e.g. the value of a <c>fill</c> or <c>stroke</c> style</param>
+        /// <returns>the colour, or <see cref="System.Drawing.Color.Empty"/> for null, an empty string, <c>none</c> and an unknown
+        /// colour name; malformed <c>rgb()</c> components throw a <see cref="FormatException"/></returns>
         public static System.Drawing.Color ParseSvgColor(string value)
         {
             if (string.IsNullOrEmpty(value) || value.Equals("none", StringComparison.OrdinalIgnoreCase))

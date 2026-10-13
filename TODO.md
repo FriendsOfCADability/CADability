@@ -251,10 +251,18 @@ None left: all of them have been fixed.
   members in `IGeoObject`, `IGeoObjectImpl`, `ISurface`, `IShowProperty` and
   `IPropertyEntry` were documented for that). The 76 `GetObjectData`
   implementations say what the binary serialization is still for.
-- [ ] Coverage, see #403: about 63 % of the public types and members have
-  no doc comment at all (CS1591 stays suppressed). Candidates by benefit:
-  the GeoObject types (`Line`, `Ellipse`, `BSpline`, `Face`, `Shell`...),
-  the attributes and their lists, `Model`, `Project` and the views.
+- [x] Coverage, see #403: the GeoObject types, the attributes and their
+  lists, `Model`, `Project`, the views, the geometry basics, the surfaces,
+  the 2d curves and shapes, the import and export classes, the property
+  classes and the actions are documented, the about 900 overrides without a
+  comment are `<inheritdoc/>`, and every public type has a summary. Of the
+  about 14,500 public types and members docfx lists, about 850 (6 %) have no
+  doc comment now, down from about 9,100 (63 %). They are members of
+  internal helpers (`Polynom`, `BRepIntersection`, `QuadTree`,
+  `JsonSerialize`, `ExtendedEntityData`...), so CS1591 stays in `NoWarn`;
+  the about 4,400 OpenGL and Win32 constants in `OpenGL.cs` and
+  `FormsSubst.cs` mirror the C headers and suppress CS1591 with a pragma.
+  CADability.Forms still has 139 members without a comment.
 
 ## Open discussions / feature requests (no action from triage)
 

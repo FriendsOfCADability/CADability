@@ -55,6 +55,7 @@ namespace CADability
                 base.SetSelection(selected);
             }
         }
+        /// <inheritdoc/>
         public override void SetSelection(int toSelect)
         {
             base.SetSelection(toSelect);
@@ -106,6 +107,7 @@ namespace CADability
         }
         protected MultipleChoiceSetting() { }
         #endregion
+        /// <inheritdoc/>
         protected override void OnSelectionChanged(string selected)
         {
             base.OnSelectionChanged(selected);

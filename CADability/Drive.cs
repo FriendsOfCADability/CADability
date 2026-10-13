@@ -35,6 +35,11 @@ namespace CADability
         List<IGeoObject> MovedObjects { get; }
     }
 
+    /// <summary>
+    /// The list of the <see cref="IDrive"/>s of a <see cref="Model"/> (see <see cref="Model.AllDrives"/>), which move objects in the
+    /// <see cref="AnimatedView"/>. Drives are added with <see cref="Add"/> and removed with <see cref="Remove"/>; the list is serialized
+    /// together with the model.
+    /// </summary>
     [Serializable]
     public class DriveList : IEnumerable<IDrive>, ISerializable, IDeserializationCallback, IJsonSerialize
     {
@@ -407,7 +412,9 @@ namespace CADability
         }
         #endregion
         #region IPropertyEntry implementation
+        /// <inheritdoc/>
         public override PropertyEntryType Flags => PropertyEntryType.Selectable | PropertyEntryType.ContextMenu | PropertyEntryType.LabelEditable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
+        /// <inheritdoc/>
         public override string LabelText
         {
             get
@@ -419,6 +426,7 @@ namespace CADability
                 base.LabelText = value;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -477,6 +485,7 @@ namespace CADability
                 }
             }
         }
+        /// <inheritdoc/>
         public override void EndEdit(bool aborted, bool modified, string newValue)
         {
             ShowPropertyDrives spd = propertyPage.GetParent(this) as ShowPropertyDrives;
@@ -614,6 +623,12 @@ namespace CADability
         #endregion
     }
 
+    /// <summary>
+    /// A drive (see <see cref="IDrive"/>) defined by two <see cref="CurveDrive"/>s: the objects are moved by the rigid motion (with
+    /// <see cref="Stretch"/> also scaled) which maps the start points of the two curve drives onto their current positions, like a
+    /// rod whose ends run along two curves. It has no position of its own, it only follows its two drives. It is also the property
+    /// entry which shows the drive in the control center.
+    /// </summary>
     [Serializable]
     public class DualCurveDrive : PropertyEntryImpl, IDrive, ICommandHandler, ISerializable, IDeserializationCallback, IJsonSerialize, IJsonSerializeDone
     {
@@ -742,6 +757,7 @@ namespace CADability
         #region IPropertyEntry implementation
         /// <inheritdoc/>
         public override PropertyEntryType Flags => PropertyEntryType.ContextMenu | PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries | PropertyEntryType.LabelEditable;
+        /// <inheritdoc/>
         public override string LabelText
         {
             get
@@ -753,6 +769,7 @@ namespace CADability
                 base.LabelText = value;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -827,6 +844,7 @@ namespace CADability
                 }
             }
         }
+        /// <inheritdoc/>
         public override void EndEdit(bool aborted, bool modified, string newValue)
         {
             ShowPropertyDrives spd = propertyPage.GetParent(this) as ShowPropertyDrives;
@@ -1102,6 +1120,7 @@ namespace CADability
         #region IPropertyEntry implementation
         /// <inheritdoc/>
         public override PropertyEntryType Flags => PropertyEntryType.ContextMenu | PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries | PropertyEntryType.LabelEditable;
+        /// <inheritdoc/>
         public override string LabelText
         {
             get
@@ -1113,6 +1132,7 @@ namespace CADability
                 base.LabelText = value;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -1174,6 +1194,7 @@ namespace CADability
                 }
             }
         }
+        /// <inheritdoc/>
         public override void EndEdit(bool aborted, bool modified, string newValue)
         {
             ShowPropertyDrives spd = propertyPage.GetParent(this) as ShowPropertyDrives;

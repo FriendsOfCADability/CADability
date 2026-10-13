@@ -49,7 +49,15 @@ namespace CADability.GeoObject
             if (Constructor != null) return Constructor();
             return new Line();
         }
+        /// <summary>
+        /// Handler for <see cref="Constructed"/>.
+        /// </summary>
+        /// <param name="justConstructed">the line that was just created</param>
         public delegate void ConstructedDelegate(Line justConstructed);
+        /// <summary>
+        /// Raised from the constructor whenever a line is created, be it by <see cref="Construct"/>, by cloning or by
+        /// deserialization, before its geometry is set. An application can use it to attach data of its own to every line.
+        /// </summary>
         public static event ConstructedDelegate Constructed;
         #endregion
         /// <summary>
@@ -60,6 +68,13 @@ namespace CADability.GeoObject
             colorDef = new ColorDef(null, Color.Black);
             if (Constructed != null) Constructed(this);
         }
+        /// <summary>
+        /// Creates a line from <paramref name="sp"/> to <paramref name="ep"/>. The line is created with <see cref="Construct"/>,
+        /// so a registered <see cref="Constructor"/> is honored. Same as <see cref="MakeLine"/>.
+        /// </summary>
+        /// <param name="sp">the start point</param>
+        /// <param name="ep">the end point</param>
+        /// <returns>the new line</returns>
         public static Line TwoPoints(GeoPoint sp, GeoPoint ep)
         {
             Line res = Line.Construct();
@@ -223,7 +238,18 @@ namespace CADability.GeoObject
             if (Precision.IsEqual(startPoint, endPoint)) return false;
             return true;
         }
+        /// <summary>
+        /// Handler for <see cref="OnPaintTo3D"/>.
+        /// </summary>
+        /// <param name="toPaint">the line being painted</param>
+        /// <param name="paintTo3D">the paint interface to paint to</param>
+        /// <returns>true if the handler painted the line itself and the default painting is to be skipped, false to let the
+        /// line paint itself as usual</returns>
         public delegate bool PaintTo3DDelegate(Line toPaint, IPaintTo3D paintTo3D);
+        /// <summary>
+        /// Hook to replace the painting of lines: when set, <see cref="PaintTo3D"/> calls it first and does nothing more
+        /// when it returns true. The hook is static, so it applies to every line of the process.
+        /// </summary>
         public static PaintTo3DDelegate OnPaintTo3D;
         /// <inheritdoc/>
         public override void PaintTo3D(IPaintTo3D paintTo3D)
@@ -243,6 +269,7 @@ namespace CADability.GeoObject
         {
             // nichts zu tun
         }
+        /// <inheritdoc/>
         public override Style.EDefaultFor PreferredStyle
         {
             get
@@ -358,6 +385,7 @@ namespace CADability.GeoObject
             info.AddValue("LineWidth", lineWidth);
             info.AddValue("LinePattern", linePattern);
         }
+        /// <inheritdoc/>
         public override void GetObjectData(IJsonWriteData data)
         {
             base.GetObjectData(data);
@@ -368,6 +396,7 @@ namespace CADability.GeoObject
             if (linePattern != null) data.AddProperty("LinePattern", linePattern);
         }
 
+        /// <inheritdoc/>
         public override void SetObjectData(IJsonReadData data)
         {
             base.SetObjectData(data);
@@ -388,6 +417,11 @@ namespace CADability.GeoObject
         }
         #region IColorDef Members
         private ColorDef colorDef;
+        /// <summary>
+        /// The color of the line, see <see cref="IColorDef.ColorDef"/>. Setting it raises the change events as a change of
+        /// an attribute and is undoable. A color with <see cref="ColorDef.ColorSource.fromParent"/> is replaced by the
+        /// corresponding color of the <see cref="Block"/> the line belongs to.
+        /// </summary>
         public ColorDef ColorDef
         {
             get => colorDef;
@@ -414,6 +448,10 @@ namespace CADability.GeoObject
         #endregion
 
         #region ICurve Members
+        /// <summary>
+        /// The direction from the start point to the end point. Its length is the length of the line, and it is the same
+        /// for every point of the line.
+        /// </summary>
         public GeoVector StartDirection
         {
             get
@@ -421,6 +459,9 @@ namespace CADability.GeoObject
                 return endPoint - startPoint;
             }
         }
+        /// <summary>
+        /// The direction from the start point to the end point, the same as <see cref="StartDirection"/>.
+        /// </summary>
         public GeoVector EndDirection
         {
             get
@@ -504,6 +545,9 @@ namespace CADability.GeoObject
             clone.Modify(m);
             return (ICurve)clone;
         }
+        /// <summary>
+        /// Always false: a line is never closed.
+        /// </summary>
         public bool IsClosed
         {
             get
@@ -511,6 +555,10 @@ namespace CADability.GeoObject
                 return false;
             }
         }
+        /// <summary>
+        /// True if start point and end point coincide within <see cref="Precision"/>, i.e. the line has no length and no
+        /// direction. Such a line is not valid, see <see cref="HasValidData"/>.
+        /// </summary>
         public bool IsSingular
         {
             get
@@ -541,6 +589,7 @@ namespace CADability.GeoObject
             Line2D res = new Line2D(sp.To2D(), ep.To2D());
             return res;
         }
+        /// <inheritdoc/>
         public override string Description
         {
             get
@@ -658,6 +707,10 @@ namespace CADability.GeoObject
         #endregion
 
         #region ILineWidth Members
+        /// <summary>
+        /// The line width attribute of the line, see <see cref="ILineWidth.LineWidth"/>; null means the default width.
+        /// Setting it raises the change events as a change of an attribute and is undoable.
+        /// </summary>
         public LineWidth LineWidth
         {
             get => lineWidth;
@@ -673,6 +726,10 @@ namespace CADability.GeoObject
 
         #region ILinePattern Members
 
+        /// <summary>
+        /// The line pattern attribute of the line, see <see cref="ILinePattern.LinePattern"/>; null means a solid line.
+        /// Setting it raises the change events as a change of an attribute and is undoable.
+        /// </summary>
         public LinePattern LinePattern
         {
             get => linePattern;
@@ -708,6 +765,12 @@ namespace CADability.GeoObject
 
         #endregion
 
+        /// <summary>
+        /// Creates a line from <paramref name="p1"/> to <paramref name="p2"/>. Identical to <see cref="TwoPoints"/>.
+        /// </summary>
+        /// <param name="p1">the start point</param>
+        /// <param name="p2">the end point</param>
+        /// <returns>the new line</returns>
         public static Line MakeLine(GeoPoint p1, GeoPoint p2)
         {
             Line res = Line.Construct();

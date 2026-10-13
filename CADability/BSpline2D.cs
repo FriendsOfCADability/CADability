@@ -731,6 +731,14 @@ namespace CADability.Curve2D
             this.startParam = this.knots[0];
             this.endParam = this.knots[this.knots.Length - 1];
         }
+        /// <summary>
+        /// Creates a full circle as a rational quadratic spline with nine poles (four spans of 90 degrees), running
+        /// counterclockwise from the point in the direction of the positive x-axis. For cases where a circle has to be a
+        /// <see cref="BSpline2D"/>; <see cref="Circle2D"/> is the exact and faster representation.
+        /// </summary>
+        /// <param name="center">center of the circle</param>
+        /// <param name="radius">radius of the circle</param>
+        /// <returns>the spline</returns>
         public static BSpline2D MakeCircle(GeoPoint2D center, double radius)
         {
             // mit dem exakten Kreis gibts Knicke, weil der nur quadratisch ist
@@ -760,6 +768,15 @@ namespace CADability.Curve2D
             int[] mults = new int[] { 3, 2, 2, 2, 3 };
             return new BSpline2D(poles, weights, knots, mults, 2, false, 0.0, 4.0);
         }
+        /// <summary>
+        /// Creates a spiral around <paramref name="center"/> as a cubic spline interpolating eight points per turn: the radius grows
+        /// linearly with the angle by <paramref name="offset"/> per full turn, starting with radius 0 at the center. Used for the
+        /// spiral hatch style.
+        /// </summary>
+        /// <param name="center">center of the spiral</param>
+        /// <param name="offset">growth of the radius per turn, the distance between consecutive windings</param>
+        /// <param name="turns">number of full turns</param>
+        /// <returns>the spline</returns>
         public static BSpline2D MakeSpiral(GeoPoint2D center, double offset, int turns)
         {
             // mit dem exakten Kreis gibts Knicke, weil der nur quadratisch ist
@@ -1097,6 +1114,14 @@ namespace CADability.Curve2D
                 return true;
             }
         }
+        /// <summary>
+        /// Makes a sequence of points in a periodic parameter space continuous: whenever a point differs from its predecessor by
+        /// more than half a period in x (or y), it is shifted by the period so that the jump disappears; the following points are
+        /// compared with the shifted point, so a whole tail of the sequence moves across the seam. The array is modified in place.
+        /// </summary>
+        /// <param name="points">the points in their order along the curve</param>
+        /// <param name="xPeriod">the period in x, or 0.0 (or less) if x is not periodic</param>
+        /// <param name="yPeriod">the period in y, or 0.0 (or less) if y is not periodic</param>
         public static void AdjustPeriodic(GeoPoint2D[] points, double xPeriod, double yPeriod)
         {
             if (xPeriod > 0.0)
@@ -1157,6 +1182,15 @@ namespace CADability.Curve2D
                 }
             }
         }
+        /// <summary>
+        /// Constructs a non-rational spline of the given degree that interpolates the points in their order. The degree is reduced
+        /// to the number of points minus one when necessary (two points give a line). A periodic spline is closed and smooth across
+        /// the first point; the first point need not be repeated at the end. The knot values at which the points are interpolated
+        /// are kept for <see cref="GeneralCurve2D.PositionOf(GeoPoint2D)"/> and similar methods.
+        /// </summary>
+        /// <param name="throughpoints">the points to interpolate, at least two</param>
+        /// <param name="degree">the degree of the spline, typically 3</param>
+        /// <param name="periodic">true for a closed, periodic spline</param>
         public BSpline2D(GeoPoint2D[] throughpoints, int degree, bool periodic)
         {
             degree = Math.Min(degree, throughpoints.Length - 1); // bei 2 Punkten nur 1. Grad, also Linie, u.s.w
@@ -1213,6 +1247,14 @@ namespace CADability.Curve2D
             }
             distanceEpsilon = (ext.Width + ext.Height) * 1e-14;
         }
+        /// <summary>
+        /// Constructs a non-rational spline of the given degree that interpolates the points and has the given tangent directions
+        /// at them. Both arrays must have the same length. The degree is reduced to the number of points minus one when necessary.
+        /// </summary>
+        /// <param name="throughpoints">the points to interpolate</param>
+        /// <param name="throughdirections">the direction of the curve at each point</param>
+        /// <param name="degree">the degree of the spline</param>
+        /// <param name="periodic">true for a closed, periodic spline</param>
         public BSpline2D(GeoPoint2D[] throughpoints, GeoVector2D[] throughdirections, int degree, bool periodic)
         {
             GeoPoint2D[] dirs = new GeoPoint2D[throughdirections.Length];
@@ -1329,6 +1371,10 @@ namespace CADability.Curve2D
                 return (GeoPoint2D[])poles.Clone();
             }
         }
+        /// <summary>
+        /// The parameter in the knot space at which the curve starts. The normalized parameter of <see cref="ICurve2D"/> maps
+        /// linearly from 0.0 at <see cref="StartParam"/> to 1.0 at <see cref="EndParam"/>; <see cref="TrimParam"/> works in the knot space.
+        /// </summary>
         public double StartParam
         {
             get
@@ -1336,6 +1382,9 @@ namespace CADability.Curve2D
                 return startParam;
             }
         }
+        /// <summary>
+        /// The parameter in the knot space at which the curve ends (see <see cref="StartParam"/>).
+        /// </summary>
         public double EndParam
         {
             get
@@ -1452,6 +1501,7 @@ namespace CADability.Curve2D
             cornerKnots = res;
             return res;
         }
+        /// <inheritdoc/>
         protected override void GetTriangulationBasis(out GeoPoint2D[] points, out GeoVector2D[] directions, out double[] parameters)
         {
             double[] tknots = GetTriangulationKnots();
@@ -1589,6 +1639,7 @@ namespace CADability.Curve2D
             res.UserData.CloneFrom(this.UserData);
             return res;
         }
+        /// <inheritdoc/>
         public override double Sweep
         {
             get
@@ -1868,6 +1919,14 @@ namespace CADability.Curve2D
             //}
             //return new BSpline2D(poles, weights, knots, multiplicities, degree, periodic, lstartParam, lendParam);
         }
+        /// <summary>
+        /// Trims this spline in place to the interval from <paramref name="startPar"/> to <paramref name="endPar"/> of the knot
+        /// space (see <see cref="StartParam"/>, <see cref="EndParam"/>). Poles and knots are recomputed by knot insertion, so the
+        /// trimmed spline is geometrically identical to that part of the original; a periodic spline becomes non-periodic.
+        /// </summary>
+        /// <param name="startPar">start of the interval in the knot space</param>
+        /// <param name="endPar">end of the interval in the knot space</param>
+        /// <returns>true if the spline was changed, false if the interval already covers the whole spline</returns>
         public bool TrimParam(double startPar, double endPar)
         {
             if (startPar < knots[0] + parameterEpsilon && endPar > knots[knots.Length - 1] - parameterEpsilon)
@@ -2061,6 +2120,7 @@ namespace CADability.Curve2D
                     new BSpline2D(poles2.ToArray(),weights2.ToArray(),knots2.ToArray(),mults2.ToArray(),degree,false,u,endParam)};
             }
         }
+        /// <inheritdoc/>
         public override double Length
         {
             get
@@ -2086,6 +2146,7 @@ namespace CADability.Curve2D
                 //				}
             }
         }
+        /// <inheritdoc/>
         public override GeoPoint2D StartPoint
         {
             get
@@ -2108,6 +2169,7 @@ namespace CADability.Curve2D
                 }
             }
         }
+        /// <inheritdoc/>
         public override GeoPoint2D EndPoint
         {
             get
@@ -2234,6 +2296,7 @@ namespace CADability.Curve2D
                 return tangent.IsNullVector() ? res : tangent;
             }
         }
+        /// <inheritdoc/>
         public override GeoVector2D MiddleDirection
         {
             get
@@ -2257,6 +2320,7 @@ namespace CADability.Curve2D
             }
             return res;
         }
+        /// <inheritdoc/>
         public override double[] GetSelfIntersections()
         {
             double[] found = base.GetSelfIntersections();
@@ -3249,6 +3313,7 @@ namespace CADability.Curve2D
             }
             return res.ToArray();
         }
+        /// <inheritdoc/>
         public override double GetArea()
         {
             // ExplicitPCurve2D uses alot of memory, it is a WeakReference now
@@ -3715,6 +3780,14 @@ namespace CADability.Curve2D
         }
 
         #endregion
+        /// <summary>
+        /// Tries to replace the spline by a simpler curve that coincides with it within <paramref name="precision"/>: a
+        /// <see cref="Line2D"/> when the spline has degree 1 or all poles lie on the line from the start point to the end point, an
+        /// <see cref="Arc2D"/> through start, middle and end point, or a <see cref="Circle2D"/> for a closed spline.
+        /// </summary>
+        /// <param name="precision">the allowed deviation; 0.0 means <see cref="Precision.eps"/></param>
+        /// <param name="simpleCurve">the simpler curve, null when there is none</param>
+        /// <returns>true if a simpler curve was found</returns>
         public bool GetSimpleCurve(double precision, out ICurve2D simpleCurve)
         {
             if (degree == 1)
@@ -3812,6 +3885,7 @@ namespace CADability.Curve2D
         //        return res;
         //    }
         //}
+        /// <inheritdoc/>
         public override string ToString()
         {
             return "BSpline2D: (" + StartPoint.DebugString + ") (" + EndPoint.DebugString + ")";

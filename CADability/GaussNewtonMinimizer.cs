@@ -9,6 +9,11 @@ using System.Runtime.CompilerServices;
 
 namespace CADability
 {
+    /// <summary>
+    /// Extension methods used by the numerical fitting code: element-wise addition of double arrays and views of (two dimensional)
+    /// arrays as <see cref="IArray{T}"/> (<see cref="Row{T}"/>, <see cref="Column{T}"/>, <see cref="Linear{T}"/>,
+    /// <see cref="ToIArray{T}"/>). Internal helper, not an entry point of the API.
+    /// </summary>
     public static class MyExtensions
     {
         public static double[] Add(this double[] a, double[] b)
@@ -37,11 +42,43 @@ namespace CADability
             return new ToIArray<T>(a);
         }
     }
+    /// <summary>
+    /// A Gauss-Newton solver for non-linear least squares problems: given an <see cref="ErrorFunction"/>, which computes the residuals
+    /// for a set of parameters, and its <see cref="JacobiFunction"/>, <see cref="Solve"/> iterates from start parameters to the
+    /// parameters which minimize the sum of the squared residuals. The static methods use it to fit geometric primitives to points
+    /// (<see cref="LineFit"/>, <see cref="CircleFit"/>, <see cref="PlaneFit"/>, <see cref="CylinderFit"/>, <see cref="ConeFit"/>,
+    /// <see cref="SphereFit"/>, <see cref="TorusFit"/>, <see cref="QuadricFit"/>) and to compute extrema and intersections of curves and
+    /// surfaces, e.g. when a shell is reconstructed from a triangulation. Internal numerical helper, not an entry point of the API.
+    /// </summary>
     public class GaussNewtonMinimizer
     {
+        /// <summary>
+        /// The residual function of the problem: computes for the given parameters the vector of error values whose sum of squares is
+        /// minimized. The number of error values must be the same on every call.
+        /// </summary>
+        /// <param name="parameters">The current parameters</param>
+        /// <param name="errorValues">The residuals for these parameters</param>
         public delegate void ErrorFunction(double[] parameters, out double[] errorValues);
+        /// <summary>
+        /// Computes the Jacobi matrix of the <see cref="ErrorFunction"/> at the given parameters: one row per error value and one column
+        /// per parameter, holding the partial derivative of that error value with respect to that parameter.
+        /// </summary>
+        /// <param name="parameters">The current parameters</param>
+        /// <param name="partialDerivations">The Jacobi matrix (number of error values x number of parameters)</param>
         public delegate void JacobiFunction(double[] parameters, out Matrix partialDerivations);
+        /// <summary>
+        /// Optional test whether the parameters computed by an iteration step are acceptable (e.g. a radius is positive). When it
+        /// returns false, the <see cref="CurtailParameterFunction"/> is applied to the parameters, and after more than three consecutive
+        /// rejected steps the iteration stops.
+        /// </summary>
+        /// <param name="parameters">The parameters to check</param>
+        /// <returns>true if the parameters are acceptable</returns>
         public delegate bool CheckParameterFunction(double[] parameters);
+        /// <summary>
+        /// Optional correction applied in place to parameters which the <see cref="CheckParameterFunction"/> rejected, e.g. clamping a
+        /// value to its valid range or normalizing a direction, so that the iteration can continue from a valid point.
+        /// </summary>
+        /// <param name="parameters">The parameters to correct in place</param>
         public delegate void CurtailParameterFunction(double[] parameters);
 
         private ErrorFunction errorFunction;

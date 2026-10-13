@@ -21,12 +21,24 @@ namespace CADability.Attribute
         private DimensionStyle current;
         internal string menuResourceId;
         private IShowProperty[] showProperties; // Anzeige der Liste
+        /// <summary>
+        /// Creates an empty list that belongs to no project or settings (<see cref="Owner"/> is null). Applications normally do not create
+        /// lists themselves but use <see cref="Project.DimensionStyleList"/> or <see cref="Settings.DimensionStyleList"/> of
+        /// <see cref="Settings.GlobalSettings"/>.
+        /// </summary>
         public DimensionStyleList()
         {
             entries = new SortedList();
             resourceIdInternal = "DimensionStyleList";
         }
 
+        /// <summary>
+        /// Returns the dimension style at the given position. The entries are kept in alphabetical order of their names, so the index of
+        /// a style changes when styles are added, removed or renamed.
+        /// </summary>
+        /// <param name="Index">Position in the list, from 0 to <see cref="Count"/> - 1</param>
+        /// <returns>The dimension style at that position</returns>
+        /// <exception cref="ArgumentOutOfRangeException">When <paramref name="Index"/> is outside the list</exception>
         public DimensionStyle this[int Index]
         {
             get
@@ -85,6 +97,11 @@ namespace CADability.Attribute
             return entries[Name] as DimensionStyle; // null, wenns ihn nicht gibt
         }
 
+        /// <summary>
+        /// The dimension style used for newly created dimensions: the <see cref="Project"/> assigns it to a <see cref="Dimension"/> that
+        /// is added without a style, and the property grid shows it in bold. When no current style has been set, the first entry is
+        /// returned; null for an empty list. Setting it does not raise <see cref="DidModifyEvent"/>.
+        /// </summary>
         public DimensionStyle Current
         {
             get
@@ -122,6 +139,11 @@ namespace CADability.Attribute
             showProperties = null;
             if (propertyTreeView != null) propertyTreeView.OpenSubEntries(this, false); // zuklappen
         }
+        /// <summary>
+        /// Raised when a style has been added to the list (<see cref="Add(DimensionStyle)"/>) or after a call to <see cref="Remove(DimensionStyle)"/>, also when nothing
+        /// was removed. The handler gets this list as sender and null as arguments. Changes to the properties of a single style are
+        /// reported through <see cref="DimensionStyle.PropertyChangedEvent"/> instead.
+        /// </summary>
         public event CADability.DidModifyDelegate DidModifyEvent;
         #region ISerializable Members
         /// <summary>
@@ -191,6 +213,7 @@ namespace CADability.Attribute
         //        return  StringTable.GetString("DimensionStyleList.InfoText");
         //    }
         //}
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -235,6 +258,7 @@ namespace CADability.Attribute
                 return showProperties;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -391,6 +415,9 @@ namespace CADability.Attribute
             if (toAdd is DimensionStyle && Find(toAdd.Name) == null)
                 Add((DimensionStyle)toAdd);
         }
+        /// <summary>
+        /// The number of dimension styles in the list.
+        /// </summary>
         public int Count
         {
             get
@@ -404,6 +431,11 @@ namespace CADability.Attribute
             return entries.GetByIndex(Index) as INamedAttribute;
         }
 
+        /// <summary>
+        /// The <see cref="Project"/> or <see cref="Settings"/> this list belongs to, null for a standalone list. The owner provides the
+        /// <see cref="ColorList"/>, <see cref="LineWidthList"/> and other attribute lists the styles refer to, is asked before a style is
+        /// removed (it refuses to remove the last style and asks the user when the style is still in use) and is informed about changes to the styles.
+        /// </summary>
         public IAttributeListContainer Owner
         {
             get

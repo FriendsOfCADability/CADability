@@ -8,6 +8,14 @@ using System.Reflection;
 namespace CADability.UserInterface
 {
 
+    /// <summary>
+    /// Property page entry to choose a <see cref="ColorDef"/> from a <see cref="ColorList"/> in a drop down list which
+    /// shows a color box next to each name. It either controls the color of an <see cref="IColorDef"/> object (the object
+    /// is updated when the selection changes and the entry follows changes of the object), accesses a ColorDef property of
+    /// an arbitrary object via reflection, or only reports the selection via <see cref="ColorDefChangedEvent"/>. The
+    /// <see cref="ColorList.StaticFlags"/> decide whether an "undefined" entry and the colors "from parent" and "from
+    /// style" are offered.
+    /// </summary>
     public class ColorSelectionProperty : MultipleChoiceProperty
     {
         private IGeoObject toWatch;
@@ -18,6 +26,14 @@ namespace CADability.UserInterface
         private IColorDef iColorDef;
         private ColorDef selectedCD;
         private bool showUnselectedGray;
+        /// <summary>
+        /// Creates an entry which is not connected to an object: the selection is reported via
+        /// <see cref="ColorDefChangedEvent"/>.
+        /// </summary>
+        /// <param name="resourceId">Resource id of the label text</param>
+        /// <param name="clrTable">The list providing the choices</param>
+        /// <param name="select">The initially selected color, or null for "undefined"</param>
+        /// <param name="flags">Which special colors are offered, see <see cref="ColorList.StaticFlags"/></param>
         public ColorSelectionProperty(string resourceId, ColorList clrTable, ColorDef select, ColorList.StaticFlags flags)
         {
             selectedCD = select;
@@ -38,6 +54,14 @@ namespace CADability.UserInterface
             unselectedText = StringTable.GetString("ColorDef.Undefined");
             showUnselectedGray = true;
         }
+        /// <summary>
+        /// Creates an entry which controls the color of <paramref name="iColorDef"/>. The current color of the object is
+        /// preselected; if the object is an <see cref="IGeoObject"/>, the entry follows changes of its color.
+        /// </summary>
+        /// <param name="iColorDef">The object whose color is edited</param>
+        /// <param name="resourceId">Resource id of the label text</param>
+        /// <param name="clrTable">The list providing the choices</param>
+        /// <param name="flags">Which special colors are offered, see <see cref="ColorList.StaticFlags"/></param>
         public ColorSelectionProperty(IColorDef iColorDef, string resourceId, ColorList clrTable, ColorList.StaticFlags flags)
         {
             useFlags = flags;
@@ -80,6 +104,16 @@ namespace CADability.UserInterface
             //}
             choices = lchoices.ToArray();
         }
+        /// <summary>
+        /// Creates an entry which edits a property of type <see cref="ColorDef"/> of an arbitrary object via reflection. The
+        /// current value of the property is preselected; if the object is an <see cref="IGeoObject"/>, the entry follows
+        /// changes of its color.
+        /// </summary>
+        /// <param name="go">The object holding the property</param>
+        /// <param name="propertyName">Name of the ColorDef property of that object</param>
+        /// <param name="resourceId">Resource id of the label text</param>
+        /// <param name="clrTable">The list providing the choices</param>
+        /// <param name="flags">Which special colors are offered, see <see cref="ColorList.StaticFlags"/></param>
         public ColorSelectionProperty(object go, string propertyName, string resourceId, ColorList clrTable, ColorList.StaticFlags flags)
         {
             useFlags = flags;
@@ -103,12 +137,17 @@ namespace CADability.UserInterface
             unselectedText = StringTable.GetString("ColorDef.Undefined");
             toWatch = go as IGeoObject; // may be null
         }
+        /// <inheritdoc/>
         public override void SetSelection(int toSelect)
         {
             if (toSelect >= 0 && toSelect < choices.Length)
                 selectedCD = colorList[toSelect];
             base.SetSelection(toSelect);
         }
+        /// <summary>
+        /// Whether the "undefined" entry should be displayed in gray. The value is only stored; the current implementation
+        /// does not evaluate it.
+        /// </summary>
         public bool ShowAllowUndefinedGray
         {
             get
@@ -120,6 +159,7 @@ namespace CADability.UserInterface
                 showUnselectedGray = value;
             }
         }
+        /// <inheritdoc/>
         protected override void OnSelectionChanged(string selected)
         {
             ColorList.StaticFlags flags = colorList.Usage;
@@ -165,7 +205,15 @@ namespace CADability.UserInterface
             else if (selectedCD != null)
                 SelectedText = selectedCD.Name;
         }
+        /// <summary>
+        /// Delegate for <see cref="ColorDefChangedEvent"/>.
+        /// </summary>
+        /// <param name="selected">The selected color, or null when the "undefined" entry was selected</param>
         public delegate void ColorDefChangedDelegate(ColorDef selected);
+        /// <summary>
+        /// Raised when the user selects a color and the entry is neither connected to an <see cref="IColorDef"/> object nor
+        /// to a property via reflection.
+        /// </summary>
         public event ColorDefChangedDelegate ColorDefChangedEvent;
         private void GeoObjectDidChange(IGeoObject Sender, GeoObjectChange Change)
         {
@@ -180,6 +228,11 @@ namespace CADability.UserInterface
                 }
             }
         }
+        /// <summary>
+        /// The <see cref="IGeoObject"/> whose color is controlled by this entry. Setting it connects the entry to the new
+        /// object (which must implement <see cref="IColorDef"/>): its color is changed when the user selects an entry, and the
+        /// entry is refreshed when the color of the object changes.
+        /// </summary>
         public IGeoObject Connected
         {   // a IGeoObject with a IColorDef to modify the color of that object
             get { return toWatch; }
@@ -195,18 +248,21 @@ namespace CADability.UserInterface
             }
         }
         #region IPropertyEntry
+        /// <inheritdoc/>
         public override void Added(IPropertyPage pp)
         {
             base.Added(pp);
             colorList.DidModifyEvent += new DidModifyDelegate(colorList_DidModify);
             if (toWatch != null) toWatch.DidChangeEvent += new ChangeDelegate(GeoObjectDidChange);
         }
+        /// <inheritdoc/>
         public override void Removed(IPropertyPage propertyTreeView)
         {
             base.Removed(propertyTreeView);
             colorList.DidModifyEvent -= new DidModifyDelegate(colorList_DidModify);
             if (toWatch != null) toWatch.DidChangeEvent -= new ChangeDelegate(GeoObjectDidChange);
         }
+        /// <inheritdoc/>
         public override string[] GetDropDownList()
         {
             string[] res = new string[choices.Length];
@@ -224,6 +280,7 @@ namespace CADability.UserInterface
             }
             return res;
         }
+        /// <inheritdoc/>
         public override string Value
         {
             get
@@ -234,6 +291,7 @@ namespace CADability.UserInterface
                 else return selectedCD.Name;
             }
         }
+        /// <inheritdoc/>
         public override void ListBoxSelected(int selectedIndex)
         {
             if (selectedIndex < 0) return;

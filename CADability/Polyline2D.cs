@@ -8,8 +8,16 @@ using System.Runtime.Serialization;
 namespace CADability.Curve2D
 {
 
+    /// <summary>
+    /// Thrown by the constructor of <see cref="Polyline2D"/> when the polyline cannot be built, i.e. when fewer than two distinct
+    /// vertices are given. <see cref="Polyline2D.MakePolyline2D"/> returns null in that case instead.
+    /// </summary>
     public class Polyline2DException : ApplicationException
     {
+        /// <summary>
+        /// Creates the exception with the given message.
+        /// </summary>
+        /// <param name="msg">the message describing the failure</param>
         public Polyline2DException(string msg)
             : base(msg)
         {
@@ -25,6 +33,13 @@ namespace CADability.Curve2D
     {
         private GeoPoint2D[] vertex;
         private double length;
+        /// <summary>
+        /// Constructs the polyline through the given vertices in their order. Consecutive vertices closer than
+        /// <see cref="Precision.eps"/> are merged into one. The polyline is closed when the last vertex coincides with the first, so
+        /// a closed outline must repeat its first vertex at the end.
+        /// </summary>
+        /// <param name="vertex">the vertices, at least two distinct ones</param>
+        /// <exception cref="Polyline2DException">when fewer than two distinct vertices remain</exception>
         public Polyline2D(GeoPoint2D[] vertex)
         {
             if (vertex.Length < 2) throw new Polyline2DException("Constructing Polyline2D with less than two points");
@@ -44,6 +59,12 @@ namespace CADability.Curve2D
             if (pnts.Count < 2) throw new Polyline2DException("Constructing Polyline2D with less than two points");
             this.vertex = pnts.ToArray();
         }
+        /// <summary>
+        /// Creates the polyline through the given vertices like the constructor, but returns null instead of throwing when fewer
+        /// than two distinct vertices are given.
+        /// </summary>
+        /// <param name="vertex">the vertices</param>
+        /// <returns>the polyline, or null</returns>
         public static Polyline2D MakePolyline2D(GeoPoint2D[] vertex)
         {   // analog zum Konstruktor, nur ohne exception
             if (vertex.Length < 2) return null;
@@ -61,6 +82,15 @@ namespace CADability.Curve2D
             if (pnts.Count < 2) return null;
             return new Polyline2D(pnts.ToArray());
         }
+        /// <summary>
+        /// Creates a closed regular polygon with <paramref name="numberOfVertices"/> corners: <paramref name="vertex"/> is the first
+        /// corner, the others are obtained by rotating it about <paramref name="center"/> counterclockwise in steps of
+        /// 360/<paramref name="numberOfVertices"/> degrees; the last vertex repeats the first.
+        /// </summary>
+        /// <param name="center">center of the polygon</param>
+        /// <param name="vertex">the first corner; its distance from the center is the circumradius</param>
+        /// <param name="numberOfVertices">number of corners, at least 3</param>
+        /// <returns>the polygon</returns>
         public static Polyline2D MakePolygon(GeoPoint2D center, GeoPoint2D vertex, int numberOfVertices)
         {
             GeoPoint2D[] vtx = new GeoPoint2D[numberOfVertices + 1];
@@ -110,19 +140,35 @@ namespace CADability.Curve2D
             if (angle.Radian != 0.0) res = res.GetModified(ModOp2D.Rotate(center, angle)) as Polyline2D;
             return res;
         }
+        /// <summary>
+        /// Replaces all vertices. The array is used directly (not copied) and is not checked for duplicate points; the cached
+        /// length is reset.
+        /// </summary>
+        /// <param name="vertices">the new vertices, at least two</param>
         public void SetVertices(GeoPoint2D[] vertices)
         {
             vertex = vertices;
             length = 0.0;
         }
+        /// <summary>
+        /// Returns the vertex with the given index.
+        /// </summary>
+        /// <param name="index">index from 0 to <see cref="VertexCount"/>-1</param>
+        /// <returns>the vertex</returns>
         public GeoPoint2D GetVertex(int index)
         {
             return vertex[index];
         }
+        /// <summary>
+        /// The number of vertices. For a closed polyline the repeated first vertex at the end counts as well.
+        /// </summary>
         public int VertexCount
         {
             get { return vertex.Length; }
         }
+        /// <summary>
+        /// The vertices in their order, as a copy of the internal array; use <see cref="SetVertices"/> to change them.
+        /// </summary>
         public GeoPoint2D[] Vertex
         {
             get
@@ -130,6 +176,11 @@ namespace CADability.Curve2D
                 return (GeoPoint2D[])vertex.Clone();
             }
         }
+        /// <summary>
+        /// Applies the modification (translation, rotation, scaling, reflection...) to all vertices in place. Unlike
+        /// <see cref="GetModified"/> it changes this polyline instead of returning a modified copy.
+        /// </summary>
+        /// <param name="m">the modification to apply</param>
         public void Modify(ModOp2D m) // gehört das nicht in das ICurve Interface?
         {
             for (int i = 0; i < vertex.Length; ++i)
@@ -137,6 +188,7 @@ namespace CADability.Curve2D
                 vertex[i] = m * vertex[i];
             }
         }
+        /// <inheritdoc/>
         public override ICurve2D GetModified(ModOp2D m)
         {
             Polyline2D res = this.Clone() as Polyline2D;
@@ -213,6 +265,7 @@ namespace CADability.Curve2D
             }
             return mindist;
         }
+        /// <inheritdoc/>
         public override GeoVector2D EndDirection
         {
             get
@@ -220,6 +273,7 @@ namespace CADability.Curve2D
                 return vertex[vertex.Length - 1] - vertex[vertex.Length - 2];
             }
         }
+        /// <inheritdoc/>
         public override GeoPoint2D EndPoint
         {
             get
@@ -301,6 +355,7 @@ namespace CADability.Curve2D
             Line2D lp = new Line2D(StartPoint, EndPoint);
             return Intersect(lp);
         }
+        /// <inheritdoc/>
         public override double[] GetSelfIntersections()
         {
             List<double> res = new List<double>();
@@ -333,6 +388,7 @@ namespace CADability.Curve2D
         {
             return base.IsParameterOnCurve(par);
         }
+        /// <inheritdoc/>
         public override double Length
         {
             get
@@ -348,6 +404,7 @@ namespace CADability.Curve2D
                 return length;
             }
         }
+        /// <inheritdoc/>
         public override double Sweep
         {
             get
@@ -372,6 +429,7 @@ namespace CADability.Curve2D
             pl.SetPoints(pp, false); // ggf. besseren Test auf geschlossen
             return pl;
         }
+        /// <inheritdoc/>
         public override GeoVector2D MiddleDirection
         {
             get
@@ -607,6 +665,7 @@ namespace CADability.Curve2D
             if (pl2 == null) return new ICurve2D[] { pl1 };
             return new ICurve2D[] { pl1, pl2 };
         }
+        /// <inheritdoc/>
         public override GeoVector2D StartDirection
         {
             get
@@ -614,6 +673,7 @@ namespace CADability.Curve2D
                 return vertex[1] - vertex[0];
             }
         }
+        /// <inheritdoc/>
         public override GeoPoint2D StartPoint
         {
             get
@@ -702,6 +762,7 @@ namespace CADability.Curve2D
             }
             return res / 2.0;
         }
+        /// <inheritdoc/>
         public override ICurve2D GetFused(ICurve2D toFuseWith, double precision)
         {
             if (toFuseWith is Line2D)
@@ -853,6 +914,10 @@ namespace CADability.Curve2D
             }
             return null;
         }
+        /// <summary>
+        /// Returns the segments of the polyline as individual <see cref="Line2D"/> objects, one for each pair of consecutive vertices.
+        /// </summary>
+        /// <returns>the lines in the order of the polyline</returns>
         public ICurve2D[] GetSubCurves()
         {
             Line2D[] subcurves = new Line2D[vertex.Length - 1];

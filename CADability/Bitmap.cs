@@ -60,6 +60,10 @@ namespace CADability.GeoObject
         /// </summary>
         public static event ConstructedDelegate Constructed;
         #endregion
+        /// <summary>
+        /// Protected constructor: raises <see cref="Constructed"/>. Use <see cref="Construct"/> to create a picture and
+        /// <see cref="Set"/> to define it.
+        /// </summary>
         protected Picture()
         {
             Constructed?.Invoke(this);
@@ -153,6 +157,14 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Sets the height of the picture, i.e. the length of <see cref="DirectionHeight"/>, to <paramref name="l"/> (in
+        /// world units), keeping its direction. With <paramref name="keepAspectRatio"/> the width is adjusted as well, so
+        /// that the picture keeps the aspect ratio of the bitmap's pixels. A value of 0 is ignored. Raises the change events
+        /// and is undoable.
+        /// </summary>
+        /// <param name="l">the new height</param>
+        /// <param name="keepAspectRatio">true to also set the width according to the aspect ratio of the bitmap</param>
         public void SetHeight(double l, bool keepAspectRatio)
         {
             if (l == 0.0) return;
@@ -166,6 +178,14 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Sets the width of the picture, i.e. the length of <see cref="DirectionWidth"/>, to <paramref name="l"/> (in
+        /// world units), keeping its direction. With <paramref name="keepAspectRatio"/> the height is adjusted as well, so
+        /// that the picture keeps the aspect ratio of the bitmap's pixels. A value of 0 is ignored. Raises the change events
+        /// and is undoable.
+        /// </summary>
+        /// <param name="l">the new width</param>
+        /// <param name="keepAspectRatio">true to also set the height according to the aspect ratio of the bitmap</param>
         public void SetWidth(double l, bool keepAspectRatio)
         {
             if (l == 0.0) return;
@@ -217,6 +237,11 @@ namespace CADability.GeoObject
 #endif
         }
 
+        /// <summary>
+        /// Replaces the bitmap without raising the change events and without an undo step, in contrast to setting
+        /// <see cref="Bitmap"/>. For callers that record the undo themselves. Not used within CADability.
+        /// </summary>
+        /// <param name="bmp">the new bitmap</param>
         public void SetBitmapNoUndo(Bitmap bmp)
         {
             bitmap = bmp;
@@ -344,6 +369,7 @@ namespace CADability.GeoObject
                 return double.MaxValue;
             }
         }
+        /// <inheritdoc/>
         public override void FindSnapPoint(SnapPointFinder spf)
         {
             if (spf.SnapToFaceSurface)
@@ -374,10 +400,16 @@ namespace CADability.GeoObject
                 spf.Check(location + directionWidth + directionHeight, this, SnapPointFinder.DidSnapModes.DidSnapToObjectSnapPoint);
             }
         }
+        /// <inheritdoc/>
         public override Style.EDefaultFor PreferredStyle => Style.EDefaultFor.Text;
         #endregion
 
         #region ISerializable Members
+        /// <summary>
+        /// Constructor required by deserialization
+        /// </summary>
+        /// <param name="info">SerializationInfo</param>
+        /// <param name="context">StreamingContext</param>
         protected Picture(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -387,6 +419,7 @@ namespace CADability.GeoObject
             directionHeight = (GeoVector)info.GetValue("DirectionHeight", typeof(GeoVector));
             Path = info.GetString("Path");
         }
+        /// <inheritdoc/>
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
@@ -414,6 +447,12 @@ namespace CADability.GeoObject
     }
 
 
+    /// <summary>
+    /// Property entry that shows and edits a <see cref="Picture"/> in the property grid: the location, the width and
+    /// height (optionally keeping the aspect ratio of the bitmap), the two direction vectors (optionally kept
+    /// perpendicular), the file path and the attributes. Location and directions have hotspots in the drawing area.
+    /// It is returned by <see cref="Picture.GetShowProperties(IFrame)"/>.
+    /// </summary>
     public class ShowPropertyPicture : PropertyEntryImpl, ICommandHandler, IGeoObjectShowProperty, IDisplayHotSpots
     {
         private readonly IPropertyEntry[] attributeProperties; // Display for the attributes (layer, color, etc.)
@@ -430,6 +469,11 @@ namespace CADability.GeoObject
         private readonly GeoVectorHotSpot dirWidthHotSpot; // Hotspot for direction
         private readonly GeoVectorHotSpot dirHeightHotSpot; // Hotspot for direction
 
+        /// <summary>
+        /// Creates the property entry for the picture <paramref name="picture"/>.
+        /// </summary>
+        /// <param name="picture">the picture to show</param>
+        /// <param name="frame">the frame the property grid belongs to</param>
         public ShowPropertyPicture(Picture picture, IFrame frame) : base(frame)
         {
             this.picture = picture;
@@ -563,8 +607,10 @@ namespace CADability.GeoObject
             }
             base.Opened(isOpen);
         }
+        /// <inheritdoc/>
         public override PropertyEntryType Flags => PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries | PropertyEntryType.ContextMenu | PropertyEntryType.Selectable;
 
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -752,6 +798,11 @@ namespace CADability.GeoObject
 
         #endregion
         #region IDisplayHotSpots Members
+        /// <summary>
+        /// Raised when the hotspots of this entry (location and directions of the picture) are to be shown, hidden,
+        /// selected or deselected: when the entry is opened or closed and when one of its sub-entries is selected. The
+        /// handler gets the hotspot and the kind of change, see <see cref="IDisplayHotSpots"/>.
+        /// </summary>
         public event CADability.HotspotChangedDelegate HotspotChangedEvent;
         /// <inheritdoc/>
         public void ReloadProperties()

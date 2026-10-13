@@ -104,7 +104,18 @@ namespace CADability.Actions
                 paintTo3D.Blending(false);
             }
         }
+        /// <summary>
+        /// Meant to switch the outline of the objects added with <see cref="AddSelected(IGeoObject)"/> on (width from the
+        /// setting "Select.SelectWidth") or off. The current repaint does not evaluate it and always draws these objects
+        /// in the select mode, so setting it has no visible effect.
+        /// </summary>
         public bool SelectOutline { get{ return selectWidth > 0; } set { selectWidth = value ? frame.GetIntSetting("Select.SelectWidth", 2) : 0; } }
+        /// <summary>
+        /// Requests that the views draw the model transparent while the action runs, so that feedback objects inside
+        /// solids stay visible, and triggers a repaint. The request is forwarded to the views whenever the feedback
+        /// changes; whether it is honoured depends on the view (<see cref="ModelView"/> currently only repaints).
+        /// </summary>
+        /// <param name="transparent">true to draw the model transparent, false to draw it normally</param>
         public void MakeModelTransparent(bool transparent)
         {
             makeTransparent = transparent;
@@ -125,6 +136,12 @@ namespace CADability.Actions
             OnFeedBackChanged(feedBackObject);
             return repaintObjects.Count - 1;
         }
+        /// <summary>
+        /// Adds all objects of <paramref name="feedBackObjects"/> that implement <see cref="IFeedBack"/> (which the
+        /// GeoObjects of CADability do) to the list of feedback objects, see <see cref="Add(IFeedBack)"/>.
+        /// </summary>
+        /// <param name="feedBackObjects">the objects to show</param>
+        /// <returns>the index of the last added object in the list, may be used for <see cref="Remove(int)"/></returns>
         public int Add(GeoObjectList feedBackObjects)
         {
             foreach (IGeoObject go in feedBackObjects)
@@ -138,6 +155,13 @@ namespace CADability.Actions
             }
             return repaintObjects.Count - 1;
         }
+        /// <summary>
+        /// Adds all objects of <paramref name="feedBackObjects"/> to the list of feedback objects, see
+        /// <see cref="Add(IFeedBack)"/>. The objects must implement <see cref="IFeedBack"/>, which the GeoObjects of
+        /// CADability do.
+        /// </summary>
+        /// <param name="feedBackObjects">the objects to show</param>
+        /// <returns>the index of the last added object in the list, may be used for <see cref="Remove(int)"/></returns>
         public int Add(IEnumerable<IGeoObject> feedBackObjects)
         {
             foreach (IGeoObject go in feedBackObjects)
@@ -216,6 +240,12 @@ namespace CADability.Actions
             OnFeedBackChanged(feedBackObject as IFeedBack);
             return paintAsSelected.Count - 1;
         }
+        /// <summary>
+        /// Adds all objects of <paramref name="feedBackObjects"/> to the list of objects displayed in the select color
+        /// and the select display mode, see <see cref="AddSelected(IGeoObject)"/>.
+        /// </summary>
+        /// <param name="feedBackObjects">the objects to add</param>
+        /// <returns>the index of the last added object in the list, may be used for <see cref="RemoveSelected(int)"/></returns>
         public int AddSelected(GeoObjectList feedBackObjects)
         {
             paintAsSelected.AddRange(feedBackObjects);
@@ -229,6 +259,12 @@ namespace CADability.Actions
             }
             return paintAsSelected.Count - 1;
         }
+        /// <summary>
+        /// Adds all objects of <paramref name="feedBackObjects"/> to the list of objects displayed in the select color
+        /// and the select display mode, see <see cref="AddSelected(IGeoObject)"/>.
+        /// </summary>
+        /// <param name="feedBackObjects">the objects to add</param>
+        /// <returns>the index of the last added object in the list, may be used for <see cref="RemoveSelected(int)"/></returns>
         public int AddSelected(IEnumerable<IGeoObject> feedBackObjects)
         {
             paintAsSelected.AddRange(feedBackObjects);
@@ -279,12 +315,22 @@ namespace CADability.Actions
             OnFeedBackChanged(null);
             paintAsSelected.Clear();
         }
+        /// <summary>
+        /// Adds a GeoObject to the list of objects that are displayed semi-transparent (with blending) on top of the
+        /// model, e.g. the rotation arrow of the parametric angle action. The view reflects changes of the object.
+        /// </summary>
+        /// <param name="feedBackObject">the object to add</param>
         public void AddTransparent(IGeoObject feedBackObject)
         {
             paintAsTransparent.Add(feedBackObject);
             (feedBackObject as IFeedBack).FeedBackChangedEvent += new FeedBackChangedDelegate(OnFeedBackChanged);
             OnFeedBackChanged(feedBackObject as IFeedBack);
         }
+        /// <summary>
+        /// Adds all objects of <paramref name="feedBackObjects"/> to the list of objects displayed semi-transparent, see
+        /// <see cref="AddTransparent(IGeoObject)"/>.
+        /// </summary>
+        /// <param name="feedBackObjects">the objects to add</param>
         public void AddTransparent(IEnumerable<IGeoObject> feedBackObjects)
         {
             paintAsTransparent.AddRange(feedBackObjects);
@@ -294,6 +340,11 @@ namespace CADability.Actions
                 OnFeedBackChanged(feedBackObject as IFeedBack);
             }
         }
+        /// <summary>
+        /// Removes a previously added object from the list of objects displayed semi-transparent. Does nothing if the
+        /// object is not in the list.
+        /// </summary>
+        /// <param name="feedBackObject">the object to remove</param>
         public void RemoveTransparent(IGeoObject feedBackObject)
         {
             if (paintAsTransparent.Contains(feedBackObject))
@@ -303,6 +354,9 @@ namespace CADability.Actions
                 OnFeedBackChanged(feedBackObject as IFeedBack);
             }
         }
+        /// <summary>
+        /// Removes all objects from the list of objects displayed semi-transparent.
+        /// </summary>
         public void ClearTransparent()
         {
             for (int i = 0; i < paintAsTransparent.Count; ++i)

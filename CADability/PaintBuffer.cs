@@ -20,6 +20,11 @@ namespace CADability
 
     public class PaintBuffer
     {
+        /// <summary>
+        /// The layers of the display of a view, which are painted on top of each other and can be invalidated separately: Background
+        /// (background color and grid), Drawing (the model), Select (the marks of the selected objects), Active (the feedback of the
+        /// running action) and All (all of them). Used with <see cref="IView.Invalidate"/> and <see cref="IView.SetPaintHandler"/>.
+        /// </summary>
         public enum DrawingAspect { Background, Drawing, Select, Active, All }
         //public delegate void Repaint(Rectangle Extent,PaintToGDIDeprecated PaintToDrawing); 
         //public event Repaint RepaintBackgroundEvent;

@@ -11,9 +11,24 @@ namespace CADability.GeoObject
 	/// </summary>
 	public interface ISphere : ISurfaceWithRadius
 	{
+		/// <summary>
+		/// The center of the sphere. Setting it moves the sphere to the new center; the surface is changed in place and no change events
+		/// are raised, the owning face has to be updated by the caller.
+		/// </summary>
 		GeoPoint Center { get; set; }
+		/// <summary>
+		/// True when the normal of the surface points away from the center, i.e. the solid is inside the sphere; false when it points
+		/// towards the center (a spherical cavity).
+		/// </summary>
 		bool OutwardOriented { get; }
 	}
+	/// <summary>
+	/// A spherical surface which implements <see cref="ISurface"/>. It represents a sphere (or, when the three axes have different
+	/// lengths, an ellipsoid) defined by its center and three axis vectors. The u parameter is the longitude: the angle around
+	/// <see cref="ZAxis"/>, 0 at <see cref="XAxis"/>, in [0, 2π]; the v parameter is the latitude: the angle from the equator towards
+	/// <see cref="ZAxis"/>, in [-π/2, π/2]. The poles at v = ±π/2 are singularities of the parameter system.
+	/// <see cref="SphericalSurfaceNP"/> describes the same geometry with a non-periodic parameter system.
+	/// </summary>
 	[Serializable()]
 	public class SphericalSurface : ISurfaceImpl, ISerializable, IDeserializationCallback, IExportStep, ISphere
 	{
@@ -22,6 +37,16 @@ namespace CADability.GeoObject
 		// u ist im Intervall 0 .. 2*pi, v: -pi/2 .. pi/2
 		private ModOp toSphere; // diese ModOp modifiziert die Einheitskugel in die konkrete Kugel
 		private ModOp toUnit; // die inverse ModOp zum schnelleren Rechnen
+		/// <summary>
+		/// Creates a spherical surface with the given center and axes. The lengths of the directions are the radii; for a real sphere
+		/// all three must have the same length. The point at (u, v) is
+		/// location + cos(v)*(cos(u)*directionx + sin(u)*directiony) + sin(v)*directionz. When the directions form a left handed system,
+		/// the normal points inward (see <see cref="OutwardOriented"/>).
+		/// </summary>
+		/// <param name="location">The center</param>
+		/// <param name="directionx">The direction and radius where u = 0 and v = 0</param>
+		/// <param name="directiony">The direction and radius where u = π/2 and v = 0</param>
+		/// <param name="directionz">The direction and radius of the pole (v = π/2)</param>
 		public SphericalSurface(GeoPoint location, GeoVector directionx, GeoVector directiony, GeoVector directionz)
 		{
 			ModOp m1 = ModOp.Fit(new GeoVector[] { GeoVector.XAxis, GeoVector.YAxis, GeoVector.ZAxis },
@@ -35,6 +60,9 @@ namespace CADability.GeoObject
 			this.toSphere = toSphere;
 			toUnit = toSphere.GetInverse();
 		}
+		/// <summary>
+		/// The length of <see cref="XAxis"/>: the radius in x direction. For a real sphere (<see cref="IsRealSphere"/>) all three radii are equal.
+		/// </summary>
 		public double RadiusX
 		{
 			get
@@ -42,6 +70,9 @@ namespace CADability.GeoObject
 				return (toSphere * GeoVector.XAxis).Length;
 			}
 		}
+		/// <summary>
+		/// The length of <see cref="YAxis"/>: the radius in y direction. For a real sphere (<see cref="IsRealSphere"/>) all three radii are equal.
+		/// </summary>
 		public double RadiusY
 		{
 			get
@@ -49,6 +80,9 @@ namespace CADability.GeoObject
 				return (toSphere * GeoVector.YAxis).Length;
 			}
 		}
+		/// <summary>
+		/// The length of <see cref="ZAxis"/>: the radius in z direction. For a real sphere (<see cref="IsRealSphere"/>) all three radii are equal.
+		/// </summary>
 		public double RadiusZ
 		{
 			get
@@ -56,6 +90,9 @@ namespace CADability.GeoObject
 				return (toSphere * GeoVector.ZAxis).Length;
 			}
 		}
+		/// <summary>
+		/// The center of the sphere. Read only; use <see cref="ISurface.Modify(ModOp)"/> or <see cref="ISphere.Center"/> to move the surface.
+		/// </summary>
 		public GeoPoint Location
 		{
 			get
@@ -63,6 +100,9 @@ namespace CADability.GeoObject
 				return toSphere * GeoPoint.Origin;
 			}
 		}
+		/// <summary>
+		/// The vector from the center to the pole (v = π/2), identical to <see cref="ZAxis"/>.
+		/// </summary>
 		public GeoVector Axis
 		{
 			get
@@ -70,6 +110,9 @@ namespace CADability.GeoObject
 				return toSphere * GeoVector.ZAxis;
 			}
 		}
+		/// <summary>
+		/// The vector from the center to the surface point with u = 0 and v = 0. Its length is <see cref="RadiusX"/>.
+		/// </summary>
 		public GeoVector XAxis
 		{
 			get
@@ -77,6 +120,9 @@ namespace CADability.GeoObject
 				return toSphere * GeoVector.XAxis;
 			}
 		}
+		/// <summary>
+		/// The vector from the center to the surface point with u = π/2 and v = 0. Its length is <see cref="RadiusY"/>.
+		/// </summary>
 		public GeoVector YAxis
 		{
 			get
@@ -84,6 +130,9 @@ namespace CADability.GeoObject
 				return toSphere * GeoVector.YAxis;
 			}
 		}
+		/// <summary>
+		/// The vector from the center to the pole (v = π/2). Its length is <see cref="RadiusZ"/>.
+		/// </summary>
 		public GeoVector ZAxis
 		{
 			get
@@ -159,6 +208,7 @@ namespace CADability.GeoObject
 		{
 			return toSphere * new GeoVector(-Math.Cos(uv.x) * Math.Sin(uv.y), -Math.Sin(uv.x) * Math.Sin(uv.y), Math.Cos(uv.y));
 		}
+		/// <inheritdoc/>
 		public override void Derivation2At(GeoPoint2D uv, out GeoPoint location, out GeoVector du, out GeoVector dv, out GeoVector duu, out GeoVector dvv, out GeoVector duv)
 		{
 			location = PointAt(uv);
@@ -168,6 +218,7 @@ namespace CADability.GeoObject
 			duv = toSphere * new GeoVector(Math.Sin(uv.x) * Math.Sin(uv.y), -Math.Cos(uv.x) * Math.Sin(uv.y), 0.0);
 			dvv = toSphere * new GeoVector(-Math.Cos(uv.x) * Math.Cos(uv.y), -Math.Sin(uv.x) * Math.Cos(uv.y), -Math.Sin(uv.y));
 		}
+		/// <inheritdoc/>
 		public override bool IsUPeriodic
 		{
 			get
@@ -175,6 +226,7 @@ namespace CADability.GeoObject
 				return true;
 			}
 		}
+		/// <inheritdoc/>
 		public override bool IsVPeriodic
 		{
 			get
@@ -182,6 +234,7 @@ namespace CADability.GeoObject
 				return true;
 			}
 		}
+		/// <inheritdoc/>
 		public override double UPeriod
 		{
 			get
@@ -189,6 +242,7 @@ namespace CADability.GeoObject
 				return 2.0 * Math.PI;
 			}
 		}
+		/// <inheritdoc/>
 		public override double VPeriod
 		{
 			get
@@ -446,6 +500,7 @@ namespace CADability.GeoObject
 				this.toUnit = cc.toUnit;
 			}
 		}
+		/// <inheritdoc/>
 		public override bool Oriented
 		{
 			get
@@ -642,6 +697,7 @@ namespace CADability.GeoObject
 			// sonst die allgemeine Überprüfung
 			return base.SameGeometry(thisBounds, other, otherBounds, precision, out firstToSecond);
 		}
+		/// <inheritdoc/>
 		public override double MaxDist(GeoPoint2D sp, GeoPoint2D ep, out GeoPoint2D mp)
 		{
 			mp = new GeoPoint2D(sp, ep);
@@ -649,19 +705,23 @@ namespace CADability.GeoObject
 			// ansonsten wäre ja auch nicht klar, welche 2d-Linie gemeint ist
 			return Geometry.DistPL(PointAt(mp), PointAt(sp), PointAt(ep));
 		}
+		/// <inheritdoc/>
 		public override double[] GetUSingularities()
 		{
 			return new double[] { };
 		}
+		/// <inheritdoc/>
 		public override double[] GetVSingularities()
 		{
 			return new double[] { -Math.PI / 2.0, Math.PI / 2.0 };
 		}
+		/// <inheritdoc/>
 		public override bool IsRotated(Axis rotationAxis)
 		{
 			return Precision.IsPointOnLine(toSphere * GeoPoint.Origin, rotationAxis.Location, rotationAxis.Location + this.RadiusX * rotationAxis.Direction);
 		}
 
+		/// <inheritdoc/>
 		public override void Intersect(ICurve curve, BoundingRect uvExtent, out GeoPoint[] ips, out GeoPoint2D[] uvOnFaces, out double[] uOnCurve3Ds)
 		{
 			ips = null;
@@ -689,6 +749,7 @@ namespace CADability.GeoObject
 			}
 			else base.Intersect(curve, uvExtent, out ips, out uvOnFaces, out uOnCurve3Ds);
 		}
+		/// <inheritdoc/>
 		public override ICurve Intersect(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, GeoPoint seed)
 		{
 			ICurve[] cvs = Intersect(thisBounds, other, otherBounds);
@@ -698,6 +759,7 @@ namespace CADability.GeoObject
 			}
 			return null;
 		}
+		/// <inheritdoc/>
 		public override ICurve[] Intersect(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds)
 		{
 			GetExtremePositions(thisBounds, other, otherBounds, out List<Tuple<double, double, double, double>> extremePositions);
@@ -713,6 +775,7 @@ namespace CADability.GeoObject
 			}
 			return BoxedSurfaceEx.Intersect(thisBounds, other, otherBounds, null, extremePositions); // allgemeine Lösung
 		}
+		/// <inheritdoc/>
 		public override IDualSurfaceCurve[] GetDualSurfaceCurves(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, List<GeoPoint> seeds, List<Tuple<double, double, double, double>> extremePositions)
 		{   // hier sollten die Schnitte mit Ebene, Cylinder, Kegel und Kugel gelöst werden
 			// mit höheren Flächen sollte bei diesen (also z.B. Torus) implementiert werden
@@ -994,6 +1057,7 @@ namespace CADability.GeoObject
 			SurfaceHelper.AdjustPeriodic(surface, bounds, ref uv);
 			return bounds.Contains(uv);
 		}
+		/// <inheritdoc/>
 		public override GeoPoint2D[] PerpendicularFoot(GeoPoint fromHere)
 		{
 			GeoVector dir = toUnit * (Location - fromHere);
@@ -1003,6 +1067,7 @@ namespace CADability.GeoObject
 			ip[1] = PositionOfUnit(GeoPoint.Origin - dir);
 			return ip;
 		}
+		/// <inheritdoc/>
 		public override ICurve2D GetProjectedCurve(ICurve curve, double precision)
 		{
 			if (curve is Ellipse elli)
@@ -1106,6 +1171,7 @@ namespace CADability.GeoObject
 			}
 			return base.GetProjectedCurve(curve, precision);
 		}
+		/// <inheritdoc/>
 		public override ISurface GetOffsetSurface(double offset)
 		{
 			if (Math.Abs(RadiusX - RadiusY) < Precision.eps && Math.Abs(RadiusY - RadiusZ) < Precision.eps)
@@ -1139,6 +1205,7 @@ namespace CADability.GeoObject
 			else return base.GetOffsetSurface(offset);
 
 		}
+		/// <inheritdoc/>
 		public override int GetExtremePositions(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, out List<Tuple<double, double, double, double>> extremePositions)
 		{
 			switch (other)
@@ -1215,6 +1282,11 @@ namespace CADability.GeoObject
 		}
 		#endregion
 		#region ISerializable Members
+		/// <summary>
+		/// Constructor for the legacy binary deserialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+		/// </summary>
+		/// <param name="info">The serialized data</param>
+		/// <param name="context">The source of the deserialization</param>
 		protected SphericalSurface(SerializationInfo info, StreamingContext context)
 		{
 			toSphere = (ModOp)info.GetValue("ToSphere", typeof(ModOp));
@@ -1231,6 +1303,7 @@ namespace CADability.GeoObject
 			toUnit = toSphere.GetInverse();
 		}
 		#endregion
+		/// <inheritdoc/>
 		public override IPropertyEntry GetPropertyEntry(IFrame frame)
 		{
 			List<IPropertyEntry> se = new List<IPropertyEntry>();
@@ -1245,6 +1318,10 @@ namespace CADability.GeoObject
 			se.Add(radius);
 			return new GroupProperty("SphericalSurface", se.ToArray());
 		}
+		/// <summary>
+		/// True when the three radii are equal (within <see cref="Precision.eps"/>), i.e. the surface is a sphere and not an ellipsoid.
+		/// Many exact computations (common axis, intersections with circles, setting the radius) are only available for real spheres.
+		/// </summary>
 		public bool IsRealSphere
 		{
 			get
@@ -1256,6 +1333,10 @@ namespace CADability.GeoObject
 
 			}
 		}
+		/// <summary>
+		/// True when the normal of the surface points away from the center (<see cref="XAxis"/>, <see cref="YAxis"/> and <see cref="ZAxis"/>
+		/// form a right handed system), false when it points towards the center, as it does for the surface of a spherical cavity.
+		/// </summary>
 		public bool OutwardOriented => toSphere.Determinant > 0;
 
 		GeoPoint ISphere.Center { get => Location; set => this.Modify(ModOp.Translate(value - Location)); }

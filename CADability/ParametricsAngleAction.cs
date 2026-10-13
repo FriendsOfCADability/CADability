@@ -106,10 +106,12 @@ namespace CADability.Actions
             }
             return (Axis.InvalidAxis, GeoVector.NullVector, GeoVector.NullVector);
         }
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "MenuId.Parametrics.Angle";
         }
+        /// <inheritdoc/>
         public override void OnSetAction()
         {
             base.TitleId = "Constr.Parametrics.Angle";
@@ -369,10 +371,12 @@ namespace CADability.Actions
         {
             parametricsName = val;
         }
+        /// <inheritdoc/>
         public override void OnRemoveAction()
         {
             base.OnRemoveAction();
         }
+        /// <inheritdoc/>
         public override void OnDone()
         {
             if (Refresh() && ActiveObject!=null)

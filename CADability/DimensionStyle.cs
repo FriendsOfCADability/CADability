@@ -16,52 +16,126 @@ namespace CADability.Attribute
     public class DimensionStyle : PropertyEntryImpl, ISerializable, INamedAttribute, ICommandHandler
     {
         // die Einstellungen so aus CONDOR Version 4 übernommen:
+        /// <summary>
+        /// The dimension types a style may be used for, as a combination of bits; see <see cref="Types"/>. The bits are in the order of
+        /// <see cref="Dimension.EDimType"/>, so the bit for a type is <c>1 &lt;&lt; (int)dimType</c>: <c>DimPoints</c> distance between points,
+        /// <c>DimCoord</c> coordinate dimensioning, <c>DimAngle</c> angles, <c>DimRadius</c> radii, <c>DimDiameter</c> diameters,
+        /// <c>DimLocation</c> labelling a location, <c>DimAllTypes</c> all of them.
+        /// </summary>
         [Flags]
         public enum ETypeFlag { DimPoints = 0x1, DimCoord = 0x2, DimAngle = 0x4, DimRadius = 0x8, DimDiameter = 0x10, DimLocation = 0x20, DimAllTypes = 0x3F }; // gültig für diese Typen
         // ETypeFlag muss in der selben Reihenfolge sein wie Dimension.EDimType {DimPoints,DimCoord,DimAngle,DimRadius,DimDiameter};
+        /// <summary>
+        /// Settings for the dimension text as a combination of bits; see <see cref="TextFlags"/>. Each bit is also available as a boolean
+        /// property of the style (<see cref="DimensionStyle.DimTxtOutside"/>, <see cref="DimensionStyle.DimTxtRotate90"/>, ...). Some of the bits date from an older
+        /// system and are stored but not evaluated by the current <see cref="Dimension"/> layout; see the individual members.
+        /// </summary>
         public enum ETextFlag
         {
+            /// <summary>The dimension text should be asked for in a dialog when the dimension is created. Stored only, not evaluated.</summary>
             DimTxtDialog = 0x00000001, // Text soll über Dialog angefragt werden
+            /// <summary>The text is always placed outside, beyond the second extension line. See <see cref="DimensionStyle.DimTxtOutside"/>.</summary>
             DimTxtOutside = 0x00000002, // Text immer außerhalb 
+            /// <summary>The text is moved outside when it does not fit between the extension lines. See <see cref="DimensionStyle.DimTxtAutomatic"/>.</summary>
             DimTxtAutomatic = 0x00000004, // Text Lage automatisch bestimmen
+            /// <summary>The text is rotated by 90 degrees against the dimension line. See <see cref="DimensionStyle.DimTxtRotate90"/>.</summary>
             DimTxtRotate90 = 0x00000008, // Text um 90 Grad drehen
+            /// <summary>The text is rotated by 60 degrees against the dimension line. See <see cref="DimensionStyle.DimTxtRotate60"/>.</summary>
             DimTxtRotate60 = 0x00000010, // Text um 60 Grad drehen
+            /// <summary>The text is rotated by 90 degrees when it does not fit between the extension lines. See <see cref="DimensionStyle.DimTxtRotateAutomatic"/>.</summary>
             DimTxtRotateAutomatic = 0x00000020, // Text rotieren, wenn zu wenig Platz
+            /// <summary>The text size refers to paper coordinates rather than model coordinates. Stored only, not evaluated.</summary>
             DimTxtSizePaper = 0x00000040, // Text Größe bezieht sich auf Papierkoordinaten
+            /// <summary>A second (alternate) text in square brackets is shown, scaled by <see cref="ScaleAlt"/>. Stored only, not drawn by the current layout.</summary>
             DimTxtAlt = 0x00000080, // zweiter Text in []
+            /// <summary>A rectangle is drawn around the text. See <see cref="DimensionStyle.DimTxtRect"/>.</summary>
             DimTxtRect = 0x00000100, // Rechteck um den Text
+            /// <summary>Tolerances are shown as stacked plus/minus texts according to <see cref="PlusTolerance"/> and <see cref="MinusTolerance"/>. See <see cref="DimensionStyle.DimTxtTolerances"/>.</summary>
             DimTxtTolerances = 0x00000200, // Toleranzen ( +- gemäß PlusTolerance,MinusTolerance)
+            /// <summary>The value is shown as upper and lower limit computed from <see cref="PlusTolerance"/> and <see cref="MinusTolerance"/>. Stored only, not drawn by the current layout.</summary>
             DimTxtLimits = 0x00000400, // Grenzmaß ( +- gemäß PlusTolerance,MinusTolerance)
+            /// <summary>Text placed inside is always horizontal. See <see cref="DimensionStyle.DimTxtInsideHor"/>.</summary>
             DimTxtInsideHor = 0x00000800, // Text immer horizontal wenn innerhalb
+            /// <summary>Text placed outside is always horizontal. Stored and exchanged with DXF, not evaluated by the layout.</summary>
             DimTxtOutsideHor = 0x00001000, // Text immer horizontal wenn außerhalb
+            /// <summary>The value is written as a fraction; the largest denominator is given by <see cref="Round"/>. See <see cref="DimensionStyle.DimTxtFractional"/>.</summary>
             DimTxtFractional = 0x00002000, // Text mit Bruchdarstellung
+            /// <summary>The alternate text is written as a fraction. Stored only, not drawn by the current layout.</summary>
             DimTxtAltFractional = 0x00004000, // zweiter Text mit Bruchdarstellung
             // DimTxtAngle0			=0x00008000, // 3 Flags für Winkel: 0: Grad, dezimal, 1: Grad, Minuten, Sekunden
             // DimTxtAngle1			=0x00010000, // 2: Neugrad (dezimal), 3: Bogenmaß (dezimal)
+            /// <summary>German building construction format ("DIN Bau"): millimetres superscript, centimetres normal, metres separated by a point, so that 1.00 is one metre. Selectable in the property page, not implemented in the current layout.</summary>
             DimTxtDinBau = 0x00020000, // mm hochgestellt, cm normal, Meter mit "." 1.00 ist ein Meter
             // DimTxtAngle2			=0x00040000, // [Fortsetzug] 4: Bogenlänge
+            /// <summary>Decimal places are always written, padded with zeros up to the precision given by <see cref="Round"/>. See <see cref="DimensionStyle.DimForceTrailingZero"/>.</summary>
             DimForceTrailingZero = 0x00080000, // Dezimalstellen sollen immer angezeigt werden
         };
         // Flags für die Textbehandlung
+        /// <summary>
+        /// Settings for the dimensioning of points as a combination of bits; see <see cref="PointFlags"/>. <c>DimMultiLine</c> gives each
+        /// measured point its own dimension line (see <see cref="DimensionStyle.DimMultiLine"/>), <c>DimNoExtLine</c> suppresses the extension lines
+        /// (see <see cref="DimensionStyle.DimNoExtLine"/>). <c>DimMultiPoint</c> is kept from an older system and has no effect.
+        /// </summary>
         public enum EPointFlag { DimMultiPoint = 0x1, DimMultiLine = 0x2, DimNoExtLine = 0x4 }; // Flags für Punktbemaßung
         // DimMultiLine und DimMultiPoint findet in CONDOR 4 offensichtlich keine Beachtung
         // deshalb wird es hier so verwendet: wenn DimMultiLine true ist, wird die Koordinaten-
         // Bemaßung mit mehreren Maßlinien implementiert, wenn false nur mit einer
+        /// <summary>
+        /// Settings for angle dimensioning as a combination of bits; see <see cref="AngleFlags"/>. <c>DimAngleFourPoint</c>: the angle is
+        /// defined by two lines of two points each; <c>DimAngleBisection</c>: the half angle is dimensioned. Both are stored and shown in the
+        /// property page but not evaluated by the current <see cref="Dimension"/> layout.
+        /// </summary>
         public enum EAngleFlag { DimAngleFourPoint = 0x1, DimAngleBisection = 0x2 }; // Flags für Winkelbemaßung
+        /// <summary>
+        /// The way an angle value is written in the text of an angle dimension; see <see cref="AngleText"/>. <c>DegreeDecimal</c>: decimal
+        /// degrees, <c>DegreeMinuteSecond</c>: degrees, minutes and seconds, <c>Grade</c>: gradians (400 per full circle), <c>Radian</c>:
+        /// radians, <c>ArcLength</c>: the length of the arc instead of the angle.
+        /// </summary>
         public enum EAngleText { DegreeDecimal, DegreeMinuteSecond, Grade, Radian, ArcLength }; // Text für Winkelmaß, Grade ist Neugrad
+        /// <summary>
+        /// Settings for radius and diameter dimensioning as a combination of bits; see <see cref="RadiusFlags"/>. <c>DimRadiusBend</c>
+        /// makes the dimension line bend at the reference point and continue horizontally for the text (see <see cref="DimensionStyle.DimRadiusBend"/>).
+        /// </summary>
         public enum ERadiusFlag { DimRadiusBend = 0x1 }; // Flags für Radienbemaßung
+        /// <summary>
+        /// Settings for the symbols (arrows) as a combination of bits; see <see cref="SymbolFlags"/>. <c>DimSymbolSizePaper</c> means that
+        /// <see cref="SymbolSize"/> refers to paper coordinates; it is stored but not evaluated by the current layout.
+        /// </summary>
         public enum ESymbolFlag { DimSymbolSizePaper = 0x1 }; // Flags für Symbole
+        /// <summary>
+        /// Settings for the general appearance of the dimension line and the extension lines as a combination of bits; see
+        /// <see cref="GeoFlags"/>. Each bit is also available as a boolean property of the style: <see cref="DimensionStyle.DimNoExtLine1"/>,
+        /// <see cref="DimensionStyle.DimNoExtLine2"/>, <see cref="DimensionStyle.DimTextOutsideForceDimensionLine"/>, <see cref="DimensionStyle.DimNoOutsideSymbols"/>,
+        /// <see cref="DimensionStyle.DimBreakDimLine"/>, <see cref="DimensionStyle.DimFixedDimLine"/> and <see cref="DimensionStyle.DimNoDimLine"/>.
+        /// </summary>
         public enum EGeoFlag
         {
             DimNoExtLine1 = 0x1, DimNoExtLine2 = 0x2, DimTextOutsideForceDimensionLine = 0x4,
             DimNoOutsideSymbols = 0x8, DimBreakDimLine = 0x10, DimFixedDimLine = 0x20, DimNoDimLine = 0x40
         }; // Flags für das allgemeine Aussehen
+        /// <summary>
+        /// The symbol drawn at the ends of the dimension line; see <see cref="Symbol"/>. <c>DimOpenArrow</c>: two lines forming an
+        /// arrow head, <c>DimClosedArrow</c>: outlined arrow head, <c>DimFilledArrow</c>: solid arrow head (a <see cref="Hatch"/> with
+        /// <see cref="HatchStyleSolid"/>), <c>DimCircle</c> and <c>DimFilledCircle</c>: a circle with the diameter <see cref="SymbolSize"/>,
+        /// <c>DimSlash</c>: a short line crossing the dimension line at 45 degrees, <c>DimSymbol</c>: a user defined symbol, which is not
+        /// implemented and draws nothing.
+        /// </summary>
         public enum ESymbol
         {
             DimOpenArrow, DimClosedArrow, DimFilledArrow, DimCircle, DimFilledCircle,
             DimSlash, DimSymbol
         }; // Bemaßungssymbol (long)
+        /// <summary>
+        /// Where the symbols are placed; see <see cref="SymbolPlacement"/>. <c>DimInside</c>: between the extension lines pointing outward,
+        /// <c>DimOutside</c>: outside the extension lines pointing inward, <c>DimAutomatic</c>: inside when the distance between the
+        /// extension lines is more than twice the symbol width, outside otherwise.
+        /// </summary>
         public enum ESymbolPlacement { DimInside, DimOutside, DimAutomatic };
+        /// <summary>
+        /// Style of the text font; see <see cref="FontFlags"/> and the boolean properties <see cref="DimensionStyle.DimFontBold"/>, <see cref="DimensionStyle.DimFontItalic"/>,
+        /// <see cref="DimensionStyle.DimFontUnderline"/> and <see cref="DimensionStyle.DimFontStrikeOut"/>. The members are declared as consecutive values rather than
+        /// single bits, and the font style is not applied by the current <see cref="Dimension"/> layout, which only uses <see cref="TextFont"/>.
+        /// </summary>
         public enum EFontFlag { DimFontBold, DimFontItalic, DimFontUnderline, DimFontStrikeOut };
 
         private string name;
@@ -108,7 +182,20 @@ namespace CADability.Attribute
         private ColorDef fillColor; // Füllfarbe für Pfeile und Kreise
         private Layer fixedLayer; // wenn nicht NULL, dann alles in diese Ebene, z.Z. nicht benutzt
         private UserData userData; // UserData sollte auch für die anderen Stile implementiert werden, genutzt für DXF import-export
+        /// <summary>
+        /// Handler for <see cref="PropertyChangedEvent"/>.
+        /// </summary>
+        /// <param name="sender">The dimension style whose property changed</param>
+        /// <param name="propertyName">The name of the changed property, e.g. "TextSize"</param>
+        /// <param name="newValue">The new value of the property (boxed)</param>
+        /// <param name="oldValue">The value the property had before (boxed)</param>
         public delegate void PropertyChangedDelegate(DimensionStyle sender, string propertyName, object newValue, object oldValue);
+        /// <summary>
+        /// Raised by the setter of every property of the style except <see cref="Name"/>, after the value has been changed. The change is
+        /// also reported to the <see cref="DimensionStyleList"/> containing the style and from there to the project or the global settings.
+        /// Dimensions already drawn with this style are not recalculated automatically; call <see cref="Dimension.Recalc()"/> on them or use
+        /// the "update all dimensions" command of the list.
+        /// </summary>
         public event PropertyChangedDelegate PropertyChangedEvent;
 
         private HatchStyleSolid hatchStyleSolid; // nicht persistent, ein HatchStyle für gefüllte Pfeile
@@ -128,6 +215,11 @@ namespace CADability.Attribute
         {
             return null;
         }
+        /// <summary>
+        /// Creates a dimension style with no name and all settings unset (null strings, zero sizes, no colors). Since many settings
+        /// have no useful zero value, a new style is usually obtained by cloning an existing one (<see cref="Clone"/>), e.g. the
+        /// <see cref="DimensionStyleList.Current"/> style of the project's <see cref="Project.DimensionStyleList"/>.
+        /// </summary>
         public DimensionStyle()
         {
             // 
@@ -179,6 +271,13 @@ namespace CADability.Attribute
 
             return res;
         }
+        /// <summary>
+        /// Returns a copy of this dimension style with the same name and settings. The copy is not contained in any list, so it can be
+        /// renamed and added to a <see cref="DimensionStyleList"/>. The copy shares the color, line width and layer objects with the original.
+        /// <see cref="AngleText"/>, <see cref="UserData"/> and <see cref="HatchStyleSolid"/> are not copied: the copy starts with
+        /// <see cref="EAngleText.DegreeDecimal"/>, empty user data and a hatch style of its own.
+        /// </summary>
+        /// <returns>The copy</returns>
         public DimensionStyle Clone()
         {
             DimensionStyle res = new DimensionStyle();
@@ -325,6 +424,11 @@ namespace CADability.Attribute
             }
             if (PropertyChangedEvent != null) PropertyChangedEvent(this, propertyName, propertyNewValue, propertyOldValue);
         }
+        /// <summary>
+        /// The name of the style, which identifies it in its <see cref="DimensionStyleList"/> and in the property grid. When the style is
+        /// contained in a list, the name must be unique in that list: setting a name that another style of the list already has throws a
+        /// <see cref="NameAlreadyExistsException"/>, otherwise the list is re-keyed. Changing the name does not raise <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public string Name
         {
             get
@@ -342,6 +446,10 @@ namespace CADability.Attribute
                 if (parent != null) (parent as IAttributeList).NameChanged(this, OldName);
             }
         }
+        /// <summary>
+        /// Text written in front of the measured value, e.g. "R" or "Ø". A <see cref="Dimension"/> uses it unless it has a prefix of its own
+        /// (see <see cref="Dimension.GetPrefix(int)"/>). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public string TextPrefix
         {
             get
@@ -355,6 +463,10 @@ namespace CADability.Attribute
                 FireDidChange("TextPrefix", value, OldValue);
             }
         }
+        /// <summary>
+        /// Text appended after the measured value, e.g. a unit. A <see cref="Dimension"/> uses it unless it has a postfix of its own
+        /// (see <see cref="Dimension.GetPostfix(int)"/>). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public string TextPostfix
         {
             get
@@ -368,6 +480,11 @@ namespace CADability.Attribute
                 FireDidChange("TextPostfix", value, OldValue);
             }
         }
+        /// <summary>
+        /// Text appended after the alternate (second) value (see <see cref="DimTxtAlt"/>). A <see cref="Dimension"/> returns it from
+        /// <see cref="Dimension.GetPostfixAlt(int)"/> when it has no alternate postfix of its own, but the current layout does not draw the
+        /// alternate text. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public string TextPostfixAlt
         {
             get
@@ -381,6 +498,10 @@ namespace CADability.Attribute
                 FireDidChange("TextPostfixAlt", value, OldValue);
             }
         }
+        /// <summary>
+        /// The settings for point dimensioning as a combination of <see cref="EPointFlag"/> bits. The same bits are available as the
+        /// boolean properties <see cref="DimMultiLine"/> and <see cref="DimNoExtLine"/>. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public EPointFlag PointFlags
         {
             get
@@ -394,6 +515,10 @@ namespace CADability.Attribute
                 FireDidChange("PointFlags", value, OldValue);
             }
         }
+        /// <summary>
+        /// The settings for angle dimensioning as a combination of <see cref="EAngleFlag"/> bits, also available as
+        /// <see cref="DimAngleFourPoint"/> and <see cref="DimAngleBisection"/>. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public EAngleFlag AngleFlags
         {
             get
@@ -407,6 +532,10 @@ namespace CADability.Attribute
                 FireDidChange("AngleFlags", value, OldValue);
             }
         }
+        /// <summary>
+        /// The settings for radius and diameter dimensioning as a combination of <see cref="ERadiusFlag"/> bits, also available as
+        /// <see cref="DimRadiusBend"/>. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public ERadiusFlag RadiusFlags
         {
             get
@@ -420,6 +549,10 @@ namespace CADability.Attribute
                 FireDidChange("RadiusFlags", value, OldValue);
             }
         }
+        /// <summary>
+        /// The settings for the symbols as a combination of <see cref="ESymbolFlag"/> bits. Stored only, not evaluated by the current
+        /// layout. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public ESymbolFlag SymbolFlags
         {
             get
@@ -433,6 +566,10 @@ namespace CADability.Attribute
                 FireDidChange("SymbolFlags", value, OldValue);
             }
         }
+        /// <summary>
+        /// The settings for the dimension line and the extension lines as a combination of <see cref="EGeoFlag"/> bits. The same bits are
+        /// available as boolean properties (<see cref="DimNoDimLine"/>, <see cref="DimBreakDimLine"/>, ...). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public EGeoFlag GeoFlags
         {
             get
@@ -446,6 +583,11 @@ namespace CADability.Attribute
                 FireDidChange("GeoFlags", value, OldValue);
             }
         }
+        /// <summary>
+        /// The style of the text font as a combination of <see cref="EFontFlag"/> values, also available as <see cref="DimFontBold"/>,
+        /// <see cref="DimFontItalic"/>, <see cref="DimFontUnderline"/> and <see cref="DimFontStrikeOut"/>. The font style is not applied by
+        /// the current <see cref="Dimension"/> layout. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public EFontFlag FontFlags
         {
             get
@@ -459,6 +601,10 @@ namespace CADability.Attribute
                 FireDidChange("FontFlags", value, OldValue);
             }
         }
+        /// <summary>
+        /// The name of the font family used for the dimension texts, e.g. "Arial" (the default); corresponds to the DXF text style of a
+        /// dimension style. The property page offers the font families installed on the system. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public string TextFont
         {
             get
@@ -472,6 +618,10 @@ namespace CADability.Attribute
                 FireDidChange("TextFont", value, OldValue);
             }
         }
+        /// <summary>
+        /// The color of the dimension line, of the open and closed arrow symbols, of the text frame (<see cref="DimTxtRect"/>) and of the
+        /// pieces of dimension line drawn behind outside symbols. The default is the default color of the <see cref="ColorList"/>. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public ColorDef DimLineColor
         {
             get
@@ -485,6 +635,9 @@ namespace CADability.Attribute
                 FireDidChange("DimLineColor", value, OldValue);
             }
         }
+        /// <summary>
+        /// The line width of the dimension line and of the symbols. null means the default line width. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public LineWidth DimLineWidth
         {
             get
@@ -498,6 +651,9 @@ namespace CADability.Attribute
                 FireDidChange("DimLineWidth", value, OldValue);
             }
         }
+        /// <summary>
+        /// The color of the extension lines (the lines from the measured points to the dimension line). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public ColorDef ExtLineColor
         {
             get
@@ -511,6 +667,9 @@ namespace CADability.Attribute
                 FireDidChange("ExtLineColor", value, OldValue);
             }
         }
+        /// <summary>
+        /// The color of the dimension texts. null (the default) means no explicit color: the text takes the color from its parent. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public ColorDef FontColor
         {
             get
@@ -524,6 +683,9 @@ namespace CADability.Attribute
                 FireDidChange("FontColor", value, OldValue);
             }
         }
+        /// <summary>
+        /// The line width of the extension lines. null means the default line width. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public LineWidth ExtLineWidth
         {
             get
@@ -537,6 +699,10 @@ namespace CADability.Attribute
                 FireDidChange("ExtLineWidth", value, OldValue);
             }
         }
+        /// <summary>
+        /// The settings for the dimension text as a combination of <see cref="ETextFlag"/> bits. The same bits are available as boolean
+        /// properties (<see cref="DimTxtOutside"/>, <see cref="DimTxtRotate90"/>, <see cref="DimTxtTolerances"/>, ...). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public ETextFlag TextFlags
         {
             get
@@ -550,6 +716,13 @@ namespace CADability.Attribute
                 FireDidChange("TextFlags", value, OldValue);
             }
         }
+        /// <summary>
+        /// The dimension types this style may be used for, as a combination of <see cref="ETypeFlag"/> bits (bit <c>1 &lt;&lt; (int)dimType</c>
+        /// for a <see cref="Dimension.EDimType"/>). The same bits are available as <see cref="DimPoints"/>, <see cref="DimCoord"/>,
+        /// <see cref="DimAngle"/>, <see cref="DimRadius"/>, <see cref="DimDiameter"/> and <see cref="DimLocation"/>. The
+        /// <see cref="DimensionStyleSelectionProperty"/> only offers styles whose types include the type of the dimension being edited. The default
+        /// is <see cref="ETypeFlag.DimAllTypes"/>. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public ETypeFlag Types
         {
             get
@@ -563,6 +736,10 @@ namespace CADability.Attribute
                 FireDidChange("Types", value, OldValue);
             }
         }
+        /// <summary>
+        /// The length by which the dimension line of a point dimension is extended beyond the outermost extension lines, in model units
+        /// (DXF: DIMDLE). 0 means the dimension line ends at the extension lines. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public double DimLineExtension
         {
             get
@@ -576,6 +753,10 @@ namespace CADability.Attribute
                 FireDidChange("DimLineExtension", value, OldValue);
             }
         }
+        /// <summary>
+        /// The length by which an extension line runs past the dimension line, in model units (DXF: DIMEXE). With
+        /// <see cref="DimNoExtLine"/> set, only a short piece of this length on both sides of the dimension line is drawn (none when 0). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public double ExtLineExtension
         {
             get
@@ -589,6 +770,9 @@ namespace CADability.Attribute
                 FireDidChange("ExtLineExtension", value, OldValue);
             }
         }
+        /// <summary>
+        /// The gap between the measured point and the start of its extension line, in model units (DXF: DIMEXO). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public double ExtLineOffset
         {
             get
@@ -602,6 +786,10 @@ namespace CADability.Attribute
                 FireDidChange("ExtLineOffset", value, OldValue);
             }
         }
+        /// <summary>
+        /// The distance between successive dimension lines, in model units, when a dimension with several points is drawn with one
+        /// dimension line per point (<see cref="DimMultiLine"/>; DXF: DIMDLI). Multi line dimensioning needs a value greater than 0. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public double LineIncrement
         {
             get
@@ -615,6 +803,10 @@ namespace CADability.Attribute
                 FireDidChange("LineIncrement", value, OldValue);
             }
         }
+        /// <summary>
+        /// The symbol (arrow head, circle, slash) drawn at the ends of the dimension line; see <see cref="ESymbol"/>. The default is
+        /// <see cref="ESymbol.DimFilledArrow"/>. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public ESymbol Symbol
         {
             get
@@ -628,6 +820,10 @@ namespace CADability.Attribute
                 FireDidChange("Symbol", value, OldValue);
             }
         }
+        /// <summary>
+        /// The size of the symbols in model units: the width of an arrow head, the diameter of a circle, the extent of a slash along the dimension line (DXF: DIMASZ).
+        /// Like the text size it is multiplied by the layout factor of the view. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public double SymbolSize
         {
             get
@@ -641,6 +837,10 @@ namespace CADability.Attribute
                 FireDidChange("SymbolSize", value, OldValue);
             }
         }
+        /// <summary>
+        /// The factor by which a measured length, radius or diameter is multiplied before it is formatted as text (DXF: DIMLFAC), e.g. to
+        /// dimension in a unit other than the model unit. The default is 1. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public double Scale
         {
             get
@@ -654,6 +854,13 @@ namespace CADability.Attribute
                 FireDidChange("Scale", value, OldValue);
             }
         }
+        /// <summary>
+        /// The precision of the dimension text (DXF: DIMRND). 0 means full precision. A value between 0 and 1 (1.0, 0.5, 0.25, 0.1, 0.05,
+        /// 0.025, 0.01, 0.001, ...) rounds the value to a multiple of it and shows as many decimals as the value needs (all of them with
+        /// <see cref="DimForceTrailingZero"/>). A value greater than 1 (2, 4, 8, 16, 32, 64) writes the value as a fraction with this largest
+        /// denominator (see <see cref="DimTxtFractional"/>). -1 selects the "DIN Bau" entry of the property page (see <see cref="DimTxtDinBau"/>).
+        /// The default is 0.001. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public double Round
         {
             get
@@ -667,6 +874,10 @@ namespace CADability.Attribute
                 FireDidChange("Round", value, OldValue);
             }
         }
+        /// <summary>
+        /// The precision of the alternate (second) text, with the same meaning as <see cref="Round"/> (DXF: DIMALTD). Stored and taken
+        /// from DXF, but the current layout does not draw the alternate text. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public double RoundAlt
         {
             get
@@ -680,6 +891,10 @@ namespace CADability.Attribute
                 FireDidChange("RoundAlt", value, OldValue);
             }
         }
+        /// <summary>
+        /// The height of the dimension text in model units (DXF: DIMTXT), multiplied by the layout factor of the view. It is also the
+        /// unit of <see cref="TextDist"/>. The default is 5. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public double TextSize
         {
             get
@@ -693,6 +908,10 @@ namespace CADability.Attribute
                 FireDidChange("TextSize", value, OldValue);
             }
         }
+        /// <summary>
+        /// The height of the tolerance texts (<see cref="DimTxtTolerances"/>) in model units, usually smaller than <see cref="TextSize"/>.
+        /// The default is 3. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public double TextSizeTol
         {
             get
@@ -706,6 +925,10 @@ namespace CADability.Attribute
                 FireDidChange("TextSizeTol", value, OldValue);
             }
         }
+        /// <summary>
+        /// The distance of the text from the dimension line as a multiple of <see cref="TextSize"/>: 0 centers the text on the dimension
+        /// line, 1 places it one text height above it (for angle dimensions: outward from the arc). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public double TextDist
         {
             get
@@ -719,6 +942,10 @@ namespace CADability.Attribute
                 FireDidChange("TextDist", value, OldValue);
             }
         }
+        /// <summary>
+        /// The upper tolerance shown after the value when <see cref="DimTxtTolerances"/> is set, in the unit of the dimension text. It is
+        /// written with its sign, a positive value gets a leading "+". Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public double PlusTolerance
         {
             get
@@ -732,6 +959,10 @@ namespace CADability.Attribute
                 FireDidChange("PlusTolerance", value, OldValue);
             }
         }
+        /// <summary>
+        /// The lower tolerance shown after the value when <see cref="DimTxtTolerances"/> is set, in the unit of the dimension text. It is
+        /// written with its sign, so a lower tolerance is given as a negative number, e.g. -0.05. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public double MinusTolerance
         {
             get
@@ -745,6 +976,10 @@ namespace CADability.Attribute
                 FireDidChange("MinusTolerance", value, OldValue);
             }
         }
+        /// <summary>
+        /// The size of the center mark of a radius or diameter dimension in model units (DXF: DIMCEN). Stored and exchanged with DXF, but
+        /// the current layout does not draw a center mark. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public double CenterMarkSize
         {
             get
@@ -758,6 +993,10 @@ namespace CADability.Attribute
                 FireDidChange("CenterMarkSize", value, OldValue);
             }
         }
+        /// <summary>
+        /// The factor applied to the measured value for the alternate (second) text (DXF: DIMALTF), e.g. 25.4 to show inches in
+        /// brackets behind millimetres. Stored and taken from DXF, but the current layout does not draw the alternate text. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public double ScaleAlt
         {
             get
@@ -771,6 +1010,10 @@ namespace CADability.Attribute
                 FireDidChange("ScaleAlt", value, OldValue);
             }
         }
+        /// <summary>
+        /// The margin around the text, in model units, that is kept free of the dimension line when it is broken at the text
+        /// (<see cref="DimBreakDimLine"/>) and that the text frame (<see cref="DimTxtRect"/>) is drawn with (DXF: DIMGAP). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public double DimensionLineGap
         {
             get
@@ -784,6 +1027,10 @@ namespace CADability.Attribute
                 FireDidChange("DimensionLineGap", value, OldValue);
             }
         }
+        /// <summary>
+        /// Whether the symbols are drawn inside or outside the extension lines, or chosen automatically depending on the available space;
+        /// see <see cref="ESymbolPlacement"/>. The default is <see cref="ESymbolPlacement.DimAutomatic"/>. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public ESymbolPlacement SymbolPlacement
         {
             get
@@ -797,6 +1044,10 @@ namespace CADability.Attribute
                 FireDidChange("SymbolPlacement", value, OldValue);
             }
         }
+        /// <summary>
+        /// The color of the solid symbols (filled arrow, filled circle), of the circle and of the slash symbol. The color of the filled
+        /// symbols is captured in <see cref="HatchStyleSolid"/> when that is first used. The default is <see cref="DimLineColor"/>. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public ColorDef FillColor
         {
             get
@@ -810,6 +1061,9 @@ namespace CADability.Attribute
                 FireDidChange("FillColor", value, OldValue);
             }
         }
+        /// <summary>
+        /// A layer onto which all parts of the dimension would be placed, null for no fixed layer. Currently not used by the layout. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public Layer FixedLayer
         {
             get
@@ -823,6 +1077,11 @@ namespace CADability.Attribute
                 FireDidChange("FixedLayer", value, OldValue);
             }
         }
+        /// <summary>
+        /// A solid hatch style with the <see cref="FillColor"/> of this style, used for the filled arrow heads and circles. It is created on
+        /// first access, named after the style with the suffix " [DimensionStyleFillSolid]", and is not persisted. It keeps the fill color
+        /// it was created with; a later change of <see cref="FillColor"/> does not update it.
+        /// </summary>
         public HatchStyleSolid HatchStyleSolid
         {
             get
@@ -836,6 +1095,10 @@ namespace CADability.Attribute
                 return hatchStyleSolid;
             }
         }
+        /// <summary>
+        /// Free user data attached to this style, e.g. by file import or by an application. It is created on first access and saved with
+        /// the style, but not copied by <see cref="Clone"/>.
+        /// </summary>
         public UserData UserData
         {
             get
@@ -895,6 +1158,10 @@ namespace CADability.Attribute
         }
         #endregion
         #region Flags als boolen properties
+        /// <summary>
+        /// No extension lines are drawn from the measured points to the dimension line; only a short piece of <see cref="ExtLineExtension"/>
+        /// length across the dimension line remains when that is not 0 (<see cref="EPointFlag.DimNoExtLine"/>). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimNoExtLine
         {
             get
@@ -909,6 +1176,12 @@ namespace CADability.Attribute
                 FireDidChange("DimNoExtLine", value, OldValue);
             }
         }
+        /// <summary>
+        /// A point or coordinate dimension with more than two points is drawn with one dimension line per point: the first point is the
+        /// reference, every further point gets its own dimension line at a distance of <see cref="LineIncrement"/> from the previous one
+        /// (needs <see cref="LineIncrement"/> greater than 0). When false, the points are dimensioned in a single chain on one dimension
+        /// line (<see cref="EPointFlag.DimMultiLine"/>). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimMultiLine
         {
             get
@@ -923,6 +1196,10 @@ namespace CADability.Attribute
                 FireDidChange("DimMultiLine", value, OldValue);
             }
         }
+        /// <summary>
+        /// The first extension line is suppressed (<see cref="EGeoFlag.DimNoExtLine1"/>, DXF: DIMSE1). Stored and exchanged with DXF, not
+        /// evaluated by the current layout, which only knows <see cref="DimNoExtLine"/>. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimNoExtLine1
         {
             get
@@ -937,6 +1214,10 @@ namespace CADability.Attribute
                 FireDidChange("DimNoExtLine1", value, OldValue);
             }
         }
+        /// <summary>
+        /// The second extension line is suppressed (<see cref="EGeoFlag.DimNoExtLine2"/>, DXF: DIMSE2). Stored and exchanged with DXF, not
+        /// evaluated by the current layout, which only knows <see cref="DimNoExtLine"/>. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimNoExtLine2
         {
             get
@@ -951,6 +1232,10 @@ namespace CADability.Attribute
                 FireDidChange("DimNoExtLine2", value, OldValue);
             }
         }
+        /// <summary>
+        /// When the text is placed outside the extension lines, the dimension line is extended until it reaches the text
+        /// (<see cref="EGeoFlag.DimTextOutsideForceDimensionLine"/>). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimTextOutsideForceDimensionLine
         {
             get
@@ -965,6 +1250,10 @@ namespace CADability.Attribute
                 FireDidChange("DimTextOutsideForceDimensionLine", value, OldValue);
             }
         }
+        /// <summary>
+        /// No symbols are drawn when they are placed outside the extension lines (<see cref="EGeoFlag.DimNoOutsideSymbols"/>). Stored only,
+        /// not evaluated by the current layout. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimNoOutsideSymbols
         {
             get
@@ -979,6 +1268,10 @@ namespace CADability.Attribute
                 FireDidChange("DimNoOutsideSymbols", value, OldValue);
             }
         }
+        /// <summary>
+        /// The dimension line is interrupted where it crosses the text, leaving a margin of <see cref="DimensionLineGap"/> around it; it
+        /// stays continuous when the text is rotated (<see cref="EGeoFlag.DimBreakDimLine"/>). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimBreakDimLine
         {
             get
@@ -993,6 +1286,9 @@ namespace CADability.Attribute
                 FireDidChange("DimBreakDimLine ", value, OldValue);
             }
         }
+        /// <summary>
+        /// The dimension line keeps a fixed position (<see cref="EGeoFlag.DimFixedDimLine"/>). Stored only, not evaluated by the current layout. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimFixedDimLine
         {
             get
@@ -1007,6 +1303,9 @@ namespace CADability.Attribute
                 FireDidChange("DimFixedDimLine", value, OldValue);
             }
         }
+        /// <summary>
+        /// No dimension line is drawn at all, only the extension lines, the symbols and the text (<see cref="EGeoFlag.DimNoDimLine"/>). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimNoDimLine
         {
             get
@@ -1022,6 +1321,10 @@ namespace CADability.Attribute
             }
         }
 
+        /// <summary>
+        /// The dimension text should be asked for in a dialog when the dimension is created (<see cref="ETextFlag.DimTxtDialog"/>). Stored
+        /// only, not evaluated. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimTxtDialog
         {
             get
@@ -1036,6 +1339,10 @@ namespace CADability.Attribute
                 FireDidChange("DimTxtDialog", value, OldValue);
             }
         }
+        /// <summary>
+        /// The text is always placed outside, to the right of the second extension line, instead of between the extension lines
+        /// (<see cref="ETextFlag.DimTxtOutside"/>). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimTxtOutside
         {
             get
@@ -1050,6 +1357,10 @@ namespace CADability.Attribute
                 FireDidChange("DimTxtOutside", value, OldValue);
             }
         }
+        /// <summary>
+        /// A dimension of two points moves its text outside when it is wider than the distance between the extension lines
+        /// (<see cref="ETextFlag.DimTxtAutomatic"/>). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimTxtAutomatic
         {
             get
@@ -1064,6 +1375,11 @@ namespace CADability.Attribute
                 FireDidChange("DimTxtAutomatic", value, OldValue);
             }
         }
+        /// <summary>
+        /// The text is rotated by 90 degrees against the dimension line (<see cref="ETextFlag.DimTxtRotate90"/>). The three rotation
+        /// settings <see cref="DimTxtRotate90"/>, <see cref="DimTxtRotate60"/> and <see cref="DimTxtRotateAutomatic"/> exclude each other:
+        /// setting one of them to true clears the other two. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimTxtRotate90
         {
             get
@@ -1089,6 +1405,10 @@ namespace CADability.Attribute
                 }
             }
         }
+        /// <summary>
+        /// The text is rotated by 60 degrees against the dimension line (<see cref="ETextFlag.DimTxtRotate60"/>). Setting it to true clears
+        /// <see cref="DimTxtRotate90"/> and <see cref="DimTxtRotateAutomatic"/>. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimTxtRotate60
         {
             get
@@ -1113,6 +1433,11 @@ namespace CADability.Attribute
                 }
             }
         }
+        /// <summary>
+        /// The text is rotated by 90 degrees when it is wider than the distance between the extension lines, otherwise it stays parallel
+        /// to the dimension line (<see cref="ETextFlag.DimTxtRotateAutomatic"/>). Setting it to true clears <see cref="DimTxtRotate90"/> and
+        /// <see cref="DimTxtRotate60"/>. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimTxtRotateAutomatic
         {
             get
@@ -1137,6 +1462,10 @@ namespace CADability.Attribute
                 }
             }
         }
+        /// <summary>
+        /// The text size refers to paper coordinates rather than model coordinates (<see cref="ETextFlag.DimTxtSizePaper"/>). Stored only,
+        /// not evaluated by the current layout. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimTxtSizePaper
         {
             get
@@ -1151,6 +1480,11 @@ namespace CADability.Attribute
                 FireDidChange("DimTxtSizePaper", value, OldValue);
             }
         }
+        /// <summary>
+        /// A second (alternate) value, scaled by <see cref="ScaleAlt"/>, rounded by <see cref="RoundAlt"/> and followed by
+        /// <see cref="TextPostfixAlt"/>, is shown in square brackets (<see cref="ETextFlag.DimTxtAlt"/>). Stored only, the current layout
+        /// does not draw the alternate text. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimTxtAlt
         {
             get
@@ -1165,6 +1499,10 @@ namespace CADability.Attribute
                 FireDidChange("DimTxtAlt", value, OldValue);
             }
         }
+        /// <summary>
+        /// A rectangle is drawn around the text of a point dimension, with a margin of <see cref="DimensionLineGap"/>
+        /// (<see cref="ETextFlag.DimTxtRect"/>). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimTxtRect
         {
             get
@@ -1179,6 +1517,11 @@ namespace CADability.Attribute
                 FireDidChange("DimTxtRect", value, OldValue);
             }
         }
+        /// <summary>
+        /// <see cref="PlusTolerance"/> and <see cref="MinusTolerance"/> are shown stacked after the value in the size
+        /// <see cref="TextSizeTol"/> (<see cref="ETextFlag.DimTxtTolerances"/>). A <see cref="Dimension"/> with tolerance texts of its own
+        /// shows those regardless of this setting. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimTxtTolerances
         {
             get
@@ -1193,6 +1536,11 @@ namespace CADability.Attribute
                 FireDidChange("DimTxtTolerances", value, OldValue);
             }
         }
+        /// <summary>
+        /// The value is shown as upper and lower limit computed from the tolerances instead of value plus tolerances
+        /// (<see cref="ETextFlag.DimTxtLimits"/>). The property page offers it as alternative to <see cref="DimTxtTolerances"/>; it is
+        /// stored only, the current layout does not draw limits. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimTxtLimits
         {
             get
@@ -1207,6 +1555,10 @@ namespace CADability.Attribute
                 FireDidChange("DimTxtLimits", value, OldValue);
             }
         }
+        /// <summary>
+        /// The text of an angle dimension stays horizontal instead of following the direction of the dimension arc
+        /// (<see cref="ETextFlag.DimTxtInsideHor"/>, DXF: DIMTIH). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimTxtInsideHor
         {
             get
@@ -1221,6 +1573,10 @@ namespace CADability.Attribute
                 FireDidChange("DimTxtInsideHor", value, OldValue);
             }
         }
+        /// <summary>
+        /// Text placed outside the extension lines stays horizontal (<see cref="ETextFlag.DimTxtOutsideHor"/>, DXF: DIMTOH). Stored and
+        /// exchanged with DXF, not evaluated by the current layout. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimTxtOutsideHor
         {
             get
@@ -1236,6 +1592,10 @@ namespace CADability.Attribute
             }
         }
 
+        /// <summary>
+        /// Decimal places are always written, padded with zeros up to the precision given by <see cref="Round"/>, e.g. "12.50" instead of
+        /// "12.5" with a precision of 0.01 (<see cref="ETextFlag.DimForceTrailingZero"/>). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimForceTrailingZero
         {
             get
@@ -1250,6 +1610,11 @@ namespace CADability.Attribute
                 FireDidChange("DimForceTrailingZero", value, OldValue);
             }
         }
+        /// <summary>
+        /// The value is written as a fraction, e.g. "3 1/8" (<see cref="ETextFlag.DimTxtFractional"/>). The formatting itself is controlled
+        /// by <see cref="Round"/>: a value greater than 1 (2, 4, 8, 16, 32, 64) is the largest denominator. The property page sets this
+        /// flag together with such a precision. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimTxtFractional
         {
             get
@@ -1264,6 +1629,10 @@ namespace CADability.Attribute
                 FireDidChange("DimTxtFractional", value, OldValue);
             }
         }
+        /// <summary>
+        /// The alternate (second) text is written as a fraction (<see cref="ETextFlag.DimTxtAltFractional"/>). Stored only, the current
+        /// layout does not draw the alternate text. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimTxtAltFractional
         {
             get
@@ -1278,6 +1647,11 @@ namespace CADability.Attribute
                 FireDidChange("DimTxtAltFractional", value, OldValue);
             }
         }
+        /// <summary>
+        /// The value is written in the German building construction format "DIN Bau": millimetres superscript, centimetres normal, metres
+        /// separated by a point (<see cref="ETextFlag.DimTxtDinBau"/>). The property page sets it together with <see cref="Round"/> = -1;
+        /// the format is not implemented in the current layout. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimTxtDinBau
         {
             get
@@ -1292,6 +1666,10 @@ namespace CADability.Attribute
                 FireDidChange("DimTxtDinBau", value, OldValue);
             }
         }
+        /// <summary>
+        /// The way the value of an angle dimension is written: decimal degrees, degrees/minutes/seconds, gradians, radians or the length of
+        /// the arc; see <see cref="EAngleText"/>. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public EAngleText AngleText
         {
             get
@@ -1305,6 +1683,10 @@ namespace CADability.Attribute
                 FireDidChange("AngleText", value, OldValue);
             }
         }
+        /// <summary>
+        /// The style may be used for dimensions of the distance between points (<see cref="Dimension.EDimType.DimPoints"/>,
+        /// <see cref="ETypeFlag.DimPoints"/>). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimPoints
         {
             get
@@ -1319,6 +1701,9 @@ namespace CADability.Attribute
                 FireDidChange("DimPoints", value, OldValue);
             }
         }
+        /// <summary>
+        /// The style may be used for coordinate dimensions (<see cref="Dimension.EDimType.DimCoord"/>, <see cref="ETypeFlag.DimCoord"/>). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimCoord
         {
             get
@@ -1333,6 +1718,9 @@ namespace CADability.Attribute
                 FireDidChange("DimCoord", value, OldValue);
             }
         }
+        /// <summary>
+        /// The style may be used for angle dimensions (<see cref="Dimension.EDimType.DimAngle"/>, <see cref="ETypeFlag.DimAngle"/>). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimAngle
         {
             get
@@ -1347,6 +1735,9 @@ namespace CADability.Attribute
                 FireDidChange("DimAngle", value, OldValue);
             }
         }
+        /// <summary>
+        /// The style may be used for radius dimensions (<see cref="Dimension.EDimType.DimRadius"/>, <see cref="ETypeFlag.DimRadius"/>). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimRadius
         {
             get
@@ -1361,6 +1752,9 @@ namespace CADability.Attribute
                 FireDidChange("DimRadius", value, OldValue);
             }
         }
+        /// <summary>
+        /// The style may be used for diameter dimensions (<see cref="Dimension.EDimType.DimDiameter"/>, <see cref="ETypeFlag.DimDiameter"/>). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimDiameter
         {
             get
@@ -1375,6 +1769,9 @@ namespace CADability.Attribute
                 FireDidChange("DimDiameter", value, OldValue);
             }
         }
+        /// <summary>
+        /// The style may be used for labelling a location (<see cref="Dimension.EDimType.DimLocation"/>, <see cref="ETypeFlag.DimLocation"/>). Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimLocation
         {
             get
@@ -1389,6 +1786,10 @@ namespace CADability.Attribute
                 FireDidChange("DimLocation", value, OldValue);
             }
         }
+        /// <summary>
+        /// The angle is defined by two lines of two points each (<see cref="EAngleFlag.DimAngleFourPoint"/>). Stored only, not evaluated
+        /// by the current layout. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimAngleFourPoint
         {
             get
@@ -1403,6 +1804,10 @@ namespace CADability.Attribute
                 FireDidChange("DimAngleFourPoint", value, OldValue);
             }
         }
+        /// <summary>
+        /// The half angle (bisector) is dimensioned (<see cref="EAngleFlag.DimAngleBisection"/>). Shown in the property page, but not
+        /// evaluated by the current layout. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimAngleBisection
         {
             get
@@ -1417,6 +1822,10 @@ namespace CADability.Attribute
                 FireDidChange("DimAngleBisection", value, OldValue);
             }
         }
+        /// <summary>
+        /// The dimension line of a radius or diameter dimension bends at the reference point and continues horizontally, and the text is
+        /// placed on that horizontal part (<see cref="ERadiusFlag.DimRadiusBend"/>). When false, the text sits on the straight dimension line. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimRadiusBend
         {
             get
@@ -1432,6 +1841,10 @@ namespace CADability.Attribute
             }
         }
 
+        /// <summary>
+        /// The dimension text is bold (<see cref="EFontFlag.DimFontBold"/>). The font style is not applied by the current layout; and since
+        /// <see cref="EFontFlag.DimFontBold"/> has the value 0, this property always reads false. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimFontBold
         {
             get
@@ -1446,6 +1859,10 @@ namespace CADability.Attribute
                 FireDidChange("DimFontBold", value, OldValue);
             }
         }
+        /// <summary>
+        /// The dimension text is italic (<see cref="EFontFlag.DimFontItalic"/>). Stored, but the font style is not applied by the current
+        /// layout. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimFontItalic
         {
             get
@@ -1460,6 +1877,10 @@ namespace CADability.Attribute
                 FireDidChange("DimFontItalic", value, OldValue);
             }
         }
+        /// <summary>
+        /// The dimension text is underlined (<see cref="EFontFlag.DimFontUnderline"/>). Stored, but the font style is not applied by the
+        /// current layout. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimFontUnderline
         {
             get
@@ -1474,6 +1895,10 @@ namespace CADability.Attribute
                 FireDidChange("DimFontUnderline", value, OldValue);
             }
         }
+        /// <summary>
+        /// The dimension text is struck out (<see cref="EFontFlag.DimFontStrikeOut"/>). Stored, but the font style is not applied by the
+        /// current layout; note that the value of <see cref="EFontFlag.DimFontStrikeOut"/> overlaps the italic and underline values. Setting it raises <see cref="PropertyChangedEvent"/>.
+        /// </summary>
         public bool DimFontStrikeOut
         {
             get
@@ -1494,6 +1919,7 @@ namespace CADability.Attribute
         private CheckProperty checkDimTxtRotate60;
         private CheckProperty checkDimTxtRotateAutomatic;
         private IPropertyEntry[] subEntries;
+        /// <inheritdoc/>
         public override PropertyEntryType Flags
         {
             get
@@ -1503,6 +1929,7 @@ namespace CADability.Attribute
                 return flags;
             }
         }
+        /// <inheritdoc/>
         public override string LabelText
         {
             get { return name; }
@@ -1675,10 +2102,12 @@ namespace CADability.Attribute
             checkDimTxtRotateAutomatic = null;
             base.Removed(propertyTreeView);
         }
+        /// <inheritdoc/>
         public override bool EditTextChanged(string newValue)
         {
             return true;
         }
+        /// <inheritdoc/>
         public override void EndEdit(bool aborted, bool modified, string newValue)
         {
             try

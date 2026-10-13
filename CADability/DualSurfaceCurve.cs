@@ -8,6 +8,12 @@ using System.Runtime.Serialization;
 namespace CADability
 {
 
+    /// <summary>
+    /// A curve which lies on two surfaces, typically the intersection curve of two surfaces: it provides the 3d curve
+    /// (<see cref="Curve3D"/>), the two surfaces and the 2d curve in the parameter space of each surface. Surfaces return such
+    /// curves from <see cref="ISurface.GetPlaneIntersection"/> and <see cref="ISurface.GetDualSurfaceCurves"/>; the boolean
+    /// operations use them to build the <see cref="Edge"/>s between the intersected faces.
+    /// </summary>
     public interface IDualSurfaceCurve
     {
         ICurve2D GetCurveOnSurface(ISurface onThisSurface);
@@ -21,6 +27,11 @@ namespace CADability
     }
 
 
+    /// <summary>
+    /// Default implementation of <see cref="IDualSurfaceCurve"/>, which simply holds a 3d curve, the two surfaces and the two 2d
+    /// curves; the surfaces create it when they compute their intersection with another surface or a plane. When the 3d curve is an
+    /// <see cref="InterpolatedDualSurfaceCurve"/>, the 2d curves are taken from it when the curve is split or the surfaces are swapped.
+    /// </summary>
     public class DualSurfaceCurve : IDualSurfaceCurve
     {
         ICurve curve3D;
@@ -751,6 +762,7 @@ namespace CADability
         {
             GetTriangulationBasis(out interpol, out _, out interparam);
         }
+        /// <inheritdoc/>
         protected override void GetTriangulationBasis(out GeoPoint2D[] points, out GeoVector2D[] directions, out double[] parameters)
         {
             double[] pars = curve3D.GetSavePositions();
@@ -951,6 +963,7 @@ namespace CADability
             //}
         }
 
+        /// <inheritdoc/>
         public override GeoVector2D DirectionAt(double Position)
         {
             GeoPoint2D loc;
@@ -958,6 +971,7 @@ namespace CADability
             PointDirAt(Position, out loc, out res);
             return res;
         }
+        /// <inheritdoc/>
         public override GeoPoint2D PointAt(double Position)
         {
             double par3d = Get3dParameter(Position);
@@ -972,6 +986,7 @@ namespace CADability
             }
             return res;
         }
+        /// <inheritdoc/>
         public override void Reverse()
         {
             double tmp = startParam;
@@ -979,10 +994,12 @@ namespace CADability
             endParam = tmp;
             base.ClearTriangulation();
         }
+        /// <inheritdoc/>
         public override ICurve2D Clone()
         {
             return new ProjectedCurve(curve3D, surface, startParam, endParam, periodicDomain);
         }
+        /// <inheritdoc/>
         public override void Copy(ICurve2D toCopyFrom)
         {
             ProjectedCurve pc = toCopyFrom as ProjectedCurve;
@@ -994,6 +1011,7 @@ namespace CADability
                 surface = pc.surface;
             }
         }
+        /// <inheritdoc/>
         public override ICurve2D Trim(double StartPos, double EndPos)
         {
             if (StartPos < EndPos)
@@ -1012,6 +1030,7 @@ namespace CADability
                 return new ProjectedCurve(c3d, surface, 0, 1, periodicDomain);
             }
         }
+        /// <inheritdoc/>
         public override ICurve2D[] Split(double Position)
         {
             double sp3d = Get3dParameter(Position);
@@ -1020,6 +1039,7 @@ namespace CADability
                 new ProjectedCurve(curve3D, surface, startParam, sp3d, periodicDomain),
                 new ProjectedCurve(curve3D, surface, sp3d, endParam, periodicDomain) };
         }
+        /// <inheritdoc/>
         public override void Move(double x, double y)
         {
             bool ok = true; // move the domain by the period
@@ -1051,6 +1071,7 @@ namespace CADability
             }
             else throw new ApplicationException("cannot move ProjectedCurve");
         }
+        /// <inheritdoc/>
         public override ICurve2D GetModified(ModOp2D m)
         {
             return base.GetModified(m);
@@ -1092,6 +1113,7 @@ namespace CADability
             info.AddValue("PeriodicDomain", periodicDomain);
         }
 
+        /// <inheritdoc/>
         public override bool TryPointDeriv2At(double position, out GeoPoint2D point, out GeoVector2D deriv, out GeoVector2D deriv2)
         {
             point = GeoPoint2D.Origin;

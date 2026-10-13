@@ -148,6 +148,14 @@ namespace CADability.Attribute
                 return entries[Index] as LinePattern;
             }
         }
+        /// <summary>
+        /// Returns the line pattern with the given name; when there is none, a new <see cref="LinePattern"/> with that name
+        /// and the given stroke/gap lengths (see <see cref="LinePattern.LinePattern(string, double[])"/>, layout scaling) is
+        /// added to the list and returned. The pattern of an existing entry is left as it is.
+        /// </summary>
+        /// <param name="Name">the name of the line pattern</param>
+        /// <param name="pattern">alternating stroke and gap lengths for a newly created entry; empty for a solid line</param>
+        /// <returns>the existing or newly created LinePattern</returns>
         public LinePattern CreateOrFind(string Name, params double[] pattern)
         {
             LinePattern res = Find(Name);
@@ -230,6 +238,10 @@ namespace CADability.Attribute
             }
             return res;
         }
+        /// <summary>
+        /// Raised when a line pattern is added to or removed from the list. Changes of the properties of a line pattern are
+        /// forwarded to the owner of the list (the project) instead.
+        /// </summary>
         public event CADability.DidModifyDelegate DidModifyEvent;
         //Hilfsfunktion für Import
         internal LinePattern CreateOrFind(double[] pattern, LinePattern.Scaling scale)
@@ -279,11 +291,13 @@ namespace CADability.Attribute
                 return ShowPropertyLabelFlags.ContextMenu | ShowPropertyLabelFlags.ContextMenu | ShowPropertyLabelFlags.Selectable;
             }
         }
+        /// <inheritdoc/>
         public override void Added(IPropertyPage pp)
         {
             base.resourceIdInternal = "LinePatternList";
             base.Added(pp);
         }
+        /// <inheritdoc/>
         public override void Removed(IPropertyPage pp)
         {
             base.Removed(pp);
@@ -313,6 +327,7 @@ namespace CADability.Attribute
                 return SubEntries.Length;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get

@@ -21,12 +21,26 @@ namespace CADability.Actions
         private readonly GeoVector lineDirection;
         private enum Mode { FromPoint, FromLine }
         private readonly Mode mode;
+        /// <summary>
+        /// Creates the action for <paramref name="lengthProperty"/>. The length is the distance of the (snapped) mouse
+        /// position from <paramref name="fixPoint"/>.
+        /// </summary>
+        /// <param name="lengthProperty">The property to modify</param>
+        /// <param name="fixPoint">The point the distance is measured from, e.g. the center of a circle for its radius</param>
         public GeneralLengthAction(LengthProperty lengthProperty, GeoPoint fixPoint)
         {
             this.lengthProperty = lengthProperty;
             this.fixPoint = fixPoint;
             mode = Mode.FromPoint;
         }
+        /// <summary>
+        /// Creates the action for <paramref name="lengthProperty"/> measuring from <paramref name="fixPoint"/> (see
+        /// <see cref="GeneralLengthAction(LengthProperty, GeoPoint)"/>) and excludes <paramref name="ignoreSnap"/> from the
+        /// snapping, which is usually the object that is being modified.
+        /// </summary>
+        /// <param name="lengthProperty">The property to modify</param>
+        /// <param name="fixPoint">The point the distance is measured from</param>
+        /// <param name="ignoreSnap">Object not to snap to, may be null</param>
         public GeneralLengthAction(LengthProperty lengthProperty, GeoPoint fixPoint, IGeoObject ignoreSnap) : this(lengthProperty, fixPoint)
         {
             if (ignoreSnap != null)
@@ -34,6 +48,15 @@ namespace CADability.Actions
                 base.IgnoreForSnap = new GeoObjectList(ignoreSnap);
             }
         }
+        /// <summary>
+        /// Creates the action for <paramref name="lengthProperty"/> measuring from a line (see
+        /// <see cref="GeneralLengthAction(LengthProperty, GeoPoint, GeoVector)"/>) and excludes <paramref name="ignoreSnap"/>
+        /// from the snapping, which is usually the object that is being modified.
+        /// </summary>
+        /// <param name="lengthProperty">The property to modify</param>
+        /// <param name="linePoint">A point on the line the distance is measured from</param>
+        /// <param name="lineDirection">The direction of that line</param>
+        /// <param name="ignoreSnap">Object not to snap to, may be null</param>
         public GeneralLengthAction(LengthProperty lengthProperty, GeoPoint linePoint, GeoVector lineDirection, IGeoObject ignoreSnap) : this(lengthProperty, linePoint, lineDirection)
         {
             if (ignoreSnap != null)
@@ -42,6 +65,14 @@ namespace CADability.Actions
             }
         }
 
+        /// <summary>
+        /// Creates the action for <paramref name="lengthProperty"/>. The length is the distance of the (snapped) mouse
+        /// position from the line through <paramref name="linePoint"/> with direction <paramref name="lineDirection"/>,
+        /// e.g. the height of a rectangle measured from its base line.
+        /// </summary>
+        /// <param name="lengthProperty">The property to modify</param>
+        /// <param name="linePoint">A point on the line the distance is measured from</param>
+        /// <param name="lineDirection">The direction of that line</param>
         public GeneralLengthAction(LengthProperty lengthProperty, GeoPoint linePoint, GeoVector lineDirection)
         {
             this.lengthProperty = lengthProperty;

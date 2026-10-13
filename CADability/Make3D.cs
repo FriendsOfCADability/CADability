@@ -2900,6 +2900,21 @@ namespace CADability.GeoObject
             return null;
         }
 
+        /// <summary>
+        /// Rotates a <see cref="Face"/>, a <see cref="Path"/> or a curve around <paramref name="axis"/> to make a solid or a
+        /// shell: a face, or a closed planar path or curve (which is made a face first), yields a <see cref="Solid"/>; an
+        /// open or not planar path or curve yields the <see cref="Shell"/> of the rotated curves. The rotation starts at
+        /// <paramref name="offset"/> from the current position of the object and sweeps <paramref name="rotation"/>; a full
+        /// rotation (2*Math.PI) gives a closed shape without start and end faces. Splines in a path are split at their
+        /// corners, so that each resulting face is smooth. Returns null for other kinds of objects and when the construction
+        /// fails. See also <see cref="MakeRevolution(IGeoObject, GeoPoint, GeoVector, double, Project)"/>.
+        /// </summary>
+        /// <param name="faceShellPathCurve">the face, path or curve to rotate</param>
+        /// <param name="axis">the axis of rotation</param>
+        /// <param name="rotation">the angle to sweep, 2*Math.PI for a full rotation</param>
+        /// <param name="offset">the angle, measured from the current position of the object, at which the rotation starts</param>
+        /// <param name="project">currently not used, may be null</param>
+        /// <returns>the solid or shell, or null</returns>
         static public IGeoObject Rotate(IGeoObject faceShellPathCurve, Axis axis, SweepAngle rotation, SweepAngle offset, Project project)
         {
             return Rotate(faceShellPathCurve, axis, rotation, offset, project, false);
@@ -3358,6 +3373,13 @@ namespace CADability.GeoObject
             }
             return null;
         }
+        /// <summary>
+        /// Not functional: reads the header of the STL file and then throws <see cref="NotImplementedException"/>. Use the
+        /// class <see cref="CADability.ImportSTL"/> to import STL files.
+        /// </summary>
+        /// <param name="fileName">the file to read</param>
+        /// <returns>nothing, throws</returns>
+        /// <exception cref="NotImplementedException">always</exception>
         static public Solid[] ImportSTL(string fileName)
         {
             using (BinaryReader reader = new BinaryReader(File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.Read)))
@@ -3387,15 +3409,41 @@ namespace CADability.GeoObject
             }
             throw new NotImplementedException();
         }
+        /// <summary>
+        /// Was meant to return the type of a file readable by the external DTK import library, which is not part of this
+        /// distribution. Always returns the string "error: dtk is not installed".
+        /// </summary>
+        /// <param name="filename">ignored</param>
+        /// <returns>"error: dtk is not installed"</returns>
         static public string GetDtkFileType(string filename)
         {
             return "error: dtk is not installed";
         }
 
+        /// <summary>
+        /// Was meant to import a file via the external DTK import library, which is not part of this distribution. Always
+        /// throws <see cref="NotImplementedException"/>.
+        /// </summary>
+        /// <param name="filename">the file to import</param>
+        /// <param name="pr">the project to set default styles for the result</param>
+        /// <param name="useProgress">true: show the progress of the import</param>
+        /// <param name="makeCompounds">true: combine the imported objects into blocks according to the structure of the file</param>
+        /// <returns>nothing, throws</returns>
+        /// <exception cref="NotImplementedException">always</exception>
         static public IGeoObject[] ImportDtk(string filename, Project pr, bool useProgress = false, bool makeCompounds = false)
         {
             throw new NotImplementedException();
         }
+        /// <summary>
+        /// Intended to cut a shell with a closed path: the path (made planar first, if necessary) is extruded through the
+        /// extent of the shell and the part of the shell inside that prism is returned, or, if several parts result, the one
+        /// closest to the path. Currently not functional: it relies on <see cref="Intersection(Shell, Solid)"/>, which is not
+        /// implemented and throws <see cref="NotImplementedException"/>.
+        /// </summary>
+        /// <param name="path">the closed path that delimits the part to keep</param>
+        /// <param name="shell">the shell to cut</param>
+        /// <returns>null when the path cannot be made planar or no prism can be made from it, otherwise throws</returns>
+        /// <exception cref="NotImplementedException">from <see cref="Intersection(Shell, Solid)"/></exception>
         static public Shell Curtail(Path path, Shell shell)
         {
             path.Flatten();

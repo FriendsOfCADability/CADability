@@ -19,6 +19,12 @@ namespace CADability.UserInterface
         GeoVectorProperty planeDirectionX;
         GeoVectorProperty planeDirectionY;
         GeoVector dirX, dirY;
+        /// <summary>
+        /// Creates the entry for the drawing plane of <paramref name="projection"/>, the projection of the view the entry
+        /// belongs to.
+        /// </summary>
+        /// <param name="projection">The projection whose <see cref="Projection.DrawingPlane"/> is edited</param>
+        /// <param name="frame">The frame, used to start the actions of the context menu and to access the project</param>
         public DrawingPlaneProperty(Projection projection, IFrame frame)
         {
             this.projection = projection;
@@ -39,6 +45,10 @@ namespace CADability.UserInterface
             subEntries[2] = planeDirectionY;
             resourceIdInternal = "DrawingPlane";
         }
+        /// <summary>
+        /// The origin of the drawing plane. Setting it moves the plane of the projection. The "DrawingPlane.Location" sub
+        /// entry accesses it via reflection.
+        /// </summary>
         public GeoPoint PlanePoint
         {
             get
@@ -52,6 +62,11 @@ namespace CADability.UserInterface
                 projection.DrawingPlane = pln;
             }
         }
+        /// <summary>
+        /// The x direction of the drawing plane as edited in the "DrawingPlane.DirectionX" sub entry (which accesses it via
+        /// reflection). Setting it only stores the value; the plane of the projection is updated when the sub entry loses the
+        /// focus.
+        /// </summary>
         public GeoVector PlaneDirectionX
         {
             get
@@ -63,6 +78,11 @@ namespace CADability.UserInterface
                 dirX = value;
             }
         }
+        /// <summary>
+        /// The y direction of the drawing plane as edited in the "DrawingPlane.DirectionY" sub entry (which accesses it via
+        /// reflection). Setting it only stores the value; the plane of the projection is updated when the sub entry loses the
+        /// focus.
+        /// </summary>
         public GeoVector PlaneDirectionY
         {
             get
@@ -75,6 +95,7 @@ namespace CADability.UserInterface
             }
         }
         #region IShowProperty Members
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -109,6 +130,7 @@ namespace CADability.UserInterface
                 return subEntries;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get

@@ -23,6 +23,10 @@ namespace CADability.Actions
 
     public class ConstructPlaneOriginNormalPoint : CADability.Actions.ConstructAction, IIntermediateConstruction, IConstructPlane
     {
+        /// <summary>
+        /// Thrown by <see cref="ConstructedPlane"/> when the plane is requested before both points are fixed or when the points did not
+        /// define a valid plane.
+        /// </summary>
         public class ConstructPlaneException : ApplicationException
         {
             public ConstructPlaneException(string Message) : base(Message) { }
@@ -58,6 +62,11 @@ namespace CADability.Actions
             catch (PlaneException)
             { } // nix zu tun
         }
+        /// <summary>
+        /// Signature of the handlers of <see cref="PlaneChangedEvent"/>: called with the current plane each time one of the two points
+        /// changes.
+        /// </summary>
+        /// <param name="plane">The plane as currently defined by the two points</param>
         public delegate void PlaneChangedDelegate(Plane plane);
         public event PlaneChangedDelegate PlaneChangedEvent;
         public ConstructPlaneOriginNormalPoint()

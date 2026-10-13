@@ -39,6 +39,22 @@ namespace CADability.GeoObject
         private ModOp toCone; // diese ModOp modifiziert den Einheitskegel in den konkreten Kegel
         private ModOp toUnit; // die inverse ModOp zum schnelleren Rechnen
         private double voffset; // OCas arbeitet mit anderem v, ggf. nach dem Einlesen die 2d Kuren verschieben und voffset wieder wegmachen
+        /// <summary>
+        /// Creates a conical surface from its apex, its axes and its semi angle. The u parameter is the angle around the axis, starting at
+        /// <paramref name="dirx"/>; the v parameter is the distance from the apex measured along the surface (when the directions are
+        /// normalized), positive in direction of <paramref name="dirz"/>: the point at (u, v) is
+        /// apex + v*sin(semiAngle)*(cos(u)*dirx + sin(u)*diry) + v*cos(semiAngle)*dirz. When <paramref name="dirx"/> and
+        /// <paramref name="diry"/> have different lengths, the cross section is an ellipse.
+        /// </summary>
+        /// <param name="apex">The apex of the cone</param>
+        /// <param name="dirx">The direction in the cross section where u = 0</param>
+        /// <param name="diry">The direction in the cross section where u = π/2</param>
+        /// <param name="dirz">The direction of the axis; the surface is the half cone on this side of the apex</param>
+        /// <param name="semiAngle">Half of the opening angle in radians: the angle between the axis and the generating lines</param>
+        /// <param name="voffset">The radius of the cross section at v = 0: when not 0, the v parameter is shifted so that v = 0 lies not at
+        /// the apex but at the circle with this radius. The STEP import uses it, because there a cone is given by a point on the axis and
+        /// the radius at that point; the shift is removed again by <see cref="MakeCanonicalForm"/> once the 2d curves of the faces have
+        /// been adjusted</param>
         public ConicalSurface(GeoPoint apex, GeoVector dirx, GeoVector diry, GeoVector dirz, double semiAngle, double voffset = 0.0)
         {
             double s = Math.Sin(semiAngle);
@@ -50,6 +66,18 @@ namespace CADability.GeoObject
             toCone = m2 * m1;
             toUnit = toCone.GetInverse();
         }
+        /// <summary>
+        /// Intended to create the cone which touches three planes, each given by a point on the surface and the normal there. The
+        /// implementation is unfinished: it computes the apex and the semi angle but does not set up the surface, so the resulting
+        /// object is not usable. Use <see cref="ConicalSurface(GeoPoint, GeoVector, GeoVector, GeoVector, double, double)"/> or
+        /// <see cref="FromTwoCircles(Ellipse, Ellipse)"/> instead.
+        /// </summary>
+        /// <param name="p1">First point on the surface</param>
+        /// <param name="n1">The normal of the surface at <paramref name="p1"/></param>
+        /// <param name="p2">Second point on the surface</param>
+        /// <param name="n2">The normal of the surface at <paramref name="p2"/></param>
+        /// <param name="p3">Third point on the surface</param>
+        /// <param name="n3">The normal of the surface at <paramref name="p3"/></param>
         public ConicalSurface(GeoPoint p1, GeoVector n1, GeoPoint p2, GeoVector n2, GeoPoint p3, GeoVector n3)
         {   // 3 Punkte mit Normalenvektor spezifizieren eine KegelFläche
             Plane pl1 = new Plane(p1, n1);
@@ -99,6 +127,10 @@ namespace CADability.GeoObject
             }
             return null;
         }
+        /// <summary>
+        /// The apex of the cone, where the v parameter is 0 (unless a v offset was specified when importing). Read only; use
+        /// <see cref="ISurface.Modify(ModOp)"/> to move the surface.
+        /// </summary>
         public GeoPoint Location
         {
             get
@@ -106,6 +138,9 @@ namespace CADability.GeoObject
                 return toCone * GeoPoint.Origin;
             }
         }
+        /// <summary>
+        /// The direction of the axis, the same as <see cref="ZAxis"/>: the half cone extends from the apex in this direction.
+        /// </summary>
         public GeoVector Axis
         {
             get
@@ -113,6 +148,10 @@ namespace CADability.GeoObject
                 return toCone * GeoVector.ZAxis;
             }
         }
+        /// <summary>
+        /// The direction in the cross section where u = 0, scaled by the sine of the semi angle: the surface point at (0, v) is
+        /// <see cref="Location"/> + v*XAxis + v*<see cref="ZAxis"/>.
+        /// </summary>
         public GeoVector XAxis
         {
             get
@@ -120,6 +159,10 @@ namespace CADability.GeoObject
                 return toCone * GeoVector.XAxis;
             }
         }
+        /// <summary>
+        /// The direction in the cross section where u = π/2, scaled by the sine of the semi angle: the surface point at (π/2, v) is
+        /// <see cref="Location"/> + v*YAxis + v*<see cref="ZAxis"/>.
+        /// </summary>
         public GeoVector YAxis
         {
             get
@@ -127,6 +170,10 @@ namespace CADability.GeoObject
                 return toCone * GeoVector.YAxis;
             }
         }
+        /// <summary>
+        /// The direction of the axis scaled by the cosine of the semi angle: the surface point at (u, v) is
+        /// <see cref="Location"/> + v*(cos(u)*<see cref="XAxis"/> + sin(u)*<see cref="YAxis"/> + ZAxis).
+        /// </summary>
         public GeoVector ZAxis
         {
             get
@@ -134,6 +181,10 @@ namespace CADability.GeoObject
                 return toCone * GeoVector.ZAxis;
             }
         }
+        /// <summary>
+        /// The full opening angle of the cone: the angle between the two opposite generating lines at u = 0 and u = π, i.e. twice the semi
+        /// angle passed to the constructor.
+        /// </summary>
         public Angle OpeningAngle
         {
             get
@@ -141,6 +192,14 @@ namespace CADability.GeoObject
                 return new Angle(toCone * new GeoVector(1, 0, 1), toCone * new GeoVector(-1, 0, 1));
             }
         }
+        /// <summary>
+        /// Returns the part of the axis which corresponds to the v interval [vmin, vmax] as a <see cref="Line"/>, e.g. for displaying the
+        /// axis of a face on this surface: it starts at the foot point on the axis of the surface points with v = vmin and ends at the
+        /// foot point of those with v = vmax.
+        /// </summary>
+        /// <param name="vmin">The v parameter of the start point</param>
+        /// <param name="vmax">The v parameter of the end point</param>
+        /// <returns>The line segment on the axis</returns>
         public Line AxisLine(double vmin, double vmax)
         {
             return Line.TwoPoints(toCone * new GeoPoint(0, 0, vmin), toCone * new GeoPoint(0, 0, vmax));
@@ -332,6 +391,7 @@ namespace CADability.GeoObject
             uv.y += voffset; // v-offset is not guaranteed to be 0, step import creates such surfaces
             return toCone * new GeoVector(Math.Cos(uv.x), Math.Sin(uv.x), 1.0);
         }
+        /// <inheritdoc/>
         public override void Derivation2At(GeoPoint2D uv, out GeoPoint location, out GeoVector du, out GeoVector dv, out GeoVector duu, out GeoVector dvv, out GeoVector duv)
         {
             location = PointAt(uv); // GeoPoint(uv.y * Math.Cos(uv.x), uv.y * Math.Sin(uv.x), uv.y);
@@ -408,6 +468,7 @@ namespace CADability.GeoObject
             }
             return base.Make3dCurve(curve2d);
         }
+        /// <inheritdoc/>
         public override bool IsUPeriodic
         {
             get
@@ -415,6 +476,7 @@ namespace CADability.GeoObject
                 return true;
             }
         }
+        /// <inheritdoc/>
         public override bool IsVPeriodic
         {
             get
@@ -422,6 +484,7 @@ namespace CADability.GeoObject
                 return false;
             }
         }
+        /// <inheritdoc/>
         public override double UPeriod
         {
             get
@@ -429,6 +492,7 @@ namespace CADability.GeoObject
                 return Math.PI * 2.0;
             }
         }
+        /// <inheritdoc/>
         public override double VPeriod
         {
             get
@@ -436,6 +500,7 @@ namespace CADability.GeoObject
                 return 0.0;
             }
         }
+        /// <inheritdoc/>
         public override double[] GetUSingularities()
         {
             return new double[0];
@@ -445,6 +510,7 @@ namespace CADability.GeoObject
         {
             return new double[] { 0.0 };
         }
+        /// <inheritdoc/>
         public override bool IsRotated(Axis rotationAxis)
         {
             return Precision.SameDirection(Axis, rotationAxis.Direction, false);
@@ -595,6 +661,7 @@ namespace CADability.GeoObject
             //}
             //return new GeoPoint2D[0];
         }
+        /// <inheritdoc/>
         public override void GetNaturalBounds(out double umin, out double umax, out double vmin, out double vmax)
         {
             base.GetNaturalBounds(out umin, out umax, out vmin, out vmax);
@@ -860,6 +927,7 @@ namespace CADability.GeoObject
             if (alpha <= 0.0 || beta <= 0.0 || gamma <= 0.0) return 0.0; // onCurve is not inside the triangle of the poles
             return beta / (2.0 * Math.Sqrt(alpha * gamma));
         }
+        /// <inheritdoc/>
         public override void Intersect(ICurve curve, BoundingRect uvExtent, out GeoPoint[] ips, out GeoPoint2D[] uvOnFaces, out double[] uOnCurve3Ds)
         {
             if (curve is Line line)
@@ -921,6 +989,7 @@ namespace CADability.GeoObject
                 this.voffset = 0.0;
             }
         }
+        /// <inheritdoc/>
         public override bool Oriented
         {
             get
@@ -1127,6 +1196,7 @@ namespace CADability.GeoObject
             }
             return base.SameGeometry(thisBounds, other, otherBounds, precision, out firstToSecond);
         }
+        /// <inheritdoc/>
         public override RuledSurfaceMode IsRuled
         {
             get
@@ -1134,6 +1204,7 @@ namespace CADability.GeoObject
                 return RuledSurfaceMode.ruledInV;
             }
         }
+        /// <inheritdoc/>
         public override double MaxDist(GeoPoint2D sp, GeoPoint2D ep, out GeoPoint2D mp)
         {
             mp = new GeoPoint2D(sp, ep);
@@ -1149,10 +1220,12 @@ namespace CADability.GeoObject
         /// - a surface that is not bound to a face - the positive nappe is assumed.
         /// </summary>
         private bool OnPositiveNappe => usedArea.IsEmpty() || usedArea.IsInfinite || usedArea.IsInvalid() || usedArea.GetCenter().y + voffset >= 0.0;
+        /// <inheritdoc/>
         public override ISurface GetOffsetSurface(double offset)
         {
             return GetOffsetSurface(offset, out ModOp2D dumy);
         }
+        /// <inheritdoc/>
         public override ISurface GetOffsetSurface(double offset, out ModOp2D mod)
         {
             // The offset surface of a cone is the same cone with its apex moved along the axis: moving the
@@ -1171,6 +1244,7 @@ namespace CADability.GeoObject
             mod = ModOp2D.Translate(0.0, voffset + signedOffset / Math.Tan(oa2));
             return res;
         }
+        /// <inheritdoc/>
         public override ICurve[] Intersect(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds)
         {   // should better use Surfaces.Intersect
             if (other is PlaneSurface ps)
@@ -1198,6 +1272,7 @@ namespace CADability.GeoObject
             }
             return base.Intersect(thisBounds, other, otherBounds);
         }
+        /// <inheritdoc/>
         public override ISurface GetNonPeriodicSurface(ICurve[] orientedCurves)
         {
             ConicalSurfaceNP res = new ConicalSurfaceNP(Location, XAxis, YAxis, ZAxis);
@@ -1212,6 +1287,7 @@ namespace CADability.GeoObject
             if (normalOriginal * normalNp < 0) res.ReverseOrientation(); // make the same orientation as this conical surface
             return res;
         }
+        /// <inheritdoc/>
         public override IDualSurfaceCurve[] GetDualSurfaceCurves(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, List<GeoPoint> seeds, List<Tuple<double, double, double, double>> extremePositions)
         {
             if (other is PlaneSurface)
@@ -1221,6 +1297,7 @@ namespace CADability.GeoObject
             }
             return base.GetDualSurfaceCurves(thisBounds, other, otherBounds, seeds, extremePositions);
         }
+        /// <inheritdoc/>
         public override ICurve2D GetProjectedCurve(ICurve curve, double precision)
         {
             ICurve2D res = null;
@@ -1428,6 +1505,7 @@ namespace CADability.GeoObject
             }
             return base.GetProjectedCurve(curve, precision);
         }
+        /// <inheritdoc/>
         public override int GetExtremePositions(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, out List<Tuple<double, double, double, double>> extremePositions)
         {
             switch (other)
@@ -1532,6 +1610,11 @@ namespace CADability.GeoObject
         }
         #endregion
         #region ISerializable Members
+        /// <summary>
+        /// Constructor for the legacy binary deserialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// </summary>
+        /// <param name="info">The serialized data</param>
+        /// <param name="context">The source of the deserialization</param>
         protected ConicalSurface(SerializationInfo info, StreamingContext context)
         {
             toCone = (ModOp)info.GetValue("ToCone", typeof(ModOp));
@@ -1556,21 +1639,33 @@ namespace CADability.GeoObject
         }
         #endregion
         #region IJsonSerialize
+        /// <summary>
+        /// Empty constructor for the JSON deserialization (<see cref="IJsonSerialize"/>); the data is set by <see cref="SetObjectData(IJsonReadData)"/>.
+        /// </summary>
         protected ConicalSurface() // for IJsonSerialize
         {
             voffset = 0.0;
         }
+        /// <summary>
+        /// Writes the data of this surface for the JSON serialization (<see cref="IJsonSerialize"/>).
+        /// </summary>
+        /// <param name="data">Receives the data</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("ToUnit", toUnit);
         }
 
+        /// <summary>
+        /// Restores this surface from the JSON data written by <see cref="GetObjectData(IJsonWriteData)"/> (<see cref="IJsonSerialize"/>).
+        /// </summary>
+        /// <param name="data">The data to read</param>
         public void SetObjectData(IJsonReadData data)
         {
             toUnit = data.GetProperty<ModOp>("ToUnit");
             toCone = toUnit.GetInverse();
         }
         #endregion
+        /// <inheritdoc/>
         public override IPropertyEntry GetPropertyEntry(IFrame frame)
         {
             List<IPropertyEntry> se = new List<IPropertyEntry>();

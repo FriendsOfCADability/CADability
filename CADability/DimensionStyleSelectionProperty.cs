@@ -8,8 +8,16 @@ namespace CADability.UserInterface
 {
 
 
+    /// <summary>
+    /// Exception reserved for errors of the <see cref="DimensionStyleSelectionProperty"/>. The current implementation
+    /// does not throw it.
+    /// </summary>
     public class DimensionStyleSelectionPropertyException : ApplicationException
     {
+        /// <summary>
+        /// Creates the exception with a message.
+        /// </summary>
+        /// <param name="msg">The message</param>
         public DimensionStyleSelectionPropertyException(string msg) : base(msg) { }
     }
     /// <summary>
@@ -24,7 +32,14 @@ namespace CADability.UserInterface
     {
         private IGeoObject toWatch;
         private DimensionStyle[] selectableStyles;
+        /// <summary>
+        /// Delegate for <see cref="DimensionStyleChangedEvent"/>.
+        /// </summary>
+        /// <param name="SelectedDimensionStyle">The selected dimension style, or null when the "undefined" entry was selected</param>
         public delegate void DimensionStyleChangedDelegate(DimensionStyle SelectedDimensionStyle);
+        /// <summary>
+        /// Raised after the user has selected a dimension style and it was set on the <see cref="IDimensionStyle"/> object.
+        /// </summary>
         public event DimensionStyleChangedDelegate DimensionStyleChangedEvent;
         private IDimensionStyle dimensionStyle;
         private DimensionStyle Find(string name)
@@ -35,6 +50,16 @@ namespace CADability.UserInterface
             }
             return null;
         }
+        /// <summary>
+        /// Creates the entry for the dimension style of <paramref name="dimensionStyle"/>. The current style of the object is
+        /// preselected; if the object is an <see cref="IGeoObject"/>, the entry follows changes of its dimension style.
+        /// </summary>
+        /// <param name="resourceId">Resource id of the label text</param>
+        /// <param name="list">The list of all dimension styles of the project</param>
+        /// <param name="dimensionStyle">The object whose dimension style is edited</param>
+        /// <param name="dimType">Only styles which support this type of dimension are offered; <see cref="Dimension.EDimType.DimAll"/>
+        /// offers all of them. When no style fits, the default style is offered</param>
+        /// <param name="includeUndefined">true: an "undefined" entry (resource "DimensionStyle.Undefined") is offered as the first choice</param>
         public DimensionStyleSelectionProperty(string resourceId, DimensionStyleList list, IDimensionStyle dimensionStyle, Dimension.EDimType dimType, bool includeUndefined) : base()
         {
             base.resourceIdInternal = resourceId;
@@ -75,6 +100,7 @@ namespace CADability.UserInterface
             }
             toWatch = dimensionStyle as IGeoObject;
         }
+        /// <inheritdoc/>
         protected override void OnSelectionChanged(string selected)
         {
             base.OnSelectionChanged(selected);

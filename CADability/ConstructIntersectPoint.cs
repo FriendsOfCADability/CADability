@@ -185,6 +185,7 @@ namespace CADability.Actions
             else base.SetInput(firstCurveInput, secondCurveInput);
             base.OnSetAction();
         }
+        /// <inheritdoc/>
         public override void OnRemoveAction()
         {
             base.OnRemoveAction();

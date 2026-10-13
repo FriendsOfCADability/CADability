@@ -6,6 +6,13 @@ using System.Text;
 
 namespace CADability
 {
+    /// <summary>
+    /// Removes fillets (rounded edges) from a shell: given the fillet faces (faces whose surface is the extrusion of an arc, i.e.
+    /// cylindrical or toroidal rounding faces, and the spherical faces where fillets meet), the faces which the fillets connect are
+    /// extended again until they intersect and the fillet faces are removed. The shell is cloned in the constructor;
+    /// <see cref="Result"/> returns the modified clone, or null when the fillets could not be removed consistently. Used by the
+    /// context menu of a selected fillet face.
+    /// </summary>
     public class RemoveFillet
     {
         Shell shell;

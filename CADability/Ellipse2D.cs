@@ -81,6 +81,10 @@ namespace CADability.Curve2D
             RecalcAxis();
             RecalcUnitCircle();
         }
+        /// <summary>
+        /// Creates an uninitialized ellipse: center and axes are zero. The library itself does not use it; use
+        /// <see cref="Ellipse2D(GeoPoint2D, GeoVector2D, GeoVector2D)"/> or one of the static factory methods to create a usable ellipse.
+        /// </summary>
         public Ellipse2D()
         {
         }
@@ -135,6 +139,14 @@ namespace CADability.Curve2D
             majaxsin = Math.Sin(majorAxis.Angle);
             majaxcos = Math.Cos(majorAxis.Angle);
         }
+        /// <summary>
+        /// Creates the ellipse through five points (see <see cref="FromFivePoints(GeoPoint2D[])"/>), oriented so that the points
+        /// follow each other in the direction of the curve. When <paramref name="isFull"/> is false the result is trimmed to the
+        /// arc from <c>p[0]</c> through <c>p[2]</c> to <c>p[4]</c> and is an <see cref="EllipseArc2D"/>.
+        /// </summary>
+        /// <param name="p">five points on the ellipse in their order along the curve; only the first five are used</param>
+        /// <param name="isFull">true for the full ellipse, false for the arc from the first to the last point</param>
+        /// <returns>the ellipse or elliptical arc, or null when no ellipse passes through the points</returns>
         public static Ellipse2D FromFivePoints(GeoPoint2D[] p, bool isFull)
         {
             Ellipse2D res = FromFivePoints(p);
@@ -171,6 +183,13 @@ namespace CADability.Curve2D
             }
             return res;
         }
+        /// <summary>
+        /// Creates the ellipse through five points by solving the equation of the conic section through them. The result runs
+        /// counterclockwise. The method does not verify that the conic is an ellipse: for points on a hyperbola or a parabola it may
+        /// return an ellipse that does not pass through them.
+        /// </summary>
+        /// <param name="p">five points; only the first five are used</param>
+        /// <returns>the ellipse, or null when the system of equations is singular or degenerate</returns>
         public static Ellipse2D FromFivePoints(GeoPoint2D[] p)
         {
             Matrix m = new DenseMatrix(5, 5);
@@ -234,6 +253,13 @@ namespace CADability.Curve2D
             Ellipse2D res = new Ellipse2D(new GeoPoint2D(mp[0], mp[1]), MajorRadius * new GeoVector2D(MajorAngle), MinorRadius * new GeoVector2D(MinorAngle));
             return res;
         }
+        /// <summary>
+        /// Fits an ellipse to any number of points (at least five) in the least squares sense: the affine map that takes the points
+        /// as close as possible to the unit circle is found by a Levenberg-Marquardt minimization, and the ellipse is its inverse
+        /// image of the unit circle.
+        /// </summary>
+        /// <param name="points">the points to approximate</param>
+        /// <returns>the fitted ellipse, or null when the minimization does not converge</returns>
         public static Ellipse2D FromPoints(IEnumerable<GeoPoint2D> points)
         {
             GeoPoint2D[] pnts = null;
@@ -550,6 +576,13 @@ namespace CADability.Curve2D
         {
             return base.PerpendicularFoot(fromHere);
         }
+        /// <summary>
+        /// Returns the foot point of the perpendicular from <paramref name="fromHere"/> onto the (full) ellipse which is closest to
+        /// that point, i.e. the point of the ellipse with the smallest distance to it. Uses <see cref="PerpendicularFoot"/> and falls
+        /// back to a Newton iteration when that yields nothing.
+        /// </summary>
+        /// <param name="fromHere">the point to project</param>
+        /// <returns>the closest foot point</returns>
         protected GeoPoint2D ClosestPerpendicularFoot(GeoPoint2D fromHere)
         {
             //GeoPoint2D p0 = toUnitCircle * fromHere;
@@ -640,6 +673,7 @@ namespace CADability.Curve2D
             //// res.Norm(); // sollte nicht genormt werden, oder?
             //return res;
         }
+        /// <inheritdoc/>
         public override bool TryPointDeriv2At(double position, out GeoPoint2D point, out GeoVector2D deriv1, out GeoVector2D deriv2)
         {
             double sweepParameter;
@@ -656,6 +690,7 @@ namespace CADability.Curve2D
             deriv2 = ppp * new GeoVector2D(-fromUnitCircle[0, 1] * su - fromUnitCircle[0, 0] * cu, -fromUnitCircle[1, 1] * su - fromUnitCircle[1, 0] * cu);
             return true;
         }
+        /// <inheritdoc/>
         public override bool TryPointDeriv3At(double position, out GeoPoint2D point, out GeoVector2D deriv1, out GeoVector2D deriv2, out GeoVector2D deriv3)
         {
             double sweepParameter;
@@ -678,6 +713,14 @@ namespace CADability.Curve2D
             deriv3 = pppp * new GeoVector2D(fromUnitCircle[0, 0] * su - fromUnitCircle[0, 1] * cu, fromUnitCircle[1, 0] * su - fromUnitCircle[1, 1] * cu);
             return true;
         }
+        /// <summary>
+        /// Refines the parameter of a perpendicular foot point from <paramref name="fromHere"/> by a Newton minimization of the
+        /// squared scalar product of the connection to the curve with the direction of the curve, starting at
+        /// <paramref name="position"/>. Uses the derivatives from <see cref="TryPointDeriv3At"/>.
+        /// </summary>
+        /// <param name="fromHere">the point to project onto the ellipse</param>
+        /// <param name="position">normalized start parameter, close to the expected foot point</param>
+        /// <returns>the refined normalized parameter; the last evaluated parameter when the minimization fails</returns>
         public double NewtonPerpendicular(GeoPoint2D fromHere, double position)
         {
             NewtonMinimizer nm = new NewtonMinimizer(1e-6, 10);
@@ -705,6 +748,7 @@ namespace CADability.Curve2D
                 return iof.Point[0];
             }
         }
+        /// <inheritdoc/>
         public override double Length
         {
             get
@@ -716,6 +760,7 @@ namespace CADability.Curve2D
                 return ArcLength.OfEllipse(majorAxis * majorAxis, minorAxis * minorAxis, 0.0, 0.0, 2.0 * Math.PI);
             }
         }
+        /// <inheritdoc/>
         public override double Sweep
         {
             get
@@ -826,6 +871,7 @@ namespace CADability.Curve2D
             UserData.CloneFrom(c.UserData);
 
         }
+        /// <inheritdoc/>
         public override bool IsClosed
         {
             get
@@ -833,6 +879,7 @@ namespace CADability.Curve2D
                 return true;
             }
         }
+        /// <inheritdoc/>
         public override GeoVector2D StartDirection
         {
             get
@@ -850,6 +897,7 @@ namespace CADability.Curve2D
                 return res;
             }
         }
+        /// <inheritdoc/>
         public override GeoVector2D EndDirection
         {
             get
@@ -857,6 +905,7 @@ namespace CADability.Curve2D
                 return StartDirection;
             }
         }
+        /// <inheritdoc/>
         public override GeoPoint2D StartPoint
         {
             get
@@ -869,6 +918,7 @@ namespace CADability.Curve2D
                     throw new ApplicationException("cannot set StartPoint of Ellipse2D");
             }
         }
+        /// <inheritdoc/>
         public override GeoPoint2D EndPoint
         {
             get
@@ -891,6 +941,10 @@ namespace CADability.Curve2D
         }
 
         #endregion
+        /// <summary>
+        /// The center of the ellipse. Setting it moves the ellipse and recomputes the derived data (extreme points, mapping to the
+        /// unit circle).
+        /// </summary>
         public GeoPoint2D Center
         {
             get { return center; }
@@ -900,6 +954,11 @@ namespace CADability.Curve2D
                 Recalc();
             }
         }
+        /// <summary>
+        /// The major axis of the ellipse as a vector from the center to the end of the axis. Read only in effect: the setter throws
+        /// <see cref="NotImplementedException"/>, because both axes have to be changed together to stay perpendicular; create a new
+        /// ellipse instead.
+        /// </summary>
         public GeoVector2D MajorAxis
         {
             get { return majorAxis; }
@@ -911,6 +970,11 @@ namespace CADability.Curve2D
                 throw new NotImplementedException("Ellipse2D: Set MajorAxis");
             }
         }
+        /// <summary>
+        /// The minor axis of the ellipse as a vector from the center to the end of the axis. Read only in effect: the setter throws
+        /// <see cref="NotImplementedException"/>, because both axes have to be changed together to stay perpendicular; create a new
+        /// ellipse instead.
+        /// </summary>
         public GeoVector2D MinorAxis
         {
             get { return minorAxis; }

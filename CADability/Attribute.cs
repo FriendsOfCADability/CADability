@@ -131,6 +131,13 @@ namespace CADability.Attribute
     }
 
 
+    /// <summary>
+    /// Signature for notifications that a property of a named attribute (e.g. the RGB value of a <see cref="ColorDef"/>)
+    /// was changed. Not used by any event of CADability at present; the lists report such changes with
+    /// <see cref="IAttributeList.AttributeChanged(INamedAttribute, ReversibleChange)"/> instead.
+    /// </summary>
+    /// <param name="Attribute">the attribute that was changed</param>
+    /// <param name="Change">describes the change and can undo it</param>
     public delegate void AttributeChangedDelegate(object Attribute, ReversibleChange Change);
 
 }

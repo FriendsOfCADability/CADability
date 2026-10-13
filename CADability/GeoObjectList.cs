@@ -13,48 +13,108 @@ namespace CADability.GeoObject
     public class GeoObjectList : IEnumerable, ISerializable, IDeserializationCallback, IEnumerable<IGeoObject>, IJsonSerialize
     {
         private ArrayList alist; // used for ISerializabe and IDeserializationCallback since list has been changed to List<IGeoObject>, which cannot be serialized/deserialized
+        /// <summary>
+        /// The objects of this list in their order. This is internal state exposed to derived classes; modify it through the
+        /// methods of this class so that <see cref="ObjectAddedEvent"/> and <see cref="ObjectRemovedEvent"/> are raised.
+        /// </summary>
         protected List<IGeoObject> list;
         private UserData userData;
+        /// <summary>
+        /// Handler for <see cref="ObjectAddedEvent"/>.
+        /// </summary>
+        /// <param name="sender">the list that changed</param>
+        /// <param name="addedObject">the object that was added</param>
+        /// <param name="lastRangeElement">true for a single added object and for the last object of a range added with
+        /// <see cref="AddRange"/>, false for the other objects of a range; lets a handler postpone its work until the whole
+        /// range has arrived</param>
         public delegate void ObjectAddedDelegate(GeoObjectList sender, IGeoObject addedObject, bool lastRangeElement);
+        /// <summary>
+        /// Raised after an object was added to the list, once for each object.
+        /// </summary>
         public event ObjectAddedDelegate ObjectAddedEvent;
+        /// <summary>
+        /// Handler for <see cref="ObjectRemovedEvent"/>.
+        /// </summary>
+        /// <param name="sender">the list that changed</param>
+        /// <param name="removedObject">the object that was removed</param>
+        /// <param name="lastRangeElement">true for a single removed object and for the last object of a range removed with
+        /// <see cref="RemoveChildrenOf"/>, false for the other objects of a range</param>
         public delegate void ObjectRemovedDelegate(GeoObjectList sender, IGeoObject removedObject, bool lastRangeElement);
+        /// <summary>
+        /// Raised after an object was removed from the list, once for each object. Not raised by <see cref="Clear"/>.
+        /// </summary>
         public event ObjectRemovedDelegate ObjectRemovedEvent;
 
+        /// <summary>
+        /// Creates an empty list.
+        /// </summary>
         public GeoObjectList()
         {
             list = new List<IGeoObject>();
             userData = new UserData();
         }
+        /// <summary>
+        /// Creates an empty list with room for <paramref name="Capacity"/> objects.
+        /// </summary>
+        /// <param name="Capacity">the initial capacity</param>
         public GeoObjectList(int Capacity)
         {
             list = new List<IGeoObject>(Capacity);
             userData = new UserData();
         }
+        /// <summary>
+        /// Creates a list that contains only <paramref name="singleObject"/>.
+        /// </summary>
+        /// <param name="singleObject">the object to put into the list</param>
         public GeoObjectList(IGeoObject singleObject)
             : this(1)
         {
             list.Add(singleObject);
         }
+        /// <summary>
+        /// Creates a list that contains the given objects in the given order.
+        /// </summary>
+        /// <param name="l">the objects to put into the list</param>
         public GeoObjectList(params IGeoObject[] l)
             : this(l.Length)
         {
             list.AddRange(l);
         }
+        /// <summary>
+        /// Creates a list that contains the objects of <paramref name="list"/> in their order. The objects are copied; the
+        /// new list is independent of <paramref name="list"/>.
+        /// </summary>
+        /// <param name="list">the objects to put into the list</param>
         public GeoObjectList(List<IGeoObject> list)
             : this(list.Count)
         {
             AddRange(list.ToArray());
         }
+        /// <summary>
+        /// Creates a list that contains the objects of <paramref name="list"/> in their order. The objects are copied; the
+        /// new list is independent of <paramref name="list"/>.
+        /// </summary>
+        /// <param name="list">the objects to put into the list</param>
         public GeoObjectList(ICollection<IGeoObject> list)
             : this(list.Count)
         {
             this.list.AddRange(list);
         }
+        /// <summary>
+        /// Creates a list that contains the objects of <paramref name="list"/> in their order. The sequence is enumerated
+        /// twice, once to determine the capacity and once to copy the objects.
+        /// </summary>
+        /// <param name="list">the objects to put into the list</param>
         public GeoObjectList(IEnumerable<IGeoObject> list)
             : this(list.ToArray().Length)
         {
             this.list.AddRange(list);
         }
+        /// <summary>
+        /// Creates a list that contains the given curves (every <see cref="ICurve"/> is an <see cref="IGeoObject"/>) in
+        /// their order. Null entries are skipped. The sequence is enumerated twice.
+        /// </summary>
+        /// <param name="list">the curves to put into the list</param>
         public GeoObjectList(IEnumerable<ICurve> list)
             : this(list.ToArray().Length)
         {
@@ -63,16 +123,33 @@ namespace CADability.GeoObject
                 this.list.AddIfNotNull(crv);
             }
         }
+        /// <summary>
+        /// Appends <paramref name="ObjectToAdd"/> at the end of the list and raises <see cref="ObjectAddedEvent"/>. The
+        /// object may already be contained; use <see cref="AddUnique"/> to avoid duplicates.
+        /// </summary>
+        /// <param name="ObjectToAdd">the object to add</param>
         public void Add(IGeoObject ObjectToAdd)
         {
             list.Add(ObjectToAdd);
             ObjectAddedEvent?.Invoke(this, ObjectToAdd, true);
         }
+        /// <summary>
+        /// Inserts <paramref name="ObjectToAdd"/> at the position <paramref name="index"/>, moving the following objects
+        /// back by one, and raises <see cref="ObjectAddedEvent"/>.
+        /// </summary>
+        /// <param name="index">the position of the new object, 0 to <see cref="Count"/>; otherwise an
+        /// <see cref="ArgumentOutOfRangeException"/> is thrown</param>
+        /// <param name="ObjectToAdd">the object to insert</param>
         public void Insert(int index, IGeoObject ObjectToAdd)
         {
             list.Insert(index, ObjectToAdd);
             ObjectAddedEvent?.Invoke(this, ObjectToAdd, true);
         }
+        /// <summary>
+        /// Appends <paramref name="ObjectToAdd"/> unless it is already contained in the list (linear search). Raises
+        /// <see cref="ObjectAddedEvent"/> only when the object is actually added.
+        /// </summary>
+        /// <param name="ObjectToAdd">the object to add</param>
         public void AddUnique(IGeoObject ObjectToAdd)
         {	// da list eine ArrayList ist, ist AddUnique u.U. aufwendig
             // Überlegung: sollte man GeoObjectList per Eigenschaft auch parallel als
@@ -80,6 +157,13 @@ namespace CADability.GeoObject
             if (!list.Contains(ObjectToAdd))
                 Add(ObjectToAdd);
         }
+        /// <summary>
+        /// Adds <paramref name="ObjectToAdd"/>, but a <see cref="Block"/> is replaced by its children, recursively; a
+        /// <see cref="Hatch"/> (which is a block) is recalculated when necessary and then replaced by its hatch lines in the
+        /// same way. All other objects are added as they are. <see cref="ObjectAddedEvent"/> is raised for each object that
+        /// is actually added.
+        /// </summary>
+        /// <param name="ObjectToAdd">the object to add</param>
         public void AddDecomposed(IGeoObject ObjectToAdd)
         {
             if (ObjectToAdd is Hatch)
@@ -148,6 +232,11 @@ namespace CADability.GeoObject
             }
         }
 
+        /// <summary>
+        /// Appends all objects of <paramref name="ObjectsToAdd"/> in their order and raises <see cref="ObjectAddedEvent"/>
+        /// for each of them, with <c>lastRangeElement</c> set for the last one.
+        /// </summary>
+        /// <param name="ObjectsToAdd">the objects to add</param>
         public void AddRange(IEnumerable<IGeoObject> ObjectsToAdd)
         {
             list.AddRange(ObjectsToAdd);
@@ -158,6 +247,12 @@ namespace CADability.GeoObject
             }
         }
 
+        /// <summary>
+        /// Appends those objects of <paramref name="ObjectsToAdd"/> that are not yet contained in this list, raising
+        /// <see cref="ObjectAddedEvent"/> for each of them. Note that the objects which are already contained are removed
+        /// from <paramref name="ObjectsToAdd"/>, so that list is modified as well.
+        /// </summary>
+        /// <param name="ObjectsToAdd">the objects to add; loses the objects that were already contained</param>
         public void AddRangeUnique(GeoObjectList ObjectsToAdd)
         {   // erst die überflüssigen entfernen, dann alle verbleibenden zufügen wg. ObjectAddedEvent
             for (int i = ObjectsToAdd.Count - 1; i >= 0; --i)
@@ -167,6 +262,11 @@ namespace CADability.GeoObject
             }
             AddRange(ObjectsToAdd);
         }
+        /// <summary>
+        /// Removes the object at the position <paramref name="index"/> and raises <see cref="ObjectRemovedEvent"/>.
+        /// </summary>
+        /// <param name="index">the position of the object to remove; an invalid index throws an
+        /// <see cref="ArgumentOutOfRangeException"/></param>
         public void Remove(int index)
         {
             // man braucht nicht auf die Gültigkeit des Index überprüfen, denn der Zugriff
@@ -198,11 +298,23 @@ namespace CADability.GeoObject
                 ObjectRemovedEvent(this, Parent.Child(j), true);
             }
         }
+        /// <summary>
+        /// Removes the first occurrence of <paramref name="ObjectToRemove"/> from the list and raises
+        /// <see cref="ObjectRemovedEvent"/>. Does nothing when the object is not contained.
+        /// </summary>
+        /// <param name="ObjectToRemove">the object to remove</param>
         public void Remove(IGeoObject ObjectToRemove)
         {
             int index = list.IndexOf(ObjectToRemove);
             if (index >= 0) Remove(index);
         }
+        /// <summary>
+        /// Replaces every <see cref="Block"/> of the list by its children, recursively, so that afterwards the list contains
+        /// no blocks any more. A <see cref="Hatch"/> at the top level of the list is kept (it is only recalculated when
+        /// necessary), while hatches inside blocks are replaced by their hatch lines; <see cref="BlockRef"/> objects are
+        /// not touched, see <see cref="DecomposeBlockRefs"/>. The children are appended at the end, so the order of the
+        /// list changes. <see cref="ObjectRemovedEvent"/> and <see cref="ObjectAddedEvent"/> are raised accordingly.
+        /// </summary>
         public void DecomposeBlocks()
         {
             for (int i = list.Count - 1; i >= 0; --i)
@@ -221,6 +333,15 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Replaces every <see cref="Block"/> and every <see cref="BlockRef"/> (through its <see cref="BlockRef.Flattened"/>
+        /// block) by its contents, recursively; a <see cref="Hatch"/> is only decomposed into its hatch lines when
+        /// <paramref name="decomposeHatch"/> is true. A <see cref="Path"/> taken out of a block is replaced by its segments,
+        /// whereas paths at the top level of the list are kept. Objects taken out of a nested block inherit the layer and
+        /// color of that block when they have none of their own (<see cref="IGeoObject.PropagateAttributes"/>). The contents
+        /// are appended at the end, so the order of the list changes.
+        /// </summary>
+        /// <param name="decomposeHatch">true to replace hatches by their hatch lines, false to keep them</param>
         public void DecomposeBlocks(bool decomposeHatch)
         {
             for (int i = list.Count - 1; i >= 0; --i)
@@ -247,6 +368,12 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Replaces every <see cref="BlockRef"/> by the objects of <see cref="BlockRef.Decompose"/>, i.e. the objects of the
+        /// referenced block with the insertion applied, repeating this until no block reference is left (the decomposed
+        /// objects may contain block references again). <see cref="Block"/> objects are not touched, see
+        /// <see cref="DecomposeBlocks()"/>.
+        /// </summary>
         public void DecomposeBlockRefs()
         {
             bool decomposed;
@@ -265,6 +392,13 @@ namespace CADability.GeoObject
                 }
             } while (decomposed);
         }
+        /// <summary>
+        /// Decomposes the list down to simple objects: every <see cref="Block"/> (hatches included) and every
+        /// <see cref="BlockRef"/> is replaced by its contents, recursively, every <see cref="Path"/> by its segments and
+        /// every <see cref="Polyline"/> by lines. Objects taken out of a block inherit the layer and color of the block when
+        /// they have none of their own (<see cref="IGeoObject.PropagateAttributes"/>). The parts are appended at the end,
+        /// so the order of the list changes.
+        /// </summary>
         public void DecomposeAll()
         {
             for (int i = list.Count - 1; i >= 0; --i)
@@ -307,14 +441,25 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Reverses the order of the objects in the list. No events are raised.
+        /// </summary>
         public void Reverse()
         {
             list.Reverse();
         }
+        /// <summary>
+        /// Removes all objects from the list without raising <see cref="ObjectRemovedEvent"/>.
+        /// </summary>
         public void Clear()
         {
             list.Clear();
         }
+        /// <summary>
+        /// Checks whether <paramref name="ToTest"/> is contained in the list (same object, linear search).
+        /// </summary>
+        /// <param name="ToTest">the object to look for</param>
+        /// <returns>true if the object is in the list</returns>
         public bool Contains(IGeoObject ToTest)
         {
             int index = list.IndexOf(ToTest);
@@ -336,6 +481,11 @@ namespace CADability.GeoObject
             }
             return true;
         }
+        /// <summary>
+        /// Returns the position of <paramref name="ToTest"/> in the list.
+        /// </summary>
+        /// <param name="ToTest">the object to look for</param>
+        /// <returns>the index of the first occurrence, or -1 if the object is not in the list</returns>
         public int IndexOf(IGeoObject ToTest)
         {
             return list.IndexOf(ToTest);
@@ -364,6 +514,16 @@ namespace CADability.GeoObject
         {
             return new GeoObjectList(this);
         }
+        /// <summary>
+        /// Returns the 2d extent of all objects of the list as they appear in <paramref name="projection"/>, in the
+        /// coordinates of the projection's plane: the union of <see cref="IGeoObject.GetExtent(Projection, ExtentPrecision)"/>
+        /// with <see cref="ExtentPrecision.Raw"/>. The parameters <paramref name="Use2DWorld"/> and
+        /// <paramref name="RegardLineWidth"/> are ignored.
+        /// </summary>
+        /// <param name="projection">the projection</param>
+        /// <param name="Use2DWorld">ignored</param>
+        /// <param name="RegardLineWidth">ignored</param>
+        /// <returns>the extent, <see cref="BoundingRect.EmptyBoundingRect"/> for an empty list</returns>
         public BoundingRect GetExtent(Projection projection, bool Use2DWorld, bool RegardLineWidth)
         {
             BoundingRect res = BoundingRect.EmptyBoundingRect;
@@ -373,6 +533,10 @@ namespace CADability.GeoObject
             }
             return res;
         }
+        /// <summary>
+        /// Returns the 3d extent of all objects of the list, the union of their <see cref="IGeoObject.GetBoundingCube"/>.
+        /// </summary>
+        /// <returns>the extent, <see cref="BoundingCube.EmptyBoundingCube"/> for an empty list</returns>
         public BoundingCube GetExtent()
         {
             BoundingCube res = BoundingCube.EmptyBoundingCube;
@@ -382,6 +546,11 @@ namespace CADability.GeoObject
             }
             return res;
         }
+        /// <summary>
+        /// Applies the modification <paramref name="m"/> to every object of the list, see <see cref="IGeoObject.Modify"/>.
+        /// Each object raises its change events, so the modification is recorded for undo when the objects belong to a model.
+        /// </summary>
+        /// <param name="m">the modification to apply</param>
         public void Modify(ModOp m)
         {
             foreach (IGeoObject go in list)
@@ -399,12 +568,26 @@ namespace CADability.GeoObject
                 return list.Count;
             }
         }
+        /// <summary>
+        /// Arbitrary data attached to this list, see <see cref="CADability.UserData"/>. Empty by default; saved together
+        /// with the list.
+        /// </summary>
         public UserData UserData { get { return userData; } }
+        /// <summary>
+        /// Gets or sets the object at the position <paramref name="Index"/>. Setting replaces the object without raising
+        /// <see cref="ObjectRemovedEvent"/> or <see cref="ObjectAddedEvent"/>. An invalid index throws an
+        /// <see cref="ArgumentOutOfRangeException"/>.
+        /// </summary>
+        /// <param name="Index">the position, 0 to <see cref="Count"/> - 1</param>
         public IGeoObject this[int Index]
         {
             get { return list[Index]; }
             set { list[Index] = value; }
         }
+        /// <summary>
+        /// Converts the list to an array of its objects. The array is a copy: changing it does not change the list.
+        /// </summary>
+        /// <param name="l">the list to convert</param>
         public static implicit operator IGeoObject[](GeoObjectList l)
         {
             return (IGeoObject[])l.list.ToArray();
@@ -444,12 +627,21 @@ namespace CADability.GeoObject
             }
         }
 
+        /// <summary>
+        /// Writes the objects and the user data of this list for the JSON serialization (<see cref="IJsonSerialize"/>).
+        /// </summary>
+        /// <param name="data">receives the data</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("List", list);
             data.AddProperty("UserData", userData);
         }
 
+        /// <summary>
+        /// Reads the objects and the user data written by <see cref="GetObjectData(IJsonWriteData)"/> back from the JSON
+        /// serialization.
+        /// </summary>
+        /// <param name="data">provides the data</param>
         public void SetObjectData(IJsonReadData data)
         {
             list = data.GetProperty<List<IGeoObject>>("List");

@@ -1228,12 +1228,28 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 				}
 			}
 		}
+		/// <summary>
+		/// Thrown while <see cref="ImportStep.Read"/> parses the file when it does not follow the ISO 10303-21 syntax, e.g. when an
+		/// expected delimiter is missing. <see cref="ImportStep.Read"/> catches it and reports the message in
+		/// <see cref="ImportStep.Problems"/>; the message names the offending line.
+		/// </summary>
 		public class SyntaxError : ApplicationException
 		{
+			/// <summary>
+			/// Creates the exception for a missing delimiter: <paramref name="expected"/> was not found at position
+			/// <paramref name="start"/> of <paramref name="line"/>.
+			/// </summary>
+			/// <param name="line">the line of the file being parsed</param>
+			/// <param name="start">the position in the line where the character was expected (not part of the message)</param>
+			/// <param name="expected">the character that was expected</param>
 			public SyntaxError(string line, int start, char expected) : base("Syntax error in step file: expected '" + expected + "' in line: " + line)
 			{
 
 			}
+			/// <summary>
+			/// Creates the exception with a general message.
+			/// </summary>
+			/// <param name="msg">describes the problem</param>
 			public SyntaxError(string msg) : base(msg)
 			{
 

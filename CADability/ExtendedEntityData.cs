@@ -3,6 +3,13 @@ using System.Collections.Generic;
 
 namespace CADability.DXF
 {
+    /// <summary>
+    /// The group codes of the records of DXF extended entity data (XDATA), used as keys in <see cref="ExtendedEntityData.Data"/>.
+    /// The numeric value of each member is the DXF group code: 1000 string, 1001 application name, 1002 control string, 1003 layer
+    /// name, 1004 binary data, 1005 database handle, 1010/1020/1030 and the following triples the x, y and z coordinate of a point,
+    /// world space position, displacement or direction, 1040 real, 1041 distance, 1042 scale factor, 1070 16 bit and 1071 32 bit
+    /// integer.
+    /// </summary>
     public enum XDataCode
     {
         AppReg = 1001,
@@ -30,6 +37,13 @@ namespace CADability.DXF
         Int32 = 1071
     }
 
+    /// <summary>
+    /// The extended entity data (XDATA) of a DXF entity for one application: the <see cref="ApplicationName"/> and the list of
+    /// (<see cref="XDataCode"/>, value) records in <see cref="Data"/>. The DXF import attaches one such object per application to the
+    /// user data of the imported object (under the application name) and the DXF export writes it back, so that application specific
+    /// data survives a round trip through CADability; the values keep the types of the DXF records (string, <see cref="GeoPoint"/>,
+    /// <see cref="GeoVector"/>, double, short, int) also after JSON serialization.
+    /// </summary>
     public class ExtendedEntityData : IJsonSerialize
     {
         public string ApplicationName { get; set; }

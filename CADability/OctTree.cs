@@ -53,6 +53,13 @@ namespace CADability
     }
 #endif
 
+    /// <summary>
+    /// Implemented by objects which can be stored in an <see cref="OctTree{T}"/>: the tree asks the object for its extent and
+    /// whether it is hit by a cube when it sorts the object into its nodes, and whether it is hit by a projected rectangle or a
+    /// line when the tree is searched by a pick rectangle or a ray. All GeoObjects implement it
+    /// (<see cref="CADability.GeoObject.IGeoObject"/> extends it), as do <see cref="CADability.GeoObject.Face"/>, <see cref="Edge"/>,
+    /// <see cref="Vertex"/> and various internal helper objects.
+    /// </summary>
     public interface IOctTreeInsertable
     {
         /// <summary>

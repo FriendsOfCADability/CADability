@@ -52,6 +52,7 @@ namespace CADability.Actions
             base.SetInput(firstPointInput, secondPointInput);
             base.OnSetAction();
         }
+        /// <inheritdoc/>
         public override void OnRemoveAction()
         {
             base.OnRemoveAction();

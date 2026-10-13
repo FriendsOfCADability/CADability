@@ -46,15 +46,55 @@ namespace CADability.Attribute
         /// <summary>
         /// Category of objects to provide different default styles
         /// </summary>
-        public enum EDefaultFor { Curves = 1, Solids = 2, Text = 4, Dimension = 8, HiddenSolids = 16, Axis = 32 }
+        public enum EDefaultFor
+        {
+            /// <summary>
+            /// Curves and points: <see cref="CADability.GeoObject.Line"/>, <see cref="CADability.GeoObject.Ellipse"/>,
+            /// <see cref="CADability.GeoObject.Polyline"/>, <see cref="CADability.GeoObject.BSpline"/>,
+            /// <see cref="CADability.GeoObject.Path"/>, <see cref="CADability.GeoObject.Point"/> and also
+            /// <see cref="CADability.GeoObject.Hatch"/>.
+            /// </summary>
+            Curves = 1,
+            /// <summary>
+            /// Solid geometry: <see cref="CADability.GeoObject.Solid"/>, <see cref="CADability.GeoObject.Shell"/> and
+            /// <see cref="CADability.GeoObject.Face"/>.
+            /// </summary>
+            Solids = 2,
+            /// <summary>
+            /// <see cref="CADability.GeoObject.Text"/> and <see cref="CADability.GeoObject.Picture"/> objects.
+            /// </summary>
+            Text = 4,
+            /// <summary>
+            /// <see cref="CADability.GeoObject.Dimension"/> objects.
+            /// </summary>
+            Dimension = 8,
+            /// <summary>
+            /// Hidden-line representations of solids. Can be set in the control center, but no object of CADability asks for it.
+            /// </summary>
+            HiddenSolids = 16,
+            /// <summary>
+            /// Axes. Can be set in the control center, but no object of CADability asks for it.
+            /// </summary>
+            Axis = 32
+        }
         private EDefaultFor defaultFor;
         private LineWidthSelectionProperty selectLineWidth;
         private HatchStyleSelectionProperty selectHatchStyle;
         private LinePatternSelectionProperty selectLinePattern;
         private DimensionStyleSelectionProperty selectDimStyle;
+        /// <summary>
+        /// Creates a style without a name and without any attribute. Such a style changes nothing when applied; it is
+        /// used by <see cref="Clone"/> and by the deserialization. Use <see cref="Style(string)"/> or
+        /// <see cref="GetDefault()"/> to create a usable style.
+        /// </summary>
         public Style()
         {
         }
+        /// <summary>
+        /// Creates a style with the given name whose attributes are all null, i.e. applying it changes nothing until
+        /// attributes like <see cref="Layer"/> or <see cref="ColorDef"/> are set.
+        /// </summary>
+        /// <param name="name">the name of the style; must be unique in the <see cref="StyleList"/> it is added to</param>
         public Style(string name)
             : this()
         {
@@ -184,6 +224,12 @@ namespace CADability.Attribute
             }
             return true;
         }
+        /// <summary>
+        /// Creates a copy of this style with the same name, the same <see cref="DefaultFor"/> categories and references
+        /// to the same attribute objects (layer, colour, line width, line pattern, hatch style, dimension style). The
+        /// copy is not contained in a <see cref="StyleList"/>.
+        /// </summary>
+        /// <returns>the copy</returns>
         public Style Clone()
         {
             Style res = new Style();
@@ -198,6 +244,13 @@ namespace CADability.Attribute
             res.defaultFor = defaultFor;
             return res;
         }
+        /// <summary>
+        /// The categories of objects (a combination of <see cref="EDefaultFor"/> flags) for which this style is the
+        /// default: <see cref="Project.SetDefaults(IGeoObject)"/> applies the style that
+        /// <see cref="StyleList.GetDefault(Style.EDefaultFor)"/> returns for the <see cref="IGeoObject.PreferredStyle"/> of a
+        /// new object. Setting it does not clear the same category on the other styles of the list; the context menu of
+        /// the style in the control center does that.
+        /// </summary>
         public EDefaultFor DefaultFor
         {
             get
@@ -209,14 +262,27 @@ namespace CADability.Attribute
                 defaultFor = value;
             }
         }
+        /// <summary>
+        /// Adds the given categories to <see cref="DefaultFor"/>, keeping the ones already set.
+        /// </summary>
+        /// <param name="toSet">the categories to add</param>
         public void SetDefaultFor(EDefaultFor toSet)
         {
             defaultFor |= toSet;
         }
+        /// <summary>
+        /// Removes the given categories from <see cref="DefaultFor"/>.
+        /// </summary>
+        /// <param name="toRemove">the categories to remove</param>
         public void RemoveDefaultFor(EDefaultFor toRemove)
         {
             defaultFor &= ~toRemove;
         }
+        /// <summary>
+        /// Checks whether this style is the default for at least one of the given categories.
+        /// </summary>
+        /// <param name="toTest">the categories to test, several may be combined</param>
+        /// <returns>true when <see cref="DefaultFor"/> contains any of the categories</returns>
         public bool IsDefaultFor(EDefaultFor toTest)
         {
             return (defaultFor & toTest) != 0;
@@ -381,6 +447,7 @@ namespace CADability.Attribute
                 Name = value;
             }
         }
+        /// <inheritdoc/>
         public override PropertyEntryType Flags
         {
             get
@@ -460,6 +527,7 @@ namespace CADability.Attribute
             base.Added(propertyPage);
             base.resourceIdInternal = "StyleName";
         }
+        /// <inheritdoc/>
         public override void EndEdit(bool aborted, bool modified, string newValue)
         {
             try
@@ -469,6 +537,7 @@ namespace CADability.Attribute
             }
             catch (NameAlreadyExistsException) { }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -528,6 +597,11 @@ namespace CADability.Attribute
             info.AddValue("Parent", parent);
             info.AddValue("DefaultFor", defaultFor);
         }
+        /// <summary>
+        /// Writes the name, the attributes, the containing list and <see cref="DefaultFor"/> for the JSON serialization
+        /// (<see cref="IJsonSerialize"/>). Attributes that are null are left out.
+        /// </summary>
+        /// <param name="data">receives the data</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("Name", styleName);
@@ -541,6 +615,11 @@ namespace CADability.Attribute
             data.AddProperty("DefaultFor", defaultFor);
         }
 
+        /// <summary>
+        /// Reads the data written by <see cref="GetObjectData(IJsonWriteData)"/> for the JSON deserialization
+        /// (<see cref="IJsonSerialize"/>). Attributes that were not written stay null.
+        /// </summary>
+        /// <param name="data">provides the data</param>
         public void SetObjectData(IJsonReadData data)
         {
             styleName = data.GetPropertyOrDefault<string>("Name");
@@ -555,6 +634,11 @@ namespace CADability.Attribute
         }
         #endregion
         #region AttributeInterface Members
+        /// <summary>
+        /// The colour this style applies (<see cref="Apply(IGeoObject)"/>) to objects that implement <see cref="IColorDef"/>,
+        /// or null when the style leaves the colour of an object unchanged. Setting it notifies the containing
+        /// <see cref="StyleList"/> and its owner (undo, modified flag); objects that already have this style are not changed.
+        /// </summary>
         public ColorDef ColorDef
         {
             get
@@ -578,6 +662,11 @@ namespace CADability.Attribute
             throw new ApplicationException("Style.IColorDef.SetTopLevel Should not be called");
         }
 
+        /// <summary>
+        /// The layer this style applies (<see cref="Apply(IGeoObject)"/>) to an object, or null when the style leaves the
+        /// layer of an object unchanged. Setting it notifies the containing <see cref="StyleList"/> and its owner (undo,
+        /// modified flag); objects that already have this style are not changed.
+        /// </summary>
         public Layer Layer
         {
             get
@@ -594,6 +683,11 @@ namespace CADability.Attribute
             }
         }
 
+        /// <summary>
+        /// The line width this style applies (<see cref="Apply(IGeoObject)"/>) to objects that implement <see cref="ILineWidth"/>,
+        /// or null when the style leaves the line width of an object unchanged. Setting it notifies the containing
+        /// <see cref="StyleList"/> and its owner (undo, modified flag); objects that already have this style are not changed.
+        /// </summary>
         public LineWidth LineWidth
         {
             get
@@ -610,6 +704,11 @@ namespace CADability.Attribute
             }
         }
 
+        /// <summary>
+        /// The line pattern this style applies (<see cref="Apply(IGeoObject)"/>) to objects that implement <see cref="ILinePattern"/>,
+        /// or null when the style leaves the line pattern of an object unchanged. Setting it notifies the containing
+        /// <see cref="StyleList"/> and its owner (undo, modified flag); objects that already have this style are not changed.
+        /// </summary>
         public LinePattern LinePattern
         {
             get
@@ -625,6 +724,11 @@ namespace CADability.Attribute
 
             }
         }
+        /// <summary>
+        /// The hatch style this style applies (<see cref="Apply(IGeoObject)"/>) to objects that implement <see cref="IHatchStyle"/>,
+        /// or null when the style leaves the hatch style of an object unchanged. Setting it notifies the containing
+        /// <see cref="StyleList"/> and its owner (undo, modified flag); objects that already have this style are not changed.
+        /// </summary>
         public HatchStyle HatchStyle
         {
             get
@@ -639,6 +743,11 @@ namespace CADability.Attribute
                     (parent as IAttributeList).AttributeChanged(this, new ReversibleChange(this, "HatchStyle", param));
             }
         }
+        /// <summary>
+        /// The dimension style this style applies (<see cref="Apply(IGeoObject)"/>) to objects that implement <see cref="IDimensionStyle"/>,
+        /// or null when the style leaves the dimension style of an object unchanged. Setting it notifies the containing
+        /// <see cref="StyleList"/> and its owner (undo, modified flag); objects that already have this style are not changed.
+        /// </summary>
         public DimensionStyle DimensionStyle
         {
             get { return dimStyle; }
@@ -737,11 +846,25 @@ namespace CADability.Attribute
     }
 
 
+    /// <summary>
+    /// Property entry that lets the user choose a <see cref="Style"/> from a <see cref="StyleList"/> in a drop-down
+    /// list. It is part of the attribute properties of every <see cref="IGeoObject"/> in the control center and of the
+    /// properties of a multiple selection. The name of the style is shown as selected only while the attributes of the
+    /// object still agree with the style (<see cref="Style.Check(IGeoObject)"/>); when one of them was changed
+    /// individually, the name is shown as not selected.
+    /// </summary>
     public class StyleSelectionProperty : MultipleChoiceProperty
     {
         private IStyle objectWithStyle;
         private StyleList styleList;
         private IGeoObject toWatch;
+        /// <summary>
+        /// Creates the entry for the given object.
+        /// </summary>
+        /// <param name="objectWithStyle">the object whose <see cref="IStyle.Style"/> is set when the user selects a
+        /// style; may be null, then the selection is only reported through the <see cref="StyleChangedEvent"/></param>
+        /// <param name="resourceId">the resource id of the label and the tooltip of the entry</param>
+        /// <param name="styleList">the list whose styles are offered</param>
         public StyleSelectionProperty(IStyle objectWithStyle, string resourceId, StyleList styleList)
         {
             this.objectWithStyle = objectWithStyle;
@@ -766,6 +889,7 @@ namespace CADability.Attribute
                 }
             }
         }
+        /// <inheritdoc/>
         protected override void OnSelectionChanged(string selected)
         {
             base.OnSelectionChanged(selected);
@@ -809,6 +933,11 @@ namespace CADability.Attribute
                 }
             }
         }
+        /// <summary>
+        /// The <see cref="IGeoObject"/> this entry controls: its style is set on selection and its changes are watched
+        /// to update the display. Setting it switches the entry to another object; the construct actions do this when
+        /// the object under construction is replaced.
+        /// </summary>
         public IGeoObject Connected
         {   // mit dieser Property kann man das kontrollierte Geoobjekt ändern
             get { return toWatch; }
@@ -823,25 +952,55 @@ namespace CADability.Attribute
                 if (toWatch != null) toWatch.DidChangeEvent += new ChangeDelegate(GeoObjectDidChange);
             }
         }
+        /// <summary>
+        /// Signature of the handler of the <see cref="StyleChangedEvent"/>.
+        /// </summary>
+        /// <param name="selected">the style the user selected</param>
         public delegate void StyleChangedDelegate(Style selected);
+        /// <summary>
+        /// Raised when the user selects a style in the drop-down list, after the style has been set on the object (if any).
+        /// </summary>
         public event StyleChangedDelegate StyleChangedEvent;
     }
 
+    /// <summary>
+    /// List of <see cref="Style"/> objects. The <see cref="Project"/> and the <see cref="Settings"/> each own one
+    /// (<see cref="Project.StyleList"/>, <see cref="Settings.StyleList"/>); the list of the project is shown in the
+    /// control center, where styles can be added, renamed and marked as the default for a kind of object. The names of
+    /// the styles are unique within the list and the entries are ordered alphabetically.
+    /// </summary>
     [Serializable()]
     public class StyleList : PropertyEntryImpl, ICloneable, ISerializable, IAttributeList, ICommandHandler, IDeserializationCallback, IJsonSerialize, IJsonSerializeDone
     {
         private Style[] unsortedEntries;
+        /// <summary>
+        /// The entries, keyed by name and ordered alphabetically. Internal state of the list.
+        /// </summary>
         protected SortedList styles;
         private IAttributeListContainer owner;
         private Style current;
         private IPropertyEntry[] showProperties;
         internal string menuResourceId;
 
+        /// <summary>
+        /// Creates an empty style list that is not owned by a project or the settings.
+        /// </summary>
         public StyleList()
         {
             styles = new SortedList();
             resourceIdInternal = "StyleList";
         }
+        /// <summary>
+        /// Creates a style list from the "StyleList.Default" entry of the string table, which (in the English
+        /// version) defines the styles "2D", "3D", "Text" and "Dimension" by the names of a layer, a colour, a line
+        /// width and a line pattern. These are looked up in the lists of the container, a name without a match gives a
+        /// null attribute. The four styles become the defaults for <see cref="Style.EDefaultFor.Curves"/>,
+        /// <see cref="Style.EDefaultFor.Solids"/>, <see cref="Style.EDefaultFor.Text"/> and
+        /// <see cref="Style.EDefaultFor.Dimension"/> in this order. Used when neither the project nor the global
+        /// settings provide a style list.
+        /// </summary>
+        /// <param name="container">provides the layer, colour, line width and line pattern lists</param>
+        /// <returns>the default style list, not yet owned by the container</returns>
         public static StyleList GetDefault(IAttributeListContainer container)
         {
             StyleList res = new StyleList();
@@ -876,11 +1035,22 @@ namespace CADability.Attribute
             }
             return res;
         }
+        /// <summary>
+        /// The <see cref="Project"/> or <see cref="Settings"/> that holds this list, or null. The container sets it when
+        /// the list is added. The styles resolve their attributes in the lists of the owner, changes of a style are
+        /// reported to it and it is asked before a style is removed (<see cref="IAttributeListContainer.RemovingItem"/>).
+        /// </summary>
         public IAttributeListContainer Owner
         {
             get { return owner; }
             set { owner = value; }
         }
+        /// <summary>
+        /// Adds a style to the list and makes this list its <see cref="Style.Parent"/>. The first style added becomes
+        /// the <see cref="Current"/> one. Throws an <see cref="ArgumentException"/> when a style with the same name is
+        /// already in the list. The control center is not refreshed.
+        /// </summary>
+        /// <param name="ToAdd">the style to add; its <see cref="Style.Name"/> must not be null</param>
         public void Add(Style ToAdd)
         {
             ToAdd.Parent = this;
@@ -888,6 +1058,12 @@ namespace CADability.Attribute
             if (styles.Count == 1)
                 current = ToAdd;
         }
+        /// <summary>
+        /// Removes a style from the list and refreshes the control center. Before removing, the <see cref="Owner"/> is
+        /// asked (<see cref="IAttributeListContainer.RemovingItem"/>): it refuses to remove the last style and lets the
+        /// user confirm when the style is still used by objects. Does nothing when the style is not in the list.
+        /// </summary>
+        /// <param name="toRemove">the style to remove</param>
         public void Remove(Style toRemove)
         {
             if (styles.Contains(toRemove.Name))
@@ -918,6 +1094,11 @@ namespace CADability.Attribute
         {
             return styles[Name] as Style;
         }
+        /// <summary>
+        /// The current style of the list, shown in bold in the control center. The construct actions set it to the style
+        /// the user chooses for the object under construction, and objects dropped into a view that carry the internal
+        /// edge style get it. Setting a style whose name is not in the list adds it; setting null throws.
+        /// </summary>
         public Style Current
         {
             get { return current; }
@@ -929,6 +1110,13 @@ namespace CADability.Attribute
                 if (propertyPage != null) propertyPage.Refresh(this);
             }
         }
+        /// <summary>
+        /// Returns the style that is the default for the given category of objects (see <see cref="Style.DefaultFor"/>).
+        /// <see cref="Project.SetDefaults(IGeoObject)"/> uses it with the <see cref="IGeoObject.PreferredStyle"/> of a
+        /// new object.
+        /// </summary>
+        /// <param name="defaultFor">the category; when several are combined, the first style that is default for any of them is returned</param>
+        /// <returns>the default style, or null when no style is marked as default for the category</returns>
         public Style GetDefault(Style.EDefaultFor defaultFor)
         {
             foreach (Style st in styles.Values)
@@ -940,6 +1128,9 @@ namespace CADability.Attribute
             }
             return null;
         }
+        /// <summary>
+        /// The names of all styles in the list in alphabetical order. The selection properties use them as choices.
+        /// </summary>
         public string[] Names
         {
             get
@@ -967,6 +1158,9 @@ namespace CADability.Attribute
             return res;
         }
         #region Properties
+        /// <summary>
+        /// The <see cref="CADability.Attribute.LayerList"/> of the <see cref="Owner"/>, or null when the list has no owner.
+        /// </summary>
         public LayerList LayerList
         {
             get
@@ -976,6 +1170,9 @@ namespace CADability.Attribute
                 return null;
             }
         }
+        /// <summary>
+        /// The <see cref="CADability.Attribute.ColorList"/> of the <see cref="Owner"/>, or null when the list has no owner.
+        /// </summary>
         public ColorList ColorList
         {
             get
@@ -985,6 +1182,9 @@ namespace CADability.Attribute
                 return null;
             }
         }
+        /// <summary>
+        /// The <see cref="CADability.Attribute.HatchStyleList"/> of the <see cref="Owner"/>, or null when the list has no owner.
+        /// </summary>
         public HatchStyleList HatchStyleList
         {
             get
@@ -994,6 +1194,9 @@ namespace CADability.Attribute
                 return null;
             }
         }
+        /// <summary>
+        /// The <see cref="CADability.Attribute.DimensionStyleList"/> of the <see cref="Owner"/>, or null when the list has no owner.
+        /// </summary>
         public DimensionStyleList DimensionStyleList
         {
             get
@@ -1006,6 +1209,7 @@ namespace CADability.Attribute
 
         #endregion
         #region PropertyEntryImpl Overrides
+        /// <inheritdoc/>
         public override PropertyEntryType Flags => PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries | PropertyEntryType.ContextMenu | PropertyEntryType.Selectable;
         /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
@@ -1024,6 +1228,7 @@ namespace CADability.Attribute
                 return showProperties;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -1041,6 +1246,10 @@ namespace CADability.Attribute
             return this.Clone();
         }
         #endregion
+        /// <summary>
+        /// Writes the styles and the <see cref="Current"/> style for the JSON serialization (<see cref="IJsonSerialize"/>).
+        /// </summary>
+        /// <param name="data">receives the data</param>
         public void GetObjectData(IJsonWriteData data)
         {
             Style[] styleArray = new Style[styles.Count];
@@ -1052,6 +1261,12 @@ namespace CADability.Attribute
             data.AddProperty("Current", current);
         }
 
+        /// <summary>
+        /// Reads the data written by <see cref="GetObjectData(IJsonWriteData)"/> for the JSON deserialization
+        /// (<see cref="IJsonSerialize"/>). The styles are sorted into the list and connected to it when all objects
+        /// have been read (<see cref="IJsonSerializeDone"/>).
+        /// </summary>
+        /// <param name="data">provides the data</param>
         public void SetObjectData(IJsonReadData data)
         {
             unsortedEntries = data.GetProperty<Style[]>("UnsortedEntries");
@@ -1388,6 +1603,12 @@ namespace CADability.Attribute
                 }
             }
         }
+        /// <summary>
+        /// Returns the index of the style with the name of the given style in the alphabetical order of the list, as
+        /// used by the property entries of the control center.
+        /// </summary>
+        /// <param name="style">the style to look for; only its name is compared</param>
+        /// <returns>the index, or -1 when no style with that name is in the list</returns>
         public int FindIndex(Style style)
         {
             return styles.IndexOfKey(style.Name);

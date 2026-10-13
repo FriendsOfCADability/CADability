@@ -30,6 +30,7 @@
         public override string GetID()
         { return "Measure"; }
 
+        /// <inheritdoc/>
         public override void OnDone()
         { base.OnDone(); }
     }

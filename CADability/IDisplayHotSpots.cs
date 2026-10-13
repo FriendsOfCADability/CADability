@@ -16,7 +16,17 @@ namespace CADability
 	 * verändern dann die entsprechende Einstellung.
 	 * */
 
+    /// <summary>
+    /// What happened to a hotspot, as reported by <see cref="HotspotChangedDelegate"/>: Visible and Invisible when the hotspot is to
+    /// be shown or hidden (e.g. the property entry it belongs to was opened or closed), Selected and Deselected when its selection
+    /// state changed, Moved when its position changed.
+    /// </summary>
     public enum HotspotChangeMode { Visible, Invisible, Selected, Deselected, Moved }
+    /// <summary>
+    /// Signature of the handlers of <see cref="IDisplayHotSpots.HotspotChangedEvent"/>.
+    /// </summary>
+    /// <param name="sender">The hotspot that changed</param>
+    /// <param name="mode">What changed</param>
     public delegate void HotspotChangedDelegate(IHotSpot sender, HotspotChangeMode mode);
     /// <summary>
     /// Implemented by property entries (typically the property entry of a selected object) which display hotspots: draggable

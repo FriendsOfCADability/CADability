@@ -30,7 +30,15 @@ namespace CADability.Attribute
         /// </item>
         /// </list>
         /// </summary>
-        public enum Scaling { Device, World, Layout }
+        public enum Scaling
+        {
+            /// <summary>The width is a number of pixels on the screen, independent of the zoom factor.</summary>
+            Device,
+            /// <summary>The width is a length in the world coordinate system of the model and scales with the zoom factor.</summary>
+            World,
+            /// <summary>The width is a length in the layout, i.e. in mm on the paper when printed; the default of the parameterless constructor.</summary>
+            Layout
+        }
         private Scaling scale;
         private LineWidthList parent;
         /// <summary>
@@ -42,6 +50,13 @@ namespace CADability.Attribute
             name = "";
             width = 0.0;
         }
+        /// <summary>
+        /// Creates a line width with the given name and width. The <see cref="Scale"/> is <see cref="Scaling.Device"/> (the
+        /// default value of the enumeration); set it explicitly when the width is meant in world or layout units. The object
+        /// does not belong to a list yet, see <see cref="LineWidthList.Add(LineWidth)"/>.
+        /// </summary>
+        /// <param name="name">the name, unique within the <see cref="LineWidthList"/> it is added to</param>
+        /// <param name="width">the width, interpreted according to <see cref="Scale"/></param>
         public LineWidth(string name, double width)
         {
             this.name = name;
@@ -91,6 +106,11 @@ namespace CADability.Attribute
                 }
             }
         }
+        /// <summary>
+        /// A line width of 0, which is the thinnest line the output device can draw (one pixel on the screen, 0.1 mm when
+        /// printed). It is a shared instance without a name that does not belong to any list; CADability itself no longer
+        /// uses it.
+        /// </summary>
         static public LineWidth ThinLine = new LineWidth();
         private void FireDidChange(string propertyName, object propertyOldValue)
         {   // Eine Eigenschaft hat sich geändert.
@@ -104,6 +124,7 @@ namespace CADability.Attribute
 
         #region PropertyEntryImpl
         private IPropertyEntry[] subEntries;
+        /// <inheritdoc/>
         public override PropertyEntryType Flags
         {
             get
@@ -114,6 +135,7 @@ namespace CADability.Attribute
                 return flags;
             }
         }
+        /// <inheritdoc/>
         public override void Added(IPropertyPage pp)
         {
             base.Added(pp);
@@ -129,6 +151,7 @@ namespace CADability.Attribute
             subEntries[0] = mcp;
             base.resourceIdInternal = "LineWidthName";
         }
+        /// <inheritdoc/>
         public override string LabelText
         {
             get
@@ -140,6 +163,7 @@ namespace CADability.Attribute
                 Name = value;
             }
         }
+        /// <inheritdoc/>
         public override void EndEdit(bool aborted, bool modified, string newValue)
         {
             try
@@ -150,6 +174,7 @@ namespace CADability.Attribute
             {
             }
         }
+        /// <inheritdoc/>
         public override void Removed(IPropertyPage pp)
         {
             base.Removed(pp);
@@ -158,6 +183,7 @@ namespace CADability.Attribute
                 mcp.ValueChangedEvent -= new ValueChangedDelegate(ScalingChanged);
             }
         }
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -165,6 +191,7 @@ namespace CADability.Attribute
                 return subEntries;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -180,6 +207,11 @@ namespace CADability.Attribute
         }
 #endregion
 #region INamedAttribute Members
+        /// <summary>
+        /// The name of the line width, unique within its <see cref="LineWidthList"/> and shown in the control center.
+        /// Setting a name that is already used by another entry of the list throws a <see cref="NameAlreadyExistsException"/>;
+        /// otherwise the change is forwarded to the owner of the list (the project), which records it for undo.
+        /// </summary>
         public string Name
         {
             get
@@ -197,6 +229,11 @@ namespace CADability.Attribute
                 FireDidChange("Name", OldName);
             }
         }
+        /// <summary>
+        /// The <see cref="LineWidthList"/> this line width belongs to, or null (<see cref="INamedAttribute.Parent"/>). It is
+        /// set by the list when the line width is added or removed; the line width forwards its changes to it. Hides
+        /// <see cref="PropertyEntryImpl.Parent"/>, the parent of the entry in the control center.
+        /// </summary>
         public new IAttributeList Parent
         {
             get
@@ -214,6 +251,16 @@ namespace CADability.Attribute
         }
 #endregion
 #region ISerializable Members
+        /// <summary>
+        /// Reads the LineWidth stored under the given name from the legacy binary serialization data
+        /// (<see cref="System.Runtime.Serialization.ISerializable"/>). For use in the deserialization constructors of objects
+        /// that have a line width; missing or incompatible entries yield null instead of an exception, so that older files
+        /// can be read.
+        /// </summary>
+        /// <param name="name">the name the LineWidth was stored under</param>
+        /// <param name="info">the serialization data</param>
+        /// <param name="context">the source of the serialization</param>
+        /// <returns>the LineWidth, or null when there is no entry with that name or it is not a LineWidth</returns>
         public static LineWidth Read(string name, SerializationInfo info, StreamingContext context)
         {
             // Versuch einer sicheren allgemeinen Implementierung von Read aus einer SerializationInfo
@@ -283,6 +330,10 @@ namespace CADability.Attribute
         void ICommandHandler.OnSelected(MenuWithHandler selectedMenuItem, bool selected) { }
         #endregion
         #region IJsonSerialize
+        /// <summary>
+        /// Writes the name, width and scaling of this line width for the JSON serialization (<see cref="IJsonSerialize"/>).
+        /// </summary>
+        /// <param name="data">receives the data</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("Name", name);
@@ -290,6 +341,10 @@ namespace CADability.Attribute
             data.AddProperty("Scale", scale);
         }
 
+        /// <summary>
+        /// Restores this line width from the JSON data written by <see cref="GetObjectData(IJsonWriteData)"/> (<see cref="IJsonSerialize"/>).
+        /// </summary>
+        /// <param name="data">the data to read from</param>
         public void SetObjectData(IJsonReadData data)
         {
             name = data.GetStringProperty("Name");
@@ -300,8 +355,17 @@ namespace CADability.Attribute
     }
 
 
+    /// <summary>
+    /// Implemented by GeoObjects that have a <see cref="LineWidth"/> attribute, e.g. <see cref="Line"/>, <see cref="Ellipse"/>,
+    /// <see cref="BSpline"/>, <see cref="Polyline"/> and <see cref="Path"/>, and by <see cref="Style"/>. The
+    /// <see cref="LineWidthList"/> of the project uses it to find and update the line widths in use.
+    /// </summary>
     public interface ILineWidth
     {
+        /// <summary>
+        /// The line width of the object, or null when none is set. For GeoObjects setting it raises the change events and is
+        /// undoable.
+        /// </summary>
         LineWidth LineWidth { get; set; }
     }
     /* Default Implementierung

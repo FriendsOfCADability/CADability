@@ -25,6 +25,12 @@ namespace CADability.Actions
         private Plane localPlane;
         Boolean usesLocalPlane;
 
+        /// <summary>
+        /// Creates the action for <paramref name="angleProperty"/>. The angle is the direction from <paramref name="fixPoint"/>
+        /// to the mouse position, both projected into the active drawing plane.
+        /// </summary>
+        /// <param name="angleProperty">The property to modify</param>
+        /// <param name="fixPoint">The vertex of the angle in model coordinates, e.g. the center of an ellipse</param>
         public GeneralAngleAction(AngleProperty angleProperty, GeoPoint fixPoint)
         {
             this.angleProperty = angleProperty;
@@ -32,6 +38,12 @@ namespace CADability.Actions
             usesLocalPlane = false;
         }
 
+        /// <summary>
+        /// Creates the action for <paramref name="angleProperty"/>. The angle is the direction from the location of
+        /// <paramref name="localPlane"/> to the mouse position projected into that plane, measured from the plane's x-axis.
+        /// </summary>
+        /// <param name="angleProperty">The property to modify</param>
+        /// <param name="localPlane">The plane in which the angle is measured, e.g. the plane of a circle (whose location is the center)</param>
         public GeneralAngleAction(AngleProperty angleProperty, Plane localPlane)
         {
             this.angleProperty = angleProperty;
@@ -39,7 +51,16 @@ namespace CADability.Actions
             usesLocalPlane = true;
         }
 
+        /// <summary>
+        /// Delegate for <see cref="CalculateAngleEvent"/>.
+        /// </summary>
+        /// <param name="MousePosition">The (snapped) mouse position in model coordinates</param>
+        /// <returns>The angle in radians to set</returns>
         public delegate double CalculateAngleDelegate(GeoPoint MousePosition);
+        /// <summary>
+        /// If a handler is attached, it computes the angle from the mouse position instead of the default calculation,
+        /// e.g. the parameter of an ellipse for the start angle of an elliptical arc.
+        /// </summary>
         public event CalculateAngleDelegate CalculateAngleEvent;
         private void SetAngle(Angle l)
         {

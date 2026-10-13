@@ -129,6 +129,7 @@ namespace CADability.Actions
             else return 0;
         }
 
+        /// <inheritdoc/>
         public override void OnSetAction()
         {
             base.TitleId = "Construct.DistanceTwoPoints";
@@ -167,6 +168,7 @@ namespace CADability.Actions
             else base.SetInput(firstPointInput, secondPointInput);
             base.OnSetAction();
         }
+        /// <inheritdoc/>
         public override void OnRemoveAction()
         {
             base.OnRemoveAction();
@@ -175,10 +177,12 @@ namespace CADability.Actions
 				lengthProperty.Select();
         }
 
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "Construct.DistanceTwoPoints";
         }
+        /// <inheritdoc/>
         public override void OnDone()
         {
             succeeded = true;

@@ -12,9 +12,18 @@ namespace CADability
     {
         private double dx;
         private double dy;
+        /// <summary>
+        /// How the grid is displayed in a view: dots (a dot at each grid point), marks (a small cross at each grid point), lines
+        /// (horizontal and vertical lines through the grid points) or fields (the grid cells shaded like a checkerboard).
+        /// </summary>
         public enum Appearance { dots, marks, lines, fields };
         private Appearance displayMode;
         private bool show;
+        /// <summary>
+        /// Signature of the handlers of <see cref="GridChangedEvent"/>, which is raised when the user changes the appearance, the
+        /// visibility or the distances of the grid in the property page.
+        /// </summary>
+        /// <param name="sender">The grid that changed</param>
         public delegate void GridChangedDelegate(Grid sender);
         public event GridChangedDelegate GridChangedEvent;
         public Grid()

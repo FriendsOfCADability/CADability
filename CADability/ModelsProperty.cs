@@ -7,6 +7,10 @@
     public class ModelsProperty : IShowPropertyImpl, ICommandHandler
     {
         private Project project;
+        /// <summary>
+        /// Creates the entry for the models of <paramref name="project"/>.
+        /// </summary>
+        /// <param name="project">The project whose models are listed</param>
         public ModelsProperty(Project project)
         {
             this.project = project;
@@ -31,6 +35,7 @@
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get 
@@ -63,6 +68,9 @@
                 return subEntries;
             }
         }
+        /// <summary>
+        /// The project whose models are listed by this entry.
+        /// </summary>
         public Project Project
         {
             get
@@ -70,6 +78,7 @@
                 return project;
             }
         }
+        /// <inheritdoc/>
         public override void Refresh()
         {
             subEntries = null;

@@ -44,7 +44,18 @@ namespace CADability
 
     public interface IMultiObjectUserData
     {
+        /// <summary>
+        /// Returns the property entry that shows (and lets the user edit) this user data for all selected objects at
+        /// once. When several objects are selected, the control center calls it once per user data key for the first
+        /// object found carrying a value with this interface under that key.
+        /// </summary>
+        /// <param name="selectedObjects">the objects currently selected</param>
+        /// <returns>the property entry to show in the control center</returns>
         IPropertyEntry GetShowProperty(GeoObjectList selectedObjects);
+        /// <summary>
+        /// Intended to tell that the user data object is currently changing the selected objects itself. CADability does
+        /// not evaluate it at present.
+        /// </summary>
         bool isChanging { get; }
     }
 
@@ -61,11 +72,33 @@ namespace CADability
     [Serializable()]
     public class UserData : ISerializable, IDictionary<string, object>, IDictionary, IJsonSerialize
     {
+        /// <summary>
+        /// Signature of the handler of the <see cref="UserDataAddedEvent"/>.
+        /// </summary>
+        /// <param name="name">the key of the entry</param>
+        /// <param name="value">the value that was added</param>
         public delegate void UserDataAddedDelegate(string name, object value);
+        /// <summary>
+        /// Signature of the handler of the <see cref="UserDataRemovedEvent"/>.
+        /// </summary>
+        /// <param name="name">the key of the entry</param>
+        /// <param name="value">the value that was removed</param>
         public delegate void UserDataRemovedDelegate(string name, object value);
+        /// <summary>
+        /// Raised when an entry is added or replaced with <see cref="Add(string, object)"/> or <see cref="Add(UserData)"/>.
+        /// The indexers and the <see cref="IDictionary"/> methods do not raise it. The property pages of the objects use it
+        /// to show new entries.
+        /// </summary>
         public event UserDataAddedDelegate UserDataAddedEvent;
+        /// <summary>
+        /// Raised when an entry is removed with <see cref="RemoveUserData(string)"/>. The other remove methods and
+        /// <see cref="Clear"/> do not raise it.
+        /// </summary>
         public event UserDataRemovedDelegate UserDataRemovedEvent;
         private Dictionary<string, object> data; // das hält die Daten
+        /// <summary>
+        /// Creates an empty table.
+        /// </summary>
         public UserData()
         {
             data = new Dictionary<string, object>();
@@ -287,26 +320,47 @@ namespace CADability
 
         #region IDictionary Members
 
+        /// <summary>
+        /// Returns an enumerator over the entries as <see cref="DictionaryEntry"/> items with the key as string.
+        /// </summary>
+        /// <returns>the enumerator</returns>
         public IDictionaryEnumerator GetEnumerator()
         {
             return data.GetEnumerator();
         }
 
+        /// <summary>
+        /// Removes the entry with the given key without raising the <see cref="UserDataRemovedEvent"/>; use
+        /// <see cref="RemoveUserData(string)"/> when the property pages should be notified. Does nothing when there is
+        /// no such entry.
+        /// </summary>
+        /// <param name="key">the key of the entry</param>
         public void Remove(string key)
         {
             data.Remove(key);
         }
 
+        /// <summary>
+        /// Checks whether an entry with the given key exists; the same as <see cref="ContainsData(string)"/>.
+        /// </summary>
+        /// <param name="key">the key to look for</param>
+        /// <returns>true when the entry exists</returns>
         public bool Contains(string key)
         {
             return data.ContainsKey(key);
         }
 
+        /// <summary>
+        /// Removes all entries without raising the <see cref="UserDataRemovedEvent"/>.
+        /// </summary>
         public void Clear()
         {
             data.Clear();
         }
 
+        /// <summary>
+        /// The values of all entries.
+        /// </summary>
         public ICollection Values
         {
             get
@@ -315,6 +369,9 @@ namespace CADability
             }
         }
 
+        /// <summary>
+        /// The keys of all entries (strings). <see cref="AllItems"/> returns them as an array.
+        /// </summary>
         public ICollection Keys
         {
             get
@@ -323,6 +380,9 @@ namespace CADability
             }
         }
 
+        /// <summary>
+        /// Always false: entries can be added and removed at any time.
+        /// </summary>
         public bool IsFixedSize
         {
             get
@@ -333,6 +393,9 @@ namespace CADability
 
         #endregion
 
+        /// <summary>
+        /// The number of entries.
+        /// </summary>
         public int Count
         {
             get
@@ -429,12 +492,27 @@ namespace CADability
             get { return false; ; }
         }
 
+        /// <summary>
+        /// Always false: the table can be modified.
+        /// </summary>
         public bool IsReadOnly => ((IDictionary)data).IsReadOnly;
 
+        /// <summary>
+        /// The object to lock on when the table is accessed from several threads (<see cref="ICollection.SyncRoot"/>).
+        /// </summary>
         public object SyncRoot => ((IDictionary)data).SyncRoot;
 
+        /// <summary>
+        /// Always false: access to the table is not synchronized.
+        /// </summary>
         public bool IsSynchronized => ((IDictionary)data).IsSynchronized;
 
+        /// <summary>
+        /// Untyped access to an entry (<see cref="IDictionary"/>). Reading an entry that does not exist or whose key is
+        /// not a string gives null; setting requires a string key and adds or replaces the entry without raising the
+        /// <see cref="UserDataAddedEvent"/>. Use <see cref="this[string]"/> for typed access.
+        /// </summary>
+        /// <param name="key">the key of the entry, a string</param>
         public object this[object key] { get => ((IDictionary)data)[key]; set => ((IDictionary)data)[key] = value; }
 
         bool ICollection<KeyValuePair<string, object>>.Remove(KeyValuePair<string, object> item)
@@ -460,26 +538,55 @@ namespace CADability
             return data.GetEnumerator();
         }
 
+        /// <summary>
+        /// Untyped check (<see cref="IDictionary"/>) whether an entry with the given key exists.
+        /// </summary>
+        /// <param name="key">the key, a string</param>
+        /// <returns>true when the entry exists, false when it does not or the key is not a string</returns>
         public bool Contains(object key)
         {
             return ((IDictionary)data).Contains(key);
         }
 
+        /// <summary>
+        /// Untyped add (<see cref="IDictionary"/>). Unlike <see cref="Add(string, object)"/> it throws an
+        /// <see cref="ArgumentException"/> when the key already exists or is not a string, and it does not raise the
+        /// <see cref="UserDataAddedEvent"/>.
+        /// </summary>
+        /// <param name="key">the key of the new entry, a string</param>
+        /// <param name="value">the value</param>
         public void Add(object key, object value)
         {
             ((IDictionary)data).Add(key, value);
         }
 
+        /// <summary>
+        /// Untyped remove (<see cref="IDictionary"/>) without raising the <see cref="UserDataRemovedEvent"/>. Does
+        /// nothing when there is no such entry or the key is not a string.
+        /// </summary>
+        /// <param name="key">the key of the entry, a string</param>
         public void Remove(object key)
         {
             ((IDictionary)data).Remove(key);
         }
 
+        /// <summary>
+        /// Copies the entries as <see cref="DictionaryEntry"/> items into an array (<see cref="ICollection.CopyTo(Array, int)"/>).
+        /// </summary>
+        /// <param name="array">the destination array</param>
+        /// <param name="index">the index in the array at which copying begins</param>
         public void CopyTo(Array array, int index)
         {
             ((IDictionary)data).CopyTo(array, index);
         }
 
+        /// <summary>
+        /// Writes the entries for the JSON serialization (<see cref="IJsonSerialize"/>), each as a property named by its
+        /// key. Only values that can be written are stored: primitive types, objects implementing
+        /// <see cref="IJsonSerialize"/>, types marked with the <see cref="SerializableAttribute"/>, and arrays of
+        /// those. Null values and keys starting with "$" (reserved for the serializer) are skipped.
+        /// </summary>
+        /// <param name="data">receives the data</param>
         public void GetObjectData(IJsonWriteData data)
         {
             foreach (KeyValuePair<string, object> de in this.data)
@@ -504,6 +611,11 @@ namespace CADability
                 }
             }
         }
+        /// <summary>
+        /// Reads the entries written by <see cref="GetObjectData(IJsonWriteData)"/> for the JSON deserialization
+        /// (<see cref="IJsonSerialize"/>); the properties of the serializer itself ("$..." and "§Index") are skipped.
+        /// </summary>
+        /// <param name="data">provides the data</param>
         public void SetObjectData(IJsonReadData data)
         {
             foreach (KeyValuePair<string,object> item in data)

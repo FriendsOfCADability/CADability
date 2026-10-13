@@ -117,6 +117,12 @@ namespace CADability.Attribute
             linePattern = pr.LinePatternList.Current;
             colorDef = pr.ColorList.Current;
         }
+        /// <summary>
+        /// Creates a contour hatch style with all values at their defaults: distances 0, <see cref="EHoleMode.circumscribe"/>,
+        /// <see cref="ESpiralMode.Parallel"/>, <see cref="CounterClock"/> and <see cref="Inbound"/> false, and no colour,
+        /// line width or line pattern. Set at least <see cref="LineDistance"/> before the style is used; a hatch style
+        /// created from the control center gets sensible defaults instead.
+        /// </summary>
         public HatchStyleContour()
         {
             resourceIdInternal = "HatchStyleNameContour";
@@ -163,6 +169,10 @@ namespace CADability.Attribute
                 holeMode = value;
             }
         }
+        /// <summary>
+        /// Selects how the contours fill the area: separate parallel contours, one or more continuous spiral paths
+        /// built from them, or a round spiral clipped by the shape (see <see cref="ESpiralMode"/>).
+        /// </summary>
         public ESpiralMode SpiralMode
         {
             get
@@ -837,10 +847,12 @@ namespace CADability.Attribute
             }
             return res;
         }
+        /// <inheritdoc/>
         public override IShowProperty GetShowProperty()
         {
             return null;
         }
+        /// <inheritdoc/>
         public override HatchStyle Clone()
         {
             HatchStyleContour res = new HatchStyleContour();
@@ -927,6 +939,7 @@ namespace CADability.Attribute
         {
             spiralMode = (ESpiralMode)(sender as MultipleChoiceProperty).CurrentIndex;
         }
+        /// <inheritdoc/>
         public override void Removed(IPropertyPage pp)
         {
             subItems = null;

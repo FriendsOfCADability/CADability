@@ -167,8 +167,10 @@ namespace CADability.UserInterface
         }
 
         #region PropertyEntryImpl Overrides
+        /// <inheritdoc/>
         public override PropertyEntryType Flags => PropertyEntryType.ContextMenu | PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
 
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -203,6 +205,7 @@ namespace CADability.UserInterface
             }
         }
 
+        /// <inheritdoc/>
         public override void Opened(bool IsOpen)
         {
             if (HotspotChangedEvent != null)
@@ -237,6 +240,7 @@ namespace CADability.UserInterface
             circle.UserData.UserDataRemovedEvent -= OnUserDataAdded;
             base.Removed(propertyTreeView);
         }
+        /// <inheritdoc/>
         public override void Added(IPropertyPage propertyTreeView)
         {
             this.circle.DidChangeEvent += OnGeoObjectDidChange;
@@ -251,6 +255,7 @@ namespace CADability.UserInterface
             propertyPage.Refresh(this);
         }
 
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get

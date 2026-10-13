@@ -15,6 +15,13 @@ namespace CADability.UserInterface
         private object ObjectWithName;
         private PropertyInfo TheProperty;
 
+        /// <summary>
+        /// Creates the entry for the string property <paramref name="PropertyName"/> of <paramref name="ObjectWithName"/>. The
+        /// property is looked up on the type of the object and, when it is not found there, on its base type.
+        /// </summary>
+        /// <param name="ObjectWithName">The object holding the property</param>
+        /// <param name="PropertyName">Name of the public string property</param>
+        /// <param name="resourceId">Resource id of the label text</param>
         public NameProperty(object ObjectWithName, string PropertyName, string resourceId)
         {
             this.ObjectWithName = ObjectWithName;
@@ -54,6 +61,7 @@ namespace CADability.UserInterface
             base.UnSelected();
         }
         #endregion
+        /// <inheritdoc/>
         public override string Value
         {
             get
@@ -64,10 +72,12 @@ namespace CADability.UserInterface
             }
         }
         private string oldName;
+        /// <inheritdoc/>
         public override void StartEdit(bool editValue)
         {
             oldName = GetName();
         }
+        /// <inheritdoc/>
         public override bool EditTextChanged(string newValue)
         {
             using (Frame.Project.Undo.ContextFrame(this))
@@ -76,6 +86,7 @@ namespace CADability.UserInterface
                 return true;
             }
         }
+        /// <inheritdoc/>
         public override void EndEdit(bool aborted, bool modified, string newValue)
         {
             if (aborted)

@@ -11,9 +11,18 @@ using System.Threading;
 namespace CADability.GeoObject
 {
 
+    /// <summary>
+    /// Implemented by objects that carry a <see cref="CADability.Attribute.DimensionStyle"/>: the <see cref="Dimension"/>
+    /// itself and the <see cref="CADability.Attribute.Style"/>. The <see cref="DimensionStyleSelectionProperty"/> and the
+    /// <see cref="DimensionStyleList"/> use it to show and change the dimension style of an object without knowing its type.
+    /// </summary>
     public interface IDimensionStyle
     {
         // für DimensionStyleSelectionProperty, damit die weiß, wie man den DimensionStyle verändert
+        /// <summary>
+        /// The dimension style of the object. Setting it replaces the style; a <see cref="Dimension"/> is displayed with the
+        /// new style from then on.
+        /// </summary>
         DimensionStyle DimensionStyle
         {
             get;
@@ -93,6 +102,11 @@ namespace CADability.GeoObject
             /// Tagging a location
             /// </summary>
             DimLocation,
+            /// <summary>
+            /// Not a type a dimension can have, but a wildcard used when selecting a dimension style: a
+            /// <see cref="DimensionStyleSelectionProperty"/> created with DimAll offers the styles for all types
+            /// (see <see cref="CADability.Attribute.DimensionStyle.Types"/>).
+            /// </summary>
             DimAll
         };
         // zunächst aus CONDOR 4 übernommen, die essentiellen Daten:
@@ -128,17 +142,45 @@ namespace CADability.GeoObject
         /// </summary>
         private Text editingText; // einer der Bemaßungstexte festgehalten für den Editor, null, wenn nicht editierend
         private int editingTextIndex; // für welchen Text Index wird gerade editiert
+        /// <summary>
+        /// Selects which of the texts of a dimension is being edited in place with a text editor: none (dontEdit), the
+        /// dimension text itself (editDimText), the upper or lower tolerance text (editTolPlusText, editTolMinusText), the
+        /// prefix (editPrefix), the postfix (editPostfix) or the alternative postfix (editPosfixAlt). The mode decides which
+        /// <see cref="CADability.GeoObject.Text"/> object is handed to the editor when the dimension is recalculated. The
+        /// in-place editing is currently not used by the property page.
+        /// </summary>
         public enum EditingMode { dontEdit, editDimText, editTolPlusText, editTolMinusText, editPrefix, editPostfix, editPosfixAlt }
         private EditingMode editingMode;
         #region polymorph construction
+        /// <summary>
+        /// Signature of the factory method that <see cref="Construct"/> calls when one is registered in <see cref="Constructor"/>.
+        /// </summary>
+        /// <returns>A new <see cref="Dimension"/> or an object of a class derived from Dimension</returns>
         public delegate Dimension ConstructionDelegate();
+        /// <summary>
+        /// Optional factory for dimensions: when set, <see cref="Construct"/> calls this delegate instead of creating a plain
+        /// <see cref="Dimension"/>, so that every dimension CADability creates (by a construction action, when importing a
+        /// file etc.) is an instance of your derived class. Null by default.
+        /// </summary>
         public static ConstructionDelegate Constructor;
+        /// <summary>
+        /// Creates a new dimension of type <see cref="EDimType.DimPoints"/> without points, style and dimension line. This is
+        /// the only public way to create a dimension, the constructor is protected. If a <see cref="Constructor"/> is
+        /// registered, the dimension is created by that delegate. See the class description for what must be set before the
+        /// dimension can be displayed.
+        /// </summary>
+        /// <returns>The new dimension</returns>
         public static Dimension Construct()
         {
             if (Constructor != null) return Constructor();
             return new Dimension();
         }
         #endregion
+        /// <summary>
+        /// Creates an empty dimension of type <see cref="EDimType.DimPoints"/> in the xy plane (<see cref="Normal"/> is the z
+        /// axis). Protected so that dimensions are created via <see cref="Construct"/>; derived classes call it from their own
+        /// constructors.
+        /// </summary>
         protected Dimension()
         {
             dimType = EDimType.DimPoints;
@@ -1297,6 +1339,17 @@ namespace CADability.GeoObject
             l.Modify(ModOp.Translate(plane.ToGlobal(txtMove)));
             list.AddRange(l);
         }
+        /// <summary>
+        /// Computes the graphical representation of the dimension (dimension line, extension lines, symbols and texts as
+        /// lines, polylines, hatches and texts) for the current <see cref="DimType"/> and appends it to the given list.
+        /// Sizes the <see cref="DimensionStyle"/> specifies in paper units (text size, symbol size) are scaled by the
+        /// <see cref="Projection.LayoutFactor"/> of the projection, and the horizontal direction of the projection decides
+        /// how the texts are oriented. Nothing is added when the dimension is incomplete (no style, too few points, plane
+        /// not determinable). The dimension keeps no child objects: painting, hit tests, extent and <see cref="Decompose"/>
+        /// all call this method. <see cref="Plane"/> is updated as a side effect.
+        /// </summary>
+        /// <param name="p">The projection the representation is computed for</param>
+        /// <param name="list">Receives the generated objects</param>
         public void Recalc(Projection p, GeoObjectList list)
         {
             ++isChanging; // während Recalc kein Changing senden (wg. Texteditor)
@@ -1319,6 +1372,17 @@ namespace CADability.GeoObject
             extent = list.GetExtent(); // cache the extent. When calling GetBoundingCube the projection is unknown
         }
         #endregion
+        /// <summary>
+        /// Appends a point to the points of the dimension. What the points mean depends on <see cref="DimType"/>: for
+        /// <see cref="EDimType.DimPoints"/> and <see cref="EDimType.DimCoord"/> they are the measured points (any number, at
+        /// least two, for DimCoord the first point is the origin), for <see cref="EDimType.DimAngle"/> the center followed by
+        /// a point on each leg, for <see cref="EDimType.DimRadius"/> and <see cref="EDimType.DimDiameter"/> the center of the
+        /// circle, for <see cref="EDimType.DimLocation"/> the labelled points. For DimPoints and DimCoord the texts of the
+        /// segments (<see cref="GetDimText"/>, <see cref="GetTextPos"/> ...) get an additional empty entry; call
+        /// <see cref="SortPoints"/> afterwards to keep the points ordered along the dimension line. For the other types the
+        /// text entries are created with the first point. The change raises the change events and is undoable.
+        /// </summary>
+        /// <param name="p">The point to add in world coordinates</param>
         public void AddPoint(GeoPoint p)
         {
             using (new Changing(this, "RemovePoint", points.Length))
@@ -1380,6 +1444,12 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Removes the point with the given index. The texts of the segments are not adjusted, so for
+        /// <see cref="EDimType.DimPoints"/> and <see cref="EDimType.DimCoord"/> dimensions the texts keep their old segment
+        /// indices. The change raises the change events and is undoable.
+        /// </summary>
+        /// <param name="Index">Index of the point, 0 &lt;= Index &lt; <see cref="PointCount"/></param>
         public void RemovePoint(int Index)
         {
             using (new Changing(this, "AddPoint", points[Index]))
@@ -1389,14 +1459,29 @@ namespace CADability.GeoObject
                 points = (GeoPoint[])pp.ToArray(typeof(GeoPoint));
             }
         }
+        /// <summary>
+        /// The number of points of the dimension, see <see cref="AddPoint"/> for their meaning.
+        /// </summary>
         public int PointCount
         {
             get { return points.Length; }
         }
+        /// <summary>
+        /// Returns the point with the given index, see <see cref="AddPoint"/> for the meaning of the points.
+        /// </summary>
+        /// <param name="Index">Index of the point, 0 &lt;= Index &lt; <see cref="PointCount"/></param>
+        /// <returns>The point in world coordinates</returns>
         public GeoPoint GetPoint(int Index)
         {
             return points[Index];
         }
+        /// <summary>
+        /// Replaces the point with the given index. For <see cref="EDimType.DimPoints"/> and <see cref="EDimType.DimCoord"/>
+        /// call <see cref="SortPoints"/> afterwards when the order of the points along the dimension line may have changed.
+        /// The change raises the change events and is undoable.
+        /// </summary>
+        /// <param name="Index">Index of the point, 0 &lt;= Index &lt; <see cref="PointCount"/></param>
+        /// <param name="p">The new point in world coordinates</param>
         public void SetPoint(int Index, GeoPoint p)
         {
             using (new Changing(this, "SetPoint", Index, points[Index]))
@@ -1404,6 +1489,12 @@ namespace CADability.GeoObject
                 points[Index] = p;
             }
         }
+        /// <summary>
+        /// The kind of dimensioning (distance between points, coordinate, angle, radius, diameter or location label), which
+        /// decides how the points and the other properties are interpreted. <see cref="EDimType.DimPoints"/> after
+        /// <see cref="Construct"/>. Set it before adding points, because <see cref="AddPoint"/> organises the texts differently
+        /// for the point based types. The change raises the change events and is undoable.
+        /// </summary>
         public EDimType DimType
         {
             get { return dimType; }
@@ -1418,6 +1509,14 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// The reference point of the dimension line in world coordinates. For <see cref="EDimType.DimPoints"/> and
+        /// <see cref="EDimType.DimCoord"/> the dimension line passes through this point, the measured points are projected
+        /// onto it. For <see cref="EDimType.DimAngle"/> its distance from the center is the radius of the dimension arc. For
+        /// <see cref="EDimType.DimRadius"/> and <see cref="EDimType.DimDiameter"/> it determines the direction of the
+        /// dimension line from the center and, when it lies outside the circle, the bend point of the leader. For
+        /// <see cref="EDimType.DimLocation"/> it is the bend point of the leader. The change raises the change events and is undoable.
+        /// </summary>
         public GeoPoint DimLineRef
         {
             get { return dimLineRef; }
@@ -1429,6 +1528,12 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// The direction of the dimension line for <see cref="EDimType.DimPoints"/> and <see cref="EDimType.DimCoord"/>
+        /// dimensions; together with <see cref="DimLineRef"/> and <see cref="Normal"/> it defines the <see cref="Plane"/> of
+        /// the dimension. For the radius, diameter and location types it is derived from <see cref="DimLineRef"/> and the
+        /// first point whenever the dimension is computed. The change raises the change events and is undoable.
+        /// </summary>
         public GeoVector DimLineDirection
         {
             get { return dimLineDirection; }
@@ -1440,6 +1545,11 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// The angle of the extension lines relative to the dimension line, usually a right angle. The value is kept and
+        /// saved with the dimension but is currently not used when the dimension is computed: the extension lines are always
+        /// perpendicular to the dimension line. The change raises the change events and is undoable.
+        /// </summary>
         public Angle ExtLineAngle
         {
             get { return extLineAngle; }
@@ -1451,6 +1561,11 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Start angle of an angle dimension, taken over from an older file format. The value is kept and saved with the
+        /// dimension but is currently not used when the dimension is computed: the angle is taken from the points (see
+        /// <see cref="AddPoint"/>). The change raises the change events and is undoable.
+        /// </summary>
         public Angle StartAngle
         {
             get { return startAngle; }
@@ -1462,6 +1577,11 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// End angle of an angle dimension, taken over from an older file format. The value is kept and saved with the
+        /// dimension but is currently not used when the dimension is computed: the angle is taken from the points (see
+        /// <see cref="AddPoint"/>). The change raises the change events and is undoable.
+        /// </summary>
         public Angle EndAngle
         {
             get { return endAngle; }
@@ -1473,6 +1593,13 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// The radius of the circle or arc for <see cref="EDimType.DimRadius"/> and <see cref="EDimType.DimDiameter"/>
+        /// dimensions, measured from the first point (the center). It determines where the dimension line touches the circle
+        /// and the displayed value: the radius or twice the radius, multiplied by the
+        /// <see cref="CADability.Attribute.DimensionStyle.Scale"/> of the style. Not used by the other types. The change
+        /// raises the change events and is undoable.
+        /// </summary>
         public double Radius
         {
             get { return radius; }
@@ -1484,6 +1611,10 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Distance value of an angle dimension, taken over from an older file format. The value is kept and saved with the
+        /// dimension but is currently not used when the dimension is computed. The change raises the change events and is undoable.
+        /// </summary>
         public double DistToStart
         {
             get { return distToStart; }
@@ -1495,6 +1626,11 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Counterpart of <see cref="DistToStart"/> for the end of an angle dimension. The value is kept and saved with the
+        /// dimension but is currently not used when the dimension is computed. It is stored as a double, the property converts
+        /// it to an <see cref="Angle"/>. The change raises the change events and is undoable.
+        /// </summary>
         public Angle DistToEnd
         {
             get { return distToEnd; }
@@ -1506,6 +1642,15 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Returns the position of the text of a segment along its dimension line as a parameter: 0.0 at the start, 0.5 in
+        /// the middle (the default), 1.0 at the end; values outside [0, 1] place the text beyond the ends. For angle dimensions
+        /// the parameter runs along the dimension arc.
+        /// </summary>
+        /// <param name="index">Index of the segment: 0 for angle, radius, diameter and location dimensions, for
+        /// <see cref="EDimType.DimPoints"/> and <see cref="EDimType.DimCoord"/> the index of the measured segment,
+        /// 0 &lt;= index &lt; <see cref="PointCount"/> - 1</param>
+        /// <returns>The position parameter of the text</returns>
         public double GetTextPos(int index)
         {
             return textPos[index];
@@ -1747,6 +1892,12 @@ namespace CADability.GeoObject
                     return plane.ToGlobal(new GeoPoint2D(p1.x + textPos[index] * (p2.x - p1.x), 0.0));
             }
         }
+        /// <summary>
+        /// Sets the position of the text of a segment along its dimension line, see <see cref="GetTextPos"/>. The change
+        /// raises the change events and is undoable.
+        /// </summary>
+        /// <param name="index">Index of the segment, see <see cref="GetTextPos"/></param>
+        /// <param name="val">The new position parameter, 0.0 at the start, 1.0 at the end of the dimension line</param>
         public void SetTextPos(int index, double val)
         {
             using (new Changing(this, "SetTextPos", index, textPos[index]))
@@ -1754,6 +1905,14 @@ namespace CADability.GeoObject
                 textPos[index] = val;
             }
         }
+        /// <summary>
+        /// Returns the main text of a segment: the text set with <see cref="SetDimText"/> if there is one, otherwise the
+        /// measured value formatted according to the <see cref="DimensionStyle"/> (the distance along the dimension line,
+        /// the distance from the origin, the angle, the radius or the diameter, or the coordinates of the first point for a
+        /// location dimension). Prefix, postfix and tolerances are not included.
+        /// </summary>
+        /// <param name="index">Index of the segment, see <see cref="GetTextPos"/></param>
+        /// <returns>The text as it is displayed</returns>
         public string GetDimText(int index)
         {
             if (dimText[index] != null) return dimText[index];
@@ -1798,6 +1957,13 @@ namespace CADability.GeoObject
                 default: return "";
             }
         }
+        /// <summary>
+        /// Replaces the measured value of a segment by a fixed text. Null or an empty string removes the replacement, so that
+        /// the measured value is displayed again. Nothing happens when the text does not change; otherwise the change raises
+        /// the change events.
+        /// </summary>
+        /// <param name="index">Index of the segment, see <see cref="GetTextPos"/></param>
+        /// <param name="text">The text to display instead of the measured value, or null</param>
         public void SetDimText(int index, string text)
         {
             string newValue = text;
@@ -1813,6 +1979,14 @@ namespace CADability.GeoObject
                 dimText[index] = newValue;
             }
         }
+        /// <summary>
+        /// Returns the upper tolerance text of a segment, which is displayed raised after the main text: the text set with
+        /// <see cref="SetTolPlusText"/> if there is one, otherwise the
+        /// <see cref="CADability.Attribute.DimensionStyle.PlusTolerance"/> of the style formatted with a leading sign. The
+        /// text is only displayed when the style shows tolerances or when the text was set explicitly.
+        /// </summary>
+        /// <param name="index">Index of the segment, see <see cref="GetTextPos"/></param>
+        /// <returns>The tolerance text</returns>
         public string GetTolPlusText(int index)
         {
             if (tolPlusText[index] != null) return tolPlusText[index];
@@ -1820,6 +1994,13 @@ namespace CADability.GeoObject
             if (res.Length > 0 && res[0] != '-' && dimStyle.PlusTolerance != 0.0) res = "+" + res; // Vorzeichen erzwingen
             return res;
         }
+        /// <summary>
+        /// Replaces the upper tolerance text of a segment (see <see cref="GetTolPlusText"/>) by a fixed text. Null or an
+        /// empty string removes the replacement. Nothing happens when the text does not change; otherwise the change raises
+        /// the change events and is undoable.
+        /// </summary>
+        /// <param name="index">Index of the segment, see <see cref="GetTextPos"/></param>
+        /// <param name="txt">The text to display, or null</param>
         public void SetTolPlusText(int index, string txt)
         {
             string newValue = txt;
@@ -1835,6 +2016,14 @@ namespace CADability.GeoObject
                 tolPlusText[index] = newValue;
             }
         }
+        /// <summary>
+        /// Returns the lower tolerance text of a segment, which is displayed lowered after the main text: the text set with
+        /// <see cref="SetTolMinusText"/> if there is one, otherwise the
+        /// <see cref="CADability.Attribute.DimensionStyle.MinusTolerance"/> of the style formatted with a leading sign. The
+        /// text is only displayed when the style shows tolerances or when the text was set explicitly.
+        /// </summary>
+        /// <param name="index">Index of the segment, see <see cref="GetTextPos"/></param>
+        /// <returns>The tolerance text</returns>
         public string GetTolMinusText(int index)
         {
             if (tolMinusText[index] != null) return tolMinusText[index];
@@ -1842,6 +2031,13 @@ namespace CADability.GeoObject
             if (res.Length > 0 && res[0] != '-' && dimStyle.MinusTolerance != 0.0) res = "+" + res; // Vorzeichen erzwingen
             return res;
         }
+        /// <summary>
+        /// Replaces the lower tolerance text of a segment (see <see cref="GetTolMinusText"/>) by a fixed text. Null or an
+        /// empty string removes the replacement. Nothing happens when the text does not change; otherwise the change raises
+        /// the change events and is undoable.
+        /// </summary>
+        /// <param name="index">Index of the segment, see <see cref="GetTextPos"/></param>
+        /// <param name="txt">The text to display, or null</param>
         public void SetTolMinusText(int index, string txt)
         {
             string newValue = txt;
@@ -1857,11 +2053,24 @@ namespace CADability.GeoObject
                 tolMinusText[index] = newValue;
             }
         }
+        /// <summary>
+        /// Returns the text displayed in front of the main text of a segment: the prefix set with <see cref="SetPrefix"/> if
+        /// there is one, otherwise the <see cref="CADability.Attribute.DimensionStyle.TextPrefix"/> of the style.
+        /// </summary>
+        /// <param name="index">Index of the segment, see <see cref="GetTextPos"/></param>
+        /// <returns>The prefix, may be null or empty</returns>
         public string GetPrefix(int index)
         {
             if (prefix[index] != null) return prefix[index];
             return dimStyle.TextPrefix;
         }
+        /// <summary>
+        /// Replaces the prefix of a segment (see <see cref="GetPrefix"/>) by a fixed text. Null or an empty string removes
+        /// the replacement, so that the prefix of the style is used again. Nothing happens when the text does not change;
+        /// otherwise the change raises the change events and is undoable.
+        /// </summary>
+        /// <param name="index">Index of the segment, see <see cref="GetTextPos"/></param>
+        /// <param name="txt">The text to display in front of the main text, or null</param>
         public void SetPrefix(int index, string txt)
         {
             string newValue = txt;
@@ -1877,11 +2086,24 @@ namespace CADability.GeoObject
                 prefix[index] = newValue;
             }
         }
+        /// <summary>
+        /// Returns the text displayed after the main text of a segment: the postfix set with <see cref="SetPostfix"/> if there
+        /// is one, otherwise the <see cref="CADability.Attribute.DimensionStyle.TextPostfix"/> of the style.
+        /// </summary>
+        /// <param name="index">Index of the segment, see <see cref="GetTextPos"/></param>
+        /// <returns>The postfix, may be null or empty</returns>
         public string GetPostfix(int index)
         {
             if (postfix[index] != null) return postfix[index];
             return dimStyle.TextPostfix;
         }
+        /// <summary>
+        /// Replaces the postfix of a segment (see <see cref="GetPostfix"/>) by a fixed text. Null or an empty string removes
+        /// the replacement, so that the postfix of the style is used again. Nothing happens when the text does not change;
+        /// otherwise the change raises the change events and is undoable.
+        /// </summary>
+        /// <param name="index">Index of the segment, see <see cref="GetTextPos"/></param>
+        /// <param name="txt">The text to display after the main text, or null</param>
         public void SetPostfix(int index, string txt)
         {
             string newValue = txt;
@@ -1897,11 +2119,25 @@ namespace CADability.GeoObject
                 postfix[index] = newValue;
             }
         }
+        /// <summary>
+        /// Returns the postfix of the alternative text of a segment: the text set with <see cref="SetPostfixAlt"/> if there is
+        /// one, otherwise the <see cref="CADability.Attribute.DimensionStyle.TextPostfixAlt"/> of the style. The alternative
+        /// text (a second value in brackets) is currently not generated, so the value is kept and saved but not displayed.
+        /// </summary>
+        /// <param name="index">Index of the segment, see <see cref="GetTextPos"/></param>
+        /// <returns>The alternative postfix, may be null or empty</returns>
         public string GetPostfixAlt(int index)
         {
             if (postfixAlt[index] != null) return postfixAlt[index];
             return dimStyle.TextPostfixAlt;
         }
+        /// <summary>
+        /// Replaces the postfix of the alternative text of a segment (see <see cref="GetPostfixAlt"/>) by a fixed text. Null
+        /// or an empty string removes the replacement. Nothing happens when the text does not change; otherwise the change
+        /// raises the change events and is undoable.
+        /// </summary>
+        /// <param name="index">Index of the segment, see <see cref="GetTextPos"/></param>
+        /// <param name="txt">The alternative postfix, or null</param>
         public void SetPostfixAlt(int index, string txt)
         {
             string newValue = txt;
@@ -1917,6 +2153,14 @@ namespace CADability.GeoObject
                 postfixAlt[index] = newValue;
             }
         }
+        /// <summary>
+        /// The normal of the plane in which the dimension lies, the z axis after <see cref="Construct"/>; the construction
+        /// actions set it to the normal of the drawing plane. Together with <see cref="DimLineRef"/> and
+        /// <see cref="DimLineDirection"/> (or the center for radius and diameter dimensions) it defines the <see cref="Plane"/>
+        /// of the dimension; for angle dimensions, whose plane is given by the three points, it only selects the side from
+        /// which the dimension is seen. Setting it raises no change events and is not undoable, so set it before the
+        /// dimension is added to a model.
+        /// </summary>
         public GeoVector Normal
         {
             get { return normal; }
@@ -1936,6 +2180,13 @@ namespace CADability.GeoObject
             }
             return list;
         }
+        /// <summary>
+        /// The plane in which the dimension is drawn. For the point based types its origin is <see cref="DimLineRef"/> and
+        /// its x axis the dimension line, for angle, radius and diameter dimensions its origin is the center. It is derived
+        /// from the points and the properties of the dimension whenever the dimension is computed
+        /// (<see cref="Recalc(Projection, GeoObjectList)"/>), so it is only up to date after the dimension has been displayed
+        /// or measured; the xy plane after <see cref="Construct"/>. Read only.
+        /// </summary>
         public Plane Plane
         {
             get
@@ -2085,8 +2336,24 @@ namespace CADability.GeoObject
                 postfix = newpostfix;
             }
         }
+        /// <summary>
+        /// The parts of a dimension that a point hits, as returned by <see cref="GetHitPosition"/>; several flags may be
+        /// combined. DimLine is the dimension line, Prefix, Text and PostFix are the texts in front of, of and after the
+        /// measured value, UpperText and LowerText are the plus and minus tolerance texts, AltText and PostFixAlt the
+        /// alternative text and its postfix.
+        /// </summary>
         [Flags]
         public enum HitPosition { DimLine = 0x01, Prefix = 0x02, Text = 0x04, PostFix = 0x08, UpperText = 0x10, LowerText = 0x20, AltText = 0x40, PostFixAlt = 0x80 }
+        /// <summary>
+        /// Determines which parts of the dimension (dimension line, texts) are hit by a point and in which segment. Intended
+        /// for the interactive editing of dimensions, where a click on a text selects the corresponding property and a point
+        /// dropped on the dimension line of a point dimension extends that dimension. The implementation is currently
+        /// disabled: it always returns 0 (nothing hit) and sets <paramref name="Index"/> to -1.
+        /// </summary>
+        /// <param name="p">The projection of the view in which the point was picked</param>
+        /// <param name="projectedPoint">The point in the 2d coordinates of that projection</param>
+        /// <param name="Index">Receives the index of the hit segment (see <see cref="GetTextPos"/>), -1 when nothing was hit</param>
+        /// <returns>The hit parts as a combination of <see cref="HitPosition"/> flags, 0 when nothing was hit</returns>
         public HitPosition GetHitPosition(Projection p, GeoPoint2D projectedPoint, out int Index)
         {
             HitPosition res = 0;
@@ -2279,7 +2546,18 @@ namespace CADability.GeoObject
                 (list[i] as IGeoObjectImpl).PrePaintTo3D(paintTo3D);
             }
         }
+        /// <summary>
+        /// Signature of the handler for <see cref="OnPaintTo3D"/>.
+        /// </summary>
+        /// <param name="toPaint">The dimension that is about to be painted</param>
+        /// <param name="paintTo3D">The paint interface to paint to</param>
+        /// <returns>true if the handler has painted the dimension itself and the default painting must be skipped, false to
+        /// let the dimension compute and paint its representation as usual</returns>
         public delegate bool PaintTo3DDelegate(Dimension toPaint, IPaintTo3D paintTo3D);
+        /// <summary>
+        /// Hook to replace the painting of dimensions: when set, <see cref="PaintTo3D"/> calls this delegate first and does
+        /// nothing more if it returns true. Applies to all dimensions. Null by default.
+        /// </summary>
         public static PaintTo3DDelegate OnPaintTo3D;
         /// <inheritdoc/>
         public override void PaintTo3D(IPaintTo3D paintTo3D)
@@ -2304,6 +2582,7 @@ namespace CADability.GeoObject
         {
             // nichts zu tun
         }
+        /// <inheritdoc/>
         public override Style.EDefaultFor PreferredStyle
         {
             get
@@ -2520,6 +2799,13 @@ namespace CADability.GeoObject
         #endregion
         #region IDimensionStyle Members
 
+        /// <summary>
+        /// The <see cref="CADability.Attribute.DimensionStyle"/> that defines the appearance of the dimension: font and size
+        /// of the texts, symbols, tolerances, prefix and postfix, number format, placement of the texts and so on. The
+        /// dimension is not displayed as long as no style is set; usually a style of the <see cref="Project.DimensionStyleList"/>
+        /// is used. Setting it raises the change events and is undoable. When the style itself has been modified, call
+        /// <see cref="Recalc()"/> to update the dimension.
+        /// </summary>
         public DimensionStyle DimensionStyle
         {
             get
@@ -2546,11 +2832,22 @@ namespace CADability.GeoObject
 
         #region IGeoObjectOwner Members
 
+        /// <summary>
+        /// Implements <see cref="IGeoObjectOwner.Remove"/>. The dimension keeps no child objects (its representation is
+        /// computed on demand), so this merely clears the <see cref="IGeoObject.Owner"/> of the given object.
+        /// </summary>
+        /// <param name="toRemove">The object that is no longer owned by this dimension</param>
         public void Remove(IGeoObject toRemove)
         {
             toRemove.Owner = null;
         }
 
+        /// <summary>
+        /// Implements <see cref="IGeoObjectOwner.Add"/>. The dimension keeps no child objects (its representation is computed
+        /// on demand), so this merely sets the <see cref="IGeoObject.Owner"/> of the given object to this dimension, e.g. for
+        /// a temporary object that belongs to the dimension while it is edited.
+        /// </summary>
+        /// <param name="toAdd">The object to be owned by this dimension</param>
         public void Add(IGeoObject toAdd)
         {
             toAdd.Owner = this;

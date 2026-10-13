@@ -21,22 +21,36 @@ namespace CADability.Curve2D
         private GeoPoint2D center;
         private double radius;
         internal bool counterClock; // nur bei Vollkreis die Richtung (Bogen hat sweep)
+        /// <summary>
+        /// Constructs a full circle with the given center and radius. The circle runs counterclockwise; a negative
+        /// <paramref name="radius"/> yields a clockwise circle with the absolute value as radius.
+        /// </summary>
+        /// <param name="center">center of the circle</param>
+        /// <param name="radius">radius; a negative value selects the clockwise direction</param>
         public Circle2D(GeoPoint2D center, double radius)
         {
             this.center = center;
             this.radius = Math.Abs(radius);
             counterClock = radius > 0.0;
         }
+        /// <summary>
+        /// The center of the circle. Setting it moves the circle; radius and direction are kept.
+        /// </summary>
         public GeoPoint2D Center
         {
             get { return center; }
             set { center = value; }
         }
+        /// <summary>
+        /// The radius of the circle, positive. Setting it scales the circle about its center; the new value must be positive, the
+        /// direction is not derived from its sign here (unlike in the constructor).
+        /// </summary>
         public double Radius
         {
             get { return radius; }
             set { radius = value; }
         }
+        /// <inheritdoc/>
         public override string ToString()
         {
             return "Circle2D: (" + center.ToString() + ") " + radius.ToString();
@@ -110,6 +124,7 @@ namespace CADability.Curve2D
             if (counterClock) return r.ToLeft();
             else return r.ToRight();
         }
+        /// <inheritdoc/>
         public override bool TryPointDeriv2At(double position, out GeoPoint2D point, out GeoVector2D deriv, out GeoVector2D deriv2)
         {
             double par = position * 2.0 * Math.PI;
@@ -136,6 +151,7 @@ namespace CADability.Curve2D
                 interpol[i] = PointAt(interparam[i]);
             }
         }
+        /// <inheritdoc/>
         public override GeoPoint2D StartPoint
         {
             get
@@ -150,6 +166,7 @@ namespace CADability.Curve2D
                 }
             }
         }
+        /// <inheritdoc/>
         public override GeoPoint2D EndPoint
         {
             get
@@ -164,6 +181,7 @@ namespace CADability.Curve2D
                 }
             }
         }
+        /// <inheritdoc/>
         public override GeoVector2D EndDirection
         {
             get
@@ -171,6 +189,7 @@ namespace CADability.Curve2D
                 return GeoVector2D.YAxis;
             }
         }
+        /// <inheritdoc/>
         public override GeoVector2D StartDirection
         {
             get
@@ -190,6 +209,7 @@ namespace CADability.Curve2D
             center.x += dx;
             center.y += dy;
         }
+        /// <inheritdoc/>
         public override ICurve2D GetModified(ModOp2D m)
         {
             // the modified curve must start at the modified start point and run in the same direction as the modified circle:
@@ -247,6 +267,7 @@ namespace CADability.Curve2D
             }
             return res;
         }
+		/// <inheritdoc/>
 		public override GeoPoint2D[] TangentPointsToAngle(Angle ang, GeoPoint2D CloseTo)
 		{
 			GeoPoint2D[] res = Geometry.IntersectLC(center + radius * new GeoVector2D(ang).ToLeft(), center + radius * new GeoVector2D(ang).ToRight(), center, radius);
@@ -272,6 +293,7 @@ namespace CADability.Curve2D
             double d = Geometry.Dist(p, center);
             return Math.Abs(d - radius);
         }
+        /// <inheritdoc/>
         public override double Length
         {
             get
@@ -279,6 +301,7 @@ namespace CADability.Curve2D
                 return Radius * 2.0 * Math.PI;
             }
         }
+        /// <inheritdoc/>
         public override double Sweep
         {
             get
@@ -486,6 +509,7 @@ namespace CADability.Curve2D
             GeoPoint2D sp = StartPoint, ep = EndPoint;
             return GetArea() - (p.x * (ep.y - sp.y) - p.y * (ep.x - sp.x)) / 2.0;
         }
+        /// <inheritdoc/>
         public override bool IsClosed
         {
             get

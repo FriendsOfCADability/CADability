@@ -14,6 +14,13 @@ namespace CADability.UserInterface
     {
         private ColorSelectionProperty colorSelectProp;
         private LayerSelectionProperty layerSelectProp;
+        /// <summary>
+        /// Creates the attribute entries for <paramref name="o"/>: a color entry when the object implements
+        /// <see cref="IColorDef"/>, and a layer entry. Both are connected to the respective property of the object via
+        /// reflection.
+        /// </summary>
+        /// <param name="o">The object whose attributes are shown</param>
+        /// <param name="frame">The frame whose project provides the color and layer lists</param>
         public AttributesProperty(IGeoObject o, IFrame frame)
         {
             IColorDef clr = o as IColorDef;

@@ -640,9 +640,28 @@ namespace CADability
         #endregion
     }
 
+    /// <summary>
+    /// A quadtree of 2d objects which implement <see cref="IQuadTreeInsertable"/>: the plane is recursively divided into quadrants so
+    /// that the objects at a position or in a rectangle can be found without testing all of them (<see cref="GetObjectsFromRect"/>,
+    /// <see cref="GetObjectsCloseTo(T)"/>, <see cref="ObjectsFromRect"/>...). Objects are added with <see cref="AddObject"/>; a leaf is
+    /// split when it holds more than <see cref="MaxListLen"/> objects, down to a depth of <see cref="MaxDeepth"/>. Used e.g. for
+    /// picking in 2d, for the triangulation of faces and for intersecting 2d curves. This generic version supersedes the older
+    /// non-generic <see cref="QuadTree"/>.
+    /// </summary>
+    /// <typeparam name="T">Type of the objects in the tree</typeparam>
     public class QuadTree<T> where T : class, IQuadTreeInsertable
     {
+        /// <summary>
+        /// The answer of <see cref="IIterateQuadTreeLists.Iterate"/> for a node: branchDone (do not descend into the sub nodes), goDeeper
+        /// (continue with the sub nodes, if any) or goDeeperAndSplit (split the leaf into four sub nodes and continue with them, e.g.
+        /// because it still holds too many objects to decide).
+        /// </summary>
         public enum IterateAction { branchDone, goDeeper, goDeeperAndSplit };
+        /// <summary>
+        /// Callback for walking the tree node by node: <see cref="Iterate"/> is called with the rectangle and the objects of each node
+        /// and decides with the returned <see cref="IterateAction"/> whether and how to continue below that node. Used internally by the
+        /// GDI printing (PrintToGDI) to resolve the visibility of the print items.
+        /// </summary>
         public interface IIterateQuadTreeLists
         {
             IterateAction Iterate(ref BoundingRect rect, HashSet<T> objects, bool hasSubNodes);
@@ -1398,6 +1417,11 @@ namespace CADability
         {
             return root.Check(closeTo, check);
         }
+        /// <summary>
+        /// Signature of the test passed to <see cref="Check"/>: called for the objects in the nodes which the reference object hits.
+        /// </summary>
+        /// <param name="toCheck">The object to test</param>
+        /// <returns>true to stop the search with a positive result, false to continue</returns>
         public delegate bool CheckOne(T toCheck);
         public BoundingRect Size
         {

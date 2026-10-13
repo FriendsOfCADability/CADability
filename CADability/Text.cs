@@ -23,10 +23,19 @@ using System.Threading;
 namespace CADability.GeoObject
 {
 
+    /// <summary>
+    /// Property entry, a group in the property grid, that shows and edits the font of a <see cref="Text"/>: the font
+    /// family, chosen from the families installed on the system, and the bold, italic, underline and strikeout flags.
+    /// It is a sub-entry of <see cref="ShowPropertyText"/>.
+    /// </summary>
     public class ShowPropertyFont : PropertyEntryImpl
     {
         private readonly Text text;
         private IPropertyEntry[] showProperties;
+        /// <summary>
+        /// Creates the font entry for the text <paramref name="t"/>.
+        /// </summary>
+        /// <param name="t">the text whose font is shown</param>
         public ShowPropertyFont(Text t)
         {
             text = t;
@@ -49,6 +58,7 @@ namespace CADability.GeoObject
             return res;
         }
         #region PropertyEntryImpl Overrides
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -79,6 +89,12 @@ namespace CADability.GeoObject
     }
 
 
+    /// <summary>
+    /// Property entry that shows and edits a <see cref="Text"/> in the property grid: the string, the location, the
+    /// alignment, the line and glyph direction, the size, the glyph angle, the column width, the font
+    /// (<see cref="ShowPropertyFont"/>) and the attributes. Location, directions and size have hotspots in the drawing
+    /// area. It is returned by <see cref="Text.GetShowProperties(IFrame)"/> and provides the context menu of the text.
+    /// </summary>
     public class ShowPropertyText : PropertyEntryImpl, IDisplayHotSpots, ICommandHandler, IGeoObjectShowProperty
     {
         private readonly Text text;
@@ -93,6 +109,11 @@ namespace CADability.GeoObject
         private readonly LengthProperty sizeProp;
         private readonly LengthHotSpot sizeHotspot;
         private readonly LengthProperty columnWidthProperty;
+        /// <summary>
+        /// Creates the property entry for the text <paramref name="t"/>.
+        /// </summary>
+        /// <param name="t">the text to show</param>
+        /// <param name="frame">the frame the property grid belongs to</param>
         public ShowPropertyText(Text t, IFrame frame) : base(frame)
         {
             text = t;
@@ -179,6 +200,7 @@ namespace CADability.GeoObject
             return res.ToArray();
         }
         #region IShowPropertyImpl Overrides
+        /// <inheritdoc/>
         public override PropertyEntryType Flags => PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries | PropertyEntryType.ContextMenu | PropertyEntryType.Selectable;
         /// <inheritdoc/>
         public override void Added(IPropertyPage propertyTreeView)
@@ -204,6 +226,7 @@ namespace CADability.GeoObject
             sizeProp.ModifyWithMouse -= SizePropModifyWithMouse;
             text.DidChangeEvent -= TextDidChange;
         }
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -254,6 +277,7 @@ namespace CADability.GeoObject
             base.Opened(IsOpen);
         }
 
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -277,6 +301,11 @@ namespace CADability.GeoObject
         }
         #region IDisplayHotSpots Members
 
+        /// <summary>
+        /// Raised when the hotspots of this entry (location, directions and size of the text) are to be shown, hidden,
+        /// selected or deselected: when the entry is opened or closed and when one of its sub-entries is selected. The
+        /// handler gets the hotspot and the kind of change, see <see cref="IDisplayHotSpots"/>.
+        /// </summary>
         public event HotspotChangedDelegate HotspotChangedEvent;
 
         /// <inheritdoc/>
@@ -368,6 +397,7 @@ namespace CADability.GeoObject
         void ICommandHandler.OnSelected(MenuWithHandler selectedMenuItem, bool selected) { }
         #endregion
         #region IGeoObjectShowProperty Members
+        /// <inheritdoc/>
         public event CreateContextMenueDelegate CreateContextMenueEvent;
         IGeoObject IGeoObjectShowProperty.GetGeoObject()
         {
@@ -946,8 +976,21 @@ namespace CADability.GeoObject
                 new HashSet<string>(FontFamily.Families.Select(f => f.Name.ToUpper())));
 
         #region polymorph construction
+        /// <summary>
+        /// Delegate for the construction of a Text.
+        /// </summary>
+        /// <returns>A Text or Text derived class</returns>
         public delegate Text ConstructionDelegate();
+        /// <summary>
+        /// Provide a delegate here if you want your Text derived class to be created each time CADability creates a text.
+        /// </summary>
         public static ConstructionDelegate Constructor;
+        /// <summary>
+        /// The only way to create a text: there are no public constructors. Calls <see cref="Constructor"/> when one is
+        /// registered, otherwise creates a <see cref="Text"/>. Set at least <see cref="Font"/>, <see cref="TextString"/>,
+        /// <see cref="Location"/> and <see cref="TextSize"/> afterwards.
+        /// </summary>
+        /// <returns>the new text</returns>
         public static Text Construct()
         {
             if (Constructor != null) return Constructor();
@@ -955,6 +998,12 @@ namespace CADability.GeoObject
         }
         #endregion
 
+        /// <summary>
+        /// Protected constructor; use <see cref="Construct"/> to create a text. The text starts with the line direction
+        /// <see cref="GeoVector.XAxis"/>, the glyph direction <see cref="GeoVector.YAxis"/>, the regular font style and the
+        /// alignment <see cref="AlignMode.Baseline"/>. Whether the text is displayed as outline paths or as filled faces
+        /// comes from the global setting "Font.DisplayMode".
+        /// </summary>
         protected Text()
         {
             displayAsPath = Settings.GlobalSettings.GetIntValue("Font.DisplayMode", 1) == 1; // müsste nur einmal geladen werden, macht aber direkt bei der static Deklaration Probleme
@@ -1502,6 +1551,14 @@ namespace CADability.GeoObject
         {
             get { return ModOp.Translate(location.x, location.y, location.z) * ModOp.Fit(new GeoVector[] { GeoVector.XAxis, GeoVector.YAxis, GeoVector.ZAxis }, new GeoVector[] { lineDirection, glyphDirection, lineDirection ^ glyphDirection }); }
         }
+        /// <summary>
+        /// Returns the center lines of the characters of this text: for each character a <see cref="Block"/> containing the
+        /// curves that run through the middle of the strokes of the glyph (computed from the outline with
+        /// <see cref="ShapeMiddelLine"/>), positioned in world coordinates like the text itself. Suited for single stroke
+        /// output such as engraving, where <see cref="GetOutline"/> would give the two sides of each stroke. Not used by
+        /// CADability itself.
+        /// </summary>
+        /// <returns>one block per character in the order of the text; line breaks produce no entry</returns>
         public virtual GeoObjectList GetCenterline()
         {   // koopiert aus Getoutline!
             GeoObjectList res = new GeoObjectList();
@@ -2087,6 +2144,15 @@ namespace CADability.GeoObject
             }
         }
 
+        /// <summary>
+        /// Sets the line direction and rotates the glyph direction along with it, so that the <see cref="GlyphAngle"/>
+        /// between both and the lengths of both (the size and the aspect ratio of the text) stay as they are: the glyph
+        /// direction is recomputed by rotating the new line direction about the normal of the text's plane by the glyph
+        /// angle. Only the direction of <paramref name="ld"/> is used, its length is ignored; a null vector is ignored
+        /// altogether. Raises the change events and is undoable. The property grid uses this method when the line direction
+        /// is edited.
+        /// </summary>
+        /// <param name="ld">the new line direction</param>
         public void SetLineDirKeepGlyphAngle(GeoVector ld)
         {
             if (ld.IsNullVector())
@@ -2128,6 +2194,13 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Sets <see cref="LineDirection"/> and <see cref="GlyphDirection"/> at once, without the checks of the individual
+        /// properties. The vectors must not be parallel; their lengths define the size and the aspect ratio of the text.
+        /// Raises the change events and is undoable.
+        /// </summary>
+        /// <param name="lineDirection">the direction of the lines of the text</param>
+        /// <param name="glyphDirection">the direction of the vertical parts of the characters</param>
         public void SetDirections(GeoVector lineDirection, GeoVector glyphDirection)
         {
             using (new Changing(this))
@@ -2136,6 +2209,12 @@ namespace CADability.GeoObject
                 this.lineDirection = lineDirection;
             }
         }
+        /// <summary>
+        /// Gets or sets the <see cref="GlyphDirection"/> without changing its length: only the direction of the value is
+        /// used, the size of the text stays as it is. A null vector or a vector parallel to the <see cref="LineDirection"/>
+        /// is ignored. Setting it raises the change events and is undoable. The property grid uses this property when the
+        /// glyph direction is edited.
+        /// </summary>
         public GeoVector GlyphDirectionKeepSize
         {
             get { return glyphDirection; }
@@ -2564,7 +2643,18 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Handler for <see cref="OnPaintTo3D"/>.
+        /// </summary>
+        /// <param name="toPaint">the text being painted</param>
+        /// <param name="paintTo3D">the paint interface to paint to</param>
+        /// <returns>true if the handler painted the text itself and the default painting is to be skipped, false to let the
+        /// text paint itself as usual</returns>
         public delegate bool PaintTo3DDelegate(Text toPaint, IPaintTo3D paintTo3D);
+        /// <summary>
+        /// Hook to replace the painting of texts: when set, <see cref="PaintTo3D"/> calls it first and does nothing more
+        /// when it returns true. The hook is static, so it applies to every text of the process.
+        /// </summary>
         public static PaintTo3DDelegate OnPaintTo3D;
         /// <inheritdoc/>
         public override void PaintTo3DList(IPaintTo3D paintTo3D, ICategorizedDislayLists lists)
@@ -2750,6 +2840,7 @@ namespace CADability.GeoObject
         {
             // nichts zu tun
         }
+        /// <inheritdoc/>
         public override Style.EDefaultFor PreferredStyle
         {
             get
@@ -2835,6 +2926,12 @@ namespace CADability.GeoObject
         }
         #endregion
         #region IColorDef Members
+        /// <summary>
+        /// The color of the text, see <see cref="IColorDef.ColorDef"/>. Setting it discards the cached display data, raises
+        /// the change events as a change of an attribute and is undoable; setting null is ignored. A color with
+        /// <see cref="ColorDef.ColorSource.fromParent"/> is replaced by the corresponding color of the <see cref="Block"/>
+        /// the text belongs to.
+        /// </summary>
         public ColorDef ColorDef
         {
             get
@@ -2925,6 +3022,7 @@ namespace CADability.GeoObject
 
         }
 
+        /// <inheritdoc/>
         public override void GetObjectData(IJsonWriteData data)
         {
             base.GetObjectData(data);
@@ -2942,6 +3040,7 @@ namespace CADability.GeoObject
             data.AddProperty("LineSpacing", lineSpacing);
         }
 
+        /// <inheritdoc/>
         public override void SetObjectData(IJsonReadData data)
         {
             base.SetObjectData(data);

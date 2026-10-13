@@ -225,6 +225,13 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
             stream.WriteLine(footer); //.Replace("%3", lst.ToString()).Replace("%5", ssi.ToString()));
             stream.Close();
         }
+        /// <summary>
+        /// Writes one entity instance <c>#n=s;</c> to the file and returns its number n. The numbers are assigned in sequence;
+        /// <see cref="IExportStep.Export"/> implementations write the entities they refer to first and use the returned numbers
+        /// as <c>#n</c> references in their own definition.
+        /// </summary>
+        /// <param name="s">the entity, e.g. <c>CARTESIAN_POINT('',(0.,0.,0.))</c>, without the leading <c>#n=</c> and the trailing semicolon</param>
+        /// <returns>the number of the entity</returns>
         public int WriteDefinition(string s)
         {
             int nr = currentItem;
@@ -232,6 +239,12 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
             stream.WriteLine("#" + nr.ToString() + "=" + s + ";"); // maybe split the line when s is too long?
             return nr;
         }
+        /// <summary>
+        /// Formats a number the way STEP requires it: invariant culture and always with a decimal point (<c>1.</c>, <c>1.5E-5</c>),
+        /// because a number without a point is read as an integer.
+        /// </summary>
+        /// <param name="d">the number</param>
+        /// <returns>the text of the number for use in an entity</returns>
         public string ToString(double d)
         {
             string res = d.ToString("G", CultureInfo.InvariantCulture);
@@ -243,6 +256,14 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
             }
             return res;
         }
+        /// <summary>
+        /// Writes an <c>AXIS2_PLACEMENT_3D</c>, the coordinate system that elementary surfaces, circles and ellipses are defined
+        /// in, together with its point and its two directions. The directions are normalized before they are written.
+        /// </summary>
+        /// <param name="location">the origin of the placement</param>
+        /// <param name="normal">the axis (z direction) of the placement</param>
+        /// <param name="xdir">the reference direction (x direction) of the placement; should be perpendicular to <paramref name="normal"/></param>
+        /// <returns>the number of the placement entity</returns>
         public int WriteAxis2Placement3d(GeoPoint location, GeoVector normal, GeoVector xdir)
         {
             int nl = (location as IExportStep).Export(this, false);
@@ -250,6 +271,13 @@ END-ISO-10303-21;"; // %0: filename, %1: date, %2: version, %3: List of MANIFOLD
             int nx = (xdir.Normalized as IExportStep).Export(this, false);
             return WriteDefinition("AXIS2_PLACEMENT_3D('',#" + nl.ToString() + ",#" + n.ToString() + ",#" + nx.ToString() + ")");
         }
+        /// <summary>
+        /// Writes an <c>AXIS1_PLACEMENT</c>, an axis given by a point and a direction as used by <c>SURFACE_OF_REVOLUTION</c>,
+        /// together with its point and direction. The direction is normalized before it is written.
+        /// </summary>
+        /// <param name="location">a point on the axis</param>
+        /// <param name="normal">the direction of the axis</param>
+        /// <returns>the number of the placement entity</returns>
         public int WriteAxis1Placement3d(GeoPoint location, GeoVector normal)
         {
             int nl = (location as IExportStep).Export(this, false);

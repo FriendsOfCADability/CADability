@@ -14,28 +14,106 @@ namespace CADability.UserInterface
     /// <param name="sender">the property entry whose value is modified</param>
     /// <param name="startModifying">true: the modification with the mouse starts, false: it is cancelled</param>
     public delegate void ModifyWithMouseDelegate(IPropertyEntry sender, bool startModifying);
+    /// <summary>
+    /// Handler for a key typed while the label or value of an entry is being edited: <paramref name="sender"/> is the
+    /// entry, <paramref name="keyPressed"/> the typed character. A remnant of the old control center; the current
+    /// property page raises no event of this type.
+    /// </summary>
+    /// <param name="sender">the entry being edited</param>
+    /// <param name="keyPressed">the character that was typed</param>
     public delegate void EditingDelegate(IShowProperty sender, char keyPressed);
+    /// <summary>
+    /// Handler for <see cref="IPropertyTreeView.FocusChangedEvent"/>: the keyboard focus moved from <paramref name="oldFocus"/>
+    /// to <paramref name="newFocus"/> within the tree view <paramref name="sender"/>. Either entry may be null when the
+    /// focus came from or went to a control outside the tree view.
+    /// </summary>
+    /// <param name="sender">the tree view in which the focus changed</param>
+    /// <param name="newFocus">the entry that received the focus, or null</param>
+    /// <param name="oldFocus">the entry that lost the focus, or null</param>
     public delegate void FocusChangedDelegate(IPropertyTreeView sender, IShowProperty newFocus, IShowProperty oldFocus);
 
+    /// <summary>
+    /// Handler for <see cref="IPropertyEntry.PropertyEntryChangedStateEvent"/>: the entry <paramref name="sender"/> was
+    /// added to or removed from a property page, selected or unselected, opened or closed, or an edit of its value
+    /// ended. <paramref name="args"/> tells which of these happened (<see cref="StateChangedArgs.EventState"/>).
+    /// </summary>
+    /// <param name="sender">the entry whose state changed</param>
+    /// <param name="args">the kind of change</param>
     public delegate void PropertyEntryChangedStateDelegate(IPropertyEntry sender, StateChangedArgs args);
+    /// <summary>
+    /// Handler for <see cref="IShowProperty.StateChangedEvent"/>, the counterpart of <see cref="PropertyEntryChangedStateDelegate"/>
+    /// for the older <see cref="IShowProperty"/> entries: the state of <paramref name="sender"/> changed as described by
+    /// <paramref name="args"/>.
+    /// </summary>
+    /// <param name="sender">the entry whose state changed</param>
+    /// <param name="args">the kind of change</param>
     public delegate void StateChangedDelegate(IShowProperty sender, StateChangedArgs args);
 
+    /// <summary>
+    /// The argument of <see cref="IPropertyEntry.PropertyEntryChangedStateEvent"/> and <see cref="IShowProperty.StateChangedEvent"/>:
+    /// tells which change of state an entry of the property page reports (<see cref="EventState"/>). When a sub entry
+    /// was selected, <see cref="SelectedChild"/> names it. The entry creates the object when it raises the event, a
+    /// handler only reads it.
+    /// </summary>
     public class StateChangedArgs : EventArgs
     {
-        public enum State { OpenSubEntries, CollapseSubEntries, Selected, UnSelected, SubEntrySelected, Added, Removed, EditEnded }
+        /// <summary>
+        /// The kinds of state change an entry reports.
+        /// </summary>
+        public enum State
+        {
+            /// <summary>The entry was opened, its sub entries are now shown.</summary>
+            OpenSubEntries,
+            /// <summary>The entry was closed, its sub entries are now hidden.</summary>
+            CollapseSubEntries,
+            /// <summary>The entry became the selected entry of its property page.</summary>
+            Selected,
+            /// <summary>The entry is no longer the selected entry of its property page.</summary>
+            UnSelected,
+            /// <summary>One of the sub entries of the entry was selected, <see cref="StateChangedArgs.SelectedChild"/> tells which one. Only the older <see cref="IShowPropertyImpl"/> entries report it.</summary>
+            SubEntrySelected,
+            /// <summary>The entry was added to a property page.</summary>
+            Added,
+            /// <summary>The entry was removed from its property page.</summary>
+            Removed,
+            /// <summary>Editing the value of the entry in the text box ended and the value has been set (reported by <see cref="EditableProperty{T}"/>).</summary>
+            EditEnded
+        }
         private State state;
+        /// <summary>
+        /// Creates the argument for the given kind of change.
+        /// </summary>
+        /// <param name="state">the change that is reported</param>
         public StateChangedArgs(State state)
         {
             this.state = state;
         }
+        /// <summary>
+        /// The change that the event reports.
+        /// </summary>
         public State EventState
         {
             get { return state; }
         }
+        /// <summary>
+        /// For <see cref="State.SubEntrySelected"/>: the sub entry that was selected. Null for the other states.
+        /// </summary>
         public IShowProperty SelectedChild;
     }
 
-    public enum MouseButtonMode { MouseLocked, MouseInactive, MouseActive }
+    /// <summary>
+    /// The states of the mouse button that entries of the old control center showed next to a value which can be
+    /// modified with the mouse (e.g. a point). Not used by the current property page; it remains for compatibility only.
+    /// </summary>
+    public enum MouseButtonMode
+    {
+        /// <summary>The value is being modified with the mouse, the button is locked in its pressed state.</summary>
+        MouseLocked,
+        /// <summary>The button is shown but cannot be pressed.</summary>
+        MouseInactive,
+        /// <summary>The button can be pressed to start modifying the value with the mouse.</summary>
+        MouseActive
+    }
 
     /// <summary>
     /// Interface for IShowProperty objects, which implement MouseButton modification.
@@ -43,9 +121,29 @@ namespace CADability.UserInterface
 
     public interface IConstructProperty
     {
+        /// <summary>
+        /// Selects the entry in its property page so that the value can be typed, e.g. after the user picked the
+        /// hotspot of the value in the drawing.
+        /// </summary>
         void SetFocus();
+        /// <summary>
+        /// Returns the position of the hotspot which represents the value in the drawing. For a point property this is
+        /// the point itself, for a length, radius or angle it is the position the owner set with <see cref="SetHotspotPosition"/>.
+        /// </summary>
+        /// <returns>the hotspot position in world coordinates</returns>
         GeoPoint GetHotspotPosition();
+        /// <summary>
+        /// Starts modifying the value with the mouse, as if the user had dragged its hotspot: the entry raises its
+        /// ModifyWithMouse event (see <see cref="ModifyWithMouseDelegate"/>) and the owning action or object follows the
+        /// mouse until the user clicks or types a value.
+        /// </summary>
         void StartModifyWithMouse();
+        /// <summary>
+        /// Sets the position of the hotspot in the drawing which represents this value. Used by the owner of values that
+        /// have no position of their own, like a length, a radius or an angle (e.g. the end of the major axis for the
+        /// major radius of an ellipse).
+        /// </summary>
+        /// <param name="Here">the hotspot position in world coordinates</param>
         void SetHotspotPosition(GeoPoint Here);
     }
 
@@ -260,7 +358,17 @@ namespace CADability.UserInterface
         /// Alt+Enter was pressed in the controlcenter while this entry was selected
         /// </summary>
         void OnEnterPressed();
+        /// <summary>
+        /// Notification that the entry became visible or invisible in the control center, e.g. because its tab page was
+        /// brought to the front or hidden. The current property page does not send this notification.
+        /// </summary>
+        /// <param name="isVisible">true: the entry is now visible, false: it is now hidden</param>
         void OnVisibilityChanged(bool isVisible);
+        /// <summary>
+        /// Whether this entry is the selected entry of its property page. Setting it to true selects the entry (it must
+        /// be visible), setting it to false unselects it when it is the selected entry. The hotspots of the editable
+        /// properties forward their selection state (<see cref="IHotSpot.IsSelected"/>) to this property.
+        /// </summary>
         bool IsSelected { get; set; }
     }
     /// <summary>
@@ -271,6 +379,10 @@ namespace CADability.UserInterface
     /// </summary>
     public class IShowPropertyImpl : IShowProperty, IPropertyEntry
     {
+        /// <summary>
+        /// The property page this entry is currently shown in, or null. The older name of <see cref="propertyPage"/>,
+        /// kept for the derived classes that still use it.
+        /// </summary>
         protected IPropertyPage propertyTreeView => propertyPage;
         /// <summary>
         /// Overrides the label text, which is normally retrieved from the <see cref="StringTable"/>
@@ -288,7 +400,17 @@ namespace CADability.UserInterface
         protected string resourceIdInternal;
         private bool hidden; // default: false!
         private bool readOnly; // default: false!
+        /// <summary>
+        /// The label flags passed to <see cref="SuppressFlags"/>. The base class only stores them; none of the entries
+        /// shipped with CADability evaluates them.
+        /// </summary>
         protected ShowPropertyLabelFlags flagsToSuppress = (ShowPropertyLabelFlags)0;
+        /// <summary>
+        /// Asks the entry not to show the given label flags (e.g. no context menu). The flags are only stored in
+        /// <see cref="flagsToSuppress"/>; a derived class would have to remove them from its <see cref="LabelType"/>,
+        /// which none of the entries shipped with CADability does.
+        /// </summary>
+        /// <param name="flagsToSuppress">the flags that should not appear in <see cref="LabelType"/></param>
         public void SuppressFlags(ShowPropertyLabelFlags flagsToSuppress)
         {
             this.flagsToSuppress = flagsToSuppress;
@@ -311,10 +433,19 @@ namespace CADability.UserInterface
                 frame = value;
             }
         }
+        /// <summary>
+        /// Creates the entry with the frame it belongs to, which <see cref="Frame"/> returns as long as the entry is not
+        /// shown in a property page.
+        /// </summary>
+        /// <param name="frame">the frame, may be null</param>
         protected IShowPropertyImpl(IFrame frame)
         {
             this.frame = frame;
         }
+        /// <summary>
+        /// Creates the entry without a frame; <see cref="Frame"/> then returns the frame of the property page the entry
+        /// is shown in, or the main frame (<see cref="FrameImpl.MainFrame"/>).
+        /// </summary>
         protected IShowPropertyImpl()
         {
             this.frame = null;
@@ -565,9 +696,18 @@ namespace CADability.UserInterface
         public virtual void OnEnterPressed()
         {
         }
+        /// <summary>
+        /// Implementation of <see cref="IShowProperty.OnVisibilityChanged"/>. Does nothing, override when needed.
+        /// </summary>
+        /// <param name="isVisible">true: the entry is now visible, false: it is now hidden</param>
         public virtual void OnVisibilityChanged(bool isVisible)
         {
         }
+        /// <summary>
+        /// Implementation of <see cref="IShowProperty.IsSelected"/>: asks the property page for its current selection;
+        /// setting it selects or unselects this entry in the property page. May only be used while the entry is shown
+        /// in a property page.
+        /// </summary>
         public virtual bool IsSelected
         {
             get
@@ -641,6 +781,10 @@ namespace CADability.UserInterface
             //				Update(sp.SubEntries[i]);
             //			}
         }
+        /// <summary>
+        /// The background color of the selected entry (the system highlight color). A remnant of the old control center;
+        /// the current property page uses the system colors directly.
+        /// </summary>
         public static Color SelectedBckgColor
         {
             get
@@ -648,6 +792,10 @@ namespace CADability.UserInterface
                 return SystemColors.Highlight;
             }
         }
+        /// <summary>
+        /// The text color of the selected entry (the system highlight text color). A remnant of the old control center;
+        /// the current property page uses the system colors directly.
+        /// </summary>
         public static Color SelectedTextColor
         {
             get
@@ -655,6 +803,10 @@ namespace CADability.UserInterface
                 return SystemColors.HighlightText;
             }
         }
+        /// <summary>
+        /// The background color of an unselected entry (the system window color). A remnant of the old control center;
+        /// the current property page uses the system colors directly.
+        /// </summary>
         public static Color UnselectedBckgColor
         {
             get
@@ -662,6 +814,10 @@ namespace CADability.UserInterface
                 return SystemColors.Window;
             }
         }
+        /// <summary>
+        /// The text color of an unselected entry (the system window text color). A remnant of the old control center;
+        /// the current property page uses the system colors directly.
+        /// </summary>
         public static Color UnselectedTextColor
         {
             get
@@ -713,8 +869,26 @@ namespace CADability.UserInterface
             }
         }
 
+        /// <summary>
+        /// Whether the entry offers a drop down list of choices for its value, which adds <see cref="PropertyEntryType.DropDown"/>
+        /// to <see cref="Flags"/>. The default is false, and no entry derived from this class returns true at present:
+        /// drop down lists are provided by <see cref="MultipleChoiceProperty"/>, which derives from <see cref="PropertyEntryImpl"/>.
+        /// </summary>
         protected virtual bool HasDropDownButton => false; // must be overridden in thos properties, which provide a drop down list (MultipleChoiceProperty)
+        /// <summary>
+        /// Whether the value of the entry may be edited in the text box of the property page: by default true unless
+        /// <see cref="ReadOnly"/> is set. Together with a non-null <see cref="Value"/> it yields
+        /// <see cref="PropertyEntryType.ValueEditable"/> in <see cref="Flags"/>.
+        /// </summary>
         protected virtual bool ValueIsEditable => !ReadOnly;
+        /// <summary>
+        /// Implementation of <see cref="IPropertyEntry.Flags"/> for the current property page, derived from the older
+        /// properties of this class: the <see cref="LabelType"/> flags (which have the same values),
+        /// <see cref="PropertyEntryType.GroupTitle"/> or <see cref="PropertyEntryType.Seperator"/> from <see cref="EntryType"/>,
+        /// <see cref="PropertyEntryType.DropDown"/> from <see cref="HasDropDownButton"/>, <see cref="PropertyEntryType.ValueEditable"/>
+        /// from <see cref="ValueIsEditable"/> and <see cref="PropertyEntryType.HasSubEntries"/> when <see cref="SubEntriesCount"/>
+        /// is greater than 0.
+        /// </summary>
         public virtual PropertyEntryType Flags
         {
             get
@@ -728,11 +902,28 @@ namespace CADability.UserInterface
                 return res;
             }
         }
+        /// <summary>
+        /// Implementation of <see cref="IPropertyEntry.Label"/>: returns <see cref="LabelText"/>.
+        /// </summary>
         public virtual string Label => LabelText;
+        /// <summary>
+        /// Implementation of <see cref="IPropertyEntry.Value"/>: the text shown in the value column. The default is null,
+        /// which means the entry has no value column; entries that show a value override it.
+        /// </summary>
         public virtual string Value => null;
         //public string ToolTip => StringTable.GetString(HelpLink, StringTable.Category.info);
+        /// <summary>
+        /// Implementation of <see cref="IPropertyEntry.ResourceId"/>: returns <see cref="HelpLink"/>, i.e. the resource id
+        /// of the entry, which the property page uses for the tool tip and which <see cref="FindSubItem"/> and
+        /// <see cref="IPropertyPage.FindFromHelpLink"/> use to identify the entry.
+        /// </summary>
         public string ResourceId => HelpLink;
+        /// <inheritdoc/>
         public object Parent { get; set; }
+        /// <summary>
+        /// Implementation of <see cref="IPropertyEntry.SubItems"/>: those of the <see cref="SubEntries"/> that implement
+        /// <see cref="IPropertyEntry"/>; entries that only implement <see cref="IShowProperty"/> are left out.
+        /// </summary>
         public virtual IPropertyEntry[] SubItems
         {
             get
@@ -748,10 +939,21 @@ namespace CADability.UserInterface
                 return res.ToArray();
             }
         }
+        /// <summary>
+        /// Implementation of <see cref="IPropertyEntry.ButtonClicked"/>. The base implementation throws a
+        /// <see cref="NotImplementedException"/>; an entry whose <see cref="Flags"/> announce a button (OK, cancel, check
+        /// box, lock symbol, direct menu, value as button) must override it.
+        /// </summary>
+        /// <param name="button">the button that was clicked</param>
         public virtual void ButtonClicked(PropertyEntryButton button)
         {
             throw new NotImplementedException();
         }
+        /// <summary>
+        /// Implementation of <see cref="IPropertyEntry.OpenOrCloseSubEntries"/>: toggles <see cref="IPropertyEntry.IsOpen"/>,
+        /// which notifies the entry via <see cref="Opened"/>.
+        /// </summary>
+        /// <returns>the number of sub items that became visible, or the negative number of sub items that were hidden</returns>
         public int OpenOrCloseSubEntries()
         {
             if ((this as IPropertyEntry).IsOpen)
@@ -766,16 +968,35 @@ namespace CADability.UserInterface
                 return SubItems.Length;
             }
         }
+        /// <summary>
+        /// The property page this entry is currently shown in, set by <see cref="Added(IPropertyPage)"/> and cleared by
+        /// <see cref="Removed(IPropertyPage)"/>. Null while the entry is not shown.
+        /// </summary>
         protected IPropertyPage propertyPage;
+        /// <summary>
+        /// Implementation of <see cref="IPropertyEntry.Added"/>: memorizes the property page in <see cref="propertyPage"/>.
+        /// Unlike <see cref="Added(IPropertyTreeView)"/> it does not raise the state changed event. Override it to
+        /// subscribe to events while the entry is displayed, and call the base implementation.
+        /// </summary>
+        /// <param name="pp">the property page the entry was added to</param>
         public virtual void Added(IPropertyPage pp)
         {
             propertyPage = pp;
             // Parent = pp;  no! all items and subitems will have the Added called, but changing theis parent would be wrong
         }
+        /// <summary>
+        /// Implementation of <see cref="IPropertyEntry.Removed"/>: forgets the property page. Override it to unsubscribe
+        /// from events, and call the base implementation.
+        /// </summary>
+        /// <param name="pp">the property page the entry was removed from</param>
         public virtual void Removed(IPropertyPage pp)
         {
             propertyPage = null;
         }
+        /// <summary>
+        /// Implementation of <see cref="IPropertyEntry.ContextMenu"/>: the default returns null. An entry whose
+        /// <see cref="LabelType"/> contains <see cref="ShowPropertyLabelFlags.ContextMenu"/> must override it.
+        /// </summary>
         public virtual MenuWithHandler[] ContextMenu
         {
             get
@@ -783,35 +1004,92 @@ namespace CADability.UserInterface
                 return null;
             }
         }
+        /// <summary>
+        /// Implementation of <see cref="IPropertyEntry.GetDropDownList"/>. Entries derived from this class have no drop
+        /// down list (see <see cref="HasDropDownButton"/>), the method throws a <see cref="NotImplementedException"/>.
+        /// </summary>
+        /// <returns>the list of choices; this implementation never returns</returns>
         public string[] GetDropDownList()
         {   // must be implemented in those properties which set HasDropDownButton to true
             throw new NotImplementedException();
         }
+        /// <summary>
+        /// Implementation of <see cref="IPropertyEntry.StartEdit"/>: does nothing. Override it when the entry has to
+        /// prepare for an edit, e.g. remember the value before the edit.
+        /// </summary>
+        /// <param name="editValue">true: the value is edited, false: the label is edited</param>
         public virtual void StartEdit(bool editValue) { }
+        /// <summary>
+        /// Implementation of <see cref="IPropertyEntry.EndEdit"/>: does nothing. An entry with an editable value or label
+        /// overrides it to take over (or, when aborted, discard) the text that was entered.
+        /// </summary>
+        /// <param name="aborted">true: the edit was aborted (Escape), false: it ended normally</param>
+        /// <param name="modified">true: the text was changed while editing</param>
+        /// <param name="newValue">the text as it was when editing ended</param>
         public virtual void EndEdit(bool aborted, bool modified, string newValue) { }
+        /// <summary>
+        /// Implementation of <see cref="IPropertyEntry.EditTextChanged"/>: accepts every text and returns true. Override
+        /// it to check the text while it is typed and to apply it immediately.
+        /// </summary>
+        /// <param name="newValue">the current text of the text box</param>
+        /// <returns>true when the text is acceptable, false to show the error symbol with the text of <see cref="GetErrorText"/></returns>
         public virtual bool EditTextChanged(string newValue) { return true; }
+        /// <summary>
+        /// Implementation of <see cref="IPropertyEntry.GetErrorText"/>: returns an empty string. Override it together with
+        /// <see cref="EditTextChanged"/> to explain why a text was rejected.
+        /// </summary>
+        /// <returns>the error text, empty by default</returns>
         public virtual string GetErrorText(){ return ""; }
         int IPropertyEntry.Index { get; set; }
         int IPropertyEntry.IndentLevel { get; set; }
+        /// <summary>
+        /// Implementation of <see cref="IPropertyEntry.Selected"/>: forwards to the parameterless <see cref="Selected()"/>
+        /// of the older interface, which raises the state changed event.
+        /// </summary>
+        /// <param name="previousSelected">the entry that was selected before, may be null</param>
         public virtual void Selected(IPropertyEntry previousSelected)
         {
             Selected();
         }
+        /// <summary>
+        /// Implementation of <see cref="IPropertyEntry.UnSelected"/>: forwards to the parameterless <see cref="UnSelected()"/>
+        /// of the older interface, which raises the state changed event.
+        /// </summary>
+        /// <param name="nowSelected">the entry that is selected instead, may be null</param>
         public virtual void UnSelected(IPropertyEntry nowSelected)
         {
             UnSelected();
         }
+        /// <summary>
+        /// Implementation of <see cref="IPropertyEntry.ListBoxSelected"/>: does nothing, since entries derived from this
+        /// class have no drop down list.
+        /// </summary>
+        /// <param name="selectedIndex">the index of the chosen item in the list of <see cref="GetDropDownList"/></param>
         public virtual void ListBoxSelected(int selectedIndex) { }
+        /// <inheritdoc/>
         public bool DeferUpdate { get; set; } = false;
         bool IPropertyEntry.IsLocked { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
         /// <inheritdoc/>
         public event PropertyEntryChangedStateDelegate PropertyEntryChangedStateEvent;
+        /// <summary>
+        /// Raises <see cref="PropertyEntryChangedStateEvent"/> with the given arguments. The standard implementations of
+        /// <see cref="Added(IPropertyTreeView)"/>, <see cref="Selected()"/>, <see cref="UnSelected()"/>, <see cref="ChildSelected"/>
+        /// and <see cref="Opened"/> use it; a derived class may report further changes.
+        /// </summary>
+        /// <param name="args">the change to report</param>
         protected void PropertyEntryChangedState(StateChangedArgs args)
         {
             PropertyEntryChangedStateEvent?.Invoke(this, args);
         }
 
+        /// <summary>
+        /// Implementation of <see cref="IPropertyEntry.FindSubItem"/>: returns this entry when its <see cref="ResourceId"/>
+        /// (or, when it has none, its label text) equals <paramref name="helpResourceID"/>, otherwise searches the
+        /// <see cref="SubItems"/> recursively, whether they are open or not.
+        /// </summary>
+        /// <param name="helpResourceID">the resource id (or label text) to look for</param>
+        /// <returns>the entry found, or null</returns>
         public virtual IPropertyEntry FindSubItem(string helpResourceID)
         {   // also check for LabeText, which would be the name of an item in the list
             if (ResourceId == helpResourceID || (string.IsNullOrEmpty(ResourceId) && labelTextInternal == helpResourceID)) return this;
@@ -832,28 +1110,49 @@ namespace CADability.UserInterface
 
     public class ShowPropertyGroup : PropertyEntryImpl
     {
+        /// <summary>
+        /// Creates an empty group whose label is the string <paramref name="resourceId"/> of the <see cref="StringTable"/>.
+        /// Add the sub entries with <see cref="AddSubEntry"/> or <see cref="AddSubEntries"/> before the group is displayed.
+        /// </summary>
+        /// <param name="resourceId">the resource id of the label text</param>
         public ShowPropertyGroup(string resourceId)
         {
             base.resourceIdInternal = resourceId;
             subEntriesInternal = new IPropertyEntry[0];
         }
+        /// <summary>
+        /// The sub entries of the group, which <see cref="SubItems"/> returns. Never null.
+        /// </summary>
         protected IPropertyEntry[] subEntriesInternal;
+        /// <summary>
+        /// Removes all sub entries from the group. The property page is not notified; when the group is already
+        /// displayed, call <see cref="PropertyEntryImpl.Refresh()"/> afterwards.
+        /// </summary>
         public void ClearSubEntries()
         {
             subEntriesInternal = new IPropertyEntry[0];
         }
+        /// <summary>
+        /// Appends an entry to the sub entries of the group.
+        /// </summary>
+        /// <param name="ToAdd">the entry to add</param>
         public void AddSubEntry(IPropertyEntry ToAdd)
         {
             ArrayList al = new ArrayList(subEntriesInternal);
             al.Add(ToAdd);
             subEntriesInternal = (IPropertyEntry[])al.ToArray(typeof(IPropertyEntry));
         }
+        /// <summary>
+        /// Appends several entries to the sub entries of the group, in the given order.
+        /// </summary>
+        /// <param name="ToAdd">the entries to add</param>
         public void AddSubEntries(params IPropertyEntry[] ToAdd)
         {
             ArrayList al = new ArrayList(subEntriesInternal);
             al.AddRange(ToAdd);
             subEntriesInternal = (IPropertyEntry[])al.ToArray(typeof(IPropertyEntry));
         }
+        /// <inheritdoc/>
         public override PropertyEntryType Flags => PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
         /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
@@ -944,7 +1243,16 @@ namespace CADability.UserInterface
         /// </summary>
         /// <returns>true if on top, false otherwise</returns>
         bool IsOnTop();
+        /// <summary>
+        /// Tells whether the sub entries of the entry are currently shown.
+        /// </summary>
+        /// <param name="toTest">the entry to test</param>
+        /// <returns>true when the entry is open, false when it is closed or not displayed</returns>
         bool IsOpen(IShowProperty toTest);
+        /// <summary>
+        /// Shows the context menu of the entry, as if the user had clicked its context menu button.
+        /// </summary>
+        /// <param name="entry">the entry whose context menu is shown</param>
         void PopupContextMenu(IShowProperty entry);
         /// <summary>
         /// Finds the <see cref="IShowProperty"/> object with the given help link (<see cref="IShowProperty.HelpLink"/>).
@@ -955,14 +1263,33 @@ namespace CADability.UserInterface
         /// <param name="HelpLink">The help link for the desired entry</param>
         /// <returns>The IShowProperty entry</returns>
         IShowProperty FindFromHelpLink(string HelpLink);
+        /// <summary>
+        /// Returns the selected entry of the display.
+        /// </summary>
+        /// <returns>the selected entry, or null when no entry is selected</returns>
         IShowProperty GetCurrentSelection();
+        /// <summary>
+        /// Returns the entry that contains <paramref name="child"/> among its sub entries.
+        /// </summary>
+        /// <param name="child">the entry whose parent is wanted</param>
+        /// <returns>the parent entry, or null for a root entry</returns>
         IShowProperty GetParent(IShowProperty child);
+        /// <summary>
+        /// Notification from an entry that a control it owns received or lost the keyboard focus, so that the display
+        /// can update its selection and raise <see cref="FocusChangedEvent"/>.
+        /// </summary>
+        /// <param name="child">the entry whose control changed its focus</param>
+        /// <param name="gotFocus">true: the control received the focus, false: it lost the focus</param>
         void ChildFocusChanged(IShowProperty child, bool gotFocus);
         /// <summary>
         /// Returns the <see cref="IFrame"/> object of the context of this IPropertyTreeView
         /// </summary>
         /// <returns></returns>
         IFrame GetFrame();
+        /// <summary>
+        /// Raised when the keyboard focus moves from one entry of the display to another, or enters or leaves the
+        /// display (see <see cref="FocusChangedDelegate"/>).
+        /// </summary>
         event FocusChangedDelegate FocusChangedEvent;
         /// <summary>
         /// Checks, whether a Focus change from oldFocus to newFocus implies a focus change from
@@ -988,11 +1315,33 @@ namespace CADability.UserInterface
         /// <param name="newFocus">the entry that got the focus</param>
         /// <returns>true if toTest lost the focus</returns>
         bool FocusEntered(IShowProperty toTest, IShowProperty oldFocus, IShowProperty newFocus);
+        /// <summary>
+        /// The help links (<see cref="IShowProperty.HelpLink"/>) of all entries the display currently contains.
+        /// </summary>
         string[] AllIds { get; }
+        /// <summary>
+        /// Converts a rectangle given relative to the line of an entry into the client coordinates of the display, for
+        /// entries that place their own control (e.g. an edit box) over their line.
+        /// </summary>
+        /// <param name="position">the rectangle relative to the entry's line, in pixels</param>
+        /// <returns>the rectangle in the client coordinates of the display</returns>
         Rectangle GetBoundsForControl(Rectangle position);
+        /// <summary>
+        /// Converts a point given relative to the line of an entry into the client coordinates of the display, the
+        /// counterpart of <see cref="GetBoundsForControl"/> for a single point.
+        /// </summary>
+        /// <param name="loc">the point relative to the entry's line, in pixels</param>
+        /// <returns>the point in the client coordinates of the display</returns>
         Point GetPointForControl(Point loc);
+        /// <summary>
+        /// Sets the font in which the display draws its entries.
+        /// </summary>
+        /// <param name="font">the new font</param>
         void SetFont(Font font);
 
+        /// <summary>
+        /// Releases the display; every displayed entry gets <see cref="IShowProperty.Removed"/> first.
+        /// </summary>
         void Dispose();
     }
 

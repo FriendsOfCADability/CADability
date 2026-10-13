@@ -92,6 +92,7 @@ namespace CADability.Actions
             return actualVector;
         }
 
+        /// <inheritdoc/>
         public override void OnSetAction()
         {
             base.TitleId = "Construct.DirectionOfSurface";
@@ -118,6 +119,7 @@ namespace CADability.Actions
             base.Frame.SnapMode = SnapPointFinder.SnapModes.SnapToFaceSurface;
         }
 
+        /// <inheritdoc/>
         public override void OnRemoveAction()
         {
             base.OnRemoveAction();
@@ -125,6 +127,7 @@ namespace CADability.Actions
         }
 
 
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "Construct.DirectionOfSurface";
@@ -141,6 +144,7 @@ namespace CADability.Actions
             base.OnInactivate(NewActiveAction, RemovingAction);
         }
 
+        /// <inheritdoc/>
         public override void OnDone()
         {
             succeeded = true;

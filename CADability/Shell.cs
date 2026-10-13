@@ -167,6 +167,15 @@ namespace CADability.GeoObject
         #endregion
     }
 
+    /// <summary>
+    /// A shell is a set of connected <see cref="Face"/>s: neighbouring faces share their <see cref="Edge"/>s, and the faces
+    /// are oriented consistently, so that the surface normals of all faces point to the same side (outward for the shell
+    /// of a <see cref="Solid"/>). A shell is closed when every edge belongs to two faces (see <see cref="OpenEdges"/>);
+    /// a closed shell can bound a <see cref="Solid"/> (<see cref="Solid.MakeSolid"/>), an open shell is a free standing
+    /// surface, e.g. a sheet metal part. Shells are created by the methods of <see cref="Make3D"/> (extrusion, rotation,
+    /// sewing of faces), by <see cref="FromFaces(Face[], bool)"/> from faces that already share their edges, or come
+    /// from the file imports. A shell is also an <see cref="IGeoObject"/> that can be added to a <see cref="Model"/>.
+    /// </summary>
     [Serializable()]
     public class Shell : IGeoObjectImpl, ISerializable, IColorDef, IGetSubShapes, IGeoObjectOwner, IDeserializationCallback, IExportStep, IJsonSerialize, IJsonSerializeDone
     {
@@ -175,38 +184,92 @@ namespace CADability.GeoObject
         private string name; // the name of the shell, may be null
         private List<ParametricProperty> parametricProperties;
         private bool orientedAndSeamless; // soll bedeuten, dass alle Faces "outwardoriented" sind und es keine Säume gibt (Kanten, die ein Face mit sich verbinden)
+        /// <summary>
+        /// Flags that record which normalizations have already been applied to a shell (see <see cref="State"/>), so that
+        /// they are not repeated unnecessarily.
+        /// </summary>
         [Flags]
         public enum ShellFlags
         {
+            /// <summary>The faces on periodic surfaces have been split at their seams (see <see cref="SplitPeriodicFaces"/>).</summary>
             NonPeriodicFaces = 0x1,
+            /// <summary>Neighbouring faces on the same surface have been combined into single faces (see <see cref="CombineConnectedFaces"/>).</summary>
             FacesCombined = 0x2,
+            /// <summary>Consecutive edges that form a single smooth curve have been combined into single edges (see <see cref="CombineConnectedFaces"/>).</summary>
             EdgesCombined = 0x4,
+            /// <summary>The shell contains inner shells (cavities), see <see cref="AddInnerHole(Face[])"/>.</summary>
             HasHoles = 0x8,
         }
+        /// <summary>
+        /// Records which normalizations (see <see cref="ShellFlags"/>) have already been applied to this shell. Maintained by
+        /// CADability and saved with the shell; not meant to be set by applications.
+        /// </summary>
         public ShellFlags State;
         private GeoObjectList featureAxis;
         #region polymorph construction
+        /// <summary>
+        /// Signature of <see cref="Constructor"/>.
+        /// </summary>
+        /// <returns>the new shell</returns>
         public delegate Shell ConstructionDelegate();
+        /// <summary>
+        /// When set, <see cref="Construct"/> calls this delegate instead of creating a <see cref="Shell"/>, so that an
+        /// application can substitute a derived class for every shell CADability creates (also when reading files).
+        /// </summary>
         public static ConstructionDelegate Constructor;
+        /// <summary>
+        /// Creates an empty shell, or an instance of the class <see cref="Constructor"/> provides. Set its faces with
+        /// <see cref="SetFaces"/>, or use <see cref="FromFaces(Face[], bool)"/>, which does both.
+        /// </summary>
+        /// <returns>the new shell</returns>
         public static Shell Construct()
         {
             if (Constructor != null) return Constructor();
             return new Shell();
         }
+        /// <summary>
+        /// Signature of <see cref="Constructed"/>.
+        /// </summary>
+        /// <param name="justConstructed">the shell whose constructor has just run</param>
         public delegate void ConstructedDelegate(Shell justConstructed);
+        /// <summary>
+        /// When set, this delegate is called at the end of the <see cref="Shell"/> constructor for every new shell, e.g. to
+        /// attach user data to it.
+        /// </summary>
         public static ConstructedDelegate Constructed;
+        /// <summary>
+        /// Creates an empty shell without faces. Not for direct use: call <see cref="Construct"/>, which honours
+        /// <see cref="Constructor"/>, and set the faces afterwards.
+        /// </summary>
         protected Shell()
             : base()
         {
             if (Constructed != null) Constructed(this);
         }
         #endregion
+        /// <summary>
+        /// Creates a shell from <paramref name="faces"/>, which must already be connected, i.e. neighbouring faces share their
+        /// edges (as the faces of an existing shell do). The faces are neither checked nor connected; see
+        /// <see cref="FromFaces(Face[], bool)"/> to connect independent faces, or <see cref="Make3D.SewFaces(Face[], bool)"/>,
+        /// which also sorts the faces into several shells. The faces become owned by the shell.
+        /// </summary>
+        /// <param name="faces">the faces of the shell</param>
+        /// <returns>the new shell</returns>
         public static Shell FromFaces(params Face[] faces)
         {
             Shell res = Shell.Construct();
             res.SetFaces(faces);
             return res;
         }
+        /// <summary>
+        /// Creates a shell from <paramref name="faces"/>. With <paramref name="connect"/> set, the faces are connected first
+        /// (see <see cref="ConnectFaces(Face[], double)"/>): vertices and open edges of different faces which coincide within
+        /// <see cref="Precision.eps"/> are merged, so that independent faces (e.g. from an import) become a connected shell.
+        /// Otherwise the faces must already share their edges. The faces become owned by the shell.
+        /// </summary>
+        /// <param name="faces">the faces of the shell</param>
+        /// <param name="connect">true: merge coinciding edges and vertices of the faces first</param>
+        /// <returns>the new shell</returns>
         public static Shell FromFaces(Face[] faces, bool connect = false)
         {
             Shell res = Shell.Construct();
@@ -268,6 +331,9 @@ namespace CADability.GeoObject
                 return faces;
             }
         }
+        /// <summary>
+        /// All vertices of the faces of this shell, each vertex once. The array is collected anew on each access.
+        /// </summary>
         public Vertex[] Vertices
         {
             get
@@ -280,6 +346,13 @@ namespace CADability.GeoObject
                 return res.ToArray();
             }
         }
+        /// <summary>
+        /// The volume enclosed by this shell, computed by <see cref="SignedVolume(IEnumerable{Face}, double)"/> from a
+        /// triangulation of the faces. The shell must be closed, otherwise the result is meaningless. The sign follows the
+        /// orientation: positive for an outward oriented shell, negative for an inward oriented one (a cavity).
+        /// </summary>
+        /// <param name="precision">precision of the triangulation, which limits the precision of the result</param>
+        /// <returns>the signed volume</returns>
         public double Volume(double precision)
         {
             return SignedVolume(Faces, precision);
@@ -516,6 +589,13 @@ namespace CADability.GeoObject
 
         internal List<ParametricProperty> ParametricProperties { get { return parametricProperties; } }
 
+        /// <summary>
+        /// Adds a <see cref="ParametricProperty"/> to this shell: a named, modifiable property (e.g. the distance between two
+        /// faces) defined by faces, edges and vertices of this shell, which the user can change later to modify the shell.
+        /// Parametric properties are usually created by the parametric actions (ParametricsDistanceAction etc.); they are
+        /// saved and cloned with the shell.
+        /// </summary>
+        /// <param name="parametricProperty">the property to add</param>
         public void AddParametricProperty(ParametricProperty parametricProperty)
         {
             if (parametricProperties == null) parametricProperties = new List<ParametricProperty>();
@@ -806,6 +886,12 @@ namespace CADability.GeoObject
             return res;
         }
 
+        /// <summary>
+        /// Returns the named features of this shell. A feature is a set of faces of the shell marked with a name (see
+        /// <see cref="AddFeature(string, IEnumerable{Face})"/>); a face may belong to several features. The names are stored as
+        /// user data of the faces, so they survive cloning and saving.
+        /// </summary>
+        /// <returns>the faces of each feature by feature name, empty when no features have been defined</returns>
         public Dictionary<string, HashSet<Face>> GetFeatures()
         {
             Dictionary<string, HashSet<Face>> features = new Dictionary<string, HashSet<Face>>();
@@ -827,6 +913,12 @@ namespace CADability.GeoObject
             }
             return features;
         }
+        /// <summary>
+        /// Marks <paramref name="faces"/> as belonging to the feature <paramref name="name"/> (see <see cref="GetFeatures"/>).
+        /// A face can belong to several features. The faces are not checked to be faces of this shell.
+        /// </summary>
+        /// <param name="name">the name of the feature, see <see cref="GetNewFeatureName"/> for an unused name</param>
+        /// <param name="faces">the faces of the feature</param>
         public void AddFeature(string name, IEnumerable<Face> faces)
         {
             foreach (Face face in faces)
@@ -842,6 +934,11 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Removes the feature <paramref name="name"/>: the mark is removed from all faces of this shell, the faces themselves
+        /// stay. Nothing happens when there is no such feature.
+        /// </summary>
+        /// <param name="name">the name of the feature</param>
         public void RemoveFeature(string name)
         {
             foreach (Face face in faces)
@@ -853,6 +950,11 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Returns a feature name that is not yet used in this shell: the localized default name (string table entry
+        /// "Solid.NewFeatureName") followed by a number greater than all numbers already in use.
+        /// </summary>
+        /// <returns>a new feature name</returns>
         public string GetNewFeatureName()
         {
             int maxNameindex = 0;
@@ -871,6 +973,17 @@ namespace CADability.GeoObject
             }
             return nn + (maxNameindex + 1).ToString();
         }
+        /// <summary>
+        /// Determines the thickness (gauge) of the material at the face <paramref name="startHere"/>, e.g. of a sheet metal
+        /// part: looks for a face of this shell that is parallel to <paramref name="startHere"/> with opposite orientation
+        /// (the other side of the material) and returns the distance between them. Both sides are then extended across
+        /// tangential edges (bends) as long as the thickness stays the same, so that <paramref name="frontSide"/> and
+        /// <paramref name="backSide"/> contain all faces of the two surfaces of the sheet.
+        /// </summary>
+        /// <param name="startHere">the face to start with, becomes part of <paramref name="frontSide"/></param>
+        /// <param name="frontSide">receives the faces on the side of <paramref name="startHere"/></param>
+        /// <param name="backSide">receives the faces on the opposite side</param>
+        /// <returns>the thickness, or <see cref="double.MaxValue"/> when there is no opposite parallel face</returns>
         public double GetGauge(Face startHere, out HashSet<Face> frontSide, out HashSet<Face> backSide)
         {
             double thickness = double.MaxValue;
@@ -1015,6 +1128,10 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// The <see cref="Name"/> of this shell, or an empty string when no name has been set (<see cref="Name"/> returns null
+        /// then).
+        /// </summary>
         public string NameOrEmpty
         {
             get
@@ -1038,6 +1155,14 @@ namespace CADability.GeoObject
             }
             return res.ToArray();
         }
+        /// <summary>
+        /// Intersects the infinite line through <paramref name="location"/> with direction <paramref name="direction"/> with
+        /// all faces of this shell (see <see cref="Face.GetLineIntersection(GeoPoint, GeoVector)"/>). The points are in no
+        /// particular order; a point on an edge may be returned once for each face of the edge.
+        /// </summary>
+        /// <param name="location">a point on the line</param>
+        /// <param name="direction">direction of the line</param>
+        /// <returns>the intersection points, empty when the line misses the shell</returns>
         public GeoPoint[] GetLineIntersection(GeoPoint location, GeoVector direction)
         {
             List<GeoPoint> res = new List<GeoPoint>();
@@ -1047,13 +1172,6 @@ namespace CADability.GeoObject
             }
             return res.ToArray();
         }
-        /// <summary>
-        /// Returns the connected components of the faces of this shell: two faces belong to the same component when there is
-        /// a path from one to the other via common edges. For a closed shell each component is itself a closed shell, i.e. the
-        /// outer hull or one of the holes (see <see cref="GetHullAndHoles"/>). This is a purely topological operation, it makes
-        /// no assumption about orientation or closedness and can also be used on open shells.
-        /// </summary>
-        /// <returns>The connected components, each face of this shell is contained in exactly one of them</returns>
         /// <summary>
         /// Adds the faces of a cavity to this shell. The faces must form a closed shell inside of this shell, oriented
         /// towards the cavity (i.e. reversed with respect to a solid of the shape of the cavity).
@@ -1066,6 +1184,13 @@ namespace CADability.GeoObject
             SetFaces(newFaces);
             State |= ShellFlags.HasHoles;
         }
+        /// <summary>
+        /// Returns the connected components of the faces of this shell: two faces belong to the same component when there is
+        /// a path from one to the other via common edges. For a closed shell each component is itself a closed shell, i.e. the
+        /// outer hull or one of the holes (see <see cref="GetHullAndHoles"/>). This is a purely topological operation, it makes
+        /// no assumption about orientation or closedness and can also be used on open shells.
+        /// </summary>
+        /// <returns>The connected components, each face of this shell is contained in exactly one of them</returns>
         public List<HashSet<Face>> GetConnectedFaceSets()
         {
             List<HashSet<Face>> res = new List<HashSet<Face>>();
@@ -1169,6 +1294,19 @@ namespace CADability.GeoObject
             }
             return boundaryCaseResult > 0;
         }
+        /// <summary>
+        /// Intersects the infinite line through <paramref name="location"/> with direction <paramref name="direction"/> with
+        /// all faces of this shell. For each intersection point the result contains the line parameter
+        /// (location + par*direction) and whether the line leaves the shell there in the direction of the surface normal
+        /// (true) or enters it (false), see <see cref="Face.GetOrientedLineIntersection"/>. The entries are not sorted.
+        /// <paramref name="isBoundaryCase"/> is set when an intersection point lies on an edge, the line is tangential to a
+        /// face there, or an intersection is at <paramref name="location"/> itself: the result is then not reliable for an
+        /// inside/outside test and a different line should be tried.
+        /// </summary>
+        /// <param name="location">a point on the line</param>
+        /// <param name="direction">direction of the line</param>
+        /// <param name="isBoundaryCase">true if the result is ambiguous</param>
+        /// <returns>line parameter and orientation of each intersection</returns>
         public List<(double, bool)> GetOrientedLineIntersection(GeoPoint location, GeoVector direction, out bool isBoundaryCase)
         {
             isBoundaryCase = false;
@@ -1197,6 +1335,13 @@ namespace CADability.GeoObject
             }
             edges = null;
         }
+        /// <summary>
+        /// Makes this shell take over the faces, edges and parametric properties of <paramref name="toCopyFrom"/> (the
+        /// objects themselves, not copies; the faces are re-owned by this shell). Used to replace the contents of a shell by a
+        /// modified clone of itself in an undoable way: the previous state is recorded for undo and the change events are
+        /// raised.
+        /// </summary>
+        /// <param name="toCopyFrom">the shell whose contents are taken over</param>
         public void CopyAll(Shell toCopyFrom)
         {   // nur wg. undo
             using (new Changing(this, "CopyAll", this.Clone(new Dictionary<Edge, Edge>())))
@@ -1211,6 +1356,14 @@ namespace CADability.GeoObject
                 parametricProperties = toCopyFrom.parametricProperties;
             }
         }
+        /// <summary>
+        /// Replaces the <see cref="NurbsSurface"/>s of the faces of this shell by the elementary surfaces (plane, cylinder,
+        /// cone, sphere, torus) they approximate within <paramref name="maxError"/>, where there are such surfaces. The 2d
+        /// curves of the edges on the modified faces are recomputed, and the 3d curves of edges between two modified faces are
+        /// recomputed as intersections of the new surfaces. Imported NURBS surfaces often are such elementary surfaces, which
+        /// are handled faster and more precisely.
+        /// </summary>
+        /// <param name="maxError">maximum distance between the NURBS surface and the replacing elementary surface</param>
         public void MakeRegularSurfaces(double maxError)
         {
             HashSet<Edge> recalcEdges = new HashSet<Edge>(); // hier alle edges sammeln, die neu berechnet werden müssen
@@ -1399,6 +1552,13 @@ namespace CADability.GeoObject
             return null; // verschwindet in der Projektion, oder Fehler
         }
 
+        /// <summary>
+        /// A quick test whether this shell and <paramref name="other"/> might have the same geometry: the numbers of faces,
+        /// edges and vertices must be equal and the volumes must coincide within a thousandth of the size of the shell.
+        /// This is not a full comparison; use <see cref="SameForm"/> to compare the faces.
+        /// </summary>
+        /// <param name="other">the other shell</param>
+        /// <returns>false if the shells certainly differ, true if they agree in these properties</returns>
         public bool SameGeometry(Shell other)
         {
             if (Faces.Length != other.Faces.Length) return false;
@@ -1410,6 +1570,12 @@ namespace CADability.GeoObject
             return true;
         }
 
+        /// <summary>
+        /// Tests whether any of the curves in <paramref name="toTestWith"/> intersects a face of this shell. Only intersection
+        /// points within the parameter range of the curve (0 to 1, i.e. on the curve itself and not on its extension) count.
+        /// </summary>
+        /// <param name="toTestWith">the curves to test</param>
+        /// <returns>true if at least one curve intersects the shell</returns>
         public bool TestIntersection(List<ICurve> toTestWith)
         {
             for (int i = 0; i < Faces.Length; i++)
@@ -2703,7 +2869,19 @@ namespace CADability.GeoObject
             else lists.Add(Layer, true, true, this); // in PaintTo3D wirds dann richtig gemacht
                                                      // paintTo3D.PaintSurfaces und paintTo3D.PaintEdges muss richtig eingestellt und zweimal aufgerufen werden
         }
+        /// <summary>
+        /// Signature of <see cref="OnPaintTo3D"/>.
+        /// </summary>
+        /// <param name="toPaint">the shell being painted</param>
+        /// <param name="paintTo3D">the paint interface to paint to</param>
+        /// <returns>true if the handler has painted the shell and the default painting is to be skipped, false to let
+        /// CADability paint the shell</returns>
         public delegate bool PaintTo3DDelegate(Shell toPaint, IPaintTo3D paintTo3D);
+        /// <summary>
+        /// Static hook called at the beginning of <see cref="PaintTo3D(IPaintTo3D)"/> for every shell. Set it to replace or
+        /// extend the way shells are displayed; when the handler returns true, the default painting of the faces is skipped.
+        /// Null by default.
+        /// </summary>
         public static PaintTo3DDelegate OnPaintTo3D;
         /// <inheritdoc/>
         public override void PaintTo3D(IPaintTo3D paintTo3D)
@@ -2757,6 +2935,7 @@ namespace CADability.GeoObject
                 faces[i].PrepareDisplayList(precision);
             }
         }
+        /// <inheritdoc/>
         public override Style.EDefaultFor PreferredStyle
         {
             get
@@ -2795,6 +2974,7 @@ namespace CADability.GeoObject
             }
             return res;
         }
+        /// <inheritdoc/>
         public override Layer Layer
         {
             get
@@ -2813,6 +2993,7 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <inheritdoc/>
         public override IGeoObject[] OwnedItems
         {
             get
@@ -2921,6 +3102,11 @@ namespace CADability.GeoObject
         }
         #endregion
         #region ISerializable Members
+        /// <summary>
+        /// Constructor required by deserialization
+        /// </summary>
+        /// <param name="info">SerializationInfo</param>
+        /// <param name="context">StreamingContext</param>
         protected Shell(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -2969,6 +3155,7 @@ namespace CADability.GeoObject
             if (Constructed != null) Constructed(this);
         }
         #endregion
+        /// <inheritdoc/>
         public override void GetObjectData(IJsonWriteData data)
         {
             base.GetObjectData(data);
@@ -2979,6 +3166,7 @@ namespace CADability.GeoObject
             if (parametricProperties != null) data.AddProperty("ParametricProperties", parametricProperties);
         }
 
+        /// <inheritdoc/>
         public override void SetObjectData(IJsonReadData data)
         {
             base.SetObjectData(data);
@@ -3002,6 +3190,9 @@ namespace CADability.GeoObject
         }
 #if DEBUG
 #endif
+        /// <summary>
+        /// Forwards <see cref="Face.FreeCachedMemory"/> to all faces of this shell. Currently nothing is released.
+        /// </summary>
         public void FreeCachedMemory()
         {
             for (int i = 0; i < faces.Length; i++)
@@ -3011,6 +3202,10 @@ namespace CADability.GeoObject
         }
         #region IColorDef Members
         private ColorDef colorDef;
+        /// <summary>
+        /// The color of this shell. Setting it sets the same color on all faces of the shell (the faces determine the color
+        /// of the display, also of the edges); the change is undoable and raises the change events.
+        /// </summary>
         public ColorDef ColorDef
         {
             get => colorDef;
@@ -3146,6 +3341,13 @@ namespace CADability.GeoObject
                 return res.ToArray();
             }
         }
+        /// <summary>
+        /// The axes of the rotationally symmetric parts of this shell (cylindrical holes, bosses, fillets etc.): for each
+        /// group of connected faces on a surface of revolution an invisible <see cref="Line"/> along the axis of that surface,
+        /// a little longer than the faces. The user data "CADability.AxisOf" of each line holds the face it was derived from.
+        /// The lines are computed on first access and cached; the context menu uses them to show the axes, the parametric
+        /// actions as reference objects.
+        /// </summary>
         public GeoObjectList FeatureAxis
         {
             get
@@ -3170,6 +3372,12 @@ namespace CADability.GeoObject
                 return featureAxis;
             }
         }
+        /// <summary>
+        /// Returns true if this shell has open edges (edges with only one face) other than poles. A pole, like the apex of a
+        /// cone, is an edge of zero length that starts and ends at the same vertex; it is open by nature and does not make the
+        /// shell open. Use this rather than <see cref="OpenEdges"/> to decide whether a shell can be made a solid.
+        /// </summary>
+        /// <returns>true if the shell is open</returns>
         public bool HasOpenEdgesExceptPoles()
         {
             Edge[] open = OpenEdges;
@@ -3179,6 +3387,10 @@ namespace CADability.GeoObject
             }
             return false;
         }
+        /// <summary>
+        /// The open edges of this shell (see <see cref="OpenEdges"/>) without the poles, i.e. without the edges of zero length
+        /// that start and end at the same vertex (like the apex of a cone). Empty for a closed shell.
+        /// </summary>
         public Edge[] OpenEdgesExceptPoles
         {
             get
@@ -3203,6 +3415,15 @@ namespace CADability.GeoObject
         {
             return edge.Vertex1 == edge.Vertex2 && (edge.Curve3D == null || edge.Curve3D.Length < Precision.eps);
         }
+        /// <summary>
+        /// Removes a feature, e.g. a hole or a boss, from this shell: the faces in <paramref name="facesToRemove"/> are removed
+        /// and the gaps they leave in the remaining faces are closed. Currently this only works when each loop of edges that
+        /// connects the feature with the rest of the shell is a hole in a single remaining face: that hole is removed (see
+        /// <see cref="Face.RemoveHole(int)"/>) and the face covers the area again. In all other cases the shell is left
+        /// unchanged. The change is undoable.
+        /// </summary>
+        /// <param name="facesToRemove">the faces of the feature</param>
+        /// <returns>currently always false, also when the feature has been removed</returns>
         public bool RemoveFeature(List<Face> facesToRemove)
         {
             HashSet<Face> shellFaces = new HashSet<Face>(faces);
@@ -3384,6 +3605,12 @@ namespace CADability.GeoObject
             }
             return OpenEdges.Length == 0;
         }
+        /// <summary>
+        /// Not implemented: does nothing and returns false. Use
+        /// <see cref="AddAndRemoveFaces(IEnumerable{Face}, IEnumerable{Face})"/> to add faces to a shell.
+        /// </summary>
+        /// <param name="faces">ignored</param>
+        /// <returns>always false</returns>
         public bool AddFaces(IEnumerable<Face> faces)
         {
             return false;
@@ -3640,6 +3867,11 @@ namespace CADability.GeoObject
             }
             return Border.SignedArea(loop) > 0.0;
         }
+        /// <summary>
+        /// Reverses the orientation of all faces of this shell (see <see cref="Face.ReverseOrientation"/>), so that the surface
+        /// normals point to the other side: an outward oriented shell becomes inward oriented, as needed for a cavity. Not
+        /// undoable, no change events are raised.
+        /// </summary>
         public void ReverseOrientation()
         {
             foreach (Face fc in faces)
@@ -3647,6 +3879,14 @@ namespace CADability.GeoObject
                 fc.ReverseOrientation();
             }
         }
+        /// <summary>
+        /// Makes sure the faces of this shell are oriented outward, i.e. the surface normals point away from the enclosed
+        /// volume, as required for the shell of a solid. A face is looked for whose normal certainly points outward (a ray
+        /// along the normal from an inner point of the face does not hit the shell again, or a ray from outside hits it
+        /// first); if none is found, all faces are assumed to be inverted. The orientation of that face is then propagated
+        /// to all other faces across their common edges, so that the shell is also consistently oriented afterwards. The shell
+        /// should be closed, for an open shell the result is ambiguous. Not undoable.
+        /// </summary>
         public void AssertOutwardOrientation()
         {
 #if DEBUG
@@ -3912,10 +4152,23 @@ namespace CADability.GeoObject
             return null;
         }
 #endif
+        /// <summary>
+        /// Same as <see cref="Contains(GeoPoint)"/>.
+        /// </summary>
+        /// <param name="toTest">the point to test</param>
+        /// <returns>true if the point is inside the closed shell</returns>
         public bool IsInside(GeoPoint toTest)
         {
             return Contains(toTest);
         }
+        /// <summary>
+        /// Tests whether <paramref name="toTest"/> lies inside the volume enclosed by this shell. The shell must be closed and
+        /// oriented outward (see <see cref="AssertOutwardOrientation"/>). The test looks for a face whose center can be
+        /// reached from the point without crossing the shell and decides by the direction of the surface normal there; it
+        /// returns false when no such face is found. Points on the surface are not reliably classified.
+        /// </summary>
+        /// <param name="toTest">the point to test</param>
+        /// <returns>true if the point is inside</returns>
         public bool Contains(GeoPoint toTest)
         {
             // suche einen Face-Mittelpunkt, so dass kein Schnittpunkt zwischen toTest und dem Facemittelpunkt liegt
@@ -4602,6 +4855,19 @@ namespace CADability.GeoObject
             return res;
         }
 
+        /// <summary>
+        /// Creates the offset of this shell: each face is replaced by its offset face at distance <paramref name="dist"/>
+        /// (see <see cref="Face.GetOffset(double, Dictionary{Vertex, Vertex})"/>), the gaps at convex edges and vertices are
+        /// closed by new faces and the material at concave edges is trimmed. Self intersections of this raw offset are then
+        /// resolved, which may split the result into several shells. This shell is prepared first (oriented outward, periodic
+        /// faces split, vertices and edges recalculated), which modifies it.
+        /// </summary>
+        /// <param name="dist">the offset distance, positive outward with respect to the orientation of the shell</param>
+        /// <param name="allowOpenEdges">true: shells with open edges are accepted as result, false: only closed shells are
+        /// returned</param>
+        /// <param name="parallelEdges">if provided, receives for each edge of this shell the corresponding edge of the raw
+        /// offset (which may not have survived the resolution of self intersections)</param>
+        /// <returns>the offset shells, empty when no valid offset could be made</returns>
         public Shell[] GetOffset(double dist, bool allowOpenEdges = true, Dictionary<Edge, Edge> parallelEdges = null)
         {
 
@@ -4615,6 +4881,17 @@ namespace CADability.GeoObject
             BRepSelfIntersection si = new BRepSelfIntersection(res, this, dist);
             return si.Result(allowOpenEdges);
         }
+        /// <summary>
+        /// Makes a solid with walls of constant thickness from this (usually open) shell, e.g. a sheet metal part from its
+        /// middle surface: the solid is bounded by the offsets of this shell at <paramref name="innerDist"/> and
+        /// <paramref name="outerDist"/> (measured along the surface normals, the thickness is their difference) and by new
+        /// faces that connect the two offsets along the open edges of this shell. A distance of 0 uses the shell itself. This
+        /// shell is prepared first (oriented outward, periodic faces split, vertices and edges recalculated), which modifies
+        /// it.
+        /// </summary>
+        /// <param name="innerDist">offset distance of the first boundary</param>
+        /// <param name="outerDist">offset distance of the second boundary; the order of the two distances does not matter</param>
+        /// <returns>the solid, or null when the two distances are equal or the solid could not be constructed</returns>
         public Solid MakeThick(double innerDist, double outerDist)
         {
             if (innerDist == outerDist) return null;
@@ -5262,6 +5539,15 @@ namespace CADability.GeoObject
             //    }
             //}
         }
+        /// <summary>
+        /// Connects independent faces to the topology of a shell: vertices of open edges of different faces that lie within
+        /// <paramref name="precision"/> of each other are merged into a single vertex, and open edges which then connect the
+        /// same two vertices with the same geometry are merged into a single edge shared by the two faces. Afterwards the
+        /// faces can be used in <see cref="FromFaces(Face[], bool)"/>. Edges that are already shared are not affected; the
+        /// orientation of the faces is not changed.
+        /// </summary>
+        /// <param name="toConnect">the faces to connect</param>
+        /// <param name="precision">maximum distance between vertices that are merged</param>
         public static void ConnectFaces(Face[] toConnect, double precision)
         {
             HashSet<Vertex> toAdd = new HashSet<Vertex>(); // alle vertices von offenen Kanten
@@ -5413,6 +5699,12 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Splits all faces of this shell on periodic surfaces that contain a seam edge (see
+        /// <see cref="Face.SplitPeriodicFace"/>) into faces without seams, e.g. a full cylinder into two halves. Boolean
+        /// operations and offsets are simpler on shells without seams. The split faces replace the originals and the
+        /// neighbouring faces are connected to the new edges. The change is undoable.
+        /// </summary>
         public void SplitPeriodicFaces()
         {   // die BReps gehen viel einfacher, wenn es keine inneren Nähte gibt
             // das soll nach BRepIntersection...
@@ -5774,6 +6066,17 @@ namespace CADability.GeoObject
                 edges = null;
             }
         }
+        /// <summary>
+        /// Modifies this shell by removing the faces in <paramref name="facesToRemove"/> and adding the faces in
+        /// <paramref name="facesToAdd"/>, which replace them, e.g. to remove a feature and close the resulting gap with new
+        /// faces. The new faces are connected among each other (see <see cref="ConnectFaces(Face[], double)"/>) and with the
+        /// remaining faces: their open edges are merged with the open edges left by the removed faces where vertices and
+        /// geometry coincide; if the new faces turn out to be oriented the wrong way, they are all reversed. The new faces take
+        /// the color of the shell (or of its solid). The change is undoable.
+        /// </summary>
+        /// <param name="facesToAdd">the faces to add</param>
+        /// <param name="facesToRemove">the faces of this shell to remove</param>
+        /// <returns>true if the shell is closed afterwards (no open edges), false otherwise</returns>
         public bool AddAndRemoveFaces(IEnumerable<Face> facesToAdd, IEnumerable<Face> facesToRemove)
         {
             using (new Changing(this, "CopyAll", this.Clone()))
@@ -5958,6 +6261,11 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Merges vertices of this shell that have (almost) the same position (within 1e-8 of the size of the shell) into a
+        /// single vertex and repairs the connections of the faces afterwards. Needed after operations that may have created
+        /// duplicate vertices, e.g. when edges have been recomputed.
+        /// </summary>
         public void RecalcVertices()
         {
             BoundingCube ext = GetExtent(0.0);
@@ -6229,6 +6537,11 @@ namespace CADability.GeoObject
             }
             return true;
         }
+        /// <summary>
+        /// Where <see cref="FindSameForm"/> looks for other instances of a form: with <c>searchX</c>, <c>searchY</c> and
+        /// <c>searchZ</c> only instances that are translated along that axis are accepted, with <c>searchAny</c> any
+        /// translation is accepted. (The candidate faces are currently collected along the x axis for all three axis modes.)
+        /// </summary>
         public enum FindSameFormSearchMode { searchX, searchY, searchZ, searchAny };
         /// <summary>
         /// Find other instances of the "form" given by the parameter form. The faces in form must be a subset of faces of this shell.
@@ -7290,6 +7603,15 @@ namespace CADability.GeoObject
                 collection.UnionWith(found);
             } while (true);
         }
+        /// <summary>
+        /// Extracts the parts of this shell delimited by the edges <paramref name="bounds"/> as separate closed shells. The
+        /// edges must form closed loops that separate the faces of this shell into parts (e.g. the edges where a boss meets
+        /// the base body). For each part, each loop is closed with a new face (cap) on the surface of the faces adjacent to
+        /// the loop on the other side, the part is cloned, connected with its caps and oriented outward. Parts for which no
+        /// cap could be made are skipped; this shell is not modified.
+        /// </summary>
+        /// <param name="bounds">the edges that delimit the parts</param>
+        /// <returns>a closed shell for each part, empty when the edges do not separate the shell</returns>
         public List<Shell> FeaturesFromEdges(ICollection<Edge> bounds)
         {
             List<Shell> res = new List<Shell>();
@@ -7582,6 +7904,13 @@ namespace CADability.GeoObject
             return res.ToArray();
         }
 
+        /// <summary>
+        /// Extends the set <paramref name="faces"/> by all faces reachable from them across edges that are not in
+        /// <paramref name="barrier"/>: neighbours are added repeatedly until no more faces can be reached. Used to collect
+        /// the faces of a feature or of a part of a shell that is delimited by a loop of edges.
+        /// </summary>
+        /// <param name="faces">the faces to start with, receives the collected faces</param>
+        /// <param name="barrier">the edges that must not be crossed</param>
         public static void CombineFaces(HashSet<Face> faces, HashSet<Edge> barrier)
         {
             HashSet<Face> toAdd = new HashSet<Face>(faces);
@@ -7661,6 +7990,17 @@ namespace CADability.GeoObject
             }
             return result;
         }
+        /// <summary>
+        /// Finds the edge of this shell that corresponds to <paramref name="original"/>, an edge of another (e.g. an earlier)
+        /// version of this shell, after the faces have been matched with <see cref="RememberFaces"/> and
+        /// <see cref="GetRememberedMultiDictionary(Shell)"/>: among the edges between the faces corresponding to the two faces
+        /// of <paramref name="original"/>, the one whose midpoint is closest to the midpoint of the original is returned.
+        /// </summary>
+        /// <param name="original">the edge of the other shell; it must have two faces, which must be keys of
+        /// <paramref name="dictionary"/></param>
+        /// <param name="dictionary">maps the faces of the other shell to the corresponding faces of this shell</param>
+        /// <returns>the corresponding edge, or null when a face of <paramref name="original"/> has no counterpart or the
+        /// counterparts have no common edge</returns>
         public Edge GetCorrespondingEdge(Edge original, Dictionary<Face, List<Face>> dictionary)
         {
             Face f1 = original.PrimaryFace;

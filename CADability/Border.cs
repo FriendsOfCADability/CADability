@@ -12,10 +12,38 @@ using System.Threading;
 namespace CADability.Shapes
 {
 
+	/// <summary>
+	/// Exception thrown by <see cref="Border"/> and the 2d shape operations when a border cannot be used as requested:
+	/// the area of an open border is asked for, a point that should lie on the border does not, or two borders to
+	/// concatenate are not connected. <see cref="ExceptionType"/> tells which of these cases occurred.
+	/// </summary>
 	public class BorderException : System.ApplicationException
 	{
-		public enum BorderExceptionType { General, AreaOpen, InternalError, PointNotOnBorder, NotConnected };
+		/// <summary>
+		/// Classifies the reason for a <see cref="BorderException"/>.
+		/// </summary>
+		public enum BorderExceptionType
+		{
+			/// <summary>Any other failure, e.g. no inner point can be found because the border has no area.</summary>
+			General,
+			/// <summary>The border is open, but the operation (e.g. <see cref="Border.Area"/>) needs a closed border.</summary>
+			AreaOpen,
+			/// <summary>An inconsistency inside the shape operations that should not occur.</summary>
+			InternalError,
+			/// <summary>A point that is expected to lie on the border (e.g. in <see cref="Border.GetParameter(GeoPoint2D)"/>) does not.</summary>
+			PointNotOnBorder,
+			/// <summary>Two borders that should connect do not, e.g. the end point of the first operand of the + operator is not the start point of the second.</summary>
+			NotConnected
+		};
+		/// <summary>
+		/// The reason for this exception, see <see cref="BorderExceptionType"/>.
+		/// </summary>
 		public BorderExceptionType ExceptionType;
+		/// <summary>
+		/// Creates the exception with a message and its classification.
+		/// </summary>
+		/// <param name="message">Text describing the failure</param>
+		/// <param name="tp">Classification of the failure, see <see cref="ExceptionType"/></param>
 		public BorderException(string message, BorderExceptionType tp)
 			: base(message)
 		{
@@ -105,6 +133,10 @@ namespace CADability.Shapes
 				flatten(); // might still contain paths or polylines
 			}
 		}
+		/// <summary>
+		/// Creates an empty border without segments. It only assigns the internal id; it exists for deserialization and
+		/// for the other constructors, which call it first, and is not usable on its own.
+		/// </summary>
 		protected Border()
 		{
 			Id = Interlocked.Increment(ref idCounter);
@@ -163,6 +195,15 @@ namespace CADability.Shapes
 			bool reversed;
 			Recalc(out reversed);
 		}
+		/// <summary>
+		/// Same as <see cref="Border(ICurve2D[])"/>, but additionally reports whether the segments had to be reversed.
+		/// The segments must be ordered and connected (the end point of each segment is the start point of the next). If
+		/// they form a closed loop running clockwise, the order of the segments and the direction of each segment are
+		/// reversed so that the border runs counterclockwise; <paramref name="reversed"/> is then true. The curves in the
+		/// array are used (and possibly reversed) by the border, they are not cloned.
+		/// </summary>
+		/// <param name="reversed">true if the segments were reversed to orient the border counterclockwise</param>
+		/// <param name="segments">Ordered, connected curves making up the border</param>
 		public Border(out bool reversed, ICurve2D[] segments)
 			: this()
 		{
@@ -186,6 +227,13 @@ namespace CADability.Shapes
 			bool reversed;
 			Recalc(out reversed);
 		}
+		/// <summary>
+		/// Creates a border from a single curve, e.g. a closed <see cref="Circle2D"/> or <see cref="BSpline2D"/>, or an
+		/// open curve for which parallels or intersections are needed. A <see cref="Path2D"/> or <see cref="Polyline2D"/>
+		/// is split into its sub curves, which become the segments. The border is closed when the curve is closed and is
+		/// then oriented counterclockwise (the curve itself is reversed if necessary).
+		/// </summary>
+		/// <param name="onlySegment">The curve making up the border</param>
 		public Border(ICurve2D onlySegment)
 			: this()
 		{
@@ -194,6 +242,12 @@ namespace CADability.Shapes
 			bool reversed;
 			Recalc(out reversed);
 		}
+		/// <summary>
+		/// Creates a closed polygonal border through the given vertices. The closing edge from the last vertex back to the
+		/// first one is added automatically, each edge becomes a <see cref="Line2D"/> segment, and the border is oriented
+		/// counterclockwise regardless of the order of the vertices.
+		/// </summary>
+		/// <param name="polyline">The vertices of the polygon in order</param>
 		public Border(GeoPoint2D[] polyline)
 			: this()
 		{
@@ -856,6 +910,12 @@ namespace CADability.Shapes
 				return false;
 			}
 		}
+		/// <summary>
+		/// Computes the signed area enclosed by the segments as the sum of the areas of the segments
+		/// (<see cref="ICurve2D.GetArea"/>): positive for a counterclockwise, negative for a clockwise border. Exact, but
+		/// slow for splines, which is why <see cref="Area"/> caches the result.
+		/// </summary>
+		/// <returns>The signed area</returns>
 		protected double RecalcArea()
 		{
 			double a = 0.0;
@@ -866,6 +926,12 @@ namespace CADability.Shapes
 			return a;
 		}
 
+		/// <summary>
+		/// Fast estimate of the signed area: like <see cref="RecalcArea"/>, but a <see cref="BSpline2D"/> segment is
+		/// replaced by the polygon through its knot points. Used by <see cref="IsEmpty"/> to decide whether the border
+		/// encloses any area at all.
+		/// </summary>
+		/// <returns>The approximate signed area</returns>
 		protected double getRoughArea()
 		{
 			double a = 0.0;
@@ -891,6 +957,15 @@ namespace CADability.Shapes
 			}
 			return a;
 		}
+		/// <summary>
+		/// Recomputes the derived data after the segments have been set: consecutive segments are connected exactly (the
+		/// end point of a segment is moved onto the start point of the next one when they only agree within
+		/// <see cref="Precision.IsEqual(GeoPoint2D, GeoPoint2D)"/>), <see cref="Extent"/> is computed, it is decided
+		/// whether the border is closed and, for a closed border running clockwise, the order of the segments and the
+		/// direction of each segment are reversed so that the border runs counterclockwise. The quad tree used for spatial
+		/// queries is discarded and rebuilt on demand.
+		/// </summary>
+		/// <param name="reversed">true if the segments were reversed to orient the border counterclockwise</param>
 		protected void Recalc(out bool reversed)
 		{   // Berechnet QuadTree, segmentToIndex und extent. Erwartet wird das segment Array
 			// in korrekter Reihenfolge. Bei geschlossenen Borders wird ggf. umgedreht
@@ -983,6 +1058,12 @@ namespace CADability.Shapes
 				}
 			}
 		}
+		/// <summary>
+		/// Rotates the segments of this closed border so that the segment with index <paramref name="newStartIndex"/>
+		/// becomes the first segment. The geometry and the orientation stay the same, only <see cref="StartPoint"/> and
+		/// the origin of the border parameter move. This is one of the few operations that modify a border in place.
+		/// </summary>
+		/// <param name="newStartIndex">Index (0 to <see cref="Count"/>-1) of the segment that becomes the first one</param>
 		public void ChangeCyclicalStart(int newStartIndex)
 		{
 			ICurve2D unsplittedOutline = UnsplittedOutline;
@@ -1000,6 +1081,11 @@ namespace CADability.Shapes
 			// only the start moved, the border is still the same closed curve
 			KeepUnsplittedOutline(unsplittedOutline);
 		}
+		/// <summary>
+		/// Returns a deep copy of this border: the segments are cloned, so the copy can be modified (e.g. with
+		/// <see cref="RemoveSmallSegments"/>) without affecting this border. <see cref="UnsplittedOutline"/> is cloned too.
+		/// </summary>
+		/// <returns>The cloned border</returns>
 		public Border Clone()
 		{
 			ICurve2D[] cloned = new ICurve2D[segment.Length];
@@ -1023,6 +1109,12 @@ namespace CADability.Shapes
 			if (Math.Sign(outline.GetArea()) != Math.Sign(RecalcArea())) outline.Reverse();
 			UnsplittedOutline = outline;
 		}
+		/// <summary>
+		/// Returns copies of the segments of this border in their order and orientation. Modifying the returned curves
+		/// does not affect this border. Use the indexer (<see cref="this[int]"/>) to access the original segments without
+		/// copying.
+		/// </summary>
+		/// <returns>Cloned segments</returns>
 		public ICurve2D[] GetClonedSegments()
 		{
 			ICurve2D[] cloned = new ICurve2D[segment.Length];
@@ -1242,6 +1334,14 @@ namespace CADability.Shapes
 		//    bb.AddWire2D(w2d);
 		//    return bb.BuildBorder();
 		//}
+		/// <summary>
+		/// Determines whether the given closed loop of curves runs counterclockwise. The curves must be ordered and
+		/// connected (the end point of each curve is the start point of the next, the last one ending at the start of the
+		/// first) and must not intersect themselves. The result is computed from the accumulated turning angle, which is
+		/// fast but unreliable for self intersecting loops.
+		/// </summary>
+		/// <param name="curves">The ordered, connected curves of the loop</param>
+		/// <returns>true if the loop runs counterclockwise, false if it runs clockwise</returns>
 		public static bool CounterClockwise(ICurve2D[] curves)
 		{   // Kurven müssen zusammenhängend und nicht selbstüberschneidnd sein
 			double d = 0.0; // die akkumulierte Winkeldifferenz
@@ -1268,6 +1368,11 @@ namespace CADability.Shapes
 			// d muss +2*pi oder -2*pi sein, alles andere deutet auf eine innere Schleife hin
 			return d > 0.0;
 		}
+		/// <summary>
+		/// Same as <see cref="CounterClockwise(ICurve2D[])"/> for a list of curves.
+		/// </summary>
+		/// <param name="curves">The ordered, connected curves of the loop</param>
+		/// <returns>true if the loop runs counterclockwise, false if it runs clockwise</returns>
 		public static bool CounterClockwise(List<ICurve2D> curves)
 		{   // Kurven müssen zusammenhängend und nicht selbstüberschneidnd sein
 			double d = 0.0; // die akkumulierte Winkeldifferenz
@@ -1330,6 +1435,14 @@ namespace CADability.Shapes
 			return a;
 		}
 
+		/// <summary>
+		/// Tests whether a point lies on one of the given curves, i.e. whether its distance to some curve is less than
+		/// <paramref name="precision"/>. The curves need not be connected or form a border.
+		/// </summary>
+		/// <param name="curves">The curves to test against</param>
+		/// <param name="toTest">The point to test</param>
+		/// <param name="precision">Maximum distance for the point to count as being on a curve</param>
+		/// <returns>true if the point is closer than <paramref name="precision"/> to one of the curves</returns>
 		public static bool IsPointOnOutline(ICurve2D[] curves, GeoPoint2D toTest, double precision)
 		{
 			for (int i = 0; i < curves.Length; i++)
@@ -1338,6 +1451,15 @@ namespace CADability.Shapes
 			}
 			return false;
 		}
+		/// <summary>
+		/// Creates a closed, counterclockwise rectangular border with axis parallel sides, composed of four
+		/// <see cref="Line2D"/> segments starting at the lower left corner.
+		/// </summary>
+		/// <param name="left">x coordinate of the left side</param>
+		/// <param name="right">x coordinate of the right side</param>
+		/// <param name="bottom">y coordinate of the bottom side</param>
+		/// <param name="top">y coordinate of the top side</param>
+		/// <returns>The rectangular border</returns>
 		public static Border MakeRectangle(double left, double right, double bottom, double top)
 		{
 			ICurve2D[] segments = new ICurve2D[4];
@@ -1366,12 +1488,27 @@ namespace CADability.Shapes
 			segments[3] = new Line2D(p4, p1);
 			return new Border(segments);
 		}
+		/// <summary>
+		/// Creates a closed border consisting of a single counterclockwise <see cref="Circle2D"/>.
+		/// </summary>
+		/// <param name="center">Center of the circle</param>
+		/// <param name="radius">Radius of the circle</param>
+		/// <returns>The circular border</returns>
 		public static Border MakeCircle(GeoPoint2D center, double radius)
 		{
 			ICurve2D[] segments = new ICurve2D[1];
 			segments[0] = new Circle2D(center, radius);
 			return new Border(segments);
 		}
+		/// <summary>
+		/// Creates the border of a regular polygon inscribed in the circle with the given center and radius, composed of
+		/// <see cref="Line2D"/> segments. The first vertex lies in the direction of the x axis from the center, the
+		/// vertices follow counterclockwise. Mostly used through <see cref="SimpleShape.MakePolygon"/>.
+		/// </summary>
+		/// <param name="center">Center of the polygon</param>
+		/// <param name="radius">Distance of the vertices from the center</param>
+		/// <param name="numberOfSides">Number of sides (and vertices), at least 3</param>
+		/// <returns>The polygonal border</returns>
 		public static Border MakePolygon(GeoPoint2D center, double radius, int numberOfSides)
 		{
 			ICurve2D[] segments = new ICurve2D[numberOfSides];
@@ -1391,6 +1528,16 @@ namespace CADability.Shapes
 			segments[1] = new Arc2D(center, radius, Angle.A180, SweepAngle.Opposite);
 			return new Border(segments);
 		}
+		/// <summary>
+		/// Creates the closed border of a slot (long hole) around an open curve: the set of all points closer than
+		/// <paramref name="radius"/> to <paramref name="centerCurve"/>. It consists of the two parallel curves at distance
+		/// <paramref name="radius"/> on both sides and two half circles around the start and the end point of the curve.
+		/// Intended for lines and for arcs whose radius is greater than <paramref name="radius"/>; see
+		/// <see cref="SimpleShape.MakeLongHole(ICurve2D, double, double)"/> for arbitrary curves and paths.
+		/// </summary>
+		/// <param name="centerCurve">The open center curve of the slot</param>
+		/// <param name="radius">Half the width of the slot</param>
+		/// <returns>The border of the slot</returns>
 		public static Border MakeLongHole(ICurve2D centerCurve, double radius)
 		{
 			ICurve2D[] segments = new ICurve2D[4];
@@ -1420,6 +1567,17 @@ namespace CADability.Shapes
 			}
 			return new Border(segments);
 		}
+		/// <summary>
+		/// Creates the closed border of a slot between two circles with different radii: the convex hull of the circle
+		/// around <paramref name="startPoint"/> with <paramref name="startRadius"/> and the circle around
+		/// <paramref name="endPoint"/> with <paramref name="endRadius"/>, i.e. two arcs connected by the two outer tangent
+		/// lines. If one of the radii is 0 or less, that end degenerates to the point itself, giving a drop shaped border.
+		/// </summary>
+		/// <param name="startPoint">Center of the first circle</param>
+		/// <param name="endPoint">Center of the second circle</param>
+		/// <param name="startRadius">Radius at <paramref name="startPoint"/>, 0 or negative for a sharp end</param>
+		/// <param name="endRadius">Radius at <paramref name="endPoint"/>, 0 or negative for a sharp end</param>
+		/// <returns>The border of the slot</returns>
 		public static Border MakeLongHole(GeoPoint2D startPoint, GeoPoint2D endPoint, double startRadius, double endRadius)
 		{
 			if (endRadius <= 0.0)
@@ -1607,6 +1765,12 @@ namespace CADability.Shapes
 			}
 			return res.ToArray();
 		}
+		/// <summary>
+		/// The area enclosed by this border, positive since closed borders run counterclockwise. The value is computed on
+		/// first access and cached. An open border whose start and end point are very close (relative to its extent) is
+		/// closed first; for any other open border a <see cref="BorderException"/> with
+		/// <see cref="BorderException.BorderExceptionType.AreaOpen"/> is thrown.
+		/// </summary>
 		public double Area
 		{
 			get
@@ -1618,6 +1782,11 @@ namespace CADability.Shapes
 				return area;
 			}
 		}
+		/// <summary>
+		/// true if this border encloses no area, e.g. because all segments lie on a line or the border degenerated to a
+		/// point. Uses a fast estimate of the area (splines are replaced by the polygon through their knots), so it is cheap
+		/// even for borders with many splines. Does not require the border to be closed.
+		/// </summary>
 		public bool IsEmpty
 		{
 			get
@@ -1628,14 +1797,25 @@ namespace CADability.Shapes
 			}
 		}
 
+		/// <summary>
+		/// true if the end point of the last segment coincides with the start point of the first segment, i.e. the border
+		/// encloses an area. Only closed borders can be the outline or a hole of a <see cref="SimpleShape"/>; open borders
+		/// occur as cutting curves (e.g. in <see cref="SimpleShape.Split"/>) and as parallels of open curves.
+		/// </summary>
 		public bool IsClosed
 		{
 			get { return isClosed; }
 		}
+		/// <summary>
+		/// The axis aligned bounding rectangle of all segments of this border.
+		/// </summary>
 		public BoundingRect Extent
 		{
 			get { return extent; }
 		}
+		/// <summary>
+		/// The total length of all segments of this border (the perimeter of a closed border). Computed on each access.
+		/// </summary>
 		public double Length
 		{
 			get
@@ -1648,10 +1828,21 @@ namespace CADability.Shapes
 				return sum;
 			}
 		}
+		/// <summary>
+		/// Returns the segment with the given index. This is the original curve of the border, not a copy: do not modify
+		/// it, the border would become inconsistent. Use <see cref="GetClonedSegments"/> for curves you want to change.
+		/// </summary>
+		/// <param name="index">Index of the segment, 0 to <see cref="Count"/>-1</param>
+		/// <returns>The segment</returns>
 		public ICurve2D this[int index]
 		{
 			get { return segment[index]; }
 		}
+		/// <summary>
+		/// The number of segments of this border. The parameter of a point on the border (see <see cref="GetParameter"/>
+		/// and <see cref="PointAt"/>) runs from 0 to this value: the integer part is the index of the segment, the
+		/// fractional part the position on that segment.
+		/// </summary>
 		public int Count
 		{
 			get { return segment.Length; }
@@ -1663,7 +1854,17 @@ namespace CADability.Shapes
 		/// Outside: the point or rectangle is completely outside the border,
 		/// OnCurve: the point or rectangle is on the outline of the border.
 		/// </summary>
-		public enum Position { Inside, Outside, OnCurve, OpenBorder }
+		public enum Position
+		{
+			/// <summary>The point or rectangle lies completely inside the (closed) border.</summary>
+			Inside,
+			/// <summary>The point or rectangle lies completely outside the border.</summary>
+			Outside,
+			/// <summary>The point or rectangle touches or intersects the outline of the border.</summary>
+			OnCurve,
+			/// <summary>The border is open, so there is no inside or outside, and the point or rectangle is not on the outline.</summary>
+			OpenBorder
+		}
 		private PositionInternal GetPosition(GeoPoint2D StartPoint, GeoPoint2D EndPoint, double precision)
 		{   // Bestimme die Anzahl der Schnittpunkte auf dem Strahl StartPoint->EndPoint.
 			// ungerade: Inside, gerade: Outside. In Zweifelsfällen: Unknown
@@ -1976,6 +2177,17 @@ namespace CADability.Shapes
 		{
 			return GetIntersectionPoints(IntersectWith, extent.Size * 1e-6);
 		}
+		/// <summary>
+		/// Returns all intersection points of this border with the given curve, see
+		/// <see cref="GetIntersectionPoints(ICurve2D)"/>. par1 of each result is the parameter on this border (segment index
+		/// plus position on the segment, 0 to <see cref="Count"/>), par2 the parameter on the curve (0 to 1). When a segment
+		/// and the curve do not properly intersect, their end points are checked: an end point of one lying closer than
+		/// <paramref name="precision"/> to the other is reported as an intersection point too, so curves that start or end
+		/// exactly on the border are found.
+		/// </summary>
+		/// <param name="IntersectWith">Curve to intersect this border with</param>
+		/// <param name="precision">Maximum distance for an end point to count as touching</param>
+		/// <returns>The intersection points, empty if there are none</returns>
 		public GeoPoint2DWithParameter[] GetIntersectionPoints(ICurve2D IntersectWith, double precision)
 		{
 			var result = new List<GeoPoint2DWithParameter>();
@@ -2041,10 +2253,25 @@ namespace CADability.Shapes
 			}
 			return result.ToArray();
 		}
+		/// <summary>
+		/// Returns all intersection points of this border with another border, using a precision derived from the extents
+		/// of both borders, see <see cref="GetIntersectionPoints(Border, double)"/>.
+		/// </summary>
+		/// <param name="IntersectWith">The border to intersect with</param>
+		/// <returns>The intersection points, empty if there are none</returns>
 		public GeoPoint2DWithParameter[] GetIntersectionPoints(Border IntersectWith)
 		{
 			return GetIntersectionPoints(IntersectWith, extent.Size * 1e-6 + IntersectWith.extent.Size * 1e-6);
 		}
+		/// <summary>
+		/// Returns all intersection points of this border with another border. par1 of each result is the parameter on this
+		/// border, par2 the parameter on <paramref name="intersectWith"/>; both are the segment index plus the position on
+		/// that segment. End points of segments that lie closer than <paramref name="precision"/> to the other border are
+		/// reported as intersection points too, and a point at a common vertex may be reported more than once.
+		/// </summary>
+		/// <param name="intersectWith">The border to intersect with</param>
+		/// <param name="precision">Maximum distance for an end point to count as touching</param>
+		/// <returns>The intersection points, empty if there are none</returns>
 		public GeoPoint2DWithParameter[] GetIntersectionPoints(Border intersectWith, double precision)
 		{
 			var res = new List<GeoPoint2DWithParameter>();
@@ -2303,6 +2530,13 @@ namespace CADability.Shapes
 			}
 			throw new BorderException("Border.GetParameter: point not on Border", BorderException.BorderExceptionType.PointNotOnBorder);
 		}
+		/// <summary>
+		/// Returns the point at the given border parameter: the integer part of <paramref name="par"/> is the index of the
+		/// segment, the fractional part the position on that segment (0 to 1). Parameters below 0 yield
+		/// <see cref="StartPoint"/>, parameters of <see cref="Count"/> or more yield <see cref="EndPoint"/>.
+		/// </summary>
+		/// <param name="par">Parameter on the border, 0 to <see cref="Count"/></param>
+		/// <returns>The point on the border</returns>
 		public GeoPoint2D PointAt(double par)
 		{
 			int ind = (int)Math.Floor(par);
@@ -2310,6 +2544,13 @@ namespace CADability.Shapes
 			if (ind < 0) return StartPoint;
 			return segment[ind].PointAt(par - ind);
 		}
+		/// <summary>
+		/// Returns the direction of the border at the given parameter (see <see cref="PointAt"/> for the meaning of the
+		/// parameter). Exactly at a vertex between two segments the mean of the end direction of the previous and the start
+		/// direction of the following segment is returned, which gives a usable direction at a corner.
+		/// </summary>
+		/// <param name="par">Parameter on the border, 0 to <see cref="Count"/></param>
+		/// <returns>The direction at that parameter</returns>
 		public GeoVector2D DirectionAt(double par)
 		{
 			int ind = (int)Math.Floor(par);
@@ -2322,6 +2563,13 @@ namespace CADability.Shapes
 			}
 			return segment[ind].DirectionAt(par - ind);
 		}
+		/// <summary>
+		/// Returns the smallest distance between any segment of this border and any segment of <paramref name="Other"/>.
+		/// The result is 0 when the borders touch or intersect; whether one border lies inside the other is not
+		/// considered. All pairs of segments are tested, so this is slow for borders with many segments.
+		/// </summary>
+		/// <param name="Other">The border to measure the distance to</param>
+		/// <returns>The minimum distance</returns>
 		public double GetMinDistance(Border Other)
 		{
 			double minDist = double.MaxValue;
@@ -2343,10 +2591,18 @@ namespace CADability.Shapes
 			}
 			return minDist;
 		}
+		/// <summary>
+		/// The start point of the first segment, i.e. the point with parameter 0. For a closed border it is also the end
+		/// point of the last segment.
+		/// </summary>
 		public GeoPoint2D StartPoint
 		{
 			get { return segment[0].StartPoint; }
 		}
+		/// <summary>
+		/// The end point of the last segment, i.e. the point with parameter <see cref="Count"/>. For a closed border it
+		/// coincides with <see cref="StartPoint"/>.
+		/// </summary>
 		public GeoPoint2D EndPoint
 		{
 			get { return segment[segment.Length - 1].EndPoint; }
@@ -3401,6 +3657,14 @@ namespace CADability.Shapes
 			}
 			isClosed = true;
 		}
+		/// <summary>
+		/// Projects this border, which is assumed to lie in <paramref name="fromPlane"/>, perpendicularly onto
+		/// <paramref name="toPlane"/> and returns the result in the 2d coordinates of that plane. If the normals of the
+		/// planes point in opposite directions, the segments are reversed so that a closed border stays counterclockwise.
+		/// </summary>
+		/// <param name="fromPlane">The plane this border lies in</param>
+		/// <param name="toPlane">The plane to project onto; must not be perpendicular to <paramref name="fromPlane"/></param>
+		/// <returns>The projected border, or null if the projected segments do not form a valid border</returns>
 		public Border Project(Plane fromPlane, Plane toPlane)
 		{
 			var segs = new List<ICurve2D>(segment.Length);
@@ -3463,6 +3727,13 @@ namespace CADability.Shapes
 		//    }
 		//    return new Border(asegs, isClosed);
 		//}
+		/// <summary>
+		/// Returns a copy of this border transformed by <paramref name="m"/>; this border stays unchanged. For a reflection
+		/// (negative determinant) the segments are reversed, so a closed border remains counterclockwise. The
+		/// <see cref="UnsplittedOutline"/> is transformed along with the segments.
+		/// </summary>
+		/// <param name="m">The transformation to apply</param>
+		/// <returns>The transformed border</returns>
 		public Border GetModified(ModOp2D m)
 		{   // reimplemented: the old version made 3d curves, manipulated them and projected them back to make ellipses from circles when necessary
 			// Now ICurve2D should implement this correctly and much faster
@@ -3489,6 +3760,18 @@ namespace CADability.Shapes
 			}
 			return res;
 		}
+		/// <summary>
+		/// Returns copies of the part of this border between two parameters (see <see cref="PointAt"/> for the meaning
+		/// of a parameter): the trimmed pieces of the segments at both ends and clones of the segments in between. With
+		/// <paramref name="forward"/> true the part runs in the direction of the border from <paramref name="startParam"/>
+		/// to <paramref name="endParam"/>, passing the start of a closed border when the end parameter is the smaller one.
+		/// With <paramref name="forward"/> false the part runs against the direction of the border; the curves are then
+		/// reversed, so the result always starts at <paramref name="startParam"/> and ends at <paramref name="endParam"/>.
+		/// </summary>
+		/// <param name="startParam">Parameter where the part starts</param>
+		/// <param name="endParam">Parameter where the part ends</param>
+		/// <param name="forward">true: walk in the direction of the border, false: walk against it</param>
+		/// <returns>The curves of the part in order, empty if both parameters are equal</returns>
 		public ICurve2D[] GetPart(double startParam, double endParam, bool forward)
 		{
 			if (startParam == endParam) return new ICurve2D[] { };
@@ -3582,6 +3865,13 @@ namespace CADability.Shapes
 			bool dumy;
 			Recalc(out dumy);
 		}
+		/// <summary>
+		/// Appends the segments of this border to a GDI+ <see cref="System.Drawing.Drawing2D.GraphicsPath"/>, e.g. for
+		/// filling or clipping with System.Drawing. With <paramref name="counterClockWise"/> false the segments are added in
+		/// reverse order and direction, which is how <see cref="SimpleShape"/> adds its holes so that they stay unfilled.
+		/// </summary>
+		/// <param name="path">The graphics path to append to</param>
+		/// <param name="counterClockWise">true: add in the direction of the border, false: add reversed</param>
 		public void AddToGraphicsPath(System.Drawing.Drawing2D.GraphicsPath path, bool counterClockWise)
 		{
 			if (counterClockWise)
@@ -3599,6 +3889,17 @@ namespace CADability.Shapes
 				}
 			}
 		}
+		/// <summary>
+		/// Clips a curve with this closed border and returns the parts of the curve inside (or outside) the border as
+		/// parameter intervals on the curve. The curve is intersected with the border and each piece between consecutive
+		/// intersection points is classified by the position of its midpoint. The result holds pairs of curve parameters
+		/// (0 to 1), start and end of each wanted piece, sorted along the curve; a curve lying completely inside yields
+		/// {0, 1}. Pieces running along the outline are included in both cases. Use <see cref="ICurve2D.Trim"/> to cut the
+		/// pieces out of the curve.
+		/// </summary>
+		/// <param name="toClip">The curve to clip</param>
+		/// <param name="returnInsideParts">true: return the parts inside the border, false: the parts outside</param>
+		/// <returns>Start and end parameters of the pieces, an even number of values; empty if there is no such piece</returns>
 		public double[] Clip(ICurve2D toClip, bool returnInsideParts)
 		{
 			List<double> res = new List<double>();
@@ -3691,6 +3992,11 @@ namespace CADability.Shapes
 			}
 			return res.ToArray();
 		}
+		/// <summary>
+		/// Some point strictly inside this closed border, found by clipping the diagonal of the extent (and, if that fails,
+		/// random lines) with the border and taking the middle of a piece inside. Useful as a test point, e.g. to decide on
+		/// which side of another border this one lies. Throws a <see cref="BorderException"/> if the border has no area.
+		/// </summary>
 		public GeoPoint2D SomeInnerPoint
 		{
 			get
@@ -3849,6 +4155,16 @@ namespace CADability.Shapes
 			}
 			return false; // nix verändert
 		}
+		/// <summary>
+		/// Finds the points where this border intersects itself, i.e. where two non adjacent segments cross (end points
+		/// touching the other segment closer than <paramref name="precision"/> count as well). The result holds three values
+		/// per intersection: the parameter on the first segment, the parameter on the second segment (both as segment
+		/// index plus position, see <see cref="PointAt"/>) and the orientation of the crossing (the cross product of the two
+		/// directions), which tells which of the two loops formed by the crossing runs counterclockwise. Together with
+		/// <see cref="GetPart"/> this splits a self intersecting border into simple loops.
+		/// </summary>
+		/// <param name="precision">Maximum distance for a touching end point to count as an intersection</param>
+		/// <returns>Three values per self intersection, empty if the border does not intersect itself</returns>
 		public double[] GetSelfIntersection(double precision)
 		{
 			List<double[]> resList = new List<double[]>();
@@ -4625,12 +4941,22 @@ namespace CADability.Shapes
 			}
 		}
 
+		/// <summary>
+		/// Writes the segments (and the <see cref="UnsplittedOutline"/>, if any) for the JSON serialization
+		/// (<see cref="IJsonSerialize"/>).
+		/// </summary>
+		/// <param name="data">Receives the properties of this border</param>
 		public void GetObjectData(IJsonWriteData data)
 		{
 			data.AddProperty("Segments", segment);
 			if (UnsplittedOutline != null) data.AddProperty("UnsplittedOutline", UnsplittedOutline);
 		}
 
+		/// <summary>
+		/// Reads the segments written by <see cref="GetObjectData(IJsonWriteData)"/> for the JSON deserialization. The
+		/// derived data (extent, orientation, whether the border is closed) is recomputed after all objects have been read.
+		/// </summary>
+		/// <param name="data">The properties of the border being read</param>
 		public void SetObjectData(IJsonReadData data)
 		{
 			segment = data.GetProperty<ICurve2D[]>("Segments");
@@ -4718,9 +5044,25 @@ namespace CADability.Shapes
 	}
 
 
+	/// <summary>
+	/// Exception thrown by <see cref="BorderBuilder"/>, e.g. by <see cref="BorderBuilder.BuildBorder"/> when no segment
+	/// has been added. <see cref="ExceptionType"/> tells the reason.
+	/// </summary>
 	public class BorderBuilderException : System.ApplicationException
 	{
-		public enum BorderBuilderExceptionType { General, NoSegments };
+		/// <summary>
+		/// Classifies the reason for a <see cref="BorderBuilderException"/>.
+		/// </summary>
+		public enum BorderBuilderExceptionType
+		{
+			/// <summary>Any other failure.</summary>
+			General,
+			/// <summary>A border was requested before any segment was added.</summary>
+			NoSegments
+		};
+		/// <summary>
+		/// The reason for this exception, see <see cref="BorderBuilderExceptionType"/>.
+		/// </summary>
 		public BorderBuilderExceptionType ExceptionType;
 		internal BorderBuilderException(string message, BorderBuilderExceptionType tp)
 			: base(message)
@@ -4737,17 +5079,32 @@ namespace CADability.Shapes
         private readonly List<ICurve2D> segment = new();
 		private BoundingRect currentExtent;
 		private double precision;
+		/// <summary>
+		/// Creates an empty builder. Add the segments in order with <see cref="AddSegment"/> and call
+		/// <see cref="BuildBorder"/> to create the <see cref="Border"/>.
+		/// </summary>
 		public BorderBuilder()
 		{
 			currentExtent = BoundingRect.EmptyBoundingRect;
 			precision = -1.0; // nicht gesetzt
 		}
+		/// <summary>
+		/// Removes all segments added so far and resets <see cref="Precision"/>, so the builder can be reused for another
+		/// border.
+		/// </summary>
 		public void Clear()
 		{
 			segment.Clear();
 			currentExtent = BoundingRect.EmptyBoundingRect;
 			precision = -1.0; // nicht gesetzt
 		}
+		/// <summary>
+		/// The maximum distance at which the start point of a new segment is considered to coincide with the end point of
+		/// the previous one (<see cref="AddSegment"/>), and at which <see cref="IsClosed"/> regards the chain as closed.
+		/// Negative values are stored as their absolute value. While it has not been set (the value is negative),
+		/// <see cref="AddSegment"/> and <see cref="BuildBorder"/> use 1e-8 of the extent of the segments added so far and
+		/// <see cref="IsClosed"/> is always false.
+		/// </summary>
 		public double Precision
 		{
 			get { return precision; }
@@ -4786,6 +5143,12 @@ namespace CADability.Shapes
 				}
 			}
 		}
+		/// <summary>
+		/// Intended to append a segment that may also fit reversed: it tries <see cref="AddSegment"/> and was meant to
+		/// reverse the segment when its end point rather than its start point connects to the chain. The reversal is not
+		/// implemented: a segment that does not connect with its start point is silently dropped.
+		/// </summary>
+		/// <param name="ToAdd">The segment to append</param>
 		public void Connect(ICurve2D ToAdd)
 		{
 			if (!AddSegment(ToAdd))
@@ -4806,6 +5169,15 @@ namespace CADability.Shapes
 		//        AddSegment(GeneralCurve2D..FromOcas(w2d.Item(i)));
 		//    }
 		//}
+		/// <summary>
+		/// Creates the <see cref="Border"/> from the segments added so far, in the order they were added. The border is
+		/// closed when the end point of the last segment coincides with the start point of the first one, and is then
+		/// oriented counterclockwise, which may reverse the segments.
+		/// </summary>
+		/// <param name="forceClosed">true: consecutive segments are connected exactly before the border is built, by moving
+		/// the start point of each segment onto the end point of the previous one (see <see cref="Border(ICurve2D[], bool, bool)"/>)</param>
+		/// <returns>The border</returns>
+		/// <exception cref="BorderBuilderException">No segment has been added</exception>
 		public Border BuildBorder(bool forceClosed = false)
 		{
 			if (segment.Count == 0) throw new BorderBuilderException("No segments", BorderBuilderException.BorderBuilderExceptionType.NoSegments);
@@ -4822,6 +5194,13 @@ namespace CADability.Shapes
 
 			return res;
 		}
+		/// <summary>
+		/// true if the segments added so far form a closed chain running counterclockwise, computed from the accumulated
+		/// turning angle like <see cref="Border.CounterClockwise(ICurve2D[])"/>; false for an open chain (see
+		/// <see cref="IsClosed"/>) or a clockwise chain. <see cref="BuildBorder"/> orients the border counterclockwise in
+		/// any case; this property tells in which direction the segments were added, which e.g. distinguishes an outline
+		/// from a hole when shapes are built from a graph of curves.
+		/// </summary>
 		public bool IsOriented
 		{
 			get
@@ -4854,6 +5233,10 @@ namespace CADability.Shapes
 				return d > 0.0;
 			}
 		}
+		/// <summary>
+		/// true if the end point of the last added segment is closer than <see cref="Precision"/> to the start point of
+		/// the first segment. Always false while <see cref="Precision"/> has not been set.
+		/// </summary>
 		public bool IsClosed
 		{
 			get
@@ -4861,6 +5244,9 @@ namespace CADability.Shapes
 				return Geometry.Dist(StartPoint, EndPoint) < precision;
 			}
 		}
+		/// <summary>
+		/// The start point of the first segment added. Must not be used before a segment was added.
+		/// </summary>
 		public GeoPoint2D StartPoint
 		{
 			get
@@ -4868,6 +5254,10 @@ namespace CADability.Shapes
 				return (segment[0] as ICurve2D).StartPoint;
 			}
 		}
+		/// <summary>
+		/// The end point of the last segment added, i.e. the point where the next segment must start. Must not be used
+		/// before a segment was added.
+		/// </summary>
 		public GeoPoint2D EndPoint
 		{
 			get
@@ -4875,6 +5265,10 @@ namespace CADability.Shapes
 				return (segment[segment.Count - 1] as ICurve2D).EndPoint;
 			}
 		}
+		/// <summary>
+		/// The direction of the last added segment at its end point, useful for choosing the next segment at a vertex
+		/// with several candidates. Must not be used before a segment was added.
+		/// </summary>
 		public GeoVector2D EndDirection
 		{
 			get
@@ -4882,6 +5276,9 @@ namespace CADability.Shapes
 				return (segment[segment.Count - 1] as ICurve2D).EndDirection;
 			}
 		}
+		/// <summary>
+		/// The segment added last (the original curve, not a copy). Must not be used before a segment was added.
+		/// </summary>
 		public ICurve2D LastCurve
 		{
 			get

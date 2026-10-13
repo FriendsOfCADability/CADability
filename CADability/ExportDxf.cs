@@ -19,6 +19,14 @@ using PlaneSurface = CADability.GeoObject.PlaneSurface;
 
 namespace CADability.DXF
 {
+    /// <summary>
+    /// Writes the model space of a <see cref="Project"/> to a DXF or DWG file with ACadSharp. Points, lines, ellipses,
+    /// polylines, splines, paths, text, dimensions, hatches and blocks become the corresponding DXF entities; faces, shells and
+    /// solids are written as polyface meshes (or as MESH entities when the setting "DxfImport.UseMesh" is set). Layers, line
+    /// patterns, text and dimension styles are created on demand. <see cref="Project.Export"/> with the formats "dxf" and "dwg"
+    /// uses this class; for direct use create an instance and call <see cref="WriteToFile(Project, string)"/> or
+    /// <see cref="WriteToByteArray"/>.
+    /// </summary>
     public class Export
     {
         private CadDocument doc;
@@ -37,6 +45,13 @@ namespace CADability.DXF
         private readonly bool dimensionsAsDimension;
         private double triangulationPrecision = 0.1;
 
+        /// <summary>
+        /// Creates an empty drawing of the given version with counter-clockwise angles and millimeters as units. For AutoCAD 2000
+        /// (AC1015) and older the objects that only later versions know are removed, so that strict readers accept the file. The
+        /// setting "DxfDwg.ExportDimension" is read here; it decides whether dimensions are written as DIMENSION entities or as
+        /// blocks.
+        /// </summary>
+        /// <param name="version">the AutoCAD version of the file; AC1015 (AutoCAD 2000) is the default and the most widely readable</param>
         [CLSCompliant(false)] // ACadVersion comes from ACadSharp, which is not CLS compliant
         public Export(ACadVersion version = ACadVersion.AC1015)
         {
@@ -79,6 +94,14 @@ namespace CADability.DXF
                 doc.RootDictionary.Remove(key);
         }
 
+        /// <summary>
+        /// Converts the model space of <paramref name="toExport"/> and returns the DXF file as bytes instead of writing it to disk,
+        /// e.g. to send it over a network. The model is the only model of the project, the model named "*Model_Space", or the
+        /// active model. Unlike <see cref="WriteToFile(Project, string)"/> single faces are written one by one and not combined
+        /// to a shell.
+        /// </summary>
+        /// <param name="toExport">the project whose model space is exported</param>
+        /// <returns>the content of the DXF file</returns>
         public byte[] WriteToByteArray(Project toExport)
         {
             Model modelSpace = null;
@@ -104,6 +127,13 @@ namespace CADability.DXF
             return ms.ToArray();
         }
 
+        /// <summary>
+        /// Writes the model space of <paramref name="toExport"/> as a DXF file. The model is the only model of the project, the
+        /// model named "*Model_Space", or the active model; single faces in the model are combined to one shell before they are
+        /// written. For a DWG file use <see cref="Project.Export"/> with the format "dwg".
+        /// </summary>
+        /// <param name="toExport">the project whose model space is exported</param>
+        /// <param name="filename">path of the file to write; an existing file is overwritten</param>
         public void WriteToFile(Project toExport, string filename)
         {
             WriteToFile(toExport, filename, false);

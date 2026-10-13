@@ -15,10 +15,25 @@ namespace CADability.UserInterface
         private LinePatternList linePatternList;
         private IGeoObject toWatch;
         private ILinePattern iLinePattern;
+        /// <summary>
+        /// Creates an entry without the "undefined" choice which is not connected to an object; the selection is reported via
+        /// <see cref="LinePatternChangedEvent"/>.
+        /// </summary>
+        /// <param name="ResourceID">Resource id of the label text</param>
+        /// <param name="linePatternList">The list providing the choices</param>
+        /// <param name="select">The initially selected line pattern, or null for no selection</param>
         public LinePatternSelectionProperty(string ResourceID, LinePatternList linePatternList, LinePattern select) :
             this(ResourceID, linePatternList, select, false)
         {
         }
+        /// <summary>
+        /// Creates an entry which is not connected to an object; the selection is reported via
+        /// <see cref="LinePatternChangedEvent"/>.
+        /// </summary>
+        /// <param name="ResourceID">Resource id of the label text</param>
+        /// <param name="linePatternList">The list providing the choices</param>
+        /// <param name="select">The initially selected line pattern, or null for "undefined" resp. no selection</param>
+        /// <param name="includeUndefined">true: an "undefined" entry (resource "LinePattern.Undefined") is offered as the first choice</param>
         public LinePatternSelectionProperty(string ResourceID, LinePatternList linePatternList, LinePattern select, bool includeUndefined)
         {
             this.linePatternList = linePatternList;
@@ -56,6 +71,15 @@ namespace CADability.UserInterface
                 }
             }
         }
+        /// <summary>
+        /// Creates an entry which controls the line pattern of <paramref name="iLinePattern"/>. The current line pattern of
+        /// the object is preselected; if the object is an <see cref="IGeoObject"/>, the entry follows changes of its line
+        /// pattern or style.
+        /// </summary>
+        /// <param name="ResourceID">Resource id of the label text</param>
+        /// <param name="linePatternList">The list providing the choices</param>
+        /// <param name="iLinePattern">The object whose line pattern is edited</param>
+        /// <param name="includeUndefined">true: an "undefined" entry (resource "LinePattern.Undefined") is offered as the first choice</param>
         public LinePatternSelectionProperty(string ResourceID, LinePatternList linePatternList, ILinePattern iLinePattern, bool includeUndefined)
         {
             this.linePatternList = linePatternList;
@@ -96,8 +120,16 @@ namespace CADability.UserInterface
             this.iLinePattern = iLinePattern;
             toWatch = iLinePattern as IGeoObject;
         }
+        /// <summary>
+        /// Delegate for <see cref="LinePatternChangedEvent"/>.
+        /// </summary>
+        /// <param name="selected">The selected line pattern, or null when the "undefined" entry was selected</param>
         public delegate void LinePatternChangedDelegate(LinePattern selected);
+        /// <summary>
+        /// Raised when the user selects a line pattern, before it is applied to the connected object (if any).
+        /// </summary>
         public event LinePatternChangedDelegate LinePatternChangedEvent;
+        /// <inheritdoc/>
         protected override void OnSelectionChanged(string selected)
         {
             base.OnSelectionChanged(selected);
@@ -133,6 +165,11 @@ namespace CADability.UserInterface
                 }
             }
         }
+        /// <summary>
+        /// The <see cref="IGeoObject"/> whose line pattern is controlled by this entry. Setting it connects the entry to the
+        /// new object (which must implement <see cref="ILinePattern"/>): its line pattern is changed when the user selects an
+        /// entry, and the entry is refreshed when the line pattern or style of the object changes.
+        /// </summary>
         public IGeoObject Connected
         {   // mit dieser Property kann man das kontrollierte Geoobjekt ändern
             get { return toWatch; }

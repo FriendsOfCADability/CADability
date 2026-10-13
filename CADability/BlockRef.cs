@@ -173,14 +173,37 @@ namespace CADability.GeoObject
         private WeakReference flattened, flattenedP;
         private BoundingCube? extent;
         #region polymorph construction
+        /// <summary>
+        /// Signature of the factory method that <see cref="Construct"/> calls when one is registered in <see cref="Constructor"/>.
+        /// </summary>
+        /// <param name="referredBlock">The block the new reference refers to</param>
+        /// <returns>A new <see cref="BlockRef"/> or an object of a class derived from BlockRef</returns>
         public delegate BlockRef ConstructionDelegate(Block referredBlock);
+        /// <summary>
+        /// Optional factory for block references: when set, <see cref="Construct"/> calls this delegate instead of creating
+        /// a plain <see cref="BlockRef"/>, so that every reference CADability creates is an instance of your derived class.
+        /// Null by default.
+        /// </summary>
         public static ConstructionDelegate Constructor;
+        /// <summary>
+        /// Creates a reference to the given block with the identity as <see cref="Insertion"/>, i.e. the block appears where
+        /// it is defined; move it with <see cref="Modify"/>, <see cref="Insertion"/> or <see cref="RefPoint"/>. This is the
+        /// only public way to create a block reference. If a <see cref="Constructor"/> is registered, the reference is created
+        /// by that delegate.
+        /// </summary>
+        /// <param name="referredBlock">The block to refer to; it is shared with other references, not copied</param>
+        /// <returns>The new block reference</returns>
         public static BlockRef Construct(Block referredBlock)
         {
             if (Constructor != null) return Constructor(referredBlock);
             return new BlockRef(referredBlock);
         }
         #endregion
+        /// <summary>
+        /// Creates a reference to the given block with the identity as insertion. Protected so that references are created
+        /// via <see cref="Construct"/>; derived classes call it from their own constructors.
+        /// </summary>
+        /// <param name="referredBlock">The block to refer to</param>
         protected BlockRef(Block referredBlock)
         {
             idea = referredBlock;
@@ -255,6 +278,7 @@ namespace CADability.GeoObject
         {
             return new ShowPropertyBlockRef(this, frame);
         }
+        /// <inheritdoc/>
         public override string Description
         {
             get
@@ -282,7 +306,18 @@ namespace CADability.GeoObject
         {
             idea.PrePaintTo3D(paintTo3D);
         }
+        /// <summary>
+        /// Signature of the handler for <see cref="OnPaintTo3D"/>.
+        /// </summary>
+        /// <param name="toPaint">The block reference that is about to be painted</param>
+        /// <param name="paintTo3D">The paint interface to paint to</param>
+        /// <returns>true if the handler has painted the reference itself and the default painting must be skipped, false to
+        /// let the reference paint the referenced block as usual</returns>
         public delegate bool PaintTo3DDelegate(BlockRef toPaint, IPaintTo3D paintTo3D);
+        /// <summary>
+        /// Hook to replace the painting of block references: when set, <see cref="PaintTo3D"/> calls this delegate first and
+        /// does nothing more if it returns true. Applies to all block references. Null by default.
+        /// </summary>
         public static PaintTo3DDelegate OnPaintTo3D;
         /// <inheritdoc/>
         public override void PaintTo3D(IPaintTo3D paintTo3D)
@@ -351,6 +386,12 @@ namespace CADability.GeoObject
             return Flattened.Position(fromHere, direction, precision);
         }
         #endregion
+        /// <summary>
+        /// The modification (translation, rotation, scaling ...) that places the referenced block in the model: the reference
+        /// displays the block as it is defined, transformed by this operation. It is the identity after <see cref="Construct"/>,
+        /// and <see cref="Modify"/> prepends its operation. Setting it discards the cached flattened block, raises the change
+        /// events and is undoable.
+        /// </summary>
         public ModOp Insertion
         {
             get
@@ -367,6 +408,11 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// The position of the reference point of the referenced block (<see cref="Block.RefPoint"/>) in the model, i.e. that
+        /// point transformed by <see cref="Insertion"/>. Setting it translates the reference so that the reference point comes
+        /// to lie at the given point; this changes <see cref="Insertion"/>, raises the change events and is undoable.
+        /// </summary>
         public GeoPoint RefPoint
         {
             get { return insertion * idea.RefPoint; }
@@ -376,6 +422,11 @@ namespace CADability.GeoObject
                 Insertion = ModOp.Translate(move) * insertion;
             }
         }
+        /// <summary>
+        /// The block definition this reference displays. The block is shared with other references and is not owned by the
+        /// reference, so modifying it changes all references. Setting it subscribes the reference to the change events of the
+        /// new block (changes of the block discard the cached flattened copy), raises the change events and is undoable.
+        /// </summary>
         public Block ReferencedBlock
         {
             get
@@ -519,6 +570,11 @@ namespace CADability.GeoObject
         }
         #region IColorDef Members
         private ColorDef colorDef;
+        /// <summary>
+        /// The color of the reference. It is given to those objects of the displayed block that have no color of their own or
+        /// whose color is "from parent" (see <see cref="Flattened"/>); objects with a color of their own keep it. May be null.
+        /// Setting it raises the change events and is undoable.
+        /// </summary>
         public ColorDef ColorDef
         {
             get => colorDef;
@@ -540,10 +596,22 @@ namespace CADability.GeoObject
         }
         #endregion
         #region IGeoObjectOwner Members
+        /// <summary>
+        /// Implements <see cref="IGeoObjectOwner.Remove"/>. The reference owns only the temporary flattened copy of its block
+        /// (see <see cref="Flattened"/>), so this merely clears the <see cref="IGeoObject.Owner"/> of the given object. The
+        /// referenced block is not changed.
+        /// </summary>
+        /// <param name="toRemove">The object that is no longer owned by this reference</param>
         public void Remove(IGeoObject toRemove)
         {
             toRemove.Owner = null;
         }
+        /// <summary>
+        /// Implements <see cref="IGeoObjectOwner.Add"/>. Only sets the <see cref="IGeoObject.Owner"/> of the given object to
+        /// this reference, the object is not added to the referenced block. This is how the flattened copy of the block
+        /// (see <see cref="Flattened"/>) is owned.
+        /// </summary>
+        /// <param name="toAdd">The object to be owned by this reference</param>
         public void Add(IGeoObject toAdd)
         {
             toAdd.Owner = this;

@@ -54,6 +54,15 @@ namespace CADability.Shapes
             this.outline = bdr;
             this.holes = new Border[0];
         }
+        /// <summary>
+        /// Creates the shape covered by a round pen of the given radius moving along the polyline: the union of a rectangle
+        /// of width 2*<paramref name="radius"/> around each edge and a disk of that radius around each vertex, so the ends
+        /// and the corners are rounded. The pieces are connected, so the union is a single simple shape; should it fall
+        /// apart (e.g. for a degenerate polyline), only the first simple shape is returned.
+        /// </summary>
+        /// <param name="p2d">The polyline to thicken</param>
+        /// <param name="radius">Half the width of the resulting band</param>
+        /// <returns>The thickened polyline as a simple shape</returns>
         public static SimpleShape ThickPolyLine(Polyline2D p2d, double radius)
         {
             CompoundShape cs = null;
@@ -148,6 +157,10 @@ namespace CADability.Shapes
                 return (Border[])holes.Clone(); // kopie des Arrays, somit unveränderlich
             }
         }
+        /// <summary>
+        /// All segments of this shape: those of the outline followed by those of the holes, each border counterclockwise as
+        /// every closed <see cref="Border"/> is. The original curves are returned, do not modify them.
+        /// </summary>
         public IEnumerable<ICurve2D> Segments
         {
             get
@@ -196,6 +209,15 @@ namespace CADability.Shapes
             }
             return true;
         }
+        /// <summary>
+        /// Determines where a point lies relative to this shape: <see cref="Border.Position.Inside"/> for a point inside the
+        /// outline but not inside a hole, <see cref="Border.Position.Outside"/> for a point outside the outline or inside a
+        /// hole, <see cref="Border.Position.OnCurve"/> for a point on the outline or on the border of a hole (within
+        /// <paramref name="prec"/>). Unlike <see cref="Contains"/> the three cases are distinguished.
+        /// </summary>
+        /// <param name="p">The point to test</param>
+        /// <param name="prec">Distance within which the point counts as being on a border; 0 uses <see cref="Precision.eps"/></param>
+        /// <returns>The position of the point</returns>
         public Border.Position GetPosition(GeoPoint2D p, double prec = 0.0)
         {
             Border.Position pos = outline.GetPosition(p, prec);
@@ -371,6 +393,15 @@ namespace CADability.Shapes
         {
             return Intersect(Part1, Part2, Precision.eps);
         }
+        /// <summary>
+        /// Returns the intersection (common area) of two simple shapes like <see cref="Intersect(SimpleShape, SimpleShape)"/>,
+        /// with an explicit precision for intersecting the outlines: points closer than <paramref name="precision"/> are
+        /// considered identical, which makes the operation robust for shapes that touch or share edges.
+        /// </summary>
+        /// <param name="Part1">First shape</param>
+        /// <param name="Part2">Second shape</param>
+        /// <param name="precision">Precision for the intersection of the outlines</param>
+        /// <returns>The resulting shape (may be empty)</returns>
         public static CompoundShape Intersect(SimpleShape Part1, SimpleShape Part2, double precision)
         {
             // SimpleShapes sollte nie leer sein. Falls doch, sollten sie sich
@@ -897,14 +928,38 @@ namespace CADability.Shapes
             // Alle Fälle abgedeckt, hierhin gehts nicht
             return Position.disjunct;
         }
+        /// <summary>
+        /// Creates a circular disk without holes, see <see cref="Border.MakeCircle"/>.
+        /// </summary>
+        /// <param name="center">Center of the circle</param>
+        /// <param name="radius">Radius of the circle</param>
+        /// <returns>The circular shape</returns>
         public static SimpleShape MakeCircle(GeoPoint2D center, double radius)
         {
             return new SimpleShape(Border.MakeCircle(center, radius));
         }
+        /// <summary>
+        /// Creates a regular polygon without holes, see <see cref="Border.MakePolygon(GeoPoint2D, double, int)"/>.
+        /// </summary>
+        /// <param name="center">Center of the polygon</param>
+        /// <param name="radius">Distance of the vertices from the center</param>
+        /// <param name="numberOfSides">Number of sides (and vertices), at least 3</param>
+        /// <returns>The polygonal shape</returns>
         public static SimpleShape MakePolygon(GeoPoint2D center, double radius, int numberOfSides)
         {
             return new SimpleShape(Border.MakePolygon(center, radius, numberOfSides));
         }
+        /// <summary>
+        /// Creates the shape of a slot around an arbitrary curve: all points closer than <paramref name="halfWidth"/> to
+        /// <paramref name="centerLine"/>. The curve is approximated by lines and arcs with the given precision, a slot is
+        /// built around each piece (see <see cref="Border.MakeLongHole(ICurve2D, double)"/>; arcs with a radius not greater
+        /// than the half width and arcs sweeping more than 180 degrees are handled specially) and the slots are united. As
+        /// the pieces are connected, the union is a single simple shape, which may have a hole when the curve winds around.
+        /// </summary>
+        /// <param name="centerLine">The open center curve of the slot, a single curve or a <see cref="Path2D"/></param>
+        /// <param name="halfWidth">Half the width of the slot, i.e. the radius of the round ends</param>
+        /// <param name="precision">Maximum deviation when approximating the curve by lines and arcs</param>
+        /// <returns>The slot, or null if no piece of the curve yielded a shape</returns>
         public static SimpleShape MakeLongHole(ICurve2D centerLine, double halfWidth, double precision)
         {
             if (!(centerLine is Path2D)) centerLine = new Path2D(new ICurve2D[] { centerLine });
@@ -1056,6 +1111,10 @@ namespace CADability.Shapes
             }
             return res;
         }
+        /// <summary>
+        /// The segments of the outline and of the holes as 3d curves in the xy plane, for inspection in a debugger or for
+        /// displaying the shape in a model. Intended for debugging.
+        /// </summary>
         public GeoObjectList DebugList
         {
             get
@@ -1136,6 +1195,13 @@ namespace CADability.Shapes
                 holes[j].Reduce();
             }
         }
+        /// <summary>
+        /// Simplifies the outline and the holes in place: segments that are not lines or arcs are approximated by lines and
+        /// arcs with the given precision, adjacent segments that can be merged into one are fused, and segments shorter than
+        /// <paramref name="precision"/> as well as dead ends (spikes going out and back) are removed. Holes whose area drops
+        /// below <paramref name="precision"/> are dropped. Useful after boolean operations, which tend to leave tiny segments.
+        /// </summary>
+        /// <param name="precision">Maximum deviation of the approximation and minimum length of a segment to keep</param>
         public void Reduce(double precision)
         {
             Reduce(precision, false);
@@ -1238,6 +1304,12 @@ namespace CADability.Shapes
             }
             return res.ToArray();
         }
+        /// <summary>
+        /// Returns the outline and the holes as one closed path: each hole (reversed, i.e. clockwise) is joined to the
+        /// outline by a pair of coincident bridge lines at the closest points, see <see cref="ConnectPaths"/>. Such a path
+        /// describes the shape with a single contour, e.g. for exporting to formats or algorithms that do not know holes.
+        /// </summary>
+        /// <returns>A single closed path covering the outline and the holes</returns>
         public Path2D GetSingleOutline()
         {   // berücksichtigt noch nicht, dass man zuerst das Loch nehmen sollte, welches am nächsten zum Rand liegt
             Path2D res = Outline.AsPath();
@@ -1250,6 +1322,16 @@ namespace CADability.Shapes
             return res;
         }
 
+        /// <summary>
+        /// Joins two closed paths into a single closed path by inserting a bridge: the closest points p1 on
+        /// <paramref name="outline"/> and p2 on <paramref name="hole"/> are determined, and the result runs from p2 to p1,
+        /// around the outline back to p1, back to p2 and around the hole back to p2. Both paths are cloned and flattened
+        /// first, the originals stay unchanged. The direction of each path is kept, so a hole should be passed reversed
+        /// (clockwise) for a correctly wound result.
+        /// </summary>
+        /// <param name="outline">The outer closed path</param>
+        /// <param name="hole">The closed path to join to it</param>
+        /// <returns>The combined closed path</returns>
         public static Path2D ConnectPaths(Path2D outline, Path2D hole)
         {
             GeoPoint2D p1, p2;
@@ -1363,6 +1445,13 @@ namespace CADability.Shapes
             holes = newholes;
         }
 
+        /// <summary>
+        /// Finds a point inside this shape (inside the outline, not in a hole) that is well away from the borders: the shape
+        /// is clipped with a growing set of horizontal and vertical lines and the middle of the widest piece inside is taken,
+        /// as long as its distance to the borders exceeds a limit that is relaxed with every round. Used e.g. as a test point
+        /// to evaluate a surface on a face. Returns the origin if no such point can be found.
+        /// </summary>
+        /// <returns>A point inside the shape</returns>
         public GeoPoint2D GetSomeInnerPoint()
         {
             BoundingRect ext = this.GetExtent() * 1.1;
@@ -1456,6 +1545,19 @@ namespace CADability.Shapes
                 if (!lok) lprec *= 1.7;
             }
         }
+        /// <summary>
+        /// Tests whether this shape and <paramref name="other"/> are congruent, i.e. whether a rotation and a translation
+        /// (possibly combined with a reflection) map this shape onto the other within <paramref name="precision"/>. The
+        /// comparison starts with the signatures (see <see cref="CalculateSignature()"/>), computed here for every longest
+        /// segment of the outline and compared with <paramref name="otherSig"/>; a candidate is then verified by actually
+        /// transforming this shape and checking that it coincides with <paramref name="other"/>. Used to find identical
+        /// faces, e.g. for recognizing repeated features in a shell.
+        /// </summary>
+        /// <param name="other">The shape to compare with</param>
+        /// <param name="otherSig">The signature of <paramref name="other"/>, as returned by its <see cref="CalculateSignature()"/></param>
+        /// <param name="thisToOther">The transformation mapping this shape onto <paramref name="other"/>, <see cref="ModOp2D.Null"/> if not congruent</param>
+        /// <param name="precision">Maximum distance for points to be considered identical</param>
+        /// <returns>true if the shapes are congruent</returns>
         public bool isCongruent(SimpleShape other, CompoundShape.Signature otherSig, out ModOp2D thisToOther, double precision)
         {
             List<int> longestSides = new List<int>(); // es kann ja mehrere von der gleichen Länge geben
@@ -1515,6 +1617,14 @@ namespace CADability.Shapes
             thisToOther = ModOp2D.Null;
             return false;
         }
+        /// <summary>
+        /// Computes a signature of this shape that is invariant under rotation and translation and can be compared quickly
+        /// (see <see cref="CompoundShape.Signature.isEqual"/>): the shape is rotated so that its longest outline segment is
+        /// horizontal and cut with two horizontal and four vertical lines at fixed relative positions; the parameter
+        /// intervals inside the shape on these lines and the total length of all borders make up the signature. Used by
+        /// <see cref="isCongruent"/> to compare many shapes cheaply before verifying congruence.
+        /// </summary>
+        /// <returns>The signature of this shape</returns>
         public CompoundShape.Signature CalculateSignature()
         {
             // bestimme die längste Seite der Umrandung
@@ -1720,14 +1830,25 @@ namespace CADability.Shapes
             }
         }
         #region IJsonSerialize
+        /// <summary>
+        /// Creates an uninitialized shape for the JSON deserialization; <see cref="SetObjectData"/> fills it in.
+        /// </summary>
         protected SimpleShape()
         { }
+        /// <summary>
+        /// Writes the outline and the holes for the JSON serialization (<see cref="IJsonSerialize"/>).
+        /// </summary>
+        /// <param name="data">Receives the properties of this shape</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("Outline", outline);
             data.AddProperty("Holes", holes);
         }
 
+        /// <summary>
+        /// Reads the outline and the holes written by <see cref="GetObjectData(IJsonWriteData)"/> for the JSON deserialization.
+        /// </summary>
+        /// <param name="data">The properties of the shape being read</param>
         public void SetObjectData(IJsonReadData data)
         {
             outline = data.GetProperty<Border>("Outline");
@@ -1804,6 +1925,13 @@ namespace CADability.Shapes
             }
         }
 
+        /// <summary>
+        /// A compact description of a <see cref="SimpleShape"/> that is invariant under rotation and translation, used to
+        /// find congruent shapes quickly: the shape is rotated so that its longest outline segment is horizontal and cut with
+        /// a few horizontal and vertical lines; the parameter intervals inside the shape on these lines, the rotation angle
+        /// and the total length of the borders are stored. Created by <see cref="SimpleShape.CalculateSignature()"/>, compared
+        /// with <see cref="isEqual"/> and verified with <see cref="SimpleShape.isCongruent"/>.
+        /// </summary>
         [Serializable()]
         public class Signature : ISerializable
         {
@@ -1811,6 +1939,12 @@ namespace CADability.Shapes
             internal double toHor; // Richtung der Schnitte
             internal double length; // Länge der Kontour
 
+            /// <summary>
+            /// Creates a signature from its components; normally only <see cref="SimpleShape.CalculateSignature()"/> does this.
+            /// </summary>
+            /// <param name="toHor">Angle (in radians) by which the shape was rotated to make its longest segment horizontal</param>
+            /// <param name="values">For each cutting line the parameter intervals (pairs of values 0 to 1) inside the shape, as returned by <see cref="SimpleShape.Clip"/></param>
+            /// <param name="length">Total length of the outline and all holes</param>
             public Signature(double toHor, double[][] values, double length)
             {
                 this.toHor = toHor;
@@ -1927,6 +2061,16 @@ namespace CADability.Shapes
             //    return res;
             //}
 
+            /// <summary>
+            /// Compares two signatures: all cut intervals must agree within <paramref name="precision"/> (relative values, 0 to
+            /// 1) and the total lengths within twice that. The cuts are also compared mirrored, so a reflected shape matches as
+            /// well; <paramref name="reflect"/> then reports that a reflection is needed. Equal signatures do not guarantee
+            /// congruent shapes, they only make it likely; <see cref="SimpleShape.isCongruent"/> verifies it.
+            /// </summary>
+            /// <param name="other">The signature to compare with</param>
+            /// <param name="reflect">true if the shapes match only with a reflection</param>
+            /// <param name="precision">Maximum difference of the (relative) cut values</param>
+            /// <returns>true if the signatures are equal</returns>
             public bool isEqual(Signature other, out bool reflect, double precision)
             {   // enthält horizontale und vertikale Schnitte im Sinne von Clip, also Werte zwischen 0 und 1
                 reflect = false;
@@ -1989,6 +2133,11 @@ namespace CADability.Shapes
                 return true; // alle Prüfungen bestenden
             }
 
+            /// <summary>
+            /// Constructor required by the binary deserialization (<see cref="ISerializable"/>).
+            /// </summary>
+            /// <param name="info">SerializationInfo</param>
+            /// <param name="context">StreamingContext</param>
             protected Signature(SerializationInfo info, StreamingContext context)
             {
                 values = (double[][])info.GetValue("Values", typeof(double[][]));
@@ -2048,6 +2197,11 @@ namespace CADability.Shapes
                 return this; // ungesplittet
             }
         }
+        /// <summary>
+        /// Returns a deep copy of this compound shape: all simple shapes and their borders are cloned, so the copy can be
+        /// modified (e.g. with <see cref="Approximate"/>) without affecting this shape.
+        /// </summary>
+        /// <returns>The cloned shape</returns>
         public CompoundShape Clone()
         {
             CompoundShape res = new CompoundShape();
@@ -2394,6 +2548,12 @@ namespace CADability.Shapes
                 return new CompoundShape(ss);
             }
         }
+        /// <summary>
+        /// Returns a copy of this shape transformed by <paramref name="m"/>; this shape stays unchanged. A reflection keeps
+        /// the borders correctly oriented, see <see cref="Border.GetModified"/>.
+        /// </summary>
+        /// <param name="m">The transformation to apply</param>
+        /// <returns>The transformed shape</returns>
         public CompoundShape GetModified(ModOp2D m)
         {
             SimpleShape[] ss = new SimpleShape[simpleShapes.Length];
@@ -2403,6 +2563,13 @@ namespace CADability.Shapes
             }
             return new CompoundShape(ss);
         }
+        /// <summary>
+        /// Shrinks the shape by moving all borders inward by <paramref name="d"/> (see <see cref="SimpleShape.Shrink"/>).
+        /// Simple shapes may fall apart into several pieces or vanish; a negative amount calls <see cref="Expand"/>. This
+        /// shape stays unchanged.
+        /// </summary>
+        /// <param name="d">Amount to shrink</param>
+        /// <returns>The shrunk shape, empty if nothing remains</returns>
         public CompoundShape Shrink(double d)
         {
             if (d < 0.0) return Expand(-d); // nur echtes Zusammenziehen, Ausdehnen dort
@@ -2415,6 +2582,13 @@ namespace CADability.Shapes
             }
             return res;
         }
+        /// <summary>
+        /// Expands the shape by moving all borders outward by <paramref name="d"/> (see <see cref="SimpleShape.Expand"/>).
+        /// Simple shapes that come to overlap are united and holes may close; a negative amount calls <see cref="Shrink"/>.
+        /// This shape stays unchanged.
+        /// </summary>
+        /// <param name="d">Amount to expand</param>
+        /// <returns>The expanded shape</returns>
         public CompoundShape Expand(double d)
         {
             if (d < 0.0) return Shrink(-d); // nur echtes Ausdehnen, Zusammenziehen dort
@@ -2426,6 +2600,14 @@ namespace CADability.Shapes
             }
             return res;
         }
+        /// <summary>
+        /// Tests whether two compound shapes have area in common or touch each other, i.e. whether some simple shape of
+        /// <paramref name="cs1"/> and some simple shape of <paramref name="cs2"/> are not disjoint (see
+        /// <see cref="SimpleShape.GetPosition(SimpleShape, SimpleShape)"/>).
+        /// </summary>
+        /// <param name="cs1">First shape</param>
+        /// <param name="cs2">Second shape</param>
+        /// <returns>true if the shapes overlap, touch or one contains the other</returns>
         public static bool Interferes(CompoundShape cs1, CompoundShape cs2)
         {   
             for (int i = 0; i < cs1.SimpleShapes.Length; i++)
@@ -2437,6 +2619,14 @@ namespace CADability.Shapes
             }
             return false;
         }
+        /// <summary>
+        /// Returns the union of two compound shapes (the same as <see cref="Union(CompoundShape, CompoundShape)"/>):
+        /// overlapping simple shapes are merged, simple shapes contained in others are dropped and the remaining disjoint
+        /// simple shapes are collected. The operands stay unchanged.
+        /// </summary>
+        /// <param name="s1">First operand</param>
+        /// <param name="s2">Second operand</param>
+        /// <returns>The union</returns>
         static public CompoundShape operator +(CompoundShape s1, CompoundShape s2)
         {
             return PlusOperator(s1, s2, Precision.eps);
@@ -2665,10 +2855,26 @@ namespace CADability.Shapes
             return res;
         }
 #endif
+        /// <summary>
+        /// Returns the union of two compound shapes, the same as <c>s1 + s2</c>, using <see cref="Precision.eps"/> as the
+        /// precision.
+        /// </summary>
+        /// <param name="s1">First operand</param>
+        /// <param name="s2">Second operand</param>
+        /// <returns>The union</returns>
         static public CompoundShape Union(CompoundShape s1, CompoundShape s2)
         {
             return s1 + s2;
         }
+        /// <summary>
+        /// Returns the union of two compound shapes with an explicit precision: points of the outlines closer than
+        /// <paramref name="precision"/> are considered identical, which makes the operation robust for shapes that touch or
+        /// share edges. The operands stay unchanged.
+        /// </summary>
+        /// <param name="s1">First operand</param>
+        /// <param name="s2">Second operand</param>
+        /// <param name="precision">Precision for the intersection of the outlines</param>
+        /// <returns>The union</returns>
         static public CompoundShape Union(CompoundShape s1, CompoundShape s2, double precision)
         {
             return PlusOperator(s1, s2, precision);
@@ -2776,10 +2982,26 @@ namespace CADability.Shapes
             return res;
         }
 #endif
+        /// <summary>
+        /// Returns the difference <paramref name="s1"/> minus <paramref name="s2"/>, the same as <c>s1 - s2</c>, using
+        /// <see cref="Precision.eps"/> as the precision.
+        /// </summary>
+        /// <param name="s1">The shape to subtract from</param>
+        /// <param name="s2">The shape to subtract</param>
+        /// <returns>The difference, empty if nothing remains</returns>
         static public CompoundShape Difference(CompoundShape s1, CompoundShape s2)
         {
             return s1 - s2;
         }
+        /// <summary>
+        /// Returns the difference <paramref name="s1"/> minus <paramref name="s2"/>, i.e. the area of <paramref name="s1"/>
+        /// not covered by <paramref name="s2"/>, with an explicit precision: points of the outlines closer than
+        /// <paramref name="precision"/> are considered identical. The operands stay unchanged.
+        /// </summary>
+        /// <param name="s1">The shape to subtract from</param>
+        /// <param name="s2">The shape to subtract</param>
+        /// <param name="precision">Precision for the intersection of the outlines</param>
+        /// <returns>The difference, empty if nothing remains</returns>
         static public CompoundShape Difference(CompoundShape s1, CompoundShape s2, double precision)
         {
             return MinusOperator(s1, s2, precision);
@@ -2805,6 +3027,14 @@ namespace CADability.Shapes
             }
             simpleShapes = (SimpleShape[])sss.ToArray(typeof(SimpleShape));
         }
+        /// <summary>
+        /// Returns the intersection of two compound shapes (the same as
+        /// <see cref="Intersection(CompoundShape, CompoundShape)"/>): the area common to both, assembled from the pairwise
+        /// intersections of their simple shapes. The operands stay unchanged.
+        /// </summary>
+        /// <param name="s1">First operand</param>
+        /// <param name="s2">Second operand</param>
+        /// <returns>The intersection, empty if the shapes do not overlap</returns>
         static public CompoundShape operator *(CompoundShape s1, CompoundShape s2)
         {   // Alle Schnitte zwischen simpleshapes von s1 und simpleshapes von s2 disjunkt vereinigen
             CompoundShape res = new CompoundShape();
@@ -2817,10 +3047,25 @@ namespace CADability.Shapes
             }
             return res;
         }
+        /// <summary>
+        /// Returns the intersection of two compound shapes, the same as <c>s1 * s2</c>, using <see cref="Precision.eps"/> as
+        /// the precision.
+        /// </summary>
+        /// <param name="s1">First operand</param>
+        /// <param name="s2">Second operand</param>
+        /// <returns>The intersection, empty if the shapes do not overlap</returns>
         static public CompoundShape Intersection(CompoundShape s1, CompoundShape s2)
         {
             return s1 * s2;
         }
+        /// <summary>
+        /// Returns the intersection (common area) of two compound shapes with an explicit precision: points of the outlines
+        /// closer than <paramref name="precision"/> are considered identical. The operands stay unchanged.
+        /// </summary>
+        /// <param name="s1">First operand</param>
+        /// <param name="s2">Second operand</param>
+        /// <param name="precision">Precision for the intersection of the outlines</param>
+        /// <returns>The intersection, empty if the shapes do not overlap</returns>
         static public CompoundShape Intersection(CompoundShape s1, CompoundShape s2, double precision)
         {
             CompoundShape res = new CompoundShape();
@@ -2851,6 +3096,10 @@ namespace CADability.Shapes
                 }
             }
         }
+        /// <summary>
+        /// true if this shape contains no simple shapes or their total <see cref="Area"/> is 0. The boolean operations
+        /// return an empty shape when nothing remains.
+        /// </summary>
         public bool Empty
         {
             get
@@ -2861,6 +3110,9 @@ namespace CADability.Shapes
                 return false;
             }
         }
+        /// <summary>
+        /// The total area of this shape: the sum of the areas of the simple shapes (each outline minus its holes).
+        /// </summary>
         public double Area
         {
             get
@@ -2873,6 +3125,12 @@ namespace CADability.Shapes
                 return res;
             }
         }
+        /// <summary>
+        /// Tests whether the given rectangle overlaps this shape: true if the rectangle is (partly) inside one of the simple
+        /// shapes or touches one of their borders, false if it lies completely outside or inside a hole.
+        /// </summary>
+        /// <param name="Rect">The rectangle to test</param>
+        /// <returns>true if the rectangle and the shape overlap</returns>
         public bool HitTest(ref BoundingRect Rect)
         {
             for (int i = 0; i < simpleShapes.Length; ++i)
@@ -2881,6 +3139,13 @@ namespace CADability.Shapes
             }
             return false;
         }
+        /// <summary>
+        /// Tests whether a point is contained in one of the simple shapes of this shape, see
+        /// <see cref="SimpleShape.Contains"/>.
+        /// </summary>
+        /// <param name="p">The point to test</param>
+        /// <param name="acceptOnCurve">true: a point on a border counts as contained, false: only points strictly inside</param>
+        /// <returns>true if the point is contained</returns>
         public bool Contains(GeoPoint2D p, bool acceptOnCurve)
         {
             for (int i = 0; i < simpleShapes.Length; ++i)
@@ -2889,6 +3154,12 @@ namespace CADability.Shapes
             }
             return false;
         }
+        /// <summary>
+        /// Converts this shape to a GDI+ <see cref="System.Drawing.Drawing2D.GraphicsPath"/> for drawing or clipping with
+        /// System.Drawing: the outlines are added counterclockwise and the holes clockwise, so filling the path leaves the
+        /// holes empty.
+        /// </summary>
+        /// <returns>The graphics path</returns>
         public System.Drawing.Drawing2D.GraphicsPath CreateGraphicsPath()
         {
             System.Drawing.Drawing2D.GraphicsPath res = new System.Drawing.Drawing2D.GraphicsPath();
@@ -2898,6 +3169,14 @@ namespace CADability.Shapes
             }
             return res;
         }
+        /// <summary>
+        /// Clips a curve with this shape: returns the parts of the curve inside (or outside) the shape as parameter
+        /// intervals on the curve, see <see cref="SimpleShape.Clip"/>. The result holds pairs of curve parameters (0 to 1),
+        /// start and end of each piece, sorted along the curve.
+        /// </summary>
+        /// <param name="toClip">The curve to clip</param>
+        /// <param name="returnInsideParts">true: return the parts inside the shape, false: the parts outside</param>
+        /// <returns>Start and end parameters of the pieces, an even number of values; empty if there is no such piece</returns>
         public double[] Clip(ICurve2D toClip, bool returnInsideParts)
         {
             List<double> res = new List<double>();
@@ -2938,6 +3217,10 @@ namespace CADability.Shapes
             }
             return res.ToArray();
         }
+        /// <summary>
+        /// All borders of this shape as 3d curves in the xy plane, for inspection in a debugger or for displaying the shape
+        /// in a model. Intended for debugging.
+        /// </summary>
         public GeoObjectList DebugList
         {
             get
@@ -2980,6 +3263,13 @@ namespace CADability.Shapes
             }
             return res.ToArray();
         }
+        /// <summary>
+        /// Returns the whole shape as one closed path: the single outlines of the simple shapes (see
+        /// <see cref="SimpleShape.GetSingleOutline"/>) are joined by bridge lines at their closest points
+        /// (<see cref="SimpleShape.ConnectPaths"/>). Whether a bridge crosses another simple shape is not checked. Requires
+        /// at least one simple shape.
+        /// </summary>
+        /// <returns>A single closed path covering all simple shapes</returns>
         public Path2D GetSingleOutline()
         {   // berücksichtigt noch nicht, dass eine Verbindungslinie ein weiteres simpleShape schneidet
             Path2D res = simpleShapes[0].GetSingleOutline();
@@ -2990,6 +3280,17 @@ namespace CADability.Shapes
             return res;
         }
 
+        /// <summary>
+        /// Reverse of <see cref="GetSingleOutline"/>: builds a compound shape from a sequence of curves describing several
+        /// closed loops one after another. A loop ends with the curve whose end point comes back (within
+        /// <paramref name="maxGap"/>) to the start point of the first curve of the loop; a bridge line that is traversed
+        /// forth and back is left out. The first loop becomes an outline, each following loop becomes a hole of the current
+        /// outline when it lies inside it, otherwise it starts a new simple shape. Curves after a loop that cannot be
+        /// closed are ignored.
+        /// </summary>
+        /// <param name="curves">The curves of the loops, each loop ordered and connected</param>
+        /// <param name="maxGap">Maximum distance between the end of a loop and its start</param>
+        /// <returns>The compound shape</returns>
         public static CompoundShape FromSingleOutline(ICurve2D[] curves, double maxGap)
         {
             int ind = 0;
@@ -3046,6 +3347,10 @@ namespace CADability.Shapes
             return new CompoundShape(simpleShapes.ToArray());
         }
         private UserData userData;
+        /// <summary>
+        /// Arbitrary data attached to this shape by the application, see <see cref="CADability.UserData"/>. The container
+        /// is created on first access; it is not serialized with the shape.
+        /// </summary>
         public UserData UserData
         {
             get
@@ -3054,8 +3359,18 @@ namespace CADability.Shapes
                 return userData;
             }
         }
+        /// <summary>
+        /// Returns the extent of this shape for display purposes; since a shape has no parts of fixed pixel size it is the
+        /// same as <see cref="GetExtent"/>.
+        /// </summary>
+        /// <param name="WorldToPixel">Scaling factor from world units to pixels, not used</param>
+        /// <returns>The extent of the shape</returns>
         public BoundingRect GetDisplayExtent(double WorldToPixel) { return GetExtent(); }
         #region IQuadTreeInsertable Members
+        /// <summary>
+        /// Returns the axis aligned bounding rectangle of all simple shapes; an empty rectangle for an empty shape.
+        /// </summary>
+        /// <returns>The extent of the shape</returns>
         public BoundingRect GetExtent()
         {
             BoundingRect res = BoundingRect.EmptyBoundingRect;
@@ -3065,6 +3380,13 @@ namespace CADability.Shapes
             }
             return res;
         }
+        /// <summary>
+        /// Implementation of <see cref="IQuadTreeInsertable.HitTest"/>: the same as <see cref="HitTest(ref BoundingRect)"/>,
+        /// a shape has no control points.
+        /// </summary>
+        /// <param name="Rect">The rectangle to test</param>
+        /// <param name="IncludeControlPoints">Not used</param>
+        /// <returns>true if the rectangle and the shape overlap</returns>
         public bool HitTest(ref BoundingRect Rect, bool IncludeControlPoints)
         {
             return HitTest(ref Rect);
@@ -3097,16 +3419,32 @@ namespace CADability.Shapes
 
         #endregion
         #region IJsonSerialize
+        /// <summary>
+        /// Writes the simple shapes for the JSON serialization (<see cref="IJsonSerialize"/>). <see cref="UserData"/> is
+        /// not written.
+        /// </summary>
+        /// <param name="data">Receives the properties of this shape</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("SimpleShapes", simpleShapes);
         }
 
+        /// <summary>
+        /// Reads the simple shapes written by <see cref="GetObjectData(IJsonWriteData)"/> for the JSON deserialization.
+        /// </summary>
+        /// <param name="data">The properties of the shape being read</param>
         public void SetObjectData(IJsonReadData data)
         {
             simpleShapes = data.GetProperty<SimpleShape[]>("SimpleShapes");
         }
         #endregion
+        /// <summary>
+        /// Replaces the segments of all borders in place by approximations with lines and arcs (or lines only) that deviate
+        /// at most <paramref name="precision"/> from the original curves. Splines and ellipses are gone afterwards, which
+        /// makes subsequent operations faster and simpler; use <see cref="Clone"/> first if the exact shape is still needed.
+        /// </summary>
+        /// <param name="linesOnly">true: approximate with lines only, false: with lines and arcs</param>
+        /// <param name="precision">Maximum deviation of the approximation</param>
         public void Approximate(bool linesOnly, double precision)
         {
             for (int i = 0; i < simpleShapes.Length; ++i)

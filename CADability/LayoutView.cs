@@ -50,7 +50,16 @@ namespace CADability
         //public event RepaintView RepaintDrawingEvent;
         //public event RepaintView RepaintSelectEvent;
         //public event RepaintView RepaintActiveEvent;
+        /// <summary>
+        /// Handler for <see cref="RepaintActionEvent"/>.
+        /// </summary>
+        /// <param name="View">The layout view that is being painted</param>
+        /// <param name="paintTo3d">The paint engine of the canvas, set up for painting in screen coordinates</param>
         public delegate void RepaintActionDelegate(IView View, IPaintTo3D paintTo3d);
+        /// <summary>
+        /// Raised during each paint cycle after the paper has been painted and before the patches are drawn. Actions on the layout view
+        /// (e.g. positioning a patch) can draw their feedback here.
+        /// </summary>
         public event RepaintActionDelegate RepaintActionEvent;
 
         private Layout layout;
@@ -63,6 +72,13 @@ namespace CADability
         private DoubleProperty paperHeight;
         // eigentlich eine Untergruppe für alle Patches
 
+        /// <summary>
+        /// Creates a view on the provided layout. The print settings of the view are taken from the page settings stored in the layout, otherwise
+        /// from the print document of the project; if there is none, only the orientation (landscape or portrait) is derived from the paper size of
+        /// the layout. The frame creates one layout view per layout of the project.
+        /// </summary>
+        /// <param name="layout">The layout to show</param>
+        /// <param name="project">The project that contains the layout, its models and the print settings</param>
         public LayoutView(Layout layout, Project project)
         {
             this.project = project;
@@ -99,6 +115,9 @@ namespace CADability
             }
         }
 
+        /// <summary>
+        /// The <see cref="CADability.Layout"/> shown by this view: the paper size and the patches.
+        /// </summary>
         public Layout Layout
         {
             get
@@ -107,6 +126,10 @@ namespace CADability
             }
         }
 
+        /// <summary>
+        /// True once the mapping from the layout (paper coordinates in mm) to the screen has been set up, i.e. after the view has been zoomed or
+        /// painted for the first time. Before that, the first paint calls <see cref="ZoomTotal(double)"/> itself.
+        /// </summary>
         public bool IsInitialized
         {
             get
@@ -114,12 +137,23 @@ namespace CADability
                 return !layoutToScreen.IsNull;
             }
         }
+        /// <summary>
+        /// Zooms so that the whole paper is visible on the canvas.
+        /// </summary>
+        /// <param name="factor">Factor by which the paper rectangle is enlarged before it is fitted into the canvas; 1.1 leaves a small margin, 1.0 fits exactly</param>
         public void ZoomTotal(double factor)
         {
             BoundingRect tot = new BoundingRect(0.0, 0.0, layout.PaperWidth, layout.PaperHeight);
             tot *= factor;
             (this as IView).ZoomToRect(tot);
         }
+        /// <summary>
+        /// Prints the layout on a single page with the provided print document. Depending on the global setting "Printing.PrintingMode" the patches
+        /// are either output as vector graphics via <see cref="PrintToGDI"/> (mode 1, with hidden line removal and shading) or each patch is rendered
+        /// into a bitmap at the printer resolution which is placed on the page. The paper size of the layout is assumed to be in mm. Exceptions of
+        /// the printing system are swallowed.
+        /// </summary>
+        /// <param name="pd">The print document to print to, with the printer and page settings already set</param>
         public void Print(PrintDocument pd)
         {
             bool printToGDI = Settings.GlobalSettings.GetIntValue("Printing.PrintingMode", 0) == 1;
@@ -198,6 +232,7 @@ namespace CADability
                 // Messagebox oder nicht?
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -205,6 +240,7 @@ namespace CADability
                 return MenuResource.LoadMenuDefinition("MenuId.LayoutView", false, this);
             }
         }
+        /// <inheritdoc/>
         public override string LabelText
         {
             get
@@ -275,6 +311,11 @@ namespace CADability
         }
         ICanvas IView.Canvas => canvas;
         string IView.PaintType => "3D";
+        /// <summary>
+        /// Paints the view: the area outside the paper in black, the paper in white, then (after <see cref="RepaintActionEvent"/>) each patch of the
+        /// layout with its own projection, clipped to its area. The first call sets up the mapping to the screen with <see cref="ZoomTotal(double)"/>.
+        /// </summary>
+        /// <param name="e">The paint event with the clip rectangle</param>
         public void OnPaint(PaintEventArgs e)
         {
             if (!IsInitialized) ZoomTotal(1.1);
@@ -361,43 +402,65 @@ namespace CADability
             }
             //ipaintTo3D.FinishPaint();
         }
+        /// <summary>
+        /// Repaints the view after the canvas has been resized; the zoom and scroll position are not adapted.
+        /// </summary>
+        /// <param name="oldRectangle">The client rectangle of the canvas before the change (not evaluated)</param>
         public void OnSizeChanged(System.Drawing.Rectangle oldRectangle)
         {
             canvas?.Invalidate();
         }
+        /// <summary>
+        /// Not implemented: the layout view does not react to scroll bars.
+        /// </summary>
+        /// <param name="Position">Not evaluated</param>
         public void HScroll(double Position)
         {
             // TODO:  Add LayoutView.HScroll implementation
         }
+        /// <summary>
+        /// Not implemented: the layout view does not react to scroll bars.
+        /// </summary>
+        /// <param name="Position">Not evaluated</param>
         public void VScroll(double Position)
         {
             // TODO:  Add LayoutView.VScroll implementation
         }
+        /// <inheritdoc/>
         public void OnMouseEnter(EventArgs e)
         {
 
             Frame.ActionStack.OnMouseEnter(e, this);
         }
+        /// <inheritdoc/>
         public void OnMouseHover(EventArgs e)
         {
             Frame.ActionStack.OnMouseHover(e, this);
         }
+        /// <inheritdoc/>
         public void OnMouseLeave(EventArgs e)
         {
             Frame.ActionStack.OnMouseLeave(e, this);
         }
+        /// <inheritdoc/>
         public void OnMouseMove(MouseEventArgs e)
         {
             Frame.ActionStack.OnMouseMove(e, this);
         }
+        /// <inheritdoc/>
         public void OnMouseUp(MouseEventArgs e)
         {
             Frame.ActionStack.OnMouseUp(e, this);
         }
+        /// <inheritdoc/>
         public void OnMouseDown(MouseEventArgs e)
         {
             Frame.ActionStack.OnMouseDown(e, this);
         }
+        /// <summary>
+        /// Zooms in or out by the factor 1.1 around the mouse position and repaints.
+        /// </summary>
+        /// <param name="e">The mouse event with the wheel delta</param>
         public void OnMouseWheel(MouseEventArgs e)
         {
             double Factor;
@@ -417,9 +480,14 @@ namespace CADability
             (this as IView).ZoomToRect(rct);
             (this as IView).InvalidateAll();
         }
+        /// <summary>
+        /// Not used: a double click has no effect in the layout view.
+        /// </summary>
+        /// <param name="e">Not evaluated</param>
         public void OnMouseDoubleClick(MouseEventArgs e)
         {
         }
+        /// <inheritdoc/>
         public void ZoomDelta(double f)
         {
             double Factor = f;
@@ -435,6 +503,9 @@ namespace CADability
             (this as IView).ZoomToRect(rct);
             (this as IView).InvalidateAll();
         }
+        /// <summary>
+        /// Always false: objects cannot be dropped on a layout view.
+        /// </summary>
         public bool AllowDrop
         {
             get
@@ -442,6 +513,9 @@ namespace CADability
                 return false;
             }
         }
+        /// <summary>
+        /// Always false: objects cannot be dragged out of a layout view.
+        /// </summary>
         public bool AllowDrag
         {
             get
@@ -449,6 +523,9 @@ namespace CADability
                 return false;
             }
         }
+        /// <summary>
+        /// Always true: a right click in the layout view opens the context menu of the current action.
+        /// </summary>
         public bool AllowContextMenu
         {
             get
@@ -456,32 +533,64 @@ namespace CADability
                 return true;
             }
         }
+        /// <summary>
+        /// Not implemented: the layout view does not accept dropped data.
+        /// </summary>
+        /// <param name="drgevent">Not evaluated</param>
         public void OnDragDrop(DragEventArgs drgevent)
         {
             // TODO:  Add LayoutView.OnDragDrop implementation
         }
+        /// <summary>
+        /// Not implemented: the layout view does not accept dropped data.
+        /// </summary>
+        /// <param name="drgevent">Not evaluated</param>
         public void OnDragEnter(DragEventArgs drgevent)
         {
             // TODO:  Add LayoutView.OnDragEnter implementation
         }
+        /// <summary>
+        /// Not implemented: the layout view does not accept dropped data.
+        /// </summary>
+        /// <param name="e">Not evaluated</param>
         public void OnDragLeave(EventArgs e)
         {
             // TODO:  Add LayoutView.OnDragLeave implementation
         }
+        /// <summary>
+        /// Not implemented: the layout view does not accept dropped data.
+        /// </summary>
+        /// <param name="drgevent">Not evaluated</param>
         public void OnDragOver(DragEventArgs drgevent)
         {
             // TODO:  Add LayoutView.OnDragOver implementation
         }
+        /// <summary>
+        /// Remnant of a former tooltip interface of the views, no longer called; always returns 0.
+        /// </summary>
+        /// <param name="ScreenCursorPosition">Not evaluated</param>
+        /// <returns>0</returns>
         public int GetInfoProviderIndex(System.Drawing.Point ScreenCursorPosition)
         {
             // TODO:  Add LayoutView.GetInfoProviderIndex implementation
             return 0;
         }
+        /// <summary>
+        /// Remnant of a former tooltip interface of the views, no longer called; always returns null.
+        /// </summary>
+        /// <param name="Index">Not evaluated</param>
+        /// <param name="Level">Not evaluated</param>
+        /// <returns>null</returns>
         public string GetInfoProviderText(int Index, CADability.UserInterface.InfoLevelMode Level)
         {
             // TODO:  Add LayoutView.GetInfoProviderText implementation
             return null;
         }
+        /// <summary>
+        /// Remnant of a former tooltip interface of the views, no longer called; always returns 0.
+        /// </summary>
+        /// <param name="Index">Not evaluated</param>
+        /// <returns>0</returns>
         public int GetInfoProviderVerticalPosition(int Index)
         {
             // TODO:  Add LayoutView.GetInfoProviderVerticalPosition implementation
@@ -516,6 +625,12 @@ namespace CADability
             }
             set { }
         }
+        /// <summary>
+        /// Dragging from a layout view is not supported: returns <see cref="DragDropEffects.None"/> without starting a drag and drop operation.
+        /// </summary>
+        /// <param name="dragList">Not evaluated</param>
+        /// <param name="all">Not evaluated</param>
+        /// <returns><see cref="DragDropEffects.None"/></returns>
         public Substitutes.DragDropEffects DoDragDrop(GeoObjectList dragList, Substitutes.DragDropEffects all)
         {
             return DragDropEffects.None;

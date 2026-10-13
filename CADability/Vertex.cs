@@ -21,6 +21,11 @@ namespace CADability
         internal static int hashCodeCounter = 0;
         private int hashCode;
         private Edge[] deserializedEdges; // we need this, because we cannot serialize/deserialize HashSet<Edge>
+        /// <summary>
+        /// Creates a vertex at <paramref name="position"/> without edges. Edges are attached when they get this vertex as
+        /// their start or end vertex (e.g. by <see cref="Edge.UseVertices(Vertex[])"/>).
+        /// </summary>
+        /// <param name="position">the position of the vertex</param>
         public Vertex(GeoPoint position)
         {
             this.position = position;
@@ -127,6 +132,12 @@ namespace CADability
                 }
             }
         }
+        /// <summary>
+        /// Returns the edges of this vertex that belong to <paramref name="onThisFace"/> (as primary or secondary face).
+        /// Normally these are two edges: the one arriving at and the one leaving the vertex in the loop of the face.
+        /// </summary>
+        /// <param name="onThisFace">the face</param>
+        /// <returns>the edges of the face at this vertex</returns>
         public List<Edge> EdgesOnFace(Face onThisFace)
         {
             List<Edge> res = new List<Edge>();
@@ -151,6 +162,12 @@ namespace CADability
                 return res;
             }
         }
+        /// <summary>
+        /// Returns the edges of this vertex that satisfy the provided condition, as a set (see
+        /// <see cref="ConditionalEdges(Predicate{Edge})"/> for a list).
+        /// </summary>
+        /// <param name="pr">the condition</param>
+        /// <returns>a new set with the edges that satisfy the condition</returns>
         public HashSet<Edge> ConditionalEdgesSet(Predicate<Edge> pr)
         {
             lock (edges)
@@ -172,6 +189,14 @@ namespace CADability
                 uvposition.Remove(face);
             }
         }
+        /// <summary>
+        /// Returns the position of this vertex in the parameter (u/v) space of the surface of <paramref name="fc"/>. The
+        /// positions are cached per face: they are recorded when edges are attached and otherwise computed with
+        /// <see cref="Face.PositionOf(GeoPoint)"/> on first request. For a vertex on the seam of a periodic surface the
+        /// recorded value is the one consistent with the 2d curves of the edges, which a plain projection might not give.
+        /// </summary>
+        /// <param name="fc">the face</param>
+        /// <returns>the u/v position of the vertex on the face</returns>
         public GeoPoint2D GetPositionOnFace(Face fc)
         {
             GeoPoint2D res;
@@ -183,6 +208,11 @@ namespace CADability
                 return uv;
             }
         }
+        /// <summary>
+        /// The faces for which a u/v position of this vertex has been cached (see <see cref="GetPositionOnFace(Face)"/>),
+        /// which normally are the faces of its edges. Use <see cref="InvolvedFaces"/> to get the faces from the edges
+        /// directly.
+        /// </summary>
         public Face[] Faces
         {
             get
@@ -194,6 +224,10 @@ namespace CADability
                 }
             }
         }
+        /// <summary>
+        /// All faces that meet at this vertex, collected from the primary and secondary faces of its edges. A new set is
+        /// created on each access.
+        /// </summary>
         public HashSet<Face> InvolvedFaces
         {
             get
@@ -207,6 +241,9 @@ namespace CADability
                 return res;
             }
         }
+        /// <summary>
+        /// The edges of this vertex as a new set (the same edges as <see cref="Edges"/>).
+        /// </summary>
         public HashSet<Edge> AllEdges
         {
             get
@@ -214,10 +251,12 @@ namespace CADability
                 return new HashSet<Edge>(edges);
             }
         }
+        /// <inheritdoc/>
         public override int GetHashCode()
         {
             return hashCode;
         }
+        /// <inheritdoc/>
         public override bool Equals(object obj)
         {
             Vertex other = obj as Vertex;
@@ -230,6 +269,14 @@ namespace CADability
             return hashCode.CompareTo(other.hashCode);
         }
         #endregion
+        /// <summary>
+        /// Returns the edges that connect <paramref name="v1"/> and <paramref name="v2"/>, i.e. the edges that belong to both
+        /// vertices. Usually there is at most one, but two faces may be connected by two different edges between the same
+        /// vertices (e.g. the two halves of a circle).
+        /// </summary>
+        /// <param name="v1">the first vertex</param>
+        /// <param name="v2">the second vertex</param>
+        /// <returns>the common edges, empty when the vertices are not connected</returns>
         public static IEnumerable<Edge> ConnectingEdges(Vertex v1, Vertex v2)
         {
             lock (v1.edges)
@@ -237,6 +284,14 @@ namespace CADability
                 return (v1.edges.Intersect(v2.edges));
             }
         }
+        /// <summary>
+        /// Returns an edge that connects <paramref name="v1"/> and <paramref name="v2"/>, or null when there is none. When
+        /// several edges connect the two vertices, an arbitrary one of them is returned (see
+        /// <see cref="ConnectingEdges(Vertex, Vertex)"/>).
+        /// </summary>
+        /// <param name="v1">the first vertex</param>
+        /// <param name="v2">the second vertex</param>
+        /// <returns>a connecting edge, or null</returns>
         public static Edge SingleConnectingEdge(Vertex v1, Vertex v2)
         {
             lock (v1.edges)
@@ -383,12 +438,20 @@ namespace CADability
         }
 
         #region IJsonSerialize Members
+        /// <summary>
+        /// Creates an empty vertex for the JSON deserialization (see <see cref="SetObjectData(IJsonReadData)"/>).
+        /// </summary>
         protected Vertex()
         {
             edges = new HashSet<Edge>();
             uvposition = new Dictionary<Face, GeoPoint2D>();
             hashCode = System.Threading.Interlocked.Increment(ref hashCodeCounter) - 1;
         }
+        /// <summary>
+        /// Writes this vertex for the JSON serialization (<see cref="IJsonSerialize"/>): its position and its edges (only
+        /// the edges that belong to a face, since edges without faces cannot be restored).
+        /// </summary>
+        /// <param name="data">receives the properties</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("Position", position);
@@ -408,6 +471,11 @@ namespace CADability
             }
             data.AddProperty("Edges", usableEdges.ToArray());
         }
+        /// <summary>
+        /// Reads this vertex from the JSON serialization (<see cref="IJsonSerialize"/>), the counterpart of
+        /// <see cref="GetObjectData(IJsonWriteData)"/>.
+        /// </summary>
+        /// <param name="data">the properties to read</param>
         public void SetObjectData(IJsonReadData data)
         {
             position = data.GetProperty<GeoPoint>("Position");
@@ -427,6 +495,11 @@ namespace CADability
             deserializedEdges = null;
         }
 
+        /// <summary>
+        /// Constructor required by deserialization
+        /// </summary>
+        /// <param name="info">SerializationInfo</param>
+        /// <param name="context">StreamingContext</param>
         protected Vertex(SerializationInfo info, StreamingContext context)
         {
             position = (GeoPoint)info.GetValue("Position", typeof(GeoPoint));

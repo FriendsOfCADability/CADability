@@ -365,6 +365,7 @@ namespace CADability.Actions
             copyObject = val;
         }
 
+        /// <inheritdoc/>
         public override void OnSetAction()
         {
             base.ActiveObject = block;
@@ -446,11 +447,13 @@ namespace CADability.Actions
             base.OnSetAction();
         }
 
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "ScaleObjects";
         }
 
+        /// <inheritdoc/>
         public override void OnDone()
         {
             // ist die Shift Taste gehalten, so werden Kopien gemacht, d.h. der die Elemente

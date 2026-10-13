@@ -47,6 +47,10 @@ namespace CADability.GeoObject
             if (Constructor != null) return Constructor();
             return new UnscaledGeoObject();
         }
+        /// <summary>
+        /// Signature of the handlers of the <see cref="Constructed"/> event.
+        /// </summary>
+        /// <param name="justConstructed">The object that has just been created</param>
         public delegate void ConstructedDelegate(UnscaledGeoObject justConstructed);
         public static event ConstructedDelegate Constructed;
         private UnscaledGeoObject()

@@ -13,6 +13,12 @@ using Microsoft.Win32.SafeHandles;
 
 namespace CADability
 {
+    /// <summary>
+    /// Experimental numerical algorithms based on the MathNet optimizers (Newton, Levenberg-Marquardt, trust region): positions of
+    /// points on surfaces, intersections of curves and surfaces and fitting of planes, lines, cones, tori, cylinders and quadrics to
+    /// points. Most of them are alternatives to the methods of <see cref="GaussNewtonMinimizer"/> and are only kept for comparison;
+    /// <see cref="ConeFit"/> is used when a shell is reconstructed from a triangulation. Internal helper, not an entry point of the API.
+    /// </summary>
     static public partial class BoxedSurfaceExtension
     {
         static private double quad(double x) { return x * x * x * x; }

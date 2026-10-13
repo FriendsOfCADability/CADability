@@ -7,6 +7,14 @@ using System.Linq;
 
 namespace CADability.Actions
 {
+    /// <summary>
+    /// Interactive construction of solids of revolution: the user picks one or more closed planar paths, closed curves or faces
+    /// (the current selection is used when the action is started with it), defines the axis by a line or by a point and a direction
+    /// and the angle of rotation (a full revolution when 0) with an optional start offset. The solids (see
+    /// <see cref="Make3D.Rotate(IGeoObject, Axis, SweepAngle, SweepAngle, Project)"/>) are inserted into the model, united with or
+    /// subtracted from the existing solids according to <see cref="IFrame.SolidModellingMode"/>. Started by the menu command
+    /// "MenuId.Constr.Solid.FaceRotate"; its id is "Constr.Solid.FaceRotate".
+    /// </summary>
     public class Constr3DFaceRotate : ConstructAction
     {
         private GeoObjectInput geoObjectInput;
@@ -389,6 +397,7 @@ namespace CADability.Actions
         }
 
 
+        /// <inheritdoc/>
         public override void OnSetAction()
         {
             base.ActiveObject = Face.Construct();
@@ -450,9 +459,11 @@ namespace CADability.Actions
 
 
 
+        /// <inheritdoc/>
         public override string GetID()
         { return "Constr.Solid.FaceRotate"; }
 
+        /// <inheritdoc/>
         public override void OnDone()
         {
             if (base.ShowActiveObject == true)

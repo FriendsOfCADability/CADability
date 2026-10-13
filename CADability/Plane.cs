@@ -9,10 +9,27 @@ using System.Runtime.Serialization;
 namespace CADability
 {
 
+    /// <summary>
+    /// Exception thrown by <see cref="Plane"/> when a plane cannot be constructed (e.g. from collinear points or parallel
+    /// direction vectors) or when an intersection does not exist (e.g. a line parallel to the plane).
+    /// <see cref="ExceptionType"/> tells which of the two happened.
+    /// </summary>
     public class PlaneException : System.ApplicationException
     {
+        /// <summary>
+        /// The kind of failure: <c>ConstructorFailed</c> when a plane could not be constructed from the given data
+        /// (collinear points, parallel or null direction vectors), <c>IntersectionFailed</c> when an intersection does not
+        /// exist, e.g. the line in <see cref="Plane.Intersect(GeoPoint, GeoVector)"/> is parallel to the plane.
+        /// </summary>
         public enum tExceptionType { ConstructorFailed, IntersectionFailed };
+        /// <summary>
+        /// The kind of failure, see <see cref="tExceptionType"/>.
+        /// </summary>
         public tExceptionType ExceptionType;
+        /// <summary>
+        /// Creates the exception for the given kind of failure.
+        /// </summary>
+        /// <param name="ExceptionType">the kind of failure</param>
         public PlaneException(tExceptionType ExceptionType)
         {
             this.ExceptionType = ExceptionType;
@@ -203,10 +220,21 @@ namespace CADability
                 throw new PlaneException(PlaneException.tExceptionType.ConstructorFailed);
             }
         }
+        /// <summary>
+        /// Creates a plane parallel to <paramref name="basePlane"/>, shifted by <paramref name="offset"/> along the normal of
+        /// the base plane. The direction vectors are those of the base plane. Same as <see cref="Offset(double)"/>.
+        /// </summary>
+        /// <param name="basePlane">the plane to shift</param>
+        /// <param name="offset">signed distance along the normal of <paramref name="basePlane"/></param>
         public Plane(Plane basePlane, double offset)
         {
             coordSys = new CoordSys(basePlane.Location + offset * basePlane.Normal, basePlane.DirectionX, basePlane.DirectionY);
         }
+        /// <summary>
+        /// Creates a copy of <paramref name="basePlane"/>. Since Plane is a value type an assignment does the same; the
+        /// constructor is used where a copy is subsequently modified, e.g. by the <c>*</c> operator of <see cref="ModOp"/>.
+        /// </summary>
+        /// <param name="basePlane">the plane to copy</param>
         public Plane(Plane basePlane)
         {
             coordSys = new CoordSys(basePlane.Location, basePlane.DirectionX, basePlane.DirectionY);
@@ -312,6 +340,18 @@ namespace CADability
             return plane;
         }
         private static double sqr(double d) { return d * d; }
+        /// <summary>
+        /// Older implementation of <see cref="FromPoints(GeoPoint[], out double, out bool)"/>: fits a plane through the given
+        /// points by minimizing the residuals along the dominant axis of the covariance of the points, which is not always
+        /// the best fitting plane. No longer used internally, kept for compatibility; prefer
+        /// <see cref="FromPoints(GeoPoint[], out double, out bool)"/>.
+        /// </summary>
+        /// <param name="Points">points to build the plane from</param>
+        /// <param name="MaxDistance">maximum distance of the points from the resulting plane, <see cref="double.MaxValue"/>
+        /// when the points do not define a plane</param>
+        /// <param name="isLinear">true, if the points do not define a plane: fewer than three points, all points coincide or
+        /// they lie on a line. The result is then the <see cref="XYPlane"/></param>
+        /// <returns>the fitted plane</returns>
         public static Plane FromPointsOld(GeoPoint[] Points, out double MaxDistance, out bool isLinear)
         {
             // nach http://www.ilikebigbits.com/blog/2015/3/2/plane-from-points
@@ -521,6 +561,15 @@ namespace CADability
         /// Returns the Y/Z plane.
         /// </summary>
         public static readonly Plane YZPlane = new Plane(StandardPlane.YZPlane, 0.0);
+        /// <summary>
+        /// Intersects the infinite line given by <paramref name="LinePoint"/> and <paramref name="LineDir"/> with this plane.
+        /// Unlike <see cref="Intersect(GeoPoint, GeoVector)"/> this overload does not throw when the line is (almost)
+        /// parallel to the plane but returns false.
+        /// </summary>
+        /// <param name="LinePoint">point on the line</param>
+        /// <param name="LineDir">direction of the line</param>
+        /// <param name="ip">the intersection point, <see cref="GeoPoint.Origin"/> if there is none</param>
+        /// <returns>true, if the line intersects the plane</returns>
         public bool Intersect(GeoPoint LinePoint, GeoVector LineDir, out GeoPoint ip)
         {
 
@@ -598,6 +647,16 @@ namespace CADability
             //			double l = -Geometry.Determinant(m1)/Geometry.Determinant(m2);
             //			return LinePoint + l*LineDir;
         }
+        /// <summary>
+        /// Intersects this plane with another plane. The intersection line is returned as a point on it and its direction,
+        /// which is the cross product of the two normals (not normalized).
+        /// </summary>
+        /// <param name="other">the other plane</param>
+        /// <param name="loc">a point on the intersection line: the point of the line closest to the <see cref="Location"/>
+        /// of this plane</param>
+        /// <param name="dir">direction of the intersection line</param>
+        /// <returns>true, if the planes intersect; false if they are parallel, <paramref name="loc"/> and <paramref name="dir"/>
+        /// are then the origin and the x-axis</returns>
         public bool Intersect(Plane other, out GeoPoint loc, out GeoVector dir)
         {
             dir = this.Normal ^ other.Normal;
@@ -612,6 +671,13 @@ namespace CADability
             return true;
         }
 
+        /// <summary>
+        /// Intersects the line segment from <paramref name="sp"/> to <paramref name="ep"/> with this plane.
+        /// </summary>
+        /// <param name="sp">start point of the segment</param>
+        /// <param name="ep">end point of the segment</param>
+        /// <returns>an array with the single intersection point if the segment crosses the plane between its end points,
+        /// otherwise an empty array</returns>
         public GeoPoint[] Interfere(GeoPoint sp, GeoPoint ep)
         {
             GeoPoint ip;
@@ -630,6 +696,11 @@ namespace CADability
             return new GeoPoint[0];
         }
 
+        /// <summary>
+        /// Checks whether the point lies on this plane, i.e. its distance from the plane is less than <see cref="Precision.eps"/>.
+        /// </summary>
+        /// <param name="g">the point to test</param>
+        /// <returns>true, if the point is on the plane</returns>
         public bool Elem(GeoPoint g)
         {
             return (Math.Abs(Distance(g)) < Precision.eps);
@@ -791,6 +862,11 @@ namespace CADability
                 }
             }
         }
+        /// <summary>
+        /// Flips this plane: <see cref="Normal"/> and <see cref="DirectionX"/> are reversed, <see cref="DirectionY"/> and
+        /// <see cref="Location"/> stay, so the coordinate system remains right handed. The signed
+        /// <see cref="Distance(GeoPoint)"/> of all points changes its sign.
+        /// </summary>
         public void Reverse()
         {
             coordSys.Reverse();
@@ -868,6 +944,12 @@ namespace CADability
         {
             return Location + p.x * DirectionX + p.y * DirectionY;
         }
+        /// <summary>
+        /// Returns the perpendicular projection of the given point onto this plane as a 3d point, in contrast to
+        /// <see cref="Project(GeoPoint)"/>, which returns it in the 2d coordinate system of the plane.
+        /// </summary>
+        /// <param name="fromHere">the point to project</param>
+        /// <returns>the foot of the perpendicular from <paramref name="fromHere"/> onto this plane</returns>
         public GeoPoint FootPoint(GeoPoint fromHere)
         {
             GeoPoint onPlane = coordSys.GlobalToLocal* fromHere;
@@ -885,6 +967,11 @@ namespace CADability
         {
             return Location + p.x * DirectionX + p.y * DirectionY + p.z * Normal;
         }
+        /// <summary>
+        /// The modification that transforms from the coordinate system of this plane into the global system: the origin
+        /// goes to <see cref="Location"/>, the x-, y- and z-axis to <see cref="DirectionX"/>, <see cref="DirectionY"/> and
+        /// <see cref="Normal"/>. It does the same as <see cref="ToGlobal(GeoPoint)"/>, but can be applied to whole objects.
+        /// </summary>
         public ModOp ModOpToGlobal
         {
             get
@@ -931,6 +1018,12 @@ namespace CADability
         {
             return new Projection(-coordSys.Normal, coordSys.DirectionY);
         }
+        /// <summary>
+        /// Transforms this plane by the given modification: location, x-direction and normal are transformed, the directions
+        /// are normalized and <see cref="DirectionY"/> is recomputed so that the coordinate system stays orthonormal and right
+        /// handed. A scaling or shearing modification therefore does not preserve the 2d coordinates of points on the plane.
+        /// </summary>
+        /// <param name="m">the modification to apply</param>
         public void Modify(ModOp m)
         {
             coordSys.Modify(m);
@@ -949,30 +1042,69 @@ namespace CADability
         {
             info.AddValue("CoordSys", coordSys);
         }
+        /// <summary>
+        /// Constructor required by JSON deserialization. Reads the coordinate system written by
+        /// <see cref="GetObjectData(IJsonWriteData)"/>.
+        /// </summary>
+        /// <param name="data">the stored values</param>
         public Plane(IJsonReadStruct data)
         {
             coordSys = data.GetValue<CoordSys>();
         }
+        /// <summary>
+        /// Implements <see cref="IJsonSerialize.GetObjectData(IJsonWriteData)"/>: writes the coordinate system of the plane
+        /// as a list of values.
+        /// </summary>
+        /// <param name="data">the JSON writer</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddValues(coordSys);
         }
 
+        /// <summary>
+        /// Implements <see cref="IJsonSerialize.SetObjectData(IJsonReadData)"/>. Does nothing, because a Plane is serialized
+        /// as a struct and read back by the <see cref="Plane(IJsonReadStruct)"/> constructor.
+        /// </summary>
+        /// <param name="data">not used</param>
         public void SetObjectData(IJsonReadData data)
         {
         }
 #endregion
 
 
+        /// <summary>
+        /// Moves the origin of the coordinate system of this plane to the point <paramref name="c"/>, given in the current
+        /// 2d coordinates of the plane. The plane itself and its direction vectors do not change, only <see cref="Location"/>.
+        /// </summary>
+        /// <param name="c">the new origin in the 2d coordinate system of the plane</param>
         public void Align(GeoPoint2D c)
         {
             Location = ToGlobal(c);
         }
 
+        /// <summary>
+        /// Intersects the given axis (infinite line) with this plane and returns the intersection point in the 2d coordinate
+        /// system of the plane. Throws a <see cref="PlaneException"/> when the axis is parallel to the plane.
+        /// </summary>
+        /// <param name="SourceBeam">the axis to intersect</param>
+        /// <returns>the intersection point in plane coordinates</returns>
         public GeoPoint2D Intersect(Axis SourceBeam)
         {
             return this.Project(Intersect(SourceBeam.Location, SourceBeam.Direction));
         }
+        /// <summary>
+        /// Computes the common point of three planes, each given by a point and its normal vector, by solving the three
+        /// linear equations norm_i * x = norm_i * loc_i.
+        /// </summary>
+        /// <param name="loc1">point on the first plane</param>
+        /// <param name="norm1">normal of the first plane</param>
+        /// <param name="loc2">point on the second plane</param>
+        /// <param name="norm2">normal of the second plane</param>
+        /// <param name="loc3">point on the third plane</param>
+        /// <param name="norm3">normal of the third plane</param>
+        /// <param name="ip">the intersection point, <see cref="GeoPoint.Origin"/> if there is none</param>
+        /// <returns>true, if the planes meet in a single point; false if the normals are linearly dependent (two of the
+        /// planes are parallel or all three share a common line)</returns>
         public static bool Intersect3Planes(GeoPoint loc1, GeoVector norm1, GeoPoint loc2, GeoVector norm2, GeoPoint loc3, GeoVector norm3, out GeoPoint ip)
         {
             Matrix m = DenseMatrix.OfRowArrays(norm1, norm2, norm3);

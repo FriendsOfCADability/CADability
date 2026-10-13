@@ -7,6 +7,10 @@ using System.Xml;
 
 namespace CADability.UserInterface
 {
+    /// <summary>
+    /// The amount of information requested for a tooltip or info text (e.g. <see cref="CADability.IHotSpot.GetInfoText"/>): NoInfo
+    /// (none), SimpleInfo (a short label) or DetailedInfo (label plus details, e.g. coordinates).
+    /// </summary>
     public enum InfoLevelMode { NoInfo, SimpleInfo, DetailedInfo };
 
     /// <summary>

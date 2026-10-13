@@ -17,6 +17,15 @@ using PaintEventArgs = CADability.Substitutes.PaintEventArgs;
 
 namespace CADability
 {
+    /// <summary>
+    /// A 2d view of a <see cref="Model"/> that is painted with GDI (see <see cref="PrintToGDI"/>) instead of OpenGL, always looking from the top
+    /// onto the x/y plane. It paints the objects in the order of the model, optionally sorted by the <see cref="Layer.DisplayOrder"/> of their layers
+    /// (<see cref="UseDisplayOrder"/>), can show a paper of a given size with the area outside the paper in black (<see cref="ShowPaper"/>) and can
+    /// print its contents as a single page (<see cref="PrintSinglePage(PrintDocument)"/>). Like the <see cref="ModelView"/> it handles actions, so the
+    /// user can select and construct objects in it. Create it with <see cref="GDI2DView(Project, Model, IFrame)"/>, add it to the frame
+    /// (<see cref="FrameImpl.AddView(IView)"/>) and make it the <see cref="IFrame.ActiveView"/>; the menu command "MenuId.View.NewGDIView" does this.
+    /// The view is saved with the project.
+    /// </summary>
     [Serializable]
     public class GDI2DView : IShowPropertyImpl, ICommandHandler, IView, IActionInputView, ISerializable, IDeserializationCallback
     {
@@ -43,8 +52,23 @@ namespace CADability
         private bool deferRefresh; // bei Änderungen nich Darstellen
         // für andere Actionen
         //public event PaintView PaintDrawingEvent;
+        /// <summary>
+        /// Raised during each paint cycle after the model and the <see cref="PaintBackgroundEvent"/> handlers, so that the selection can be drawn on
+        /// top of the model. Handlers are registered with <see cref="IView.SetPaintHandler(PaintBuffer.DrawingAspect, PaintView)"/> for
+        /// <see cref="PaintBuffer.DrawingAspect.Select"/>.
+        /// </summary>
         public event PaintView PaintSelectEvent;
+        /// <summary>
+        /// Raised during each paint cycle after the <see cref="PaintSelectEvent"/> handlers, so that the feedback of the running action (the active
+        /// objects) is drawn last. Handlers are registered with <see cref="IView.SetPaintHandler(PaintBuffer.DrawingAspect, PaintView)"/> for
+        /// <see cref="PaintBuffer.DrawingAspect.Active"/>.
+        /// </summary>
         public event PaintView PaintActiveEvent;
+        /// <summary>
+        /// Raised during each paint cycle directly after the model (and the grid and coordinate cross) has been painted and before the
+        /// <see cref="PaintSelectEvent"/> and <see cref="PaintActiveEvent"/> handlers. Handlers are registered with
+        /// <see cref="IView.SetPaintHandler(PaintBuffer.DrawingAspect, PaintView)"/> for <see cref="PaintBuffer.DrawingAspect.Background"/>.
+        /// </summary>
         public event PaintView PaintBackgroundEvent;
         /// <summary>
         /// Provide an event handler for the mouse move message here if you want to manipulate the mouse input to this ModelView
@@ -75,6 +99,10 @@ namespace CADability
         private SnapPointFinder.DidSnapModes lastSnapMode;
         IPaintTo3DList drawing;
 
+        /// <summary>
+        /// Common initialization for the public constructor and the deserialization constructor: reads the drag and drop flags, the paper size and the
+        /// mouse wheel zoom factor from the global settings. Project, model and projection are not set here.
+        /// </summary>
         protected GDI2DView()
         {
             if (Settings.GlobalSettings != null) mouseWheelZoomFactor = Settings.GlobalSettings.GetDoubleValue("MouseWheelZoomFactor", 1.1);
@@ -91,6 +119,11 @@ namespace CADability
             showCoordCross = true;
             deferRefresh = false;
         }
+        /// <summary>
+        /// Completes the initialization once project, model and frame are set: creates the list of visible layers with all layers of the project
+        /// checked, reads the selection color and widths from the frame and creates a projection from the top with the grid settings of the global
+        /// settings. Called by the public constructor.
+        /// </summary>
         protected void Init()
         {
             if (Settings.GlobalSettings != null)
@@ -161,6 +194,11 @@ namespace CADability
             projection.SetExtent(model.Extent); // wg. ERSACAD: die Ausdehnung des Modells kann sich geändert haben (vor allem in Z) und das wurde beim Picken nicht berücksichtigt.
             projection.CalcOpenGlMatrix();
         }
+        /// <summary>
+        /// The color with which the canvas (or the paper, see <see cref="ShowPaper"/>) is cleared before the model is painted. Unless set explicitly,
+        /// it is the color setting "Colors.Background" of the frame (or of the global settings), and it follows changes of that setting. Setting it does
+        /// not repaint; call <see cref="IView.InvalidateAll"/>.
+        /// </summary>
         public Color BackgroundColor
         {
             get
@@ -194,6 +232,9 @@ namespace CADability
             modelNeedsRepaint = true;
             canvas?.Invalidate();
         }
+        /// <summary>
+        /// The name of the view as shown in the property page and used by the frame to identify the view. Setting it does not refresh the property page.
+        /// </summary>
         public string Name
         {
             get
@@ -205,6 +246,10 @@ namespace CADability
                 name = value;
             }
         }
+        /// <summary>
+        /// Width of the paper in model units (extent in x direction from the origin), see <see cref="ShowPaper"/>. The initial value comes from the
+        /// global setting "GDI2DView.Paper.Width". Setting it repaints the view.
+        /// </summary>
         public double PaperWidth
         {
             get
@@ -217,6 +262,10 @@ namespace CADability
                 (this as IView).InvalidateAll();
             }
         }
+        /// <summary>
+        /// Height of the paper in model units (extent in y direction from the origin), see <see cref="ShowPaper"/>. The initial value comes from the
+        /// global setting "GDI2DView.Paper.Height". Setting it repaints the view.
+        /// </summary>
         public double PaperHeight
         {
             get
@@ -229,6 +278,11 @@ namespace CADability
                 (this as IView).InvalidateAll();
             }
         }
+        /// <summary>
+        /// If true, a paper of <see cref="PaperWidth"/> by <see cref="PaperHeight"/> with its lower left corner at the origin is shown in the
+        /// <see cref="BackgroundColor"/> and the area outside the paper in black (as in the old CONDOR system); the paper is also included in the extent
+        /// used for zoom total and for scrolling. Initially true when both paper dimensions are set in the global settings. Setting it repaints the view.
+        /// </summary>
         public bool ShowPaper
         {
             get
@@ -241,6 +295,10 @@ namespace CADability
                 (this as IView).InvalidateAll();
             }
         }
+        /// <summary>
+        /// If true (the default), the coordinate cross with the axes of the world coordinate system (and of the drawing plane, when its origin differs)
+        /// is painted in the background. Setting it does not repaint by itself.
+        /// </summary>
         public bool ShowCoordCross
         {
             get
@@ -252,6 +310,11 @@ namespace CADability
                 showCoordCross = value;
             }
         }
+        /// <summary>
+        /// If true, the objects are painted sorted by the <see cref="Layer.DisplayOrder"/> of their layers (lowest first, objects without a layer at 0),
+        /// so that objects on layers with a higher display order cover those on lower ones; if false (the default) they are painted in the order of the
+        /// model. Setting it rebuilds the display list and repaints.
+        /// </summary>
         public bool UseDisplayOrder
         {
             get
@@ -280,6 +343,11 @@ namespace CADability
                 thinLinesOnly = value;
             }
         }
+        /// <summary>
+        /// Prints the contents of this view on a single page via <see cref="PrintToGDI"/>. The paper (<see cref="PaperWidth"/> by <see cref="PaperHeight"/>)
+        /// is fitted onto the page, so the paper size should be set. Exceptions of the printing system are swallowed.
+        /// </summary>
+        /// <param name="pd">The print document to print to, with the printer and page settings already set</param>
         public void PrintSinglePage(PrintDocument pd)
         {
             PrintToGDI pdg = new PrintToGDI(this);
@@ -293,6 +361,10 @@ namespace CADability
             }
             pd.PrintPage -= new PrintPageEventHandler(pdg.OnPrintPage);
         }
+        /// <summary>
+        /// The <see cref="CADability.Model"/> shown by this view. Setting it rebuilds the display list and repaints; the projection and the list of
+        /// visible layers are kept.
+        /// </summary>
         public Model Model
         {
             get
@@ -306,6 +378,10 @@ namespace CADability
                 (this as IView).InvalidateAll();
             }
         }
+        /// <summary>
+        /// The layers that are shown in this view, as a checkable list for the property page. Objects on unchecked layers are neither painted nor picked.
+        /// Change the visibility with <see cref="CheckedLayerList.Set(Layer, bool)"/>; the view repaints when the check state changes.
+        /// </summary>
         public CheckedLayerList VisibleLayers
         {
             get
@@ -342,6 +418,7 @@ namespace CADability
                 return res;
             }
         }
+        /// <inheritdoc/>
         public override string LabelText
         {
             get
@@ -368,6 +445,7 @@ namespace CADability
             }
             this.name = NewText;
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -514,6 +592,13 @@ namespace CADability
 
         #endregion
         #region ICondorViewInternal Members
+        /// <summary>
+        /// Not used: returns <see cref="DragDropEffects.None"/> without starting a drag and drop operation. The <see cref="IView"/> implementation
+        /// of this view forwards to the canvas instead.
+        /// </summary>
+        /// <param name="dragList">Not evaluated</param>
+        /// <param name="all">Not evaluated</param>
+        /// <returns><see cref="DragDropEffects.None"/></returns>
         public Substitutes.DragDropEffects DoDragDrop(GeoObjectList dragList, Substitutes.DragDropEffects all)
         {
             return DragDropEffects.None;
@@ -1226,11 +1311,15 @@ namespace CADability
                 }
             }
         }
+        /// <inheritdoc/>
         public event CADability.ScrollPositionChanged ScrollPositionChangedEvent;
         private void Scroll(double dx, double dy)
         {
             projection.MovePlacement(dx, dy);
         }
+        /// <summary>
+        /// Whether objects may be dropped on this view; the initial value comes from the global setting "AllowDrop".
+        /// </summary>
         public bool AllowDrop
         {
             get
@@ -1242,6 +1331,9 @@ namespace CADability
                 allowDrop = value;
             }
         }
+        /// <summary>
+        /// Whether objects may be dragged out of this view; the initial value comes from the global setting "AllowDrag".
+        /// </summary>
         public bool AllowDrag
         {
             get
@@ -1253,6 +1345,9 @@ namespace CADability
                 allowDrag = value;
             }
         }
+        /// <summary>
+        /// Whether a right click in this view opens the context menu of the current action; the initial value comes from the global setting "AllowContextMenu".
+        /// </summary>
         public bool AllowContextMenu
         {
             get
@@ -1524,6 +1619,7 @@ namespace CADability
             else vPos = 1.0 - (d.Top - e.Bottom) / (e.Height - d.Height); // 0.0: ganz unten, , 1.0 ganz oben
             if (ScrollPositionChangedEvent != null) ScrollPositionChangedEvent(hPart, hPos, vPart, vPos);
         }
+        /// <inheritdoc/>
         public void ZoomTotal(double f) // implements ICadView.ZoomTotal
         {
             Rectangle clientRect = canvas.ClientRectangle;
@@ -1567,6 +1663,13 @@ namespace CADability
         #endregion
 
         #region ISerializable Members
+        /// <summary>
+        /// Constructor for the legacy binary deserialization (<see cref="ISerializable"/>): restores project, model, name, projection, paper settings,
+        /// display order flag and visible layers. Values missing in older files get their defaults. The remaining initialization happens in
+        /// <see cref="IDeserializationCallback.OnDeserialization(object)"/>.
+        /// </summary>
+        /// <param name="info">The serialized data</param>
+        /// <param name="context">The source of the deserialization</param>
         protected GDI2DView(SerializationInfo info, StreamingContext context)
             : this()
         {

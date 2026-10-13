@@ -13,6 +13,11 @@ using MathNet.Numerics.Optimization;
 namespace CADability.GeoObject
 {
 
+    /// <summary>
+    /// Thrown by <see cref="GeneralCurve"/> and derived curves when an operation is not possible on the curve, e.g. when the start
+    /// or end point of a curve which is defined by other data is set, or when a <see cref="HelicalCurve"/> is given a null vector as
+    /// axis direction.
+    /// </summary>
     public class GeneralCurveException : ApplicationException
     {
         public GeneralCurveException(string Message)
@@ -187,6 +192,12 @@ namespace CADability.GeoObject
         }
         private ColorDef colorDef; // die Farbe.
         #region polymorph construction
+        /// <summary>
+        /// Signature of the <see cref="Constructor"/> hook, which would create a new object of a class derived from
+        /// <see cref="GeneralCurve"/>. Not used: <see cref="GeneralCurve"/> is abstract and has no <c>Construct</c> method which calls the
+        /// hook; the derived classes have their own.
+        /// </summary>
+        /// <returns>The newly created curve</returns>
         public delegate GeneralCurve ConstructionDelegate();
         public static ConstructionDelegate Constructor;
         //public static GeneralCurve Construct()
@@ -596,6 +607,7 @@ namespace CADability.GeoObject
         {
             return new ProjectedCurve(this, p);
         }
+        /// <inheritdoc/>
         public override string Description
         {
             get

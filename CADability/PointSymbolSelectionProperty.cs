@@ -13,16 +13,28 @@ namespace CADability.UserInterface
     {
         private GeoObject.Point point;
         private GeoObject.GeoObjectList multiPoint;
+        /// <summary>
+        /// Creates the entry for the symbol of a single point.
+        /// </summary>
+        /// <param name="point">The point whose symbol is edited</param>
+        /// <param name="ResourceID">Resource id of the label text</param>
         public PointSymbolSelectionProperty(GeoObject.Point point, string ResourceID)
         {
             this.point = point;
             resourceIdInternal = ResourceID;
         }
+        /// <summary>
+        /// Creates the entry for the symbol of several selected points. A selection in the context menu is applied to all of
+        /// them; the menu shows the common symbol, or none when the symbols differ.
+        /// </summary>
+        /// <param name="multiPoint">The points whose symbol is edited; all objects in the list must be <see cref="GeoObject.Point"/> objects</param>
+        /// <param name="ResourceID">Resource id of the label text</param>
         public PointSymbolSelectionProperty(GeoObject.GeoObjectList multiPoint, string ResourceID)
         {   // mehrere Punkte ausgewählt
             this.multiPoint = multiPoint;
             resourceIdInternal = ResourceID;
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -31,6 +43,7 @@ namespace CADability.UserInterface
             }
         }
 
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get { return ShowPropertyLabelFlags.Selectable | ShowPropertyLabelFlags.ContextMenu | ShowPropertyLabelFlags.ContextMenu; }

@@ -109,6 +109,7 @@ namespace CADability.Actions
         }
 
 
+        /// <inheritdoc/>
         public override void OnSetAction()
         {
             base.ActiveObject = block;
@@ -152,11 +153,13 @@ namespace CADability.Actions
 
 
 
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "ReflectObjects";
         }
 
+        /// <inheritdoc/>
         public override void OnDone()
         {
             // ist die Shift Taste gehalten, so werden Kopien gemacht, d.h. der die Elemente

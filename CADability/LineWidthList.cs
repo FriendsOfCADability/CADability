@@ -141,6 +141,15 @@ namespace CADability.Attribute
             res.Name = scale.ToString() + width.ToString();
             return res;
         }
+        /// <summary>
+        /// Returns the line width with the given name; when there is none, a new <see cref="LineWidth"/> with that name and
+        /// width is created (see <see cref="LineWidth.LineWidth(string, double)"/>; its scaling is
+        /// <see cref="LineWidth.Scaling.Device"/>), added to the list and returned. The width of an existing entry is left as
+        /// it is, see <see cref="CreateOrModify(string, double)"/>.
+        /// </summary>
+        /// <param name="Name">the name of the line width</param>
+        /// <param name="width">the width for a newly created entry</param>
+        /// <returns>the existing or newly created LineWidth</returns>
         public LineWidth CreateOrFind(string Name, double width)
         {
             LineWidth res = Find(Name);
@@ -149,6 +158,14 @@ namespace CADability.Attribute
             Add(res);
             return res;
         }
+        /// <summary>
+        /// Returns the line width with the given name, setting its <see cref="LineWidth.Width"/> to <paramref name="width"/>;
+        /// when there is none, a new <see cref="LineWidth"/> with that name and width (see
+        /// <see cref="LineWidth.LineWidth(string, double)"/>) is added to the list and returned.
+        /// </summary>
+        /// <param name="Name">the name of the line width</param>
+        /// <param name="width">the width</param>
+        /// <returns>the existing (modified) or newly created LineWidth</returns>
         public LineWidth CreateOrModify(string Name, double width)
         {
             LineWidth res = Find(Name);
@@ -248,6 +265,10 @@ namespace CADability.Attribute
             }
             return res;
         }
+        /// <summary>
+        /// Raised when a line width is added to or removed from the list. Changes of the properties of a line width are
+        /// forwarded to the owner of the list (the project) instead.
+        /// </summary>
         public event CADability.DidModifyDelegate DidModifyEvent;
         #region IShowProperty Members (IShowPropertyImpl)
         private IShowProperty[] subEntries;
@@ -279,6 +300,7 @@ namespace CADability.Attribute
             base.resourceIdInternal = "LineWidthList";
             base.Added(pp);
         }
+        /// <inheritdoc/>
         public override void Removed(IPropertyPage pp)
         {
             base.Removed(pp);
@@ -310,6 +332,7 @@ namespace CADability.Attribute
                 return SubEntries.Length;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -443,6 +466,15 @@ namespace CADability.Attribute
         }
 #endregion
 #region ISerializable Members
+        /// <summary>
+        /// Reads the LineWidthList stored under the given name from the legacy binary serialization data
+        /// (<see cref="System.Runtime.Serialization.ISerializable"/>); missing or incompatible entries yield null instead of
+        /// an exception, so that older files can be read.
+        /// </summary>
+        /// <param name="name">the name the list was stored under</param>
+        /// <param name="info">the serialization data</param>
+        /// <param name="context">the source of the serialization</param>
+        /// <returns>the list, or null when there is no entry with that name or it is not a LineWidthList</returns>
         public static LineWidthList Read(string name, SerializationInfo info, StreamingContext context)
         {
             try

@@ -702,6 +702,7 @@ namespace CADability
 
             return res;
         }
+        /// <inheritdoc/>
         public override string ToString()
         {
             StringBuilder res = new StringBuilder();
@@ -4273,14 +4274,32 @@ namespace CADability
     //    }
     //}
 
+    /// <summary>
+    /// Implemented by surfaces which can be described by an implicit polynomial equation P(x,y,z)=0 (currently
+    /// <see cref="ToroidalSurface"/>): <see cref="GetImplicitPSurface"/> returns that polynomial as an <see cref="ImplicitPSurface"/>.
+    /// Substituting a polynomial curve (<see cref="IExplicitPCurve3D"/>) into it yields a polynomial in one variable whose roots are
+    /// the parameters of the intersection points, which is how the intersections of such surfaces with splines are computed.
+    /// Internal helper of the intersection algorithms.
+    /// </summary>
     public interface IImplicitPSurface
     {
         ImplicitPSurface GetImplicitPSurface();
     }
+    /// <summary>
+    /// Implemented by 3d curves which can be represented piecewise by polynomials in their parameter (currently <see cref="BSpline"/>):
+    /// <see cref="GetExplicitPCurve3D"/> returns that representation as an <see cref="ExplicitPCurve3D"/>, which is used for
+    /// intersections with implicit polynomial surfaces (<see cref="IImplicitPSurface"/>) and for finding the position of a point on
+    /// the curve. Internal helper of the intersection algorithms.
+    /// </summary>
     public interface IExplicitPCurve3D
     {
         ExplicitPCurve3D GetExplicitPCurve3D();
     }
+    /// <summary>
+    /// Implemented by 2d curves which can be represented piecewise by polynomials in their parameter (currently
+    /// <see cref="CADability.Curve2D.BSpline2D"/>): <see cref="GetExplicitPCurve2D"/> returns that representation as an
+    /// <see cref="ExplicitPCurve2D"/>. Internal helper of the 2d intersection algorithms.
+    /// </summary>
     public interface IExplicitPCurve2D
     {
         ExplicitPCurve2D GetExplicitPCurve2D();

@@ -6,18 +6,35 @@ using System.Runtime.Serialization;
 
 namespace CADability.GeoObject
 {
+    /// <summary>
+    /// The surface at a constant distance from another surface: the point at (u, v) is the point of <see cref="BaseSurface"/>
+    /// at (u, v) moved by <see cref="Offset"/> along the normal of the base surface, so both surfaces share the same parameter
+    /// space. <see cref="ISurface.GetOffsetSurface(double)"/> returns it for surfaces that have no exact offset of their own
+    /// kind, and the STEP import creates it for OFFSET_SURFACE entities. Derivatives are computed from the derivatives of the
+    /// base surface; where the base surface is curved more strongly than the offset (radius of curvature below the offset)
+    /// the offset surface is singular.
+    /// </summary>
     [Serializable()]
     public class OffsetSurface : ISurfaceImpl, ISerializable, IExportStep
     {
         private ISurface baseSurface;
         private double offset;
         double umin, umax, vmin, vmax; // nur zur Kommunikation mit OCas nötig
+        /// <summary>
+        /// Creates the offset of <paramref name="baseSurface"/> at the distance <paramref name="offset"/>.
+        /// </summary>
+        /// <param name="baseSurface">the surface to offset; it is used as it is, not copied</param>
+        /// <param name="offset">the distance along the normal of the base surface; negative values offset against the normal</param>
+        /// <param name="usedArea">the rectangle in parameter space that is actually used, if known; it helps methods that need to sample the surface</param>
         public OffsetSurface(ISurface baseSurface, double offset, BoundingRect? usedArea = null) : base(usedArea)
         {
             this.baseSurface = baseSurface;
             this.offset = offset;
             baseSurface.GetNaturalBounds(out umin, out umax, out vmin, out vmax);
         }
+        /// <summary>
+        /// The surface this surface is the offset of.
+        /// </summary>
         public ISurface BaseSurface
         {
             get
@@ -25,6 +42,10 @@ namespace CADability.GeoObject
                 return baseSurface;
             }
         }
+        /// <summary>
+        /// The distance between the base surface and this surface, measured along the normal of the base surface; negative when
+        /// this surface lies on the back side of the base surface.
+        /// </summary>
         public double Offset
         {
             get
@@ -188,6 +209,7 @@ namespace CADability.GeoObject
                 // baseSurface.GetNaturalBounds(out umin, out umax, out vmin, out vmax);
             }
         }
+        /// <inheritdoc/>
         public override bool SameGeometry(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, double precision, out ModOp2D firstToSecond)
         {
             if (other is OffsetSurface)
@@ -252,10 +274,12 @@ namespace CADability.GeoObject
             return baseSurface.GetNormal(uv); // the normal should be the same, and we would have to handle singularities here
             // return this.UDirection(uv) ^ this.VDirection(uv);
         }
+        /// <inheritdoc/>
         public override double[] GetUSingularities()
         {
             return baseSurface.GetUSingularities();
         }
+        /// <inheritdoc/>
         public override double[] GetVSingularities()
         {
             return baseSurface.GetVSingularities();
@@ -265,6 +289,7 @@ namespace CADability.GeoObject
         {
             throw new NotImplementedException("GetZMinMax not implemented");
         }
+        /// <inheritdoc/>
         public override void Derivation2At(GeoPoint2D uv, out GeoPoint location, out GeoVector du, out GeoVector dv, out GeoVector duu, out GeoVector dvv, out GeoVector duv)
         {
             BaseSurface.Derivation2At(uv, out location, out du, out dv, out duu, out dvv, out duv);
@@ -377,6 +402,7 @@ namespace CADability.GeoObject
                 return new FixedCurve(this, u, umin, umax, false);
             }
         }
+        /// <inheritdoc/>
         public override bool IsUPeriodic
         {
             get
@@ -384,6 +410,7 @@ namespace CADability.GeoObject
                 return baseSurface.IsUPeriodic;
             }
         }
+        /// <inheritdoc/>
         public override bool IsVPeriodic
         {
             get
@@ -391,8 +418,11 @@ namespace CADability.GeoObject
                 return baseSurface.IsVPeriodic;
             }
         }
+        /// <inheritdoc/>
         public override double UPeriod => baseSurface.UPeriod;
+        /// <inheritdoc/>
         public override double VPeriod => baseSurface.VPeriod;
+        /// <inheritdoc/>
         public override RuledSurfaceMode IsRuled
         {
             get
@@ -400,6 +430,7 @@ namespace CADability.GeoObject
                 return baseSurface.IsRuled;
             }
         }
+        /// <inheritdoc/>
         public override ModOp2D ReverseOrientation()
         {
             boxedSurfaceEx = null;
@@ -407,12 +438,19 @@ namespace CADability.GeoObject
             return baseSurface.ReverseOrientation();
         }
         #endregion
+        /// <inheritdoc/>
         public override IPropertyEntry GetPropertyEntry(IFrame frame)
         {
             // to implement:
             return new GroupProperty("OffsetSurface", new IPropertyEntry[0]);
         }
         #region ISerializable Members
+        /// <summary>
+        /// Constructor for the legacy binary deserialization (<see cref="System.Runtime.Serialization.ISerializable"/>). Files are
+        /// written in the JSON format now; the binary format is still read.
+        /// </summary>
+        /// <param name="info">the data of the object</param>
+        /// <param name="context">the source of the deserialization</param>
         protected OffsetSurface(SerializationInfo info, StreamingContext context)
         {
             baseSurface = info.GetValue("BaseSurface", typeof(ISurface)) as ISurface;

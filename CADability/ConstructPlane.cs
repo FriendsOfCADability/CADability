@@ -21,8 +21,16 @@ namespace CADability.Actions
 
     public class ConstructPlane : ConstructAction, IIntermediateConstruction, IConstructPlane
     {
+        /// <summary>
+        /// Thrown by <see cref="ConstructedPlane"/> when the plane is requested before all three points are fixed or when
+        /// the points do not define a valid plane.
+        /// </summary>
         public class ConstructPlaneException : ApplicationException
         {
+            /// <summary>
+            /// Creates the exception with the given message.
+            /// </summary>
+            /// <param name="Message">The error message</param>
             public ConstructPlaneException(string Message) : base(Message) { }
         }
         private Plane plane;
@@ -66,8 +74,22 @@ namespace CADability.Actions
             catch (PlaneException)
             { } // nix zu tun
         }
+        /// <summary>
+        /// Delegate for <see cref="PlaneChangedEvent"/>.
+        /// </summary>
+        /// <param name="plane">The plane as defined by the points entered so far</param>
         public delegate void PlaneChangedDelegate(Plane plane);
+        /// <summary>
+        /// Raised whenever one of the three points changes (by mouse move or keyboard) and a plane can be computed from
+        /// the points entered so far: through the first point parallel to the drawing plane, then through the first two
+        /// points, finally through all three. Lets the caller (e.g. the drawing plane property) preview the plane.
+        /// </summary>
         public event PlaneChangedDelegate PlaneChangedEvent;
+        /// <summary>
+        /// Creates the action. <paramref name="resourceId"/> is the string table id of the title shown in the property page
+        /// (e.g. "Construct.DrawingPlane").
+        /// </summary>
+        /// <param name="resourceId">resource id of the title</param>
         public ConstructPlane(string resourceId)
         {
             base.TitleId = resourceId;
@@ -155,6 +177,11 @@ namespace CADability.Actions
             if (input1.Fixed && input2.Fixed) CheckPlane();
             // wenn die beiden anderen noch nicht gesetzt sind, gibts halt kein Feedback
         }
+        /// <summary>
+        /// The resulting plane: its location is the first point, its x-axis points from the first to the second point and
+        /// the third point lies in it. Only available after all three points are fixed and define a valid plane (see
+        /// <see cref="IIntermediateConstruction.Succeeded"/>); otherwise a <see cref="ConstructPlaneException"/> is thrown.
+        /// </summary>
         public Plane ConstructedPlane
         {
             get

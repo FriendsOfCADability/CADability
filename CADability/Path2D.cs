@@ -20,6 +20,13 @@ namespace CADability.Curve2D
         // private double[] length; // die Längen der einzelnen Teilstücke wird nirgends verwendet, kostet Zeit
         private enum State { yes, no, unknown }
         private bool displayClosed;
+        /// <summary>
+        /// Constructs a path from curves that are already connected in the right order: the end point of each curve must coincide
+        /// with the start point of the next (according to <see cref="Precision.IsEqual(GeoPoint2D, GeoPoint2D)"/>). The array is
+        /// copied, the curves themselves are shared with the caller.
+        /// </summary>
+        /// <param name="subCurves">the connected curves in their order</param>
+        /// <exception cref="ApplicationException">when two consecutive curves are not connected</exception>
         public Path2D(ICurve2D[] subCurves)
         {
             this.subCurves = (ICurve2D[])subCurves.Clone();
@@ -40,6 +47,13 @@ namespace CADability.Curve2D
             }
             displayClosed = false;
         }
+        /// <summary>
+        /// Constructs a path from curves in the right order and closes small gaps between them by moving the end point of each
+        /// curve onto the start point of the next, which modifies the given curves. The value of <paramref name="forceConnection"/>
+        /// is not examined; this overload always connects.
+        /// </summary>
+        /// <param name="subCurves">the curves in their order</param>
+        /// <param name="forceConnection">not examined, the overload itself selects the behaviour</param>
         public Path2D(ICurve2D[] subCurves, bool forceConnection)
         {
             this.subCurves = (ICurve2D[])subCurves.Clone();
@@ -54,10 +68,17 @@ namespace CADability.Curve2D
             // for (int i = 0; i < subCurves.Length; ++i) length[i] = subCurves[i].Length;
             displayClosed = false;
         }
+        /// <summary>
+        /// The curves the path consists of, in their order, as a copy of the internal array. The curves themselves are not copied,
+        /// so changing one of them changes the path.
+        /// </summary>
         public ICurve2D[] SubCurves
         {
             get { return (ICurve2D[])subCurves.Clone(); }
         }
+        /// <summary>
+        /// The number of curves the path consists of.
+        /// </summary>
         public int SubCurvesCount
         {
             get
@@ -65,6 +86,7 @@ namespace CADability.Curve2D
                 return subCurves.Length;
             }
         }
+        /// <inheritdoc/>
         public override bool IsClosed
         {
             get
@@ -73,10 +95,21 @@ namespace CADability.Curve2D
                 return Precision.IsEqual(StartPoint, EndPoint);
             }
         }
+        /// <summary>
+        /// Creates a <see cref="Border"/> from the curves of this path. A closed border is oriented counterclockwise, so the
+        /// segments may be reversed; use <see cref="MakeBorder(out bool)"/> to learn whether that happened.
+        /// </summary>
+        /// <returns>the border</returns>
         public Border MakeBorder()
         {
             return new Border(subCurves);
         }
+        /// <summary>
+        /// Creates a <see cref="Border"/> from the curves of this path and tells whether its orientation was reversed to make a
+        /// closed border counterclockwise.
+        /// </summary>
+        /// <param name="reversed">true if the border runs in the opposite direction of this path</param>
+        /// <returns>the border</returns>
         public Border MakeBorder(out bool reversed)
         {
             return new Border(out reversed, subCurves);
@@ -108,6 +141,11 @@ namespace CADability.Curve2D
                 AddFlattend(addTo, toAdd[i]);
             }
         }
+        /// <summary>
+        /// Replaces nested <see cref="Path2D"/> segments by their own sub curves and <see cref="Polyline2D"/> segments by lines,
+        /// so that the path consists of simple curves only. Null segments and segments shorter than <see cref="Precision.eps"/> are
+        /// dropped.
+        /// </summary>
         public void Flatten()
         {
             ArrayList newSubCurves = new ArrayList();
@@ -133,10 +171,18 @@ namespace CADability.Curve2D
                 subCurves[i].StartPoint = c;
             }
         }
+        /// <summary>
+        /// Intended to mark the path as closed for display purposes. The value is stored but not used by the library at present.
+        /// </summary>
         public bool DisplayClosed
         {
             set { displayClosed = value; }
         }
+        /// <summary>
+        /// Appends a curve at the end of the path. The start point of <paramref name="toAppend"/> is set to the end point of the
+        /// path, which modifies that curve, so it should already start there or close to it.
+        /// </summary>
+        /// <param name="toAppend">the curve to append</param>
         public void Append(ICurve2D toAppend)
         {
             toAppend.StartPoint = this.EndPoint;
@@ -144,12 +190,23 @@ namespace CADability.Curve2D
             sub.Add(toAppend);
             subCurves = sub.ToArray();
         }
+        /// <summary>
+        /// Removes the first curve of the path; the remaining curves stay as they are.
+        /// </summary>
         public void RemoveFirstSegment()
         {
             List<ICurve2D> sub = new List<ICurve2D>(SubCurves);
             sub.RemoveAt(0);
             subCurves = sub.ToArray();
         }
+        /// <summary>
+        /// Rough test whether two paths describe the same curve: both must have the same start and end points, and each inner
+        /// vertex (junction of two segments) of either path must be closer than <paramref name="precision"/> to the other path. For a
+        /// path with a single segment its middle point is tested as well. Deviations between the vertices are not detected.
+        /// </summary>
+        /// <param name="precision">the allowed distance</param>
+        /// <param name="other">the path to compare with</param>
+        /// <returns>true if the paths are considered equal</returns>
         public bool GeometricalEqual(double precision, Path2D other)
         {   // nur grober Test, mehr brauch ich z.Z. nicht bei BorderOperation
             if (this.SubCurvesCount == 0 && other.SubCurvesCount == 0) return true;
@@ -171,6 +228,14 @@ namespace CADability.Curve2D
             }
             return true;
         }
+        /// <summary>
+        /// Adds a curve at the end or at the beginning of the path if one of its end points is closer than
+        /// <paramref name="precision"/> to the end point or the start point of the path. The curve is reversed when necessary, and
+        /// small gaps are closed by moving end points, so <paramref name="toConnect"/> may be modified.
+        /// </summary>
+        /// <param name="toConnect">the curve to add</param>
+        /// <param name="precision">the maximal distance between the end points to connect</param>
+        /// <returns>true if the curve was added, false if it does not connect to either end of the path</returns>
         public bool ConnectWith(ICurve2D toConnect, double precision)
         {
             if ((this.EndPoint | toConnect.StartPoint) < precision)
@@ -211,10 +276,22 @@ namespace CADability.Curve2D
             // for (int i = 0; i < subCurves.Length; ++i) length[i] = subCurves[i].Length;
             return true;
         }
+        /// <summary>
+        /// The curve with the given index, in the order of the path. It is the curve itself, not a copy.
+        /// </summary>
+        /// <param name="Index">index from 0 to <see cref="SubCurvesCount"/>-1</param>
+        /// <returns>the curve</returns>
         public ICurve2D this[int Index]
         {
             get { return subCurves[Index]; }
         }
+        /// <summary>
+        /// Replaces the curve with the given index by another curve with the same start and end points, e.g. by a simpler or a
+        /// more precise representation of the same segment.
+        /// </summary>
+        /// <param name="index">index of the curve to replace</param>
+        /// <param name="curve">the new curve</param>
+        /// <returns>true if replaced, false if the start or end point of <paramref name="curve"/> differs from those of the segment</returns>
         public bool ReplaceSubcurve(int index, ICurve2D curve)
         {
             if (!Precision.IsEqual(subCurves[index].StartPoint, curve.StartPoint)) return false;
@@ -223,6 +300,7 @@ namespace CADability.Curve2D
             return true;
         }
         #region ICurve2D Members
+        /// <inheritdoc/>
         public override GeoPoint2D StartPoint
         {
             get
@@ -235,6 +313,7 @@ namespace CADability.Curve2D
                 // TODO: Achtung, das macht length kaputt, fehlt entsprechender Mechanismus
             }
         }
+        /// <inheritdoc/>
         public override GeoPoint2D EndPoint
         {
             get
@@ -246,6 +325,7 @@ namespace CADability.Curve2D
                 subCurves[subCurves.Length - 1].EndPoint = value;
             }
         }
+        /// <inheritdoc/>
         public override GeoVector2D StartDirection
         {
             get
@@ -253,6 +333,7 @@ namespace CADability.Curve2D
                 return subCurves[0].StartDirection;
             }
         }
+        /// <inheritdoc/>
         public override GeoVector2D EndDirection
         {
             get
@@ -260,6 +341,7 @@ namespace CADability.Curve2D
                 return subCurves[subCurves.Length - 1].EndDirection;
             }
         }
+        /// <inheritdoc/>
         public override GeoVector2D MiddleDirection
         {
             get
@@ -380,6 +462,7 @@ namespace CADability.Curve2D
             }
             return 1.0;
         }
+        /// <inheritdoc/>
         public override double Length
         {
             get
@@ -392,6 +475,7 @@ namespace CADability.Curve2D
                 return l;
             }
         }
+        /// <inheritdoc/>
         public override double Sweep
         {
             get
@@ -431,6 +515,12 @@ namespace CADability.Curve2D
                 return new ICurve2D[] { Trim(0.0, Position), Trim(Position, 1.0) };
             }
         }
+        /// <summary>
+        /// Splits the path at several normalized parameters at once. The path itself remains unchanged.
+        /// </summary>
+        /// <param name="positions">the parameters where to split; the array is sorted in place</param>
+        /// <returns>the pieces between consecutive parameters, from 0.0 to 1.0, in their order; empty intervals (duplicate
+        /// parameters, parameters at 0.0 or 1.0) and degenerate pieces are left out</returns>
         public ICurve2D[] Split(double[] positions)
         {
             Array.Sort(positions);
@@ -757,6 +847,7 @@ namespace CADability.Curve2D
             }
             return (GeoPoint2DWithParameter[])res.ToArray(typeof(GeoPoint2DWithParameter));
         }
+        /// <inheritdoc/>
         public override GeoPoint2DWithParameter[] Intersect(GeoPoint2D StartPoint, GeoPoint2D EndPoint)
         {
             Line2D l2d = new Line2D(StartPoint, EndPoint);
@@ -1166,6 +1257,7 @@ namespace CADability.Curve2D
             }
 
         }
+        /// <inheritdoc/>
         public override double GetArea()
         {
             double res = 0.0;
@@ -1175,6 +1267,7 @@ namespace CADability.Curve2D
             }
             return res;
         }
+        /// <inheritdoc/>
         public override ICurve2D GetModified(ModOp2D m)
         {
             ICurve2D[] mod = new ICurve2D[subCurves.Length];
@@ -1184,6 +1277,7 @@ namespace CADability.Curve2D
             }
             return new Path2D(mod);
         }
+        /// <inheritdoc/>
         public override bool IsValidParameter(double par)
         {
             double l = par * subCurves.Length;
@@ -1202,10 +1296,12 @@ namespace CADability.Curve2D
             }
             return true; // dazwischen ist natürlich alles erlaubt
         }
+        /// <inheritdoc/>
         public override ICurve2D GetFused(ICurve2D toFuseWith, double precision)
         {
             return null;
         }
+        /// <inheritdoc/>
         public override bool TryPointDeriv2At(double position, out GeoPoint2D point, out GeoVector2D deriv, out GeoVector2D deriv2)
         {
             point = GeoPoint2D.Origin;
@@ -1215,6 +1311,7 @@ namespace CADability.Curve2D
         #endregion
         #region IQuadTreeInsertable Members
 
+        /// <inheritdoc/>
         public override BoundingRect GetExtent()
         {
             BoundingRect res = BoundingRect.EmptyBoundingRect;
@@ -1222,6 +1319,7 @@ namespace CADability.Curve2D
             return res;
         }
 
+        /// <inheritdoc/>
         public override bool HitTest(ref BoundingRect Rect, bool IncludeControlPoints)
         {
             for (int i = 0; i < subCurves.Length; ++i)

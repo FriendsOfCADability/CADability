@@ -7,11 +7,21 @@ using System.Runtime.Serialization;
 namespace CADability
 {
 
+    /// <summary>
+    /// Sets the positions of the drives of an animation for a point in time: <see cref="AnimatedView.StartAnimation"/> calls
+    /// <see cref="SetDrivePositions"/> for each frame. Implemented by <see cref="Schedule"/>, which interpolates between stored
+    /// time/position pairs; an application may provide its own implementation to control the drives by code.
+    /// </summary>
     public interface ISchedule
     {
         void SetDrivePositions(double time, AnimatedView animatedView);
     }
 
+    /// <summary>
+    /// The list of the <see cref="Schedule"/>s of a <see cref="Model"/> (see <see cref="Model.AllSchedules"/>). Schedules are added
+    /// with <see cref="Add"/>, removed with <see cref="Remove"/> and found by name with <see cref="Find"/>; the list is serialized
+    /// together with the model.
+    /// </summary>
     [Serializable]
     public class ScheduleList : IEnumerable<Schedule>, ISerializable, IDeserializationCallback, IJsonSerialize
     {
@@ -95,6 +105,12 @@ namespace CADability
         }
     }
 
+    /// <summary>
+    /// A time table for an animation in the <see cref="AnimatedView"/>: for each <see cref="IDrive"/> of the model's
+    /// <see cref="DriveList"/> it stores positions at points in time (<see cref="AddPosition"/>), and while the animation runs it sets
+    /// each drive to the position linearly interpolated between the neighbouring times. It is also the property entry which shows
+    /// and edits the time table in the control center. The schedules of a model are kept in <see cref="Model.AllSchedules"/>.
+    /// </summary>
     [Serializable]
     public class Schedule : IShowPropertyImpl, ISchedule, ICommandHandler, ISerializable, IDeserializationCallback, IJsonSerialize
     {
@@ -267,6 +283,7 @@ namespace CADability
             }
             catch (NameAlreadyExistsException) { }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu => MenuResource.LoadMenuDefinition("MenuId.Schedule", false, this);
         /// <summary>
         /// Overrides <see cref="IShowPropertyImpl.EntryType"/>,

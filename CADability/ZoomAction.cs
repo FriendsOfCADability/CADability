@@ -25,6 +25,9 @@ namespace CADability.Actions
         private int Mode; // 0: 1. Punkt setzen, 2: 2. Punkt setzen, -1: nicht aktiv
         Point FirstPoint, SecondPoint;
         private IView activeView; // nur dort wird gezoomt. Dort, wo der erste Punkt gesetzt wurde
+        /// <summary>
+        /// Creates the zoom action in its inactive state. Start it with <see cref="IFrame.SetAction"/>.
+        /// </summary>
         public ZoomAction()
         {
             Mode = -1;

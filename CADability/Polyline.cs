@@ -9,10 +9,30 @@ using System.Runtime.Serialization;
 namespace CADability.GeoObject
 {
 
+    /// <summary>
+    /// Exception thrown by <see cref="Polyline"/> when an operation is not possible on the current polyline: when the
+    /// rectangle or parallelogram members are used on a polyline that is not one, when a polyline is set with less than two
+    /// different points, or when start point, end point or directions are requested from a polyline without vertices.
+    /// <see cref="ExceptionType"/> says which case it is.
+    /// </summary>
     public class PolylineException : ApplicationException
     {
+        /// <summary>
+        /// The reason for a <see cref="PolylineException"/>: <c>General</c> for an invalid value (e.g. a width or an angle of 0),
+        /// <c>NoPoints</c> when the polyline has no or too few vertices for the operation, <c>NoRectangle</c> and
+        /// <c>NoParallelogram</c> when a rectangle or parallelogram member is used on a polyline that is not one, and
+        /// <c>RectangleSameDirections</c> when <see cref="Polyline.SetRectangle"/> is called with parallel directions.
+        /// </summary>
         public enum PolylineExceptionType { General, NoPoints, NoRectangle, NoParallelogram, RectangleSameDirections };
+        /// <summary>
+        /// The reason for this exception.
+        /// </summary>
         public PolylineExceptionType ExceptionType;
+        /// <summary>
+        /// Creates the exception with a message and the reason.
+        /// </summary>
+        /// <param name="message">Description of the failure</param>
+        /// <param name="tp">The reason for the exception</param>
         public PolylineException(string message, PolylineExceptionType tp)
             : base(message)
         {
@@ -38,22 +58,58 @@ namespace CADability.GeoObject
         private PlanarState planarState;
         private Plane plane; // nur gültig wenn planarState == Planar
         #region polymorph construction
+        /// <summary>
+        /// Signature of the <see cref="Constructor"/> hook: creates a new, empty <see cref="Polyline"/> or an object of a class
+        /// derived from it.
+        /// </summary>
+        /// <returns>The newly created polyline</returns>
         public delegate Polyline ConstructionDelegate();
+        /// <summary>
+        /// Optional hook for polymorphic construction. When set, <see cref="Construct"/> calls this delegate instead of creating
+        /// a plain <see cref="Polyline"/>, so that an application can have its own derived class instantiated wherever CADability
+        /// creates a polyline.
+        /// </summary>
         public static ConstructionDelegate Constructor;
+        /// <summary>
+        /// Creates a new polyline. This is the only way to create one, the constructor is protected. The returned polyline has no
+        /// vertices; define it with <see cref="SetPoints"/>, <see cref="AddPoint"/>, <see cref="SetRectangle"/> or
+        /// <see cref="SetParallelogram"/>, or use <see cref="FromPoints"/>.
+        /// </summary>
+        /// <returns>A new <see cref="Polyline"/>, or an object of the derived class provided by <see cref="Constructor"/></returns>
         public static Polyline Construct()
         {
             if (Constructor != null) return Constructor();
             return new Polyline();
         }
+        /// <summary>
+        /// Signature of the handlers of the <see cref="Constructed"/> event.
+        /// </summary>
+        /// <param name="justConstructed">The polyline that has just been created</param>
         public delegate void ConstructedDelegate(Polyline justConstructed);
+        /// <summary>
+        /// Raised from the constructor whenever a new polyline is created, i.e. for every <see cref="Construct"/> call, every
+        /// clone and every polyline read from a file. The handler gets the new object; when it comes from <see cref="Construct"/>, it has no vertices yet.
+        /// </summary>
         public static event ConstructedDelegate Constructed;
         #endregion
+        /// <summary>
+        /// Creates a polyline through the given points (see <see cref="SetPoints"/>): consecutive identical points are merged,
+        /// and for a closed polyline a last point that equals the first one is dropped.
+        /// </summary>
+        /// <param name="pnts">The vertices in order, at least two different points</param>
+        /// <param name="closed">true to connect the last vertex with the first one</param>
+        /// <returns>The new polyline</returns>
+        /// <exception cref="PolylineException">when there are less than two different points</exception>
         public static Polyline FromPoints(GeoPoint[] pnts, bool closed = false)
         {
             Polyline res = Polyline.Construct();
             res.SetPoints(pnts, closed);
             return res;
         }
+        /// <summary>
+        /// Creates a polyline without vertices and raises <see cref="Constructed"/>. Protected: use <see cref="Construct"/> or
+        /// <see cref="FromPoints"/> to create a polyline.
+        /// </summary>
         protected Polyline()
             : base()
         {
@@ -62,6 +118,10 @@ namespace CADability.GeoObject
             if (Constructed != null) Constructed(this);
         }
         #region allgemeine Manipulation
+        /// <summary>
+        /// Appends a vertex at the end of the polyline. The change is undoable and raises the change events.
+        /// </summary>
+        /// <param name="p">The vertex to append</param>
         public void AddPoint(GeoPoint p)
         {
             int pos = 0;
@@ -84,6 +144,11 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Moves the vertex with the given index. The change is undoable and raises the change events.
+        /// </summary>
+        /// <param name="Index">Index of the vertex, 0 to <see cref="PointCount"/>-1</param>
+        /// <param name="p">New position of the vertex</param>
         public void SetPoint(int Index, GeoPoint p)
         {
             using (new Changing(this, "SetPoint", Index, vertex[Index]))
@@ -92,6 +157,11 @@ namespace CADability.GeoObject
                 vertex[Index] = p;
             }
         }
+        /// <summary>
+        /// Removes the vertex with the given index; its two neighbours become connected. The change is undoable and raises the
+        /// change events.
+        /// </summary>
+        /// <param name="Index">Index of the vertex to remove, 0 to <see cref="PointCount"/>-1</param>
         public void RemovePoint(int Index)
         {
             using (new Changing(this, "InsertPoint", Index, vertex[Index]))
@@ -103,6 +173,12 @@ namespace CADability.GeoObject
                 vertex = newvertex;
             }
         }
+        /// <summary>
+        /// Inserts a vertex in front of the vertex with the given index, or at the end when <paramref name="Index"/> equals
+        /// <see cref="PointCount"/>. The change is undoable and raises the change events.
+        /// </summary>
+        /// <param name="Index">Index the new vertex will have</param>
+        /// <param name="p">The new vertex</param>
         public void InsertPoint(int Index, GeoPoint p)
         {
             using (new Changing(this, "RemovePoint", Index))
@@ -115,6 +191,12 @@ namespace CADability.GeoObject
                 vertex = newvertex;
             }
         }
+        /// <summary>
+        /// Inserts a new vertex on the polyline at the given curve position without changing the shape: the segment that
+        /// contains the position is split in two. The change is undoable and raises the change events.
+        /// </summary>
+        /// <param name="position">Position on the curve from 0 (start point) to 1 (end point), as used by
+        /// <see cref="PointAt"/></param>
         public void InsertPoint(double position)
         {
             GeoPoint p = PointAt(position);
@@ -168,10 +250,19 @@ namespace CADability.GeoObject
             }
             return true;
         }
+        /// <summary>
+        /// Returns the vertex with the given index.
+        /// </summary>
+        /// <param name="Index">Index of the vertex, 0 to <see cref="PointCount"/>-1</param>
+        /// <returns>The vertex</returns>
         public GeoPoint GetPoint(int Index)
         {
             return vertex[Index];
         }
+        /// <summary>
+        /// The number of vertices. A closed polyline does not repeat its first vertex at the end, so a closed polyline with n
+        /// vertices has n segments, an open one n-1.
+        /// </summary>
         public int PointCount
         {
             get
@@ -180,6 +271,14 @@ namespace CADability.GeoObject
                 else return vertex.Length;
             }
         }
+        /// <summary>
+        /// Replaces all vertices. Consecutive identical points are merged, and when <paramref name="closed"/> is true and the
+        /// last point equals the first one, the last point is dropped. The change is undoable and raises the change events.
+        /// </summary>
+        /// <param name="points">The new vertices in order</param>
+        /// <param name="closed">true to connect the last vertex with the first one</param>
+        /// <exception cref="PolylineException">with <see cref="PolylineException.PolylineExceptionType.NoPoints"/> when less than
+        /// two different points remain; the vertices are then unchanged</exception>
         public void SetPoints(GeoPoint[] points, bool closed)
         {
             using (new Changing(this, "SetPoints", vertex, this.closed))
@@ -197,6 +296,13 @@ namespace CADability.GeoObject
                 this.closed = closed;
             }
         }
+        /// <summary>
+        /// Replaces all vertices like <see cref="SetPoints"/>, but returns false instead of throwing when less than two different
+        /// points remain. Unlike <see cref="SetPoints"/> it keeps a last point that equals the first one of a closed polyline.
+        /// </summary>
+        /// <param name="points">The new vertices in order</param>
+        /// <param name="closed">true to connect the last vertex with the first one</param>
+        /// <returns>true on success, false when there are less than two different points (the vertices are then unchanged)</returns>
         public bool TrySetPoints(GeoPoint[] points, bool closed)
         {
             using (new Changing(this, "SetPoints", vertex, this.closed))
@@ -214,6 +320,11 @@ namespace CADability.GeoObject
                 return true;
             }
         }
+        /// <summary>
+        /// true if this polyline is a closed quadrilateral whose opposite sides are parallel (and not all vertices are
+        /// collinear), i.e. it was created with <see cref="SetParallelogram"/> or <see cref="SetRectangle"/> or happens to have
+        /// that shape. Only then the <c>Parallelogram...</c> properties may be used.
+        /// </summary>
         public bool IsParallelogram
         {
             get
@@ -228,6 +339,10 @@ namespace CADability.GeoObject
                 return true;
             }
         }
+        /// <summary>
+        /// true if this polyline is a parallelogram (see <see cref="IsParallelogram"/>) whose sides are perpendicular. Only then
+        /// the <c>Rectangle...</c> properties may be used.
+        /// </summary>
         public bool IsRectangle
         {
             get
@@ -237,6 +352,19 @@ namespace CADability.GeoObject
                 return true;
             }
         }
+        /// <summary>
+        /// Makes this polyline a closed rectangle with the vertices <paramref name="location"/>,
+        /// <paramref name="location"/>+<paramref name="directionX"/>,
+        /// <paramref name="location"/>+<paramref name="directionX"/>+<paramref name="directionY"/> and
+        /// <paramref name="location"/>+<paramref name="directionY"/>. If the two directions are not perpendicular,
+        /// <paramref name="directionY"/> is replaced by the vector perpendicular to <paramref name="directionX"/> in the plane of
+        /// both vectors, keeping its length. The change is undoable and raises the change events.
+        /// </summary>
+        /// <param name="location">First vertex of the rectangle</param>
+        /// <param name="directionX">First side as a vector, its length is the width</param>
+        /// <param name="directionY">Second side as a vector, its length is the height</param>
+        /// <exception cref="PolylineException">with <see cref="PolylineException.PolylineExceptionType.RectangleSameDirections"/>
+        /// when the two directions are parallel</exception>
         public void SetRectangle(GeoPoint location, GeoVector directionX, GeoVector directionY)
         {
             // kein Changing nötig, da "SetPoints" aufgerufen wird
@@ -255,6 +383,11 @@ namespace CADability.GeoObject
             points[3] = location + directionY;
             SetPoints(points, true);
         }
+        /// <summary>
+        /// The length of the first side of a rectangle (from vertex 0 to vertex 1). Setting it keeps vertex 0 and the directions
+        /// of the sides and moves vertices 1 and 2; the value must not be 0. Only valid when <see cref="IsRectangle"/> is true,
+        /// otherwise a <see cref="PolylineException"/> is thrown. The change is undoable and raises the change events.
+        /// </summary>
         public double RectangleWidth
         {
             get
@@ -274,6 +407,11 @@ namespace CADability.GeoObject
                 SetRectangle(vertex[0], dirx, diry);
             }
         }
+        /// <summary>
+        /// The length of the second side of a rectangle (from vertex 0 to vertex 3). Setting it keeps vertex 0 and the directions
+        /// of the sides and moves vertices 2 and 3. Only valid when <see cref="IsRectangle"/> is true, otherwise a
+        /// <see cref="PolylineException"/> is thrown. The change is undoable and raises the change events.
+        /// </summary>
         public double RectangleHeight
         {
             get
@@ -292,6 +430,10 @@ namespace CADability.GeoObject
                 SetRectangle(vertex[0], dirx, diry);
             }
         }
+        /// <summary>
+        /// The first vertex of a rectangle. Setting it translates the whole rectangle. Only valid when <see cref="IsRectangle"/>
+        /// is true, otherwise a <see cref="PolylineException"/> is thrown. The change is undoable and raises the change events.
+        /// </summary>
         public GeoPoint RectangleLocation
         {
             get
@@ -306,6 +448,16 @@ namespace CADability.GeoObject
                 this.Modify(m);
             }
         }
+        /// <summary>
+        /// Makes this polyline a closed parallelogram with the vertices <paramref name="location"/>,
+        /// <paramref name="location"/>+<paramref name="directionX"/>,
+        /// <paramref name="location"/>+<paramref name="directionX"/>+<paramref name="directionY"/> and
+        /// <paramref name="location"/>+<paramref name="directionY"/>. The directions should be neither parallel nor zero,
+        /// otherwise the result is not a parallelogram. The change is undoable and raises the change events.
+        /// </summary>
+        /// <param name="location">First vertex of the parallelogram</param>
+        /// <param name="directionX">First side as a vector</param>
+        /// <param name="directionY">Second side as a vector</param>
         public void SetParallelogram(GeoPoint location, GeoVector directionX, GeoVector directionY)
         {
             GeoPoint[] points = new GeoPoint[4];
@@ -315,6 +467,11 @@ namespace CADability.GeoObject
             points[3] = location + directionY;
             SetPoints(points, true);
         }
+        /// <summary>
+        /// The length of the first side of a parallelogram (from vertex 0 to vertex 1). Setting it keeps vertex 0 and the
+        /// directions of the sides and moves vertices 1 and 2. Only valid when <see cref="IsParallelogram"/> is true, otherwise a
+        /// <see cref="PolylineException"/> is thrown. The change is undoable and raises the change events.
+        /// </summary>
         public double ParallelogramWidth
         {
             get
@@ -333,6 +490,11 @@ namespace CADability.GeoObject
                 SetParallelogram(vertex[0], dirx, diry);
             }
         }
+        /// <summary>
+        /// The length of the second side of a parallelogram (from vertex 0 to vertex 3). Setting it keeps vertex 0 and the
+        /// directions of the sides and moves vertices 2 and 3. Only valid when <see cref="IsParallelogram"/> is true, otherwise a
+        /// <see cref="PolylineException"/> is thrown. The change is undoable and raises the change events.
+        /// </summary>
         public double ParallelogramHeight
         {
             get
@@ -351,6 +513,11 @@ namespace CADability.GeoObject
                 SetParallelogram(vertex[0], dirx, diry);
             }
         }
+        /// <summary>
+        /// The first vertex of a parallelogram. Setting it translates the whole parallelogram. Only valid when
+        /// <see cref="IsParallelogram"/> is true, otherwise a <see cref="PolylineException"/> is thrown. The change is undoable
+        /// and raises the change events.
+        /// </summary>
         public GeoPoint ParallelogramLocation
         {
             get
@@ -365,6 +532,12 @@ namespace CADability.GeoObject
                 this.Modify(m);
             }
         }
+        /// <summary>
+        /// The first side of a parallelogram as a vector (from vertex 0 to vertex 1). Setting it rotates the whole parallelogram
+        /// about vertex 0 in its plane so that the first side points in the given direction (projected into the plane); the
+        /// length of the value is ignored. Only valid when <see cref="IsParallelogram"/> is true, otherwise a
+        /// <see cref="PolylineException"/> is thrown. The change is undoable and raises the change events.
+        /// </summary>
         public GeoVector ParallelogramMainDirection
         {
             get
@@ -386,6 +559,11 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// The second side of a parallelogram as a vector (from vertex 0 to vertex 3). Setting it replaces that side by the given
+        /// vector, direction and length, keeping vertex 0 and the first side. Only valid when <see cref="IsParallelogram"/> is
+        /// true, otherwise a <see cref="PolylineException"/> is thrown. The change is undoable and raises the change events.
+        /// </summary>
         public GeoVector ParallelogramSecondaryDirection
         {
             get
@@ -399,6 +577,12 @@ namespace CADability.GeoObject
                 this.SetParallelogram(vertex[0], vertex[1] - vertex[0], value);
             }
         }
+        /// <summary>
+        /// The angle from the first side to the second side of a parallelogram. Setting it rotates the second side about the
+        /// normal of the parallelogram to the given angle, keeping its length and the first side; 0 is not allowed. Only valid
+        /// when <see cref="IsParallelogram"/> is true, otherwise a <see cref="PolylineException"/> is thrown. The change is
+        /// undoable and raises the change events.
+        /// </summary>
         public SweepAngle ParallelogramAngle
         {
             get
@@ -419,6 +603,10 @@ namespace CADability.GeoObject
                 SetParallelogram(vertex[0], dirx, y);
             }
         }
+        /// <summary>
+        /// Removes every vertex that coincides with its predecessor (within <see cref="Precision.eps"/>). Raises the change
+        /// events when something was removed, but is not recorded for undo.
+        /// </summary>
         public void RemoveDoublePoints()
         {
             bool modified = false;
@@ -441,6 +629,10 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// A copy of the vertices in order; a closed polyline does not repeat its first vertex at the end. Modifying the returned
+        /// array has no effect on the polyline, use <see cref="SetPoints"/> or <see cref="SetPoint"/> for that.
+        /// </summary>
         public GeoPoint[] Vertices
         {
             get
@@ -448,6 +640,13 @@ namespace CADability.GeoObject
                 return (GeoPoint[])vertex.Clone();
             }
         }
+        /// <summary>
+        /// Creates a <see cref="BSpline"/> that approximates this polyline: a cubic spline through a subset of the vertices,
+        /// chosen so that no vertex is farther than <paramref name="precision"/> from the spline (see
+        /// <see cref="BSpline.Approximate(GeoPoint[], double)"/>). This polyline is not changed.
+        /// </summary>
+        /// <param name="precision">Maximum distance of the vertices from the resulting spline</param>
+        /// <returns>The approximating spline</returns>
         public BSpline ApproximateByBSpline(double precision)
         {
             BSpline res = BSpline.Construct();
@@ -568,7 +767,18 @@ namespace CADability.GeoObject
             }
             return false;
         }
+        /// <summary>
+        /// Signature of the <see cref="OnPaintTo3D"/> hook. The handler returns true when it has painted the polyline itself,
+        /// false to let the default painting in <see cref="PaintTo3D(IPaintTo3D)"/> proceed.
+        /// </summary>
+        /// <param name="toPaint">The polyline to paint</param>
+        /// <param name="paintTo3D">The paint interface to paint to</param>
+        /// <returns>true if the painting is done, false for the default painting</returns>
         public delegate bool PaintTo3DDelegate(Polyline toPaint, IPaintTo3D paintTo3D);
+        /// <summary>
+        /// Static hook called at the beginning of <see cref="PaintTo3D(IPaintTo3D)"/> for every polyline. Set it to replace or
+        /// extend the way polylines are displayed; when the handler returns true, the default painting is skipped.
+        /// </summary>
         public static PaintTo3DDelegate OnPaintTo3D;
         /// <inheritdoc/>
         public override void PaintTo3D(IPaintTo3D paintTo3D)
@@ -604,6 +814,7 @@ namespace CADability.GeoObject
         {
             // nichts zu tun
         }
+        /// <inheritdoc/>
         public override Style.EDefaultFor PreferredStyle
         {
             get
@@ -762,6 +973,10 @@ namespace CADability.GeoObject
 
 		#endregion
 		#region IColorDef Members
+		/// <summary>
+		/// The color of this polyline, null if it has none of its own. Setting it is an undoable attribute change that raises the
+		/// change events; a "color from parent" value is resolved against the <see cref="Block"/> that owns this object.
+		/// </summary>
 		public ColorDef ColorDef
         {
             get
@@ -783,6 +998,12 @@ namespace CADability.GeoObject
         }
         #endregion
         #region ICurve Members
+        /// <summary>
+        /// The first vertex. Setting it moves that vertex, like <see cref="SetPoint"/> with index 0; the change is undoable and
+        /// raises the change events.
+        /// </summary>
+        /// <exception cref="PolylineException">with <see cref="PolylineException.PolylineExceptionType.NoPoints"/> when the
+        /// polyline has no vertices</exception>
         public GeoPoint StartPoint
         {
             get
@@ -796,6 +1017,12 @@ namespace CADability.GeoObject
                 SetPoint(0, value);
             }
         }
+        /// <summary>
+        /// The last vertex of an open polyline, or the first vertex of a closed one. Setting it moves that vertex, like
+        /// <see cref="SetPoint"/>; the change is undoable and raises the change events.
+        /// </summary>
+        /// <exception cref="PolylineException">with <see cref="PolylineException.PolylineExceptionType.NoPoints"/> when the
+        /// polyline has no vertices</exception>
         public GeoPoint EndPoint
         {
             get
@@ -819,6 +1046,12 @@ namespace CADability.GeoObject
         {
             if (vertex.Length == 0) throw new PolylineException(member + ": NoPoints", PolylineException.PolylineExceptionType.NoPoints);
         }
+        /// <summary>
+        /// The direction of the first segment, from vertex 0 to vertex 1. The vector is not normalized, its length is the length
+        /// of the segment.
+        /// </summary>
+        /// <exception cref="PolylineException">with <see cref="PolylineException.PolylineExceptionType.NoPoints"/> when the
+        /// polyline has less than two vertices</exception>
         public GeoVector StartDirection
         {
             get
@@ -827,6 +1060,12 @@ namespace CADability.GeoObject
                 return new GeoVector(vertex[0], vertex[1]);
             }
         }
+        /// <summary>
+        /// The direction of the last segment: from the second last to the last vertex, or from the last vertex back to the first
+        /// one for a closed polyline. The vector is not normalized, its length is the length of the segment.
+        /// </summary>
+        /// <exception cref="PolylineException">with <see cref="PolylineException.PolylineExceptionType.NoPoints"/> when the
+        /// polyline has less than two vertices</exception>
         public GeoVector EndDirection
         {
             get
@@ -976,6 +1215,9 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// The sum of the lengths of all segments, including the closing segment of a closed polyline.
+        /// </summary>
         public double Length
         {
             get
@@ -1150,6 +1392,10 @@ namespace CADability.GeoObject
             clone.Modify(m);
             return (ICurve)clone;
         }
+        /// <summary>
+        /// Whether the last vertex is connected to the first one. Setting it opens or closes the polyline without changing the
+        /// vertices; the change is undoable and raises the change events.
+        /// </summary>
         public bool IsClosed
         {
             get
@@ -1165,6 +1411,9 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// true if the polyline consists of a single vertex only.
+        /// </summary>
         public bool IsSingular
         {
             get
@@ -1227,6 +1476,7 @@ namespace CADability.GeoObject
                 return null; // alle Punkte identisch
             }
         }
+        /// <inheritdoc/>
         public override string Description
         {
             get
@@ -1522,6 +1772,7 @@ namespace CADability.GeoObject
             info.AddValue("LinePattern", linePattern);
         }
 
+        /// <inheritdoc/>
         public override void GetObjectData(IJsonWriteData data)
         {
             base.GetObjectData(data);
@@ -1532,6 +1783,7 @@ namespace CADability.GeoObject
             if (linePattern != null) data.AddProperty("LinePattern", linePattern);
         }
 
+        /// <inheritdoc/>
         public override void SetObjectData(IJsonReadData data)
         {
             base.SetObjectData(data);
@@ -1545,6 +1797,10 @@ namespace CADability.GeoObject
         #endregion
         #region ILineWidth Members
         private LineWidth lineWidth;
+        /// <summary>
+        /// The line width used to display this polyline, null for the default. Setting it is an undoable attribute change that
+        /// raises the change events.
+        /// </summary>
         public LineWidth LineWidth
         {
             get => lineWidth;
@@ -1560,6 +1816,10 @@ namespace CADability.GeoObject
         #endregion
         #region ILinePattern Members
         private LinePattern linePattern;
+        /// <summary>
+        /// The line pattern (dashes) used to display this polyline, null for a solid line. Setting it is an undoable attribute
+        /// change that raises the change events.
+        /// </summary>
         public LinePattern LinePattern
         {
             get => linePattern;

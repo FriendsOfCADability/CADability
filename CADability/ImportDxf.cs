@@ -69,6 +69,13 @@ namespace CADability.DXF
         /// </summary>
         private List<(Attribute.DimensionStyle pristine, Attribute.DimensionStyle used)> importedDimensionStyles;
 
+        /// <summary>
+        /// Reads the DXF file <paramref name="fileName"/> with ACadSharp. The file is read into memory first; when its OBJECTS
+        /// section, which holds no geometry, is malformed, the file is read again without that section. Nothing is converted yet:
+        /// get <see cref="Project"/> to convert the drawing. Reading errors propagate as the exceptions of ACadSharp. DWG files are
+        /// read by <see cref="CADability.Project.ReadFromFile(string, string)"/> with the format "dwg".
+        /// </summary>
+        /// <param name="fileName">path of the DXF file</param>
         public Import(string fileName)
         {
             byte[] raw;
@@ -379,6 +386,12 @@ namespace CADability.DXF
             model.Name = "*Paper_Space";
         }
 
+        /// <summary>
+        /// Converts the drawing into a new <see cref="CADability.Project"/> and returns it. The model space becomes the first
+        /// model of the project; a non-empty paper space is added as a second model named "*Paper_Space" (and shown instead when
+        /// the model space is empty). Layers and the other table entries become attributes of the project. Each access converts
+        /// the drawing again, so keep the result. Returns null when no document was read.
+        /// </summary>
         public Project Project { get => CreateProject(); }
 
         private Project CreateProject()

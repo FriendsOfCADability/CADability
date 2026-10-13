@@ -234,12 +234,25 @@ namespace CADability
     {
         public VertexIsOnCubeBoundsException() : base() { }
     }
+    /// <summary>
+    /// An entry of the <see cref="OctTree{T}"/> which <see cref="BRepOperation"/> uses to find the intersections of two shells: it
+    /// wraps a <see cref="Vertex"/>, an <see cref="Edge"/> or a <see cref="Face"/> of one of the shells (<see cref="Type"/> tells which)
+    /// and implements the extent and hit tests of <see cref="IOctTreeInsertable"/> for it, so that only edges and faces whose cubes
+    /// overlap are intersected. A vertex item may also be an intersection vertex produced by intersecting an edge with a face; then
+    /// <see cref="isIntersection"/> is set and <see cref="edge"/> and <see cref="face"/> refer to the edge and the face which created it.
+    /// Internal helper of the boolean operations, not an entry point of the API.
+    /// </summary>
 #if DEBUG
     public class BRepItem : IOctTreeInsertable, IDebuggerVisualizer
 #else
     public class BRepItem : IOctTreeInsertable
 #endif
     {
+        /// <summary>
+        /// The kind of topological object a <see cref="BRepItem"/> stands for: Vertex (the <see cref="vertex"/> field is set, for an
+        /// intersection vertex also <see cref="edge"/> and <see cref="face"/>), Edge (<see cref="edge"/> is set) or Face
+        /// (<see cref="face"/> is set).
+        /// </summary>
         public enum ItemType { Vertex, Edge, Face };
         public ItemType Type;
         static int hashCodeCounter = 0;
@@ -1357,6 +1370,11 @@ namespace CADability
             }
         }
     }
+    /// <summary>
+    /// Extension methods used by <see cref="BRepOperation"/>; currently only <see cref="ContainsSameFace"/>, which tests whether a
+    /// face is completely covered by the overlapping faces of the other shell stored in a dictionary. Internal helper of the boolean
+    /// operations, not an entry point of the API.
+    /// </summary>
     public static class Extension
     {
         /// <summary>
@@ -1410,6 +1428,18 @@ namespace CADability
         }
 
     }
+    /// <summary>
+    /// The boolean operations on BRep shells: union, intersection and difference of two closed shells, splitting a shell by a plane
+    /// or a face, clipping a face by a shell and connecting a set of intersecting faces to shells. It is an <see cref="OctTree{T}"/>
+    /// of <see cref="BRepItem"/>s: the vertices, edges and faces of both shells are inserted so that only nearby edge/face pairs are
+    /// intersected; the intersection edges split the faces, the parts are classified as inside or outside the other shell and
+    /// recombined to the resulting shells according to the <see cref="Operation"/> passed to the constructor. Create one with the
+    /// two shells and the operation and call <see cref="Result()"/> for the resulting shells. Applications usually call it through
+    /// <see cref="Solid.Unite(Solid, Solid)"/>, <see cref="Solid.Intersect(Solid, Solid)"/>, <see cref="Solid.Subtract(Solid, Solid)"/>
+    /// and the static methods <see cref="SplitByPlane(Shell, Plane)"/>, <see cref="SplitByFace(Shell, Face)"/>,
+    /// <see cref="RoundEdges(Shell, Edge[], double)"/>, <see cref="ChamferEdges(Face, Edge[], double, double)"/> and
+    /// <see cref="ClipFace(Face, Shell)"/>.
+    /// </summary>
     public class BRepOperation : OctTree<BRepItem>
     {
         private Shell shell1; // the two shells, which are intersected
@@ -1840,6 +1870,13 @@ namespace CADability
             }
         }
 
+        /// <summary>
+        /// Selects what a <see cref="BRepOperation"/> computes: union (the hull of both shells, see <see cref="Solid.Unite(Solid, Solid)"/>),
+        /// intersection (the common part, see <see cref="Solid.Intersect(Solid, Solid)"/>), difference (the first shell minus the second,
+        /// see <see cref="Solid.Subtract(Solid, Solid)"/>), clip (a face is clipped by a shell, see <see cref="ClipFace(Face, Shell)"/>),
+        /// connectMultiple (a set of faces is intersected and connected to shells, see <see cref="BRepOperation(IEnumerable{Face})"/>)
+        /// and testonly (stop at the first intersection found; used to test whether two shells collide).
+        /// </summary>
         public enum Operation { union, intersection, difference, clip, connectMultiple, testonly }
         Operation operation;
         /// <summary>
@@ -9931,6 +9968,7 @@ namespace CADability
             }
             return !Border.CounterClockwise(curves);
         }
+        /// <inheritdoc/>
         protected override bool SplitNode(Node<BRepItem> node, BRepItem objectToAdd)
         {
 #if DEBUG

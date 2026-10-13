@@ -15,14 +15,39 @@ namespace CADability.UserInterface
         private HatchStyleList hatchStyleList;
         private IHatchStyle iHatchStyle;
         private IGeoObject toWatch;
+        /// <summary>
+        /// Delegate for <see cref="HatchStyleChangedEvent"/>.
+        /// </summary>
+        /// <param name="SelectedHatchstyle">The selected hatch style, or null when the "undefined" entry was selected</param>
         public delegate void HatchStyleChanged(HatchStyle SelectedHatchstyle);
+        /// <summary>
+        /// Raised when the user selects a hatch style, before it is applied to the connected <see cref="IHatchStyle"/> object
+        /// (if any).
+        /// </summary>
         public event HatchStyleChanged HatchStyleChangedEvent;
+        /// <summary>
+        /// Creates an entry which controls the hatch style of <paramref name="iHatchStyle"/>. The current hatch style of the
+        /// object is preselected; if the object is an <see cref="IGeoObject"/>, the entry follows changes of the object (e.g.
+        /// by undo).
+        /// </summary>
+        /// <param name="ResourceId">Resource id of the label text</param>
+        /// <param name="hsl">The list providing the choices</param>
+        /// <param name="iHatchStyle">The object whose hatch style is edited</param>
+        /// <param name="includeUndefined">true: an "undefined" entry (resource "HatchStyle.Undefined") is offered as the first choice</param>
         public HatchStyleSelectionProperty(string ResourceId, HatchStyleList hsl, IHatchStyle iHatchStyle, bool includeUndefined) :
             this(ResourceId, hsl, iHatchStyle.HatchStyle, includeUndefined)
         {
             this.iHatchStyle = iHatchStyle;
             toWatch = iHatchStyle as IGeoObject;
         }
+        /// <summary>
+        /// Creates an entry which is not connected to an object; the selection is reported via
+        /// <see cref="HatchStyleChangedEvent"/>.
+        /// </summary>
+        /// <param name="ResourceId">Resource id of the label text</param>
+        /// <param name="hsl">The list providing the choices</param>
+        /// <param name="preselect">The initially selected hatch style, or null for "undefined" resp. no selection</param>
+        /// <param name="includeUndefined">true: an "undefined" entry (resource "HatchStyle.Undefined") is offered as the first choice</param>
         public HatchStyleSelectionProperty(string ResourceId, HatchStyleList hsl, HatchStyle preselect, bool includeUndefined)
         {
             hatchStyleList = hsl;
@@ -53,6 +78,11 @@ namespace CADability.UserInterface
                 if (preselect != null) SelectedText = preselect.Name;
             }
         }
+        /// <summary>
+        /// Sets the current selection to the given hatch style without raising the event and without changing the connected
+        /// object.
+        /// </summary>
+        /// <param name="hatchStyle">The hatch style to select, or null to clear the selection</param>
         public void SetSelection(HatchStyle hatchStyle)
         {
             if (hatchStyle == null)
@@ -64,6 +94,7 @@ namespace CADability.UserInterface
                 base.SelectedText = hatchStyle.Name;
             }
         }
+        /// <inheritdoc/>
         protected override void OnSelectionChanged(string selected)
         {
             if (HatchStyleChangedEvent != null)

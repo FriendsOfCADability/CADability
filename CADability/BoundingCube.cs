@@ -13,6 +13,11 @@ namespace CADability
     [Serializable()]
     public struct BoundingCube : ISerializable, IJsonSerialize
     {
+        /// <summary>
+        /// The limits of the cube in the three coordinate directions. For the <see cref="EmptyBoundingCube"/> the minima
+        /// are <see cref="double.MaxValue"/> and the maxima <see cref="double.MinValue"/>, so that <see cref="MinMax(GeoPoint)"/>
+        /// can grow it from there. The fields may be set directly; <see cref="IsEmpty"/> and <see cref="IsValid"/> check the state.
+        /// </summary>
         public double Xmin, Xmax, Ymin, Ymax, Zmin, Zmax;
         /// <summary>
         /// Gets an array of the 8 vertices of this cube
@@ -96,6 +101,12 @@ namespace CADability
                 return new Face[0];
             }
         }
+        /// <summary>
+        /// Returns the 6 planes of the faces of this cube as <see cref="PlaneSurface"/>s, in the order x=Xmin, y=Ymin, z=Zmin,
+        /// z=Zmax, y=Ymax, x=Xmax (the same order as the faces of <see cref="GetSides"/>). For a degenerated cube, where a
+        /// face collapses to a line or a point, an empty array is returned.
+        /// </summary>
+        /// <returns>the planes of the faces</returns>
         public PlaneSurface[] GetPlanes()
         {
             try
@@ -192,6 +203,11 @@ namespace CADability
             }
             isCube = false;
         }
+        /// <summary>
+        /// Constructs the BoundingCube that encloses the extents (<c>GetExtent(0.0)</c>) of all given objects. For an empty
+        /// enumeration the result is the <see cref="EmptyBoundingCube"/>.
+        /// </summary>
+        /// <param name="objects">the objects to enclose</param>
         public BoundingCube(IEnumerable<IGeoObject> objects)
         {
             Xmin = double.MaxValue;
@@ -206,6 +222,15 @@ namespace CADability
                 MinMax(geoObject.GetExtent(0.0));
             }
         }
+        /// <summary>
+        /// Sets all six limits of this cube at once.
+        /// </summary>
+        /// <param name="Xmin">Minimum in x-direction</param>
+        /// <param name="Xmax">Maximum in x-direction</param>
+        /// <param name="Ymin">Minimum in y-direction</param>
+        /// <param name="Ymax">Maximum in y-direction</param>
+        /// <param name="Zmin">Minimum in z-direction</param>
+        /// <param name="Zmax">Maximum in z-direction</param>
         public void Set(double Xmin, double Xmax, double Ymin, double Ymax, double Zmin, double Zmax)
         {
             this.Xmin = Xmin;
@@ -275,6 +300,13 @@ namespace CADability
                 MinMax(go.GetExtent(0.0));
             }
         }
+        /// <summary>
+        /// Returns the smallest cube that contains both cubes (the union of their extents), like
+        /// <see cref="MinMax(BoundingCube)"/> but without changing the operands.
+        /// </summary>
+        /// <param name="b1">first cube</param>
+        /// <param name="b2">second cube</param>
+        /// <returns>the enclosing cube</returns>
         public static BoundingCube operator +(BoundingCube b1, BoundingCube b2)
         {
             return new BoundingCube(Math.Min(b1.Xmin, b2.Xmin), Math.Max(b1.Xmax, b2.Xmax), Math.Min(b1.Ymin, b2.Ymin), Math.Max(b1.Ymax, b2.Ymax), Math.Min(b1.Zmin, b2.Zmin), Math.Max(b1.Zmax, b2.Zmax));
@@ -486,6 +518,10 @@ namespace CADability
             }
         }
 
+        /// <summary>
+        /// True, if all limits are finite numbers (neither NaN nor infinite). The <see cref="EmptyBoundingCube"/> is valid
+        /// in this sense; test for it with <see cref="IsEmpty"/>.
+        /// </summary>
         public bool IsValid
         {
             get
@@ -495,6 +531,11 @@ namespace CADability
             }
         }
 
+        /// <summary>
+        /// The length of the space diagonal, i.e. the distance between the vertices (Xmin,Ymin,Zmin) and (Xmax,Ymax,Zmax).
+        /// Often used as a measure for precision values relative to the size of an object, whereas <see cref="Size"/> is
+        /// the sum of the three edge lengths.
+        /// </summary>
         public double DiagonalLength
         {
             get
@@ -909,6 +950,13 @@ namespace CADability
             }
             return false;
         }
+        /// <summary>
+        /// Checks whether all given points lie outside of this cube beyond the same face, i.e. one of the six face planes
+        /// separates all the points from the cube. If so, nothing spanned by these points (a line segment, a triangle, a
+        /// tetrahedron) can interfere with the cube. The converse does not hold: false does not mean that there is an interference.
+        /// </summary>
+        /// <param name="pnts">the points to test</param>
+        /// <returns>true, if all points are beyond the same face of the cube</returns>
         public bool OnSameSide(params GeoPoint[] pnts)
         {
             int c = ClipAll;
@@ -1302,6 +1350,13 @@ namespace CADability
                     && (Ymin <= bc.Ymin && Ymax >= bc.Ymin || Ymin > bc.Ymin && Ymin <= bc.Ymax)
                     && (Zmin <= bc.Zmin && Zmax >= bc.Zmin || Zmin > bc.Zmin && Zmin <= bc.Zmax));
         }
+        /// <summary>
+        /// Clips the infinite line given by <paramref name="axis"/> by this cube (see <see cref="ClipLine(ref GeoPoint, ref GeoPoint)"/>).
+        /// </summary>
+        /// <param name="axis">the line to clip</param>
+        /// <param name="startPoint">start of the part of the line inside the cube, in the direction of the axis</param>
+        /// <param name="endPoint">end of the part of the line inside the cube</param>
+        /// <returns>true, if the line passes through the cube; false if it misses the cube, the two points are then meaningless</returns>
         public bool ClipAxis(Axis axis, out GeoPoint startPoint, out GeoPoint endPoint)
         {
             GeoPoint cnt = Geometry.DropPL(this.GetCenter(), axis.Location, axis.Direction);
@@ -1431,6 +1486,7 @@ namespace CADability
             if (((BoundingCube)obj).Zmax != Zmax) return false;
             return true;
         }
+        /// <inheritdoc/>
         public override int GetHashCode()
         {
             return base.GetHashCode();
@@ -1452,6 +1508,12 @@ namespace CADability
         {
             return new BoundingCube(Xmin + translate.x, Xmax + translate.x, Ymin + translate.y, Ymax + translate.y, Zmin + translate.z, Zmax + translate.z);
         }
+        /// <summary>
+        /// Clips the given curve by this cube: the curve is split at its intersections with the six face planes and those
+        /// pieces whose middle point lies inside the cube are returned as trimmed clones. The curve itself is not changed.
+        /// </summary>
+        /// <param name="toClip">the curve to clip</param>
+        /// <returns>the parts of the curve inside the cube, an empty array when the curve lies completely outside</returns>
         public ICurve[] Clip(ICurve toClip)
         {
             List<double> intersectionParameters = new List<double>();
@@ -1490,11 +1552,20 @@ namespace CADability
             Zmax = data.GetValue<double>();
             isCube = false;
         }
+        /// <summary>
+        /// Implements <see cref="IJsonSerialize.GetObjectData(IJsonWriteData)"/>: writes the six limits as a list of values.
+        /// </summary>
+        /// <param name="data">the JSON writer</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddValues(Xmin, Xmax, Ymin, Ymax, Zmin, Zmax);
         }
 
+        /// <summary>
+        /// Implements <see cref="IJsonSerialize.SetObjectData(IJsonReadData)"/>. Does nothing, because a BoundingCube is
+        /// serialized as a struct and read back by a constructor taking the stored values.
+        /// </summary>
+        /// <param name="data">not used</param>
         public void SetObjectData(IJsonReadData data)
         {
         }

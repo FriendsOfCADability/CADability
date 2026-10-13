@@ -166,6 +166,7 @@ namespace CADability.Actions
 
             base.OnSetAction();
         }
+        /// <inheritdoc/>
         public override void OnRemoveAction()
         {
             base.OnRemoveAction();

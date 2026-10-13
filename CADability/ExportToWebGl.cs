@@ -13,16 +13,44 @@ using System.Text;
 
 namespace CADability
 {
+    /// <summary>
+    /// A triangle mesh with a single colour, as <see cref="IConvertForWebGL"/> objects provide it to <see cref="ExportToWebGl"/>.
+    /// </summary>
     public struct WebGLData
     {
+        /// <summary>
+        /// The vertices of the mesh in model coordinates.
+        /// </summary>
         public GeoPoint[] vertices;
+        /// <summary>
+        /// The normals at the vertices, one per entry of <see cref="vertices"/>.
+        /// </summary>
         public GeoVector[] normals;
+        /// <summary>
+        /// Indices into <see cref="vertices"/>, three per triangle.
+        /// </summary>
         public int[] indices;
+        /// <summary>
+        /// The colour of the mesh as an ARGB value (see <see cref="System.Drawing.Color.ToArgb"/>).
+        /// </summary>
         public int color;
     }
+    /// <summary>
+    /// Implemented by <see cref="IGeoObject"/>s that are not among the types <see cref="ExportToWebGl"/> handles itself and
+    /// want to take part in the export: the exporter first asks for <see cref="Data"/> and uses the meshes when there are any,
+    /// otherwise it exports <see cref="Conversion"/> in place of the object.
+    /// </summary>
     public interface IConvertForWebGL
     {
+        /// <summary>
+        /// A standard object (solid, shell, face, curve, text, block...) that represents this object in the export; used when
+        /// <see cref="Data"/> is null or empty. May be null, then the object itself is exported as far as its type allows.
+        /// </summary>
         IGeoObject Conversion { get; }
+        /// <summary>
+        /// Ready-made triangle meshes for the object, each with its own colour; null or empty when <see cref="Conversion"/> is
+        /// to be used instead.
+        /// </summary>
         WebGLData[] Data { get; }
     }
 
@@ -1237,6 +1265,14 @@ namespace CADability
 
             return true;
         }
+        /// <summary>
+        /// Converts the model and returns the JSON data the html template embeds (the value of the
+        /// <c>%%CADability-WebGL-Data%%</c> placeholder), for callers that build the page themselves instead of using
+        /// <see cref="WriteToFile"/>. <see cref="InitialProjectionDirection"/> is included.
+        /// </summary>
+        /// <param name="escapeQuote">true to remove backslashes and escape the double quotes, so that the result can be embedded as a
+        /// string literal in a script; false for the plain JSON</param>
+        /// <returns>the JSON text</returns>
         public string GetData(bool escapeQuote)
         {
             data.ipd = InitialProjectionDirection;

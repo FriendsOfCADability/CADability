@@ -1446,6 +1446,13 @@ namespace CADability
     }
 
     // must be implemented in CADability.Forms!
+    /// <summary>
+    /// An <see cref="IPaintTo3D"/> implementation which draws with GDI+ (System.Drawing) instead of OpenGL: it collects the paint
+    /// calls as print items in a <see cref="QuadTree{T}"/>, determines their visibility and draws them to a <see cref="Graphics"/>
+    /// object. It is used to print a <see cref="LayoutView"/> or a <see cref="GDI2DView"/> (<see cref="PrintSinglePage"/>,
+    /// <see cref="OnPrintPage"/>), to render a model into a <see cref="Bitmap"/> (<see cref="PrintToBitmap"/>) and for the display of
+    /// the <see cref="GDI2DView"/>. Not available in the WebAssembly build.
+    /// </summary>
     public class PrintToGDI : IPaintTo3D, QuadTree<IPrintItemImpl>.IIterateQuadTreeLists
     {
 

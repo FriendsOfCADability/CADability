@@ -25,10 +25,32 @@ namespace CADability.Attribute
         private Layer current;
         internal string menuResourceId;
         IPropertyEntry[] showProperties;
+        /// <summary>
+        /// Handler for <see cref="LayerAddedEvent"/>.
+        /// </summary>
+        /// <param name="sender">the list the layer was added to</param>
+        /// <param name="added">the layer that was added</param>
         public delegate void LayerAddedDelegate(LayerList sender, Layer added);
+        /// <summary>
+        /// Handler for <see cref="LayerRemovedEvent"/>.
+        /// </summary>
+        /// <param name="sender">the list the layer was removed from</param>
+        /// <param name="removed">the layer that was removed</param>
         public delegate void LayerRemovedDelegate(LayerList sender, Layer removed);
+        /// <summary>
+        /// Raised after a layer has been added to the list by <see cref="Add(Layer)"/> (this includes
+        /// <see cref="CreateOrFind(string)"/> and the commands of the context menu). Views use it to update their lists of
+        /// visible layers (<see cref="CheckedLayerList"/>).
+        /// </summary>
         public event LayerAddedDelegate LayerAddedEvent;
+        /// <summary>
+        /// Raised after a layer has been removed from the list by <see cref="Remove(Layer)"/>.
+        /// </summary>
         public event LayerRemovedDelegate LayerRemovedEvent;
+        /// <summary>
+        /// Creates an empty layer list without a current layer. A new <see cref="Project"/> gets a clone of the global layer
+        /// list, so this constructor is rarely needed; <see cref="GetDefault"/> creates a list with the default layers.
+        /// </summary>
         public LayerList()
         {
             entries = new SortedList();
@@ -90,6 +112,12 @@ namespace CADability.Attribute
         {
             return entries[Name] as Layer;
         }
+        /// <summary>
+        /// Returns the layer with the given name, creating and adding it to the list when there is none yet. This is the
+        /// usual way to get a layer for an object: <c>project.LayerList.CreateOrFind("3D")</c>.
+        /// </summary>
+        /// <param name="Name">the name of the layer</param>
+        /// <returns>the existing or newly created layer</returns>
         public Layer CreateOrFind(string Name)
         {
             Layer res = Find(Name);
@@ -98,6 +126,12 @@ namespace CADability.Attribute
             Add(res);
             return res;
         }
+        /// <summary>
+        /// Returns the layer at the given position in the alphabetical order of the names, or null when the index is out of
+        /// range.
+        /// </summary>
+        /// <param name="Index">index from 0 to <see cref="Count"/>-1</param>
+        /// <returns>the layer, or null</returns>
         public Layer this[int Index]
         {
             get
@@ -107,6 +141,11 @@ namespace CADability.Attribute
                 return null;
             }
         }
+        /// <summary>
+        /// Returns the position of the given layer object in the alphabetical order of the list, as used by the indexer.
+        /// </summary>
+        /// <param name="ly">the layer to look for (compared by reference)</param>
+        /// <returns>the index, or -1 when the layer is not in this list</returns>
         public int FindIndex(Layer ly)
         {
             for (int i = 0; i < entries.Count; ++i)
@@ -115,6 +154,10 @@ namespace CADability.Attribute
             }
             return -1;
         }
+        /// <summary>
+        /// Returns all layers of the list as an array, sorted alphabetically by name.
+        /// </summary>
+        /// <returns>a new array with the layers; empty when the list is empty</returns>
         public Layer[] ToArray()
         {
             Layer[] res = new Layer[entries.Count];
@@ -145,6 +188,10 @@ namespace CADability.Attribute
             }
             return res;
         }
+        /// <summary>
+        /// The <see cref="CADability.Attribute.ColorList"/> of the owner of this list (the project or the global settings), or
+        /// null when the list has no owner.
+        /// </summary>
         public ColorList ColorList
         {
             get
@@ -156,6 +203,11 @@ namespace CADability.Attribute
                 return null;
             }
         }
+        /// <summary>
+        /// The <see cref="Project"/> or <see cref="Settings"/> that holds this list. It is set by the owner when the list is
+        /// added to it; the list asks it before removing a layer (see <see cref="Remove(Layer)"/>) and forwards changes of its
+        /// layers to it.
+        /// </summary>
         public IAttributeListContainer Owner
         {
             get { return owner; }
@@ -216,6 +268,10 @@ namespace CADability.Attribute
             return res;
         }
         #region INotifyModification Members
+        /// <summary>
+        /// Raised when a layer is added, removed or renamed (<see cref="INotifyModification"/>). Changes of the other
+        /// properties of a layer are forwarded to the <see cref="Owner"/> instead.
+        /// </summary>
         public event CADability.DidModifyDelegate DidModifyEvent;
         #endregion
         #region ISerializable Members
@@ -284,6 +340,9 @@ namespace CADability.Attribute
         #endregion
         #region ICollection Members
 
+        /// <summary>
+        /// Implements <see cref="ICollection.IsSynchronized"/>. The list is not synchronized, the value is false.
+        /// </summary>
         public bool IsSynchronized
         {
             get
@@ -292,6 +351,9 @@ namespace CADability.Attribute
             }
         }
 
+        /// <summary>
+        /// The number of layers in the list.
+        /// </summary>
         public int Count
         {
             get
@@ -300,11 +362,19 @@ namespace CADability.Attribute
             }
         }
 
+        /// <summary>
+        /// Copies the layers, in alphabetical order of their names, to the given array (<see cref="ICollection.CopyTo(Array, int)"/>).
+        /// </summary>
+        /// <param name="array">the destination array, which must be large enough</param>
+        /// <param name="index">the index in <paramref name="array"/> at which copying begins</param>
         public void CopyTo(Array array, int index)
         {
             entries.Values.CopyTo(array, index);
         }
 
+        /// <summary>
+        /// An object that can be used to lock the list for synchronized access (<see cref="ICollection.SyncRoot"/>).
+        /// </summary>
         public object SyncRoot
         {
             get
@@ -316,6 +386,10 @@ namespace CADability.Attribute
         #endregion
         #region IEnumerable Members
 
+        /// <summary>
+        /// Enumerates the layers in alphabetical order of their names, so <c>foreach (Layer l in layerList)</c> can be used.
+        /// </summary>
+        /// <returns>an enumerator over the <see cref="Layer"/> objects</returns>
         public IEnumerator GetEnumerator()
         {
             return entries.Values.GetEnumerator();
@@ -323,6 +397,7 @@ namespace CADability.Attribute
 
         #endregion
         #region IPropertyEntry Members
+        /// <inheritdoc/>
         public override PropertyEntryType Flags
         {
             get
@@ -349,6 +424,7 @@ namespace CADability.Attribute
                 return showProperties;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -429,6 +505,11 @@ namespace CADability.Attribute
             }
         }
         #endregion
+        /// <summary>
+        /// The current layer: the layer that newly constructed objects get (see <see cref="Project.SetDefaults(IGeoObject)"/>),
+        /// shown in bold in the control center. When no current layer has been set, the first layer of the list is used.
+        /// Only a layer that belongs to this list can be made current; a layer that is not in the list is ignored.
+        /// </summary>
         public Layer Current
         {
             get
@@ -640,6 +721,13 @@ namespace CADability.Attribute
             layerList.LayerRemovedEvent += new LayerList.LayerRemovedDelegate(OnLayerRemoved);
             layerList.DidModifyEvent += new DidModifyDelegate(OnLayerModified);
         }
+        /// <summary>
+        /// Checks or unchecks the given layer programmatically. When the state actually changes, the
+        /// <see cref="CheckStateChangedEvent"/> is raised just as if the user had clicked the checkbox, and the entry is
+        /// refreshed in the control center.
+        /// </summary>
+        /// <param name="l">the layer</param>
+        /// <param name="check">true to check, false to uncheck the layer</param>
         public void Set(Layer l, bool check)
         {
             if (check)
@@ -731,6 +819,7 @@ namespace CADability.Attribute
                 return subEntries;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu => MenuResource.LoadMenuDefinition("MenuId.VisibleLayer", false, this);
         #endregion
         private void OnCheckStateChanged(string label, CheckState state)
@@ -786,6 +875,7 @@ namespace CADability.Attribute
         }
         void ICommandHandler.OnSelected(MenuWithHandler selectedMenuItem, bool selected) { }
         #endregion
+        /// <inheritdoc/>
         public override void Refresh()
         {
             subEntries = null;
@@ -802,6 +892,11 @@ namespace CADability.Attribute
             }
         }
         // Tests whether the provided layer is checked.
+        /// <summary>
+        /// Tests whether the given layer is checked, e.g. whether it is visible in the view this list belongs to.
+        /// </summary>
+        /// <param name="l">the layer (compared by reference)</param>
+        /// <returns>true if the layer is checked</returns>
         public bool IsLayerChecked(Layer l)
         {
             return checkedLayers.Contains(l);
@@ -819,6 +914,11 @@ namespace CADability.Attribute
         public event CheckStateChangedDelegate CheckStateChangedEvent;
 
         #region ISerializable Members
+        /// <summary>
+        /// Constructor required by deserialization
+        /// </summary>
+        /// <param name="info">SerializationInfo</param>
+        /// <param name="context">StreamingContext</param>
         protected CheckedLayerList(SerializationInfo info, StreamingContext context)
         {
             resourceIdInternal = info.GetString("ResourceId");

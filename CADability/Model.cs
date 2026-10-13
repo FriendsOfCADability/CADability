@@ -754,6 +754,9 @@ namespace CADability
 			noSingleAddEvents = false;
 			showTransparentFaceEdges = Settings.GlobalSettings.GetBoolValue("Display.ShowTransparentFaceEdges", false);
 		}
+		/// <summary>
+		/// Finalizer. It does nothing; a model holds no unmanaged resources.
+		/// </summary>
 		~Model()
 		{
 		}
@@ -771,6 +774,11 @@ namespace CADability
 				name = value;
 			}
 		}
+		/// <summary>
+		/// The <see cref="CADability.UserData"/> of this model: a container in which any kind of data can be attached to the
+		/// model under a string key. Serializable data objects are saved together with the model (i.e. in the project file).
+		/// The container is created on first access, so the property is never null.
+		/// </summary>
 		public UserData UserData
 		{
 			get
@@ -929,10 +937,22 @@ namespace CADability
 			}
 			return res;
 		}
+		/// <summary>
+		/// Moves the given object to the end of the list of objects of this model. The list order is the drawing order
+		/// in views that draw the objects one after the other (e.g. the 2d views), so the object then appears in front of
+		/// all others. The object must belong to this model. This is not undoable and raises no change events.
+		/// </summary>
+		/// <param name="iGeoObject">The object to move to the front</param>
 		public void MoveToFront(IGeoObject iGeoObject)
 		{
 			geoObjects.MoveToFront(iGeoObject);
 		}
+		/// <summary>
+		/// Moves the given object to the beginning of the list of objects of this model, so that all other objects are drawn
+		/// after (i.e. over) it in views that draw the objects in list order. The object must belong to this model. This is
+		/// not undoable and raises no change events. See also <see cref="MoveToFront(IGeoObject)"/>.
+		/// </summary>
+		/// <param name="iGeoObject">The object to move to the back</param>
 		public void MoveToBack(IGeoObject iGeoObject)
 		{
 			geoObjects.MoveToBack(iGeoObject);
@@ -1108,6 +1128,13 @@ namespace CADability
 			}
 			if (GeoObjectsRemovedEvent != null) GeoObjectsRemovedEvent(ToRemove);
 		}
+		/// <summary>
+		/// Removes all objects of the given set from this model in one step; objects that do not belong to the model are
+		/// ignored. The removal is one undo step. <see cref="RemovingGeoObjectsEvent"/> is raised before and
+		/// <see cref="GeoObjectsRemovedEvent"/> after the removal, the events for single objects are not raised. A running
+		/// background calculation of the display lists is aborted first.
+		/// </summary>
+		/// <param name="HToRemove">The objects to remove</param>
 		public void Remove(HashSet<IGeoObject> HToRemove)
 		{
 			AbortBackgroundRecalc(); // wenn gerade im Hintergrund was läüft, abbrechen
@@ -1281,6 +1308,12 @@ namespace CADability
 		/// <param name="pr">The Projection</param>
 		/// <returns>The extent projected to 2D</returns>
 		public delegate BoundingRect CalculateExtentForZoomTotalDelegate(Model m, Projection pr);
+		/// <summary>
+		/// Raised when a view needs the extent to show for "zoom total" (<see cref="ModelView.ZoomTotal(double)"/> and the
+		/// corresponding menu commands). If a handler is attached, its result is used instead of the extent of all objects
+		/// of the model projected with the given projection. Use it to zoom to a fixed working area or to exclude auxiliary
+		/// objects from the zoom.
+		/// </summary>
 		public event CalculateExtentForZoomTotalDelegate CalculateExtentForZoomTotalEvent;
 		private void ParallelTriangulation(IGeoObject go, double precision)
 		{
@@ -1318,6 +1351,14 @@ namespace CADability
 				});
 			}
 		}
+		/// <summary>
+		/// Triangulates the faces of all solids, shells, faces and blocks of this model with the given precision, using
+		/// several threads. The triangulation is needed for the display and for hit tests; computing it in advance avoids the
+		/// delays when it is made on demand, e.g. after a file has been imported. Faces whose triangulation fails are
+		/// skipped, objects of other types are ignored. See also <see cref="SerialTriangulation(double)"/>.
+		/// </summary>
+		/// <param name="precision">The maximum deviation of the triangles from the surfaces in world units, typically the
+		/// size of a pixel in world units of the view that will show the model</param>
 		public void ParallelTriangulation(double precision)
 		{
 			Parallel.For(0, geoObjects.Count, i =>
@@ -1362,6 +1403,11 @@ namespace CADability
 				}
 			}
 		}
+		/// <summary>
+		/// Triangulates the faces of all solids, shells, faces and blocks of this model with the given precision, like
+		/// <see cref="ParallelTriangulation(double)"/> but in the calling thread. Mainly useful for debugging.
+		/// </summary>
+		/// <param name="precision">The maximum deviation of the triangles from the surfaces in world units</param>
 		public void SerialTriangulation(double precision)
 		{
 			for (int i = 0; i < geoObjects.Count; ++i)
@@ -1570,6 +1616,7 @@ namespace CADability
 				return ShowPropertyLabelFlags.Selectable | ShowPropertyLabelFlags.ContextMenu | ShowPropertyLabelFlags.Editable;
 			}
 		}
+		/// <inheritdoc/>
 		public override string LabelText
 		{
 			get
@@ -1581,6 +1628,7 @@ namespace CADability
 				base.LabelText = value;
 			}
 		}
+		/// <inheritdoc/>
 		public override MenuWithHandler[] ContextMenu
 		{
 			get

@@ -172,6 +172,7 @@ namespace CADability.Actions
             else base.SetInput(ratioCurveInput, ratioInput, ratioLength);
             base.OnSetAction();
         }
+        /// <inheritdoc/>
         public override void OnRemoveAction()
         {
             base.OnRemoveAction();
@@ -190,6 +191,7 @@ namespace CADability.Actions
             if (geoPointProperty != null) geoPointProperty.ModifiedByAction(this);
             base.OnDone();
         }
+        /// <inheritdoc/>
         public override bool OnEscape()
         {
             if (geoPointProperty != null) geoPointProperty.SetGeoPoint(cancelPoint);

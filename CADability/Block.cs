@@ -19,13 +19,34 @@ namespace CADability.GeoObject
     public class Block : IGeoObjectImpl, IColorDef, ISerializable, IGeoObjectOwner, IDeserializationCallback, IExportStep, IJsonSerialize, IJsonSerializeDone
     {
         private GeoPoint refPoint;
+        /// <summary>
+        /// The objects contained in this block, in drawing order. This is the internal state of the block: derived classes
+        /// such as <see cref="Hatch"/> may read and modify it directly, everyone else uses <see cref="Add(IGeoObject)"/>,
+        /// <see cref="Remove(int)"/>, <see cref="Item"/> and <see cref="Children"/>, which keep the owner and the change
+        /// events of the objects consistent.
+        /// </summary>
         protected GeoObjectList containedObjects;
         private string name;
         private ColorDef CDfromParent;
         private ColorDef colorDef;
         #region polymorph construction
+        /// <summary>
+        /// Signature of the factory method that <see cref="Construct"/> calls when one is registered in <see cref="Constructor"/>.
+        /// </summary>
+        /// <returns>A new <see cref="Block"/> or an object of a class derived from Block</returns>
         public delegate Block ConstructionDelegate();
+        /// <summary>
+        /// Optional factory for blocks: when set, <see cref="Construct"/> calls this delegate instead of creating a plain
+        /// <see cref="Block"/>, so that every block CADability creates (when importing a file, grouping objects etc.) is an
+        /// instance of your derived class. Null by default.
+        /// </summary>
         public static ConstructionDelegate Constructor;
+        /// <summary>
+        /// Creates a new, empty block. This is the only public way to create a block, the constructor is protected. If a
+        /// <see cref="Constructor"/> is registered, the block is created by that delegate, otherwise a plain <see cref="Block"/>
+        /// is returned. Fill it with <see cref="Add(IGeoObject)"/>, <see cref="Add(GeoObjectList)"/> or <see cref="Set"/>.
+        /// </summary>
+        /// <returns>The new block, which contains no objects yet</returns>
         public static Block Construct()
         {
             if (Constructor != null) return Constructor();
@@ -36,6 +57,10 @@ namespace CADability.GeoObject
             return new Block();
         }
         #endregion
+        /// <summary>
+        /// Creates an empty block. Protected so that blocks are created via <see cref="Construct"/>; derived classes call it
+        /// from their own constructors.
+        /// </summary>
         protected Block() // wird gebraucht wg. BlockRef Paint
         {
             containedObjects = new GeoObjectList();
@@ -138,6 +163,7 @@ namespace CADability.GeoObject
             }
             return res;
         }
+        /// <inheritdoc/>
         public override string Description
         {
             get
@@ -161,6 +187,11 @@ namespace CADability.GeoObject
         {
             return containedObjects.Count > 0;
         }
+        /// <summary>
+        /// The reference point of the block in world coordinates: the base point that is used when the block is placed or
+        /// inserted via a <see cref="BlockRef"/>. <see cref="Modify"/> transforms it together with the contained objects.
+        /// Setting it only moves the reference point, not the contained objects; the change raises the change events and is undoable.
+        /// </summary>
         public GeoPoint RefPoint
         {
             get
@@ -186,6 +217,11 @@ namespace CADability.GeoObject
                 return containedObjects.Count;
             }
         }
+        /// <summary>
+        /// Returns the contained object at the given position in the drawing order.
+        /// </summary>
+        /// <param name="Index">Position of the object, 0 &lt;= Index &lt; <see cref="Count"/></param>
+        /// <returns>The object itself (not a copy); it still belongs to the block</returns>
         public IGeoObject Item(int Index)
         {
             return containedObjects[Index];
@@ -205,6 +241,13 @@ namespace CADability.GeoObject
                 if (cd.ColorDef.Source == ColorDef.ColorSource.fromParent)
                     cd.ColorDef = CDfromParent;
         }
+        /// <summary>
+        /// Appends an object to the block and makes the block its <see cref="IGeoObject.Owner"/>. If the object currently
+        /// belongs to another owner (a <see cref="Model"/> or another block) it is removed from there first. An object whose
+        /// color is "from parent" is displayed in the color of this block from now on, and changes of the object are
+        /// forwarded as changes of the block. The change raises the change events and is undoable.
+        /// </summary>
+        /// <param name="ToAdd">The object to add</param>
         public virtual void Add(IGeoObject ToAdd)
         {
             using (new Changing(this, "Remove", ToAdd))
@@ -223,6 +266,12 @@ namespace CADability.GeoObject
                         cd.ColorDef = CDfromParent;
             }
         }
+        /// <summary>
+        /// Removes the object at the given position from the block. The object loses its owner and is no longer displayed
+        /// with the block; an object whose color is "from parent" no longer follows the color of this block. The change
+        /// raises the change events and is undoable.
+        /// </summary>
+        /// <param name="Index">Position of the object to remove, 0 &lt;= Index &lt; <see cref="Count"/></param>
         public virtual void Remove(int Index)
         {
             using (new Changing(this, "Add", containedObjects[Index]))
@@ -253,6 +302,11 @@ namespace CADability.GeoObject
             }
         }
 
+        /// <summary>
+        /// Removes all objects of the given list from the block, see <see cref="Remove(int)"/>. Objects that are not contained
+        /// in this block are ignored. The change raises the change events and is undoable as a single step.
+        /// </summary>
+        /// <param name="ToRemove">The objects to remove</param>
         public virtual void Remove(GeoObjectList ToRemove)
         {
             using (new Changing(this, "Add", new object[] { ToRemove }))
@@ -263,6 +317,12 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Replaces the contents of the block by the objects of the given list. The objects contained so far lose their
+        /// owner, the new objects become owned by this block. The objects are not cloned, so pass copies if the originals
+        /// are still in use elsewhere. The change raises the change events and is undoable.
+        /// </summary>
+        /// <param name="toSet">The new contents of the block</param>
         public virtual void Set(GeoObjectList toSet)
         {
             using (new Changing(this, "Set", new object[] { containedObjects.Clone() }))
@@ -270,6 +330,12 @@ namespace CADability.GeoObject
                 ReplaceContent(toSet);
             }
         }
+        /// <summary>
+        /// Appends all objects of the given list to the block as a single undoable change, otherwise like
+        /// <see cref="Add(IGeoObject)"/> for each object. Unlike the single object overload this method does not remove the
+        /// objects from a previous owner, so pass objects that have no owner yet.
+        /// </summary>
+        /// <param name="ToAdd">The objects to add</param>
         public virtual void Add(GeoObjectList ToAdd)
         {
             using (new Changing(this, "Remove", ToAdd))
@@ -290,6 +356,13 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Inserts an object at the given position in the drawing order of the block. Apart from the position this behaves
+        /// like <see cref="Add(IGeoObject)"/>: the object is removed from a previous owner and becomes owned by this block,
+        /// the change raises the change events and is undoable.
+        /// </summary>
+        /// <param name="index">Position at which the object is inserted, 0 &lt;= index &lt;= <see cref="Count"/></param>
+        /// <param name="ToAdd">The object to insert</param>
         public virtual void Insert(int index, IGeoObject ToAdd)
         {
             using (new Changing(this, "Remove", ToAdd))
@@ -309,6 +382,13 @@ namespace CADability.GeoObject
             }
         }
         private bool isTmpContainer;
+        /// <summary>
+        /// Marks the block as a temporary container, e.g. the block in which a construction action collects the objects it
+        /// is about to create in order to display them. In a temporary container the attributes of the block
+        /// (<see cref="Layer"/>, <see cref="ColorDef"/>, <see cref="Style"/>) are copied to the contained objects whenever
+        /// they are set, so that the objects carry these attributes when they are taken out of the block later. Setting it
+        /// to true copies the attributes immediately. False by default; not saved with the block.
+        /// </summary>
         public bool IsTmpContainer
         {
             get
@@ -321,6 +401,7 @@ namespace CADability.GeoObject
                 if (isTmpContainer) PropagateAttributes();
             }
         }
+        /// <inheritdoc/>
         public override Style Style
         {
             get
@@ -333,6 +414,7 @@ namespace CADability.GeoObject
                 if (isTmpContainer) PropagateAttributes();
             }
         }
+        /// <inheritdoc/>
         public override Layer Layer
         {
             get
@@ -371,7 +453,18 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Signature of the handler for <see cref="OnPaintTo3D"/>.
+        /// </summary>
+        /// <param name="toPaint">The block that is about to be painted</param>
+        /// <param name="paintTo3D">The paint interface to paint to</param>
+        /// <returns>true if the handler has painted the block itself and the default painting must be skipped, false to let
+        /// the block paint its contained objects as usual</returns>
         public delegate bool PaintTo3DDelegate(Block toPaint, IPaintTo3D paintTo3D);
+        /// <summary>
+        /// Hook to replace the painting of blocks: when set, <see cref="PaintTo3D"/> calls this delegate first and does
+        /// nothing more if it returns true. Applies to all blocks. Null by default.
+        /// </summary>
         public static PaintTo3DDelegate OnPaintTo3D;
         /// <inheritdoc/>
         public override void PaintTo3D(IPaintTo3D paintTo3D)
@@ -438,6 +531,11 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// The name of the block, e.g. the name of the product or assembly when the block stems from a STEP import, or the
+        /// name of the block definition when it stems from a DXF file. It is written as the product name on STEP export.
+        /// May be null. Setting it raises the change events and is undoable; it is an attribute change, the geometry is not affected.
+        /// </summary>
         public string Name
         {
             get
@@ -524,6 +622,7 @@ namespace CADability.GeoObject
         {
             return new ShowPropertyBlock(this, Frame);
         }
+        /// <inheritdoc/>
         public override int NumChildren
         {
             get
@@ -533,6 +632,7 @@ namespace CADability.GeoObject
             }
         }
         internal ColorDef GetCDfromParent() { return CDfromParent; }
+        /// <inheritdoc/>
         public override IGeoObject[] OwnedItems
         {
             get
@@ -620,6 +720,12 @@ namespace CADability.GeoObject
         }
         #endregion
         #region IColorDef Members
+        /// <summary>
+        /// The color of the block. Contained objects whose color is "from parent"
+        /// (<see cref="CADability.Attribute.ColorDef.ColorSource.fromParent"/>) are displayed in this color and follow it when
+        /// it changes; objects with a color of their own are not affected. May be null, the objects "from parent" are then
+        /// displayed in the default color. Setting it raises the change events and is undoable.
+        /// </summary>
         public virtual ColorDef ColorDef
         {
             get
@@ -712,6 +818,12 @@ namespace CADability.GeoObject
         #endregion
         #region IDeserializationCallback Members
         //void IDeserializationCallback.OnDeserialization(object sender)
+        /// <summary>
+        /// Implements <see cref="IDeserializationCallback.OnDeserialization"/> for the legacy binary format: after the whole
+        /// object graph has been read, the block registers itself as owner of its contained objects, subscribes to their
+        /// change events and reconnects the colors "from parent". Called by the deserialization, not meant to be called by user code.
+        /// </summary>
+        /// <param name="sender">Not used</param>
         public virtual void OnDeserialization(object sender)
         {
             lock (this)
@@ -741,6 +853,7 @@ namespace CADability.GeoObject
             data.AddProperty("Name", name);
         }
 
+        /// <inheritdoc/>
         public override void SetObjectData(IJsonReadData data)
         {
             base.SetObjectData(data);
@@ -750,6 +863,13 @@ namespace CADability.GeoObject
             name = data.GetPropertyOrDefault<string>("Name");
             data.RegisterForSerializationDoneCallback(this);
         }
+        /// <summary>
+        /// Implements <see cref="IJsonSerializeDone.SerializationDone"/>. After reading from JSON the contained objects are
+        /// completed first, then the block registers itself as their owner, subscribes to their change events and
+        /// reconnects the colors "from parent". When writing there is nothing to do. Called by the serialization, not meant
+        /// to be called by user code.
+        /// </summary>
+        /// <param name="jsonSerialize">The serializer; <see cref="JsonSerialize.IsWriting"/> tells the direction</param>
         public virtual void SerializationDone(JsonSerialize jsonSerialize)
         {
             if (jsonSerialize.IsWriting)
@@ -914,26 +1034,53 @@ namespace CADability.GeoObject
 
     }
 
+    /// <summary>
+    /// The <see cref="IQuadTreeInsertableZ"/> item of a composite object (<see cref="Block"/>, <see cref="Dimension"/>,
+    /// <see cref="Path"/>, <see cref="Shell"/>, <see cref="Solid"/> ...) in the quadtree of a <see cref="ProjectedModel"/>.
+    /// It keeps the quadtree items of the parts in a quadtree of its own, so that the extent, the hit test and the z
+    /// position of the composite object are answered by its parts, while <see cref="IQuadTreeInsertable.ReferencedObject"/>
+    /// is the composite object itself. Created by <see cref="IGeoObject.GetQuadTreeItem"/> of those objects.
+    /// </summary>
     public class QuadTreeCollection : IQuadTreeInsertableZ
     {
         QuadTree allObjects;
         IGeoObject go;
         BoundingRect extent;
+        /// <summary>
+        /// Creates an empty collection for the given object. The items of the parts are added with <see cref="Add"/>.
+        /// </summary>
+        /// <param name="go">The composite object this item stands for, returned as <see cref="IQuadTreeInsertable.ReferencedObject"/></param>
+        /// <param name="projection">The projection of the quadtree; currently not used by the collection itself</param>
         public QuadTreeCollection(IGeoObject go, Projection projection)
         {
             this.go = go;
             allObjects = new QuadTree();
             extent = BoundingRect.EmptyBoundingRect;
         }
+        /// <summary>
+        /// Adds the quadtree item of a part and extends the extent of the collection by its extent.
+        /// </summary>
+        /// <param name="toAdd">The item of a part, usually obtained by <see cref="IGeoObject.GetQuadTreeItem"/></param>
         public void Add(IQuadTreeInsertableZ toAdd)
         {
             allObjects.AddObject(toAdd);
             extent.MinMax(toAdd.GetExtent());
         }
+        /// <summary>
+        /// Replaces the object this item stands for. <see cref="BlockRef"/> uses it to let the collection that was built for
+        /// its flattened block refer to the block reference itself.
+        /// </summary>
+        /// <param name="go">The object to return as <see cref="IQuadTreeInsertable.ReferencedObject"/></param>
         public void SetOwner(IGeoObject go)
         {
             this.go = go;
         }
+        /// <summary>
+        /// Returns the items of the parts whose extent overlaps the given rectangle. Nested collections are resolved, so
+        /// the result only contains items of simple objects.
+        /// </summary>
+        /// <param name="rect">The rectangle in the 2d coordinates of the projection</param>
+        /// <returns>The matching items, an empty array when there are none</returns>
         public IQuadTreeInsertableZ[] GetObjectsFromRect(ref BoundingRect rect)
         {
             List<IQuadTreeInsertableZ> res = new List<IQuadTreeInsertableZ>();

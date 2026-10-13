@@ -19,6 +19,16 @@ namespace CADability.GeoObject
         private ICurve basisCurve;
         private GeoVector direction;
         private double curveStartParameter, curveEndParameter;
+        /// <summary>
+        /// Creates the surface swept by <paramref name="basisCurve"/> moved along <paramref name="direction"/>. The point at (u, v)
+        /// is the point of the curve plus v·direction; u runs from <paramref name="curveStartParameter"/> at the start point of the
+        /// curve to <paramref name="curveEndParameter"/> at its end point. Pass 0 and 1 unless a different u interval is required
+        /// (e.g. by an imported file). The curve is used as it is, not copied.
+        /// </summary>
+        /// <param name="basisCurve">the curve to extrude; its tangents must not be parallel to <paramref name="direction"/></param>
+        /// <param name="direction">direction of the extrusion; its length is the distance one v unit covers</param>
+        /// <param name="curveStartParameter">u value of the start point of the curve</param>
+        /// <param name="curveEndParameter">u value of the end point of the curve</param>
         public SurfaceOfLinearExtrusion(ICurve basisCurve, GeoVector direction, double curveStartParameter, double curveEndParameter)
         {
             this.basisCurve = basisCurve;
@@ -33,6 +43,10 @@ namespace CADability.GeoObject
             // Leztlich ist es nur eine Forderung von OpenCascade, bei CADability könnten start- und
             // endparameter immer 0.0 und 1.0 sein.
         }
+        /// <summary>
+        /// The curve that is moved along <see cref="Direction"/> to generate this surface (the curve at v = 0). It is the object
+        /// the surface works with, not a copy; do not modify it.
+        /// </summary>
         public ICurve BasisCurve
         {
             get
@@ -40,6 +54,9 @@ namespace CADability.GeoObject
                 return basisCurve;
             }
         }
+        /// <summary>
+        /// The direction of the extrusion. Its length is the distance one v unit covers; the surface is unbounded in v.
+        /// </summary>
         public GeoVector Direction
         {
             get
@@ -47,6 +64,13 @@ namespace CADability.GeoObject
                 return direction;
             }
         }
+        /// <summary>
+        /// Simplifies the basis curve of an imported surface: a <see cref="BSpline"/> whose weights are all almost 1 loses its
+        /// weights, and a non-planar curve is replaced by its projection into the plane through its start point perpendicular to
+        /// <see cref="Direction"/>, which describes the same surface. The latter may change the u parameterization, so this must
+        /// not be called when 2d curves (e.g. of edges) already refer to the surface; the STEP import (<see cref="Face"/>) calls
+        /// it for the surface of an imported face before the 2d curves of the edges are computed.
+        /// </summary>
         public void Simplify()
         {
             if (basisCurve is BSpline bsp)
@@ -73,6 +97,7 @@ namespace CADability.GeoObject
                 basisCurve = projected.MakeGeoObject(pl) as ICurve;
             }
         }
+        /// <inheritdoc/>
         public override ISurface GetOffsetSurface(double offset)
         {
             if (basisCurve.GetPlanarState() != PlanarState.NonPlanar && !(basisCurve is BSpline))
@@ -175,6 +200,7 @@ namespace CADability.GeoObject
         {
             return UDirection(uv) ^ VDirection(uv);
         }
+        /// <inheritdoc/>
         public override void Derivation2At(GeoPoint2D uv, out GeoPoint location, out GeoVector du, out GeoVector dv, out GeoVector duu, out GeoVector dvv, out GeoVector duv)
         {
             if (IsUPeriodic)
@@ -473,6 +499,7 @@ namespace CADability.GeoObject
             //return base.GetPlaneIntersection(pl, umin, umax, vmin, vmax, precision);
         }
 
+        /// <inheritdoc/>
         public override IDualSurfaceCurve[] GetDualSurfaceCurves(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, List<GeoPoint> seeds, List<Tuple<double, double, double, double>> extremePositions)
         {
             if (other is PlaneSurface ps)
@@ -484,6 +511,7 @@ namespace CADability.GeoObject
             }
             return base.GetDualSurfaceCurves(thisBounds, other, otherBounds, seeds, extremePositions);
         }
+        /// <inheritdoc/>
         public override bool IsUPeriodic
         {
             get
@@ -491,6 +519,7 @@ namespace CADability.GeoObject
                 return basisCurve.IsClosed || Precision.IsEqual(basisCurve.StartPoint, basisCurve.EndPoint);
             }
         }
+        /// <inheritdoc/>
         public override bool IsVPeriodic
         {
             get
@@ -498,6 +527,7 @@ namespace CADability.GeoObject
                 return false;
             }
         }
+        /// <inheritdoc/>
         public override double UPeriod
         {
             get
@@ -506,6 +536,7 @@ namespace CADability.GeoObject
                 return 0.0;
             }
         }
+        /// <inheritdoc/>
         public override double VPeriod
         {
             get
@@ -570,6 +601,7 @@ namespace CADability.GeoObject
             }
             return base.SameGeometry(thisBounds, other, otherBounds, precision, out firstToSecond);
         }
+        /// <inheritdoc/>
         public override CADability.GeoObject.RuledSurfaceMode IsRuled
         {
             get
@@ -577,10 +609,12 @@ namespace CADability.GeoObject
                 return RuledSurfaceMode.ruledInV;
             }
         }
+        /// <inheritdoc/>
         public override bool IsVanishingProjection(Projection p, double umin, double umax, double vmin, double vmax)
         {
             return Precision.SameDirection(p.Direction, direction, false);
         }
+        /// <inheritdoc/>
         public override void GetNaturalBounds(out double umin, out double umax, out double vmin, out double vmax)
         {   // there is no limit in v, and there is no good handling of semi-infinite bounds
             // base.GetNaturalBounds(out umin, out umax, out vmin, out vmax);
@@ -589,10 +623,12 @@ namespace CADability.GeoObject
             umin = curveStartParameter;
             umax = curveEndParameter;
         }
+        /// <inheritdoc/>
         public override bool IsExtruded(GeoVector direction)
         {
             return Precision.SameDirection(this.direction, direction, false);
         }
+        /// <inheritdoc/>
         public override ISurface GetCanonicalForm(double precision, BoundingRect? bounds)
         {
             ICurve testWith = basisCurve;
@@ -626,6 +662,7 @@ namespace CADability.GeoObject
             }
             return null;
         }
+        /// <inheritdoc/>
         public override bool CanStretch => true;
 #if DEBUG
         public override GeoObjectList DebugGrid
@@ -647,6 +684,7 @@ namespace CADability.GeoObject
             }
         }
 #endif
+        /// <inheritdoc/>
         public override IPropertyEntry GetPropertyEntry(IFrame frame)
         {
             List<IPropertyEntry> se = new List<IPropertyEntry>();
@@ -662,6 +700,12 @@ namespace CADability.GeoObject
         }
         #endregion
         #region ISerializable Members
+        /// <summary>
+        /// Constructor for the legacy binary deserialization (<see cref="System.Runtime.Serialization.ISerializable"/>). Files are
+        /// written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
+        /// </summary>
+        /// <param name="info">the data of the object</param>
+        /// <param name="context">the source of the deserialization</param>
         protected SurfaceOfLinearExtrusion(SerializationInfo info, StreamingContext context)
         {
             basisCurve = info.GetValue("BasisCurve", typeof(ICurve)) as ICurve;
@@ -677,7 +721,15 @@ namespace CADability.GeoObject
             info.AddValue("CurveEndParameter", curveEndParameter, typeof(double));
         }
 
+        /// <summary>
+        /// Empty constructor for the JSON deserialization (<see cref="IJsonSerialize"/>); the data is set by
+        /// <see cref="SetObjectData(IJsonReadData)"/>.
+        /// </summary>
         protected SurfaceOfLinearExtrusion() { } // for IJsonSerialize
+        /// <summary>
+        /// Writes the basis curve, the direction and the u interval for the JSON serialization (<see cref="IJsonSerialize"/>).
+        /// </summary>
+        /// <param name="data">receives the properties</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("BasisCurve", basisCurve);
@@ -685,6 +737,11 @@ namespace CADability.GeoObject
             data.AddProperty("CurveStartParameter", curveStartParameter);
             data.AddProperty("CurveEndParameter", curveEndParameter);
         }
+        /// <summary>
+        /// Reads the data written by <see cref="GetObjectData(IJsonWriteData)"/> for the JSON deserialization
+        /// (<see cref="IJsonSerialize"/>).
+        /// </summary>
+        /// <param name="data">provides the properties</param>
         public void SetObjectData(IJsonReadData data)
         {
             basisCurve = data.GetProperty<ICurve>("BasisCurve");

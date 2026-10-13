@@ -33,6 +33,14 @@ namespace CADability.GeoObject
      * haben sind double, GeoPoint, GeoVector, ICurve. Das ist alles serialisierbar.
      */
 
+    /// <summary>
+    /// Tells whether and how a surface is ruled, i.e. whether its parameter lines in one direction are straight lines.
+    /// Returned by <see cref="ISurface.IsRuled"/>; the triangulation uses it to split faces preferably along the straight direction.
+    /// <c>notRuled</c>: no straight parameter lines (the default). <c>ruledInU</c>: the lines of constant v (u varies) are straight,
+    /// e.g. a <see cref="NurbsSurface"/> of degree 1 in u. <c>ruledInV</c>: the lines of constant u (v varies) are straight, like the
+    /// generating lines of a <see cref="CylindricalSurface"/> or <see cref="ConicalSurface"/>. <c>planar</c>: straight in every direction.
+    /// <c>local</c>: only parts of the surface are ruled. The surfaces of CADability currently return only the first three values.
+    /// </summary>
     public enum RuledSurfaceMode { notRuled, ruledInU, ruledInV, planar, local }
     /// <summary>
     /// The ISurface interface must be implemented by all 3-dimensional unbound surfaces that are used by the
@@ -374,6 +382,14 @@ namespace CADability.GeoObject
         /// <param name="umax"></param>
         /// <returns></returns>
         ICurve FixedV(double v, double umin, double umax);
+        /// <summary>
+        /// Returns the coefficients of the implicit equation of the surface when it is an algebraic surface of degree at most 2
+        /// (plane, sphere, cone). The result holds 10 values c for the equation
+        /// c[0]*x^2 + c[1]*y^2 + c[2]*z^2 + c[3]*x*y + c[4]*y*z + c[5]*x*z + c[6]*x + c[7]*y + c[8]*z + c[9] = 0,
+        /// which describes the points (x, y, z) of the surface. Surfaces which cannot be described this way return null.
+        /// Currently not used by CADability itself; see <see cref="ISurfaceImpl.GetImplicitPolynomial"/> for the form the kernel works with.
+        /// </summary>
+        /// <returns>The 10 coefficients of the implicit equation, or null</returns>
         double[] GetPolynomialParameters();
         /// <summary>
         /// Mostly used internally
@@ -386,6 +402,13 @@ namespace CADability.GeoObject
         /// <param name="fromHere">Source point for the perpendicular foot</param>
         /// <returns>Array of foot-points, may be empty</returns>
         GeoPoint2D[] PerpendicularFoot(GeoPoint fromHere);
+        /// <summary>
+        /// Tells whether there are lines in the parameter space across which the first derivative (and thus the normal) of the surface
+        /// jumps. This is the case for a <see cref="NurbsSurface"/> of degree 1 with inner knots, which consists of planar or ruled strips
+        /// with sharp bends between them. Faces on such a surface are split along these lines before they are triangulated or intersected.
+        /// </summary>
+        /// <param name="discontinuities">The 2d curves (in the u/v system) along which the derivative is discontinuous; null when the result is false</param>
+        /// <returns>true when there are discontinuities, false for the usual smooth surfaces</returns>
         bool HasDiscontinuousDerivative(out ICurve2D[] discontinuities);
         /// <summary>
         /// If this surface is periodic in u or v or both return a non-periodic surface
@@ -509,6 +532,13 @@ namespace CADability.GeoObject
         /// <param name="face"></param>
         /// <returns></returns>
         MenuWithHandler[] GetContextMenuForParametrics(IFrame frame, Face face);
+        /// <summary>
+        /// True when <see cref="Modify(ModOp)"/> (e.g. a rotation) changes the u/v parameter system in a way that 2d curves on the surface
+        /// are no longer valid afterwards. This is the case for the non-periodic surfaces (<see cref="CylindricalSurfaceNP"/>,
+        /// <see cref="ConicalSurfaceNP"/>, <see cref="SphericalSurfaceNP"/>), whose parameter system is bound to the global axes;
+        /// <see cref="Edge"/> recomputes the 2d curves of its faces after a modification when this is true. False for the elementary
+        /// surfaces, which carry their parameter system with them.
+        /// </summary>
         bool UvChangesWithModification { get; }
         /// <summary>
         /// Gets the IPropertyEntry to display this surface in the property grid (may be null)
@@ -553,6 +583,12 @@ namespace CADability.GeoObject
         /// The axis of extrusion. The axis must start at the bottom of the domain and go up to the top of the domain (or left and right, depending on <see cref="ExtrusionDirectionIsV"/>).
         /// </summary>
         ICurve Axis(BoundingRect domain);
+        /// <summary>
+        /// Reserved for an orientation along the axis of extrusion: an object which provides for each parameter of the axis a direction
+        /// perpendicular to it (see <see cref="IOrientation.OrientationAt(double)"/>), as needed for sweeps along a curved axis. Currently
+        /// none of the implementing surfaces provides it (<see cref="CylindricalSurface"/> and <see cref="ToroidalSurface"/> throw
+        /// <see cref="NotImplementedException"/>), so callers cannot rely on it.
+        /// </summary>
         IOrientation Orientation { get; }
         /// <summary>
         /// The curve, which is moved along the axis, e.g. an arc, when this is a <see cref="CylindricalSurface"/>
@@ -575,13 +611,44 @@ namespace CADability.GeoObject
     /// </summary>
     public interface ISurfaceOfArcExtrusion : ISurfaceOfExtrusion
     {
+        /// <summary>
+        /// The radius of the extruded arc, i.e. the radius of the fillet this surface forms: the radius of a <see cref="CylindricalSurface"/>,
+        /// the minor radius of a <see cref="ToroidalSurface"/>. Setting it changes the surface in place while keeping its axis; no change
+        /// events are raised, the owning <see cref="Face"/> has to be updated by the caller (as the parametric fillet actions do).
+        /// </summary>
         double Radius { get; set; }
     }
+    /// <summary>
+    /// Implemented by surfaces which describe the same geometry as a periodic surface but with a non-periodic parameter system
+    /// (e.g. <see cref="NonPeriodicCylindricalSurface"/>, which replaces the angle u of the <see cref="CylindricalSurface"/>). It converts
+    /// u/v points and 2d curves between the two parameter systems, so that curves computed on the periodic surface can be used on the
+    /// non-periodic one and vice versa.
+    /// </summary>
     public interface INonPeriodicSurfaceConversion
     {
+        /// <summary>
+        /// Converts a point from the parameter system of this (non-periodic) surface to the parameter system of the underlying periodic surface.
+        /// </summary>
+        /// <param name="uv">Point in the parameter system of this surface</param>
+        /// <returns>The same point in the parameter system of the periodic surface</returns>
         GeoPoint2D ToPeriodic(GeoPoint2D uv);
+        /// <summary>
+        /// Converts a point from the parameter system of the underlying periodic surface to the parameter system of this (non-periodic) surface.
+        /// </summary>
+        /// <param name="uv">Point in the parameter system of the periodic surface</param>
+        /// <returns>The same point in the parameter system of this surface</returns>
         GeoPoint2D FromPeriodic(GeoPoint2D uv);
+        /// <summary>
+        /// Converts a 2d curve from the parameter system of this (non-periodic) surface to the parameter system of the underlying periodic surface.
+        /// </summary>
+        /// <param name="curve2d">Curve in the parameter system of this surface</param>
+        /// <returns>The corresponding curve in the parameter system of the periodic surface</returns>
         ICurve2D ToPeriodic(ICurve2D curve2d);
+        /// <summary>
+        /// Converts a 2d curve from the parameter system of the underlying periodic surface to the parameter system of this (non-periodic) surface.
+        /// </summary>
+        /// <param name="curve2d">Curve in the parameter system of the periodic surface</param>
+        /// <returns>The corresponding curve in the parameter system of this surface</returns>
         ICurve2D FromPeriodic(ICurve2D curve2d);
     }
 
@@ -2242,6 +2309,10 @@ namespace CADability.GeoObject
     /// </summary>
     public abstract class ISurfaceImpl : ISurface, IOctTreeInsertable
     {
+        /// <summary>
+        /// Cache for <see cref="GetExtrema"/>: the u/v positions of the extrema in direction of the axes, computed on first use.
+        /// Internal state: it must be reset to null (see <see cref="InvalidateSecondaryData"/>) whenever the geometry of the surface changes.
+        /// </summary>
         protected GeoPoint2D[] extrema; // Achtung, muss bei Modify auf null gesetzt werden
         internal BoxedSurface boxedSurface;
         internal BoundingRect usedArea = BoundingRect.EmptyBoundingRect;
@@ -2503,6 +2574,13 @@ namespace CADability.GeoObject
         static int idcounter = 0;
         public int uniqueid;
 #endif
+        /// <summary>
+        /// Initializes the common state of a surface.
+        /// </summary>
+        /// <param name="usedArea">The part of the parameter space in which the surface is used (the domain of the <see cref="Face"/> it
+        /// belongs to), or null when not known yet. For surfaces without natural bounds of their own this is what
+        /// <see cref="GetNaturalBounds(out double, out double, out double, out double)"/> returns; it can be set later with
+        /// <see cref="SetBounds(BoundingRect)"/></param>
         protected ISurfaceImpl(BoundingRect? usedArea = null)
         {
 #if DEBUG
@@ -2510,6 +2588,11 @@ namespace CADability.GeoObject
 #endif
             if (usedArea.HasValue) this.usedArea = usedArea.Value;
         }
+        /// <summary>
+        /// Discards the cached data derived from the geometry of the surface: the extrema and the boxed surface used by
+        /// <see cref="PositionOf(GeoPoint)"/> and by intersections. Derived classes must call this whenever they change the geometry,
+        /// e.g. in <see cref="Modify(ModOp)"/>.
+        /// </summary>
         protected void InvalidateSecondaryData()
         {
             extrema = null;
@@ -2873,6 +2956,10 @@ namespace CADability.GeoObject
                 throw new NotImplementedException();
             }
         }
+        /// <summary>
+        /// True when the surface is closed in u direction, i.e. the parameter lines of constant v are closed curves. By default this is
+        /// the same as <see cref="IsUPeriodic"/>; no surface overrides it.
+        /// </summary>
         public virtual bool IsUClosed
         {
             get
@@ -2880,6 +2967,10 @@ namespace CADability.GeoObject
                 return IsUPeriodic;
             }
         }
+        /// <summary>
+        /// True when the surface is closed in v direction, i.e. the parameter lines of constant u are closed curves. By default this is
+        /// the same as <see cref="IsVPeriodic"/>; no surface overrides it.
+        /// </summary>
         public virtual bool IsVClosed
         {
             get
@@ -3289,6 +3380,16 @@ namespace CADability.GeoObject
         {
             return new OffsetSurface(this, offset);
         }
+        /// <summary>
+        /// Returns the surface parallel to this surface at the distance <paramref name="offset"/> (in direction of the normal) together
+        /// with the mapping of the parameter space, for surfaces whose offset is of the same type but with a different parameter system
+        /// (the offset of a <see cref="ConicalSurface"/> is a cone with a shifted apex and a shifted v parameter). The base implementation
+        /// returns null and <see cref="ModOp2D.Null"/>; callers then fall back to <see cref="GetOffsetSurface(double)"/>, which wraps this
+        /// surface in an <see cref="OffsetSurface"/>.
+        /// </summary>
+        /// <param name="offset">The distance of the offset surface, positive in direction of the normal</param>
+        /// <param name="mod">The 2d transformation which maps u/v points of this surface to u/v points of the offset surface</param>
+        /// <returns>The offset surface, or null when not implemented for this type of surface</returns>
         public virtual ISurface GetOffsetSurface(double offset, out ModOp2D mod)
         {
             mod = ModOp2D.Null;
@@ -3528,10 +3629,21 @@ namespace CADability.GeoObject
         {
             return 0.0;
         }
+        /// <summary>
+        /// Returns u values which subdivide the parameter range into intervals that <see cref="GetExtrema"/> searches one by one for
+        /// extrema in direction of the axes. Each interval must contain at most one extremum per axis direction (the periodic surfaces
+        /// return quarter circles). The base implementation returns an empty array, which makes <see cref="GetExtrema"/> find nothing.
+        /// </summary>
+        /// <returns>Ascending u values from the start to the end of the parameter range, or an empty array</returns>
         protected virtual double[] GetSaveUSteps()
         {
             return new double[0];
         }
+        /// <summary>
+        /// Returns v values which subdivide the parameter range into intervals that <see cref="GetExtrema"/> searches one by one for
+        /// extrema in direction of the axes, see <see cref="GetSaveUSteps"/>. The base implementation returns an empty array.
+        /// </summary>
+        /// <returns>Ascending v values from the start to the end of the parameter range, or an empty array</returns>
         protected virtual double[] GetSaveVSteps()
         {
             return new double[0];
@@ -3675,6 +3787,13 @@ namespace CADability.GeoObject
         {
             return null;
         }
+        /// <summary>
+        /// Returns the implicit form of the surface: a polynomial in x, y and z which is zero exactly for the points of the surface and
+        /// whose value approximates the (signed) distance of a point from the surface. It is used to speed up intersections and distance
+        /// computations with other surfaces. The base implementation returns null; the elementary surfaces (e.g.
+        /// <see cref="CylindricalSurface"/>, <see cref="ToroidalSurface"/>) override it.
+        /// </summary>
+        /// <returns>The implicit polynomial, or null when not available for this type of surface</returns>
         public virtual Polynom GetImplicitPolynomial()
         {
             return null;
@@ -3735,6 +3854,13 @@ namespace CADability.GeoObject
         {
             return null;
         }
+        /// <summary>
+        /// Returns the u/v position of the given point like <see cref="PositionOf(GeoPoint)"/>, but for a periodic surface the result is
+        /// moved by multiples of the period so that it lies as close as possible to <paramref name="domain"/> (typically the domain of a face).
+        /// </summary>
+        /// <param name="p">The point, which is assumed to lie on the surface</param>
+        /// <param name="domain">The area of the parameter space the result should lie in</param>
+        /// <returns>The u/v position, adjusted to the domain</returns>
         public GeoPoint2D PositionOf(GeoPoint p, BoundingRect domain)
         {
             GeoPoint2D res = PositionOf(p);
@@ -3819,8 +3945,15 @@ namespace CADability.GeoObject
         {
             return new MenuWithHandler[0];
         }
+        /// <inheritdoc/>
         public virtual bool UvChangesWithModification => false;
+        /// <summary>
+        /// True when <see cref="Fit(IEnumerable{GeoPoint})"/> may also scale the surface with different factors for the three axes,
+        /// which is the case for a <see cref="SurfaceOfLinearExtrusion"/>. For all other surfaces the fit uses rotation, translation
+        /// and a uniform scaling only.
+        /// </summary>
         public virtual bool CanStretch => false;
+        /// <inheritdoc/>
         public virtual double Fit(IEnumerable<GeoPoint> points)
         {
             // we are looking for the best transformation of the points so that the distance to the surface of all points becomes minimal
@@ -4075,6 +4208,12 @@ namespace CADability.GeoObject
 #endif
             return mres.ModelInfoAtMinimum.Value;
         }
+        /// <summary>
+        /// Previous implementation of <see cref="Fit(IEnumerable{GeoPoint})"/>, kept for reference and not used by CADability.
+        /// Use <see cref="Fit(IEnumerable{GeoPoint})"/> instead.
+        /// </summary>
+        /// <param name="points">The points the surface should approximate</param>
+        /// <returns>The sum of the squared distances of the points from the fitted surface</returns>
         public virtual double FitOld(IEnumerable<GeoPoint> points)
         {
             // we are looking for the best transformation of the points so that the distance to the surface of all points becomes minimal
@@ -4328,6 +4467,7 @@ namespace CADability.GeoObject
 #endif
             return mres.ModelInfoAtMinimum.Value;
         }
+        /// <inheritdoc/>
         public abstract IPropertyEntry GetPropertyEntry(IFrame frame);
 #if DEBUG
         // Starte mit dem Mittelpunkt
@@ -4486,11 +4626,37 @@ namespace CADability.GeoObject
             }
         }
 #endif
+        /// <summary>Returns the square of <paramref name="x"/>; helper for the formulas of derived surfaces.</summary>
+        /// <param name="x">The value</param>
+        /// <returns>x*x</returns>
         protected static double sqr(double x) { return x * x; }
+        /// <summary>Returns the cube of <paramref name="x"/>; helper for the formulas of derived surfaces.</summary>
+        /// <param name="x">The value</param>
+        /// <returns>x*x*x</returns>
         protected static double cube(double x) { return x * x * x; }
+        /// <summary>Returns the fourth power of <paramref name="x"/>; helper for the formulas of derived surfaces.</summary>
+        /// <param name="x">The value</param>
+        /// <returns>x*x*x*x</returns>
         protected static double quad(double x) { return x * x * x * x; }
+        /// <summary>Returns <paramref name="x"/> to the power of 3/2, i.e. x*sqrt(x); helper for the formulas of derived surfaces.</summary>
+        /// <param name="x">The value, must not be negative</param>
+        /// <returns>sqrt(x*x*x)</returns>
         protected static double exp32(double x) { return Math.Sqrt(x * x * x); }
+        /// <summary>Returns <paramref name="x"/> to the power of 5/2, i.e. x*x*sqrt(x); helper for the formulas of derived surfaces.</summary>
+        /// <param name="x">The value, must not be negative</param>
+        /// <returns>sqrt(x*x*x*x*x)</returns>
         protected static double exp52(double x) { return Math.Sqrt(x * x * x * x * x); }
+        /// <summary>
+        /// Returns the maximum distance between the surface and the straight 3d line connecting the surface points at <paramref name="sp"/>
+        /// and <paramref name="ep"/>, i.e. the error made when the segment from <paramref name="sp"/> to <paramref name="ep"/> in the
+        /// parameter space is replaced by a straight line in 3d. The triangulation uses it to decide whether an edge of a triangle must be
+        /// subdivided. The base implementation only samples the distance at 1/4, 1/2 and 3/4 of the segment; the elementary surfaces
+        /// override it with exact computations.
+        /// </summary>
+        /// <param name="sp">Start point in the parameter space</param>
+        /// <param name="ep">End point in the parameter space</param>
+        /// <param name="mp">The u/v position where the maximum distance was found</param>
+        /// <returns>The maximum distance found</returns>
         public virtual double MaxDist(GeoPoint2D sp, GeoPoint2D ep, out GeoPoint2D mp)
         {
             GeoPoint sp3d, ep3d; // start und enpunkt in 3d, der maximale Abstand zu dieser Linie wird gesucht
@@ -4968,6 +5134,17 @@ namespace CADability.GeoObject
             if (pp.z < zMin) zMin = pp.z;
             if (pp.z > zMax) zMax = pp.z;
         }
+        /// <summary>
+        /// Creates a <see cref="BSpline"/> of the given degree through the provided points. The name stems from an earlier implementation
+        /// which refined the interpolation until <paramref name="precision"/> was met; now it simply interpolates the points and
+        /// <paramref name="pl"/> and <paramref name="precision"/> are not used. Only used by <see cref="ToroidalSurface"/> for its plane intersection.
+        /// </summary>
+        /// <param name="geopoints">The points the BSpline passes through</param>
+        /// <param name="degree">The degree of the BSpline</param>
+        /// <param name="closed">True to create a closed BSpline</param>
+        /// <param name="pl">Not used</param>
+        /// <param name="precision">Not used</param>
+        /// <returns>The interpolating BSpline</returns>
         public BSpline Refine(GeoPoint[] geopoints, int degree, bool closed, PlaneSurface pl, double precision)
         {
             Plane pln = new Plane(pl.Location, pl.DirectionX, pl.DirectionY);
@@ -5085,6 +5262,7 @@ namespace CADability.GeoObject
             throw new Exception("The method or operation is not implemented.");
         }
 
+        /// <inheritdoc/>
         public virtual IDualSurfaceCurve[] GetDualSurfaceCurves(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, List<GeoPoint> seeds, List<Tuple<double, double, double, double>> extremePositions)
         {
             if (this is ISurfaceOfRevolution && other is SphericalSurface sphere && sphere.IsRealSphere && Surfaces.GetCommonAxis(this, other, out Axis _))
@@ -5207,6 +5385,13 @@ namespace CADability.GeoObject
             return res;
         }
 
+        /// <summary>
+        /// Returns the curves (in the u/v system) along which the surface intersects itself within <paramref name="bounds"/>, see
+        /// <see cref="ISurface.GetSelfIntersections(BoundingRect)"/>. The base implementation returns null: the elementary surfaces do not
+        /// intersect themselves.
+        /// </summary>
+        /// <param name="bounds">The part of the parameter space to consider</param>
+        /// <returns>The self intersection curves, or null when there are none</returns>
         public virtual ICurve2D[] GetSelfIntersections(BoundingRect bounds)
         {
             return null;
@@ -14563,8 +14748,19 @@ namespace CADability.GeoObject
 
     }
 
+    /// <summary>
+    /// Static helper methods for working with <see cref="ISurface"/> objects, mainly for handling the periodicity of the u/v parameter
+    /// space: the <c>AdjustPeriodic</c> methods move points and curves by multiples of the period into a given domain.
+    /// </summary>
     public class SurfaceHelper
     {
+        /// <summary>
+        /// Enumerates the four 3d curves which bound the rectangle <paramref name="ext"/> of the parameter space on the surface: the curves
+        /// of constant u at the left and right border and the curves of constant v at the bottom and top border.
+        /// </summary>
+        /// <param name="srf">The surface</param>
+        /// <param name="ext">The rectangle in the parameter space</param>
+        /// <returns>An enumerator yielding the left, right, bottom and top boundary curve</returns>
         public IEnumerator<ICurve> BoundingCurves(ISurface srf, BoundingRect ext)
         {
             yield return srf.FixedU(ext.Left, ext.Bottom, ext.Top);
@@ -14573,6 +14769,13 @@ namespace CADability.GeoObject
             yield return srf.FixedV(ext.Top, ext.Left, ext.Right);
 
         }
+        /// <summary>
+        /// Moves the point by multiples of the periods into the interval [0, period] in u and/or v. A period of 0 (or less) means that the
+        /// respective direction is not periodic and the coordinate stays unchanged.
+        /// </summary>
+        /// <param name="uperiod">The period in u, or 0 when not periodic in u</param>
+        /// <param name="vperiod">The period in v, or 0 when not periodic in v</param>
+        /// <param name="p">The point to adjust (in place)</param>
         public static void AdjustPeriodic(double uperiod, double vperiod, ref GeoPoint2D p)
         {
             if (uperiod > 0.0)
@@ -14637,6 +14840,13 @@ namespace CADability.GeoObject
             }
             return (0, 0);
         }
+        /// <summary>
+        /// Moves the 2d curve by multiples of the period of the surface (in u and/or v) so that its middle point lies as close as possible
+        /// to the center of <paramref name="bounds"/>, typically the domain of a face. Nothing happens when the surface is not periodic.
+        /// </summary>
+        /// <param name="surface">The surface which defines the periods</param>
+        /// <param name="bounds">The domain the curve should lie in</param>
+        /// <param name="cv2d">The curve to move (in place)</param>
         public static void AdjustPeriodic(ISurface surface, BoundingRect bounds, ICurve2D cv2d)
         {
             if (surface.IsUPeriodic || surface.IsVPeriodic)
@@ -14794,6 +15004,13 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Moves the point by multiples of the period of the surface (in u and/or v) so that it lies as close as possible to the center
+        /// of <paramref name="bounds"/>, typically the domain of a face. Nothing happens when the surface is not periodic.
+        /// </summary>
+        /// <param name="surface">The surface which defines the periods</param>
+        /// <param name="bounds">The domain the point should lie in</param>
+        /// <param name="p2d">The point to move (in place)</param>
         public static void AdjustPeriodic(ISurface surface, BoundingRect bounds, ref GeoPoint2D p2d)
         {
             if (surface.IsUPeriodic || surface.IsVPeriodic)
@@ -14831,6 +15048,16 @@ namespace CADability.GeoObject
             }
         }
 
+        /// <summary>
+        /// Computes the principal curvatures of the surface at <paramref name="uv"/> (the eigenvalues of the Weingarten map) and returns
+        /// them as curves: a circle with the radius of curvature, lying in the plane of the normal and the principal direction, or a line
+        /// in the principal direction when the curvature is 0. The implementation is marked as untested in the code: at present the second
+        /// result is also stored in <paramref name="minCurvature"/> and <paramref name="maxCurvature"/> stays null.
+        /// </summary>
+        /// <param name="surface">The surface</param>
+        /// <param name="uv">The position in the parameter space</param>
+        /// <param name="minCurvature">The curvature circle (or line) of a principal direction; null when it could not be computed</param>
+        /// <param name="maxCurvature">Intended as the curvature circle of the other principal direction, currently always null</param>
         public static void MinMaxCurvature(ISurface surface, GeoPoint2D uv, out ICurve minCurvature, out ICurve maxCurvature)
         {   // to be tested
             surface.Derivation2At(uv, out GeoPoint location, out GeoVector du, out GeoVector dv, out GeoVector duu, out GeoVector dvv, out GeoVector duv);
@@ -14892,6 +15119,15 @@ namespace CADability.GeoObject
             }
         }
 
+        /// <summary>
+        /// Returns the positions in the parameter space where the surface has an extremum in direction <paramref name="dir"/>, i.e. where
+        /// the normal is parallel to <paramref name="dir"/>. A copy of the surface is rotated so that <paramref name="dir"/> becomes the
+        /// z-axis and <see cref="ISurface.GetExtrema"/> of the copy is filtered for the z direction.
+        /// </summary>
+        /// <param name="surface">The surface (not modified)</param>
+        /// <param name="domain">The part of the parameter space of interest; currently not used to restrict the result</param>
+        /// <param name="dir">The direction of the extrema</param>
+        /// <returns>The u/v positions of the extrema, may be empty</returns>
         public static GeoPoint2D[] GetExtrema(ISurface surface, BoundingRect domain, GeoVector dir)
         {
             ISurface srf = surface.Clone();

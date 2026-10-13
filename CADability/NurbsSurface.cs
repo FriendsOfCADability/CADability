@@ -374,6 +374,14 @@ namespace CADability.GeoObject
             GeoPoint dbg = PointAt(new GeoPoint2D(this.uKnots[0], this.vKnots[0]));
 #endif
         }
+        /// <summary>
+        /// Creates a NURBS surface which passes through the provided ellipses (or circles), e.g. the cross sections of a pipe along a
+        /// curved path. The u parameter follows the ellipses (the surface is rational of degree 2 in u), the v parameter runs from the
+        /// first to the last ellipse (degree 3, interpolated through the poles of the ellipses). All ellipses must have the same shape
+        /// (full ellipses or the same kind of arc) so that their BSpline representations have the same number of poles.
+        /// </summary>
+        /// <param name="throughEllis">The ellipses the surface passes through, in the order of the v parameter</param>
+        /// <param name="knots">Optional v parameter values for the ellipses; when null they are derived from the distances of the poles</param>
         public NurbsSurface(Ellipse[] throughEllis, double[] knots=null)
         {
             GeoPoint[,] rawpoles = null;
@@ -545,6 +553,18 @@ namespace CADability.GeoObject
             return new NurbsSurface(poles, weights, uknots, vknots, udegree, 3, false, false);
         }
 
+        /// <summary>
+        /// Creates a NURBS surface which interpolates the provided points, like the constructor without knots: the surface contains the
+        /// points exactly and is smoothly interpolated in between. The parameters <paramref name="uKnots"/> and <paramref name="vKnots"/>
+        /// are currently ignored; the parameter values of the points are derived from the chord lengths of the point rows and columns.
+        /// </summary>
+        /// <param name="throughPoints">Points to be interpolated; the first index is the u direction, the second the v direction</param>
+        /// <param name="maxUDegree">The maximum degree in u (reduced when there are fewer points)</param>
+        /// <param name="maxVDegree">The maximum degree in v (reduced when there are fewer points)</param>
+        /// <param name="uKnots">Intended as the parameter values of the points in u direction, currently ignored</param>
+        /// <param name="vKnots">Intended as the parameter values of the points in v direction, currently ignored</param>
+        /// <param name="uPeriodic">True when the surface is closed in u direction (the last row of points connects to the first)</param>
+        /// <param name="vPeriodic">True when the surface is closed in v direction (the last column of points connects to the first)</param>
         public NurbsSurface(GeoPoint[,] throughPoints, int maxUDegree, int maxVDegree, double[] uKnots, double[] vKnots, bool uPeriodic, bool vPeriodic)
         {   // 1. Index ist u, 2. Index ist V
             int ulength = throughPoints.GetLength(0);
@@ -1170,6 +1190,7 @@ namespace CADability.GeoObject
                 return false;
             }
         }
+        /// <inheritdoc/>
         public override ISurface GetCanonicalForm(double precision, BoundingRect? bounds)
         {
             double umin, umax, vmin, vmax;
@@ -1393,6 +1414,14 @@ namespace CADability.GeoObject
 
             return null;
         }
+        /// <summary>
+        /// Previous implementation of <see cref="GetCanonicalForm(double, Nullable{BoundingRect})"/>: tries to find an elementary surface
+        /// (plane, cylinder, cone, sphere, torus) which coincides with this NURBS surface by checking whether its parameter lines are
+        /// lines and circles. Kept for reference; not used by CADability.
+        /// </summary>
+        /// <param name="precision">The maximum allowed distance between the NURBS surface and the elementary surface</param>
+        /// <param name="bounds">The part of the parameter space to check, or null for the whole surface</param>
+        /// <returns>The elementary surface, or null when none was found</returns>
         public ISurface GetCanonicalFormOld(double precision, BoundingRect? bounds)
         {
             double umin, umax, vmin, vmax;
@@ -1658,6 +1687,13 @@ namespace CADability.GeoObject
             return true;
         }
 
+        /// <summary>
+        /// Returns a new NURBS surface which is the part of this surface between the u parameters <paramref name="u0"/> and
+        /// <paramref name="u1"/>: the knot vector is clamped to this interval, the v direction stays unchanged. This surface is not modified.
+        /// </summary>
+        /// <param name="u0">The new start of the u parameter range</param>
+        /// <param name="u1">The new end of the u parameter range</param>
+        /// <returns>The trimmed surface, or null when this surface is not initialized</returns>
         public NurbsSurface TrimmU(double u0, double u1)
         {
             if (nubs != null)
@@ -1674,6 +1710,13 @@ namespace CADability.GeoObject
             }
             return null;
         }
+        /// <summary>
+        /// Returns a new NURBS surface which is the part of this surface between the v parameters <paramref name="v0"/> and
+        /// <paramref name="v1"/>: the knot vector is clamped to this interval, the u direction stays unchanged. This surface is not modified.
+        /// </summary>
+        /// <param name="v0">The new start of the v parameter range</param>
+        /// <param name="v1">The new end of the v parameter range</param>
+        /// <returns>The trimmed surface, or null when this surface is not initialized</returns>
         public NurbsSurface TrimmV(double v0, double v1)
         {   // it is easier to exchange u and v and use TrimmU than implementing Nurbs.TrimmV
             GeoPoint[,] rpoles = new GeoPoint[poles.GetLength(1), poles.GetLength(0)];
@@ -3454,6 +3497,10 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// The control points of the surface; the first index runs in u direction, the second in v direction. This is the internal array:
+        /// changing its entries does not update the surface.
+        /// </summary>
         public GeoPoint[,] Poles
         {
             get
@@ -3461,6 +3508,10 @@ namespace CADability.GeoObject
                 return poles;
             }
         }
+        /// <summary>
+        /// The weights of the control points, with the same indices as <see cref="Poles"/>, or null for a non-rational surface.
+        /// This is the internal array: changing its entries does not update the surface.
+        /// </summary>
         public double[,] Weights
         {
             get
@@ -3468,6 +3519,10 @@ namespace CADability.GeoObject
                 return weights;
             }
         }
+        /// <summary>
+        /// The knot vector in u direction with each knot repeated according to its multiplicity (the form the constructors which take
+        /// knots and degrees expect). A new array on each access.
+        /// </summary>
         public double[] UKnots
         {
             get
@@ -3483,6 +3538,10 @@ namespace CADability.GeoObject
                 return uknotslist.ToArray();
             }
         }
+        /// <summary>
+        /// The knot vector in v direction with each knot repeated according to its multiplicity (the form the constructors which take
+        /// knots and degrees expect). A new array on each access.
+        /// </summary>
         public double[] VKnots
         {
             get
@@ -3498,6 +3557,10 @@ namespace CADability.GeoObject
                 return vknotslist.ToArray();
             }
         }
+        /// <summary>
+        /// The polynomial degree of the surface in u direction. A degree of 1 means that the lines of constant v are straight
+        /// (see <see cref="IsRuled"/>).
+        /// </summary>
         public int UDegree
         {
             get
@@ -3505,6 +3568,10 @@ namespace CADability.GeoObject
                 return uDegree;
             }
         }
+        /// <summary>
+        /// The polynomial degree of the surface in v direction. A degree of 1 means that the lines of constant u are straight
+        /// (see <see cref="IsRuled"/>).
+        /// </summary>
         public int VDegree
         {
             get
@@ -3543,6 +3610,11 @@ namespace CADability.GeoObject
             InvalidateSecondaryData();
             Init();
         }
+        /// <summary>
+        /// Returns the whole parameter range in which the surface is defined: from the first to the last knot in u and in v. Unlike
+        /// <see cref="GetNaturalBounds(out double, out double, out double, out double)"/> it does not depend on the bounds a face has set.
+        /// </summary>
+        /// <returns>The rectangle of the parameter space covered by the knot vectors</returns>
         public BoundingRect GetMaximumExtent()
         {
             return new BoundingRect(uKnots[0], vKnots[0], uKnots[uKnots.Length - 1], vKnots[vKnots.Length - 1]);
@@ -3733,6 +3805,7 @@ namespace CADability.GeoObject
         }
 #endif
         #region ISurfaceImpl Overrides
+        /// <inheritdoc/>
         public override ISurface GetNonPeriodicSurface(ICurve[] orientedCurves)
         {
             BoundingRect ext = BoundingRect.EmptyBoundingRect;
@@ -3937,6 +4010,7 @@ namespace CADability.GeoObject
 
             // base.DerivationAt(uv, out location, out du, out dv);
         }
+        /// <inheritdoc/>
         public override double VPeriod
         {
             get
@@ -3945,6 +4019,7 @@ namespace CADability.GeoObject
                 return vKnots[vKnots.Length - 1] - vKnots[0]; // das muss so sein, sonst macht periodisch keinen Sinn, oder?
             }
         }
+        /// <inheritdoc/>
         public override double UPeriod
         {
             get
@@ -4561,6 +4636,7 @@ namespace CADability.GeoObject
             intu = uSteps.ToArray();
             intv = vSteps.ToArray();
         }
+        /// <inheritdoc/>
         public override BoundingCube GetPatchExtent(BoundingRect uvPatch, bool rough)
         {
             if (rough && uvPatch.Left <= uKnots[0] && uvPatch.Right >= uKnots[uKnots.Length - 1] && uvPatch.Bottom <= vKnots[0] && uvPatch.Top >= vKnots[vKnots.Length - 1])
@@ -4602,6 +4678,7 @@ namespace CADability.GeoObject
                 Init();
             }
         }
+        /// <inheritdoc/>
         public override bool IsUPeriodic
         {
             get
@@ -4609,6 +4686,7 @@ namespace CADability.GeoObject
                 return uPeriodic;
             }
         }
+        /// <inheritdoc/>
         public override bool IsVPeriodic
         {
             get
@@ -5281,6 +5359,7 @@ namespace CADability.GeoObject
             discontinuities = dsc.ToArray();
             return discontinuities.Length > 0;
         }
+        /// <inheritdoc/>
         public override CADability.GeoObject.RuledSurfaceMode IsRuled
         {
             get
@@ -5292,6 +5371,7 @@ namespace CADability.GeoObject
                 return RuledSurfaceMode.notRuled;
             }
         }
+        /// <inheritdoc/>
         public override ICurve2D GetProjectedCurve(ICurve curve, double precision)
         {
             if (hasSimpleSurface && simpleSurface is PlaneSurface)
@@ -5499,6 +5579,7 @@ namespace CADability.GeoObject
             }
             return base.GetProjectedCurve(curve, precision);
         }
+        /// <inheritdoc/>
         public override double MaxDist(GeoPoint2D sp, GeoPoint2D ep, out GeoPoint2D mp)
         {
             if (hasSimpleSurface)
@@ -5509,6 +5590,7 @@ namespace CADability.GeoObject
             }
             return base.MaxDist(sp, ep, out mp);
         }
+        /// <inheritdoc/>
         public override ISurface GetOffsetSurface(double offset)
         {
             // Idee: finde die Parameter, die den Polen am besten entsprechen und verschiebe die Pole
@@ -5557,6 +5639,11 @@ namespace CADability.GeoObject
         #endregion
         #region ISerializable Members
         // constructor for serialization
+        /// <summary>
+        /// Constructor for the legacy binary deserialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// </summary>
+        /// <param name="info">The serialized data</param>
+        /// <param name="context">The source of the deserialization</param>
         protected NurbsSurface(SerializationInfo info, StreamingContext context)
         {
             poles = (GeoPoint[,])info.GetValue("Poles", typeof(GeoPoint[,]));
@@ -5605,6 +5692,7 @@ namespace CADability.GeoObject
         }
 
         #endregion
+        /// <inheritdoc/>
         public override IPropertyEntry GetPropertyEntry(IFrame frame)
         {
             // to implement:
@@ -5623,6 +5711,10 @@ namespace CADability.GeoObject
             return null;
         }
 
+        /// <summary>
+        /// True when the surface is rational, i.e. it has weights and at least one of them differs from 1 (e.g. a surface built from exact
+        /// circles). A non-rational surface is evaluated with the faster non-rational algorithm.
+        /// </summary>
         public bool isRational
         {
             get

@@ -224,9 +224,21 @@ namespace CADability.GeoObject
             if (Constructor != null) return Constructor();
             return new Solid();
         }
+        /// <summary>
+        /// Signature of <see cref="Constructed"/>.
+        /// </summary>
+        /// <param name="justConstructed">the solid whose constructor has just run</param>
         public delegate void ConstructedDelegate(Solid justConstructed);
+        /// <summary>
+        /// When set, this delegate is called at the end of the <see cref="Solid"/> constructor for every new solid, e.g. to
+        /// attach user data to it.
+        /// </summary>
         public static ConstructedDelegate Constructed;
         #endregion
+        /// <summary>
+        /// Creates an empty solid without shells. Not for direct use: call <see cref="Construct"/>, which honours
+        /// <see cref="Constructor"/>, and set the shell afterwards.
+        /// </summary>
         protected Solid()
             : base()
         {
@@ -299,6 +311,12 @@ namespace CADability.GeoObject
                 shells[i].DidChangeEvent += new ChangeDelegate(OnDidChange);
             }
         }
+        /// <summary>
+        /// Removes <paramref name="sh"/> from this solid, if it is the outer shell (the first one): the solid is left without
+        /// shells and no longer listens to the change events of the shell. The change is undoable (it is the reverse of
+        /// <see cref="SetShell"/>). Other shells are ignored.
+        /// </summary>
+        /// <param name="sh">the shell to remove</param>
         protected void RemoveShell(Shell sh)
         {
             if (Shells.Length > 0 && sh == Shells[0])
@@ -492,7 +510,19 @@ namespace CADability.GeoObject
                 lists.Add(Layer, true, true, this); // in PaintTo3D wirds dann richtig gemacht
             // paintTo3D.PaintSurfaces und paintTo3D.PaintEdges muss richtig eingestellt und zweimal aufgerufen werden
         }
+        /// <summary>
+        /// Signature of <see cref="OnPaintTo3D"/>.
+        /// </summary>
+        /// <param name="toPaint">the solid being painted</param>
+        /// <param name="paintTo3D">the paint interface to paint to</param>
+        /// <returns>true if the handler has painted the solid and the default painting is to be skipped, false to let
+        /// CADability paint the solid</returns>
         public delegate bool PaintTo3DDelegate(Solid toPaint, IPaintTo3D paintTo3D);
+        /// <summary>
+        /// Static hook called at the beginning of <see cref="PaintTo3D(IPaintTo3D)"/> for every solid. Set it to replace or
+        /// extend the way solids are displayed; when the handler returns true, the default painting of the shells is skipped.
+        /// Null by default.
+        /// </summary>
         public static PaintTo3DDelegate OnPaintTo3D;
         /// <inheritdoc/>
         public override void PaintTo3D(IPaintTo3D paintTo3D)
@@ -512,6 +542,7 @@ namespace CADability.GeoObject
                 shells[i].PrepareDisplayList(precision);
             }
         }
+        /// <inheritdoc/>
         public override Style.EDefaultFor PreferredStyle
         {
             get
@@ -539,6 +570,7 @@ namespace CADability.GeoObject
             }
             return res;
         }
+        /// <inheritdoc/>
         public override Layer Layer
         {
             get
@@ -557,6 +589,7 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <inheritdoc/>
         public override IGeoObject[] OwnedItems
         {
             get
@@ -564,6 +597,7 @@ namespace CADability.GeoObject
                 return Shells;
             }
         }
+        /// <inheritdoc/>
         public override string Description
         {
             get
@@ -677,6 +711,9 @@ namespace CADability.GeoObject
             // END DEBUG
         }
 #endif
+        /// <summary>
+        /// Forwards <see cref="Shell.FreeCachedMemory"/> to all shells of this solid. Currently nothing is released.
+        /// </summary>
         public void FreeCachedMemory()
         {
             for (int i = 0; i < shells.Length; i++)
@@ -836,6 +873,11 @@ namespace CADability.GeoObject
         }
 
         #region ISerializable Members
+        /// <summary>
+        /// Constructor required by deserialization
+        /// </summary>
+        /// <param name="info">SerializationInfo</param>
+        /// <param name="context">StreamingContext</param>
         protected Solid(SerializationInfo info, StreamingContext context)
             : base(context)
         {
@@ -881,6 +923,7 @@ namespace CADability.GeoObject
             info.AddValue("ColorDef", colorDef);
             info.AddValue("Name", name);
         }
+        /// <inheritdoc/>
         public override void SetObjectData(IJsonReadData data)
         {
             base.SetObjectData(data);
@@ -890,6 +933,7 @@ namespace CADability.GeoObject
             flags = data.GetPropertyOrDefault<Flags>("Flags");
             data.RegisterForSerializationDoneCallback(this);
         }
+        /// <inheritdoc/>
         public override void GetObjectData(IJsonWriteData data)
         {
             base.GetObjectData(data);
@@ -925,6 +969,10 @@ namespace CADability.GeoObject
         #endregion
         #region IColorDef Members
         private ColorDef colorDef;
+        /// <summary>
+        /// The color of this solid. Setting it sets the same color on all shells of the solid (and hence on their faces);
+        /// the change is undoable and raises the change events.
+        /// </summary>
         public ColorDef ColorDef
         {
             get => colorDef;
@@ -1225,11 +1273,25 @@ namespace CADability.GeoObject
             return res.ToArray();
         }
     }
+    /// <summary>
+    /// Command handler for the entries of the context menu of a <see cref="Solid"/> that apply a boolean operation to the
+    /// solid and all other solids whose extent overlaps it: "MenuId.Solid.RemoveFromAll" subtracts the solid from the
+    /// others, "MenuId.Solid.RemoveAll" subtracts the others from the solid, "MenuId.Solid.UniteWithAll" unites them all,
+    /// "MenuId.Solid.IntersectWithAll" keeps the common part and "MenuId.Solid.SplitWithAll" splits the solids into the
+    /// fragments made by their mutual intersections. The results replace the original solids in their owner (model or
+    /// block) within a single undo frame. Created by the solid when its context menu is built.
+    /// </summary>
     public class BRepOpWith : ICommandHandler
     {
         private Solid solid;
         private List<Solid> other;
         private IFrame frame;
+        /// <summary>
+        /// Creates the handler for <paramref name="solid"/> and the solids <paramref name="other"/> it interacts with.
+        /// </summary>
+        /// <param name="solid">the solid whose context menu is shown</param>
+        /// <param name="other">the other solids, those whose extent overlaps the extent of <paramref name="solid"/></param>
+        /// <param name="frame">the frame, whose project provides the undo frame</param>
         public BRepOpWith(Solid solid, List<Solid> other, IFrame frame)
         {
             this.solid = solid;

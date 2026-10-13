@@ -6,6 +6,12 @@ using MathNet.Numerics.LinearAlgebra.Double;
 
 namespace CADability
 {
+    /// <summary>
+    /// Enumerates several enumerables one after the other as one sequence without copying them; created by
+    /// <see cref="Extensions.Combine{T}"/>. It is both the enumerable and its enumerator, so it can only be enumerated once at a time.
+    /// Internal helper, not an entry point of the API.
+    /// </summary>
+    /// <typeparam name="T">Element type</typeparam>
     public class CombinedEnumerable<T> : IEnumerable<T>, IEnumerator<T>, IEnumerator
     {
         IEnumerable<T>[] toEnumerate;
@@ -78,6 +84,12 @@ namespace CADability
         //}
     }
 
+    /// <summary>
+    /// Enumerates a sequence and replaces each element by its value in a dictionary when the dictionary contains it, otherwise
+    /// yields the element unchanged; used e.g. to map faces of a shell to the corresponding faces of a clone. Created by
+    /// <see cref="Extensions.LookUp{T}"/>. Internal helper, not an entry point of the API.
+    /// </summary>
+    /// <typeparam name="T">Element type</typeparam>
     public class LookedUpEnumerable<T> : IEnumerable<T>, IEnumerator<T>, IEnumerator
     {
         IEnumerable<T> toEnumerate;
@@ -153,6 +165,12 @@ namespace CADability
             }
         }
     }
+    /// <summary>
+    /// Small general purpose helpers used throughout CADability: combining and mapping enumerables (<see cref="Combine{T}"/>,
+    /// <see cref="LookUp{T}"/>), building MathNet matrices from <see cref="GeoVector"/>s, validity checks for matrices and vectors and
+    /// some LINQ like extension methods (<see cref="MinBy{TSource, TKey}"/>, <see cref="AddIfNotNull{T}"/>). Internal helper, not an
+    /// entry point of the API.
+    /// </summary>
     public static partial class Extensions
     {
         public static IEnumerable<T> Combine<T>(params IEnumerable<T>[] enumerators)

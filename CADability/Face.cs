@@ -168,9 +168,21 @@ namespace CADability.GeoObject
     /// </summary>
     public class FaceReference : ICloneable
     {
+        /// <summary>
+        /// Creates a reference to <paramref name="face"/>.
+        /// </summary>
+        /// <param name="face">the face to refer to</param>
         public FaceReference(Face face) { Face = face; }
+        /// <summary>
+        /// The face this object refers to.
+        /// </summary>
         public Face Face { get; }
 
+        /// <summary>
+        /// Returns this object itself instead of a copy, so that cloning the user data of a face which refers to itself
+        /// does not clone the face again (which would recurse forever). Implements <see cref="ICloneable.Clone"/>.
+        /// </summary>
+        /// <returns>this object</returns>
         public object Clone()
         {
             return this; // don't clone the face, this would result in an infinite loop
@@ -205,6 +217,13 @@ namespace CADability.GeoObject
         private Edge[][] holes; // die Kanten der Löcher in richtiger Reihenfolge, die jeweilige Richtung steht in Edge
         private bool orientedOutward; // wenn das Face Bestandteil eines solid ist, dann kann hier festgestellt werden
 
+        /// <summary>
+        /// Returns the faces which share an outline edge with this face and lie on the same surface (see
+        /// <see cref="SameSurface(Face)"/>), e.g. the parts of a cylinder that has been split at its seam. Faces connected
+        /// only via a hole edge are not considered. The result does not contain this face and is empty when there is no
+        /// such neighbour.
+        /// </summary>
+        /// <returns>the directly connected faces on geometrically identical surfaces</returns>
         public IEnumerable<Face> GetSameSurfaceConnected()
         {
             HashSet<Face> res = new HashSet<Face>();
@@ -224,16 +243,42 @@ namespace CADability.GeoObject
         private string name;
 
         #region polymorph construction
+        /// <summary>
+        /// Signature of <see cref="Constructor"/>.
+        /// </summary>
+        /// <returns>the new face</returns>
         public delegate Face ConstructionDelegate();
+        /// <summary>
+        /// When set, <see cref="Construct"/> calls this delegate instead of creating a <see cref="Face"/>, so that an
+        /// application can substitute a derived class for every face CADability creates (also when reading files).
+        /// </summary>
         public static ConstructionDelegate Constructor;
+        /// <summary>
+        /// Creates an empty face, or an instance of the class <see cref="Constructor"/> provides. The face has no surface and
+        /// no edges yet: define it with <see cref="Set(ISurface, Edge[][], bool)"/>, or use one of the <c>MakeFace</c> methods
+        /// (e.g. <see cref="MakeFace(ISurface, SimpleShape)"/>), which create and define a face in one step.
+        /// </summary>
+        /// <returns>the new face</returns>
         public static Face Construct()
         {
             if (Constructor != null) return Constructor();
             return new Face();
         }
+        /// <summary>
+        /// Signature of <see cref="Constructed"/>.
+        /// </summary>
+        /// <param name="justConstructed">the face whose constructor has just run</param>
         public delegate void ConstructedDelegate(Face justConstructed);
+        /// <summary>
+        /// When set, this delegate is called at the end of every <see cref="Face"/> constructor (also during deserialization),
+        /// e.g. to attach user data to each new face.
+        /// </summary>
         public static ConstructedDelegate Constructed;
         #endregion
+        /// <summary>
+        /// Creates an empty face without surface and edges. Not for direct use: call <see cref="Construct"/>, which honours
+        /// <see cref="Constructor"/>, and define the face afterwards.
+        /// </summary>
         protected Face()
             : base()
         {
@@ -3310,6 +3355,14 @@ namespace CADability.GeoObject
             return res;
         }
 
+        /// <summary>
+        /// Creates a face on <paramref name="surface"/> bounded by the rectangle <paramref name="br"/> in the parameter (u/v)
+        /// space of the surface, e.g. a rectangular patch of a plane or a segment of a cylinder. The rectangle also becomes
+        /// the used area of the surface. The edges of the face are new and belong only to this face.
+        /// </summary>
+        /// <param name="surface">the surface of the face</param>
+        /// <param name="br">the bounds in the u/v system of the surface</param>
+        /// <returns>the created face</returns>
         public static Face MakeFace(ISurface surface, BoundingRect br)
         {
             SimpleShape ss = new SimpleShape(br.ToBorder());
@@ -3317,6 +3370,15 @@ namespace CADability.GeoObject
             return Face.MakeFace(surface, ss);
         }
 
+        /// <summary>
+        /// Creates a face on <paramref name="surface"/> from 2d curves in its parameter (u/v) space. The first list is the
+        /// outline, each further list a hole. The curves of each list must form a closed loop in the given order, the outline
+        /// counterclockwise, the holes clockwise; this is not checked. The 3d curves of the edges are computed from the
+        /// surface, the new edges belong only to this face.
+        /// </summary>
+        /// <param name="surface">the surface of the face</param>
+        /// <param name="outlineAndHoles">the outline followed by the holes, each as a loop of 2d curves on the surface</param>
+        /// <returns>the created face</returns>
         public static Face MakeFace(ISurface surface, List<List<ICurve2D>> outlineAndHoles)
         {
             Face res = Face.Construct();
@@ -3376,11 +3438,22 @@ namespace CADability.GeoObject
             PlaneSurface ps = new PlaneSurface(pln);
             return MakeFace(ps, cs.SimpleShapes[0]);
         }
+        /// <summary>
+        /// Sets the surface of this face without touching its edges and resets the cached extent. Only used while a face is
+        /// being constructed: the edges must be set afterwards to match the surface.
+        /// </summary>
+        /// <param name="surface">the surface</param>
         protected virtual void SetSurface(ISurface surface)
         {   // nur intern zu verwenden
             this.surface = surface;
             extent = BoundingCube.EmptyBoundingCube;
         }
+        /// <summary>
+        /// Replaces the edges of this face by new edges made from the 2d shape <paramref name="outline"/> in the parameter space
+        /// of the current surface (one edge per curve of the outline and of each hole). Only used while a face is being
+        /// constructed.
+        /// </summary>
+        /// <param name="outline">the outline and holes in the u/v system of the surface</param>
         protected virtual void SetArea(SimpleShape outline)
         {
             Path2D p2d = outline.Outline.AsPath();
@@ -3401,6 +3474,18 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Defines a face created with <see cref="Construct"/>: sets its surface and its edges. Each array in
+        /// <paramref name="edges"/> is a closed loop of edges, which must already refer to this face with their 2d curves
+        /// (see <see cref="Edge.SetFace(Face, ICurve2D, bool)"/>); the loop with the largest extent in the u/v system of the
+        /// surface becomes the outline, all other loops become holes. The face becomes the owner of the edges, and the used
+        /// area of the surface is set to the domain of the face.
+        /// </summary>
+        /// <param name="surface">the surface of the face</param>
+        /// <param name="edges">the loops of edges, one of them the outline, the others holes</param>
+        /// <param name="checkOutline">true: the 2d curves of each loop are checked and, where necessary, reversed or shifted by
+        /// the period of the surface so that they form a connected loop (needed for edges from an import, where direction
+        /// and periodic position of the 2d curves are not reliable)</param>
         public void Set(ISurface surface, Edge[][] edges, bool checkOutline = false)
         {
             this.surface = surface;
@@ -3805,6 +3890,12 @@ namespace CADability.GeoObject
             }
         }
 
+        /// <summary>
+        /// Removes the hole with the given index (see <see cref="HoleEdges(int)"/>) from this face, so that the face covers the
+        /// area of the hole again. The edges of the hole are no longer part of this face and their vertices are removed from
+        /// the vertices of the face. The change is undoable and raises the change events.
+        /// </summary>
+        /// <param name="holeIndex">index of the hole to remove, 0 &lt;= holeIndex &lt; <see cref="HoleCount"/></param>
         public void RemoveHole(int holeIndex)
         {
             using (new Changing(this))
@@ -3860,6 +3951,10 @@ namespace CADability.GeoObject
         }
 #if DEBUG
 #endif
+        /// <summary>
+        /// Forwards <see cref="Edge.FreeCachedMemory"/> to all edges of this face. Currently nothing is released; the
+        /// triangulation of the face is kept.
+        /// </summary>
         public void FreeCachedMemory()
         {
             foreach (Edge edge in Edges)
@@ -4276,6 +4371,10 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// The <see cref="Name"/> of this face, or an empty string when no name has been set (<see cref="Name"/> returns null
+        /// then).
+        /// </summary>
         public string NameOrEmpty
         {
             get
@@ -4394,6 +4493,11 @@ namespace CADability.GeoObject
             }
         }
 
+        /// <summary>
+        /// Enumerates all edges of this face: first the edges of the outline, then the edges of each hole, in the order of the
+        /// loops. Unlike <see cref="AllEdges"/> no array is created. A seam edge, which bounds the face on both sides, is
+        /// returned twice.
+        /// </summary>
         public IEnumerable<Edge> Edges
         {
             get
@@ -4407,6 +4511,10 @@ namespace CADability.GeoObject
             }
         }
 
+        /// <summary>
+        /// All edges of this face (outline and holes) as a set. Unlike <see cref="AllEdges"/> a seam edge, which occurs twice
+        /// in the outline of a face on a periodic surface, is contained only once. A new set is created on each call.
+        /// </summary>
         public HashSet<Edge> AllEdgesSet
         {
             get
@@ -4478,6 +4586,11 @@ namespace CADability.GeoObject
                 edge.UseVertices(aToUse);
             }
         }
+        /// <summary>
+        /// All vertices of this face, i.e. the start- and endpoints of its edges, each vertex once. They are collected from the
+        /// edges on first access and cached; call <see cref="RecalcVertices"/> after the edges have been changed. Do not
+        /// modify the returned array.
+        /// </summary>
         public Vertex[] Vertices
         {
             get
@@ -4496,6 +4609,10 @@ namespace CADability.GeoObject
                 return vertices;
             }
         }
+        /// <summary>
+        /// Recollects the vertices of this face from its edges (see <see cref="Vertices"/>). Needed after edges have been
+        /// replaced or their vertices have been merged, because the vertices are cached.
+        /// </summary>
         public void RecalcVertices()
         {
             HashSet<Vertex> res = new HashSet<Vertex>();
@@ -4580,6 +4697,14 @@ namespace CADability.GeoObject
             return res;
         }
 
+        /// <summary>
+        /// Returns the shadow of this face when it is projected perpendicularly onto <paramref name="onThisPlane"/>: a
+        /// <see cref="SimpleShape"/> in the 2d coordinate system of the plane. A face that folds over in the projection is
+        /// split at its silhouette first and the shadows of the parts are united. Returns null when the face is seen edge-on
+        /// (its projection has no area) or when the shadow could not be computed.
+        /// </summary>
+        /// <param name="onThisPlane">the plane to project onto</param>
+        /// <returns>the outline (and holes) of the shadow, or null</returns>
         public SimpleShape GetShadow(Plane onThisPlane)
         {
             return GetShadow(onThisPlane, null);
@@ -5174,6 +5299,16 @@ namespace CADability.GeoObject
         {
             return new ShowPropertyFace(this, Frame);
         }
+        /// <summary>
+        /// Clones this face so that several faces of a shell can be cloned with shared edges and vertices: an edge found in
+        /// <paramref name="clonedEdges"/> is reused and the clone becomes its second face, otherwise the edge is cloned and the
+        /// pair original/clone is added to the dictionary; the same holds for the vertices. Used by
+        /// <see cref="Shell.Clone(Dictionary{Edge, Edge}, Dictionary{Vertex, Vertex}, Dictionary{Face, Face})"/>. Pass empty
+        /// dictionaries to clone a single face with new edges and vertices.
+        /// </summary>
+        /// <param name="clonedEdges">maps original edges to their clones, extended by this call</param>
+        /// <param name="clonedVertices">maps original vertices to their clones, extended by this call</param>
+        /// <returns>the cloned face</returns>
         public Face Clone(Dictionary<Edge, Edge> clonedEdges, Dictionary<Vertex, Vertex> clonedVertices)
         {   // das kann von einer Shell aufgerufen werden, so dass die Kanten ggf nur einmal gekloned werden
             Face res = Face.Construct();
@@ -5441,6 +5576,15 @@ namespace CADability.GeoObject
 
         }
 
+        /// <summary>
+        /// Replaces the surface of this face by (a clone of) <paramref name="surface"/>, which must have the same geometry but
+        /// may use a different parameterization (e.g. a <see cref="NurbsSurface"/> replaced by the
+        /// <see cref="CylindricalSurface"/> it describes). <paramref name="reparameterize"/> maps the u/v system of the old
+        /// surface to the one of the new surface; the 2d curves of all edges on this face are transformed accordingly, the 3d
+        /// curves are kept, and edges with an <see cref="InterpolatedDualSurfaceCurve"/> are rebuilt on the new surface.
+        /// </summary>
+        /// <param name="surface">the new surface, geometrically identical to the old one</param>
+        /// <param name="reparameterize">transformation from the old to the new u/v system</param>
         public void ModifySurface(ISurface surface, ModOp2D reparameterize)
         {
             this.surface = surface.Clone();
@@ -5609,6 +5753,13 @@ namespace CADability.GeoObject
             (surface as ISurfaceImpl).usedArea = ext; // needed for BoxedSurface
             extent = BoundingCube.EmptyBoundingCube;
         }
+        /// <summary>
+        /// Applies <paramref name="m"/> to the surface (and to the cached triangulation) of this face only. The edges are not
+        /// modified, so the face is inconsistent until the caller has modified them too; <see cref="Modify(ModOp)"/> does both
+        /// and is what normally should be used. Used by <see cref="Shell"/>, which modifies its shared edges separately.
+        /// Raises the change events, but is not undoable.
+        /// </summary>
+        /// <param name="m">the modification</param>
         public void ModifySurface(ModOp m)
         {
             // usually called from Shell, which modifies the edges separately
@@ -5838,6 +5989,14 @@ namespace CADability.GeoObject
             }
             #endregion
         }
+        /// <summary>
+        /// Returns the boundary of this face in the parameter (u/v) space of its surface as closed polygons: the first polygon
+        /// is the outline, the following polygons are the holes. The edges are approximated so that the polygons deviate at
+        /// most <paramref name="precision"/> from the exact curves; the first point of a polygon is not repeated at its end.
+        /// Returns an empty array when the outline degenerates (has no area).
+        /// </summary>
+        /// <param name="precision">maximum deviation of the polygons from the edges</param>
+        /// <returns>the outline and the holes as polygons in the u/v system</returns>
         public GeoPoint2D[][] GetUVOutline(double precision)
         {   // kopiert aus Triangulate, liefert dei uv Umrandung zu der gegebenen Auflösung als Array von Polylinien
             List<GeoPoint2D[]> polylines = new List<GeoPoint2D[]>();
@@ -6444,12 +6603,31 @@ namespace CADability.GeoObject
             return res.ToArray();
         }
 
+        /// <summary>
+        /// Obsolete, use <see cref="GetInnerIntersection(Face)"/>.
+        /// </summary>
+        /// <param name="other">the other face</param>
+        /// <returns>the inner intersection curves</returns>
         [Obsolete("Has been renamed to \"GetInnerIntersection\"")]
         public ICurve[] Intersect(Face other)
         {
             return GetInnerIntersection(other);
         }
 
+        /// <summary>
+        /// Computes a triangulation of this face without using or filling the cached triangulation (see
+        /// <see cref="GetTriangulation"/>). The points of the boundary polygons come first in <paramref name="trianglePoint"/>
+        /// and <paramref name="triangleUVPoint"/>: <paramref name="edgeIndizes"/> holds, for the outline and for each hole, the
+        /// index following its last point, so the points of loop i are those from edgeIndizes[i-1] (0 for the first loop) to
+        /// edgeIndizes[i]-1. All arrays are empty when the outline of the face has no area.
+        /// </summary>
+        /// <param name="precision">maximum deviation of the polygons from the edges and of the triangles from the surface</param>
+        /// <param name="noInnerPoints">true: the boundary polygons are triangulated as they are; false: triangles whose edges
+        /// deviate too much from the surface are subdivided, which adds points inside the face</param>
+        /// <param name="trianglePoint">the 3d points of the triangles</param>
+        /// <param name="triangleUVPoint">the same points in the u/v system of the surface</param>
+        /// <param name="triangleIndex">three indices per triangle into the point arrays</param>
+        /// <param name="edgeIndizes">for each loop (outline, holes) the index following its last point</param>
         public void GetSimpleTriangulation(double precision, bool noInnerPoints, out GeoPoint[] trianglePoint, out GeoPoint2D[] triangleUVPoint, out int[] triangleIndex, out int[] edgeIndizes)
         {
             edgeIndizes = new int[0]; // damit es gesetzt ist;
@@ -6905,7 +7083,19 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// Signature of <see cref="OnPaintTo3D"/>.
+        /// </summary>
+        /// <param name="toPaint">the face being painted</param>
+        /// <param name="paintTo3D">the paint interface to paint to</param>
+        /// <returns>true if the handler has painted the face and the default painting is to be skipped, false to let
+        /// CADability paint the face</returns>
         public delegate bool PaintTo3DDelegate(Face toPaint, IPaintTo3D paintTo3D);
+        /// <summary>
+        /// Static hook called at the beginning of <see cref="PaintTo3D(IPaintTo3D)"/> for every face. Set it to replace or
+        /// extend the way faces are displayed; when the handler returns true, the default painting of the surface and the
+        /// edges is skipped. Null by default.
+        /// </summary>
         public static PaintTo3DDelegate OnPaintTo3D;
         /// <inheritdoc/>
         public override void PaintTo3D(IPaintTo3D paintTo3D)
@@ -6947,6 +7137,7 @@ namespace CADability.GeoObject
         {
             TryAssureTriangles(precision);
         }
+        /// <inheritdoc/>
         public override Style.EDefaultFor PreferredStyle
         {
             get
@@ -7093,6 +7284,7 @@ namespace CADability.GeoObject
             }
             return res;
         }
+        /// <inheritdoc/>
         public override IGeoObject[] OwnedItems
         {
             get
@@ -7100,6 +7292,7 @@ namespace CADability.GeoObject
                 return null;
             }
         }
+        /// <inheritdoc/>
         public override string Description
         {
             get
@@ -7218,10 +7411,25 @@ namespace CADability.GeoObject
             return Contains(ref pos, acceptOnCurve);
         }
 
+        /// <summary>
+        /// Tests whether this face interferes with the cube <paramref name="bc"/>: true if a vertex of the face lies in the
+        /// cube, an edge passes through it, or the surface passes through the cube at a point inside the face. The test is
+        /// exact, it does not use the triangulation. <see cref="HitTest(ref BoundingCube, double)"/> is the general entry
+        /// point for this test.
+        /// </summary>
+        /// <param name="bc">the cube to test</param>
+        /// <returns>true if face and cube have a point in common</returns>
         public bool HitBoundingCube(BoundingCube bc)
         {
             return HitBoundingCube(bc, GetBoundingCube());
         }
+        /// <summary>
+        /// Same as <see cref="HitBoundingCube(BoundingCube)"/>. <paramref name="fbc"/>, the extent of this face, was once used
+        /// for a shortcut that is now disabled and is ignored.
+        /// </summary>
+        /// <param name="bc">the cube to test</param>
+        /// <param name="fbc">the bounding cube of this face, not used</param>
+        /// <returns>true if face and cube have a point in common</returns>
         public bool HitBoundingCube(BoundingCube bc, BoundingCube fbc)
         {
             //  any vertex in the cube?
@@ -8060,6 +8268,7 @@ namespace CADability.GeoObject
 
         }
         #region IJsonSerialize Members
+        /// <inheritdoc/>
         public override void GetObjectData(IJsonWriteData data)
         {
             base.GetObjectData(data);
@@ -8070,6 +8279,7 @@ namespace CADability.GeoObject
             data.AddProperty("OrientedOutward", orientedOutward);
         }
 
+        /// <inheritdoc/>
         public override void SetObjectData(IJsonReadData data)
         {
             base.SetObjectData(data);
@@ -8184,6 +8394,11 @@ namespace CADability.GeoObject
         #endregion
         #region IColorDef Members
         private ColorDef colorDef;
+        /// <summary>
+        /// The color of this face, which is also used for its edges. When the face belongs to a <see cref="Shell"/> (or a
+        /// <see cref="Solid"/>), setting the color changes this face only, but the change events are raised on the shell or
+        /// solid, so that it is redrawn. The change is undoable.
+        /// </summary>
         public ColorDef ColorDef
         {
             get => colorDef;
@@ -8472,6 +8687,15 @@ namespace CADability.GeoObject
             }
             return res.ToArray();
         }
+        /// <summary>
+        /// Intersects the infinite line through <paramref name="sp"/> with direction <paramref name="direction"/> with this
+        /// face. Only the intersection points with the surface that lie inside the face (or on its border) are returned, in
+        /// no particular order. Use <see cref="GetOrientedLineIntersection"/> when the line parameters and the orientation of
+        /// the intersections are needed.
+        /// </summary>
+        /// <param name="sp">a point on the line</param>
+        /// <param name="direction">direction of the line</param>
+        /// <returns>the intersection points inside the face, empty when there are none</returns>
         public GeoPoint[] GetLineIntersection(GeoPoint sp, GeoVector direction)
         {
             GeoPoint2D[] all = this.surface.GetLineIntersection(sp, direction);
@@ -9283,6 +9507,14 @@ namespace CADability.GeoObject
             }
             return res;
         }
+        /// <summary>
+        /// Splits a face on a periodic surface (e.g. a full cylinder or torus) that contains a seam edge, i.e. an outline edge
+        /// which bounds the face on both sides, into faces without seams. The face is split across the middle of its domain,
+        /// perpendicular to the seam. The resulting faces are new objects with their own edges; this face is not modified.
+        /// Returns null when the surface is not periodic or the outline has no seam edge. Boolean operations work better
+        /// without seams, see <see cref="Shell.SplitPeriodicFaces"/>.
+        /// </summary>
+        /// <returns>the parts of the face, or null when there is nothing to split</returns>
         public List<Face> SplitPeriodicFace()
         {
             if (!surface.IsUPeriodic && !surface.IsVPeriodic) return null;
@@ -9363,6 +9595,13 @@ namespace CADability.GeoObject
             return res;
         }
 
+        /// <summary>
+        /// Splits a face whose surface has a singularity (a pole, like the apex of a cone or the poles of a sphere) inside its
+        /// domain along the parameter lines through the singularity, so that the singularity lies on the border of each
+        /// resulting face. The resulting faces are new objects with their own edges; this face is not modified. Returns null
+        /// when the surface has no singularities or none of them is inside the face.
+        /// </summary>
+        /// <returns>the parts of the face, or null when there is nothing to split</returns>
         public List<Face> SplitSingularFace()
         {
             double[] us = surface.GetUSingularities();
@@ -10661,6 +10900,14 @@ namespace CADability.GeoObject
             }
             return true;
         }
+        /// <summary>
+        /// Checks the topological consistency of this face: the outline and each hole must be a closed loop of edges in which
+        /// the end vertex of each edge is the start vertex of the next, each edge must refer to this face as its primary or
+        /// secondary face, an edge shared with another face must be used in opposite directions by the two faces, and the 2d
+        /// curves of the edges must run around the face in the correct direction and agree with the 3d curves. Intended for
+        /// debugging and for validating imported or newly constructed faces.
+        /// </summary>
+        /// <returns>true if the face is consistent, false if a violation was found</returns>
         public bool CheckConsistency()
         {   // consistency check
             if (!IsConnectedLoop(outline)) return false;
@@ -10733,6 +10980,12 @@ namespace CADability.GeoObject
             return true;
         }
 
+        /// <summary>
+        /// Returns true if this face and <paramref name="fc1"/> share an edge (of the outline or of a hole), i.e. are direct
+        /// neighbours.
+        /// </summary>
+        /// <param name="fc1">the other face</param>
+        /// <returns>true if there is a common edge</returns>
         public bool IsConnectedWith(Face fc1)
         {
             foreach (Edge edge in Edges)
@@ -10790,6 +11043,14 @@ namespace CADability.GeoObject
             }
             return false;
         }
+        /// <summary>
+        /// Returns true if this face together with a tangentially connected neighbour on the same surface forms a closed
+        /// (full periodic) surface, like the two halves of a cylinder that has been split at its seam. The test is heuristic:
+        /// it looks for a neighbour with the same surface that shares at least two outline edges with this face. Only faces
+        /// on a cylindrical or toroidal surface (<c>ISurfaceOfArcExtrusion</c>) are considered, for all other faces the
+        /// result is false.
+        /// </summary>
+        /// <returns>true if this face is a part of a closed surface</returns>
         public bool IsClosedSurface()
         {
             if (Surface is ISurfaceOfArcExtrusion sae)
@@ -10933,6 +11194,19 @@ namespace CADability.GeoObject
 
             return res;
         }
+        /// <summary>
+        /// Tests whether two sets of faces have the same shape and differ only by a translation: for each face in
+        /// <paramref name="faces1"/> there must be a face in <paramref name="faces2"/> with the same surface and the same
+        /// outline after <paramref name="faces2"/> has been moved by <paramref name="translation"/>. Note that the faces in
+        /// <paramref name="faces2"/> are actually moved by the translation as a side effect of the test and are not moved
+        /// back. See also <see cref="Shell.SameForm"/> and <see cref="Shell.FindSameForm"/>.
+        /// </summary>
+        /// <param name="faces1">the first set of faces</param>
+        /// <param name="faces2">the second set of faces, which gets translated</param>
+        /// <param name="precision">maximum deviation still accepted as equal</param>
+        /// <param name="translation">the translation that moves the center of the extent of <paramref name="faces2"/> onto the
+        /// center of the extent of <paramref name="faces1"/> (the identity when the arrays differ in length)</param>
+        /// <returns>true if the two sets have the same form</returns>
         static public bool SameForm(Face[] faces1, Face[] faces2, double precision, out ModOp translation)
         {
             if (faces1.Length != faces2.Length)

@@ -650,6 +650,10 @@ namespace CADability.Actions
                 actionStack.RemoveActiveAction();
             }
         }
+        /// <summary>
+        /// The action below this one on the action stack, i.e. the action that was active before this one was set and
+        /// becomes active again when this one is removed. Null if there is none or this action is not on the stack.
+        /// </summary>
         public Action PreviousAction
         {
             get

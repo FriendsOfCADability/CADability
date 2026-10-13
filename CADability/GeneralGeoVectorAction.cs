@@ -30,6 +30,13 @@ namespace CADability.Actions
             initialGeoVectorValue = ToModify.GetGeoVector();
             this.basePoint = basePoint;
         }
+        /// <summary>
+        /// Constructs a GeneralGeoVectorAction to modify the provided <see cref="GeoVectorProperty"/> and excludes
+        /// <paramref name="ignoreSnap"/> from the snapping, which is usually the object that is being modified.
+        /// </summary>
+        /// <param name="ToModify">Property to modify</param>
+        /// <param name="basePoint">The start point of the vector in model coordinates; the vector is the (snapped) mouse position minus this point</param>
+        /// <param name="ignoreSnap">Object not to snap to, may be null</param>
         public GeneralGeoVectorAction(GeoVectorProperty ToModify, GeoPoint basePoint, IGeoObject ignoreSnap) : this(ToModify, basePoint)
         {
             if (ignoreSnap != null)
@@ -104,6 +111,7 @@ namespace CADability.Actions
             return "GeneralGeoVectorAction[LeaveSelectProperties]"; // LeaveSelectProperties ist das Zauberwort, 
                                                                     // damit die Properties der SelectObjectAction stehen bleiben.
         }
+        /// <inheritdoc/>
         public override void OnRemoveAction()
         {
         }
@@ -152,12 +160,14 @@ namespace CADability.Actions
                 base.RemoveThisAction();
             }
         }
+        /// <inheritdoc/>
         public override bool OnEscape()
         {
             SetGeoVector(initialGeoVectorValue);
             base.RemoveThisAction();
             return true;
         }
+        /// <inheritdoc/>
         public override bool OnEnter()
         {
             base.RemoveThisAction();

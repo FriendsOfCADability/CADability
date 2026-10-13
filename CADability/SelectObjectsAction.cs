@@ -249,7 +249,42 @@ namespace CADability.Actions
 	public class SelectObjectsAction : Action
 	{
 		private enum Mode { NoAction, TestDragRect, DragRect, DragWidth, DragHeight, DragSize, DragMove, DragRotate, DragObjectProperty, TestHotSpot }
-		public enum CursorPosition { EmptySpace, OverObject, OverSelectedObject, OverHandleLB, OverHandleLM, OverHandleLT, OverHandleMB, OverHandleMM, OverHandleMT, OverHandleRB, OverHandleRM, OverHandleRT, OverFixPoint, OverHotSpot }
+		/// <summary>
+		/// What is under the mouse cursor while the selection action waits for a click. It determines the cursor shape and
+		/// what dragging with the left button does: open a selection rectangle, move, resize or stretch the selected objects
+		/// by the handles of the selection frame, or drag a hotspot.
+		/// </summary>
+		public enum CursorPosition
+		{
+			/// <summary>Nothing under the cursor; dragging opens a selection rectangle.</summary>
+			EmptySpace,
+			/// <summary>Over an object that is not selected; dragging opens a selection rectangle.</summary>
+			OverObject,
+			/// <summary>Over an object that is already selected; dragging opens a selection rectangle.</summary>
+			OverSelectedObject,
+			/// <summary>Over the handle at the lower left corner of the selection frame; dragging resizes the selection.</summary>
+			OverHandleLB,
+			/// <summary>Over the handle in the middle of the left edge of the selection frame; dragging changes the width.</summary>
+			OverHandleLM,
+			/// <summary>Over the handle at the upper left corner of the selection frame; dragging resizes the selection.</summary>
+			OverHandleLT,
+			/// <summary>Over the handle in the middle of the bottom edge of the selection frame; dragging changes the height.</summary>
+			OverHandleMB,
+			/// <summary>Over the handle in the center of the selection frame; dragging moves the selection.</summary>
+			OverHandleMM,
+			/// <summary>Over the handle in the middle of the top edge of the selection frame; dragging changes the height.</summary>
+			OverHandleMT,
+			/// <summary>Over the handle at the lower right corner of the selection frame; dragging resizes the selection.</summary>
+			OverHandleRB,
+			/// <summary>Over the handle in the middle of the right edge of the selection frame; dragging changes the width.</summary>
+			OverHandleRM,
+			/// <summary>Over the handle at the upper right corner of the selection frame; dragging resizes the selection.</summary>
+			OverHandleRT,
+			/// <summary>Over the fix point of the selection. Currently never detected.</summary>
+			OverFixPoint,
+			/// <summary>Over a hotspot of a selected object (see <see cref="IHotSpot"/>); dragging modifies the corresponding property.</summary>
+			OverHotSpot
+		}
 		private Mode mode; // der Zustand, in dem sich die Aktion gerade befindet
 		private CursorPosition lastCursorPosition; // die letzte gemessene Cursorposition, wird in den DragXxx Modi nicht berechnet
 		private Point downPoint; // Position des letzten MouseDown

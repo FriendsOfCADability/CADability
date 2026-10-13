@@ -14,6 +14,12 @@ namespace CADability.Curve2D
     {
         private GeoPoint2D startPoint;
         private GeoPoint2D endPoint;
+        /// <summary>
+        /// Constructs the line from <paramref name="StartPoint"/> to <paramref name="EndPoint"/>. The points may coincide, but a
+        /// line of zero length has no direction and some operations (e.g. <see cref="Parallel"/>) then throw a <see cref="Curve2DException"/>.
+        /// </summary>
+        /// <param name="StartPoint">start point of the line</param>
+        /// <param name="EndPoint">end point of the line</param>
         public Line2D(GeoPoint2D StartPoint, GeoPoint2D EndPoint)
         {
             startPoint = StartPoint;
@@ -37,6 +43,7 @@ namespace CADability.Curve2D
             ClipRect clr = new ClipRect(clippedBy);
             clr.ClipLine(ref startPoint, ref endPoint);
         }
+        /// <inheritdoc/>
         public override string ToString()
         {
             return "Line2D: (" + startPoint.DebugString + ") (" + endPoint.DebugString + ")";
@@ -47,6 +54,7 @@ namespace CADability.Curve2D
             interpol = new GeoPoint2D[] { startPoint, endPoint };
             interparam = new double[] { 0.0, 1.0 };
         }
+        /// <inheritdoc/>
         public override GeoPoint2D StartPoint
         {
             get
@@ -58,6 +66,7 @@ namespace CADability.Curve2D
                 startPoint = value;
             }
         }
+        /// <inheritdoc/>
         public override GeoPoint2D EndPoint
         {
             get
@@ -69,6 +78,7 @@ namespace CADability.Curve2D
                 endPoint = value;
             }
         }
+        /// <inheritdoc/>
         public override GeoVector2D StartDirection
         {
             get
@@ -77,6 +87,7 @@ namespace CADability.Curve2D
                 return v;
             }
         }
+        /// <inheritdoc/>
         public override GeoVector2D EndDirection
         {
             get
@@ -84,6 +95,7 @@ namespace CADability.Curve2D
                 return StartDirection;
             }
         }
+        /// <inheritdoc/>
         public override GeoVector2D MiddleDirection
         {
             get
@@ -103,6 +115,7 @@ namespace CADability.Curve2D
             double dy = endPoint.y - startPoint.y;
             return new GeoPoint2D(startPoint.x + Position * dx, startPoint.y + Position * dy);
         }
+        /// <inheritdoc/>
         public override bool TryPointDeriv2At(double position, out GeoPoint2D point, out GeoVector2D deriv, out GeoVector2D deriv2)
         {
             point = PointAt(position);
@@ -118,6 +131,7 @@ namespace CADability.Curve2D
             if (Math.Abs(dx) > Math.Abs(dy)) return (p.x - startPoint.x) / dx;
             else return (p.y - startPoint.y) / dy;
         }
+        /// <inheritdoc/>
         public override double Length
         {
             get
@@ -131,6 +145,7 @@ namespace CADability.Curve2D
             // mit Vorzeichen (gegen Uhrzeigersinn ist positiv)
             return ((startPoint.x - p.x) * (endPoint.y - p.y) - (startPoint.y - p.y) * (endPoint.x - p.x)) / 2.0;
         }
+        /// <inheritdoc/>
         public override double Sweep { get { return 0.0; } }
         /// <inheritdoc/>
 		public override ICurve2D[] Split(double Position)
@@ -578,13 +593,24 @@ namespace CADability.Curve2D
             info.AddValue("StartPoint", startPoint);
             info.AddValue("EndPoint", endPoint);
         }
+        /// <summary>
+        /// Creates an empty line for the JSON deserialization (<see cref="IJsonSerialize"/>); the data is set by <see cref="SetObjectData"/>.
+        /// </summary>
         protected Line2D() { } // needed for IJsonSerialize
+        /// <summary>
+        /// Writes the start point and the end point for the JSON serialization (<see cref="IJsonSerialize.GetObjectData(IJsonWriteData)"/>).
+        /// </summary>
+        /// <param name="data">receives the data</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("StartPoint", startPoint);
             data.AddProperty("EndPoint", endPoint);
         }
 
+        /// <summary>
+        /// Reads the start point and the end point from the JSON serialization (<see cref="IJsonSerialize.SetObjectData(IJsonReadData)"/>).
+        /// </summary>
+        /// <param name="data">the data to read from</param>
         public void SetObjectData(IJsonReadData data)
         {
             startPoint = data.GetProperty<GeoPoint2D>("StartPoint");

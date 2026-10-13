@@ -12,6 +12,12 @@ namespace CADability.UserInterface
         private IView[] condorViews;
         private IFrame frame;
         private IShowProperty[] subEntries;
+        /// <summary>
+        /// Creates the entry for the given views; their property entries (<see cref="IView.GetShowProperties(IFrame)"/>)
+        /// become the sub entries.
+        /// </summary>
+        /// <param name="condorViews">The views to show</param>
+        /// <param name="frame">The frame the views belong to; its project handles the context menu</param>
         public MultiViewProperty(IView[] condorViews, IFrame frame)
         {
             this.condorViews = condorViews;
@@ -19,6 +25,7 @@ namespace CADability.UserInterface
             base.resourceIdInternal = "MultiViewProperty";
         }
         #region IShowProperty Members
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -26,6 +33,7 @@ namespace CADability.UserInterface
                 return ShowPropertyLabelFlags.Selectable | ShowPropertyLabelFlags.ContextMenu;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -68,6 +76,7 @@ namespace CADability.UserInterface
                 return subEntries;
             }
         }
+        /// <inheritdoc/>
         public override void Removed(IPropertyTreeView propertyTreeView)
         {
             base.Removed(propertyTreeView);

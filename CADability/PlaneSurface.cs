@@ -21,16 +21,39 @@ namespace CADability.GeoObject
             fromUnitPlane = m;
             toUnitPlane = fromUnitPlane.GetInverse();
         }
+        /// <summary>
+        /// Creates the surface of the given plane. The u/v system of the surface is the coordinate system of the plane: u runs along
+        /// <see cref="CADability.Plane.DirectionX"/>, v along <see cref="CADability.Plane.DirectionY"/> (both in length units) and the
+        /// origin is <see cref="CADability.Plane.Location"/>.
+        /// </summary>
+        /// <param name="plane">The plane to represent</param>
         public PlaneSurface(Plane plane)
         {
             fromUnitPlane = new ModOp(plane.DirectionX, plane.DirectionY, plane.Normal, plane.Location);
             toUnitPlane = fromUnitPlane.GetInverse();
         }
+        /// <summary>
+        /// Creates a planar surface from its origin, the directions of the u and v axes and its normal. The vectors need not be
+        /// perpendicular or normalized: the 3d point of (u, v) is location + u*uDirection + v*vDirection. <paramref name="zDirection"/>
+        /// defines the normal and thus the orientation of the surface; when it points to the other side than uDirection x vDirection,
+        /// the surface is left handed and its normal points to that side.
+        /// </summary>
+        /// <param name="location">The 3d point of the parameter origin (0, 0)</param>
+        /// <param name="uDirection">The 3d direction and scale of the u axis</param>
+        /// <param name="vDirection">The 3d direction and scale of the v axis</param>
+        /// <param name="zDirection">The direction of the normal; must not lie in the plane</param>
         public PlaneSurface(GeoPoint location, GeoVector uDirection, GeoVector vDirection, GeoVector zDirection)
         {
             fromUnitPlane = new ModOp(uDirection, vDirection, zDirection, location);
             toUnitPlane = fromUnitPlane.GetInverse();
         }
+        /// <summary>
+        /// Creates a planar surface from its origin and the directions of the u and v axes. The vectors need not be perpendicular or
+        /// normalized: the 3d point of (u, v) is location + u*uDirection + v*vDirection. The normal is uDirection x vDirection (right handed).
+        /// </summary>
+        /// <param name="location">The 3d point of the parameter origin (0, 0)</param>
+        /// <param name="uDirection">The 3d direction and scale of the u axis</param>
+        /// <param name="vDirection">The 3d direction and scale of the v axis; must not be parallel to <paramref name="uDirection"/></param>
         public PlaneSurface(GeoPoint location, GeoVector uDirection, GeoVector vDirection)
         {
             GeoVector zDirection = uDirection ^ vDirection;
@@ -44,10 +67,14 @@ namespace CADability.GeoObject
             fromUnitPlane = new ModOp(dirx, diry, dirx ^ diry, p0);
             toUnitPlane = fromUnitPlane.GetInverse();
         }
+        /// <inheritdoc/>
         public override string ToString()
         {
             return "PlaneSurface: " + "loc: " + Location.ToString() + "dirx: " + DirectionX.ToString() + "diry: " + DirectionY.ToString();
         }
+        /// <summary>
+        /// The 3d point of the parameter origin (0, 0). Read only; use <see cref="ISurface.Modify(ModOp)"/> to move the surface.
+        /// </summary>
         public GeoPoint Location
         {
             get
@@ -55,6 +82,10 @@ namespace CADability.GeoObject
                 return fromUnitPlane * GeoPoint.Origin;
             }
         }
+        /// <summary>
+        /// The 3d direction of the u axis: the derivative of the surface in u, which is constant over the plane. Its length is the scale
+        /// of the u parameter (one unit of u corresponds to this vector).
+        /// </summary>
         public GeoVector DirectionX
         {
             get
@@ -62,6 +93,10 @@ namespace CADability.GeoObject
                 return fromUnitPlane * GeoVector.XAxis;
             }
         }
+        /// <summary>
+        /// The 3d direction of the v axis: the derivative of the surface in v, which is constant over the plane. Its length is the scale
+        /// of the v parameter (one unit of v corresponds to this vector).
+        /// </summary>
         public GeoVector DirectionY
         {
             get
@@ -69,6 +104,10 @@ namespace CADability.GeoObject
                 return fromUnitPlane * GeoVector.YAxis;
             }
         }
+        /// <summary>
+        /// The normal vector of the plane (not necessarily normalized). It defines the orientation: when the surface is used by a
+        /// <see cref="Face"/>, the side the normal points to is the outside of the solid.
+        /// </summary>
         public GeoVector Normal
         {
             get
@@ -76,6 +115,10 @@ namespace CADability.GeoObject
                 return fromUnitPlane * GeoVector.ZAxis;
             }
         }
+        /// <summary>
+        /// The transformation which maps this plane onto the global x/y plane: a 3d point on the surface is mapped to (u, v, 0).
+        /// The inverse of <see cref="FromXYPlane"/>.
+        /// </summary>
         public ModOp ToXYPlane
         {
             get
@@ -83,6 +126,10 @@ namespace CADability.GeoObject
                 return toUnitPlane;
             }
         }
+        /// <summary>
+        /// The transformation which maps the global x/y plane onto this surface: (u, v, 0) is mapped to the 3d point at (u, v).
+        /// The inverse of <see cref="ToXYPlane"/>.
+        /// </summary>
         public ModOp FromXYPlane
         {
             get
@@ -90,6 +137,9 @@ namespace CADability.GeoObject
                 return fromUnitPlane;
             }
         }
+        /// <summary>
+        /// The geometry of this surface as a <see cref="CADability.Plane"/> with the same location and directions (a new value on each access).
+        /// </summary>
         public Plane Plane
         {
             get
@@ -155,6 +205,7 @@ namespace CADability.GeoObject
             if (toUnitPlane.IsNull) toUnitPlane = fromUnitPlane.GetInverse();
             return (toUnitPlane * p).To2D();
         }
+        /// <inheritdoc/>
         public override void Derivation2At(GeoPoint2D uv, out GeoPoint location, out GeoVector du, out GeoVector dv, out GeoVector duu, out GeoVector dvv, out GeoVector duv)
         {
             location = PointAt(uv);
@@ -164,9 +215,13 @@ namespace CADability.GeoObject
             duv = GeoVector.NullVector;
             dvv = GeoVector.NullVector;
         }
+        /// <inheritdoc/>
         public override bool IsUPeriodic { get { return false; } }
+        /// <inheritdoc/>
         public override bool IsVPeriodic { get { return false; } }
+        /// <inheritdoc/>
         public override double UPeriod { get { return 0.0; } }
+        /// <inheritdoc/>
         public override double VPeriod { get { return 0.0; } }
         /// <inheritdoc/>
         public override bool IsVanishingProjection(Projection p, double umin, double umax, double vmin, double vmax)
@@ -299,6 +354,7 @@ namespace CADability.GeoObject
             }
             return base.SameGeometry(thisBounds, other, otherBounds, precision, out firstToSecond);
         }
+        /// <inheritdoc/>
         public override double IsParallel(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds)
         {
             if (other is PlaneSurface ps)
@@ -320,6 +376,7 @@ namespace CADability.GeoObject
             //ModOp newToUnit = toUnitPlane * ModOp.Translate(-offset * n);
             //return new PlaneSurface(newToUnit.GetInverse());
         }
+        /// <inheritdoc/>
         public override bool Oriented
         {
             get
@@ -485,11 +542,13 @@ namespace CADability.GeoObject
         {   // den einzigen Fußpunkt gibts immer, auch wenn der Punkt genau auf der Fläche liegt
             return new GeoPoint2D[] { PositionOf(fromHere) };
         }
+        /// <inheritdoc/>
         public override double MaxDist(GeoPoint2D sp, GeoPoint2D ep, out GeoPoint2D mp)
         {
             mp = new GeoPoint2D(sp, ep);
             return 0.0;
         }
+        /// <inheritdoc/>
         public override ICurve[] Intersect(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds)
         {
             IDualSurfaceCurve[] dsc = other.GetPlaneIntersection(this, otherBounds.Left, otherBounds.Right, otherBounds.Bottom, otherBounds.Top, Precision.eps);
@@ -501,6 +560,7 @@ namespace CADability.GeoObject
             }
             return res; // es wird nicht auf otherBounds geclippt
         }
+        /// <inheritdoc/>
         public override IDualSurfaceCurve[] GetDualSurfaceCurves(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, List<GeoPoint> seeds, List<Tuple<double, double, double, double>> extremePositions)
         {
             // this is always implemented at the more complex surface:
@@ -518,6 +578,7 @@ namespace CADability.GeoObject
                 return res;
             }
         }
+        /// <inheritdoc/>
         public override int GetExtremePositions(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, out List<Tuple<double, double, double, double>> extremePositions)
         {
             switch (other)
@@ -566,12 +627,18 @@ namespace CADability.GeoObject
             extremePositions = null;
             return -1; // means: no implementation for this combination
         }
+        /// <inheritdoc/>
         public override bool IsExtruded(GeoVector direction)
         {
             return Precision.IsPerpendicular(Normal, direction, false);
         }
         #endregion
         #region ISerializable Members
+        /// <summary>
+        /// Constructor for the legacy binary deserialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// </summary>
+        /// <param name="info">The serialized data</param>
+        /// <param name="context">The source of the deserialization</param>
         protected PlaneSurface(SerializationInfo info, StreamingContext context)
         {
             fromUnitPlane = (ModOp)info.GetValue("FromUnitPlane", typeof(ModOp));
@@ -584,11 +651,22 @@ namespace CADability.GeoObject
         {
             info.AddValue("FromUnitPlane", fromUnitPlane, typeof(ModOp));
         }
+        /// <summary>
+        /// Empty constructor for the JSON deserialization (<see cref="IJsonSerialize"/>); the data is set by <see cref="SetObjectData(IJsonReadData)"/>.
+        /// </summary>
         protected PlaneSurface() { } // for IJsonSerialize
+        /// <summary>
+        /// Writes the data of this surface for the JSON serialization (<see cref="IJsonSerialize"/>).
+        /// </summary>
+        /// <param name="data">Receives the data</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("FromUnitPlane", fromUnitPlane);
         }
+        /// <summary>
+        /// Restores this surface from the JSON data written by <see cref="GetObjectData(IJsonWriteData)"/> (<see cref="IJsonSerialize"/>).
+        /// </summary>
+        /// <param name="data">The data to read</param>
         public void SetObjectData(IJsonReadData data)
         {
             fromUnitPlane = data.GetProperty<ModOp>("FromUnitPlane");
@@ -602,6 +680,7 @@ namespace CADability.GeoObject
             toUnitPlane = fromUnitPlane.GetInverse();
         }
         #endregion
+        /// <inheritdoc/>
         public override IPropertyEntry GetPropertyEntry(IFrame frame)
         {
             List<IPropertyEntry> se = new List<IPropertyEntry>();

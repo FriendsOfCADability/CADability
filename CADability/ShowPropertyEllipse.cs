@@ -191,6 +191,7 @@ namespace CADability.UserInterface
             ellipse.UserData.UserDataAddedEvent += OnUserDataAdded;
             ellipse.UserData.UserDataRemovedEvent += OnUserDataAdded;
         }
+        /// <inheritdoc/>
         public override void Removed(IPropertyPage page)
         {
             base.Removed(page);
@@ -205,6 +206,7 @@ namespace CADability.UserInterface
             propertyPage.Refresh(this);
         }
 
+        /// <inheritdoc/>
         public override string LabelText
         {
             get
@@ -215,8 +217,10 @@ namespace CADability.UserInterface
                     return StringTable.GetString("Ellipse.Object.Label");
             }
         }
+        /// <inheritdoc/>
         public override PropertyEntryType Flags => PropertyEntryType.Selectable | PropertyEntryType.ContextMenu | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
 
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -228,6 +232,7 @@ namespace CADability.UserInterface
             }
         }
 
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -267,6 +272,7 @@ namespace CADability.UserInterface
             }
         }
 
+        /// <inheritdoc/>
         public override void Opened(bool isOpen)
         {
             if (HotspotChangedEvent != null)

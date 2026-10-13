@@ -831,7 +831,9 @@ namespace CADability.GeoObject
             //paintFacesCache = new Dictionary<IPaintTo3D, IPaintTo3DList>();
             //paintCurvesCache = new Dictionary<IPaintTo3D, IPaintTo3DList>();
             isModifyingWithMouse = false;
-            uniqueId = ++UniqueIdCounter; // kann der Counter überlaufen? Wie geht das Increment mit Überlauf?
+            // objects created at the same time on different threads (parallel STEP import, boolean operations) must
+            // not share an id: UniqueId orders objects in CompareTo and identifies them in the display lists
+            uniqueId = System.Threading.Interlocked.Increment(ref UniqueIdCounter);
             visible = true;
 #if DEBUG
             if (5845 == uniqueId)
@@ -2022,7 +2024,9 @@ namespace CADability.GeoObject
 
         public virtual void SetObjectData(IJsonReadData data)
         {
-            userData = data.GetPropertyOrDefault<UserData>("UserData");
+            // never null: a type that did not write its base attributes before (HelicalCurve until 1.5.0) has no
+            // "UserData" in older files, and the empty UserData of the constructor must not be replaced by null then
+            userData = data.GetPropertyOrDefault<UserData>("UserData") ?? new UserData();
             layer = data.GetPropertyOrDefault<Layer>("Layer");
             style = data.GetPropertyOrDefault<Style>("Style");
             userAttributes = data.GetPropertyOrDefault<SortedList>("UserAttributes");

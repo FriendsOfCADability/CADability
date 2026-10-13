@@ -230,16 +230,18 @@ namespace CADability.Curve2D
         }
         /// <summary>
         /// Returns the image of the arc with the provided <paramref name="center"/>, <paramref name="radius"/>, start angle and sweep
-        /// under the modification <paramref name="m"/>, which must not be singular. The result has the same start point, direction
+        /// under the modification <paramref name="m"/>. The result has the same start point, direction
         /// and parametrisation as the modified arc. Circles and arcs use it when <paramref name="m"/> is not isogonal, ellipses
         /// and elliptical arcs, which are images of the unit circle, for every modification. A full circle (<paramref name="isCircle"/>) becomes an <see cref="Ellipse2D"/>, when
         /// its start point is mapped to the end of the major axis, where an ellipse starts, and a full <see cref="EllipseArc2D"/> otherwise.
+        /// A singular <paramref name="m"/> maps the arc onto a line, see <see cref="FlattenedArc"/>.
         /// </summary>
-        internal static Ellipse2D ModifiedArc(ModOp2D m, GeoPoint2D center, double radius, double start, double sweep, bool isCircle)
+        internal static ICurve2D ModifiedArc(ModOp2D m, GeoPoint2D center, double radius, double start, double sweep, bool isCircle)
         {
             GeoPoint2D c = m * center;
             GeoVector2D xAxis = m * (radius * GeoVector2D.XAxis);
             GeoVector2D yAxis = m * (radius * GeoVector2D.YAxis);
+            if (m.Determinant == 0.0) return FlattenedArc(c, xAxis, yAxis, start, sweep);
             // right handed axes, so that the orientation only depends on the sign of the sweep (or counterClock)
             Geometry.PrincipalAxis(c, xAxis, yAxis, out GeoVector2D majorAxis, out GeoVector2D minorAxis, out GeoPoint2D left, out GeoPoint2D right, out GeoPoint2D bottom, out GeoPoint2D top, true);
             // m maps the point of the circle at angle a to c + cos(a)*xAxis + sin(a)*yAxis, which is the point of the ellipse
@@ -253,6 +255,38 @@ namespace CADability.Curve2D
                 return new Ellipse2D(c, majorAxis, minorAxis, sign * sweep > 0.0, left, right, bottom, top);
             }
             return new EllipseArc2D(c, majorAxis, minorAxis, startPar, sign * sweep, left, right, bottom, top);
+        }
+        /// <summary>
+        /// The image c + cos(a)*<paramref name="xAxis"/> + sin(a)*<paramref name="yAxis"/>, a from <paramref name="start"/> to
+        /// <paramref name="start"/> + <paramref name="sweep"/>, of an arc under a singular modification, where both axes are
+        /// parallel or null. It runs along a line, so it is returned as a <see cref="Line2D"/>: from the image of the start point
+        /// to the image of the end point when it does not turn back, otherwise over the whole range it covers, in the direction
+        /// in which it leaves the start point. Dividing by the vanishing minor axis gave NaN coordinates instead.
+        /// </summary>
+        private static Line2D FlattenedArc(GeoPoint2D c, GeoVector2D xAxis, GeoVector2D yAxis, double start, double sweep)
+        {
+            GeoVector2D dir = xAxis.Length >= yAxis.Length ? xAxis : yAxis;
+            if (dir.IsNullVector()) return new Line2D(c, c); // everything is mapped to the center
+            dir.Norm();
+            double px = xAxis * dir, py = yAxis * dir;
+            double Along(double a) => px * Math.Cos(a) + py * Math.Sin(a); // position along dir
+            double phi = Math.Atan2(py, px); // Along is extreme at phi + k*pi
+            double lo = Math.Min(start, start + sweep), hi = Math.Max(start, start + sweep);
+            double min = Math.Min(Along(start), Along(start + sweep)), max = Math.Max(Along(start), Along(start + sweep));
+            bool turns = false;
+            for (double a = phi + Math.PI * Math.Ceiling((lo - phi) / Math.PI); a < hi; a += Math.PI)
+            {
+                if (a <= lo) continue;
+                turns = true;
+                min = Math.Min(min, Along(a));
+                max = Math.Max(max, Along(a));
+            }
+            if (!turns) return new Line2D(c + Along(start) * dir, c + Along(start + sweep) * dir);
+            // the direction in which the image leaves the start point
+            double leaving = (py * Math.Cos(start) - px * Math.Sin(start)) * Math.Sign(sweep);
+            // (at an extreme it does not move at first and runs to the other end)
+            if (leaving > 0.0 || (leaving == 0.0 && Along(start) <= (min + max) / 2.0)) return new Line2D(c + min * dir, c + max * dir);
+            else return new Line2D(c + max * dir, c + min * dir);
         }
         /// <inheritdoc/>
         public override GeoPoint2D[] TangentPoints(GeoPoint2D FromHere, GeoPoint2D CloseTo)

@@ -2727,7 +2727,9 @@ namespace CADability.GeoObject
                 pth.Set(crvs);
                 faceShellPathCurve = pth;
             }
-            faceShellPathCurve = SplitSplinesAtCorners(faceShellPathCurve);
+            // a path or curve is split at the corners of its splines, so that each face of the result is smooth. The
+            // path made from a face is not: its curves must stay the edges of the face, which give the side edges below
+            if (originalFace == null) faceShellPathCurve = SplitSplinesAtCorners(faceShellPathCurve);
             if (faceShellPathCurve is Ellipse && !(faceShellPathCurve as Ellipse).IsArc)
             {
                 Path pth = Path.Construct();

@@ -1201,8 +1201,9 @@ namespace CADability.Shapes
 			Recalc(out _);
 			// Reduce only approximates and fuses the segments within prec, the closed border still describes the
 			// same curve. So the unsplitted original curve (e.g. the circle of a hole) remains valid, while the
-			// setter of Segments has reset it (issue #194).
-			if (wasClosed) UnsplittedOutline = unsplittedOutline;
+			// setter of Segments has reset it (issue #194). Recalc may have reversed the segments, so it is turned like them,
+			// as the other operations that keep it do.
+			if (wasClosed) KeepUnsplittedOutline(unsplittedOutline);
 		}
 		internal bool ReduceDeadEnd()
 		{

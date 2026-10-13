@@ -6,7 +6,10 @@ using System.Collections;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a circular arc that is tangential to two curves and has a given radius. The user selects the
+    /// two curves (the positions of the clicks choose among the possible solutions, which can also be switched
+    /// explicitly) and enters the radius or the diameter; the arc lies in the common plane of the two curves and
+    /// connects the two tangent points. Menu id: "Constr.Arc.TwoTangentsRadius".
     /// </summary>
     internal class ConstrArc2TangentsRadius : ConstructAction
     {

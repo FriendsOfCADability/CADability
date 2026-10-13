@@ -64,10 +64,11 @@ namespace CADability
 		/// <returns></returns>
 		IView GetView();
 		/// <summary>
-		/// 
+		/// Converts a position given in screen coordinates to the client coordinates of this canvas (pixels relative to the
+		/// upper left corner of the canvas).
 		/// </summary>
-		/// <param name="mousePosition"></param>
-		/// <returns></returns>
+		/// <param name="mousePosition">Position in screen coordinates</param>
+		/// <returns>The same position in client coordinates of the canvas</returns>
 		Point PointToClient(Point mousePosition);
 		/// <summary>
 		/// Shows the provided <paramref name="contextMenu"/> at the provided <paramref name="viewPosition"/> on this canvas
@@ -174,9 +175,7 @@ namespace CADability
 				return ShowPropertyEntryType.GroupTitle;
 			}
 		}
-		/// <summary>
-		/// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-		/// </summary>
+		/// <inheritdoc/>
 		public override ShowPropertyLabelFlags LabelType
 		{
 			get
@@ -184,10 +183,7 @@ namespace CADability
 				return ShowPropertyLabelFlags.ContextMenu | ShowPropertyLabelFlags.ContextMenu | ShowPropertyLabelFlags.Selectable;
 			}
 		}
-		/// <summary>
-		/// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-		/// returns the number of subentries in this property view.
-		/// </summary>
+		/// <inheritdoc/>
 		public override int SubEntriesCount
 		{
 			get
@@ -196,10 +192,7 @@ namespace CADability
 			}
 		}
 		IShowProperty[] subEntries;
-		/// <summary>
-		/// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-		/// returns the subentries in this property view.
-		/// </summary>
+		/// <inheritdoc/>
 		public override IShowProperty[] SubEntries
 		{
 			get
@@ -239,11 +232,7 @@ namespace CADability
 				LayerVisibilityChangedEvent(layerList.Find(label), state == CheckState.Checked);
 		}
 		#region ICommandHandler Members
-		/// <summary>
-		/// Implements <see cref="CADability.UserInterface.ICommandHandler.OnCommand (string)"/>
-		/// </summary>
-		/// <param name="MenuId"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		virtual public bool OnCommand(string MenuId)
 		{
 			switch (MenuId)
@@ -282,12 +271,7 @@ namespace CADability
 			return false;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.UserInterface.ICommandHandler.OnUpdateCommand (string, CommandState)"/>
-		/// </summary>
-		/// <param name="MenuId"></param>
-		/// <param name="CommandState"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		virtual public bool OnUpdateCommand(string MenuId, CommandState CommandState)
 		{
 			// TODO:  Add CheckedAttributes.OnUpdateCommand implementation
@@ -296,9 +280,7 @@ namespace CADability
 		void ICommandHandler.OnSelected(MenuWithHandler selectedMenuItem, bool selected) { }
 
 		#endregion
-		/// <summary>
-		/// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.Refresh ()"/>
-		/// </summary>
+		/// <inheritdoc/>
 		public override void Refresh()
 		{
 			subEntries = null;
@@ -642,10 +624,7 @@ namespace CADability
 			else vPos = 1.0 - (d.Top - e.Bottom) / (e.Height - d.Height); // 0.0: ganz unten, , 1.0 ganz oben
 			if (ScrollPositionChangedEvent != null) ScrollPositionChangedEvent(hPart, hPos, vPart, vPos);
 		}
-		/// <summary>
-		/// Implements <see cref="CADability.IView.ZoomToRect (BoundingRect)"/>
-		/// </summary>
-		/// <param name="visibleRect"></param>
+		/// <inheritdoc/>
 		public void ZoomToRect(BoundingRect visibleRect)
 		{
 			if (canvas != null)
@@ -1532,9 +1511,7 @@ namespace CADability
 				return ShowPropertyEntryType.GroupTitle;
 			}
 		}
-		/// <summary>
-		/// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-		/// </summary>
+		/// <inheritdoc/>
 		public override ShowPropertyLabelFlags LabelType
 		{
 			get
@@ -1547,10 +1524,7 @@ namespace CADability
 				return res;
 			}
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.LabelChanged (string)"/>
-		/// </summary>
-		/// <param name="NewText"></param>
+		/// <inheritdoc/>
 		public override void LabelChanged(string NewText)
 		{
 			if (NewText == this.Name) return;
@@ -1583,10 +1557,7 @@ namespace CADability
 		}
 
 		IShowProperty[] subEntries;
-		/// <summary>
-		/// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-		/// returns the number of subentries in this property view.
-		/// </summary>
+		/// <inheritdoc/>
 		public override int SubEntriesCount
 		{
 			get
@@ -1594,10 +1565,7 @@ namespace CADability
 				return SubEntries.Length;
 			}
 		}
-		/// <summary>
-		/// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-		/// returns the subentries in this property view.
-		/// </summary>
+		/// <inheritdoc/>
 		public override IShowProperty[] SubEntries
 		{
 			get
@@ -1657,10 +1625,7 @@ namespace CADability
 			projectedModel.ForceRecalc();
 			canvas?.Invalidate();
 		}
-		/// <summary>
-		/// Overrides <see cref="IShowPropertyImpl.Added(IPropertyPage)"/>
-		/// </summary>
-		/// <param name="page"></param>
+		/// <inheritdoc/>
 		public override void Added(IPropertyPage page)
 		{
 			base.Added(page);

@@ -1007,12 +1007,14 @@ namespace CADability
             //return !double.IsInfinity(x) && !double.IsInfinity(y);
         }
         /// <summary>
-        /// Liefert den Parameter des gegebenen Punktes auf der gegebenen Linie
+        /// Returns the parameter of the given point on the given (infinite) 2d line, i.e. the factor t with p = sp + t*dir. The
+        /// point is assumed to lie on the line; for a point off the line only its major coordinate is evaluated, so the result is
+        /// not the parameter of the perpendicular foot point.
         /// </summary>
-        /// <param name="sp">Startpunkt der Linie</param>
-        /// <param name="dir">Richtung der Linie</param>
-        /// <param name="p">zu testender Punkt</param>
-        /// <returns>der Parameter, z.B. 0.0==StartPunkt</returns>
+        /// <param name="sp">Start point of the line</param>
+        /// <param name="dir">Direction of the line (need not be normalized)</param>
+        /// <param name="p">The point whose parameter is requested</param>
+        /// <returns>The parameter, e.g. 0.0 for the start point, 1.0 for sp+dir</returns>
         public static double LinePar(GeoPoint2D sp, GeoVector2D dir, GeoPoint2D p)
         {
             if (Math.Abs(dir.x) > Math.Abs(dir.y)) return (p.x - sp.x) / dir.x;
@@ -2865,20 +2867,21 @@ namespace CADability
             return Math.Sqrt(dDelta0 * dDelta0 + dDelta1 * dDelta1);
         }
         /// <summary>
-        /// Abstand Punkt Ellipse für ungederhte Ellipse mit x-Achse größer y-Achse aus
-        /// http://www.geometrictools.com/Documentation/DistancePointToEllipse2.pdf
-        /// kommt i.A. mit wenigen Iterationsschritten aus (maximal 7 bis jetzt gesehen
+        /// Distance of a point from an axis aligned ellipse (x/a)^2 + (y/b)^2 = 1 centered at the origin, computed with Newton's
+        /// method as described in http://www.geometrictools.com/Documentation/DistancePointToEllipse2.pdf. Usually converges in a
+        /// few iterations (at most 7 observed so far). The test point is reflected into the first quadrant internally, the closest
+        /// point is returned reflected back to the original quadrant. The special case of a circle is handled directly.
         /// </summary>
-        /// <param name="dU"></param>
-        /// <param name="dV"></param>
-        /// <param name="dA"></param>
-        /// <param name="dB"></param>
-        /// <param name="dEpsilon"></param>
-        /// <param name="iMax"></param>
-        /// <param name="riIFinal"></param>
-        /// <param name="rdX"></param>
-        /// <param name="rdY"></param>
-        /// <returns></returns>
+        /// <param name="dU">x-coordinate of the test point</param>
+        /// <param name="dV">y-coordinate of the test point</param>
+        /// <param name="dA">Semi-axis of the ellipse in x-direction</param>
+        /// <param name="dB">Semi-axis of the ellipse in y-direction</param>
+        /// <param name="dEpsilon">Zero tolerance for Newton's method</param>
+        /// <param name="iMax">Maximum number of iterations for Newton's method</param>
+        /// <param name="riIFinal">Receives the number of iterations used, -1 if the method failed to converge</param>
+        /// <param name="rdX">Receives the x-coordinate of the closest point on the ellipse</param>
+        /// <param name="rdY">Receives the y-coordinate of the closest point on the ellipse</param>
+        /// <returns>The distance of the point from the ellipse, or double.MinValue if the method failed to converge</returns>
         internal static double DistancePointEllipse(
             double dU, double dV, // test point (u,v)
             double dA, double dB, // ellipse is (x/a)^2 + (y/b)^2 = 1

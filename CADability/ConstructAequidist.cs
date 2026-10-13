@@ -8,7 +8,11 @@ using System;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of an equidistant (offset) curve to a base curve at a given distance. The base curve is either
+    /// passed to the constructor or selected by the user (paths are preferred over their segments); the user enters
+    /// the distance (its sign selects the side) and optionally the inner angle below which sharp corners of the
+    /// offset are rounded by an arc. The result is computed in the plane of the base curve (or the active drawing
+    /// plane for a non-planar curve) and gets the attributes of the base curve. Menu id: "ConstructAequidist".
     /// </summary>
     internal class ConstructAequidist : ConstructAction
     {

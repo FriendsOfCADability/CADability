@@ -4,7 +4,10 @@ using CADability.GeoObject;
 namespace CADability.UserInterface
 {
     /// <summary>
-    /// 
+    /// A property page entry to select a <see cref="LinePattern"/> from a <see cref="LinePatternList"/> in a drop down
+    /// list, optionally with an additional "undefined" entry. It either controls the line pattern of an
+    /// <see cref="ILinePattern"/> object (the object is updated when the selection changes and the entry follows
+    /// changes of the object) or reports the selected line pattern via <see cref="LinePatternChangedEvent"/>.
     /// </summary>
 
     public class LinePatternSelectionProperty : MultipleChoiceProperty
@@ -102,10 +105,7 @@ namespace CADability.UserInterface
             if (LinePatternChangedEvent != null) LinePatternChangedEvent(linePatternList.Find(selected));
             if (iLinePattern != null) iLinePattern.LinePattern = linePatternList.Find(selected);
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Added(IPropertyPage)"/>
-        /// </summary>
-        /// <param name="propertyPage"></param>
+        /// <inheritdoc/>
         public override void Added(IPropertyPage propertyPage)
         {
             base.Added(propertyPage);

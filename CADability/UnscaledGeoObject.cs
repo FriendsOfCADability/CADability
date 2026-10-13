@@ -148,10 +148,7 @@ namespace CADability.GeoObject
             --res.isChanging;
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.CopyGeometry (IGeoObject)"/>
-        /// </summary>
-        /// <param name="toCopyFrom"></param>
+        /// <inheritdoc/>
         public override void CopyGeometry(IGeoObject toCopyFrom)
         {
             if (toCopyFrom is UnscaledGeoObject res)
@@ -188,10 +185,7 @@ namespace CADability.GeoObject
         {
             return new ShowPropertyUnscaledGeoObject(this, frame);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3D (IPaintTo3D)"/>
-        /// </summary>
-        /// <param name="paintTo3D"></param>
+        /// <inheritdoc/>
         public override void PaintTo3D(IPaintTo3D paintTo3D)
         {
             ModOp m = ModOp.Translate(location.x, location.y, location.z) * ModOp.Scale(paintTo3D.PixelToWorld);
@@ -199,100 +193,54 @@ namespace CADability.GeoObject
             geoObject.PaintTo3D(paintTo3D);
             paintTo3D.PopModOp();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PrepareDisplayList (double)"/>
-        /// </summary>
-        /// <param name="precision"></param>
+        /// <inheritdoc/>
         public override void PrepareDisplayList(double precision)
         {
             geoObject.PrepareDisplayList(precision);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PrePaintTo3D (IPaintTo3D)"/>
-        /// </summary>
-        /// <param name="paintTo3D"></param>
+        /// <inheritdoc/>
         public override void PrePaintTo3D(IPaintTo3D paintTo3D)
         {
             geoObject.PrePaintTo3D(paintTo3D);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetQuadTreeItem (Projection, ExtentPrecision)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="extentPrecision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IQuadTreeInsertableZ GetQuadTreeItem(Projection projection, ExtentPrecision extentPrecision)
         {
             return null;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (double)"/>
-        /// </summary>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingCube GetExtent(double precision)
         {
             return new BoundingCube(location);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (Projection, ExtentPrecision)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="extentPrecision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingRect GetExtent(Projection projection, ExtentPrecision extentPrecision)
         {
             BoundingRect res = new BoundingRect(projection.Project(location));
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
-        /// </summary>
-        /// <param name="cube"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(ref BoundingCube cube, double precision)
         {
             return cube.Contains(location);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection, BoundingRect, bool)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="rect"></param>
-        /// <param name="onlyInside"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(Projection projection, BoundingRect rect, bool onlyInside)
         {
             // regardless of onlyInside, since only a single point is being tested
             return projection.ProjectUnscaled(location) <= rect;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection.PickArea, bool)"/>
-        /// </summary>
-        /// <param name="area"></param>
-        /// <param name="onlyInside"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(Projection.PickArea area, bool onlyInside)
         {
             return BoundingCube.UnitBoundingCube.Contains(area.ToUnitBox * location);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Position (GeoPoint, GeoVector, double)"/>
-        /// </summary>
-        /// <param name="fromHere"></param>
-        /// <param name="direction"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double Position(GeoPoint fromHere, GeoVector direction, double precision)
         {
             return Geometry.LinePar(fromHere, direction, location);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3DList (IPaintTo3D, ICategorizedDislayLists)"/>
-        /// </summary>
-        /// <param name="paintTo3D"></param>
-        /// <param name="lists"></param>
+        /// <inheritdoc/>
         public override void PaintTo3DList(IPaintTo3D paintTo3D, ICategorizedDislayLists lists)
         {
             lists.Add(Layer, false, false, this);
@@ -306,12 +254,12 @@ namespace CADability.GeoObject
             location = (GeoPoint)info.GetValue("Location", typeof(GeoPoint));
         }
         /// <summary>
-        /// Implements ISerializable.GetObjectData. Saves <see cref="UserData"/>, <see cref="CADability.Attribute.Layer"/> and <see cref="CADability.Attribute.Style"/>.
-        /// All other properties of the GeoObject must be saved by the derived class. don't forget
-        /// to call the base implementation
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
+        /// Saves <see cref="UserData"/>, <see cref="CADability.Attribute.Layer"/> and <see cref="CADability.Attribute.Style"/>; a derived class saves its own data and calls the base implementation.
         /// </summary>
-        /// <param name="info">info</param>
-        /// <param name="context">context</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("GeoObject", geoObject);

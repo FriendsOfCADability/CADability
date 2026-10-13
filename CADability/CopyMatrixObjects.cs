@@ -6,7 +6,11 @@ using System;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Action that arranges copies of the given objects in a rectangular grid (matrix). The user enters the number of
+    /// copies to the right, to the left, above and below the originals, the horizontal and the vertical distance between
+    /// the copies and optionally the direction of the rows (the columns are perpendicular to it in the active drawing
+    /// plane). The copies are computed in a background task and inserted into the active model as individual objects when
+    /// the action is finished. Menu id: "CopyMatrixObjects".
     /// </summary>
 
     public class CopyMatrixObjects : ConstructAction
@@ -174,9 +178,7 @@ namespace CADability.Actions
         }
 
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnSetAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnSetAction()
         {
             base.TitleId = "CopyMatrixObjects";
@@ -240,17 +242,13 @@ namespace CADability.Actions
             showMatrix();
         }
 
-        /// <summary>
-        /// Implements <see cref="Action.GetID"/>.
-        /// </summary>
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "CopyMatrixObjects";
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnDone ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnDone()
         {
             using (base.Frame.Project.Undo.UndoFrame)

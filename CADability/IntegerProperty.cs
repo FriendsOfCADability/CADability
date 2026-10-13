@@ -91,9 +91,7 @@ namespace CADability.UserInterface
                 SetText(internalValue);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.Refresh ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void Refresh()
         {
             internalValue = GetInt();
@@ -188,7 +186,8 @@ namespace CADability.UserInterface
         }
 
         /// <summary>
-        /// Der Besitzer dieses Objektes muss GeoPointChanged aufrufen, um eine neue Anzeige zu erzwingen.
+        /// Must be called by the owner of this property when the integer value has been changed from outside (not by
+        /// the user editing this property) to update the displayed value.
         /// </summary>
         public void IntChanged()
         {
@@ -326,10 +325,11 @@ namespace CADability.UserInterface
         }
 
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("InternalValue", internalValue, internalValue.GetType());

@@ -110,20 +110,12 @@ namespace CADability.GeoObject
                 return true;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetModified (ModOp)"/>
-        /// </summary>
-        /// <param name="m"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ISurface GetModified(ModOp m)
         {
             return new PlaneSurface(m * fromUnitPlane, usedArea);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Make3dCurve (ICurve2D)"/>
-        /// </summary>
-        /// <param name="curve2d"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve Make3dCurve(CADability.Curve2D.ICurve2D curve2d)
         {
             if (curve2d is Curve2DAspect)
@@ -136,48 +128,28 @@ namespace CADability.GeoObject
             go.Modify(fromUnitPlane);
             return go as ICurve;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetNormal (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoVector GetNormal(GeoPoint2D uv)
         {
             // return (fromUnitPlane * GeoVector.ZAxis); // this looks like a sever bug! Fixed on 22.02.18
             return ((fromUnitPlane * GeoVector.XAxis) ^ (fromUnitPlane * GeoVector.YAxis)).Normalized;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.UDirection (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoVector UDirection(GeoPoint2D uv)
         {
             return (fromUnitPlane * GeoVector.XAxis);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.VDirection (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoVector VDirection(GeoPoint2D uv)
         {
             return (fromUnitPlane * GeoVector.YAxis);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.PointAt (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint PointAt(GeoPoint2D uv)
         {
             return fromUnitPlane * new GeoPoint(uv);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.PositionOf (GeoPoint)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D PositionOf(GeoPoint p)
         {
             if (toUnitPlane.IsNull) toUnitPlane = fromUnitPlane.GetInverse();
@@ -196,29 +168,12 @@ namespace CADability.GeoObject
         public override bool IsVPeriodic { get { return false; } }
         public override double UPeriod { get { return 0.0; } }
         public override double VPeriod { get { return 0.0; } }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.IsVanishingProjection (Projection, double, double, double, double)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool IsVanishingProjection(Projection p, double umin, double umax, double vmin, double vmax)
         {
             return Precision.IsPerpendicular(p.Direction, fromUnitPlane * GeoVector.ZAxis, false);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetZMinMax (Projection, double, double, double, double, ref double, ref double)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <param name="zMin"></param>
-        /// <param name="zMax"></param>
+        /// <inheritdoc/>
         public override void GetZMinMax(Projection p, double umin, double umax, double vmin, double vmax, ref double zMin, ref double zMax)
         {
             // zuerst die Eckpunkte einschließen
@@ -227,34 +182,19 @@ namespace CADability.GeoObject
             CheckZMinMax(p, umax, vmin, ref zMin, ref zMax);
             CheckZMinMax(p, umax, vmax, ref zMin, ref zMax);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Clone ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ISurface Clone()
         {
             return new PlaneSurface(fromUnitPlane);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Modify (ModOp)"/>
-        /// </summary>
-        /// <param name="m"></param>
+        /// <inheritdoc/>
         public override void Modify(ModOp m)
         {
             boxedSurfaceEx = null;
             fromUnitPlane = m * fromUnitPlane;
             toUnitPlane = fromUnitPlane.GetInverse();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetPlaneIntersection (PlaneSurface, double, double, double, double, double)"/>
-        /// </summary>
-        /// <param name="pl"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IDualSurfaceCurve[] GetPlaneIntersection(PlaneSurface pl, double umin, double umax, double vmin, double vmax, double precision)
         {
             PlaneSurface plm = pl.GetModified(toUnitPlane) as PlaneSurface;
@@ -289,12 +229,7 @@ namespace CADability.GeoObject
             return new DualSurfaceCurve[] { };
             //return base.GetPlaneIntersection(pl, umin, umax, vmin, vmax);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetLineIntersection (GeoPoint, GeoVector)"/>
-        /// </summary>
-        /// <param name="startPoint"></param>
-        /// <param name="direction"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D[] GetLineIntersection(GeoPoint startPoint, GeoVector direction)
         {
             GeoPoint sp = toUnitPlane * startPoint;
@@ -307,10 +242,7 @@ namespace CADability.GeoObject
             }
             return new GeoPoint2D[] { };
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.CopyData (ISurface)"/>
-        /// </summary>
-        /// <param name="CopyFrom"></param>
+        /// <inheritdoc/>
         public override void CopyData(ISurface CopyFrom)
         {
             PlaneSurface cc = CopyFrom as PlaneSurface;
@@ -320,12 +252,7 @@ namespace CADability.GeoObject
                 this.toUnitPlane = cc.toUnitPlane;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetProjectedCurve (ICurve, double)"/>
-        /// </summary>
-        /// <param name="curve"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D GetProjectedCurve(ICurve curve, double precision)
         {
             // Hier muss beachtet werden, dass dieses PlaneSurface Objekt ein anderes uv System haben kann als
@@ -337,10 +264,7 @@ namespace CADability.GeoObject
             ICurve crvunit = curve.CloneModified(toUnitPlane);
             return crvunit.GetProjectedCurve(Plane.XYPlane);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.ReverseOrientation ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ModOp2D ReverseOrientation()
         {   // x- und y-Achse vertauschen
             boxedSurfaceEx = null;
@@ -348,15 +272,7 @@ namespace CADability.GeoObject
             toUnitPlane = fromUnitPlane.GetInverse();
             return new ModOp2D(0, 1, 0, 1, 0, 0);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.SameGeometry (BoundingRect, ISurface, BoundingRect, double, out ModOp2D)"/>
-        /// </summary>
-        /// <param name="thisBounds"></param>
-        /// <param name="other"></param>
-        /// <param name="otherBounds"></param>
-        /// <param name="precision"></param>
-        /// <param name="firstToSecond"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool SameGeometry(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, double precision, out ModOp2D firstToSecond)
         {
             firstToSecond = ModOp2D.Null;
@@ -394,11 +310,7 @@ namespace CADability.GeoObject
             }
             return double.MaxValue;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetOffsetSurface (double)"/>
-        /// </summary>
-        /// <param name="offset"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ISurface GetOffsetSurface(double offset)
         {
             return new PlaneSurface(Location + offset * GetNormal(GeoPoint2D.Origin).Normalized, this.DirectionX, this.DirectionY);
@@ -415,11 +327,7 @@ namespace CADability.GeoObject
                 return true;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Orientation (GeoPoint)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double Orientation(GeoPoint p)
         {
             GeoPoint q = this.PointAt((GetLineIntersection(p, Normal))[0]);
@@ -427,12 +335,7 @@ namespace CADability.GeoObject
             if (Precision.IsEqual(q + d / Normal.Length * Normal, p)) return d;
             else return -d;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.HitTest (BoundingCube, out GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="bc"></param>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(BoundingCube bc, out GeoPoint2D uv)
         {
             GeoPoint[] cube = bc.Points;
@@ -466,18 +369,12 @@ namespace CADability.GeoObject
             uv = GeoPoint2D.Origin;
             return false;  //convexity of the inner and outer points
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetExtrema ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D[] GetExtrema()
         {
             return new GeoPoint2D[0];
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetPolynomialParameters ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double[] GetPolynomialParameters()
         {
             double[,] m = fromUnitPlane.Matrix;
@@ -489,14 +386,7 @@ namespace CADability.GeoObject
             }
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Intersect (ICurve, BoundingRect, out GeoPoint[], out GeoPoint2D[], out double[])"/>
-        /// </summary>
-        /// <param name="curve"></param>
-        /// <param name="uvExtent"></param>
-        /// <param name="ips"></param>
-        /// <param name="uvOnFaces"></param>
-        /// <param name="uOnCurve3Ds"></param>
+        /// <inheritdoc/>
         public override void Intersect(ICurve curve, BoundingRect uvExtent, out GeoPoint[] ips, out GeoPoint2D[] uvOnFaces, out double[] uOnCurve3Ds)
         {
             if (curve is Line)
@@ -580,33 +470,17 @@ namespace CADability.GeoObject
             th.PlaneIntersection(this, out ips, out uvOnFaces, out uOnCurve3Ds);
             // base.Intersect(curve, out ips, out uvOnFaces, out uOnCurve3Ds);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.FixedU (double, double, double)"/>
-        /// </summary>
-        /// <param name="u"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve FixedU(double u, double vmin, double vmax)
         {
             return Line.TwoPoints(fromUnitPlane * new GeoPoint(u, vmin, 0), fromUnitPlane * new GeoPoint(u, vmax, 0));
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.FixedV (double, double, double)"/>
-        /// </summary>
-        /// <param name="v"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve FixedV(double v, double umin, double umax)
         {
             return Line.TwoPoints(fromUnitPlane * new GeoPoint(umin, v, 0), fromUnitPlane * new GeoPoint(umax, v, 0));
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.PerpendicularFoot (GeoPoint)"/>
-        /// </summary>
-        /// <param name="fromHere"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D[] PerpendicularFoot(GeoPoint fromHere)
         {   // den einzigen Fußpunkt gibts immer, auch wenn der Punkt genau auf der Fläche liegt
             return new GeoPoint2D[] { PositionOf(fromHere) };

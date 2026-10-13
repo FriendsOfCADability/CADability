@@ -4,7 +4,10 @@ using CADability.GeoObject;
 namespace CADability.UserInterface
 {
     /// <summary>
-    /// 
+    /// Property entry that lets the user choose a <see cref="HatchStyle"/> from a <see cref="HatchStyleList"/> in a
+    /// drop-down list, optionally including an "undefined" entry. It either sets the hatch style of the
+    /// <see cref="IHatchStyle"/> object (typically a <see cref="Hatch"/>) it was constructed for, following changes of
+    /// that object (e.g. by undo), or it only reports the selection via the <see cref="HatchStyleChangedEvent"/>.
     /// </summary>
 
     public class HatchStyleSelectionProperty : MultipleChoiceProperty
@@ -75,10 +78,7 @@ namespace CADability.UserInterface
             }
             base.OnSelectionChanged(selected);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.Added (IPropertyTreeView)"/>
-        /// </summary>
-        /// <param name="propertyTreeView"></param>
+        /// <inheritdoc/>
         public override void Added(IPropertyPage propertyTreeView)
         {   // bei Undo kann sich der HatchStyle ändern und muss in der Auswahl 
             base.Added(propertyTreeView);
@@ -96,10 +96,7 @@ namespace CADability.UserInterface
                 }
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.Removed (IPropertyTreeView)"/>
-        /// </summary>
-        /// <param name="propertyTreeView"></param>
+        /// <inheritdoc/>
         public override void Removed(IPropertyPage propertyTreeView)
         {
             base.Removed(propertyTreeView);

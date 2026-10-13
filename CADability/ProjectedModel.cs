@@ -47,7 +47,8 @@ namespace CADability
      */
 
     /// <summary>
-    /// INTERN: eine 2D Kure aus einer projizierten Kante entstanden, ggf mit Sichtbarkeitsberechnung.
+    /// INTERNAL: a 2d curve that results from projecting an <see cref="Edge"/>, together with its kind (hard edge, soft
+    /// edge or contour edge), used for the hidden line computation.
     /// </summary>
     internal class ProjectedEdge
     {
@@ -59,7 +60,11 @@ namespace CADability
 
 
     /// <summary>
-    ///
+    /// The projection of a <see cref="Model"/> with a certain <see cref="Projection"/> for the display in a
+    /// <see cref="ModelView"/>. It keeps display lists of the model's objects per layer, the set of visible layers and the
+    /// 2d extent of the projected model, and it follows changes of the model so that the display lists are updated. It also
+    /// provides the hit testing and the intersection queries (e.g. for trimming and extending curves) that the actions
+    /// need on the projected objects.
     /// </summary>
     [Serializable]
     public class ProjectedModel : ISerializable, IDeserializationCallback, IJsonSerialize

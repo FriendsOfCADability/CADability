@@ -398,9 +398,11 @@ namespace CADability.UserInterface
         }
     }
     /// <summary>
-    /// Eigenschaftsanzeige für die Markierten Objekte. Diese Anzeige wird bei Änderung
-    /// der Markierung neu generiert. Die Anzeige ermöglicht für jedes markierte Objekt
-    /// Änderungen der Eigenschaften.
+    /// Property entry for the currently selected objects, shown in the control center by
+    /// <see cref="CADability.Actions.SelectObjectsAction"/>. It is regenerated whenever the selection
+    /// changes and contains the properties of each selected object as a sub entry, so that every object can
+    /// be edited individually; with more than one object it also offers their common attributes (layer,
+    /// color, style etc.) for a combined change. The hotspots of the sub entries are passed on to the views.
     /// </summary>
 
     public class SelectedObjectsProperty : PropertyEntryImpl, IDisplayHotSpots
@@ -608,9 +610,7 @@ namespace CADability.UserInterface
         #region IDisplayHotSpots Members
 
         public event CADability.HotspotChangedDelegate HotspotChangedEvent;
-        /// <summary>
-        /// Implements <see cref="CADability.IDisplayHotSpots.ReloadProperties ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public void ReloadProperties()
         {
             if (showProperties != null)

@@ -1116,10 +1116,11 @@ namespace CADability.Shapes
             holes = (Border[])info.GetValue("Holes", typeof(Border[]));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Outline", outline);
@@ -2020,12 +2021,12 @@ namespace CADability.Shapes
             this.simpleShapes = (SimpleShape[])simpleShapes.Clone();
         }
         /// <summary>
-        /// Das im Parameter gegebene Objekt muss eine offene Kurve sein, die dieses CompoundShape
-        /// Objekt durchschneidet. Das Ergebniss ist ein CompoundShape, was aus mehreren SimpleShapes
-        /// besteht, die durch das Durchschneiden entstanden sind.
+        /// Splits this compound shape with the given open curve. The result is a compound shape whose simple shapes are the
+        /// parts of the original simple shapes that the curve cuts them into. If the splitting fails, the unchanged shape is
+        /// returned.
         /// </summary>
-        /// <param name="ToSplitWith"></param>
-        /// <returns></returns>
+        /// <param name="ToSplitWith">An open border that cuts through this shape</param>
+        /// <returns>The split shape</returns>
         public CompoundShape Split(Border ToSplitWith)
         {
             try
@@ -3084,10 +3085,11 @@ namespace CADability.Shapes
             simpleShapes = (SimpleShape[])info.GetValue("SimpleShapes", typeof(SimpleShape[]));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("SimpleShapes", simpleShapes);

@@ -4,7 +4,11 @@ using System;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of an elliptical arc from its centre and its axes: the user picks the centre, a point that defines the
+    /// major axis (its direction and the major radius), a point that defines the minor radius, and the start and the end
+    /// angle of the arc; a boolean input selects the direction (counterclockwise or clockwise). Major radius, minor radius
+    /// and the angle of the major axis may alternatively be entered as values. The ellipse lies in the active drawing plane.
+    /// Menu id: "Constr.EllipseArc.CenterRadius".
     /// </summary>
     internal class ConstrEllipseArcCenterRadius : ConstructAction
     {

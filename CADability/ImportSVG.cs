@@ -16,8 +16,10 @@ using System.Numerics;
 namespace CADability
 {
     /// <summary>
-    /// Gerüst zum Einlesen einfacher SVG-Elemente und Aufrufe von CreateXXX-Methoden.
-    /// Transformationen werden geschachtelt und als Matrix3x2 verwaltet.
+    /// Reads simple SVG files and converts their elements (lines, rectangles, circles, ellipses, polylines, polygons
+    /// and paths with Bézier and elliptical arc segments) into <see cref="IGeoObject"/>s. The transformations of nested
+    /// elements are accumulated on a stack of <see cref="ModOp2D"/>s; the virtual CreateXxx methods may be overridden
+    /// in a derived class to customize the objects that are created. Use <see cref="Import(string)"/> to import a file.
     /// </summary>
     public class ImportSVG
     {
@@ -60,10 +62,11 @@ namespace CADability
         }
 
         /// <summary>
-        /// Importiert die SVG-Datei und ruft für gefundene Elemente die entsprechenden Methoden auf.
+        /// Imports the SVG file and calls the corresponding CreateXxx method for each element found. The result is
+        /// mirrored at a horizontal axis through its center, because the y axis of SVG points downwards.
         /// </summary>
-        /// <param name="fileName">Pfad zur SVG-Datei.</param>
-        /// <returns>True, wenn erfolgreich importiert wurde.</returns>
+        /// <param name="fileName">path of the SVG file</param>
+        /// <returns>the imported objects, or null if the file could not be read</returns>
         public GeoObjectList Import(string fileName)
         {
             try

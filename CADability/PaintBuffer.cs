@@ -10,24 +10,12 @@ using Point = System.Drawing.Point;
 namespace CADability
 {
     /// <summary>
-    /// Klasse, die die Darstellung auf dem Bildschirm realisiert.
-    /// Die Klasse hält (z.Z.) 4 Bitmaps, die nacheinander und transparent
-    /// in das Fenster (genauer in das Graphics Objekt des Parameters e beim 
-    /// Aufruf von Compose) kopiert werden. Für jedes Bitmap gibt es ein eigenes
-    /// "Invalid" Rechteck bzw. Region. Der Ablauf ist wie folgt:
-    /// 1. irgend etwas ändert sich (z.B das Raster, die Markierung, ein 
-    /// geometrisches Objekt u.s.w.). Das muss zur Folge haben, dass InvalidateXxx
-    /// für den entsprechenden Aspekt (z.B. InvalidateDrawing für die 
-    /// geometrischen Objekte, InvalidateSelect für die Markierung) aufgerufen 
-    /// wird. Die Invalid-Bereiche werden für die einzelnen Aspekte akkumuliert.
-    /// Irgendwann erfolgt der Aufruf von Compose (gewöhnlich ausgelöst durch den 
-    /// Paint Event des Controls)Dort versucht nun diese Klasse das Bild neu 
-    /// zusammenzusetzten. Ist der Invalid-Bereich eines Aspektes leer, dann ist
-    /// das zugehörige Bitmap aktuell, d.h. kann so verwendet werden. Wenn nicht,
-    /// so muss der Bereich neu gezeichnet werden. Compose löst den RepaintXxxEvent
-    /// (z.B. RepaintDrawingEvent) aus. Die Handler dieses Events (gewöhnlich 
-    /// nur einer) bekommen ein PaintToGDI Objekt, mit dessen Hilfe sie zeichnen
-    /// können. 
+    /// Remnant of the former GDI based display implementation. Originally this class held one bitmap per <see cref="DrawingAspect"/>
+    /// (background, drawing, selection, active objects), accumulated the invalid rectangles of each aspect via the InvalidateXxx
+    /// methods and composed the bitmaps into the window on the paint event, raising a repaint event for each aspect whose invalid
+    /// area was not empty. Today only the <see cref="DrawingAspect"/> enumeration (used by the views to invalidate and to register
+    /// paint handlers for a specific aspect) and the static rectangle helpers <see cref="Union"/> and
+    /// <see cref="RectangleFromPoints"/> are still in use; the invalidation and scrolling methods have no effect on the display.
     /// </summary>
 
     public class PaintBuffer
@@ -48,11 +36,12 @@ namespace CADability
         private Rectangle ActiveInvalid;
         
         /// <summary>
-        /// liefert einRechteck, welches die beiden im Parameter gegeben Rechtecke umfasst
+        /// Returns the smallest rectangle which contains both given rectangles. An empty rectangle is ignored, i.e. the other
+        /// rectangle is returned.
         /// </summary>
-        /// <param name="r1"></param>
-        /// <param name="r2"></param>
-        /// <returns></returns>
+        /// <param name="r1">First rectangle (pixel coordinates)</param>
+        /// <param name="r2">Second rectangle (pixel coordinates)</param>
+        /// <returns>The union of the two rectangles</returns>
         static public Rectangle Union(Rectangle r1, Rectangle r2)
         {
             if (r1.IsEmpty) return r2;

@@ -11,7 +11,10 @@ using Point = System.Drawing.Point;
 namespace CADability.UserInterface
 {
     /// <summary>
-    /// 
+    /// The entry of a single color in the property page display of a <see cref="ColorList"/>. The label shows the
+    /// name of the color (editable unless the color is static), the value shows a color box; clicking on it opens
+    /// the color dialog. The context menu ("MenuId.ColorListEntry") allows to delete the color, to make it the
+    /// current color of the list, to change the color or to rename it. The entry of the current color is shown in bold.
     /// </summary>
 
     public class ColorListProperty : PropertyEntryImpl, ICommandHandler

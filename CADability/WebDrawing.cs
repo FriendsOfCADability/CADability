@@ -123,10 +123,9 @@ namespace CADability.WebDrawing
     public struct SizeF
     {
 
-        /// <include file='doc\SizeF.uex' path='docs/doc[@for="SizeF.Empty"]/*' />
-        /// <devdoc>
-        ///    Initializes a new instance of the <see cref='System.Drawing.SizeF'/> class.
-        /// </devdoc>
+        /// <summary>
+        /// The size with zero width and height.
+        /// </summary>
         public static readonly SizeF Empty = new SizeF();
         private float width;
         private float height;
@@ -135,11 +134,9 @@ namespace CADability.WebDrawing
         /**
          * Create a new SizeF object from another size object
          */
-        /// <include file='doc\SizeF.uex' path='docs/doc[@for="SizeF.SizeF"]/*' />
-        /// <devdoc>
-        ///    Initializes a new instance of the <see cref='System.Drawing.SizeF'/> class
-        ///    from the specified existing <see cref='System.Drawing.SizeF'/>.
-        /// </devdoc>
+        /// <summary>
+        /// Initializes a new <see cref="SizeF"/> with the width and height of <paramref name="size"/>.
+        /// </summary>
         public SizeF(SizeF size)
         {
             width = size.width;
@@ -149,13 +146,10 @@ namespace CADability.WebDrawing
         /**
          * Create a new SizeF object from a point
          */
-        /// <include file='doc\SizeF.uex' path='docs/doc[@for="SizeF.SizeF1"]/*' />
-        /// <devdoc>
-        ///    <para>
-        ///       Initializes a new instance of the <see cref='System.Drawing.SizeF'/> class from
-        ///       the specified <see cref='System.Drawing.PointF'/>.
-        ///    </para>
-        /// </devdoc>
+        /// <summary>
+        /// Initializes a new <see cref="SizeF"/> whose width and height are the X and Y coordinates of
+        /// <paramref name="pt"/>.
+        /// </summary>
         public SizeF(PointF pt)
         {
             width = pt.X;
@@ -165,82 +159,58 @@ namespace CADability.WebDrawing
         /**
          * Create a new SizeF object of the specified dimension
          */
-        /// <include file='doc\SizeF.uex' path='docs/doc[@for="SizeF.SizeF2"]/*' />
-        /// <devdoc>
-        ///    <para>
-        ///       Initializes a new instance of the <see cref='System.Drawing.SizeF'/> class from
-        ///       the specified dimensions.
-        ///    </para>
-        /// </devdoc>
+        /// <summary>
+        /// Initializes a new <see cref="SizeF"/> with the given width and height.
+        /// </summary>
         public SizeF(float width, float height)
         {
             this.width = width;
             this.height = height;
         }
 
-        /// <include file='doc\SizeF.uex' path='docs/doc[@for="SizeF.operator+"]/*' />
-        /// <devdoc>
-        ///    <para>
-        ///       Performs vector addition of two <see cref='System.Drawing.SizeF'/> objects.
-        ///    </para>
-        /// </devdoc>
+        /// <summary>
+        /// Adds the widths and the heights of two sizes (vector addition).
+        /// </summary>
         public static SizeF operator +(SizeF sz1, SizeF sz2)
         {
             return Add(sz1, sz2);
         }
 
-        /// <include file='doc\SizeF.uex' path='docs/doc[@for="SizeF.operator-"]/*' />
-        /// <devdoc>
-        ///    <para>
-        ///       Contracts a <see cref='System.Drawing.SizeF'/> by another <see cref='System.Drawing.SizeF'/>
-        ///       .
-        ///    </para>
-        /// </devdoc>        
+        /// <summary>
+        /// Subtracts the width and the height of <paramref name="sz2"/> from those of <paramref name="sz1"/>.
+        /// </summary>
         public static SizeF operator -(SizeF sz1, SizeF sz2)
         {
             return Subtract(sz1, sz2);
         }
 
-        /// <include file='doc\SizeF.uex' path='docs/doc[@for="SizeF.operator=="]/*' />
-        /// <devdoc>
-        ///    Tests whether two <see cref='System.Drawing.SizeF'/> objects
-        ///    are identical.
-        /// </devdoc>
+        /// <summary>
+        /// Tests whether two sizes have the same width and height.
+        /// </summary>
         public static bool operator ==(SizeF sz1, SizeF sz2)
         {
             return sz1.Width == sz2.Width && sz1.Height == sz2.Height;
         }
 
-        /// <include file='doc\SizeF.uex' path='docs/doc[@for="SizeF.operator!="]/*' />
-        /// <devdoc>
-        ///    <para>
-        ///       Tests whether two <see cref='System.Drawing.SizeF'/> objects are different.
-        ///    </para>
-        /// </devdoc>
+        /// <summary>
+        /// Tests whether two sizes differ in width or height.
+        /// </summary>
         public static bool operator !=(SizeF sz1, SizeF sz2)
         {
             return !(sz1 == sz2);
         }
 
-        /// <include file='doc\SizeF.uex' path='docs/doc[@for="SizeF.operatorPointF"]/*' />
-        /// <devdoc>
-        ///    <para>
-        ///       Converts the specified <see cref='System.Drawing.SizeF'/> to a
-        ///    <see cref='System.Drawing.PointF'/>.
-        ///    </para>
-        /// </devdoc>
+        /// <summary>
+        /// Converts a size to a <see cref="PointF"/> whose X is the width and whose Y is the height.
+        /// </summary>
         public static explicit operator PointF(SizeF size)
         {
             return new PointF(size.Width, size.Height);
         }
 
-        /// <include file='doc\SizeF.uex' path='docs/doc[@for="SizeF.IsEmpty"]/*' />
-        /// <devdoc>
-        ///    <para>
-        ///       Tests whether this <see cref='System.Drawing.SizeF'/> has zero
-        ///       width and height.
-        ///    </para>
-        /// </devdoc>
+        /// <summary>
+        /// Whether both the width and the height are zero.
+        /// </summary>
         public bool IsEmpty
         {
             get
@@ -252,13 +222,9 @@ namespace CADability.WebDrawing
         /**
          * Horizontal dimension
          */
-        /// <include file='doc\SizeF.uex' path='docs/doc[@for="SizeF.Width"]/*' />
-        /// <devdoc>
-        ///    <para>
-        ///       Represents the horizontal component of this
-        ///    <see cref='System.Drawing.SizeF'/>.
-        ///    </para>
-        /// </devdoc>
+        /// <summary>
+        /// The horizontal component of this size.
+        /// </summary>
         public float Width
         {
             get
@@ -274,13 +240,9 @@ namespace CADability.WebDrawing
         /**
          * Vertical dimension
          */
-        /// <include file='doc\SizeF.uex' path='docs/doc[@for="SizeF.Height"]/*' />
-        /// <devdoc>
-        ///    <para>
-        ///       Represents the vertical component of this
-        ///    <see cref='System.Drawing.SizeF'/>.
-        ///    </para>
-        /// </devdoc>
+        /// <summary>
+        /// The vertical component of this size.
+        /// </summary>
         public float Height
         {
             get
@@ -293,36 +255,25 @@ namespace CADability.WebDrawing
             }
         }
 
-        /// <devdoc>
-        ///    <para>
-        ///       Performs vector addition of two <see cref='System.Drawing.SizeF'/> objects.
-        ///    </para>
-        /// </devdoc>
+        /// <summary>
+        /// Adds the widths and the heights of two sizes (vector addition).
+        /// </summary>
         public static SizeF Add(SizeF sz1, SizeF sz2)
         {
             return new SizeF(sz1.Width + sz2.Width, sz1.Height + sz2.Height);
         }
 
-        /// <include file='doc\SizeF.uex' path='docs/doc[@for="SizeF.operator-"]/*' />
-        /// <devdoc>
-        ///    <para>
-        ///       Contracts a <see cref='System.Drawing.SizeF'/> by another <see cref='System.Drawing.SizeF'/>
-        ///       .
-        ///    </para>
-        /// </devdoc>        
+        /// <summary>
+        /// Subtracts the width and the height of <paramref name="sz2"/> from those of <paramref name="sz1"/>.
+        /// </summary>
         public static SizeF Subtract(SizeF sz1, SizeF sz2)
         {
             return new SizeF(sz1.Width - sz2.Width, sz1.Height - sz2.Height);
         }
 
-        /// <include file='doc\SizeF.uex' path='docs/doc[@for="SizeF.Equals"]/*' />
-        /// <devdoc>
-        ///    <para>
-        ///       Tests to see whether the specified object is a
-        ///    <see cref='System.Drawing.SizeF'/> 
-        ///    with the same dimensions as this <see cref='System.Drawing.SizeF'/>.
-        /// </para>
-        /// </devdoc>
+        /// <summary>
+        /// Tests whether <paramref name="obj"/> is a <see cref="SizeF"/> with the same width and height as this one.
+        /// </summary>
         public override bool Equals(object obj)
         {
             if (!(obj is SizeF))
@@ -335,40 +286,34 @@ namespace CADability.WebDrawing
             (comp.GetType().Equals(GetType()));
         }
 
-        /// <include file='doc\SizeF.uex' path='docs/doc[@for="SizeF.GetHashCode"]/*' />
-        /// <devdoc>
-        ///    <para>[To be supplied.]</para>
-        /// </devdoc>
+        /// <summary>
+        /// Returns a hash code for this size (the default value type hash of its fields).
+        /// </summary>
         public override int GetHashCode()
         {
             return base.GetHashCode();
         }
 
-        /// <include file='doc\SizeF.uex' path='docs/doc[@for="SizeF.ToPointF"]/*' />
-        /// <devdoc>
-        ///    <para>[To be supplied.]</para>
-        /// </devdoc>
+        /// <summary>
+        /// Converts this size to a <see cref="PointF"/> whose X is the width and whose Y is the height.
+        /// </summary>
         public PointF ToPointF()
         {
             return (PointF)this;
         }
 
-        /// <include file='doc\SizeF.uex' path='docs/doc[@for="SizeF.ToSize"]/*' />
-        /// <devdoc>
-        ///    <para>[To be supplied.]</para>
-        /// </devdoc>
+        /// <summary>
+        /// Converts this size to a <see cref="Size"/> by truncating the width and the height to integers
+        /// (see <see cref="Size.Truncate"/>).
+        /// </summary>
         public Size ToSize()
         {
             return Size.Truncate(this);
         }
 
-        /// <include file='doc\SizeF.uex' path='docs/doc[@for="SizeF.ToString"]/*' />
-        /// <devdoc>
-        ///    <para>
-        ///       Creates a human-readable string that represents this
-        ///    <see cref='System.Drawing.SizeF'/>.
-        ///    </para>
-        /// </devdoc>
+        /// <summary>
+        /// Returns the size as a string of the form "{Width=w, Height=h}".
+        /// </summary>
         public override string ToString()
         {
             return "{Width=" + width.ToString() + ", Height=" + height.ToString() + "}";
@@ -377,10 +322,9 @@ namespace CADability.WebDrawing
     public struct Size
     {
 
-        /// <include file='doc\Size.uex' path='docs/doc[@for="Size.Empty"]/*' />
-        /// <devdoc>
-        ///    Initializes a new instance of the <see cref='System.Drawing.Size'/> class.
-        /// </devdoc>
+        /// <summary>
+        /// The size with zero width and height.
+        /// </summary>
         public static readonly Size Empty = new Size();
 
         private int width;
@@ -389,13 +333,10 @@ namespace CADability.WebDrawing
         /**
          * Create a new Size object from a point
          */
-        /// <include file='doc\Size.uex' path='docs/doc[@for="Size.Size"]/*' />
-        /// <devdoc>
-        ///    <para>
-        ///       Initializes a new instance of the <see cref='System.Drawing.Size'/> class from
-        ///       the specified <see cref='System.Drawing.Point'/>.
-        ///    </para>
-        /// </devdoc>
+        /// <summary>
+        /// Initializes a new <see cref="Size"/> whose width and height are the X and Y coordinates of
+        /// <paramref name="pt"/>.
+        /// </summary>
         public Size(Point pt)
         {
             width = pt.X;
@@ -405,86 +346,66 @@ namespace CADability.WebDrawing
         /**
          * Create a new Size object of the specified dimension
          */
-        /// <include file='doc\Size.uex' path='docs/doc[@for="Size.Size1"]/*' />
-        /// <devdoc>
-        ///    Initializes a new instance of the <see cref='System.Drawing.Size'/> class from
-        ///    the specified dimensions.
-        /// </devdoc>
+        /// <summary>
+        /// Initializes a new <see cref="Size"/> with the given width and height.
+        /// </summary>
         public Size(int width, int height)
         {
             this.width = width;
             this.height = height;
         }
 
-        /// <include file='doc\Size.uex' path='docs/doc[@for="Size.operatorSizeF"]/*' />
-        /// <devdoc>
-        ///    Converts the specified <see cref='System.Drawing.Size'/> to a
-        /// <see cref='System.Drawing.SizeF'/>.
-        /// </devdoc>
+        /// <summary>
+        /// Converts a <see cref="Size"/> to a <see cref="SizeF"/> with the same width and height.
+        /// </summary>
         public static implicit operator SizeF(Size p)
         {
             return new SizeF(p.Width, p.Height);
         }
 
-        /// <include file='doc\Size.uex' path='docs/doc[@for="Size.operator+"]/*' />
-        /// <devdoc>
-        ///    <para>
-        ///       Performs vector addition of two <see cref='System.Drawing.Size'/> objects.
-        ///    </para>
-        /// </devdoc>
+        /// <summary>
+        /// Adds the widths and the heights of two sizes (vector addition).
+        /// </summary>
         public static Size operator +(Size sz1, Size sz2)
         {
             return Add(sz1, sz2);
         }
 
-        /// <include file='doc\Size.uex' path='docs/doc[@for="Size.operator-"]/*' />
-        /// <devdoc>
-        ///    <para>
-        ///       Contracts a <see cref='System.Drawing.Size'/> by another <see cref='System.Drawing.Size'/>
-        ///       .
-        ///    </para>
-        /// </devdoc>
+        /// <summary>
+        /// Subtracts the width and the height of <paramref name="sz2"/> from those of <paramref name="sz1"/>.
+        /// </summary>
         public static Size operator -(Size sz1, Size sz2)
         {
             return Subtract(sz1, sz2);
         }
 
-        /// <include file='doc\Size.uex' path='docs/doc[@for="Size.operator=="]/*' />
-        /// <devdoc>
-        ///    Tests whether two <see cref='System.Drawing.Size'/> objects
-        ///    are identical.
-        /// </devdoc>
+        /// <summary>
+        /// Tests whether two sizes have the same width and height.
+        /// </summary>
         public static bool operator ==(Size sz1, Size sz2)
         {
             return sz1.Width == sz2.Width && sz1.Height == sz2.Height;
         }
 
-        /// <include file='doc\Size.uex' path='docs/doc[@for="Size.operator!="]/*' />
-        /// <devdoc>
-        ///    <para>
-        ///       Tests whether two <see cref='System.Drawing.Size'/> objects are different.
-        ///    </para>
-        /// </devdoc>
+        /// <summary>
+        /// Tests whether two sizes differ in width or height.
+        /// </summary>
         public static bool operator !=(Size sz1, Size sz2)
         {
             return !(sz1 == sz2);
         }
 
-        /// <include file='doc\Size.uex' path='docs/doc[@for="Size.operatorPoint"]/*' />
-        /// <devdoc>
-        ///    Converts the specified <see cref='System.Drawing.Size'/> to a
-        /// <see cref='System.Drawing.Point'/>.
-        /// </devdoc>
+        /// <summary>
+        /// Converts a size to a <see cref="Point"/> whose X is the width and whose Y is the height.
+        /// </summary>
         public static explicit operator Point(Size size)
         {
             return new Point(size.Width, size.Height);
         }
 
-        /// <include file='doc\Size.uex' path='docs/doc[@for="Size.IsEmpty"]/*' />
-        /// <devdoc>
-        ///    Tests whether this <see cref='System.Drawing.Size'/> has zero
-        ///    width and height.
-        /// </devdoc>
+        /// <summary>
+        /// Whether both the width and the height are zero.
+        /// </summary>
         public bool IsEmpty
         {
             get
@@ -496,13 +417,9 @@ namespace CADability.WebDrawing
         /**
          * Horizontal dimension
          */
-        /// <include file='doc\Size.uex' path='docs/doc[@for="Size.Width"]/*' />
-        /// <devdoc>
-        ///    <para>
-        ///       Represents the horizontal component of this
-        ///    <see cref='System.Drawing.Size'/>.
-        ///    </para>
-        /// </devdoc>
+        /// <summary>
+        /// The horizontal component of this size.
+        /// </summary>
         public int Width
         {
             get
@@ -518,11 +435,9 @@ namespace CADability.WebDrawing
         /**
          * Vertical dimension
          */
-        /// <include file='doc\Size.uex' path='docs/doc[@for="Size.Height"]/*' />
-        /// <devdoc>
-        ///    Represents the vertical component of this
-        /// <see cref='System.Drawing.Size'/>.
-        /// </devdoc>
+        /// <summary>
+        /// The vertical component of this size.
+        /// </summary>
         public int Height
         {
             get
@@ -535,64 +450,52 @@ namespace CADability.WebDrawing
             }
         }
 
-        /// <devdoc>
-        ///    <para>
-        ///       Performs vector addition of two <see cref='System.Drawing.Size'/> objects.
-        ///    </para>
-        /// </devdoc>
+        /// <summary>
+        /// Adds the widths and the heights of two sizes (vector addition).
+        /// </summary>
         public static Size Add(Size sz1, Size sz2)
         {
             return new Size(sz1.Width + sz2.Width, sz1.Height + sz2.Height);
         }
 
-        /// <include file='doc\Size.uex' path='docs/doc[@for="Size.Ceiling"]/*' />
-        /// <devdoc>
-        ///   Converts a SizeF to a Size by performing a ceiling operation on
-        ///   all the coordinates.
-        /// </devdoc>
+        /// <summary>
+        /// Converts a <see cref="SizeF"/> to a <see cref="Size"/> by rounding the width and the height up to
+        /// the next integer.
+        /// </summary>
         public static Size Ceiling(SizeF value)
         {
             return new Size((int)Math.Ceiling(value.Width), (int)Math.Ceiling(value.Height));
         }
 
-        /// <devdoc>
-        ///    <para>
-        ///       Contracts a <see cref='System.Drawing.Size'/> by another <see cref='System.Drawing.Size'/> .
-        ///    </para>
-        /// </devdoc>
+        /// <summary>
+        /// Subtracts the width and the height of <paramref name="sz2"/> from those of <paramref name="sz1"/>.
+        /// </summary>
         public static Size Subtract(Size sz1, Size sz2)
         {
             return new Size(sz1.Width - sz2.Width, sz1.Height - sz2.Height);
         }
 
-        /// <include file='doc\Size.uex' path='docs/doc[@for="Size.Truncate"]/*' />
-        /// <devdoc>
-        ///   Converts a SizeF to a Size by performing a truncate operation on
-        ///   all the coordinates.
-        /// </devdoc>
+        /// <summary>
+        /// Converts a <see cref="SizeF"/> to a <see cref="Size"/> by truncating the width and the height to
+        /// integers (towards zero).
+        /// </summary>
         public static Size Truncate(SizeF value)
         {
             return new Size((int)value.Width, (int)value.Height);
         }
 
-        /// <include file='doc\Size.uex' path='docs/doc[@for="Size.Round"]/*' />
-        /// <devdoc>
-        ///   Converts a SizeF to a Size by performing a round operation on
-        ///   all the coordinates.
-        /// </devdoc>
+        /// <summary>
+        /// Converts a <see cref="SizeF"/> to a <see cref="Size"/> by rounding the width and the height to the
+        /// nearest integer.
+        /// </summary>
         public static Size Round(SizeF value)
         {
             return new Size((int)Math.Round(value.Width), (int)Math.Round(value.Height));
         }
 
-        /// <include file='doc\Size.uex' path='docs/doc[@for="Size.Equals"]/*' />
-        /// <devdoc>
-        ///    <para>
-        ///       Tests to see whether the specified object is a
-        ///    <see cref='System.Drawing.Size'/> 
-        ///    with the same dimensions as this <see cref='System.Drawing.Size'/>.
-        /// </para>
-        /// </devdoc>
+        /// <summary>
+        /// Tests whether <paramref name="obj"/> is a <see cref="Size"/> with the same width and height as this one.
+        /// </summary>
         public override bool Equals(object obj)
         {
             if (!(obj is Size))
@@ -605,24 +508,17 @@ namespace CADability.WebDrawing
                    (comp.height == this.height);
         }
 
-        /// <include file='doc\Size.uex' path='docs/doc[@for="Size.GetHashCode"]/*' />
-        /// <devdoc>
-        ///    <para>
-        ///       Returns a hash code.
-        ///    </para>
-        /// </devdoc>
+        /// <summary>
+        /// Returns a hash code for this size, the exclusive or of its width and height.
+        /// </summary>
         public override int GetHashCode()
         {
             return width ^ height;
         }
 
-        /// <include file='doc\Size.uex' path='docs/doc[@for="Size.ToString"]/*' />
-        /// <devdoc>
-        ///    <para>
-        ///       Creates a human-readable string that represents this
-        ///    <see cref='System.Drawing.Size'/>.
-        ///    </para>
-        /// </devdoc>
+        /// <summary>
+        /// Returns the size as a string of the form "{Width=w, Height=h}".
+        /// </summary>
         public override string ToString()
         {
             return "{Width=" + width.ToString() + ", Height=" + height.ToString() + "}";

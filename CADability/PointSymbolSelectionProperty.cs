@@ -4,7 +4,9 @@ using System.Drawing;
 namespace CADability.UserInterface
 {
     /// <summary>
-    /// 
+    /// A property page entry to choose the <see cref="PointSymbol"/> of a <see cref="GeoObject.Point"/> (or of several
+    /// selected points at once) via the context menu "MenuId.PointSymbol": the basic symbol (empty, dot, plus, cross or
+    /// line) and the optional square and circle around it, which can be combined with the basic symbol.
     /// </summary>
 
     public class PointSymbolSelectionProperty : IShowPropertyImpl, ICommandHandler

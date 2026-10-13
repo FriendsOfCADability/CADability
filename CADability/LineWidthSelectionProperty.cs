@@ -4,7 +4,10 @@ using CADability.GeoObject;
 namespace CADability.UserInterface
 {
     /// <summary>
-    /// 
+    /// Property entry which lets the user choose a <see cref="LineWidth"/> from a <see cref="LineWidthList"/> in a drop-down
+    /// list, optionally including an "undefined" entry. When constructed for an object implementing <see cref="ILineWidth"/>,
+    /// the selection is applied to that object and the entry follows changes of the object's line width; otherwise the selection
+    /// is only reported via <see cref="LineWidthChangedEvent"/>.
     /// </summary>
 
     public class LineWidthSelectionProperty : MultipleChoiceProperty
@@ -101,10 +104,7 @@ namespace CADability.UserInterface
             if (LineWidthChangedEvent != null) LineWidthChangedEvent(lineWidthList.Find(selected));
             if (iLineWidth != null) iLineWidth.LineWidth = lineWidthList.Find(selected);
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Added(IPropertyPage)"/>
-        /// </summary>
-        /// <param name="propertyPage"></param>
+        /// <inheritdoc/>
         public override void Added(IPropertyPage propertyPage)
         {
             base.Added(propertyPage);

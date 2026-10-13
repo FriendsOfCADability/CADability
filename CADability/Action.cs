@@ -554,8 +554,8 @@ namespace CADability.Actions
             return ActiveDrawingPlane.ToGlobal(a.Direction);
         }
         /// <summary>
-        /// Liefert ein Größe im Koordinatensystem des Modells, die in etwa dem aktuell dargestellten
-        /// Ausschnitt entspricht.
+        /// A length in the coordinate system of the model that corresponds roughly to the part of the model currently
+        /// shown in the active view (the mean of the width and height of the view in model units).
         /// </summary>
         internal double WorldViewSize
         {

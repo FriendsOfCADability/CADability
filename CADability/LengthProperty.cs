@@ -19,10 +19,7 @@ namespace CADability.UserInterface
             this.lengthProperty = lengthProperty;
         }
         #region IHotSpot Members
-        /// <summary>
-        /// Implements <see cref="CADability.IHotSpot.GetHotspotPosition ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public GeoPoint GetHotspotPosition()
         {
             return Position;
@@ -38,9 +35,7 @@ namespace CADability.UserInterface
                 lengthProperty.IsSelected = value;
             }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.IHotSpot.StartDrag(IFrame)"/>
-        /// </summary>
+        /// <inheritdoc/>
         public void StartDrag(IFrame frame)
         {
             lengthProperty.StartModifyWithMouse();

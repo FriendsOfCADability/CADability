@@ -60,22 +60,12 @@ namespace CADability.GeoObject
             return "NonPeriodicCylindricalSurface: " + "loc: " + Location.ToString() + "dirx: " + XAxis.ToString() + "diry: " + YAxis.ToString();
         }
         #region ISurface
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.PointAt (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint PointAt(GeoPoint2D uv)
         {
             return base.PointAt(toPeriodic(uv));
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.DerivationAt (GeoPoint2D, out GeoPoint, out GeoVector, out GeoVector)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <param name="location"></param>
-        /// <param name="du"></param>
-        /// <param name="dv"></param>
+        /// <inheritdoc/>
         public override void DerivationAt(GeoPoint2D uv, out GeoPoint location, out GeoVector du, out GeoVector dv)
         {
             // Maxima code:
@@ -93,16 +83,7 @@ namespace CADability.GeoObject
             du = toCylinder * new GeoVector(1 / rt - u * u / rt3, -(u * v) / rt3, u / rt);
             dv = toCylinder * new GeoVector(-(u * v) / rt3, 1 / rt - v * v / rt3, v / rt);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Derivation2At (GeoPoint2D, out GeoPoint, out GeoVector, out GeoVector, out GeoVector, out GeoVector, out GeoVector)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <param name="location"></param>
-        /// <param name="du"></param>
-        /// <param name="dv"></param>
-        /// <param name="duu"></param>
-        /// <param name="dvv"></param>
-        /// <param name="duv"></param>
+        /// <inheritdoc/>
         public override void Derivation2At(GeoPoint2D uv, out GeoPoint location, out GeoVector du, out GeoVector dv,
             out GeoVector duu, out GeoVector dvv, out GeoVector duv)
         {
@@ -119,11 +100,7 @@ namespace CADability.GeoObject
             dvv = toCylinder * new GeoVector((3 * u * v * v) / rt5 - u / rt3, (3 * v * v * v) / rt5 - (3 * v) / rt3, 1 / rt - v * v / rt3);
             duv = toCylinder * new GeoVector((3 * u * u * v) / rt5 - v / rt3, (3 * u * v * v) / rt5 - u / rt3, -(u * v) / rt3);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.UDirection (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoVector UDirection(GeoPoint2D uv)
         {
             double u = uv.x;
@@ -133,11 +110,7 @@ namespace CADability.GeoObject
             double rt3 = rt * rt * rt;
             return toCylinder * new GeoVector(1 / rt - u * u / rt3, -(u * v) / rt3, u / rt);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.VDirection (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoVector VDirection(GeoPoint2D uv)
         {
             double u = uv.x;
@@ -147,11 +120,7 @@ namespace CADability.GeoObject
             double rt3 = rt * rt * rt;
             return toCylinder * new GeoVector(-(u * v) / rt3, 1 / rt - v * v / rt3, v / rt);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetNormal (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoVector GetNormal(GeoPoint2D uv)
         {
             double u = uv.x;
@@ -163,27 +132,17 @@ namespace CADability.GeoObject
             GeoVector dv = toCylinder * new GeoVector(-(u * v) / rt3, 1 / rt - v * v / rt3, v / rt);
             return du ^ dv;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.PositionOf (GeoPoint)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D PositionOf(GeoPoint p)
         {
             return fromPeriodic(base.PositionOf(p));
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Clone ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ISurface Clone()
         {
             return new NonPeriodicCylindricalSurface(this);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.CopyData (ISurface)"/>
-        /// </summary>
-        /// <param name="CopyFrom"></param>
+        /// <inheritdoc/>
         public override void CopyData(ISurface CopyFrom)
         {
             base.CopyData(CopyFrom);
@@ -203,43 +162,22 @@ namespace CADability.GeoObject
                 return false;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetModified (ModOp)"/>
-        /// </summary>
-        /// <param name="m"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ISurface GetModified(ModOp m)
         {
             return new NonPeriodicCylindricalSurface(m * toCylinder, vmin, usedArea);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.FixedU (double, double, double)"/>
-        /// </summary>
-        /// <param name="u"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve FixedU(double u, double vmin, double vmax)
         {
             return new FixedParameterCurve<NonPeriodicCylindricalSurface>(this, new GeoPoint2D(u, vmin), new GeoPoint2D(u, vmax));
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.FixedV (double, double, double)"/>
-        /// </summary>
-        /// <param name="v"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve FixedV(double v, double umin, double umax)
         {
             return new FixedParameterCurve<NonPeriodicCylindricalSurface>(this, new GeoPoint2D(umin, v), new GeoPoint2D(umax, v));
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetLineIntersection (GeoPoint, GeoVector)"/>
-        /// </summary>
-        /// <param name="startPoint"></param>
-        /// <param name="direction"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D[] GetLineIntersection(GeoPoint startPoint, GeoVector direction)
         {
             GeoPoint2D[] res = base.GetLineIntersection(startPoint, direction);
@@ -249,26 +187,12 @@ namespace CADability.GeoObject
             }
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetProjectedCurve (ICurve, double)"/>
-        /// </summary>
-        /// <param name="curve"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D GetProjectedCurve(ICurve curve, double precision)
         {
             return new ProjectedCurve(curve, this, true, BoundingRect.EmptyBoundingRect);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetPlaneIntersection (PlaneSurface, double, double, double, double, double)"/>
-        /// </summary>
-        /// <param name="pl"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IDualSurfaceCurve[] GetPlaneIntersection(PlaneSurface pl, double umin, double umax, double vmin, double vmax, double precision)
         {
             IDualSurfaceCurve[] idsc = base.GetPlaneIntersection(pl, umin, umax, vmin, vmax, precision);
@@ -280,11 +204,7 @@ namespace CADability.GeoObject
             }
             return new IDualSurfaceCurve[] { dsc };
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Make3dCurve (ICurve2D)"/>
-        /// </summary>
-        /// <param name="curve2d"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve Make3dCurve(ICurve2D curve2d)
         {
             if (curve2d is ProjectedCurve && (curve2d as ProjectedCurve).Surface == this)
@@ -355,10 +275,11 @@ namespace CADability.GeoObject
             vmin = info.GetDouble("Vmin");
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Vmin", vmin);
@@ -373,9 +294,11 @@ namespace CADability.GeoObject
     }
 
     /// <summary>
-    /// Allgemeine Implementierung einer 3D Kurve auf einer Fläche mit festem u bzw v Parameter
+    /// General implementation of a 3d curve on a surface along which one of the surface parameters is fixed, i.e. a
+    /// line in the (u, v) parameter space that is either horizontal (fixed v) or vertical (fixed u), given by its start
+    /// and end point in parameter space. Points and directions are computed by evaluating the surface.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
+    /// <typeparam name="T">the type of the surface</typeparam>
     internal class FixedParameterCurve<T> : GeneralCurve where T : ISurface
     {
         T surface;
@@ -439,27 +362,18 @@ namespace CADability.GeoObject
             this.endPoint = ep;
             InvalidateSecondaryData();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Modify (ModOp)"/>
-        /// </summary>
-        /// <param name="m"></param>
+        /// <inheritdoc/>
         public override void Modify(ModOp m)
         {
             this.surface = (T)surface.GetModified(m);
             InvalidateSecondaryData();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Clone ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IGeoObject Clone()
         {
             return new FixedParameterCurve<T>(surface, startPoint, endPoint);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.CopyGeometry (IGeoObject)"/>
-        /// </summary>
-        /// <param name="ToCopyFrom"></param>
+        /// <inheritdoc/>
         public override void CopyGeometry(IGeoObject ToCopyFrom)
         {
             if (ToCopyFrom is FixedParameterCurve<T>)

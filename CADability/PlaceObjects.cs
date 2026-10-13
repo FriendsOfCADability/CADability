@@ -4,7 +4,10 @@
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Action which places a list of objects at a position picked by the user: the objects are shown as a block hanging on the
+    /// mouse at the given reference point, and when the position is fixed the objects are moved so that the reference point
+    /// coincides with the picked position and are added to the active model. Used by the <see cref="SelectObjectsAction"/> when
+    /// objects are pasted from the clipboard and the setting "Select.KeepPasteActive" is set. Its id is "PlaceObjects".
     /// </summary>
     internal class PlaceObjects : ConstructAction
     {

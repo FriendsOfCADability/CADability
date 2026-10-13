@@ -4,7 +4,10 @@ using CADability.Substitutes;
 namespace CADability.UserInterface
 {
     /// <summary>
-    ///
+    /// Property page entry for the drawing plane of a <see cref="Projection"/>, the plane in which 2d constructions
+    /// take place. It shows the origin and the x and y directions of the plane as editable sub entries and offers the
+    /// context menu "MenuId.DrawingPlane" to select one of the standard planes (optionally with an offset), to define
+    /// the plane by three points, by a curve or tangential to a surface, and to show or hide the plane.
     /// </summary>
 
     public class DrawingPlaneProperty : IShowPropertyImpl, ICommandHandler
@@ -90,10 +93,7 @@ namespace CADability.UserInterface
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>,
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -101,10 +101,7 @@ namespace CADability.UserInterface
                 return subEntries.Length;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>,
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get

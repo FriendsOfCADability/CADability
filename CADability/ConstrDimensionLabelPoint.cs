@@ -14,7 +14,11 @@ using Point = System.Drawing.Point;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a location dimension (<see cref="Dimension.EDimType.DimLocation"/>), either as a coordinate
+    /// dimension of a point (<see cref="DimLabelType.Point"/>, menu id "Constr.Dimension.Point") or as an annotation
+    /// with a free text that points to a point (<see cref="DimLabelType.Labeling"/>, menu id "Constr.Dimension.Labeling").
+    /// Depending on the method input the point is given either as a snap point or as the perpendicular foot on a
+    /// selected curve; then the user enters the position of the label and, for the annotation, its text.
     /// </summary>
     internal class ConstrDimensionLabelPoint : ConstructAction
     {

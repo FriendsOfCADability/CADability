@@ -12,7 +12,13 @@ using Point = System.Drawing.Point;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Intermediate construction of a <see cref="Plane"/> from its origin and a second point: the vector
+    /// from the origin to that point is the normal of the plane. It is started by the plane input of another
+    /// construction action (see <see cref="IIntermediateConstruction"/>), e.g. when a new drawing plane is
+    /// defined, and shows the plane as a feedback rectangle around the mouse position while the points are
+    /// entered. The result is available in <see cref="ConstructedPlane"/> once both points are fixed, and
+    /// <see cref="PlaneChangedEvent"/> reports every change. The action does not auto-repeat. Started with
+    /// the action id "Construct.Plane.OriginNormalPoint" (menu command "MenuId.Plane.OriginNormalPoint").
     /// </summary>
 
     public class ConstructPlaneOriginNormalPoint : CADability.Actions.ConstructAction, IIntermediateConstruction, IConstructPlane
@@ -57,25 +63,17 @@ namespace CADability.Actions
         public ConstructPlaneOriginNormalPoint()
         {
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.GetID ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override string GetID()
         {
             return "Construct.Plane.OriginNormalPoint";
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.AutoRepeat ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool AutoRepeat()
         {
             return false;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnSetAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnSetAction()
         {
 

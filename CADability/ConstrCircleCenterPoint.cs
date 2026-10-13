@@ -8,7 +8,11 @@ namespace CADability.Actions
     //Gerhard: Defaultwerte auch bei Readonly setzen
     // Eckhard: Dann Zeile bei OnDone rausnehmen
     /// <summary>
-    /// 
+    /// Construction of a full circle in the active drawing plane from its center and a point on the circle.
+    /// The user enters the center and then a point through which the circle passes; while the point is
+    /// entered, perpendicular feet on curves under the cursor are offered as tangential snap points. The
+    /// resulting radius is shown as a read-only input. Started with the action id "Constr.Circle.CenterPoint"
+    /// (menu command "MenuId.Constr.Circle.CenterPoint").
     /// </summary>
     internal class ConstrCircleCenterPoint : ConstructAction
     {

@@ -183,10 +183,7 @@ namespace CADability.UserInterface
         }
 
         #region PropertyEntryImpl Overrides
-        /// <summary>
-        /// Overrides <see cref="PropertyEntryImpl.Added"/>
-        /// </summary>
-        /// <param name="page"></param>
+        /// <inheritdoc/>
         public override void Added(IPropertyPage page)
         {
             base.Added(page);

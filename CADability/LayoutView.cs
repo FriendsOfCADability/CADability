@@ -39,7 +39,10 @@ namespace CADability
 
 
     /// <summary>
-    /// 
+    /// A view that shows a <see cref="Layout"/>, i.e. the arrangement of one or more patches (projections of a model)
+    /// on a sheet of paper, as it will be printed. The paper can be zoomed and scrolled; the paper size and the patches
+    /// are shown as properties in the property page, and the context menu allows to add patches, to rename or remove
+    /// the layout and to print it with the print settings of the project.
     /// </summary>
 
     public class LayoutView : IShowPropertyImpl, IView, ICommandHandler
@@ -148,10 +151,7 @@ namespace CADability
         }
 
 #region IShowProperty
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Added(IPropertyPage)"/>
-        /// </summary>
-        /// <param name="propertyTreeView"></param>
+        /// <inheritdoc/>
         public override void Added(IPropertyPage propertyTreeView)
         {
             base.Added(propertyTreeView);
@@ -176,9 +176,7 @@ namespace CADability
             //propertyTreeView.FocusChangedEvent -= new FocusChangedDelegate(OnFocusChanged);
             base.Removed(propertyTreeView);
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -191,10 +189,7 @@ namespace CADability
                 return res;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.LabelChanged (string)"/>
-        /// </summary>
-        /// <param name="NewText"></param>
+        /// <inheritdoc/>
         public override void LabelChanged(string NewText)
         {
             if (NewText == layout.Name) return;
@@ -233,10 +228,7 @@ namespace CADability
             }
         }
         IShowProperty[] subEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -244,10 +236,7 @@ namespace CADability
                 return SubEntries.Length;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get

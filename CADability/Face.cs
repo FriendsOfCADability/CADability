@@ -5146,10 +5146,7 @@ namespace CADability.GeoObject
             return ext;
         }
         #region IGeoObject Members
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.CopyGeometry (IGeoObject)"/>
-        /// </summary>
-        /// <param name="ToCopyFrom"></param>
+        /// <inheritdoc/>
         public override void CopyGeometry(IGeoObject ToCopyFrom)
         {
             Face copyface = ToCopyFrom as Face;
@@ -5172,11 +5169,7 @@ namespace CADability.GeoObject
             extent = BoundingCube.EmptyBoundingCube;
             ClearTriangulation();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetShowProperties (IFrame)"/>
-        /// </summary>
-        /// <param name="Frame"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IPropertyEntry GetShowProperties(IFrame Frame)
         {
             return new ShowPropertyFace(this, Frame);
@@ -5576,10 +5569,7 @@ namespace CADability.GeoObject
             return res;
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Clone ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IGeoObject Clone()
         {
             Face res = this.Clone(new Dictionary<Edge, Edge>(), new Dictionary<Vertex, Vertex>());
@@ -5654,10 +5644,7 @@ namespace CADability.GeoObject
 #endif
             extent = BoundingCube.EmptyBoundingCube;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Modify (ModOp)"/>
-        /// </summary>
-        /// <param name="m"></param>
+        /// <inheritdoc/>
         public override void Modify(ModOp m)
         {
 #if DEBUG
@@ -5681,10 +5668,7 @@ namespace CADability.GeoObject
                 extent = BoundingCube.EmptyBoundingCube;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.FindSnapPoint (SnapPointFinder)"/>
-        /// </summary>
-        /// <param name="spf"></param>
+        /// <inheritdoc/>
         public override void FindSnapPoint(SnapPointFinder spf)
         {
             if (!spf.Accept(this)) return;
@@ -5734,10 +5718,7 @@ namespace CADability.GeoObject
             }
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingCube GetBoundingCube()
         {
             if (extent.IsEmpty && surface != null)
@@ -6926,10 +6907,7 @@ namespace CADability.GeoObject
         }
         public delegate bool PaintTo3DDelegate(Face toPaint, IPaintTo3D paintTo3D);
         public static PaintTo3DDelegate OnPaintTo3D;
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3D (IPaintTo3D)"/>
-        /// </summary>
-        /// <param name="paintTo3D"></param>
+        /// <inheritdoc/>
         public override void PaintTo3D(IPaintTo3D paintTo3D)
         {
             if (surface == null) return; // has not been fully initialized
@@ -6954,11 +6932,7 @@ namespace CADability.GeoObject
                 }
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3DList (IPaintTo3D, ICategorizedDislayLists)"/>
-        /// </summary>
-        /// <param name="paintTo3D"></param>
-        /// <param name="lists"></param>
+        /// <inheritdoc/>
         public override void PaintTo3DList(IPaintTo3D paintTo3D, ICategorizedDislayLists lists)
         {
             if (Layer != null && Layer.Transparency > 0)
@@ -6968,10 +6942,7 @@ namespace CADability.GeoObject
             // es wird in beide Listen eingefügt, dann wird PaintTo3D zweimal aufgerufen, einmal mit
             // paintTo3D.PaintSurfaces und einmal mit paintTo3D.PaintEdges
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PrepareDisplayList (double)"/>
-        /// </summary>
-        /// <param name="precision"></param>
+        /// <inheritdoc/>
         public override void PrepareDisplayList(double precision)
         {
             TryAssureTriangles(precision);
@@ -6983,12 +6954,7 @@ namespace CADability.GeoObject
                 return Style.EDefaultFor.Solids;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (Projection, ExtentPrecision)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="extentPrecision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingRect GetExtent(Projection projection, ExtentPrecision extentPrecision)
         {
             BoundingRect res = BoundingRect.EmptyBoundingRect;
@@ -7108,12 +7074,7 @@ namespace CADability.GeoObject
             }
             #endregion
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetQuadTreeItem (Projection, ExtentPrecision)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="extentPrecision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IQuadTreeInsertableZ GetQuadTreeItem(Projection projection, ExtentPrecision extentPrecision)
         {
             QuadTreeCollection res = new QuadTreeCollection(this, projection);
@@ -7148,11 +7109,7 @@ namespace CADability.GeoObject
         }
         #endregion
         #region IOctTreeInsertable members
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (double)"/>
-        /// </summary>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingCube GetExtent(double precision)
         {
             // if (trianglePoint == null) AssureTriangles(precision); // eine muss es geben
@@ -7307,12 +7264,7 @@ namespace CADability.GeoObject
             return (Surface.HitTest(bc, out uv) && Contains(ref uv, true));
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
-        /// </summary>
-        /// <param name="cube"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(ref BoundingCube cube, double precision)
         {
             // if (!GetExtent(precision).Interferes(cube)) return false;
@@ -7344,13 +7296,7 @@ namespace CADability.GeoObject
             GeoPoint2D uv;
             return (Surface.HitTest(cube, out uv) && Contains(ref uv, false));
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection, BoundingRect, bool)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="rect"></param>
-        /// <param name="onlyInside"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(Projection projection, BoundingRect rect, bool onlyInside)
         {
             if (trianglePoint == null) return false; // this is only for selecting with the mouse
@@ -7384,12 +7330,7 @@ namespace CADability.GeoObject
                 return false;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection.PickArea, bool)"/>
-        /// </summary>
-        /// <param name="area"></param>
-        /// <param name="onlyInside"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(Projection.PickArea area, bool onlyInside)
         {   // this is the hit test when selecting
             // there are two different approaches: let the "beam" of the pick area intersect the surface of this face and test
@@ -7528,13 +7469,7 @@ namespace CADability.GeoObject
             if (a > Math.PI / 2.0) res = -res;
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Position (GeoPoint, GeoVector, double)"/>
-        /// </summary>
-        /// <param name="fromHere"></param>
-        /// <param name="direction"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double Position(GeoPoint fromHere, GeoVector direction, double precision)
         {
             double res = double.MaxValue;
@@ -8196,10 +8131,11 @@ namespace CADability.GeoObject
             lockTriangulationData = new object();
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
@@ -8436,11 +8372,14 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
-        /// die gegebene edge soll in dieses Face eingebaut werden. Eine Umrisskante wird zunächst auf dem
-        /// ganzen Face erzeugt und dann in die beiden betroffenen split Faces eingebaut
+        /// Incorporates the given edge into this face: the edge of the outline that is geometrically the same
+        /// (<see cref="Edge.IsSame(Edge)"/>) is replaced by <paramref name="edge"/>, which takes over the face related
+        /// data (2d curve and orientation) of the replaced edge. Used when an outline edge that was first created on
+        /// the whole face has to be transferred to the faces that resulted from splitting it.
         /// </summary>
-        /// <param name="edge"></param>
-        /// <param name="RemoveFromThis"></param>
+        /// <param name="edge">the edge that replaces the matching edge of the outline</param>
+        /// <param name="RemoveFromThis">the face that is currently the primary face of <paramref name="edge"/>; decides
+        /// whether the primary or the secondary face data of the edge is taken from the replaced edge</param>
         private void ReplaceEdge(Edge edge, Face RemoveFromThis)
         {
             for (int i = 0; i < outline.Length; i++)
@@ -9308,13 +9247,14 @@ namespace CADability.GeoObject
             Orient();
         }
         /// <summary>
-        /// Mache ein neues Face, welches diesem entspricht und durch die neue outline bzw. holes gegeben ist
-        /// Die Kanten wandern von diesem Face zum neuen, d.h. das primaryFace bzw. secondaryFace der Kanten wird geändert.
-        /// Somit wird dieses Face ungültig.
+        /// Creates a new face on a clone of the surface of this face, bounded by the given outline and holes. The edges
+        /// move from this face to the new one, i.e. their primary or secondary face is changed from this face to the
+        /// result, and their orientation is marked as undetermined. This face becomes invalid by this call. Used when
+        /// a face is split into several faces.
         /// </summary>
-        /// <param name="outlines"></param>
-        /// <param name="holes"></param>
-        /// <returns></returns>
+        /// <param name="outlines">the edges of the outline of the new face</param>
+        /// <param name="holes">the edges of the holes of the new face, one list per hole; may be null</param>
+        /// <returns>the new face</returns>
         internal Face Split(List<Edge> outlines, List<List<Edge>> holes)
         {   // komisch, die holes sind rechtsrum, warum funktioniert es trotzdem?
             Face res = new Face(); // construct? wozu?

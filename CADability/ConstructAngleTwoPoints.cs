@@ -34,9 +34,7 @@ namespace CADability.Actions
             secondPointIsValid = false;
             succeeded = false;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnSetAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnSetAction()
         {
             base.TitleId = "Constr.AngleTwoPoints";
@@ -86,10 +84,7 @@ namespace CADability.Actions
             base.OnInactivate(NewActiveAction, RemovingAction);
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.GetID ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override string GetID()
         {
             return "Constr.AngleTwoPoints";
@@ -148,9 +143,7 @@ namespace CADability.Actions
             get { return succeeded; }
         }
 #endregion
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnDone ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void OnDone()
         {
             succeeded = true;

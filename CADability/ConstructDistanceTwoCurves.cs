@@ -167,9 +167,7 @@ namespace CADability.Actions
             return actualLength;
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnSetAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnSetAction()
         {
             base.TitleId = "Construct.DistanceTwoCurves";
@@ -205,17 +203,12 @@ namespace CADability.Actions
 				lengthProperty.Select();
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.GetID ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override string GetID()
         {
             return "Construct.DistanceTwoCurves";
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnDone ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void OnDone()
         {
             succeeded = true;

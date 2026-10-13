@@ -427,10 +427,7 @@ namespace CADability
             }
         }
         IPropertyEntry[] subEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>,
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -491,9 +488,7 @@ namespace CADability
                 }
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.Refresh ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void Refresh()
         {
             subEntries = null;
@@ -745,9 +740,7 @@ namespace CADability
         }
         #endregion
         #region IPropertyEntry implementation
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override PropertyEntryType Flags => PropertyEntryType.ContextMenu | PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries | PropertyEntryType.LabelEditable;
         public override string LabelText
         {
@@ -768,10 +761,7 @@ namespace CADability
             }
         }
         IPropertyEntry[] subEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>,
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -848,9 +838,7 @@ namespace CADability
                 }
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.Refresh ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void Refresh()
         {
             subEntries = null;
@@ -1112,9 +1100,7 @@ namespace CADability
 
         #endregion
         #region IPropertyEntry implementation
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override PropertyEntryType Flags => PropertyEntryType.ContextMenu | PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries | PropertyEntryType.LabelEditable;
         public override string LabelText
         {
@@ -1139,10 +1125,7 @@ namespace CADability
         /// returns <see cref="ShowPropertyEntryType.GroupTitle"/>.
         /// </summary>
         IPropertyEntry[] subEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>,
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -1202,9 +1185,7 @@ namespace CADability
                 }
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.Refresh ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void Refresh()
         {
             subEntries = null;
@@ -1469,10 +1450,7 @@ namespace CADability
             }
         }
         IPropertyEntry[] subEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>,
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -1561,10 +1539,7 @@ namespace CADability
             }
         }
         IPropertyEntry[] subEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>,
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get

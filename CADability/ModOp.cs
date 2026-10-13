@@ -42,9 +42,9 @@ namespace CADability
     }
 
     /// <summary>
-    /// Ein "Objekt-Wrapper" um die ModOp. Manchmal ist es sinnvoll in Klassen eine
-    /// ModOp zu halten, die ggf. noch nicht berechnet, also null ist. Hierzu dient diese
-    /// interne Klasse.
+    /// A reference type wrapper around the value type <see cref="ModOp"/>. It is used where a class needs to hold a
+    /// ModOp that may not have been computed yet, so that the field can be null (e.g. the cached transformations of a
+    /// <see cref="CoordSys"/>).
     /// </summary>
     internal class ModOpRef
     {
@@ -596,6 +596,10 @@ namespace CADability
             double[,] mat = m.Matrix;
             return new ModOp2D(mat[0, 0], mat[0, 1], mat[0, 3], mat[1, 0], mat[1, 1], mat[1, 3]);
         }
+        /// <summary>
+        /// Converts this modification to a GDI+ <see cref="System.Drawing.Drawing2D.Matrix"/> with the same coefficients
+        /// (in single precision), e.g. to apply it when drawing with GDI+.
+        /// </summary>
         /// <value>
         /// Returns the <see cref="System.Drawing.Drawing2D.Matrix"/> object equivalent to this
         /// modification.
@@ -825,9 +829,8 @@ namespace CADability
     public struct ModOp : ISerializable, IJsonSerialize
     {
         /// <summary>
-        /// Die homogene Matrix, die die Modifikationsoperation darstellt.
-        /// Sie hat drei Zeilen und vier Spalten. Die vierte Zeile hätte immer
-        /// den Wert (0,0,0,1) und wird nicht in den Daten dargestellt.
+        /// The homogeneous matrix that represents the modification. It has three rows and four columns (the first
+        /// index is the row, the second the column); the fourth row would always be (0,0,0,1) and is not stored.
         /// </summary>
         private double Matrix00, Matrix01, Matrix02, Matrix03, Matrix10, Matrix11, Matrix12, Matrix13, Matrix20, Matrix21, Matrix22, Matrix23;
         private double ScalingFactor;

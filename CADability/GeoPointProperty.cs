@@ -31,10 +31,7 @@ namespace CADability.UserInterface
 
         #region IHotSpot Members
 
-        /// <summary>
-        /// Implements <see cref="CADability.IHotSpot.GetHotspotPosition ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual GeoPoint GetHotspotPosition()
         {
             return position;

@@ -12,7 +12,9 @@ using MathNet.Numerics.LinearAlgebra.Factorization;
 namespace CADability
 {
     /// <summary>
-    /// Dient zur Manipulation von Polynomkoeffizienten, bevor aus Polynomen die Wurzel gezogen wird
+    /// A polynomial in a single variable, represented by its coefficients (the index in the coefficient array is the exponent,
+    /// so c[0] is the constant term). Serves to manipulate polynomial coefficients (multiplication, addition and powers of
+    /// polynomials) before the roots of the polynomial are computed.
     /// </summary>
     internal class PolynomSingleVariable
     {

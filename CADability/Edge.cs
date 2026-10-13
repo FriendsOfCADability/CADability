@@ -28,8 +28,10 @@ namespace CADability
      */
 
     /// <summary>
-    /// Mit dieser Klasse kann eine ICurve2D in einem Border verwurstet werden, also z.B. gesplittet werden
-    /// und man weiß imme noch aus welcher Edge es kommt.
+    /// User data attached to an <see cref="ICurve2D"/> (under the name <see cref="UserDataName"/>) that records the
+    /// <see cref="Edge"/> the 2d curve was derived from. It survives the processing of the curve in a
+    /// <see cref="CADability.Shapes.Border"/> (e.g. splitting), so the originating edge can still be found afterwards. When the user
+    /// data is overridden by another EdgeReference, the previous one is kept in <see cref="previous"/>.
     /// </summary>
     internal class EdgeReference : IManageUserData
     {
@@ -2171,11 +2173,14 @@ namespace CADability
             }
         }
         /// <summary>
-        /// Stellt fest, ob diese Edge teil einer anderen Edge ist. Das das über geometrische Eigenschaften läuft
-        /// ist blöd, denn man könnte es besser beim Erzeugen (Face.Split) bestimmen, ist aber dort sehr umständlich
+        /// Determines whether this edge (which resulted from splitting a face and therefore has only a primary face) is
+        /// a part of the edge <paramref name="original"/>. The test is purely geometrical: both edges must lie on the
+        /// same surface and the 2d curve of this edge must lie on the 2d curve of the original. On success
+        /// <see cref="IsPartOf"/>, <see cref="StartAtOriginal"/> and <see cref="EndAtOriginal"/> are set. It would be
+        /// better to record this relation when the split is made, but that is cumbersome there.
         /// </summary>
-        /// <param name="original"></param>
-        /// <returns></returns>
+        /// <param name="original">the edge that may contain this edge</param>
+        /// <returns>true if this edge is a part of <paramref name="original"/></returns>
         internal bool CheckSplit(Edge original)
         {
             // this hat nur primaryFace, nicht secondary, da es ja beim splitten entstanden ist
@@ -3474,15 +3479,16 @@ namespace CADability
             if (secondaryFace != null) secondaryFace.ClearVertices();
         }
         /// <summary>
-        /// Stellt fest, ob die beiden geometrisch identisch sind. Die Endpunkte sind meist schon getestet,
-        /// die Richtung kann auch eine Rolle spielen.
+        /// Determines whether the two edges are geometrically identical. Assuming that the end points have already been
+        /// compared and that edges only intersect at their end points, it is sufficient to compare the midpoints of the
+        /// two 3d curves. <paramref name="vertexTested"/> and <paramref name="forward"/> are currently not evaluated.
         /// </summary>
-        /// <param name="e1"></param>
-        /// <param name="e2"></param>
-        /// <param name="vertexTested"></param>
-        /// <param name="forward"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <param name="e1">first edge</param>
+        /// <param name="e2">second edge</param>
+        /// <param name="vertexTested">true if the end points are already known to coincide</param>
+        /// <param name="forward">true if both edges are expected to have the same direction</param>
+        /// <param name="precision">maximum distance of the midpoints for the edges to be considered equal</param>
+        /// <returns>true if the edges are geometrically equal</returns>
         internal static bool IsGeometricallyEqual(Edge e1, Edge e2, bool vertexTested, bool forward, double precision)
         {   // hier einfach mal mit der Überlegung, dass Kanten sich nur in den Endpunkten schneiden der Test nach dem Mittelpunkt
             // vielleicht mit komplexen Kurven besser anders zu testen

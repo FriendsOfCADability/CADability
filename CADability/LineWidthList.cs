@@ -9,7 +9,10 @@ using System.Runtime.Serialization;
 namespace CADability.Attribute
 {
     /// <summary>
-    /// 
+    /// The list of the <see cref="LineWidth"/> attributes available in a <see cref="Project"/> or in the global
+    /// <see cref="Settings"/>. Line widths are addressed by their unique name; the list keeps track of the current
+    /// (default) line width, can be edited interactively in the property grid and raises the <see cref="DidModifyEvent"/>
+    /// when it changes.
     /// </summary>
     [Serializable()]
     public class LineWidthList : IShowPropertyImpl, IAttributeList, ISerializable, ICommandHandler, IDeserializationCallback
@@ -259,9 +262,7 @@ namespace CADability.Attribute
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -283,10 +284,7 @@ namespace CADability.Attribute
             base.Removed(pp);
             subEntries = null;
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get
@@ -304,10 +302,7 @@ namespace CADability.Attribute
                 return subEntries;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -474,10 +469,11 @@ namespace CADability.Attribute
             current = (LineWidth)(info.GetValue("Current", typeof(LineWidth)));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Entries", entries);

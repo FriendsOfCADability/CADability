@@ -5,7 +5,11 @@ using System;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a line which bisects the angle between two curves. The user picks the two objects (polylines and paths are
+    /// decomposed into their single elements) and enters the length of the line. The line starts at the intersection point of the
+    /// two curves closest to the pick positions and bisects the angle between their directions at that point; of the four possible
+    /// directions (the bisector, its opposite and the two perpendicular ones) the one closest to the pick positions is used, the
+    /// others can be selected with the multi-solution mechanism. Started with the menu id "Constr.Line.BisectAngle".
     /// </summary>
     internal class ConstrLineBisectAngle : ConstructAction
     {

@@ -11,7 +11,9 @@ namespace CADability
     }
 
     /// <summary>
-    /// Mit dieser Klasse werden primitive Clip-Funktionen abgehandelt.
+    /// An axis aligned 2d rectangle (Left, Right, Bottom, Top) which provides primitive clipping functions: classification of
+    /// points by outcodes (Cohen-Sutherland), clipping of line segments and fast hit tests of line segments against the rectangle.
+    /// Used by the 2d curves and borders for hit testing.
     /// </summary>
     public struct ClipRect
     {
@@ -57,12 +59,13 @@ namespace CADability
             return ClipCode(ref p) == 0;
         }
         /// <summary>
-        /// Verändert die durch die beiden gegebenen Punkte gegebene Linie so, dass sie
-        /// vom Clip-Rechteck geklippt wird. 
+        /// Clips the line segment given by the two points to this rectangle: the points are moved onto the sides of the rectangle
+        /// so that the resulting segment is the part of the original segment inside the rectangle. If the segment lies completely
+        /// outside, false is returned (the points may then have been partially modified).
         /// </summary>
-        /// <param name="p1">Startpunkt der Linie</param>
-        /// <param name="p2">Endpunkt der Linie</param>
-        /// <returns>true, wenn etwas von der Linie sichtbar bleibt</returns>
+        /// <param name="p1">Start point of the line, modified on return</param>
+        /// <param name="p2">End point of the line, modified on return</param>
+        /// <returns>true if a part of the line remains visible (inside the rectangle), false otherwise</returns>
         public bool ClipLine(ref GeoPoint2D p1, ref GeoPoint2D p2)
         {
             int c;
@@ -127,11 +130,11 @@ namespace CADability
             return true;
         }
         /// <summary>
-        /// Testet, ob die durch die beiden Punkte gegebene Linie von dem Rechteck berührt wird.
+        /// Tests whether the line segment given by the two points touches or crosses this rectangle. The points are not modified.
         /// </summary>
-        /// <param name="p1">Startpunkt der Linie</param>
-        /// <param name="p2">Endpunkt der Linie</param>
-        /// <returns>true, wenn die Linie berührt wird</returns>
+        /// <param name="p1">Start point of the line</param>
+        /// <param name="p2">End point of the line</param>
+        /// <returns>true if the line segment intersects the rectangle or lies (partially) inside of it</returns>
         public bool LineHitTest(GeoPoint2D p1, GeoPoint2D p2)
         {
             int c;

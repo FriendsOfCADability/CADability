@@ -6,7 +6,10 @@ using System.Runtime.Serialization;
 namespace CADability.Attribute
 {
     /// <summary>
-    /// 
+    /// A named attribute which defines a dash pattern for the display of curves: an array of alternating stroke and gap lengths
+    /// (<see cref="Pattern"/>) and a <see cref="Scaling"/> which says whether these lengths are pixels, world units or layout
+    /// units (mm on paper). An empty pattern means a solid line. Line patterns are kept in the <see cref="LinePatternList"/> of
+    /// the project, are referenced by objects implementing <see cref="ILinePattern"/> and can be edited in the property grid.
     /// </summary>
     [Serializable()]
     public class LinePattern : PropertyEntryImpl, INamedAttribute, ISerializable, ICommandHandler, IJsonSerialize
@@ -288,10 +291,11 @@ namespace CADability.Attribute
             scale = (Scaling)info.GetValue("Scale", typeof(Scaling));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Name", name);

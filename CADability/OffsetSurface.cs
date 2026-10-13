@@ -105,29 +105,20 @@ namespace CADability.GeoObject
                 fixedCurve.Trim(StartPos, EndPos);
             }
 
-            /// <summary>
-            /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Modify (ModOp)"/>
-            /// </summary>
-            /// <param name="m"></param>
+            /// <inheritdoc/>
             public override void Modify(ModOp m)
             {   // this curve cannot be modified, because it is defined by the underlying offset surface.
                 // this is only called when a Face or Surface has been modified.
                 InvalidateSecondaryData();
             }
 
-            /// <summary>
-            /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Clone ()"/>
-            /// </summary>
-            /// <returns></returns>
+            /// <inheritdoc/>
             public override IGeoObject Clone()
             {
                 return new FixedCurve(offsetSurface, param, pmin, pmax, fixedU);
             }
 
-            /// <summary>
-            /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.CopyGeometry (IGeoObject)"/>
-            /// </summary>
-            /// <param name="ToCopyFrom"></param>
+            /// <inheritdoc/>
             public override void CopyGeometry(IGeoObject ToCopyFrom)
             {
                 throw new NotImplementedException();
@@ -184,13 +175,7 @@ namespace CADability.GeoObject
             #endregion
         }
         #region ISurfaceImpl overrides
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetNaturalBounds (out double, out double, out double, out double)"/>
-        /// </summary>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
+        /// <inheritdoc/>
         public override void GetNaturalBounds(out double umin, out double umax, out double vmin, out double vmax)
         {
             base.GetNaturalBounds(out umin, out umax, out vmin, out vmax);
@@ -213,20 +198,12 @@ namespace CADability.GeoObject
             return base.SameGeometry(thisBounds, other, otherBounds, precision, out firstToSecond);
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.PointAt (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint PointAt(GeoPoint2D uv)
         {
             return baseSurface.PointAt(uv) + offset * baseSurface.GetNormal(uv).Normalized;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.UDirection (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoVector UDirection(GeoPoint2D uv)
         {
             /* Formula from maxima, syntax:
@@ -250,11 +227,7 @@ namespace CADability.GeoObject
             //GeoVector dgb4 = -0.5 * offset * (duu * crop + (du * (dv ^ ((duu ^ dv) + (du ^ duv)))) + (du * (duv ^ (du ^ dv)))) / System.Math.Pow((du * crop), 1.5) * (du ^ dv) + offset * ((duu ^ dv) + (du ^ duv)) / System.Math.Pow((du * crop), 0.5) + du;
             return -0.5 * offset * (duu * crop + (du * (dv ^ ((duu ^ dv) + (du ^ duv)))) + (du * (duv ^ (du ^ dv)))) / System.Math.Pow((du * crop), 1.5) * (du ^ dv) + offset * ((duu ^ dv) + (du ^ duv)) / System.Math.Pow((du * crop), 0.5) + du;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.VDirection (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoVector VDirection(GeoPoint2D uv)
         {
             /* Formula from maxima, syntax:
@@ -273,11 +246,7 @@ namespace CADability.GeoObject
             //GeoVector dbg1 = (-0.5 * offset * ((duv * crop) + (du * (dvv ^ (du ^ dv))) + (du * (dv ^ ((duv ^ dv) + (du ^ dvv))))) / System.Math.Pow(du * crop, 1.5) * (du ^ dv)) + (offset / System.Math.Pow(du * crop, 0.5) * ((duv ^ dv) + (du ^ dvv))) + dv;
             return (-0.5 * offset * ((duv * crop) + (du * (dvv ^ (du ^ dv))) + (du * (dv ^ ((duv ^ dv) + (du ^ dvv))))) / System.Math.Pow(du * crop, 1.5) * (du ^ dv)) + (offset / System.Math.Pow(du * crop, 0.5) * ((duv ^ dv) + (du ^ dvv))) + dv;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetNormal (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoVector GetNormal(GeoPoint2D uv)
         {
             return baseSurface.GetNormal(uv); // the normal should be the same, and we would have to handle singularities here
@@ -291,16 +260,7 @@ namespace CADability.GeoObject
         {
             return baseSurface.GetVSingularities();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetZMinMax (Projection, double, double, double, double, ref double, ref double)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <param name="zMin"></param>
-        /// <param name="zMax"></param>
+        /// <inheritdoc/>
         public override void GetZMinMax(Projection p, double umin, double umax, double vmin, double vmax, ref double zMin, ref double zMax)
         {
             throw new NotImplementedException("GetZMinMax not implemented");
@@ -310,11 +270,7 @@ namespace CADability.GeoObject
             BaseSurface.Derivation2At(uv, out location, out du, out dv, out duu, out dvv, out duv);
             //base.Derivation2At(uv, out location, out du, out dv, out duu, out dvv, out duv);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Make3dCurve (ICurve2D)"/>
-        /// </summary>
-        /// <param name="curve2d"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve Make3dCurve(ICurve2D curve2d)
         {
             if (curve2d is Curve2DAspect)
@@ -325,24 +281,12 @@ namespace CADability.GeoObject
             if (Curve3dOfProjected<OffsetSurface>(curve2d) is ICurve onThisSurface) return onThisSurface;
             return base.Make3dCurve(curve2d);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetPlaneIntersection (PlaneSurface, double, double, double, double, double)"/>
-        /// </summary>
-        /// <param name="pl"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IDualSurfaceCurve[] GetPlaneIntersection(PlaneSurface pl, double umin, double umax, double vmin, double vmax, double precision)
         {
             return base.GetPlaneIntersection(pl, umin, umax, vmin, vmax, precision);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Clone ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ISurface Clone()
         {
             OffsetSurface res = new OffsetSurface(baseSurface.Clone(), offset);
@@ -353,10 +297,7 @@ namespace CADability.GeoObject
             res.usedArea = usedArea;
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Modify (ModOp)"/>
-        /// </summary>
-        /// <param name="m"></param>
+        /// <inheritdoc/>
         public override void Modify(ModOp m)
         {   // genaugenommen geht eine Modifikation hier nicht, wird aber z.Z. nur zur Translation verwendet
             boxedSurfaceEx = null;
@@ -367,11 +308,7 @@ namespace CADability.GeoObject
             }
             else throw new NotImplementedException("Modify OffsetSurface with non ortogonal Matrix");
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetModified (ModOp)"/>
-        /// </summary>
-        /// <param name="m"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ISurface GetModified(ModOp m)
         {
             // Only correct for an isogonal m. A scaling with different factors along perpendicular axes was treated as
@@ -392,10 +329,7 @@ namespace CADability.GeoObject
             GeoVector z = new GeoVector(a[0, 2], a[1, 2], a[2, 2]);
             return Precision.IsPerpendicular(x, y, false) && Precision.IsPerpendicular(x, z, false) && Precision.IsPerpendicular(y, z, false);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.CopyData (ISurface)"/>
-        /// </summary>
-        /// <param name="CopyFrom"></param>
+        /// <inheritdoc/>
         public override void CopyData(ISurface CopyFrom)
         {
             OffsetSurface cc = CopyFrom as OffsetSurface;
@@ -405,32 +339,17 @@ namespace CADability.GeoObject
                 this.offset = cc.offset;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetLineIntersection (GeoPoint, GeoVector)"/>
-        /// </summary>
-        /// <param name="startPoint"></param>
-        /// <param name="direction"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D[] GetLineIntersection(GeoPoint startPoint, GeoVector direction)
         {
             return base.GetLineIntersection(startPoint, direction);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetOffsetSurface (double)"/>
-        /// </summary>
-        /// <param name="offset"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ISurface GetOffsetSurface(double offset)
         {
             return new OffsetSurface(baseSurface.Clone(), this.offset + offset);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.FixedU (double, double, double)"/>
-        /// </summary>
-        /// <param name="u"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve FixedU(double u, double vmin, double vmax)
         {
             if (vmin > vmax)
@@ -444,13 +363,7 @@ namespace CADability.GeoObject
                 return new FixedCurve(this, u, vmin, vmax, true);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.FixedV (double, double, double)"/>
-        /// </summary>
-        /// <param name="u"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve FixedV(double u, double umin, double umax)
         {
             if (umin > umax)

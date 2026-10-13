@@ -125,17 +125,13 @@ namespace CADability.Actions
                 SetGeoPoint(p);
             }
         }
-        /// <summary>
-        /// Implements <see cref="Action.GetID"/>.
-        /// </summary>
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "GeneralGeoPointAction[LeaveSelectProperties]"; // LeaveSelectProperties ist das Zauberwort, 
             // damit die Properties der SelectObjectAction stehen bleiben.
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.OnRemoveAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void OnRemoveAction()
         {
             if (ActionDoneEvent != null) ActionDoneEvent(this);
@@ -212,9 +208,7 @@ namespace CADability.Actions
                 base.RemoveThisAction();
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.OnEscape ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override bool OnEscape()
         {
             SetGeoPoint(initialGeoPointValue);
@@ -222,9 +216,7 @@ namespace CADability.Actions
             // base.Frame.Project.Undo.IgnoreLastChange();
             return true;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.OnEnter ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override bool OnEnter()
         {
             if (GeoPointProperty != null)

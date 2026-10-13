@@ -79,11 +79,7 @@ namespace CADability.Attribute
             }
             if (DidModifyEvent != null) DidModifyEvent(this, null); // ist das ok? der Modelview brauchts
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Attribute.IAttributeList.Find (string)"/>
-        /// </summary>
-        /// <param name="Name"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public DimensionStyle Find(string Name)
         {
             return entries[Name] as DimensionStyle; // null, wenns ihn nicht gibt
@@ -147,10 +143,11 @@ namespace CADability.Attribute
             current = (DimensionStyle)(info.GetValue("CurrentDimensionStyle", typeof(DimensionStyle)));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             // info.AddValue("Entries",entries);
@@ -212,10 +209,7 @@ namespace CADability.Attribute
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>,
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -223,10 +217,7 @@ namespace CADability.Attribute
                 return entries.Count;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>,
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get

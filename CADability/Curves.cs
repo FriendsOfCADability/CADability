@@ -378,8 +378,9 @@ namespace CADability.GeoObject
     }
 
     /// <summary>
-    /// Wird von einfachen Kurven implementiert um schnellere Schnitte berechnen zu können.
-    /// Das kann auch noch aufgebohrt werden
+    /// Implemented by simple analytic curves (<see cref="Line"/>, <see cref="Ellipse"/> and the internal
+    /// infinite ray) so that intersections, e.g. with surfaces, can be computed faster than through the
+    /// general <see cref="ICurve"/> interface. May be extended by further methods.
     /// </summary>
     internal interface ISimpleCurve
     {

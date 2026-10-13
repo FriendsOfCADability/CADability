@@ -523,8 +523,8 @@ namespace CADability.GeoObject
     }
 
     /// <summary>
-    /// Soll von Flächen implementiert werden, deren Schnitte mit Ebenen einfach sind (Linien, Ellipsen) um numerisch iterierte
-    /// Lösungen zu vermeiden
+    /// Implemented by surfaces whose intersections with planes are simple curves (lines, ellipses), so that the
+    /// intersection can be computed exactly instead of by numerical iteration.
     /// </summary>
     internal interface ISurfacePlaneIntersection
     {
@@ -2515,27 +2515,11 @@ namespace CADability.GeoObject
             extrema = null;
             boxedSurface = null;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.FixedU (double, double, double)"/>
-        /// </summary>
-        /// <param name="u"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public abstract ICurve FixedU(double u, double vmin, double vmax);
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.FixedV (double, double, double)"/>
-        /// </summary>
-        /// <param name="u"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public abstract ICurve FixedV(double u, double umin, double umax);
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.GetModified (ModOp)"/>
-        /// </summary>
-        /// <param name="m"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public abstract ISurface GetModified(ModOp m);
         //{
         //    throw new ApplicationException("GetModified must be implemented");
@@ -2561,11 +2545,7 @@ namespace CADability.GeoObject
             if (GetDistance(res.PointAt(0.5)) > Precision.eps) return null; // the same geometry, but the curve is not on this surface
             return res;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.Make3dCurve (ICurve2D)"/>
-        /// </summary>
-        /// <param name="curve2d"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual ICurve Make3dCurve(CADability.Curve2D.ICurve2D curve2d)
         {
             if (curve2d is Curve2DAspect)
@@ -2668,24 +2648,19 @@ namespace CADability.GeoObject
             //CndHlp3D.Edge edge = sf.Make3DCurve(g2d.Entity2D);
             //return IGeoObjectImpl.FromHlp3DEdge(edge) as ICurve;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.GetNormal (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual GeoVector GetNormal(GeoPoint2D uv)
         {
             return (this as ISurface).UDirection(uv) ^ (this as ISurface).VDirection(uv);
             // return new GeoVector(Helper.GetNormal(uv.ToCndHlp()));
         }
+        /// <inheritdoc/>
         public abstract GeoVector UDirection(GeoPoint2D uv);
+        /// <inheritdoc/>
         public abstract GeoVector VDirection(GeoPoint2D uv);
+        /// <inheritdoc/>
         public abstract GeoPoint PointAt(GeoPoint2D uv);
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.PositionOf (GeoPoint)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual GeoPoint2D PositionOf(GeoPoint p)
         {
             GeoPoint2D res;
@@ -2808,53 +2783,24 @@ namespace CADability.GeoObject
             }
             // return new GeoPoint2D(Helper.PositionOf(p.ToCndHlp()));
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.DerivationAt (GeoPoint2D, out GeoPoint, out GeoVector, out GeoVector)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <param name="location"></param>
-        /// <param name="du"></param>
-        /// <param name="dv"></param>
+        /// <inheritdoc/>
         public virtual void DerivationAt(GeoPoint2D uv, out GeoPoint location, out GeoVector du, out GeoVector dv)
         {
             location = (this as ISurface).PointAt(uv);
             du = (this as ISurface).UDirection(uv);
             dv = (this as ISurface).VDirection(uv);
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.Derivation2At (GeoPoint2D, out GeoPoint, out GeoVector, out GeoVector, out GeoVector, out GeoVector, out GeoVector)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <param name="location"></param>
-        /// <param name="du"></param>
-        /// <param name="dv"></param>
-        /// <param name="duu"></param>
-        /// <param name="dvv"></param>
-        /// <param name="duv"></param>
+        /// <inheritdoc/>
         public virtual void Derivation2At(GeoPoint2D uv, out GeoPoint location, out GeoVector du, out GeoVector dv, out GeoVector duu, out GeoVector dvv, out GeoVector duv)
         {
             throw new NotImplementedException("Derivation2At must be implemented");
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.GetPlaneIntersection (PlaneSurface, double, double, double, double, double)"/>
-        /// </summary>
-        /// <param name="pl"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual IDualSurfaceCurve[] GetPlaneIntersection(PlaneSurface pl, double umin, double umax, double vmin, double vmax, double precision)
         {
             return BoxedSurfaceEx.GetPlaneIntersection(pl, umin, umax, vmin, vmax, precision);
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.GetLineIntersection (GeoPoint, GeoVector)"/>
-        /// </summary>
-        /// <param name="startPoint"></param>
-        /// <param name="direction"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual GeoPoint2D[] GetLineIntersection(GeoPoint startPoint, GeoVector direction)
         {
             Polynom impl = GetImplicitPolynomial();
@@ -2872,15 +2818,7 @@ namespace CADability.GeoObject
             }
             return BoxedSurfaceEx.GetLineIntersection(startPoint, direction);
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.GetSafeParameterSteps (double, double, double, double, out double[], out double[])"/>
-        /// </summary>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <param name="intu"></param>
-        /// <param name="intv"></param>
+        /// <inheritdoc/>
         public virtual void GetSafeParameterSteps(double umin, double umax, double vmin, double vmax, out double[] intu, out double[] intv)
         {
             int n = 4;
@@ -2892,33 +2830,18 @@ namespace CADability.GeoObject
                 intv[i] = vmin + i * (vmax - vmin) / (n - 1);
             }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.GetTangentCurves (GeoVector, double, double, double, double)"/>
-        /// </summary>
-        /// <param name="direction"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual ICurve2D[] GetTangentCurves(GeoVector direction, double umin, double umax, double vmin, double vmax)
         {
             FindTangentCurves ftc = new FindTangentCurves(this);
             return ftc.GetTangentCurves(direction, umin, umax, vmin, vmax);
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.IsVanishingProjection (Projection, double, double, double, double)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual bool IsVanishingProjection(Projection p, double umin, double umax, double vmin, double vmax)
         {
             return false;
         }
+        /// <inheritdoc/>
         public virtual bool IsUPeriodic
         {
             get
@@ -2926,6 +2849,7 @@ namespace CADability.GeoObject
                 throw new NotImplementedException();
             }
         }
+        /// <inheritdoc/>
         public virtual bool IsVPeriodic
         {
             get
@@ -2933,6 +2857,7 @@ namespace CADability.GeoObject
                 throw new NotImplementedException();
             }
         }
+        /// <inheritdoc/>
         public virtual double UPeriod
         {
             get
@@ -2940,6 +2865,7 @@ namespace CADability.GeoObject
                 throw new NotImplementedException();
             }
         }
+        /// <inheritdoc/>
         public virtual double VPeriod
         {
             get
@@ -2961,28 +2887,18 @@ namespace CADability.GeoObject
                 return IsVPeriodic;
             }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.GetUSingularities ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual double[] GetUSingularities()
         {
             return new double[0];
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.GetVSingularities ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual double[] GetVSingularities()
         {
             return new double[0];
         }
 
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.MakeFace (SimpleShape)"/>
-        /// </summary>
-        /// <param name="simpleShape"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual Face MakeFace(CADability.Shapes.SimpleShape simpleShape)
         {
             Face res = Face.Construct();
@@ -3003,71 +2919,37 @@ namespace CADability.GeoObject
             res.Set(this, outline, holes);
             return res;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.GetZMinMax (Projection, double, double, double, double, ref double, ref double)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <param name="zMin"></param>
-        /// <param name="zMax"></param>
+        /// <inheritdoc/>
         public virtual void GetZMinMax(Projection p, double umin, double umax, double vmin, double vmax, ref double zMin, ref double zMax)
         {
             throw new NotImplementedException("GetZMinMax must be implemented by derived surface");
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.MakeCanonicalForm ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual ModOp2D MakeCanonicalForm()
         {
             return ModOp2D.Identity;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.Clone ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual ISurface Clone()
         {
             throw new NotImplementedException("Clone must be implemented by derived surface");
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.Modify (ModOp)"/>
-        /// </summary>
-        /// <param name="m"></param>
+        /// <inheritdoc/>
         public virtual void Modify(ModOp m)
         {
             throw new NotImplementedException("Modify must be implemented by derived surface");
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.CopyData (ISurface)"/>
-        /// </summary>
-        /// <param name="CopyFrom"></param>
+        /// <inheritdoc/>
         public virtual void CopyData(ISurface CopyFrom)
         {
             throw new NotImplementedException("CopyData must be implemented by derived surface");
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.Approximate (double, double, double, double, double)"/>
-        /// </summary>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual NurbsSurface Approximate(double umin, double umax, double vmin, double vmax, double precision)
         {
             throw new NotImplementedException();
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.GetProjectedCurve (ICurve, double)"/>
-        /// </summary>
-        /// <param name="curve"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual ICurve2D GetProjectedCurve(ICurve curve, double precision)
         {   // ganz schlecht, unbedingt in die Objekte verlegen und StandardKurven erkennen
             if (curve is Polyline)
@@ -3331,14 +3213,7 @@ namespace CADability.GeoObject
             return b2d;
             */
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.Intersect (ICurve, BoundingRect, out GeoPoint[], out GeoPoint2D[], out double[])"/>
-        /// </summary>
-        /// <param name="curve"></param>
-        /// <param name="uvExtent"></param>
-        /// <param name="ips"></param>
-        /// <param name="uvOnFaces"></param>
-        /// <param name="uOnCurve3Ds"></param>
+        /// <inheritdoc/>
         public virtual void Intersect(ICurve curve, BoundingRect uvExtent, out GeoPoint[] ips, out GeoPoint2D[] uvOnFaces, out double[] uOnCurve3Ds)
         {   // nach und nach selbst implementieren, bei den einzelnen Flächen und hier generell
             //try
@@ -3367,19 +3242,14 @@ namespace CADability.GeoObject
                 }
             BoxedSurfaceEx.Intersect(curve, uvExtent, out ips, out uvOnFaces, out uOnCurve3Ds);
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.Intersect (BoundingRect, ISurface, BoundingRect)"/>
-        /// </summary>
-        /// <param name="thisBounds"></param>
-        /// <param name="other"></param>
-        /// <param name="otherBounds"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual ICurve[] Intersect(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds)
         {
             GetExtremePositions(thisBounds, other, otherBounds, out List<Tuple<double, double, double, double>> extremePositions);
             if (usedArea.IsEmpty() || usedArea.IsInfinite) usedArea = thisBounds;
             return BoxedSurfaceEx.Intersect(thisBounds, other, otherBounds, null, extremePositions);
         }
+        /// <inheritdoc/>
         public virtual ICurve Intersect(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, GeoPoint seed)
         {
             if (usedArea.IsEmpty()) usedArea = thisBounds;
@@ -3392,23 +3262,12 @@ namespace CADability.GeoObject
             return null;
         }
 
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.ReverseOrientation ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual ModOp2D ReverseOrientation()
         {
             throw new NotImplementedException("ReverseOrientation must be implemented");
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.SameGeometry (BoundingRect, ISurface, BoundingRect, double, out ModOp2D)"/>
-        /// </summary>
-        /// <param name="thisBounds"></param>
-        /// <param name="other"></param>
-        /// <param name="otherBounds"></param>
-        /// <param name="precision"></param>
-        /// <param name="firstToSecond"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual bool SameGeometry(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, double precision, out ModOp2D firstToSecond)
         {
             // hier bräuchte man die allgemeine triangulierung oder so ...
@@ -3419,16 +3278,13 @@ namespace CADability.GeoObject
             }
             return Surfaces.Overlapping(this, thisBounds, other, otherBounds, precision, out firstToSecond);
         }
+        /// <inheritdoc/>
         public virtual double IsParallel(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds)
         {   // should be implemented for standard surfaces
             return double.MaxValue;
         }
 
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.GetOffsetSurface (double)"/>
-        /// </summary>
-        /// <param name="offset"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual ISurface GetOffsetSurface(double offset)
         {
             return new OffsetSurface(this, offset);
@@ -3438,13 +3294,7 @@ namespace CADability.GeoObject
             mod = ModOp2D.Null;
             return null;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.GetNaturalBounds (out double, out double, out double, out double)"/>
-        /// </summary>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
+        /// <inheritdoc/>
         public virtual void GetNaturalBounds(out double umin, out double umax, out double vmin, out double vmax)
         {
             if (usedArea.IsEmpty())
@@ -3462,25 +3312,12 @@ namespace CADability.GeoObject
                 vmax = usedArea.Top;
             }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.HitTest (BoundingCube, double, double, double, double)"/>
-        /// </summary>
-        /// <param name="cube"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual bool HitTest(BoundingCube cube, double umin, double umax, double vmin, double vmax)
         {
             throw new NotImplementedException("HitTest must be implemented");
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.HitTest (BoundingCube, out GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="cube"></param>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual bool HitTest(BoundingCube cube, out GeoPoint2D uv)
         {
             Polynom implicitSurface = GetImplicitPolynomial();
@@ -3669,6 +3506,7 @@ namespace CADability.GeoObject
             }
             return false;
         }
+        /// <inheritdoc/>
         public virtual bool Oriented
         {
             get
@@ -3676,6 +3514,7 @@ namespace CADability.GeoObject
                 return false;
             }
         }
+        /// <inheritdoc/>
         public virtual RuledSurfaceMode IsRuled
         {
             get
@@ -3684,11 +3523,7 @@ namespace CADability.GeoObject
             }
         }
 
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.Orientation (GeoPoint)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual double Orientation(GeoPoint p)
         {
             return 0.0;
@@ -3701,10 +3536,7 @@ namespace CADability.GeoObject
         {
             return new double[0];
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.GetExtrema ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual GeoPoint2D[] GetExtrema()
         {
             if (extrema == null)
@@ -3838,10 +3670,7 @@ namespace CADability.GeoObject
             }
             return res;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.GetPolynomialParameters ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual double[] GetPolynomialParameters()
         {
             return null;
@@ -3851,19 +3680,12 @@ namespace CADability.GeoObject
             return null;
         }
 
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.SetBounds (BoundingRect)"/>
-        /// </summary>
-        /// <param name="boundingRect"></param>
+        /// <inheritdoc/>
         public virtual void SetBounds(BoundingRect boundingRect)
         {
             usedArea = boundingRect;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.PerpendicularFoot (GeoPoint)"/>
-        /// </summary>
-        /// <param name="fromHere"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual GeoPoint2D[] PerpendicularFoot(GeoPoint fromHere)
         {
             GeoPoint2D pos = PositionOf(fromHere);
@@ -3883,11 +3705,7 @@ namespace CADability.GeoObject
                 return new GeoPoint2D[0];
             }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.HasDiscontinuousDerivative (out ICurve2D[])"/>
-        /// </summary>
-        /// <param name="discontinuities"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual bool HasDiscontinuousDerivative(out ICurve2D[] discontinuities)
         {   // kommt nur bei einigen komischen Flächen vor und bei NURBS mit degree==1 und mehr als 2 knots
             discontinuities = null;
@@ -3902,22 +3720,17 @@ namespace CADability.GeoObject
         {
             return null;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ISurface.GetPatchHull (BoundingRect, out GeoPoint, out GeoVector, out GeoVector, out GeoVector)"/>
-        /// </summary>
-        /// <param name="uvpatch"></param>
-        /// <param name="loc"></param>
-        /// <param name="dir1"></param>
-        /// <param name="dir2"></param>
-        /// <param name="dir3"></param>
+        /// <inheritdoc/>
         public virtual void GetPatchHull(BoundingRect uvpatch, out GeoPoint loc, out GeoVector dir1, out GeoVector dir2, out GeoVector dir3)
         {
             BoxedSurfaceEx.GetPatchHull(uvpatch, out loc, out dir1, out dir2, out dir3);
         }
+        /// <inheritdoc/>
         public virtual GeoPoint[] GetTouchingPoints(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds)
         {
             throw new NotImplementedException();
         }
+        /// <inheritdoc/>
         public virtual ISurface GetCanonicalForm(double precision, BoundingRect? bounds)
         {
             return null;
@@ -3928,6 +3741,7 @@ namespace CADability.GeoObject
             SurfaceHelper.AdjustPeriodic(this, domain, ref res);
             return res;
         }
+        /// <inheritdoc/>
         public virtual int GetExtremePositions(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, out List<Tuple<double, double, double, double>> extremePositions)
         {
             extremePositions = new List<Tuple<double, double, double, double>>();
@@ -3972,6 +3786,7 @@ namespace CADability.GeoObject
             // else: search with different starting points
             return extremePositions.Count;
         }
+        /// <inheritdoc/>
         public virtual int GetExtremePositions(BoundingRect domain, ICurve curve3D, out List<Tuple<double, double, double>> positions)
         {   // to implement
             positions = new List<Tuple<double, double, double>>();
@@ -3984,18 +3799,22 @@ namespace CADability.GeoObject
             }
             return positions.Count;
         }
+        /// <inheritdoc/>
         public virtual double GetDistance(GeoPoint p)
         {
             return PointAt(PositionOf(p)) | p;
         }
+        /// <inheritdoc/>
         public virtual bool IsExtruded(GeoVector direction)
         {
             return false;
         }
+        /// <inheritdoc/>
         public virtual bool IsRotated(Axis rotationAxis)
         {
             return false;
         }
+        /// <inheritdoc/>
         public virtual MenuWithHandler[] GetContextMenuForParametrics(IFrame frame, Face face)
         {
             return new MenuWithHandler[0];
@@ -7105,9 +6924,9 @@ namespace CADability.GeoObject
     }
 
     /// <summary>
-    /// Ein Klasse, die ein Surface Objekt mit Würfeln einhüllt: Jeder Patch hat einen BoundingCube. Alle BoundingCubes
-    /// sind in einem OctTree enthalten. Wenn ein Würfelchen verkleinert werden muss, dann wird es aus dem
-    /// OctTree entfernt und die kleinen werden eingefügt. Die Würfelchen können sich überlappen
+    /// Wraps a surface in boxes for fast intersection tests: the parameter space is divided into patches, each patch has
+    /// a bounding cube, and all cubes are kept in an oct tree. When a cube has to be refined it is removed from the tree
+    /// and the cubes of its sub patches are inserted. The cubes may overlap.
     /// </summary>
     internal class BoxedSurface
     {
@@ -7245,12 +7064,12 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
-        /// Stellt fest, ob die Fläche von dem BoundingCube getroffen wird und wenn ja liefert es einen inneren Flächenpunkt
-        /// zurück. Der OctTree wird bei deiser Gelegenheit u.U. verfeinert
+        /// Determines whether the surface is hit by the cube and, if so, returns a point of the surface inside the cube.
+        /// The oct tree may be refined on this occasion.
         /// </summary>
-        /// <param name="test"></param>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <param name="test">the cube to test</param>
+        /// <param name="uv">receives the parameters of a surface point inside the cube</param>
+        /// <returns>true if the surface passes through the cube</returns>
         public bool HitTest(BoundingCube test, out GeoPoint2D uv)
         {
             Cube[] hits = octtree.GetObjectsFromBox(test);
@@ -8654,9 +8473,9 @@ namespace CADability.GeoObject
 
 
     /// <summary>
-    /// Ein Klasse, die ein Surface Objekt mit Würfeln einhüllt: Jeder Patch hat einen BoundingCube. Alle BoundingCubes
-    /// sind in einem OctTree enthalten. Wenn ein Würfelchen verkleinert werden muss, dann wird es aus dem
-    /// OctTree entfernt und die kleinen werden eingefügt. Die Würfelchen können sich überlappen
+    /// Wraps a surface in boxes for fast intersection tests: the parameter space is divided into patches, each patch has
+    /// a bounding cube, and all cubes are kept in an oct tree. When a cube has to be refined it is removed from the tree
+    /// and the cubes of its sub patches are inserted. The cubes may overlap.
     /// </summary>
     internal class BoxedSurfaceEx
     {

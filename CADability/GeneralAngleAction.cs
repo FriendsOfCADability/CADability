@@ -10,7 +10,11 @@ using Keys = CADability.Substitutes.Keys;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Action which lets the user set the value of an <see cref="AngleProperty"/> with the mouse. While the action is active the
+    /// angle is the direction from a fixed point to the current (snapped) mouse position, measured in the active drawing plane,
+    /// or, if the action was constructed with a local plane, the direction from the origin of that plane to the mouse position
+    /// projected into it; a <see cref="CalculateAngleEvent"/> handler may compute the angle from the mouse position instead.
+    /// A mouse click or Enter accepts the value, Escape restores the initial value. Typically started by the hotspot of an angle property.
     /// </summary>
 
     public class GeneralAngleAction : Action
@@ -89,17 +93,13 @@ namespace CADability.Actions
             }
         }
 
-        /// <summary>
-        /// Implements <see cref="Action.GetID"/>.
-        /// </summary>
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "GeneralAngleAction[LeaveSelectProperties]";
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.OnRemoveAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnRemoveAction()
         {
         }
@@ -139,9 +139,7 @@ namespace CADability.Actions
             }
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.OnEscape ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override bool OnEscape()
         {
             SetAngle(InitialAngleValue);
@@ -149,9 +147,7 @@ namespace CADability.Actions
             return true;
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.OnEnter ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override bool OnEnter()
         {
             base.RemoveThisAction();

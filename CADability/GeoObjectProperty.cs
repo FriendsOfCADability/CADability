@@ -66,9 +66,7 @@ namespace CADability.UserInterface
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -78,10 +76,7 @@ namespace CADability.UserInterface
                 return res;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -89,10 +84,7 @@ namespace CADability.UserInterface
                 return brepObjects.Length;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get
@@ -202,9 +194,7 @@ namespace CADability.UserInterface
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -214,10 +204,7 @@ namespace CADability.UserInterface
                 return res;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -225,10 +212,7 @@ namespace CADability.UserInterface
                 return geoObjects.Length;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get
@@ -272,8 +256,9 @@ namespace CADability.UserInterface
     }
 
     /// <summary>
-    /// Anzeige einer einfachen stringbasierten Property. Ein Objekt kann damit gekoppelt sein und 
-    /// wird bei dem Event SelectionChangedEvent gemeldet. Ansonsten funktionslos.
+    /// Displays a simple string as a selectable entry in the property grid. An arbitrary object can be associated with the
+    /// entry; it is reported by the <see cref="SelectionChangedEvent"/> when the entry is selected. Optionally the entry has
+    /// a context menu, whose commands are forwarded to the <see cref="OnCommandEvent"/>. Apart from that it has no function.
     /// </summary>
     internal sealed class SimpleNameProperty : IShowPropertyImpl, ICommandHandler
     {
@@ -321,9 +306,7 @@ namespace CADability.UserInterface
             get => name;
             set => base.LabelText = value;
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Selected()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void Selected()
         {
             this.IsSelected = true;

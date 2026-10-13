@@ -6,7 +6,11 @@ using System.Runtime.Serialization;
 namespace CADability.Attribute
 {
     /// <summary>
-    /// 
+    /// A named attribute which defines the appearance of <see cref="Dimension"/> objects: the layout of the dimension line,
+    /// extension lines and symbols (arrows), the font, size and placement of the dimension text, the number format, units and
+    /// tolerances, and which dimension types (points, coordinates, angle, radius, diameter, location) it applies to. Dimension
+    /// styles are kept in the <see cref="DimensionStyleList"/> of the project and are presented in the property grid, where they
+    /// can be edited.
     /// </summary>
     [Serializable]
     public class DimensionStyle : PropertyEntryImpl, ISerializable, INamedAttribute, ICommandHandler
@@ -1514,10 +1518,7 @@ namespace CADability.Attribute
                     return MenuResource.LoadMenuDefinition("MenuId.DimStyleEntry", false, this);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="PropertyEntryImpl.SubItems"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -1655,10 +1656,7 @@ namespace CADability.Attribute
                 return subEntries;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="PropertyEntryImpl.Added"/>
-        /// </summary>
-        /// <param name="propertyTreeView"></param>
+        /// <inheritdoc/>
         public override void Added(IPropertyPage propertyTreeView)
         {	// erfolgt als erster Aufruf, hier werden die subentries erzeugt
             base.Added(propertyTreeView); // schon hier, damit Frame gesetzt ist
@@ -1758,10 +1756,11 @@ namespace CADability.Attribute
             }
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Name", name);

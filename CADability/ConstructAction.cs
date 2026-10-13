@@ -706,13 +706,14 @@ namespace CADability.Actions
 		/// <param name="View"></param>
 		public delegate void MouseClickDelegate(bool up, GeoPoint MousePosition, IView View);
 		/// <summary>
-		/// Der Zustand der linken Maustaste
+		/// The state of the left mouse button while the action runs.
 		/// </summary>
 		private enum MouseState { ClickDown, MoveDown, ClickUp, MoveUp, RightUp }
 		private enum ActivationMode { Inactivate, BySelection, ByHotspot }
 		/// <summary>
-		/// Dieses Interface dient der inneren Kommunikation dieser Klasse mit den
-		/// Input Objekten. Es ist nicht nach außen sichtbar 
+		/// The internal interface between the construct action and its input objects (<see cref="GeoPointInput"/>,
+		/// <see cref="LengthInput"/> etc.): the action initializes them, lets them build their entry in the property page,
+		/// forwards the mouse to them and asks them whether they are fixed. Not visible outside.
 		/// </summary>
 		private interface IInputObject
 		{
@@ -2715,6 +2716,9 @@ namespace CADability.Actions
 				set { defaultGeoVector = value; }
 			}
 			private bool isAngle;
+			/// <summary>
+			/// Whether the vector is interpreted as an angle (true) or as a direction (false).
+			/// </summary>
 			/// <value>
 			/// The vector should be interpreted as an angle (IsAngle==true) or as
 			/// a direction (IsAngle==false). For an angle there is no vector length,
@@ -6397,9 +6401,8 @@ namespace CADability.Actions
 			}
 		}
 		/// <summary>
-		/// Dieses Objekt wird über der Zeichnung dargestellt. Kann auch auf null gesetzt werden
-		/// um kein Objekt (mehr) darzustallen. Mehrere Objekte können nur als Block dargestellt 
-		/// werden.
+		/// The object that is displayed on top of the drawing while the action runs, usually the object under construction.
+		/// Set it to null to display nothing. Several objects can only be displayed as a <see cref="Block"/>.
 		/// </summary>
 		public IGeoObject ActiveObject
 		{
@@ -6974,9 +6977,7 @@ namespace CADability.Actions
 			RemoveThisAction();
 			return true;
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.Actions.Action.OnEscape ()"/>
-		/// </summary>
+		/// <inheritdoc/>
 		public override bool OnEscape()
 		{
 			return OnEscape(null);
@@ -7025,9 +7026,7 @@ namespace CADability.Actions
 				return false;
 			}
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.Actions.Action.OnEnter ()"/>
-		/// </summary>
+		/// <inheritdoc/>
 		public override bool OnEnter()
 		{
 			return OnEnter(null);
@@ -7462,12 +7461,7 @@ namespace CADability.Actions
 			}
 			return base.OnCommand(MenuId);
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.Actions.Action.OnUpdateCommand (string, CommandState)"/>
-		/// </summary>
-		/// <param name="MenuId"></param>
-		/// <param name="CommandState"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override bool OnUpdateCommand(string MenuId, CommandState CommandState)
 		{
 			switch (MenuId)

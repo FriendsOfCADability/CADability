@@ -343,10 +343,12 @@ namespace CADability.Actions
             return (FeedbackPoint(frame, pointSymbol));
         }
         /// <summary>
-        /// 
+        /// Creates a point which can be used as a feedback object and is displayed with the given <paramref name="pointSymbol"/>.
+        /// The point uses the feedback color ("Colors.Feedback") as specified in the project settings. Construction actions
+        /// typically add the returned point to their feedback to mark positions they are working with.
         /// </summary>
-        /// <param name="frame">Frame to gat access to the settings</param>
-        /// <param name="pointSymbol">The icon, in which the point is beiing displayed</param>
+        /// <param name="frame">Frame to get access to the settings</param>
+        /// <param name="pointSymbol">The symbol with which the point is displayed</param>
         /// <returns>A <see cref="GeoObject.Point"/> as a feedback object</returns>
         static public CADability.GeoObject.Point FeedbackPoint(IFrame frame, PointSymbol pointSymbol)
         {

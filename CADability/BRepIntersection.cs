@@ -3451,8 +3451,11 @@ namespace CADability
 
         }
         /// <summary>
-        /// Beschreibt ein Objekt, welches an Edge hängt und für alle möglichen Zusatzinfos bezüglich der Edge während der BRepOperation verwendet werden kann
-        /// Damit kann man die umständliche Speicherung von Extras per UserData umgehen, und ist schneller.
+        /// Additional data attached to an <see cref="Edge"/> for the duration of a <see cref="BRepOperation"/>: the
+        /// <see cref="EdgeOnFace"/> entries for the primary and the secondary face, whether the edge is an intersection edge or
+        /// lies on overlapping faces, and the neighbouring edges used while building the cycles of new faces. Keeping this in a
+        /// dedicated object (reachable through <c>Edge.edgeInfo</c>) avoids the slower and more cumbersome storage of such
+        /// extras in the edge's UserData.
         /// </summary>
         internal class EdgeInfo
         {
@@ -9146,9 +9149,14 @@ namespace CADability
         }
 
         /// <summary>
-        /// Liefert die Vereinigung der beiden Shells. Das können mehrere Shells sein, denn es kann eine innere Höhlung entstehen.
+        /// Returns the pairs of faces of the two shells that lie on the same surface and overlap (or coincide), as found when
+        /// the operation was prepared. Such faces are not intersected with each other but handled separately.
         /// </summary>
-        /// <returns></returns>
+        /// <param name="onShell1">The overlapping faces belonging to the first shell</param>
+        /// <param name="onShell2">The corresponding faces belonging to the second shell, in the same order as <paramref name="onShell1"/></param>
+        /// <param name="firstToSecond">For each pair the 2d transformation that maps the parameter space of the face on the first shell
+        /// to the parameter space of the face on the second shell</param>
+        /// <returns>The number of overlapping face pairs, i.e. the length of the three arrays</returns>
         public int GetOverlappingFaces(out Face[] onShell1, out Face[] onShell2, out ModOp2D[] firstToSecond)
         {
             onShell1 = new Face[overlappingFaces.Count];
@@ -10049,9 +10057,8 @@ namespace CADability
     }
 
     /// <summary>
-    /// Analog zu Border, jedoch nicht zwangsweise linksrum orientiert.
-    /// Als innen wird alles betrachtet, was links von den Kurven liegt, also auch inverse Border möglich, die ein Loch im Unendlichen darstellen.
-    /// Unveränderlich!
+    /// Like <see cref="Border"/>, but not necessarily oriented counterclockwise: everything to the left of the curves counts as
+    /// inside, so an inverted border, which describes a hole in the infinite plane, is possible as well. Immutable.
     /// </summary>
     //internal class Cycle
     //{
@@ -10948,8 +10955,10 @@ namespace CADability
             }
         }
         /// <summary>
-        /// Erzeuge die Schnitte zwischen Edges und Faces von verschiedenen shells.
-        /// edgesToSplit, intersectionVertices und facesToIntersectionVertices werden gesetzt
+        /// Computes the intersections of the edges of the shell with the faces of the same shell (an edge is not intersected
+        /// with the faces it belongs to, and faces that overlap each other are skipped). The candidate pairs come from the
+        /// leaves of the octree. Fills <c>edgesToSplit</c> (the vertices each edge has to be split at),
+        /// <c>intersectionVertices</c> and <c>facesToIntersectionVertices</c>.
         /// </summary>
         private void createEdgeFaceIntersections()
         {

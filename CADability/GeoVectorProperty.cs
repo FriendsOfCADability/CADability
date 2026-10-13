@@ -13,10 +13,7 @@ namespace CADability.UserInterface
             this.geoVectorProperty = geoVectorProperty;
         }
         #region IHotSpot Members
-        /// <summary>
-        /// Implements <see cref="CADability.IHotSpot.GetHotspotPosition ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public GeoPoint GetHotspotPosition()
         {
             return Position;
@@ -32,9 +29,7 @@ namespace CADability.UserInterface
                 geoVectorProperty.IsSelected = value;
             }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.IHotSpot.StartDrag(IFrame)"/>
-        /// </summary>
+        /// <inheritdoc/>
         public void StartDrag(IFrame frame)
         {
             geoVectorProperty.StartModifyWithMouse();

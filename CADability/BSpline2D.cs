@@ -28,7 +28,12 @@ using System.Threading;
 namespace CADability.Curve2D
 {
     /// <summary>
-    /// 
+    /// A non-uniform rational B-spline curve (NURBS) in 2d. It is mostly used as a curve in the parameter space of a surface
+    /// (e.g. as part of the outline of a <see cref="Face"/>) or as the projection of a 3d <see cref="BSpline"/> onto a plane.
+    /// The curve is defined by its poles (control points), optional weights (a rational spline has one weight per pole),
+    /// the knots with their multiplicities, the degree and a start and end parameter. The underlying NURBS is always clamped,
+    /// the periodic flag only records how the spline was created. Like every <see cref="ICurve2D"/> it is addressed by a
+    /// normalized parameter running from 0.0 (start point) to 1.0 (end point).
     /// </summary>
     [Serializable()]
     public class BSpline2D : GeneralCurve2D, ISerializable, IDeserializationCallback, IDebuggerVisualizer, IExplicitPCurve2D
@@ -1504,20 +1509,14 @@ namespace CADability.Curve2D
             }
         }
         #region ICurve2D Members
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Clone ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D Clone()
         {
             BSpline2D res = new BSpline2D(poles, weights, knots, multiplicities, degree, periodic, startParam, endParam);
             res.UserData.CloneFrom(this.UserData);
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Copy (ICurve2D)"/>
-        /// </summary>
-        /// <param name="toCopyFrom"></param>
+        /// <inheritdoc/>
         public override void Copy(ICurve2D toCopyFrom)
         {
             BSpline2D c = toCopyFrom as BSpline2D;
@@ -1534,9 +1533,7 @@ namespace CADability.Curve2D
             this.InvalidateCache();
             this.Init();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Reverse ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void Reverse()
         {
             Array.Reverse(poles);
@@ -1574,11 +1571,7 @@ namespace CADability.Curve2D
 
             InvalidateCache();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Move (double, double)"/>
-        /// </summary>
-        /// <param name="dx"></param>
-        /// <param name="dy"></param>
+        /// <inheritdoc/>
         public override void Move(double dx, double dy)
         {
             GeoVector2D offset = new GeoVector2D(dx, dy);
@@ -1588,11 +1581,7 @@ namespace CADability.Curve2D
             }
             InvalidateCache();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.CloneReverse (bool)"/>
-        /// </summary>
-        /// <param name="reverse"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D CloneReverse(bool reverse)
         {
             BSpline2D res = (BSpline2D)Clone();
@@ -1620,11 +1609,7 @@ namespace CADability.Curve2D
                 return sweep;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.AddToGraphicsPath (System.Drawing.Drawing2D.GraphicsPath, bool)"/>
-        /// </summary>
-        /// <param name="path"></param>
-        /// <param name="forward"></param>
+        /// <inheritdoc/>
         public override void AddToGraphicsPath(System.Drawing.Drawing2D.GraphicsPath path, bool forward)
         {
             // Notfalls Darstellung als Polyline
@@ -1638,12 +1623,7 @@ namespace CADability.Curve2D
             if (!forward) Array.Reverse(ppf);
             path.AddLines(ppf);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Project (Plane, Plane)"/>
-        /// </summary>
-        /// <param name="fromPlane"></param>
-        /// <param name="toPlane"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D Project(Plane fromPlane, Plane toPlane)
         {
             BSpline2D res = (BSpline2D)this.Clone();
@@ -1654,11 +1634,7 @@ namespace CADability.Curve2D
             res.InvalidateCache();
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.GetModified (ModOp2D)"/>
-        /// </summary>
-        /// <param name="m"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D GetModified(ModOp2D m)
         {
             BSpline2D res = (BSpline2D)this.Clone();
@@ -1768,12 +1744,7 @@ namespace CADability.Curve2D
             //InvalidateCache();
             //Init();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Trim (double, double)"/>
-        /// </summary>
-        /// <param name="StartPos"></param>
-        /// <param name="EndPos"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D Trim(double StartPos, double EndPos)
         {
             if (StartPos == EndPos) return null;
@@ -1996,11 +1967,7 @@ namespace CADability.Curve2D
                 return true;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Split (double)"/>
-        /// </summary>
-        /// <param name="Position"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D[] Split(double Position)
         {
             double u = startParam + (endParam - startParam) * Position;
@@ -2164,11 +2131,7 @@ namespace CADability.Curve2D
                 }
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.PointAt (double)"/>
-        /// </summary>
-        /// <param name="Position"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D PointAt(double Position)
         {
             if (nubs == null && nurbs == null) Init(); // nach dem Einlesen ist dies leider manchmal der Fall (Reihenfolge von IDeserializationCallback)
@@ -2220,11 +2183,7 @@ namespace CADability.Curve2D
             if (res.Length > 0.0) res.Norm();
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.DirectionAt (double)"/>
-        /// </summary>
-        /// <param name="Position"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoVector2D DirectionAt(double Position)
         {
             double u = startParam + Position * (endParam - startParam);
@@ -2341,14 +2300,7 @@ namespace CADability.Curve2D
             }
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Parallel (double, bool, double, double)"/>
-        /// </summary>
-        /// <param name="Dist"></param>
-        /// <param name="approxSpline"></param>
-        /// <param name="precision"></param>
-        /// <param name="roundAngle"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D Parallel(double Dist, bool approxSpline, double precision, double roundAngle)
         {
             // Man bräuchte einen Konstruktor, der auch Knoten (und ggf. Gewichte) nimmt
@@ -2420,12 +2372,7 @@ namespace CADability.Curve2D
             //double dbg = this.MinDistance(res);
             //return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.GetFused (ICurve2D, double)"/>
-        /// </summary>
-        /// <param name="toFuseWith"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D GetFused(ICurve2D toFuseWith, double precision)
         {
             if (toFuseWith is BSpline2D)
@@ -2476,10 +2423,11 @@ namespace CADability.Curve2D
             return null;
         }
         /// <summary>
-        /// wie DirectionAt, jedoch Ergebnis nicht normiert
+        /// Like <see cref="DirectionAt(double)"/>, but the result is not normalized: it is the first derivative of the curve
+        /// (with respect to the spline's knot parameter) at the given position.
         /// </summary>
-        /// <param name="Position"></param>
-        /// <returns></returns>
+        /// <param name="Position">Normalized parameter in the range 0.0 to 1.0</param>
+        /// <returns>The unnormalized derivative at that position</returns>
         internal GeoVector2D DerivationAt(double Position)
         {
             double u = startParam + Position * (endParam - startParam);
@@ -2490,11 +2438,7 @@ namespace CADability.Curve2D
             return res;
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Intersect (ICurve2D)"/>
-        /// </summary>
-        /// <param name="IntersectWith"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2DWithParameter[] Intersect(ICurve2D IntersectWith)
         {
             GeoPoint2DWithParameter[] found = base.Intersect(IntersectWith);
@@ -3051,34 +2995,26 @@ namespace CADability.Curve2D
         //    return res.ToArray();
         //}
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.Intersect (GeoPoint2D, GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="StartPoint"></param>
-        /// <param name="EndPoint"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2DWithParameter[] Intersect(GeoPoint2D StartPoint, GeoPoint2D EndPoint)
         {
             return Intersect(new Line2D(StartPoint, EndPoint));
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.IsValidParameter (double)"/>
-        /// </summary>
-        /// <param name="par"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool IsValidParameter(double par)
         {
             double u = startParam + par * (endParam - startParam);
             return u >= knots[0] && u <= knots[knots.Length - 1];
         }
         /// <summary>
-        /// Punkt und 1. und 2. Ableitung. ACHTUNG: param ist echter Parameter nicht 0..1!
-        /// dir1 und dir2 sind nicht normiert (dir2 kann 0 sein)
+        /// Point, first and second derivative of the curve. NOTE: <paramref name="param"/> is the spline's knot parameter,
+        /// not the normalized parameter 0..1. <paramref name="dir1"/> and <paramref name="dir2"/> are not normalized
+        /// (<paramref name="dir2"/> may be the null vector).
         /// </summary>
-        /// <param name="param"></param>
-        /// <param name="point"></param>
-        /// <param name="dir1"></param>
-        /// <param name="dir2"></param>
+        /// <param name="param">Knot parameter, between the first and the last knot</param>
+        /// <param name="point">The point on the curve</param>
+        /// <param name="dir1">The first derivative at that point</param>
+        /// <param name="dir2">The second derivative at that point</param>
         private void PointDirAt2(double param, out GeoPoint2D point, out GeoVector2D dir1, out GeoVector2D dir2)
         {
             if (nubs != null)
@@ -3097,11 +3033,7 @@ namespace CADability.Curve2D
                 dir2 = (GeoVector2D)ndir2;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.MakeGeoObject (Plane)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IGeoObject MakeGeoObject(Plane p)
         {
             BSpline bsp = BSpline.Construct();
@@ -3217,14 +3149,7 @@ namespace CADability.Curve2D
             uFoot = u;
             return true;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.TryPointDeriv2At (double, out GeoPoint2D, out GeoVector2D, out GeoVector2D)"/>
-        /// </summary>
-        /// <param name="position"></param>
-        /// <param name="point"></param>
-        /// <param name="deriv1"></param>
-        /// <param name="deriv2"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool TryPointDeriv2At(double position, out GeoPoint2D point, out GeoVector2D deriv1, out GeoVector2D deriv2)
         {
             double param = startParam + position * (endParam - startParam);
@@ -3605,10 +3530,7 @@ namespace CADability.Curve2D
         #endregion
         #region IQuadTreeInsertable Members
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.GetExtent ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingRect GetExtent()
         {
             if (nubs == null && nurbs == null) Init(); // this is sometimes the case when a file is read
@@ -3775,10 +3697,11 @@ namespace CADability.Curve2D
             endParam = (double)info.GetValue("EndParam", typeof(double));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Poles", poles, typeof(GeoPoint2D[]));

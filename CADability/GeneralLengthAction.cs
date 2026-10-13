@@ -5,7 +5,11 @@ using MouseEventArgs = CADability.Substitutes.MouseEventArgs;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// An action that lets the user modify a <see cref="LengthProperty"/> with the mouse. Depending on the constructor
+    /// the length is either the distance of the (snapped) mouse position from a fixed point or its distance from a line
+    /// given by a point and a direction. The length is updated on every mouse move; a mouse click accepts it, ESC (or
+    /// the activation of another action) restores the initial value and ends the action. Used e.g. by the radius
+    /// property of a circle or the size property of a text.
     /// </summary>
 
     public class GeneralLengthAction : Action
@@ -86,17 +90,13 @@ namespace CADability.Actions
                 }
             }
         }
-        /// <summary>
-        /// Implements <see cref="Action.GetID"/>.
-        /// </summary>
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "GeneralLengthAction[LeaveSelectProperties]";
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.OnRemoveAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnRemoveAction()
         {
         }
@@ -137,9 +137,7 @@ namespace CADability.Actions
             }
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.OnEscape ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override bool OnEscape()
         {
             SetLength(initialLengthValue);
@@ -147,9 +145,7 @@ namespace CADability.Actions
             return true;
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.OnEnter ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override bool OnEnter()
         {
             base.RemoveThisAction();

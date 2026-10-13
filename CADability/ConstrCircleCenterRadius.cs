@@ -6,7 +6,8 @@ using MouseEventArgs = CADability.Substitutes.MouseEventArgs;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a circle in the active drawing plane by its center and its radius (or diameter).
+    /// Menu id: "Constr.Circle.Center.Radius".
     /// </summary>
     internal class ConstrCircleCenterRadius : ConstructAction
     {

@@ -15,7 +15,12 @@ using Point = System.Drawing.Point;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Action which rotates a list of objects (typically the current selection). The rotation center is the reference point, by
+    /// default the center of the extent of the objects, changeable via a hotspot; the axis is the normal of the active drawing
+    /// plane unless the user picks a line as the axis. The angle is given numerically, by the mouse (direction from the reference
+    /// point), by a start and an end point, or by a source and a target plane (the objects are rotated so that the source plane is
+    /// mapped onto the target plane); an additional offset of 0, 90, 180 or 270 degrees can be chosen. The objects are modified in
+    /// place or, if "copy" is selected or Shift is held, rotated copies are added to the model. Started with the menu id "RotateObjects".
     /// </summary>
     public class RotateObjects : ConstructAction
     {

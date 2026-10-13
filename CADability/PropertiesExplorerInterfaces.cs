@@ -176,6 +176,12 @@ namespace CADability.UserInterface
         /// </summary>
         /// <returns></returns>
         int OpenOrCloseSubEntries();
+        /// <summary>
+        /// Notification that the user clicked one of the buttons of the entry (see <see cref="PropertyEntryButton"/>): the
+        /// context menu or drop down button, ok or cancel of an edit, the check box, the lock symbol or the direct menu
+        /// arrow, or double clicked the value.
+        /// </summary>
+        /// <param name="button">the button that was clicked</param>
         void ButtonClicked(PropertyEntryButton button);
         /// <summary>
         /// Has been added to the property page, can be used to do some initialization.

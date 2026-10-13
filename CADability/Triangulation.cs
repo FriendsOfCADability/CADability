@@ -544,7 +544,7 @@ namespace CADability
                 connected = new List<ConnectionTree>();
             }
             /// <summary>
-            /// Liefert alle Items, also auch die der untergeordneten Äste
+            /// Returns this node and all nodes of the subordinate branches (the whole subtree, depth first).
             /// </summary>
             public IEnumerable<ConnectionTree> Items
             {

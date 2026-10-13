@@ -15,9 +15,9 @@ namespace CADability.Attribute
 {
 
     /// <summary>
-    /// Eine Tabelle von benannten Farben. Die Tabelle ist serialisierbar und wird gewöhnlich
-    /// in einem "Settings" Objekt gespeichert. Die Tabelle kann in der EigenschaftenAnzeige
-    /// interaktiv manipuliert werden.
+    /// A table of named colours (<see cref="ColorDef"/> objects). The table is serializable and is usually kept in a
+    /// <see cref="Project"/> or in the global <see cref="Settings"/>. It can be edited interactively in the property grid,
+    /// where it also handles the context menu commands for its entries.
     /// </summary>
     [Serializable()]
     public class ColorList : PropertyEntryImpl, ISerializable,
@@ -36,7 +36,7 @@ namespace CADability.Attribute
         // allowAll ist nicht allow undefined
         private StaticFlags staticFlags;
         /// <summary>
-        /// Erzeugt eine leere ColorList.
+        /// Creates an empty ColorList.
         /// </summary>
         public ColorList()
         {
@@ -149,9 +149,10 @@ namespace CADability.Attribute
             if (ind >= 0) RemoveAt(ind);
         }
         /// <summary>
-        /// Entfernt die Farbe mit dem gegebenen Index.
+        /// Removes the colour at the given index. If the list belongs to a project or to the settings, the owner is asked first
+        /// and may refuse the removal (e.g. when the colour is still in use). Raises the <see cref="DidModifyEvent"/>.
         /// </summary>
-        /// <param name="Index">Der Index.</param>
+        /// <param name="Index">Index of the colour to remove</param>
         public void RemoveAt(int Index)
         {
             if (owner != null)
@@ -255,10 +256,10 @@ namespace CADability.Attribute
             }
         }
         /// <summary>
-        /// Liefert die Farbe zu dem gegebenen Index.
+        /// Returns the RGB colour of the entry at the given index. For an index outside the list the colour blue is returned.
         /// </summary>
-        /// <param name="Index">Der Index.</param>
-        /// <returns>Die Farbe.</returns>
+        /// <param name="Index">Index of the entry</param>
+        /// <returns>The colour</returns>
         public Color GetColor(int Index)
         {
             if (Index < 0 || Index >= namedColors.Count)
@@ -266,11 +267,11 @@ namespace CADability.Attribute
             return ((ColorDef)namedColors[Index]).Color;
         }
         /// <summary>
-        /// Liefert das ColorDef Objekt zu dem gegebenen Index. Den Index zu einem Namen 
-        /// bekommt man mit der Methode <seealso cref="IndexOf"/>.
+        /// Returns the <see cref="ColorDef"/> object at the given index. The index of a name can be found with the
+        /// <seealso cref="IndexOf"/> method.
         /// </summary>
-        /// <param name="Index">Der Index des gesuchten Objektes</param>
-        /// <returns></returns>
+        /// <param name="Index">Index of the requested object</param>
+        /// <returns>The ColorDef at that index</returns>
         /*public ColorDef this[int Index]
         {
             string name = GetName(Index);
@@ -317,11 +318,7 @@ namespace CADability.Attribute
             Add(cd);
             return cd;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Attribute.IAttributeList.Find (string)"/>
-        /// </summary>
-        /// <param name="Name"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public ColorDef Find(string Name)
         {
             for (int i = 0; i < namedColors.Count; ++i)
@@ -369,10 +366,11 @@ namespace CADability.Attribute
             return namedColors[0] as ColorDef;
         }
         /// <summary>
-        /// Verändert den Namen bei gegebenem Index. 
+        /// Changes the name of the entry at the given index. The change is rejected when the new name is already used by
+        /// another entry of the list. Raises the <see cref="DidModifyEvent"/>.
         /// </summary>
-        /// <param name="Index">Index des zu verändernden Wertes.</param>
-        /// <param name="Name">Neuer Name.</param>
+        /// <param name="Index">Index of the entry to change</param>
+        /// <param name="Name">The new name</param>
         public void SetName(int Index, string Name)
         {
             if (Index < namedColors.Count)
@@ -385,10 +383,10 @@ namespace CADability.Attribute
             }
         }
         /// <summary>
-        /// Verändert die Farbe bei gegebenem Index. 
+        /// Changes the RGB colour of the entry at the given index. Raises the <see cref="DidModifyEvent"/>.
         /// </summary>
-        /// <param name="Index">Index des zu verändernden Wertes.</param>
-        /// <param name="Color">Neuer Farbwert.</param>
+        /// <param name="Index">Index of the entry to change</param>
+        /// <param name="Color">The new colour value</param>
         public void SetColor(int Index, Color Color)
         {
             ((ColorDef)namedColors[Index]).Color = Color;
@@ -487,10 +485,7 @@ namespace CADability.Attribute
                 return PropertyEntryType.ContextMenu | PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -529,10 +524,11 @@ namespace CADability.Attribute
             resourceIdInternal = "ColorList";
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("NamedColors", namedColors, namedColors.GetType());

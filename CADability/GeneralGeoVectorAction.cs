@@ -98,9 +98,7 @@ namespace CADability.Actions
                 SetGeoVector(base.SnapPoint(e, vw, out DidSnap) - basePoint);
             }
         }
-        /// <summary>
-        /// Implements <see cref="Action.GetID"/>.
-        /// </summary>
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "GeneralGeoVectorAction[LeaveSelectProperties]"; // LeaveSelectProperties ist das Zauberwort, 

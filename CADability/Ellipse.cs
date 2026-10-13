@@ -109,7 +109,12 @@ namespace CADability.GeoObject
 	}
 
 	/// <summary>
-	///
+	/// A circle, circular arc, ellipse or elliptical arc as a <see cref="IGeoObject"/> implementing <see cref="ICurve"/>.
+	/// It is defined by a <see cref="Plane"/>, whose location is the centre and whose x and y directions are the directions
+	/// of the axes, by the major and the minor radius (equal for a circle), and by a start parameter and a sweep parameter
+	/// (angles in radians; a full circle or ellipse has a sweep of 2π, a negative sweep means clockwise). Create one with the
+	/// static <see cref="Construct"/> method and define it with one of the <c>Set...</c> methods, e.g.
+	/// <see cref="SetCirclePlaneCenterRadius"/> or <see cref="SetArc3Points"/>.
 	/// </summary>
 	[Serializable]
 	public class Ellipse : IGeoObjectImpl, IColorDef, ILineWidth, ILinePattern, ICurve, ISerializable,
@@ -850,11 +855,12 @@ namespace CADability.GeoObject
 		}
 
 		/// <summary>
-		/// Kreis aus Ebene und zwei gegenüberliegenden Punkten auf dem Kreis
+		/// Defines the circle by a plane and two diametrically opposite points on the circle: the centre is the midpoint of
+		/// the two points, the radius is half their distance. Start and sweep parameter are not changed.
 		/// </summary>
-		/// <param name="p">Die Ebene des Kreises (3D-Parameter)</param>
-		/// <param name="circlePoint1">1. Punkt des Kreises</param>
-		/// <param name="circlePoint2">2. Punkt des Kreises</param>
+		/// <param name="p">The plane of the circle (only its orientation is used, the location is replaced by the centre)</param>
+		/// <param name="circlePoint1">First point on the circle</param>
+		/// <param name="circlePoint2">Second point on the circle, opposite to the first one</param>
 		public void SetCirclePlane2Points(Plane p, GeoPoint circlePoint1, GeoPoint circlePoint2)
 		{
 			using (new Changing(this, "SetArcPlaneCenterRadius", this.plane, this.plane.Location, this.majorRadius))
@@ -1139,9 +1145,12 @@ namespace CADability.GeoObject
 		}
 
 		/// <summary>
-		/// Tangentenpunkte der Ellipse bei vorgegebener Richtung
+		/// Returns the parameter of the point where the tangent of the ellipse is parallel to the given direction. The second
+		/// point with a tangent in that direction has the parameter u + π. The direction is projected into the plane of the
+		/// ellipse first.
 		/// </summary>
-		/// <param name="Direction">Richtung der Tangente</param>
+		/// <param name="Direction">Direction of the tangent</param>
+		/// <returns>The parameter, an angle in radians as used by <see cref="Point(double)"/></returns>
 		public double TangentParameter(GeoVector Direction)
 		{
 			ModOp Transform = ModOp.Transform(CoordSys.StandardCoordSys, plane.CoordSys);
@@ -1380,10 +1389,7 @@ namespace CADability.GeoObject
 
 		#region IGeoObject
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.CopyGeometry (IGeoObject)"/>
-		/// </summary>
-		/// <param name="ToCopyFrom"></param>
+		/// <inheritdoc/>
 		public override void CopyGeometry(IGeoObject ToCopyFrom)
 		{
 			using (new Changing(this, "CopyGeometry", Clone()))
@@ -1398,10 +1404,7 @@ namespace CADability.GeoObject
 			}
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Modify (ModOp)"/>
-		/// </summary>
-		/// <param name="m"></param>
+		/// <inheritdoc/>
 		public override void Modify(ModOp m)
 		{
 			using (new Changing(this, "ModifyInverse", m))
@@ -1466,10 +1469,7 @@ namespace CADability.GeoObject
 			}
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Clone ()"/>
-		/// </summary>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override IGeoObject Clone()
 		{
 			Ellipse result = Construct();
@@ -1483,10 +1483,7 @@ namespace CADability.GeoObject
 			return result;
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.FindSnapPoint (SnapPointFinder)"/>
-		/// </summary>
-		/// <param name="spf"></param>
+		/// <inheritdoc/>
 		public override void FindSnapPoint(SnapPointFinder spf)
 		{
 			if (!spf.Accept(this)) return;
@@ -1594,11 +1591,7 @@ namespace CADability.GeoObject
 			}
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.AttributeChanged (INamedAttribute)"/>
-		/// </summary>
-		/// <param name="attribute"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override bool AttributeChanged(INamedAttribute attribute)
 		{
 			if (attribute == colorDef || attribute == Layer)
@@ -1612,10 +1605,7 @@ namespace CADability.GeoObject
 			return false;
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HasValidData ()"/>
-		/// </summary>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override bool HasValidData()
 		{
 			if (majorRadius < Precision.eps) return false;
@@ -1624,11 +1614,7 @@ namespace CADability.GeoObject
 			return true;
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetShowProperties (IFrame)"/>
-		/// </summary>
-		/// <param name="Frame"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override IPropertyEntry GetShowProperties(IFrame Frame)
 		{
 			if (IsCircle)
@@ -1641,10 +1627,7 @@ namespace CADability.GeoObject
 			}
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
-		/// </summary>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override BoundingCube GetBoundingCube()
 		{
 			// es hilft nichts, man muss in 2-dimensionalen 2Mal die BoundingBox bestimmen
@@ -1677,10 +1660,7 @@ namespace CADability.GeoObject
 
 		public static PaintTo3DDelegate OnPaintTo3D;
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3D (IPaintTo3D)"/>
-		/// </summary>
-		/// <param name="paintTo3D"></param>
+		/// <inheritdoc/>
 		public override void PaintTo3D(IPaintTo3D paintTo3D)
 		{
 			if (OnPaintTo3D != null && OnPaintTo3D(this, paintTo3D)) return;
@@ -1707,10 +1687,7 @@ namespace CADability.GeoObject
 			}
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PrepareDisplayList (double)"/>
-		/// </summary>
-		/// <param name="precision"></param>
+		/// <inheritdoc/>
 		public override void PrepareDisplayList(double precision)
 		{
 			GetCashedApproximation(precision);
@@ -1721,12 +1698,7 @@ namespace CADability.GeoObject
 			get { return Style.EDefaultFor.Curves; }
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetQuadTreeItem (Projection, ExtentPrecision)"/>
-		/// </summary>
-		/// <param name="projection"></param>
-		/// <param name="extentPrecision"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override IQuadTreeInsertableZ GetQuadTreeItem(Projection projection, ExtentPrecision extentPrecision)
 		{
 			EllipseData2D d2d = CalculateProjectionData(projection.ProjectionPlane);
@@ -1734,12 +1706,7 @@ namespace CADability.GeoObject
 			return new QuadTreeEllipse(this, this.plane, c2d, projection);
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (Projection, ExtentPrecision)"/>
-		/// </summary>
-		/// <param name="projection"></param>
-		/// <param name="extentPrecision"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override BoundingRect GetExtent(Projection projection, ExtentPrecision extentPrecision)
 		{
 			ICurve2D c2d = (this as ICurve).GetProjectedCurve(projection.ProjectionPlane);
@@ -1750,11 +1717,7 @@ namespace CADability.GeoObject
 
 		#region IOctTreeInsertable members
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (double)"/>
-		/// </summary>
-		/// <param name="precision"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override BoundingCube GetExtent(double precision)
 		{
 			return GetBoundingCube();
@@ -1767,24 +1730,13 @@ namespace CADability.GeoObject
 			//return res;
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
-		/// </summary>
-		/// <param name="cube"></param>
-		/// <param name="precision"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override bool HitTest(ref BoundingCube cube, double precision)
 		{
 			return (this as ICurve).HitTest(cube);
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection, BoundingRect, bool)"/>
-		/// </summary>
-		/// <param name="projection"></param>
-		/// <param name="rect"></param>
-		/// <param name="onlyInside"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override bool HitTest(Projection projection, BoundingRect rect, bool onlyInside)
 		{
 			ICurve2D c2d = (this as ICurve).GetProjectedCurve(projection.ProjectionPlane);
@@ -1798,12 +1750,7 @@ namespace CADability.GeoObject
 			}
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection.PickArea, bool)"/>
-		/// </summary>
-		/// <param name="area"></param>
-		/// <param name="onlyInside"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override bool HitTest(Projection.PickArea area, bool onlyInside)
 		{
 			GeoPoint unitCenter = area.ToUnitBox * Center;
@@ -1843,13 +1790,7 @@ namespace CADability.GeoObject
 			}
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Position (GeoPoint, GeoVector, double)"/>
-		/// </summary>
-		/// <param name="fromHere"></param>
-		/// <param name="direction"></param>
-		/// <param name="precision"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override double Position(GeoPoint fromHere, GeoVector direction, double precision)
 		{
 			// noch nicht getestet
@@ -2178,11 +2119,7 @@ namespace CADability.GeoObject
 			}
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.DirectionAt (double)"/>
-		/// </summary>
-		/// <param name="Position"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public GeoVector DirectionAt(double Position)
 		{
 			Angle a = startParameter + Position * sweepParameter;
@@ -2214,11 +2151,7 @@ namespace CADability.GeoObject
 			return true;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.PointAt (double)"/>
-		/// </summary>
-		/// <param name="Position"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public GeoPoint PointAt(double Position)
 		{
 			// TODO: Ellipsenbogen (und Kreisbogen) müssen sich konsistent verhalten
@@ -2241,11 +2174,7 @@ namespace CADability.GeoObject
 			       Math.Sin(ea) * minorRadius * plane.DirectionY;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.PositionOf (GeoPoint)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public double PositionOf(GeoPoint p)
 		{
 			GeoPoint2D p2d = plane.Project(p);
@@ -2266,12 +2195,7 @@ namespace CADability.GeoObject
 			return ax;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.PositionOf (GeoPoint, double)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <param name="prefer"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public double PositionOf(GeoPoint p, double prefer)
 		{
 			GeoPoint2D p2d = plane.Project(p);
@@ -2289,12 +2213,7 @@ namespace CADability.GeoObject
 			return ax;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.PositionOf (GeoPoint, Plane)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <param name="pl"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public double PositionOf(GeoPoint p, Plane pl)
 		{
 			// das müsste stimmen, solange es in 2d ein Kreis- oder Ellipsenbogen ist
@@ -2519,11 +2438,7 @@ namespace CADability.GeoObject
 			}
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.Split (double)"/>
-		/// </summary>
-		/// <param name="Position"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public ICurve[] Split(double Position)
 		{
 			// Wozu war diese Einschränkung mit IsClosed? Sie stört in Face.GetProjectedArea
@@ -2536,12 +2451,7 @@ namespace CADability.GeoObject
 			return new ICurve[] { e1, e2 };
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.Split (double, double)"/>
-		/// </summary>
-		/// <param name="Position1"></param>
-		/// <param name="Position2"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public ICurve[] Split(double Position1, double Position2)
 		{
 			if (!IsClosed) return null;
@@ -2561,11 +2471,7 @@ namespace CADability.GeoObject
 			return new ICurve[] { e1, e2 };
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.Trim (double, double)"/>
-		/// </summary>
-		/// <param name="StartPos"></param>
-		/// <param name="EndPos"></param>
+		/// <inheritdoc/>
 		public void Trim(double StartPos, double EndPos)
 		{
 			if (StartPos == 0 && EndPos == 1) return; // kommt oft vor
@@ -2601,39 +2507,25 @@ namespace CADability.GeoObject
 			get { return sweepParameter == 0.0; }
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.GetPlanarState ()"/>
-		/// </summary>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public PlanarState GetPlanarState()
 		{
 			return PlanarState.Planar;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.GetPlane ()"/>
-		/// </summary>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public Plane GetPlane()
 		{
 			return this.plane;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.IsInPlane (Plane)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public bool IsInPlane(Plane p)
 		{
 			return Precision.IsEqual(p, this.plane);
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.GetProjectedCurve (Plane)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public ICurve2D GetProjectedCurve(Plane p)
 		{
 			EllipseData2D d2d = CalculateProjectionData(p);
@@ -3004,14 +2896,7 @@ namespace CADability.GeoObject
 			}
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.TryPointDeriv2At (double, out GeoPoint, out GeoVector, out GeoVector)"/>
-		/// </summary>
-		/// <param name="position"></param>
-		/// <param name="point"></param>
-		/// <param name="deriv"></param>
-		/// <param name="deriv2"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual bool TryPointDeriv2At(double position, out GeoPoint point, out GeoVector deriv,
 			out GeoVector deriv2)
 		{
@@ -3106,10 +2991,11 @@ namespace CADability.GeoObject
 		}
 
 		/// <summary>
-		/// Implements <see cref="ISerializable.GetObjectData"/>
+		/// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+		/// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
 		/// </summary>
-		/// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-		/// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+		/// <param name="info">receives the data</param>
+		/// <param name="context">the destination of the serialization</param>
 		public override void GetObjectData(SerializationInfo info, StreamingContext context)
 		{
 			base.GetObjectData(info, context);

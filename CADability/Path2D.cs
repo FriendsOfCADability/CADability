@@ -267,11 +267,7 @@ namespace CADability.Curve2D
                 throw new NotSupportedException("Get MiddleDirection of Path2D");
             }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.DirectionAt (double)"/>
-        /// </summary>
-        /// <param name="Position"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoVector2D DirectionAt(double Position)
         {
             double l = Position * subCurves.Length;
@@ -281,11 +277,7 @@ namespace CADability.Curve2D
             double p = l - i;
             return subCurves[i].DirectionAt(p);
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.PointAt (double)"/>
-        /// </summary>
-        /// <param name="Position"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D PointAt(double Position)
         {	// Position ist zwischen 0.0 und 1.0
             // wird zuerst hochgerechnet auf Gesamtlänge und dann in Index und Offset aufgeteilt
@@ -296,11 +288,7 @@ namespace CADability.Curve2D
             double p = l - i;
             return subCurves[i].PointAt(p);
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.PositionOf (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double PositionOf(GeoPoint2D p)
         {
             int foundSegment = -1;
@@ -373,11 +361,7 @@ namespace CADability.Curve2D
             if (foundSegment >= 0) return (foundSegment + foundPosition) / subCurves.Length;
             else return -1.0; // d.h. außerhalb
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.PositionAtLength (double)"/>
-        /// </summary>
-        /// <param name="position"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double PositionAtLength(double position)
         {
             double length = Length;
@@ -425,11 +409,7 @@ namespace CADability.Curve2D
                 return sweep;
             }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.GetAreaFromPoint (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double GetAreaFromPoint(GeoPoint2D p)
         {
             double res = 0.0;
@@ -439,11 +419,7 @@ namespace CADability.Curve2D
             }
             return res;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.Split (double)"/>
-        /// </summary>
-        /// <param name="Position"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D[] Split(double Position)
         {
             if (Position <= 0.0 || Position >= 1.0)
@@ -474,11 +450,7 @@ namespace CADability.Curve2D
             }
             return res.ToArray();
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.Distance (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double Distance(GeoPoint2D p)
         {
             double mindist = double.MaxValue; // Absolut, immer positiv
@@ -495,11 +467,7 @@ namespace CADability.Curve2D
             }
             return res;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.MinDistance (ICurve2D)"/>
-        /// </summary>
-        /// <param name="Other"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double MinDistance(ICurve2D Other)
         {
             double minDist = double.MaxValue;
@@ -509,11 +477,7 @@ namespace CADability.Curve2D
             }
             return minDist;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.MinDistance (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double MinDistance(GeoPoint2D p)
         {
             double minDist = double.MaxValue;
@@ -523,12 +487,7 @@ namespace CADability.Curve2D
             }
             return minDist;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.Trim (double, double)"/>
-        /// </summary>
-        /// <param name="StartPos"></param>
-        /// <param name="EndPos"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D Trim(double StartPos, double EndPos)
         {
             Path2D res = this.Clone() as Path2D;
@@ -581,14 +540,7 @@ namespace CADability.Curve2D
             subCurves = (ICurve2D[])res.ToArray(typeof(ICurve2D));
 
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.Parallel (double, bool, double, double)"/>
-        /// </summary>
-        /// <param name="Dist"></param>
-        /// <param name="approxSpline"></param>
-        /// <param name="precision"></param>
-        /// <param name="roundAngle"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D Parallel(double Dist, bool approxSpline, double precision, double roundAngle)
         {
             ICurve2D[] par = new ICurve2D[subCurves.Length];
@@ -784,11 +736,7 @@ namespace CADability.Curve2D
             Path2D pres = new Path2D(res.ToArray(), true);
             return pres;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.Intersect (ICurve2D)"/>
-        /// </summary>
-        /// <param name="IntersectWith"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2DWithParameter[] Intersect(ICurve2D IntersectWith)
         {
             ArrayList res = new ArrayList();
@@ -814,11 +762,7 @@ namespace CADability.Curve2D
             Line2D l2d = new Line2D(StartPoint, EndPoint);
             return Intersect(l2d);
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.PerpendicularFoot (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="FromHere"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D[] PerpendicularFoot(GeoPoint2D FromHere)
         {
             ArrayList res = new ArrayList();
@@ -837,12 +781,7 @@ namespace CADability.Curve2D
             }
             return (GeoPoint2D[])res.ToArray(typeof(GeoPoint2D));
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.TangentPoints (GeoPoint2D, GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="FromHere"></param>
-        /// <param name="CloseTo"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D[] TangentPoints(GeoPoint2D FromHere, GeoPoint2D CloseTo)
         {
             ArrayList res = new ArrayList();
@@ -852,12 +791,7 @@ namespace CADability.Curve2D
             }
             return (GeoPoint2D[])res.ToArray(typeof(GeoPoint2D));
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.TangentPointsToAngle (Angle, GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="ang"></param>
-        /// <param name="CloseTo"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D[] TangentPointsToAngle(Angle ang, GeoPoint2D CloseTo)
         {
             List<GeoPoint2D> res = new List<GeoPoint2D>();
@@ -867,11 +801,7 @@ namespace CADability.Curve2D
             }
             return res.ToArray();
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.TangentPointsToAngle (GeoVector2D)"/>
-        /// </summary>
-        /// <param name="direction"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double[] TangentPointsToAngle(GeoVector2D direction)
         {
             List<double> res = new List<double>();
@@ -886,17 +816,12 @@ namespace CADability.Curve2D
             }
             return res.ToArray();
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.GetInflectionPoints ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double[] GetInflectionPoints()
         {
             return base.GetInflectionPoints();
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.Reverse ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void Reverse()
         {
             Array.Reverse(subCurves);
@@ -905,11 +830,7 @@ namespace CADability.Curve2D
                 subCurves[i].Reverse();
             }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.Move (double, double)"/>
-        /// </summary>
-        /// <param name="dx"></param>
-        /// <param name="dy"></param>
+        /// <inheritdoc/>
         public override void Move(double dx, double dy)
         {
             for (int i = 0; i < subCurves.Length; ++i)
@@ -917,10 +838,7 @@ namespace CADability.Curve2D
                 subCurves[i].Move(dx, dy);
             }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.Clone ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D Clone()
         {
             ICurve2D[] subCurvesClone = new ICurve2D[subCurves.Length];
@@ -932,21 +850,14 @@ namespace CADability.Curve2D
             res.UserData.CloneFrom(this.UserData);
             return res;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.CloneReverse (bool)"/>
-        /// </summary>
-        /// <param name="reverse"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D CloneReverse(bool reverse)
         {
             ICurve2D res = Clone();
             if (reverse) res.Reverse();
             return res;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.Copy (ICurve2D)"/>
-        /// </summary>
-        /// <param name="toCopyFrom"></param>
+        /// <inheritdoc/>
         public override void Copy(ICurve2D toCopyFrom)
         {   // müssen die gleiche Struktur haben
             Path2D c = toCopyFrom as Path2D;
@@ -956,11 +867,7 @@ namespace CADability.Curve2D
             }
             UserData.CloneFrom(c.UserData);
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.MakeGeoObject (Plane)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IGeoObject MakeGeoObject(Plane p)
         {
             ICurve[] curves3D = new ICurve[subCurves.Length];
@@ -973,12 +880,7 @@ namespace CADability.Curve2D
             res.Set(curves3D);
             return res;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.Project (Plane, Plane)"/>
-        /// </summary>
-        /// <param name="fromPlane"></param>
-        /// <param name="toPlane"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D Project(Plane fromPlane, Plane toPlane)
         {
             ArrayList curves = new ArrayList(subCurves.Length);
@@ -989,11 +891,7 @@ namespace CADability.Curve2D
             }
             return new Path2D((ICurve2D[])(curves.ToArray(typeof(ICurve2D))));
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.AddToGraphicsPath (System.Drawing.Drawing2D.GraphicsPath, bool)"/>
-        /// </summary>
-        /// <param name="path"></param>
-        /// <param name="forward"></param>
+        /// <inheritdoc/>
         public override void AddToGraphicsPath(System.Drawing.Drawing2D.GraphicsPath path, bool forward)
         {
             if (forward)
@@ -1011,11 +909,7 @@ namespace CADability.Curve2D
                 }
             }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.IsParameterOnCurve (double)"/>
-        /// </summary>
-        /// <param name="par"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool IsParameterOnCurve(double par)
         {
             double l = par * subCurves.Length;
@@ -1025,18 +919,12 @@ namespace CADability.Curve2D
             double p = l - i;
             return subCurves[i].IsParameterOnCurve(p);
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.GetExtendedHitTest ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IQuadTreeInsertable GetExtendedHitTest()
         {
             return new InfinitePath2D(this);
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.GetSelfIntersections ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double[] GetSelfIntersections()
         {
             ArrayList res = new ArrayList();
@@ -1107,11 +995,7 @@ namespace CADability.Curve2D
                 return null;
             }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.ReinterpretParameter (ref double)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool ReinterpretParameter(ref double p)
         {
             if (subCurves.Length == 1)
@@ -1120,12 +1004,7 @@ namespace CADability.Curve2D
             }
             return false;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.Approximate (bool, double)"/>
-        /// </summary>
-        /// <param name="linesOnly"></param>
-        /// <param name="maxError"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D Approximate(bool linesOnly, double maxError)
         {
             // wenn alles Linien oder Kreisbögen sind, dann ist man ja schon fertig
@@ -1378,10 +1257,11 @@ namespace CADability.Curve2D
             subCurves = info.GetValue("SubCurves", typeof(ICurve2D[])) as ICurve2D[];
         }
         /// <summary>
-        /// Implements ISerializable:GetObjectData
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">SerializationInfo</param>
-        /// <param name="context">StreamingContext</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("SubCurves", subCurves);
@@ -1534,12 +1414,10 @@ namespace CADability.Curve2D
     }
 
     /// <summary>
-    /// Interne Klasse für den HitTest für verlängerte Pfade oder PolyLines.
-    /// Wird lediglich für das Suchen im QuadTree verwendet, muss deshalb nicht
-    /// so genau sein. Insbesondere werden von der ersten und letzten Kurve die
-    /// Verlängerunden verwendet, was nicht exakt ist, denn man müsste nur die
-    /// Verlängerung in eine Richtung verwenden. Sollte aber keine Probleme machen.
-    /// Wird nur für offene PolyLinien bzw. Pfade verwendet.
+    /// Internal helper for the hit test of extended paths or polylines. It is used only for searching the quad tree and
+    /// therefore does not have to be exact: it consists of the curve itself plus the extensions of its first and its last
+    /// segment. Both extensions are infinite in both directions, which is more than necessary (only the extension beyond
+    /// the end would be needed), but harmless for this purpose. Used only for open polylines and paths.
     /// </summary>
     internal class InfinitePath2D : IQuadTreeInsertable
     {
@@ -1576,22 +1454,14 @@ namespace CADability.Curve2D
         }
         #region IQuadTreeInsertable Members
 
-        /// <summary>
-        /// Implements <see cref="CADability.IQuadTreeInsertable.GetExtent ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public BoundingRect GetExtent()
         {
             // braucht nicht implementiert zu werden
             return new BoundingRect();
         }
 
-        /// <summary>
-        /// Implements <see cref="CADability.IQuadTreeInsertable.HitTest (ref BoundingRect, bool)"/>
-        /// </summary>
-        /// <param name="Rect"></param>
-        /// <param name="IncludeControlPoints"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public bool HitTest(ref BoundingRect Rect, bool IncludeControlPoints)
         {
             for (int i = 0; i < subCurves.Length; ++i)

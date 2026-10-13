@@ -3,7 +3,8 @@
 namespace CADability.UserInterface
 {
     /// <summary>
-    /// 
+    /// Property entry that groups the property entries of several views (<see cref="IView"/>) of a project under one
+    /// title in the property grid and provides the context menu for managing the views ("MenuId.ViewProperty").
     /// </summary>
 
     public class MultiViewProperty : IShowPropertyImpl
@@ -43,10 +44,7 @@ namespace CADability.UserInterface
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -54,10 +52,7 @@ namespace CADability.UserInterface
                 return condorViews.Length;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get

@@ -6,12 +6,13 @@ using System.Drawing;
 namespace CADability.UserInterface
 {
     /// <summary>
-    /// Wird mit StartModifying==true aufgerufen, wenn der Anwender den MouseButton drückt.
-    /// sender und propertyInfo können dazu verwendet werden, den Punkt ohne kenntnis des Objektes
-    /// zu verändern.
-    /// Wird mit StartModifying==false aufgerufen, wenn der Anwender in das Editfeld eintippt.
-    /// Dann soll die MausAktion für diesen Punkt abgebrochen werden.
+    /// Called with <paramref name="startModifying"/> true when the user presses the mouse button to modify a value (e.g. a
+    /// point) with the mouse; <paramref name="sender"/> identifies the property, so that the value can be changed without
+    /// knowing the object. Called with <paramref name="startModifying"/> false when the user types into the edit field
+    /// instead: the mouse action for this value must then be cancelled.
     /// </summary>
+    /// <param name="sender">the property entry whose value is modified</param>
+    /// <param name="startModifying">true: the modification with the mouse starts, false: it is cancelled</param>
     public delegate void ModifyWithMouseDelegate(IPropertyEntry sender, bool startModifying);
     public delegate void EditingDelegate(IShowProperty sender, char keyPressed);
     public delegate void FocusChangedDelegate(IPropertyTreeView sender, IShowProperty newFocus, IShowProperty oldFocus);
@@ -79,8 +80,8 @@ namespace CADability.UserInterface
         Control
     };
     /// <summary>
-    /// Selectable: der Text kann markiert werden, Editable: der Text kann geändert werden, Bold: fett gedruckt,
-    /// ContextMenu: beim Rechtsklick wird ein ContextMenu benötigt
+    /// How the label of an entry in the property page behaves: whether it can be selected, whether its text can be
+    /// edited, whether it is printed bold and whether a right click shows a context menu. The flags can be combined.
     /// </summary>
     [Flags]
     public enum ShowPropertyLabelFlags
@@ -476,16 +477,17 @@ namespace CADability.UserInterface
         /// </summary>
         public virtual string HelpLink { get { return resourceIdInternal; } }
         /// <summary>
-        /// Implementation of <see cref="IShowProperty.LabelType"/>.
-        /// Returns <see cref="ShowPropertyLabelFlags.Selectable"/>
+        /// How the label of this entry behaves (see <see cref="ShowPropertyLabelFlags"/>): whether it can be selected or
+        /// edited, is bold or has a context menu. The default implementation returns <see cref="ShowPropertyLabelFlags.Selectable"/>.
         /// </summary>
         public virtual ShowPropertyLabelFlags LabelType
         {
             get { return ShowPropertyLabelFlags.Selectable; }
         }
         /// <summary>
-        /// Implementation of <see cref="IShowProperty.EntryType"/>.
-        /// Returns <see cref="ShowPropertyEntryType.SimpleEntry"/>
+        /// The kind of entry (see <see cref="ShowPropertyEntryType"/>): a simple entry, a group title, an editable value...
+        /// It decides how the property page displays the entry. The default implementation returns
+        /// <see cref="ShowPropertyEntryType.SimpleEntry"/>.
         /// </summary>
         public virtual ShowPropertyEntryType EntryType
         {
@@ -495,8 +497,7 @@ namespace CADability.UserInterface
             }
         }
         /// <summary>
-        /// Implementation of <see cref="IShowProperty.SubEntriesCount"/>.
-        /// Returns 0.
+        /// The number of <see cref="SubEntries"/>, 0 for an entry that cannot be opened. The default implementation returns 0.
         /// </summary>
         public virtual int SubEntriesCount
         {
@@ -506,8 +507,8 @@ namespace CADability.UserInterface
             }
         }
         /// <summary>
-        /// Implementation of <see cref="IShowProperty.SubEntries"/>.
-        /// Returns an empty array.
+        /// The sub entries shown below this entry when it is opened in the property page. The default implementation has
+        /// none and returns an empty array.
         /// </summary>
         public virtual IShowProperty[] SubEntries
         {
@@ -525,9 +526,7 @@ namespace CADability.UserInterface
             }
         }
         void IShowProperty.SetTabIndex(ref int TabIndex) { }
-        /// <summary>
-        /// Implementation of <see cref="IShowProperty.StateChangedEvent"/>.
-        /// </summary>
+        /// <inheritdoc/>
         public event StateChangedDelegate StateChangedEvent;
         /// <summary>
         /// Implementation of <see cref="IShowProperty.LabelChanged"/>. Override if <see cref="LabelType"/>
@@ -542,17 +541,13 @@ namespace CADability.UserInterface
         public virtual void SetFocus()
         {
         }
-        /// <summary>
-        /// Implementation of <see cref="IShowProperty.Hidden"/>. 
-        /// </summary>
+        /// <inheritdoc/>
         public virtual bool Hidden
         {
             get { return hidden; }
             set { hidden = value; } // TODO: hier noch PropertyTreeView benachrichtigen!
         }
-        /// <summary>
-        /// Implementation of <see cref="IShowProperty.Hidden"/>. 
-        /// </summary>
+        /// <inheritdoc/>
         public virtual bool ReadOnly
         {
             get { return readOnly; }
@@ -562,15 +557,11 @@ namespace CADability.UserInterface
                 // nur merken, die subentries gibts ggf noch garnicht
             }
         }
-        /// <summary>
-        /// Implementation of <see cref="IShowProperty.Refresh"/>. 
-        /// </summary>
+        /// <inheritdoc/>
         public virtual void Refresh()
         {
         }
-        /// <summary>
-        /// Implements <see cref="CADability.UserInterface.IShowProperty.OnEnterPressed ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public virtual void OnEnterPressed()
         {
         }
@@ -814,9 +805,7 @@ namespace CADability.UserInterface
         public bool DeferUpdate { get; set; } = false;
         bool IPropertyEntry.IsLocked { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
-        /// <summary>
-        /// Implementation of <see cref="IPropertyEntry.PropertyEntryChangedStateEvent"/>.
-        /// </summary>
+        /// <inheritdoc/>
         public event PropertyEntryChangedStateDelegate PropertyEntryChangedStateEvent;
         protected void PropertyEntryChangedState(StateChangedArgs args)
         {
@@ -866,10 +855,7 @@ namespace CADability.UserInterface
             subEntriesInternal = (IPropertyEntry[])al.ToArray(typeof(IPropertyEntry));
         }
         public override PropertyEntryType Flags => PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -881,39 +867,36 @@ namespace CADability.UserInterface
     }
 
     /// <summary>
-    /// Das Interface, das von dem PropertyDisplay Control zu Verfügung gestellt werden muss.
-    /// CADability implementiert mit PropertyDisplay ein Control, welches dieses Interface 
-    /// zu Verfügung stellt. Das PropertyDisplay Control kann aber auch  durch ein Control
-    /// des Anwenders ersetzt werden. Dieses muss lediglich das IPropertyTreeView Interface
-    /// implementieren.
+    /// The interface a property display control provides to the entries (<see cref="IShowProperty"/>) it shows. CADability
+    /// implements it in its properties explorer; an application can replace that control by its own, which only has to
+    /// implement this interface.
     /// </summary>
-
     public interface IPropertyTreeView
     {
         /// <summary>
-        /// Liefert das aktive View Objekt. Dieses kann auch fehlen, dann wird null geliefert.
+        /// The active view, or null when there is none.
         /// </summary>
         IView ActiveView { get; set; }
         /// <summary>
-        /// Liefert die Standard Zeilenhöhe der Anzeige
+        /// The standard height of a line of the display, in pixels.
         /// </summary>
         int DefaultLineHeight { get; }
         /// <summary>
-        /// Fügt das im Parameter gegebene Objekt zur Anzeige hinzu.
+        /// Adds the entry to the display, as a root entry.
         /// </summary>
-        /// <param name="ToAdd">Dieses Objekt soll angezeigt werden</param>
-        /// <param name="TopMost">true: an oberster Stelle, false: an unterster Stelle.</param>
+        /// <param name="ToAdd">the entry to show</param>
+        /// <param name="TopMost">true: as the first entry, false: as the last entry</param>
         void AddShowProperty(IShowProperty ToAdd, bool TopMost);
         /// <summary>
-        /// Das im Parameter gegebene Objekt soll nicht mehr angezeigt werden.
+        /// Removes the entry from the display.
         /// </summary>
-        /// <param name="ToRemove">Die zu entfernende Anzeige.</param>
+        /// <param name="ToRemove">the entry to remove</param>
         void RemoveShowProperty(IShowProperty ToRemove);
         /// <summary>
-        /// Ersetzt eine Anzeige durch eine andere.
+        /// Replaces an entry of the display by another one, at the same position.
         /// </summary>
-        /// <param name="ToReplace">Die zu ersetzende Anzeige</param>
-        /// <param name="ToInsert">Die neue Anzeige</param>
+        /// <param name="ToReplace">the entry to replace</param>
+        /// <param name="ToInsert">the new entry</param>
         void ReplaceShowProperty(IShowProperty ToReplace, IShowProperty ToInsert);
         /// <summary>
         /// Determins whether the given IShowProperty LookForThis is one of the root
@@ -923,25 +906,24 @@ namespace CADability.UserInterface
         /// <returns>true, if LookForThis is a root ShowProperty, false otherwise</returns>
         bool HasTopLevelShowProperty(IShowProperty LookForThis);
         /// <summary>
-        /// Das im Parameter gegebene Objekt soll markiert dargestellt werden.
+        /// Selects (highlights) the entry.
         /// </summary>
-        /// <param name="NewSelection">Das neu zu markierende objekt.</param>
+        /// <param name="NewSelection">the entry to select</param>
         void SelectEntry(IShowProperty NewSelection);
         /// <summary>
-        /// Das im Parameter gegebene Objekt muss neu dargestellt werden. Z.B wenn sich die 
-        /// Liste der Unterobjekte geändert hat.
+        /// Redisplays the entry, e.g. after its value or its list of sub entries has changed.
         /// </summary>
-        /// <param name="ToRefresh">Das neu darzustellende Objekt.</param>
+        /// <param name="ToRefresh">the entry to redisplay</param>
         void Refresh(IShowProperty ToRefresh);
         /// <summary>
-        /// Das im Parameter gegebene Objekt soll sichtbar dargestellt werden.
+        /// Scrolls the display so that the entry is visible, opening its parents if necessary.
         /// </summary>
-        /// <param name="ToShow">Das anzuzeigende Objekt.</param>
+        /// <param name="ToShow">the entry to show</param>
         void MakeVisible(IShowProperty ToShow);
         /// <summary>
-        /// Der LabelText des im Parameter gegebenen Objektes soll editiert werden.
+        /// Starts editing the label text of the entry.
         /// </summary>
-        /// <param name="ToEdit">Das zu editiernde Objekt</param>
+        /// <param name="ToEdit">the entry whose label is edited</param>
         void StartEditLabel(IShowProperty ToEdit);
         /// <summary>
         /// The sub entries of the object given in the parameter shall be (created and) visible.
@@ -1015,27 +997,23 @@ namespace CADability.UserInterface
     }
 
     /// <summary>
-    /// Controls, die dieses interface implementieren, können genaueren Einfluß auf das
-    /// Erscheinen im InfoPopup nehmen, z.B. dynamisch sich ändernde Texte
-    /// oder verschiedene ToolTips, je nach Position
+    /// Implemented by controls that want more control over what the info popup (tooltip) shows, e.g. texts that
+    /// change dynamically or different texts depending on the position of the cursor.
     /// </summary>
-
     public interface IInfoProvider
     {
         /// <summary>
-        /// Liefert die Positionsnummer für mehrere verschiedene Texte
+        /// Returns an index that tells which of several texts is to be shown at the cursor position.
         /// </summary>
-        /// <param name="ScreenCursorPosition">Bildschirmposition des Cursors</param>
-        /// <returns>Die Positionsnummer, oder 0, wenn es nur einen Text gibt, 
-        /// oder -1, wenn an dieser Stelle nichts angezeigt werden soll.</returns>
+        /// <param name="ScreenCursorPosition">the position of the cursor in screen coordinates</param>
+        /// <returns>the index of the text, 0 when there is only one text, or -1 when nothing is to be shown at this position</returns>
         int GetPositionIndex(Point ScreenCursorPosition);
         /// <summary>
-        ///  Liefert den darzustellenden InfoText, ggf. abhängig von der Positionsnummer
-        ///  und dem Level (wie ausführlich)
+        /// Returns the text to show in the info popup for the given position index and level of detail.
         /// </summary>
-        /// <param name="Index">Die Positionsnummer aus GetPositionIndex</param>
-        /// <param name="Level">Der Level (0: einfach, 1: ausführlich)</param>
-        /// <returns>Der darzustellende Text</returns>
+        /// <param name="Index">the position index from <see cref="GetPositionIndex"/></param>
+        /// <param name="Level">the level of detail (short or detailed)</param>
+        /// <returns>the text to show</returns>
         string GetInfoText(int Index, InfoLevelMode Level);
         /// <summary>
         /// Retursn a preferred position for the InfoPopup (tooltip) relative to the cursor

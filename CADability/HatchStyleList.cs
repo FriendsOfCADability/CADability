@@ -48,8 +48,13 @@ namespace CADability.Attribute
         }
 
         /// <summary>
+        /// Creates a hatch style list with two default entries: a solid fill (<see cref="HatchStyleSolid"/>) in the
+        /// current color of the container and a line hatch (<see cref="HatchStyleLines"/>) with 45° lines at a distance
+        /// of 10 that uses the current color, line width and line pattern of the container. Used when neither the
+        /// project nor the global settings provide a hatch style list.
         /// </summary>
-        /// <returns></returns>
+        /// <param name="container">provides the color, line width and line pattern lists</param>
+        /// <returns>the default hatch style list</returns>
         public static HatchStyleList GetDefault(IAttributeListContainer container)
         {
             HatchStyleList res = new HatchStyleList();

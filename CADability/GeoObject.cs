@@ -379,11 +379,20 @@ namespace CADability.GeoObject
         /// <param name="paintTo3D"></param>
         void PrePaintTo3D(IPaintTo3D paintTo3D);
         /// <summary>
-        /// Paint the object to the 3D display machine and returns a (possibly cached) displaylist
+        /// Paints the object with the methods of <paramref name="paintTo3D"/>: lines, triangles, text... The views implement
+        /// <see cref="IPaintTo3D"/> (with OpenGL or GDI) and collect what the object paints in a display list, so this is
+        /// called rarely, after <see cref="PrepareDisplayList"/> has done the expensive work (triangulation, approximation).
         /// </summary>
         /// <param name="paintTo3D">where to paint</param>
-        // IPaintTo3DList GetDisplayList(IPaintTo3D paintTo3D); // wird ersetzt durch folgendes:
         void PaintTo3D(IPaintTo3D paintTo3D);
+        /// <summary>
+        /// Paints the object into the display lists of a view, sorted by category: the object adds itself, or its parts,
+        /// to <paramref name="lists"/> as faces, edges, curves, text... with their layer, so that the view can draw the categories
+        /// in the right order and with the right settings (e.g. edges on top of faces). Simple objects add themselves as a whole,
+        /// solids and shells add their faces and edges separately.
+        /// </summary>
+        /// <param name="paintTo3D">the paint interface of the view</param>
+        /// <param name="lists">the display lists to add to</param>
         void PaintTo3DList(IPaintTo3D paintTo3D, ICategorizedDislayLists lists);
         /// <summary>
         /// This method will be called from a background thread when a higher precision
@@ -394,11 +403,42 @@ namespace CADability.GeoObject
         /// </summary>
         /// <param name="precision">The required precision</param>
         void PrepareDisplayList(double precision);
+        /// <summary>
+        /// A number that is unique among all objects of this process. Used to identify objects, e.g. as keys in dictionaries.
+        /// </summary>
         int UniqueId { get; }
+        /// <summary>
+        /// The kind of object for the purpose of the default styles (see <see cref="Style.EDefaultFor"/>):
+        /// <see cref="Project.SetDefaults"/> gives the object the default style of this kind.
+        /// </summary>
         Style.EDefaultFor PreferredStyle { get; }
+        /// <summary>
+        /// Returns the 2d extent of the object as it appears in the given projection, in the coordinates of the
+        /// projection's plane (not in pixels).
+        /// </summary>
+        /// <param name="projection">the projection</param>
+        /// <param name="extentPrecision"><see cref="ExtentPrecision.Exact"/> for the exact extent, <see cref="ExtentPrecision.Raw"/>
+        /// for a quick estimate that may be larger</param>
+        /// <returns>the extent in the projection's 2d coordinates</returns>
         BoundingRect GetExtent(Projection projection, ExtentPrecision extentPrecision);
+        /// <summary>
+        /// Returns an item for a 2d quad tree of the projected objects, used for hit tests in a projection: it knows the
+        /// 2d extent of the object, whether a 2d rectangle hits it, and the depth (z position) of the object at a 2d point.
+        /// Composite objects (blocks, solids, paths) return a collection of the items of their parts.
+        /// </summary>
+        /// <param name="projection">the projection</param>
+        /// <param name="extentPrecision">precision of the extent, see <see cref="GetExtent(Projection, ExtentPrecision)"/></param>
+        /// <returns>the item for the quad tree</returns>
         IQuadTreeInsertableZ GetQuadTreeItem(Projection projection, ExtentPrecision extentPrecision);
+        /// <summary>
+        /// The objects this object consists of and owns, e.g. the shells of a solid or the faces of a shell. Empty for
+        /// simple objects.
+        /// </summary>
         IGeoObject[] OwnedItems { get; }
+        /// <summary>
+        /// Whether the object is displayed. Invisible objects stay in the model, are saved and take part in the extent, but
+        /// are not drawn and not picked.
+        /// </summary>
         bool IsVisible { get; set; }
         /// <summary>
         /// Propagates the layer and color from the owner (usually a <see cref="BlockRef"/>) to this object.
@@ -406,6 +446,11 @@ namespace CADability.GeoObject
         /// <param name="layer">The layer</param>
         /// <param name="colorDef">The color</param>
         void PropagateAttributes(Layer layer, ColorDef colorDef);
+        /// <summary>
+        /// Decomposes the object into simpler objects, e.g. a block into its children, a path into its curves or a shell into
+        /// its faces. Returns null when there is nothing simpler.
+        /// </summary>
+        /// <returns>the parts, or null</returns>
         GeoObjectList Decompose();
         /// <summary>
         /// Gets or sets an actuator or drive that defines the mechanical constraint or degree of freedom for this object
@@ -982,11 +1027,7 @@ namespace CADability.GeoObject
             }
             return null;
         }
-        /// <summary>
-        /// Overrides <see cref="IGeoObject.Modify"/>. Must be implemented by each GeoObject.
-        /// No default implementation.
-        /// </summary>
-        /// <param name="m">the modification</param>
+        /// <inheritdoc/>
         public abstract void Modify(ModOp m);
         /// <summary>
         /// Modify with the inverse modification. Calls Modify(m.GetInverse());
@@ -996,10 +1037,7 @@ namespace CADability.GeoObject
         {
             Modify(m.GetInverse());
         }
-        /// <summary>
-        /// Overrides <see cref="IGeoObject.Clone"/>. Must be implemented by each GeoObject. No default implementation.
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public abstract IGeoObject Clone();
         /// <summary>
         /// Overrides <see cref="IGeoObject.HasChildren"/>. The deafult implementation returns false.
@@ -1130,11 +1168,7 @@ namespace CADability.GeoObject
 
             return false;
         }
-        /// <summary>
-        /// Overrides <see cref="IGeoObject.CopyGeometry"/>, but doesn't implement it.
-        /// Must be implemented by each GeoObject.
-        /// </summary>
-        /// <param name="ToCopyFrom">GeoObject to copy geometrical data from</param>
+        /// <inheritdoc/>
         public abstract void CopyGeometry(IGeoObject ToCopyFrom);
         #region Handling Attributes
         /// <summary>
@@ -1357,12 +1391,12 @@ namespace CADability.GeoObject
         }
         #endregion
         /// <summary>
-        /// Implements ISerializable.GetObjectData. Saves <see cref="UserData"/>, <see cref="Layer"/> and <see cref="Style"/>.
-        /// All other properties of the GeoObject must be saved by the derived class. don't forget
-        /// to call the base implementation
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
+        /// The base implementation saves <see cref="UserData"/>, <see cref="Layer"/> and <see cref="Style"/>; a derived class saves its own data and calls the base implementation.
         /// </summary>
-        /// <param name="info">info</param>
-        /// <param name="context">context</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public virtual void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("UserData", userData);
@@ -1429,11 +1463,7 @@ namespace CADability.GeoObject
             }
             return res.ToArray();
         }
-        /// <summary>
-        /// Implements <see cref="IGeoObject.GetBoundingCube"/> abstract.
-        /// Must be overridden.
-        /// </summary>
-        /// <returns>the bounding cube</returns>
+        /// <inheritdoc/>
         public abstract BoundingCube GetBoundingCube();
         /// <summary>
         /// Implements <see cref="IGeoObject.UpdateAttributes"/> for all CADability attributes.
@@ -1617,9 +1647,10 @@ namespace CADability.GeoObject
             return true; // Rückgabewert z.Z. noch ohne Bedeutung
         }
         /// <summary>
-        /// Implements <see cref="IGeoObject.FindSnapPoint"/>, but does nothing. Should be overridden.
+        /// Asks the object to add its snap points (end points, centres, intersections...) of the kinds that
+        /// <paramref name="spf"/> asks for. The default implementation adds none; objects with geometry override it.
         /// </summary>
-        /// <param name="spf"></param>
+        /// <param name="spf">definition and collection of the snap points</param>
         public virtual void FindSnapPoint(SnapPointFinder spf)
         {
         }
@@ -1639,10 +1670,7 @@ namespace CADability.GeoObject
                 return this.ToString();
             }
         }
-        /// <summary>
-        /// Patin the object to th <see cref="IPaintTo3D"/> interface.
-        /// </summary>
-        /// <param name="paintTo3D">Target for the paint operation</param>
+        /// <inheritdoc/>
         public abstract void PaintTo3D(IPaintTo3D paintTo3D);
         /// <summary>
         /// Called before <see cref="PaintTo3D"/> is called, should implement the time consuming work for the display (like calculationg the triangulation
@@ -1651,9 +1679,11 @@ namespace CADability.GeoObject
         /// <param name="precision">Required precision</param>
         public abstract void PrepareDisplayList(double precision);
         /// <summary>
-        /// Hier kann man Dinge vor OpenList tun (da sie selbst vielleicht ein OpenList benötigen)
+        /// Called before <see cref="PaintTo3D"/>, outside of the display list that collects what PaintTo3D paints.
+        /// Override it for work that must not go into that list, e.g. painting that needs a display list of its own.
+        /// The default implementation does nothing.
         /// </summary>
-        /// <param name="paintTo3D"></param>
+        /// <param name="paintTo3D">the paint interface of the view</param>
         public virtual void PrePaintTo3D(IPaintTo3D paintTo3D)
         {
         }
@@ -1675,10 +1705,11 @@ namespace CADability.GeoObject
                 return 0;
         }
         /// <summary>
-        /// Implements <see cref="CADability.GeoObject.IGeoObject.PaintTo3DList (IPaintTo3D, ICategorizedDislayLists)"/>
+        /// Adds this object as a whole to the display lists, in the category of its layer. Suitable for simple objects like
+        /// curves and text; composite objects (solids, shells, blocks) override it and add their parts by category.
         /// </summary>
-        /// <param name="paintTo3D"></param>
-        /// <param name="lists"></param>
+        /// <param name="paintTo3D">the paint interface of the view</param>
+        /// <param name="lists">the display lists to add to</param>
         public virtual void PaintTo3DList(IPaintTo3D paintTo3D, ICategorizedDislayLists lists)
         {   // muss von komplexen Objekten überschrieben werden, hier nur für linienartige
             PrePaintTo3D(paintTo3D);
@@ -1735,19 +1766,9 @@ namespace CADability.GeoObject
                 return (Style.EDefaultFor)0;
             }
         }
-        /// <summary>
-        /// Returns the 2 dimensional extent of objects for a specific projection.
-        /// </summary>
-        /// <param name="projection">The projection for which the extent is beeing queried</param>
-        /// <param name="extentPrecision">Raw or exact extent</param>
-        /// <returns>The 2 dimensional extent.</returns>
+        /// <inheritdoc/>
         public abstract BoundingRect GetExtent(Projection projection, ExtentPrecision extentPrecision);
-        /// <summary>
-        /// Deprecated.
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="extentPrecision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public abstract IQuadTreeInsertableZ GetQuadTreeItem(Projection projection, ExtentPrecision extentPrecision);
         /// <summary>
         /// Returns an array of objects owned by this object. E.g. a face is owned by a shell.
@@ -1802,9 +1823,10 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
-        /// Decomposes this GeoObject into simpler GeoObjects. May return null if there are no simpler objects.
+        /// Decomposes the object into simpler objects, see <see cref="IGeoObject.Decompose"/>. The default implementation
+        /// returns null: the object cannot be decomposed.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>the parts, or null</returns>
         public virtual GeoObjectList Decompose()
         {
             return null;
@@ -1838,10 +1860,11 @@ namespace CADability.GeoObject
         //}
 
         /// <summary>
-        /// Hilfsfunktion zum Setzen der Farbe und gleichzeitig die Events feuern
+        /// Helper for the implementation of <see cref="IColorDef.ColorDef"/>: sets the colour and raises the
+        /// <see cref="WillChangeEvent"/> and <see cref="DidChangeEvent"/> events, so that the change is displayed and can be undone.
         /// </summary>
-        /// <param name="color">Referenz auf die i.a. private Membervariable</param>
-        /// <param name="c">der neue Farbwert</param>
+        /// <param name="color">reference to the field that holds the colour</param>
+        /// <param name="c">the new colour; null is ignored</param>
         protected void SetColorDef(ref ColorDef color, ColorDef c)
         {
             if (c == null) return;

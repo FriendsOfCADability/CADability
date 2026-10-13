@@ -14,7 +14,13 @@ using Point = System.Drawing.Point;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Transforms the selected objects by snapping up to three source points onto three destination points.
+    /// The user enters pairs of a source point on the objects and the destination it should be moved to:
+    /// with one pair the objects are translated, with two pairs they are also rotated and scaled, with three
+    /// pairs the transformation is fully determined (see <see cref="ModOp.Fit(GeoPoint[], GeoPoint[], bool)"/>).
+    /// Options allow distortion (non-uniform scaling) and making copies instead of modifying the originals
+    /// (also with the shift key). Started from the "MenuId.Object.Snap" command of the selection; the action
+    /// id is "SnapObjects".
     /// </summary>
     internal class SnapObjects : ConstructAction
     {

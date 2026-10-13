@@ -6,7 +6,10 @@ using System.Collections;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a circle that is tangential to two curves and has a given radius. The user selects the two
+    /// curves (the positions of the clicks choose among the possible solutions, which can also be switched explicitly)
+    /// and enters the radius or the diameter; the circle lies in the common plane of the two curves.
+    /// Menu id: "Constr.Circle.TwoTangentsRadius".
     /// </summary>
     internal class ConstrCircle2TangentsRadius : ConstructAction
     {

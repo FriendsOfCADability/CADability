@@ -22,8 +22,11 @@ namespace CADability.UserInterface
         //protected int[] imageIndices; // die Indizes in der ImageList, selbe Reihenfolge wie choices
         //protected ImageList images; // die ImageList (kann fehlen)
         protected string unselectedText; // der Text, wenn nichts ausgewählt ist (wenn null, dann ganz leer)
-        /// <value>
+        /// <summary>
         /// Back reference to any user item. Not used by the MultipleChoiceProperty object itself.
+        /// </summary>
+        /// <value>
+        /// An arbitrary object supplied by the user of this property entry, or null
         /// </value>
         public object user;
 
@@ -49,8 +52,8 @@ namespace CADability.UserInterface
             SelectedText = choices[InitialSelection];
         }
         /// <summary>
-        /// Leerer Konstruktor (für die Verwendung von abgeleiteten Klassen).
-        /// wenigstens propertyLabelText und choices müssen gesetzt werden.
+        /// Empty constructor for the use by derived classes. The derived class has to set at least <c>propertyLabelText</c>
+        /// and <c>choices</c>.
         /// </summary>
         public MultipleChoiceProperty()
         {

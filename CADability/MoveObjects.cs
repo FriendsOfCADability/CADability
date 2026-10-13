@@ -13,7 +13,9 @@ using Point = System.Drawing.Point;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Moves (or copies) the selected objects by a translation. The user enters the translation vector, either directly
+    /// or by a start point and an end point, and decides whether the originals are moved or copies are created.
+    /// While the action runs, a copy of the objects follows the mouse. Menu id: "MoveObjects".
     /// </summary>
     public class MoveObjects : ConstructAction
     {

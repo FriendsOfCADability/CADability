@@ -628,11 +628,11 @@ namespace CADability
         }
 
         /// <summary>
-        /// Stellt die Platzierung im Zweidimensionalen ein: Das Quellrechteck 
-        /// soll in das Zielrechteck passen.
+        /// Sets the 2d placement (scaling and offset) of the projection so that the source rectangle fits into the
+        /// destination rectangle and is centered in it. This is how a view zooms to a given extent.
         /// </summary>
-        /// <param name="Destination">das Zielrechteck, gewöhnlich ClientRect des Controls</param>
-        /// <param name="Source">Das Quellrechteck in 2-dimensionalen Weltkoordinaten</param>
+        /// <param name="Destination">the destination rectangle in pixels, usually the client rectangle of the control</param>
+        /// <param name="Source">the source rectangle in the 2d world coordinates of the projection plane</param>
         public void SetPlacement(Rectangle Destination, BoundingRect Source)
         {
             SetPlacement(new RectangleF(Destination.X, Destination.Y, Destination.Width, Destination.Height), Source);
@@ -682,12 +682,13 @@ namespace CADability
             SetCoefficients();
         }
         /// <summary>
-        /// Liefert die Werte für die Platzierung. Achtung: die Y-Werte müssen mit dem negativen
-        /// Faktor multipliziert werden, denn die Platzierung dreht die y-achse um!
+        /// Returns the values of the 2d placement, which maps the unscaled 2d projection to pixel coordinates:
+        /// x' = Factor * x + dx and y' = -Factor * y + dy. Note that the y values have to be multiplied with the
+        /// negative factor, because the placement flips the y axis (pixel coordinates grow downwards).
         /// </summary>
-        /// <param name="Factor">Skalierungsfaktor, Achtung: für y negativ!</param>
-        /// <param name="dx">Verschiebung in X</param>
-        /// <param name="dy">Verschiebung in X</param>
+        /// <param name="Factor">the scaling factor (to be used with a negative sign for y)</param>
+        /// <param name="dx">the offset in x (pixels)</param>
+        /// <param name="dy">the offset in y (pixels)</param>
         public void GetPlacement(out double Factor, out double dx, out double dy)
         {
             Factor = placementFactor;
@@ -728,13 +729,11 @@ namespace CADability
             SetCoefficients();
         }
         /// <summary>
-        /// Berechnet die Projektion des gegebenen Punktes ins Zweidimensionale ohne 
-        /// Berücksichtigung der Skalierung und Platzierung im Zweidimensionalen, also
-        /// in das zweidimensionale Weltkoordinatensystem und nicht in das 
-        /// Papierkoordinatensystem.
+        /// Projects the given point into 2d without applying the scaling and the placement, i.e. the result is in the
+        /// 2d world coordinate system of the projection plane and not in the pixel (paper) coordinate system.
         /// </summary>
-        /// <param name="p">der zu projizierende Punkt</param>
-        /// <returns>der in 2-dim projizierte Punkt</returns>
+        /// <param name="p">the point to project (model coordinates)</param>
+        /// <returns>the projected point in the 2d world coordinate system</returns>
         public GeoPoint2D ProjectUnscaled(GeoPoint p)
         {
             if (isPerspective)
@@ -896,13 +895,12 @@ namespace CADability
             get { return grid; } // da es eine Klasse ist, genügt das get
         }
         /// <summary>
-        /// Berechnet die Projektion des gegebenen Punktes ins Zweidimensionale mit 
-        /// Berücksichtigung der Skalierung und Platzierung im Zweidimensionalen, also
-        /// in das zweidimensionale Papierkoordinatensystem und nicht in das 
-        /// Weltkoordinatensystem.
+        /// Projects the given point into 2d including the scaling and the placement, i.e. the result is in the pixel
+        /// (paper) coordinate system of the view, with y growing downwards, and not in the 2d world coordinate system.
+        /// Same as <see cref="Project(GeoPoint)"/>, but returns a PointF.
         /// </summary>
-        /// <param name="p">der zu projizierende Punkt</param>
-        /// <returns>der in 2-dim projizierte Punkt</returns>
+        /// <param name="p">the point to project (model coordinates)</param>
+        /// <returns>the projected point in pixel coordinates</returns>
         public PointF ProjectF(GeoPoint p)
         {
             // return new PointF((float)(Matrix00 * p.x + Matrix01 * p.y + Matrix02 * p.z + Matrix03), (float)(Matrix10 * p.x + Matrix11 * p.y + Matrix12 * p.z + Matrix13));
@@ -920,11 +918,14 @@ namespace CADability
             return new GeoPoint2D((Matrix00 * p.x + Matrix01 * p.y + Matrix02 * p.z + Matrix03), (Matrix10 * p.x + Matrix11 * p.y + Matrix12 * p.z + Matrix13));
         }
         /// <summary>
-        /// Liefert einen 3D Punkt in der Ebene, die durch den Urprung geht. Ist eigentlich so nicht zu gebrauchen
-        /// denn es fehlt die Information wie weit vorne oder hinten der Punkt sein soll
+        /// Converts a pixel position back to a 3d point on the plane through the origin that is perpendicular to the
+        /// direction of the projection (the placement is reverted and the inverse projection is applied with z = 0).
+        /// Not very useful on its own, because the information how far in front of or behind that plane the point
+        /// should be is missing; see <see cref="PointBeam(System.Drawing.Point)"/> and
+        /// <see cref="DrawingPlanePoint(System.Drawing.Point)"/> for the usual alternatives.
         /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <param name="p">the position in pixel coordinates</param>
+        /// <returns>the 3d point on the plane through the origin</returns>
         public GeoPoint UnProject(System.Drawing.Point p)
         {
             return inverseProjection * new GeoPoint((p.X - placementX) / placementFactor, -(p.Y - placementY) / placementFactor, 0.0);
@@ -1698,10 +1699,11 @@ namespace CADability
             }
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("UnscaledProjection", unscaledProjection, typeof(ModOp));

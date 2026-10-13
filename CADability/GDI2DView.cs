@@ -329,9 +329,7 @@ namespace CADability
             }
         }
         #region IShowProperty implementation
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -357,10 +355,7 @@ namespace CADability
                 name = value;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.LabelChanged (string)"/>
-        /// </summary>
-        /// <param name="NewText"></param>
+        /// <inheritdoc/>
         public override void LabelChanged(string NewText)
         {
             if (NewText == this.Name) return;
@@ -392,10 +387,7 @@ namespace CADability
             }
         }
         IShowProperty[] subEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -403,10 +395,7 @@ namespace CADability
                 return SubEntries.Length;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get
@@ -440,10 +429,7 @@ namespace CADability
             if (m == null) return;
             Model = m; // das macht schon alles
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.Added (IPropertyTreeView)"/>
-        /// </summary>
-        /// <param name="propertyTreeView"></param>
+        /// <inheritdoc/>
         public override void Added(IPropertyPage propertyTreeView)
         {
             base.Added(propertyTreeView);
@@ -453,10 +439,7 @@ namespace CADability
             project.ModelsChangedEvent += new CADability.Project.ModelsChangedDelegate(OnModelsChanged);
             Frame.SettingChangedEvent += new SettingChangedDelegate(OnSettingChanged);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.Removed (IPropertyTreeView)"/>
-        /// </summary>
-        /// <param name="propertyTreeView"></param>
+        /// <inheritdoc/>
         public override void Removed(IPropertyTreeView propertyTreeView)
         {
             project.ModelsChangedEvent -= new CADability.Project.ModelsChangedDelegate(OnModelsChanged);

@@ -132,9 +132,7 @@ namespace CADability.Actions
         }
 
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnSetAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnSetAction()
         {
             base.TitleId = "Construct.DirectionTwoPoints";
@@ -174,18 +172,13 @@ namespace CADability.Actions
             Frame.Project.Undo.ClearContext();
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.GetID ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override string GetID()
         {
             return "Construct.DirectionTwoPoints";
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnDone ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnDone()
         {
             succeeded = true;

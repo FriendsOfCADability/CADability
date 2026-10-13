@@ -175,11 +175,12 @@ namespace CADability
         }
 
         /// <summary>
-        /// Liefert die 3D Kurve zu diesem Objekt, wenn die Surface stimmt. Bestimmt bei geklippten Objekten
-        /// die Start- und Endpunkte im 3D. Ansonsten ist es identisch mit der 3D Kurve
+        /// Returns the 3d curve of this object, provided <paramref name="onThisSurface"/> is the surface this aspect refers
+        /// to; otherwise null is returned. For a clipped aspect the 3d curve is trimmed to the clipped start and end point,
+        /// otherwise it is the 3d curve of the underlying dual surface curve itself.
         /// </summary>
-        /// <param name="onThisSurface"></param>
-        /// <returns></returns>
+        /// <param name="onThisSurface">The surface the 3d curve is requested for</param>
+        /// <returns>The 3d curve, or null if the surface does not match</returns>
         public ICurve Get3DCurve(ISurface onThisSurface)
         {
             if (onThisSurface != theSurface) return null;
@@ -561,12 +562,7 @@ namespace CADability
                 return userData;
             }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Curve2D.ICurve2D.GetFused (ICurve2D, double)"/>
-        /// </summary>
-        /// <param name="toFuseWith"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public ICurve2D GetFused(ICurve2D toFuseWith, double precision)
         {
             return theCurve.GetFused(toFuseWith, precision);
@@ -1081,10 +1077,11 @@ namespace CADability
             }
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);

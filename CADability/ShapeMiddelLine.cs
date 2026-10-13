@@ -10,7 +10,10 @@ using System.Linq;
 namespace CADability
 {
     /// <summary>
-    /// Erzeugt die Mittelline für einen Text
+    /// Computes the middle lines (center lines) of a <see cref="CompoundShape"/>, in particular of the outline of a text glyph:
+    /// the shape is rasterized with several families of hatch lines, the midpoints of opposite sections of the outline are
+    /// connected to polylines, and these are merged and cleaned up. Used by <see cref="Text"/> to produce single stroke center
+    /// lines of characters, e.g. for engraving.
     /// </summary>
     public class ShapeMiddelLine
     {

@@ -3,7 +3,9 @@
 namespace CADability.UserInterface
 {
     /// <summary>
-    /// 
+    /// Property entry (a selectable group title) which represents a single <see cref="ICurve"/> in the property grid. It shows the
+    /// description of the curve as its label and raises <see cref="SelectionChangedEvent"/> when the user selects it. Used by
+    /// <see cref="CurvesProperty"/> to list the curves a curve input of a construction has found under the mouse.
     /// </summary>
 
     public class CurveProperty : IShowPropertyImpl
@@ -54,9 +56,7 @@ namespace CADability.UserInterface
                 base.LabelText = value;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Selected()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void Selected()
         {
             this.IsSelected = true;

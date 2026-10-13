@@ -302,10 +302,11 @@ namespace MathNet.Numerics
             return System.Math.Floor(0.5 + System.Math.Exp(FactorialLn(n) - FactorialLn(k) - FactorialLn(n - k)));
         }
         /// <summary>
-        /// 
+        /// Returns the natural logarithm of the factorial of <paramref name="n"/>, ln(n!), computed via the logarithm of the
+        /// gamma function (<see cref="GammaLn"/>). Throws an <see cref="ArithmeticException"/> for a negative argument.
         /// </summary>
-        /// <param name="n"></param>
-        /// <returns></returns>
+        /// <param name="n">A non-negative integer</param>
+        /// <returns>ln(n!)</returns>
         public static double FactorialLn(int n)
         {
             double[] a = new double[101];
@@ -324,11 +325,11 @@ namespace MathNet.Numerics
             }
         }
         /// <summary>
-        /// 
+        /// Returns the beta function B(z, w) = Γ(z)·Γ(w) / Γ(z + w), computed via <see cref="GammaLn"/>.
         /// </summary>
-        /// <param name="z"></param>
-        /// <param name="w"></param>
-        /// <returns></returns>
+        /// <param name="z">First argument, must be positive</param>
+        /// <param name="w">Second argument, must be positive</param>
+        /// <returns>The value of the beta function</returns>
         public static double Beta(double z, double w)
         {
             return System.Math.Exp(GammaLn(z) + GammaLn(w) - GammaLn(z + w));

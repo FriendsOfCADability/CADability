@@ -158,9 +158,7 @@ namespace CADability.Actions
             return actualPoint;
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnSetAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnSetAction()
         {
             base.TitleId = "Construct.IntersectPoint";
@@ -192,17 +190,12 @@ namespace CADability.Actions
             base.OnRemoveAction();
             Frame.Project.Undo.ClearContext();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.GetID ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override string GetID()
         {
             return "Construct.IntersectPoint";
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnDone ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnDone()
         {
             succeeded = true;

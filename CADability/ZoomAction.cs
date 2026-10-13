@@ -14,7 +14,10 @@ using Keys = CADability.Substitutes.Keys;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// The interactive zoom action ("zoom window"): the user clicks the first corner of a rectangle in a view (a cross
+    /// hair follows the mouse) and then the opposite corner (the rectangle is drawn while the mouse moves); the view is
+    /// zoomed so that the rectangle fills it. Only the view in which the first point was set is zoomed.
+    /// Id: "Zoom[LeaveSelectProperties]".
     /// </summary>
 
     public class ZoomAction : Action, IIntermediateConstruction
@@ -51,9 +54,7 @@ namespace CADability.Actions
                     break;
             }
         }
-        /// <summary>
-        /// Implements <see cref="Action.GetID"/>.
-        /// </summary>
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "Zoom[LeaveSelectProperties]";
@@ -67,9 +68,7 @@ namespace CADability.Actions
             Mode = 0;
             base.OnSetAction();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.OnRemoveAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnRemoveAction()
         {
             Mode = -1;
@@ -101,11 +100,7 @@ namespace CADability.Actions
                     break;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.OnMouseUp (MouseEventArgs, IView)"/>
-        /// </summary>
-        /// <param name="e"></param>
-        /// <param name="vw"></param>
+        /// <inheritdoc/>
 		public override void OnMouseUp(MouseEventArgs e, IView vw)
         {
             OnMouseMove(e, vw); // damit wird Invalidate... aufgerufen
@@ -183,9 +178,7 @@ namespace CADability.Actions
                 base.RemoveThisAction();
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.OnEscape ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override bool OnEscape()
         {
             base.RemoveThisAction();

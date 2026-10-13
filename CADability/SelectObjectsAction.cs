@@ -26,11 +26,10 @@ namespace CADability.Actions
 
 
 	/// <summary>
-	/// Diese Klasse fasst die Settings für das Markieren zusammen. Im einzelnen sind das:
-	/// Select.HandleSize, 
-	/// Select.FrameColor, 
-	/// Select.HandleColor, 
-	/// Select.UseFrame
+	/// Groups the settings for selecting objects (the "Select" settings node): the size of the handles, the colors of the
+	/// selection frame, the handles, the selected objects, the focused object and the feedback, the width and transparency of the
+	/// selection display, whether to select the topmost object, the drag width, whether to use the frame with handles, and
+	/// whether to use fast feedback.
 	/// </summary>
 	[Serializable]
 	class SelectObjectsSettings : Settings, IDeserializationCallback, IJsonSerialize, IJsonSerializeDone
@@ -1731,9 +1730,7 @@ namespace CADability.Actions
 				mode = Mode.NoAction;
 			}
 		}
-		/// <summary>
-		/// Implements <see cref="Action.GetID"/>.
-		/// </summary>
+		/// <inheritdoc/>
 		public override string GetID()
 		{
 			return "SelectObjects";

@@ -101,7 +101,7 @@ namespace CADability.GeoObject
         private EDimType dimType; // welcher Art von Bemaßung (Punkt, Radius, Winkel...)
         private GeoPoint dimLineRef; // Bezugspunkt durch den die Maßlinie geht
         /// <summary>
-        /// Richtung der Maßlinie
+        /// Direction of the dimension line
         /// </summary>
         private GeoVector dimLineDirection; // Richtung der Maßlinie
         private Angle extLineAngle; // Winkel der Hilfslinien, gewöhnlich pi/2
@@ -123,7 +123,8 @@ namespace CADability.GeoObject
         private BoundingCube extent = BoundingCube.EmptyBoundingCube;
 
         /// <summary>
-        /// Die folgenden Daten für den Fall, dass der Text editiert wird
+        /// The following fields hold the state while one of the texts of the dimension is being edited: the <see cref="Text"/>
+        /// object handed to the editor (null when not editing), the index of the text being edited and the editing mode.
         /// </summary>
         private Text editingText; // einer der Bemaßungstexte festgehalten für den Editor, null, wenn nicht editierend
         private int editingTextIndex; // für welchen Text Index wird gerade editiert
@@ -1992,10 +1993,7 @@ namespace CADability.GeoObject
             }
             return GetTextPosCoordinate(index, Projection.FromTop); // Notlösung, wenns nicht klappt
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Decompose ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoObjectList Decompose()
         {
             return GetList();
@@ -2144,10 +2142,7 @@ namespace CADability.GeoObject
             return editingText; // der müsste ja jetzt neu entstanden sein
         }
         #region IGeoObject overrides
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Modify (ModOp)"/>
-        /// </summary>
-        /// <param name="m"></param>
+        /// <inheritdoc/>
         public override void Modify(ModOp m)
         {
             using (new Changing(this, "ModifyInverse", m))
@@ -2162,10 +2157,7 @@ namespace CADability.GeoObject
                 normal = m * normal;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Clone ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IGeoObject Clone()
         {
             Dimension res = Construct();
@@ -2192,10 +2184,7 @@ namespace CADability.GeoObject
 
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.CopyGeometry (IGeoObject)"/>
-        /// </summary>
-        /// <param name="ToCopyFrom"></param>
+        /// <inheritdoc/>
         public override void CopyGeometry(IGeoObject ToCopyFrom)
         {
             using (new Changing(this))
@@ -2222,30 +2211,18 @@ namespace CADability.GeoObject
                 this.normal = dim.normal;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetShowProperties (IFrame)"/>
-        /// </summary>
-        /// <param name="Frame"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IPropertyEntry GetShowProperties(IFrame Frame)
         {
             return new ShowPropertyDimension(this, Frame);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.IsAttributeUsed (object)"/>
-        /// </summary>
-        /// <param name="Attribute"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool IsAttributeUsed(object Attribute)
         {
             if (Attribute == dimStyle) return true;
             return base.IsAttributeUsed(Attribute);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetAttributeProperties (IFrame)"/>
-        /// </summary>
-        /// <param name="Frame"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IPropertyEntry[] GetAttributeProperties(IFrame Frame)
         {
             IPropertyEntry[] b = base.GetAttributeProperties(Frame);
@@ -2254,10 +2231,7 @@ namespace CADability.GeoObject
             res[b.Length] = new DimensionStyleSelectionProperty("DimensionStyle.Selection", Frame.Project.DimensionStyleList, this, dimType, false);
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingCube GetBoundingCube()
         {
             if (!extent.IsEmpty) return extent;
@@ -2288,10 +2262,7 @@ namespace CADability.GeoObject
             }
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PrePaintTo3D (IPaintTo3D)"/>
-        /// </summary>
-        /// <param name="paintTo3D"></param>
+        /// <inheritdoc/>
         public override void PrePaintTo3D(IPaintTo3D paintTo3D)
         {
             GeoObjectList list = new GeoObjectList();
@@ -2310,10 +2281,7 @@ namespace CADability.GeoObject
         }
         public delegate bool PaintTo3DDelegate(Dimension toPaint, IPaintTo3D paintTo3D);
         public static PaintTo3DDelegate OnPaintTo3D;
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3D (IPaintTo3D)"/>
-        /// </summary>
-        /// <param name="paintTo3D"></param>
+        /// <inheritdoc/>
         public override void PaintTo3D(IPaintTo3D paintTo3D)
         {
             if (OnPaintTo3D != null && OnPaintTo3D(this, paintTo3D)) return;
@@ -2331,10 +2299,7 @@ namespace CADability.GeoObject
                 (list[i] as IGeoObjectImpl).PaintTo3D(paintTo3D);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PrepareDisplayList (double)"/>
-        /// </summary>
-        /// <param name="precision"></param>
+        /// <inheritdoc/>
         public override void PrepareDisplayList(double precision)
         {
             // nichts zu tun
@@ -2346,12 +2311,7 @@ namespace CADability.GeoObject
                 return Style.EDefaultFor.Dimension;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetQuadTreeItem (Projection, ExtentPrecision)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="extentPrecision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IQuadTreeInsertableZ GetQuadTreeItem(Projection projection, ExtentPrecision extentPrecision)
         {
             GeoObjectList list = new GeoObjectList();
@@ -2372,12 +2332,7 @@ namespace CADability.GeoObject
 
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (Projection, ExtentPrecision)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="extentPrecision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingRect GetExtent(Projection projection, ExtentPrecision extentPrecision)
         {
             GeoObjectList list = new GeoObjectList();
@@ -2398,21 +2353,12 @@ namespace CADability.GeoObject
         }
         #endregion
         #region IOctTreeInsertable members
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (double)"/>
-        /// </summary>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingCube GetExtent(double precision)
         {
             return GetBoundingCube();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
-        /// </summary>
-        /// <param name="cube"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(ref BoundingCube cube, double precision)
         {
             GeoObjectList list = new GeoObjectList();
@@ -2430,13 +2376,7 @@ namespace CADability.GeoObject
             }
             return false;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection, BoundingRect, bool)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="rect"></param>
-        /// <param name="onlyInside"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(Projection projection, BoundingRect rect, bool onlyInside)
         {
             GeoObjectList list = new GeoObjectList();
@@ -2465,12 +2405,7 @@ namespace CADability.GeoObject
                 return false;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection.PickArea, bool)"/>
-        /// </summary>
-        /// <param name="area"></param>
-        /// <param name="onlyInside"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(Projection.PickArea area, bool onlyInside)
         {
             GeoObjectList list = new GeoObjectList();
@@ -2499,13 +2434,7 @@ namespace CADability.GeoObject
                 return false;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Position (GeoPoint, GeoVector, double)"/>
-        /// </summary>
-        /// <param name="fromHere"></param>
-        /// <param name="direction"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double Position(GeoPoint fromHere, GeoVector direction, double precision)
         {
             GeoObjectList list = new GeoObjectList();
@@ -2558,10 +2487,11 @@ namespace CADability.GeoObject
             normal = (GeoVector)info.GetValue("Normal", typeof(GeoVector));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public new void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);

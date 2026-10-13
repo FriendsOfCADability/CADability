@@ -198,10 +198,13 @@ namespace CADability.GeoObject
             if (FilterList == null) return true;
             return FilterList.Accept(toTest);
         }
+        /// <summary>
+        /// The source point (the mouse position on the projection plane, see <see cref="SourcePoint"/>) as a 3d point
+        /// in model coordinates. Together with the direction of the projection it defines the line perpendicular to
+        /// the screen through the mouse position, along which snap points are searched.
+        /// </summary>
         /// <value>
-        /// Gets the source point (which is the mouse position on the projection plane)
-        /// as a 3D point. Together with the direction of the projection this makes a
-        /// line that is perpendicular to the screen and goes through the mouse point.
+        /// The mouse position as a 3d point on the projection plane.
         /// </value>
         public GeoPoint SourcePoint3D
         {

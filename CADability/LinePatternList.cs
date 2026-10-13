@@ -9,7 +9,10 @@ using System.Runtime.Serialization;
 namespace CADability.Attribute
 {
     /// <summary>
-    /// 
+    /// The list of <see cref="LinePattern"/> attributes (dash patterns) available in a <see cref="Project"/>
+    /// or in the global <see cref="Settings"/>. The entries are identified by their unique names, one of
+    /// them is the current pattern that newly constructed objects get, and the list is shown as an editable
+    /// group in the control center. A new project gets a clone of the global default list.
     /// </summary>
     [Serializable()]
     public class LinePatternList : IShowPropertyImpl, IAttributeList, ISerializable, ICommandHandler, IDeserializationCallback
@@ -268,9 +271,7 @@ namespace CADability.Attribute
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -288,10 +289,7 @@ namespace CADability.Attribute
             base.Removed(pp);
             subEntries = null;
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get
@@ -307,10 +305,7 @@ namespace CADability.Attribute
                 return subEntries;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get

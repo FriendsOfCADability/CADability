@@ -7,7 +7,10 @@ using System;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Creates multiple copies of the selected objects arranged on a circle (a polar array). The user enters the
+    /// rotation point (default: the center of the objects), the number of copies, whether the copies are distributed
+    /// over a full circle or over a given angle, and whether the copies are rotated together with their position or
+    /// keep their orientation. Menu id: "CopyCircularObjects".
     /// </summary>
 
     public class CopyCircularObjects : ConstructAction
@@ -148,9 +151,7 @@ namespace CADability.Actions
             return (copAngle);
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnSetAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnSetAction()
         {
             base.TitleId = "CopyCircularObjects";
@@ -199,17 +200,13 @@ namespace CADability.Actions
             showCirc();
         }
 
-        /// <summary>
-        /// Implements <see cref="Action.GetID"/>.
-        /// </summary>
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "CopyCircularObjects";
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnDone ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnDone()
         {
             using (base.Frame.Project.Undo.UndoFrame)

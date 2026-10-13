@@ -243,9 +243,18 @@ None left: all of them have been fixed.
   entry points, and `Make3D`, the boolean operations of `Solid`, the import
   and export methods of `Project`, `Model.Add` and the STEP and STL classes
   are documented (#403).
-- [ ] Content, see #403: 37 % of the public types and members have a
-  summary, about 1,500 of the 5,000 summaries are boilerplate ("Overrides
-  ...", "Implements ..."), 116 are empty and about 140 are in German.
+- [x] Content, see #403: the 116 empty and the 136 German summaries are
+  written and translated, the public members that only had `param` tags have
+  a summary, and the about 1,200 "Overrides ..." / "Implements ..." summaries
+  are `<inheritdoc/>` now, so the pages of the overrides show the description
+  of the base member (docfx resolves it, also over two levels; the base
+  members in `IGeoObject`, `IGeoObjectImpl`, `ISurface`, `IShowProperty` and
+  `IPropertyEntry` were documented for that). The 76 `GetObjectData`
+  implementations say what the binary serialization is still for.
+- [ ] Coverage, see #403: about 63 % of the public types and members have
+  no doc comment at all (CS1591 stays suppressed). Candidates by benefit:
+  the GeoObject types (`Line`, `Ellipse`, `BSpline`, `Face`, `Shell`...),
+  the attributes and their lists, `Model`, `Project` and the views.
 
 ## Open discussions / feature requests (no action from triage)
 

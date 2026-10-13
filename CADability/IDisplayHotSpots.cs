@@ -19,7 +19,11 @@ namespace CADability
     public enum HotspotChangeMode { Visible, Invisible, Selected, Deselected, Moved }
     public delegate void HotspotChangedDelegate(IHotSpot sender, HotspotChangeMode mode);
     /// <summary>
-    /// 
+    /// Implemented by property entries (typically the property entry of a selected object) which display hotspots: draggable
+    /// handles in the drawing area which represent properties of the object, e.g. a point or a length. The
+    /// <see cref="SelectedObjectsProperty"/> of the <see cref="CADability.Actions.SelectObjectsAction"/> subscribes to
+    /// <see cref="HotspotChangedEvent"/> to learn when hotspots are to be shown, hidden, selected or moved. The hotspots
+    /// themselves implement <see cref="IHotSpot"/>.
     /// </summary>
 
     public interface IDisplayHotSpots

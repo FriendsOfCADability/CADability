@@ -65,18 +65,15 @@ namespace CADability.UserInterface
         public event SetBooleanDelegate SetBooleanEvent;
         public event GetBooleanDelegate GetBooleanEvent;
         /// <summary>
-        /// Erzeugt ein BooleanProperty Objekt, welches die boolean Property eines anderen
-        /// Objektes darstellt und manipuliert.
+        /// Creates a BooleanProperty that displays and manipulates the boolean property of another object.
         /// </summary>
-        /// <param name="ObjectWithProperty">das Objekt, welches die boolean Property enthält</param>
-        /// <param name="PropertyName">der Name der Property (wird für Reflection verwendet)</param>
-        /// <param name="resourceIdLabel">ResourceId für den Label und dessen ToolTips. Die
-        /// Texte für die ToolTips werden unter dieser ResourceId gefolgt von ".ShortInfo" bzw. ".DetailedInfo"
-        /// gesucht. Unter ".Images" findet sich der Name und die Indizes einer ImageList
-        /// in der Resource</param>
-        /// <param name="resourceIdValues">ResourceId für die Texte für true bzw. false. Der Text muss
-        /// mit einem Trennzeichen beginnen, gefolgt von dem Text für true, gefolgt von dem Trennzeichen,
-        /// gefolgt von dem Wert für false, z.B. "|ja|nein"</param>
+        /// <param name="ObjectWithProperty">The object that holds the boolean property</param>
+        /// <param name="PropertyName">Name of the property (it is accessed via reflection)</param>
+        /// <param name="resourceIdLabel">Resource id of the label and its tooltips. The tooltip texts are looked up under this
+        /// resource id followed by ".ShortInfo" and ".DetailedInfo" respectively; ".Images" gives the name of an image list
+        /// in the resources and the indices into it</param>
+        /// <param name="resourceIdValues">Resource id of the texts for true and false. The text must start with a separator
+        /// character, followed by the text for true, the separator again and the text for false, e.g. "|yes|no"</param>
         public BooleanProperty(object ObjectWithProperty, string PropertyName, string resourceIdLabel, string resourceIdValues)
         {
             Initialize(ObjectWithProperty, PropertyName, resourceIdLabel, resourceIdValues);
@@ -201,10 +198,11 @@ namespace CADability.UserInterface
             settingName = (string)info.GetValue("SettingName", typeof(string));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("InternalValue", internalValue, internalValue.GetType());

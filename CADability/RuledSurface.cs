@@ -17,7 +17,10 @@ namespace CADability
     public class RuledSurface : ISurfaceImpl, ISerializable, IExportStep
     {
         /// <summary>
-        /// Dient der Beschreibung einer Zwischenkurve bei festem V
+        /// A curve of the ruled surface at a fixed v parameter: the linear interpolation between the two
+        /// defining curves (v = 0 is the first curve, v = 1 the second), restricted to a parameter interval
+        /// of these curves so that it can be trimmed and split. Returned by <see cref="RuledSurface.FixedV"/> when the
+        /// result is not a simple line or arc.
         /// </summary>
         [Serializable()]
         private class IntermediateCurve : GeneralCurve, ISerializable
@@ -35,10 +38,7 @@ namespace CADability
                 this.endParam = endParam;
             }
             #region implement GeneralCurve abstract methods
-            /// <summary>
-            /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Clone ()"/>
-            /// </summary>
-            /// <returns></returns>
+            /// <inheritdoc/>
             public override IGeoObject Clone()
             {
                 return new IntermediateCurve(firstCurve, secondCurve, v, startParam, endParam);
@@ -87,10 +87,7 @@ namespace CADability
                 }
                 return res.ToArray();
             }
-            /// <summary>
-            /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.CopyGeometry (IGeoObject)"/>
-            /// </summary>
-            /// <param name="ToCopyFrom"></param>
+            /// <inheritdoc/>
             public override void CopyGeometry(IGeoObject ToCopyFrom)
             {
                 IntermediateCurve other = ToCopyFrom as IntermediateCurve;
@@ -122,10 +119,7 @@ namespace CADability
                 startParam = p1;
                 endParam = p2;
             }
-            /// <summary>
-            /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Modify (ModOp)"/>
-            /// </summary>
-            /// <param name="m"></param>
+            /// <inheritdoc/>
             public override void Modify(ModOp m)
             {
                 firstCurve.Modify(m);
@@ -229,46 +223,28 @@ namespace CADability
 
         }
         #region ISurfaceImpl Overrides
-        /// <summary>
-        /// Implements <see cref="ISurface.PointAt"/>.
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint PointAt(GeoPoint2D uv)
         {
             GeoPoint p1 = firstCurve.PointAt(uv.x);
             GeoPoint p2 = secondCurve.PointAt(uv.x);
             return p1 + uv.y * (p2 - p1);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.UDirection (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoVector UDirection(GeoPoint2D uv)
         {
             GeoVector v1 = firstCurve.DirectionAt(uv.x);
             GeoVector v2 = secondCurve.DirectionAt(uv.x);
             return (1.0 - uv.y) * v1 + uv.y * v2;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.VDirection (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoVector VDirection(GeoPoint2D uv)
         {
             GeoPoint p1 = firstCurve.PointAt(uv.x);
             GeoPoint p2 = secondCurve.PointAt(uv.x);
             return p2 - p1; // ist ja auf die Länge bezogen, wie es sein soll
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.DerivationAt (GeoPoint2D, out GeoPoint, out GeoVector, out GeoVector)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <param name="location"></param>
-        /// <param name="du"></param>
-        /// <param name="dv"></param>
+        /// <inheritdoc/>
         public override void DerivationAt(GeoPoint2D uv, out GeoPoint location, out GeoVector du, out GeoVector dv)
         {
             GeoPoint p1 = firstCurve.PointAt(uv.x);
@@ -279,16 +255,7 @@ namespace CADability
             du = ((1.0 - uv.y) * v1 + uv.y * v2); // hier stand 0.5 * davor, was m.E. falsch war
             dv = p2 - p1;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Derivation2At (GeoPoint2D, out GeoPoint, out GeoVector, out GeoVector, out GeoVector, out GeoVector, out GeoVector)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <param name="location"></param>
-        /// <param name="du"></param>
-        /// <param name="dv"></param>
-        /// <param name="duu"></param>
-        /// <param name="dvv"></param>
-        /// <param name="duv"></param>
+        /// <inheritdoc/>
         public override void Derivation2At(GeoPoint2D uv, out GeoPoint location, out GeoVector du, out GeoVector dv, out GeoVector duu, out GeoVector dvv, out GeoVector duv)
         {
             GeoPoint p1, p2;
@@ -309,13 +276,7 @@ namespace CADability
                 base.Derivation2At(uv, out location, out du, out dv, out duu, out dvv, out duv);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.FixedU (double, double, double)"/>
-        /// </summary>
-        /// <param name="u"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve FixedU(double u, double vmin, double vmax)
         {
             GeoPoint p1 = PointAt(new GeoPoint2D(u, vmin));
@@ -324,13 +285,7 @@ namespace CADability
             l.SetTwoPoints(p1, p2);
             return l;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.FixedV (double, double, double)"/>
-        /// </summary>
-        /// <param name="v"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve FixedV(double v, double umin, double umax)
         {
             if (firstCurve is Line && secondCurve is Line)
@@ -363,31 +318,19 @@ namespace CADability
             // allgeimer Fall: eine vermischte Kurve
             return new IntermediateCurve(firstCurve, secondCurve, v, umin, umax);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Clone ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ISurface Clone()
         {
             return new RuledSurface(firstCurve.Clone(), secondCurve.Clone()); // need to clone the curves, because the new surface might be modified
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.CopyData (ISurface)"/>
-        /// </summary>
-        /// <param name="CopyFrom"></param>
+        /// <inheritdoc/>
         public override void CopyData(ISurface CopyFrom)
         {
             RuledSurface other = CopyFrom as RuledSurface;
             this.firstCurve = other.firstCurve;
             this.secondCurve = other.secondCurve;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetNaturalBounds (out double, out double, out double, out double)"/>
-        /// </summary>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
+        /// <inheritdoc/>
         public override void GetNaturalBounds(out double umin, out double umax, out double vmin, out double vmax)
         {
             umin = 0.0;
@@ -395,16 +338,7 @@ namespace CADability
             vmin = 0.0;
             vmax = 1.0;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetPlaneIntersection (PlaneSurface, double, double, double, double, double)"/>
-        /// </summary>
-        /// <param name="pl"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IDualSurfaceCurve[] GetPlaneIntersection(PlaneSurface pl, double umin, double umax, double vmin, double vmax, double precision)
         {
             if (firstCurve is Line && secondCurve is Line)
@@ -478,11 +412,7 @@ namespace CADability
             }
             return base.GetPlaneIntersection(pl, umin, umax, vmin, vmax, precision);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Make3dCurve (ICurve2D)"/>
-        /// </summary>
-        /// <param name="curve2d"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve Make3dCurve(ICurve2D curve2d)
         {
             if (Curve3dOfProjected<RuledSurface>(curve2d) is ICurve onThisSurface) return onThisSurface;
@@ -565,11 +495,7 @@ namespace CADability
             }
             usteps.CopyTo(intu);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetModified (ModOp)"/>
-        /// </summary>
-        /// <param name="m"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ISurface GetModified(ModOp m)
         {
             RuledSurface res = this.Clone() as RuledSurface;
@@ -577,19 +503,13 @@ namespace CADability
             res.usedArea = usedArea;
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Modify (ModOp)"/>
-        /// </summary>
-        /// <param name="m"></param>
+        /// <inheritdoc/>
         public override void Modify(ModOp m)
         {
             firstCurve = firstCurve.CloneModified(m);
             secondCurve = secondCurve.CloneModified(m);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetExtrema ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D[] GetExtrema()
         {   // in einer Richtung ist es immer liniear, es gibt also keine Beulen
             return new GeoPoint2D[0];

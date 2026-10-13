@@ -13,7 +13,11 @@ namespace CADability.UserInterface
         public DimensionStyleSelectionPropertyException(string msg) : base(msg) { }
     }
     /// <summary>
-    /// 
+    /// Property entry (a drop-down list in the control center) to choose the <see cref="DimensionStyle"/> of
+    /// an object implementing <see cref="IDimensionStyle"/>, e.g. a <see cref="Dimension"/> or a
+    /// <see cref="Style"/>. The choices are the names of those styles of a <see cref="DimensionStyleList"/>
+    /// that apply to the given <see cref="Dimension.EDimType"/>, optionally preceded by an "undefined" entry.
+    /// Selecting an entry sets the style of the object and raises <see cref="DimensionStyleChangedEvent"/>.
     /// </summary>
 
     public class DimensionStyleSelectionProperty : MultipleChoiceProperty
@@ -78,10 +82,7 @@ namespace CADability.UserInterface
             dimensionStyle.DimensionStyle = sel;
             if (DimensionStyleChangedEvent != null) DimensionStyleChangedEvent(sel);
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Added(IPropertyPage)"/>
-        /// </summary>
-        /// <param name="propertyTreeView"></param>
+        /// <inheritdoc/>
         public override void Added(IPropertyPage propertyTreeView)
         {
             base.Added(propertyTreeView);

@@ -5,7 +5,9 @@ using System.Reflection;
 namespace CADability.UserInterface
 {
     /// <summary>
-    /// 
+    /// Property entry which shows and edits a string property (typically "Name") of an arbitrary object via reflection: the
+    /// property is looked up by name on the type of the object (or its base type) and its getter and setter are invoked when the
+    /// entry is displayed or the user enters a new text. Used e.g. for the names of blocks, faces, shells and solids.
     /// </summary>
 
     public class NameProperty : IShowPropertyImpl
@@ -46,9 +48,7 @@ namespace CADability.UserInterface
         #region IShowPropertyImpl Overrides
 
 
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.UnSelected ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void UnSelected()
         {
             base.UnSelected();

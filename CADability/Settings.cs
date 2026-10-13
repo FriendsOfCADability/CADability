@@ -81,10 +81,11 @@ namespace CADability
             }
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             // sollte nicht drankommen
@@ -94,7 +95,7 @@ namespace CADability
     }
 
     /// <summary>
-    /// Exception Klasse für die Methoden der Klasse Settings
+    /// Exception thrown by the methods of the <see cref="Settings"/> class, e.g. when a setting is accessed with an invalid name.
     /// </summary>
 
     public class SettingsException : System.Exception
@@ -1080,14 +1081,12 @@ namespace CADability
             }
         }
         /// <summary>
-        /// Wandelt das im Parameter gegebene Objekt in den Typ bool um. Werte vom Typ bool können
-        /// auf zwei Arten in den Settings gespeichert sein: einmal als primitiver bool Typ und einmal als
-        /// Booleanproperty Typ. Letzterer hat noch Informationen, wie er interaktiv durch den
-        /// Anwender in einem ShowProperty Control geändert werden kann. Wenn das gegebene Objekt
-        /// einen anderen Typ hat, dann gibt es eine InvalidCastException.
+        /// Converts the given object into a bool. Values of type bool can be stored in the settings in two ways: as a primitive
+        /// bool and as a <see cref="BooleanProperty"/>, which additionally knows how it can be changed interactively by the user
+        /// in a property grid. If the given object has another type, an InvalidCastException is thrown.
         /// </summary>
-        /// <param name="TheValue">ein Objekt, gewöhnlich aus den Einstellungen</param>
-        /// <returns>der bool Wert des Objektes</returns>
+        /// <param name="TheValue">An object, usually taken from the settings</param>
+        /// <returns>The bool value of the object</returns>
         public static bool GetBoolValue(object TheValue)
         {
             if (TheValue.GetType() == typeof(bool)) return (bool)TheValue;
@@ -1160,10 +1159,7 @@ namespace CADability
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -1171,10 +1167,7 @@ namespace CADability
                 return SubEntries.Length;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get
@@ -1288,10 +1281,11 @@ namespace CADability
             deserialized = false;
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("SortedEntries", sortedEntries, sortedEntries.GetType());

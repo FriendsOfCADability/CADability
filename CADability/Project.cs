@@ -252,10 +252,11 @@ namespace CADability
                 modelView = null;
             }
             /// <summary>
-            /// Implements <see cref="ISerializable.GetObjectData"/>
+            /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+            /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
             /// </summary>
-            /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-            /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+            /// <param name="info">receives the data</param>
+            /// <param name="context">the destination of the serialization</param>
             public void GetObjectData(SerializationInfo info, StreamingContext context)
             {
                 if (modelView != null)
@@ -938,11 +939,12 @@ namespace CADability
             activeModelIndex = Index;
         }
         /// <summary>
-        /// Liefert die Standard Darstellung des gegebenen Modells.
-        /// Wenn keine definiert ist, die Draufsicht.
+        /// Creates a <see cref="ModelView"/> that shows the given model in the standard projection, i.e. the view from top with
+        /// the x/y plane as drawing plane. Note that a new view is created on each call; views already defined for the model
+        /// are not looked up.
         /// </summary>
-        /// <param name="m"></param>
-        /// <returns></returns>
+        /// <param name="m">The model to show</param>
+        /// <returns>The new model view</returns>
         public ModelView GetStandardModelView(Model m)
         {
             // noch nicht richtig implementiert
@@ -989,10 +991,11 @@ namespace CADability
             return view;
         }
         /// <summary>
-        /// Überprüft, ob Daten verändert wurden (IsModified) und fordert ggf. den Anwender auf
-        /// das Projekt zu speichern. 
+        /// Checks whether the project has been modified (<see cref="IsModified"/>) and, if so, asks the user whether to save
+        /// it; on "yes" the project is written to its file. Without a user interface (setting "DontUse.WindowsForms") a
+        /// modified project is saved without asking.
         /// </summary>
-        /// <returns>false, wenn Abbrechen gedrückt wurde, true sonst (speichern oder verwerfen)</returns>
+        /// <returns>false if the user pressed cancel, true otherwise (saved or discarded)</returns>
         public virtual bool SaveModified()
         {
             if (IsModified)
@@ -1879,10 +1882,7 @@ namespace CADability
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -1890,10 +1890,7 @@ namespace CADability
                 return SubEntries.Length;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get
@@ -2241,11 +2238,12 @@ namespace CADability
         }
 #if DEBUG
         /// <summary>
-        /// Probleme beim Serialisieren (z.B. Datenverlust) können hiermit getestet werden. Es wird in einen MemoryStream srialisiert
-        /// und gleich wieder deserialisiert. Das zurückgelieferte Objekt hat keine verbindung mehr zu anderen Objekten
+        /// Serializes the given object into a memory stream and immediately deserializes it again. This can be used to test for
+        /// problems with the serialization (e.g. loss of data). The returned object has no connection to any other object any
+        /// more; it is a deep copy of the input.
         /// </summary>
-        /// <param name="toSerialize"></param>
-        /// <returns></returns>
+        /// <param name="toSerialize">The object to serialize; it must be serializable</param>
+        /// <returns>The deserialized copy</returns>
         public static object SerializeDeserialize(object toSerialize)
         {
             Stream stream = new MemoryStream();
@@ -2380,10 +2378,11 @@ namespace CADability
         //    }
         //}
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public virtual void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Models", models);

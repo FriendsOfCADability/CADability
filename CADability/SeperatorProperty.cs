@@ -1,7 +1,8 @@
 ﻿namespace CADability.UserInterface
 {
     /// <summary>
-    /// Seperator-Eintrag für TreeView
+    /// A separator entry for the property page (tree view): it is displayed as a separator line and has neither a
+    /// label, nor a value, nor sub entries.
     /// </summary>
 
     public class SeperatorProperty : IShowPropertyImpl

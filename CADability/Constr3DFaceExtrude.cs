@@ -605,9 +605,7 @@ namespace CADability.Actions
         }
 
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnSetAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void OnSetAction()
         {
             base.ActiveObject = Face.Construct();
@@ -684,10 +682,7 @@ namespace CADability.Actions
         }
 
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.GetID ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override string GetID()
         { return "Constr.Solid.FaceExtrude"; }
 
@@ -695,9 +690,7 @@ namespace CADability.Actions
         {
             return false; // autorepeating this action seems not pracitcable
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnDone ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void OnDone()
         {
             if (base.ShowActiveObject == true)

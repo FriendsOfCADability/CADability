@@ -63,7 +63,11 @@ namespace CADability
 	}
 
 	/// <summary>
-	///
+	/// A model is the container for the geometric objects (<see cref="IGeoObject"/>) of a <see cref="Project"/>. It owns
+	/// the objects (see <see cref="IGeoObjectOwner"/>), keeps track of their extent, raises events when objects are added,
+	/// removed or modified, maintains the display lists used by the views and knows the units of its world coordinate
+	/// system. A project may contain several models; each <see cref="ModelView"/> shows one of them with a certain
+	/// <see cref="Projection"/>.
 	/// </summary>
 	[Serializable]
 	public class Model : IShowPropertyImpl, ISerializable, IGeoObjectOwner,
@@ -1558,9 +1562,7 @@ namespace CADability
 				return ShowPropertyEntryType.GroupTitle;
 			}
 		}
-		/// <summary>
-		/// Overrides <see cref="IShowPropertyImpl.LabelType"/>,
-		/// </summary>
+		/// <inheritdoc/>
 		public override ShowPropertyLabelFlags LabelType
 		{
 			get
@@ -1586,10 +1588,7 @@ namespace CADability
 				return MenuResource.LoadMenuDefinition("MenuId.Model", false, this);
 			}
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.LabelChanged (string)"/>
-		/// </summary>
-		/// <param name="NewText"></param>
+		/// <inheritdoc/>
 		public override void LabelChanged(string NewText)
 		{
 			Project project = FindProject();
@@ -1622,10 +1621,7 @@ namespace CADability
 			return null;
 		}
 		IShowProperty[] subEntries;
-		/// <summary>
-		/// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>,
-		/// returns the number of subentries in this property view.
-		/// </summary>
+		/// <inheritdoc/>
 		public override int SubEntriesCount
 		{
 			get
@@ -1633,10 +1629,7 @@ namespace CADability
 				return SubEntries.Length;
 			}
 		}
-		/// <summary>
-		/// Overrides <see cref="IShowPropertyImpl.SubEntries"/>,
-		/// returns the subentries in this property view.
-		/// </summary>
+		/// <inheritdoc/>
 		public override IShowProperty[] SubEntries
 		{
 			get

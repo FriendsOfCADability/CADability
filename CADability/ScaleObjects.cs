@@ -13,7 +13,10 @@ using Point = System.Drawing.Point;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Scales (or copies and scales) the selected objects. The user enters the fixed point, the scaling factor (either
+    /// directly or by a start point and an end point whose distances from the fixed point define the factor) or,
+    /// if distortion is chosen, separate factors for x, y and z, and decides whether the originals are scaled or
+    /// copies are created. Menu id: "ScaleObjects".
     /// </summary>
     public class ScaleObjects : ConstructAction
     {

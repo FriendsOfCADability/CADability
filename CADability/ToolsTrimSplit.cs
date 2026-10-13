@@ -15,7 +15,9 @@ using Point = System.Drawing.Point;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Tool that splits a curve at its intersections with other curves of the model (and at its self intersections): the
+    /// user picks a curve, and it is split at the intersection points on either side of the pick position. The original
+    /// curve is replaced by the resulting pieces, which keep its attributes. Menu id: "ToolsTrimSplit".
     /// </summary>
     internal class ToolsTrimSplit : ConstructAction // aufteilen
     {

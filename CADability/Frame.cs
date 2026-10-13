@@ -56,11 +56,14 @@ namespace CADability
     /// <param name="Processed">Set to true, if you have processed this command and no further action is required, leave unmodified if CADability should process this command</param>
     public delegate void ProcessCommandDelegate(string MenuId, ref bool Processed);
     /// <summary>
-    /// 
+    /// Delegate for the <see cref="IFrame.UpdateCommandEvent"/>, which is raised when the user interface wants to know the
+    /// state (enabled, checked) of the menu item or toolbar button with the given id. A handler sets the flags in
+    /// <paramref name="CommandState"/> and sets <paramref name="Processed"/> to true to prevent the frame from determining
+    /// the state itself.
     /// </summary>
-    /// <param name="MenuId"></param>
-    /// <param name="CommandState"></param>
-    /// <param name="Processed"></param>
+    /// <param name="MenuId">Id of the menu item or command</param>
+    /// <param name="CommandState">The state to fill in</param>
+    /// <param name="Processed">Set to true when the handler has determined the state</param>
     public delegate void UpdateCommandDelegate(string MenuId, CommandState CommandState, ref bool Processed);
     public delegate void UIEventHandler(string MenuId, bool Active);
     public delegate void ProjectClosedDelegate(Project theProject, IFrame theFrame);
@@ -807,24 +810,17 @@ namespace CADability
             if (MainFrame == this) MainFrame = null;
         }
         public ActionStack ActionStack => actionStack;
-        /// <summary>
-        /// Implements <see cref="IFrame.SetAction"/>.
-        /// </summary>
-        /// <param name="Action"></param>
+        /// <inheritdoc/>
         public void SetAction(Action Action)
         {
             actionStack.SetAction(Action);
         }
-        /// <summary>
-        /// Implements <see cref="IFrame.RemoveActiveAction"/>.
-        /// </summary>
+        /// <inheritdoc/>
         public void RemoveActiveAction()
         {
             actionStack.RemoveActiveAction();
         }
-        /// <summary>
-        /// Implements <see cref="IFrame.ActiveAction"/>.
-        /// </summary>
+        /// <inheritdoc/>
         public Action ActiveAction
         {
             get { return actionStack.ActiveAction; }

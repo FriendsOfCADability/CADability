@@ -369,9 +369,7 @@ namespace CADability.Attribute
         }
         #endregion
         #region PropertyEntryImpl Overrides
-        /// <summary>
-        /// Implements <see cref="PropertyEntryImpl.LabelText"/>.
-        /// </summary>
+        /// <inheritdoc/>
         public override string LabelText
         {
             get
@@ -394,10 +392,7 @@ namespace CADability.Attribute
             }
         }
         private IPropertyEntry[] subEntries;
-        /// <summary>
-        /// Overrides <see cref="PropertyEntryImpl.SubItems"/>,
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -459,10 +454,7 @@ namespace CADability.Attribute
             }
         }
 
-        /// <summary>
-        /// Overrides <see cref="PropertyEntryImpl.Added"/>
-        /// </summary>
-        /// <param name="propertyPage"></param>
+        /// <inheritdoc/>
         public override void Added(IPropertyPage propertyPage)
         {
             base.Added(propertyPage);
@@ -519,10 +511,11 @@ namespace CADability.Attribute
             }
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Name", styleName);
@@ -781,10 +774,7 @@ namespace CADability.Attribute
             if (objectWithStyle != null) objectWithStyle.Style = stl;
             if (StyleChangedEvent != null) StyleChangedEvent(stl);
         }
-        /// <summary>
-        /// Overrides <see cref="PropertyEntryImpl.Added"/>
-        /// </summary>
-        /// <param name="propertyPage"></param>
+        /// <inheritdoc/>
         public override void Added(IPropertyPage propertyPage)
         {
             base.Added(propertyPage);
@@ -923,11 +913,7 @@ namespace CADability.Attribute
             showProperties = null;
             if (propertyPage != null) propertyPage.OpenSubEntries(this, false); // zuklappen
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Attribute.IAttributeList.Find (string)"/>
-        /// </summary>
-        /// <param name="Name"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public Style Find(string Name)
         {
             return styles[Name] as Style;
@@ -963,10 +949,7 @@ namespace CADability.Attribute
                 return res;
             }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.Attribute.IAttributeList.Clone ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public StyleList Clone()
         {
             StyleList res = new StyleList();
@@ -1024,10 +1007,7 @@ namespace CADability.Attribute
         #endregion
         #region PropertyEntryImpl Overrides
         public override PropertyEntryType Flags => PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries | PropertyEntryType.ContextMenu | PropertyEntryType.Selectable;
-        /// <summary>
-        /// Overrides <see cref="PropertyEntryImpl.SubItems"/>,
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -1116,10 +1096,11 @@ namespace CADability.Attribute
             resourceIdInternal = "StyleList";
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             // info.AddValue("Styles",styles);

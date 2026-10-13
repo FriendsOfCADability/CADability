@@ -321,11 +321,7 @@ namespace CADability.Actions
         }
 
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnActivate (Action, bool)"/>
-        /// </summary>
-        /// <param name="OldActiveAction"></param>
-        /// <param name="SettingAction"></param>
+        /// <inheritdoc/>
         public override void OnActivate(Action OldActiveAction, bool SettingAction)
         {
             base.OnActivate(OldActiveAction, SettingAction);

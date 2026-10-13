@@ -85,8 +85,8 @@ namespace CADability.Curve2D
 
 	public enum ParallelFlag { Standard = 0, RoundEdges = 1 }
 	/// <summary>
-	/// Zum verschneiden von unendlichen Linien, Parabeln, Hyperbeln(, Sinuskurven?), die nicht längenbeschränkt sind,
-	/// und nicht unbedingt im Parameter von 0 bis 1 laufen
+	/// Interface for intersecting unbounded 2d curves such as infinite lines, parabolas and hyperbolas, which are not limited in
+	/// length and whose parameter does not necessarily run from 0 to 1.
 	/// </summary>
 	internal interface I2DIntersectable
 	{
@@ -327,7 +327,7 @@ namespace CADability.Curve2D
 	}
 
 	/// <summary>
-	/// Nur temporär, später soll alles von TriangulatedCurve2D abgeleitet sein
+	/// Only temporary (commented out): later all 2d curves were meant to be derived from TriangulatedCurve2D
 	/// </summary>
 	//internal class TempTriangulatedCurve2D : TriangulatedCurve2D
 	//{
@@ -759,25 +759,13 @@ namespace CADability.Curve2D
 			}
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.DirectionAt (double)"/>
-		/// </summary>
-		/// <param name="Position"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public abstract GeoVector2D DirectionAt(double Position);
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.PointAt (double)"/>
-		/// </summary>
-		/// <param name="Position"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public abstract GeoPoint2D PointAt(double Position);
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.PositionOf (GeoPoint2D)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual double PositionOf(GeoPoint2D p)
 		{
 			double res;
@@ -928,11 +916,7 @@ namespace CADability.Curve2D
 			return true;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.PositionAtLength (double)"/>
-		/// </summary>
-		/// <param name="position"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual double PositionAtLength(double position)
 		{
 			return position / Length;
@@ -986,21 +970,14 @@ namespace CADability.Curve2D
 			}
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.GetAreaFromPoint (GeoPoint2D)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual double GetAreaFromPoint(GeoPoint2D p)
 		{
 			if (baseApproximation == null) baseApproximation = Approximate(false, 0.0); // Annäherung mit Bögen unter Auswertung der Tangenten
 			return baseApproximation.GetAreaFromPoint(p);
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.GetArea ()"/>
-		/// </summary>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual double GetArea()
 		{
 			if (baseApproximation == null) baseApproximation = Approximate(false, 0.0); // Annäherung mit Bögen unter Auswertung der Tangenten
@@ -1016,21 +993,13 @@ namespace CADability.Curve2D
 			}
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.Split (double)"/>
-		/// </summary>
-		/// <param name="Position"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual ICurve2D[] Split(double Position)
 		{
 			throw new Exception("The method or operation is not implemented.");
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.Distance (GeoPoint2D)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual double Distance(GeoPoint2D p)
 		{
 			double res = double.MaxValue;
@@ -1043,20 +1012,12 @@ namespace CADability.Curve2D
 			return res;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.MinDistance (ICurve2D)"/>
-		/// </summary>
-		/// <param name="Other"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual double MinDistance(ICurve2D Other)
 		{   // we should use the triangulation here!
 			return Curves2D.SimpleMinimumDistance(this, Other);
 		}
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.MinDistance (GeoPoint2D)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual double MinDistance(GeoPoint2D p)
 		{
 			double res = Math.Min(p | StartPoint, p | EndPoint);
@@ -1073,26 +1034,14 @@ namespace CADability.Curve2D
 			return res;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.Trim (double, double)"/>
-		/// </summary>
-		/// <param name="StartPos"></param>
-		/// <param name="EndPos"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual ICurve2D Trim(double StartPos, double EndPos)
 		{
 			// this must be overridden!
 			return this;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.Parallel (double, bool, double, double)"/>
-		/// </summary>
-		/// <param name="Dist"></param>
-		/// <param name="approxSpline"></param>
-		/// <param name="precision"></param>
-		/// <param name="roundAngle"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual ICurve2D Parallel(double Dist, bool approxSpline, double precision, double roundAngle)
 		{
 			if (approxSpline)
@@ -1629,11 +1578,7 @@ namespace CADability.Curve2D
 		//                return new GeoPoint2DWithParameter[0];
 		//            }
 		//        }
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.Intersect (ICurve2D)"/>
-		/// </summary>
-		/// <param name="IntersectWith"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual GeoPoint2DWithParameter[] Intersect(ICurve2D IntersectWith)
 		{
 			ICurve2D[] sc = null;
@@ -1722,22 +1667,13 @@ namespace CADability.Curve2D
 			return res.ToArray();
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.Intersect (GeoPoint2D, GeoPoint2D)"/>
-		/// </summary>
-		/// <param name="StartPoint"></param>
-		/// <param name="EndPoint"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual GeoPoint2DWithParameter[] Intersect(GeoPoint2D StartPoint, GeoPoint2D EndPoint)
 		{
 			return Intersect(new Line2D(StartPoint, EndPoint));
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.PerpendicularFoot (GeoPoint2D)"/>
-		/// </summary>
-		/// <param name="fromHere"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual GeoPoint2D[] PerpendicularFoot(GeoPoint2D fromHere)
 		{
 			List<GeoPoint2D> res = new List<GeoPoint2D>();
@@ -1889,12 +1825,7 @@ namespace CADability.Curve2D
 			return true;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.TangentPoints (GeoPoint2D, GeoPoint2D)"/>
-		/// </summary>
-		/// <param name="FromHere"></param>
-		/// <param name="CloseTo"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual GeoPoint2D[] TangentPoints(GeoPoint2D FromHere, GeoPoint2D CloseTo)
 		{
 			if (tringulation == null) MakeTriangulation();
@@ -1944,12 +1875,7 @@ namespace CADability.Curve2D
 			return res.ToArray();
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.TangentPointsToAngle (Angle, GeoPoint2D)"/>
-		/// </summary>
-		/// <param name="ang"></param>
-		/// <param name="CloseTo"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual GeoPoint2D[] TangentPointsToAngle(Angle ang, GeoPoint2D CloseTo)
 		{
 			GeoVector2D direction = new GeoVector2D(ang);
@@ -1998,11 +1924,7 @@ namespace CADability.Curve2D
 			return res.ToArray();
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.TangentPointsToAngle (GeoVector2D)"/>
-		/// </summary>
-		/// <param name="direction"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual double[] TangentPointsToAngle(GeoVector2D direction)
 		{
 			List<double> res = new List<double>();
@@ -2148,22 +2070,13 @@ namespace CADability.Curve2D
 			return res.ToArray();
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.Reverse ()"/>
-		/// </summary>
+		/// <inheritdoc/>
 		public abstract void Reverse();
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.Clone ()"/>
-		/// </summary>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public abstract ICurve2D Clone();
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.CloneReverse (bool)"/>
-		/// </summary>
-		/// <param name="reverse"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual ICurve2D CloneReverse(bool reverse)
 		{
 			ICurve2D res = this.Clone();
@@ -2171,17 +2084,10 @@ namespace CADability.Curve2D
 			return res;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.Copy (ICurve2D)"/>
-		/// </summary>
-		/// <param name="toCopyFrom"></param>
+		/// <inheritdoc/>
 		public abstract void Copy(ICurve2D toCopyFrom);
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.MakeGeoObject (Plane)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual IGeoObject MakeGeoObject(Plane p)
 		{
 			BSpline2D bsp = ToBspline(0.0);
@@ -2226,60 +2132,37 @@ namespace CADability.Curve2D
 			}
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.Project (Plane, Plane)"/>
-		/// </summary>
-		/// <param name="fromPlane"></param>
-		/// <param name="toPlane"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual ICurve2D Project(Plane fromPlane, Plane toPlane)
 		{
 			throw new Exception("The method or operation is not implemented.");
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.AddToGraphicsPath (System.Drawing.Drawing2D.GraphicsPath, bool)"/>
-		/// </summary>
-		/// <param name="path"></param>
-		/// <param name="forward"></param>
+		/// <inheritdoc/>
 		public virtual void AddToGraphicsPath(System.Drawing.Drawing2D.GraphicsPath path, bool forward)
 		{
 			throw new Exception("The method or operation is not implemented.");
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.IsParameterOnCurve (double)"/>
-		/// </summary>
-		/// <param name="par"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual bool IsParameterOnCurve(double par)
 		{
 			return par >= -1e-8 && par <= 1 + 1e-8;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.IsValidParameter (double)"/>
-		/// </summary>
-		/// <param name="par"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual bool IsValidParameter(double par)
 		{
 			return true;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.GetExtendedHitTest ()"/>
-		/// </summary>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual IQuadTreeInsertable GetExtendedHitTest()
 		{
 			throw new Exception("The method or operation is not implemented.");
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.GetSelfIntersections ()"/>
-		/// </summary>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual double[] GetSelfIntersections()
 		{
 			//private GeoPoint2D[] interpol; // gewisse Stützpunkte für jeden Knoten und ggf Zwischenpunkte (Wendepunkte, zu große Dreiecke)
@@ -2307,23 +2190,14 @@ namespace CADability.Curve2D
 			return res.ToArray();
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.ReinterpretParameter (ref double)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual bool ReinterpretParameter(ref double p)
 		{
 			return false;
 			//throw new Exception("The method or operation is not implemented.");
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.Approximate (bool, double)"/>
-		/// </summary>
-		/// <param name="linesOnly"></param>
-		/// <param name="maxError"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual ICurve2D Approximate(bool linesOnly, double maxError)
 		{
 			if (interpol == null) MakeTriangulation();
@@ -2507,11 +2381,7 @@ namespace CADability.Curve2D
 			}
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.Move (double, double)"/>
-		/// </summary>
-		/// <param name="x"></param>
-		/// <param name="y"></param>
+		/// <inheritdoc/>
 		public virtual void Move(double x, double y)
 		{
 			throw new ApplicationException("The method or operation is not implemented.");
@@ -2525,11 +2395,7 @@ namespace CADability.Curve2D
 			}
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.GetModified (ModOp2D)"/>
-		/// </summary>
-		/// <param name="m"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual ICurve2D GetModified(ModOp2D m)
 		{
 			if (baseApproximation == null) baseApproximation = Approximate(false, 0.0); // Annäherung mit Bögen unter Auswertung der Tangenten
@@ -2560,12 +2426,7 @@ namespace CADability.Curve2D
 			}
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.Curve2D.ICurve2D.GetFused (ICurve2D, double)"/>
-		/// </summary>
-		/// <param name="toFuseWith"></param>
-		/// <param name="precision"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual ICurve2D GetFused(ICurve2D toFuseWith, double precision)
 		{
 			return null; // should be implemented
@@ -2739,10 +2600,11 @@ namespace CADability.Curve2D
 			userData = info.GetValue("UserData", typeof(UserData)) as UserData;
 		}
 		/// <summary>
-		/// Implements <see cref="ISerializable.GetObjectData"/>
+		/// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+		/// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
 		/// </summary>
-		/// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-		/// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+		/// <param name="info">receives the data</param>
+		/// <param name="context">the destination of the serialization</param>
 		public virtual void GetObjectData(SerializationInfo info, StreamingContext context)
 		{
 			info.AddValue("UserData", userData);
@@ -2922,7 +2784,7 @@ namespace CADability.Curve2D
 	}
 
 	/// <summary>
-	/// Könnte man verwenden für nicht parametrierte 2d Kurven, mal sehen
+	/// Could be used for 2d curves given in implicit (non-parametric) form. An experiment, currently without implementations.
 	/// </summary>
 	internal interface IImplicitCurve2D
 	{

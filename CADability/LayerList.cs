@@ -10,9 +10,10 @@ using CheckState = CADability.Substitutes.CheckState;
 namespace CADability.Attribute
 {
     /// <summary>
-    /// Eine Liste von Layern, immer alphabetisch nach Namen sortiert.
-    /// Die Namen müssen eindeutig sein. Das Zufügen bzw. Umbenennen eines Layers, so
-    /// dass Mehrdeutigkeiten entstehen würden, führt zu einer Exception.
+    /// A list of <see cref="Layer"/>s, always sorted alphabetically by name. The names must be unique: adding or
+    /// renaming a layer so that a name would occur twice throws a <see cref="NameAlreadyExistsException"/>.
+    /// The list is owned by a project or by the global settings, keeps a current layer and is displayed in the
+    /// property page with its layers as sub entries.
     /// </summary>
     [Serializable]
     public class LayerList : PropertyEntryImpl, INotifyModification, ISerializable,
@@ -34,9 +35,10 @@ namespace CADability.Attribute
             resourceIdInternal = "LayerList";
         }
         /// <summary>
-        /// Fügt einen neuen Layer der Liste zu.
+        /// Adds a new layer to the list. The first layer added becomes the current layer. A
+        /// <see cref="NameAlreadyExistsException"/> is thrown if there is already a layer with the same name.
         /// </summary>
-        /// <param name="LayerToAdd">Der neue Layer</param>
+        /// <param name="LayerToAdd">the layer to add</param>
         public void Add(Layer LayerToAdd)
         {
             if (entries.Contains(LayerToAdd.Name))
@@ -53,9 +55,10 @@ namespace CADability.Attribute
             if (propertyPage != null) propertyPage.Refresh(this);
         }
         /// <summary>
-        /// Entfernt einen Layer aus der Liste. Kein Propblem, wenn der Layer nicht in der Liste ist.
+        /// Removes a layer from the list. Nothing happens if the layer is not in the list or if the owner of the list
+        /// (project or settings) refuses the removal, e.g. because the layer is still in use.
         /// </summary>
-        /// <param name="LayerToRemove"></param>
+        /// <param name="LayerToRemove">the layer to remove</param>
         public void Remove(Layer LayerToRemove)
         {
             if (entries.Contains(LayerToRemove.Name))
@@ -79,11 +82,10 @@ namespace CADability.Attribute
             if (propertyPage != null) propertyPage.OpenSubEntries(this, false); // zuklappen
         }
         /// <summary>
-        /// Liefert den Layer mit dem im Parameter gegebenen Namen. 
-        /// Liefert null, wenn kein solcher Layer in der Liste existiert.
+        /// Returns the layer with the given name, or null if there is no such layer in the list.
         /// </summary>
-        /// <param name="Name"></param>
-        /// <returns></returns>
+        /// <param name="Name">the name of the layer</param>
+        /// <returns>the layer, or null</returns>
         public Layer Find(string Name)
         {
             return entries[Name] as Layer;
@@ -194,10 +196,10 @@ namespace CADability.Attribute
 		}
 */
         /// <summary>
-        /// Liefert eine LayerList aus der StringResource. Wird benötigt, wenn keine
-        /// globale LayerListe gegeben ist.
+        /// Creates a layer list with the layer names taken from the string resource "LayerList.Default".
+        /// Used when no global layer list is available.
         /// </summary>
-        /// <returns>Die Default LayerList</returns>
+        /// <returns>the default layer list</returns>
         public static LayerList GetDefault()
         {
             LayerList res = new LayerList();
@@ -236,10 +238,11 @@ namespace CADability.Attribute
             current = (Layer)InfoReader.Read(info, "Current", typeof(Layer));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             // info.AddValue("Entries",entries);
@@ -328,10 +331,7 @@ namespace CADability.Attribute
                 return flags;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -690,9 +690,7 @@ namespace CADability.Attribute
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -700,10 +698,7 @@ namespace CADability.Attribute
                 return ShowPropertyLabelFlags.ContextMenu | ShowPropertyLabelFlags.ContextMenu | ShowPropertyLabelFlags.Selectable;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -712,10 +707,7 @@ namespace CADability.Attribute
             }
         }
         IShowProperty[] subEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get
@@ -759,11 +751,7 @@ namespace CADability.Attribute
             if (CheckStateChangedEvent != null) CheckStateChangedEvent(l, state == CheckState.Checked);
         }
         #region ICommandHandler Members
-        /// <summary>
-        /// Implements <see cref="CADability.UserInterface.ICommandHandler.OnCommand (string)"/>
-        /// </summary>
-        /// <param name="MenuId"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         virtual public bool OnCommand(string MenuId)
         {
             switch (MenuId)
@@ -790,12 +778,7 @@ namespace CADability.Attribute
             }
             return false;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.UserInterface.ICommandHandler.OnUpdateCommand (string, CommandState)"/>
-        /// </summary>
-        /// <param name="MenuId"></param>
-        /// <param name="CommandState"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         virtual public bool OnUpdateCommand(string MenuId, CommandState CommandState)
         {
             // TODO:  Add CheckedAttributes.OnUpdateCommand implementation

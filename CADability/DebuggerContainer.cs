@@ -16,10 +16,10 @@ using System.Runtime.CompilerServices;
 namespace CADability
 {
     /// <summary>
-    /// Ein Kontainer für den DebuggerVisualizer, der verschiedene Dinge (Punkte, Vektoren, GeoObjekte) im Zusammenhang
-    /// darstellen kann.
-    /// Wenn man spontan Arrays von etwas darstellbarem zeigen will, dann in CommandWindow gehen und ??DebuggerContainer.Show(array) eingeben
-    /// </summary>    
+    /// A container for the debugger visualizer that shows several things (points, vectors, curves, faces and other
+    /// GeoObjects) together in one view. To look at an array of displayable objects on the fly, enter
+    /// <c>??DebuggerContainer.Show(array)</c> in the immediate window of the debugger.
+    /// </summary>
     [Serializable()]
     public class DebuggerContainer : IDebuggerVisualizer
     {

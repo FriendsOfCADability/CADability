@@ -8,14 +8,13 @@ using System;
 namespace CADability
 {
     /// <summary>
-    /// Prototyp für die Mitteilung von Änderungen. Die Zeichnung verwendet es für
-    /// das IsModified Flag, welches gesetzt wird, wenn von irgendwo (GeoObjekte, Listen)
-    /// dieser event kommt
+    /// Prototype for the notification of modifications. The project uses it for its IsModified flag, which is set
+    /// whenever this event arrives from anywhere (GeoObjects, attribute lists).
     /// </summary>
     public delegate void DidModifyDelegate(object sender, EventArgs args);
     /// <summary>
-    /// Objekte, die dieses Interface implementieren, rufen bei relevanten Veränderungen
-    /// DidModifyDelegate auf.
+    /// Objects implementing this interface raise the <see cref="DidModifyEvent"/> (a <see cref="DidModifyDelegate"/>)
+    /// whenever they are modified in a relevant way.
     /// </summary>
 
     public interface INotifyModification

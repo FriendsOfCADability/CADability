@@ -5,7 +5,10 @@ using System.Collections;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a line from a point perpendicular onto a curve. The user picks the start point and the curve (polylines and
+    /// paths are decomposed into their single elements); the line ends at the perpendicular foot point on the curve which is closest
+    /// to the pick position. For a circle or arc whose center is the start point, every point is a foot point, so the point closest
+    /// to the mouse position is used. Started with the menu id "Constr.Line.PointPerp".
     /// </summary>
     internal class ConstrLinePointPerp : ConstructAction
     {

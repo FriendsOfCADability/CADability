@@ -688,11 +688,14 @@ namespace CADability.Shapes
 			return new Border(segments, true, false); // don't flatten, because of Area calculation in Face
 		}
 		/// <summary>
-		/// Für BrepIntersection brauchen wir unveränderte Orientierung und einen entsprechenden "Innen-/Außen-begriff"
+		/// Creates a border directly from the given, already connected and ordered segments without changing their orientation.
+		/// Needed by the BRep intersection, which requires the orientation to remain as it is together with the corresponding
+		/// notion of inside and outside: the orientation of the result is marked as unknown, the segments are neither reordered
+		/// nor reversed, and the border is closed if the end point of the last segment coincides with the start point of the first.
 		/// </summary>
-		/// <param name="segments"></param>
-		/// <param name="keepOrientation"></param>
-		/// <returns></returns>
+		/// <param name="segments">The segments in their final order; the array is copied, the segment objects are used as they are</param>
+		/// <param name="keepOrientation">Currently not evaluated, the orientation is always kept</param>
+		/// <returns>The border, or null if <paramref name="segments"/> is empty</returns>
 		internal static Border FromOrientedList(ICurve2D[] segments, bool keepOrientation)
 		{
 			if (segments.Length == 0) return null;
@@ -4042,10 +4045,11 @@ namespace CADability.Shapes
 			UnsplittedOutline = (ICurve2D)InfoReader.Read(info, "UnsplittedOutline", typeof(ICurve2D)); // after Segments, which resets it
 		}
 		/// <summary>
-		/// Implements <see cref="ISerializable.GetObjectData"/>
+		/// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+		/// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
 		/// </summary>
-		/// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-		/// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+		/// <param name="info">receives the data</param>
+		/// <param name="context">the destination of the serialization</param>
 		public void GetObjectData(SerializationInfo info, StreamingContext context)
 		{
 			info.AddValue("Segments", segment, typeof(ICurve2D[]));
@@ -4750,11 +4754,14 @@ namespace CADability.Shapes
 			set { precision = Math.Abs(value); }
 		}
 		/// <summary>
-		/// Fügt das im Parameter gegebene Segment zu. ACHTUNG: die Methode <see cref="BuildBorder"/> BuildBorder
-		/// dreht dieses Segment möglicherweise um. Wenn das nicht passieren darf, dann hier mit
-		/// Clone arbeiten!
+		/// Appends the given segment to the chain of segments collected so far. The segment is only accepted if its start point
+		/// coincides with the end point of the previously added segment (within <see cref="Precision"/>, or a small fraction of the
+		/// current extent if no precision was set); the first segment is always accepted. Use <see cref="Connect"/> if the segment
+		/// may also be reversed to fit. CAUTION: <see cref="BuildBorder"/> may reverse this segment later on. If that must not
+		/// happen to the original, add a clone.
 		/// </summary>
-		/// <param name="ToAdd">zuzufügendes Segment</param>
+		/// <param name="ToAdd">The segment to add</param>
+		/// <returns>true if the segment was appended, false if it does not connect to the previous segment</returns>
 		public bool AddSegment(ICurve2D ToAdd)
 		{
 			if (segment.Count == 0)

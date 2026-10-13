@@ -8,9 +8,9 @@ using System.Collections.Generic;
 namespace CADability
 {
     /// <summary>
-    /// Ein Interface für Objekte, die in einen QuadTree eingefügt werden können.
-    /// Der QuadTree kann also nicht nur IGeoObject Objekte aufnehmen, sondern alle
-    /// Objekte, die IQuadTreeInsertable unterstützen.
+    /// Interface for objects which can be inserted into a <see cref="QuadTree"/>. The quadtree can thus hold not only
+    /// <see cref="IGeoObject"/>s but any objects that implement this interface, e.g. 2d curves or borders: an object has to
+    /// provide its 2d extent and a hit test against a rectangle.
     /// </summary>
 
     public interface IQuadTreeInsertable
@@ -33,8 +33,8 @@ namespace CADability
         object ReferencedObject { get; }
     }
     /// <summary>
-    /// Eine Collection, die sicherstellt, dass jedes Objekt nur einmal eingefügt wird.
-    /// Leider gibt es so etwas wie "set" aus STL nicht
+    /// A collection which ensures that each object is inserted only once: a set of <see cref="IQuadTreeInsertable"/> objects,
+    /// implemented as a hashtable with the objects as keys, since there was nothing like the "set" of the STL.
     /// </summary>
     internal class QuadTreeInsertableHashtable : Hashtable
     {
@@ -91,13 +91,12 @@ namespace CADability
     public class QuadTree : IEnumerable
     {
         /// <summary>
-        /// Ein Knoten im QuadTree. Er enthält entweder eine Liste von Objekten oder
-        /// vier Unterknoten, aber nie beides gleichzeitig.
+        /// A node of the quadtree. It contains either a list of objects (a leaf) or four sub-nodes, but never both at the same time.
         /// </summary>
         internal class QuadNode
         {
             /// <summary>
-            /// Einfache typensichere Liste für IQuadTreeInsertable
+            /// Simple type-safe list of <see cref="IQuadTreeInsertable"/> objects (the objects of a leaf node).
             /// </summary>
             public class IQuadTreeInsertableCollection : CollectionBase
             {
@@ -381,9 +380,9 @@ namespace CADability
         }
 
         /// <summary>
-        /// Liefert alle Objekte im QuadTree, aber möglicherweise mehrfach. Um wirklich über 
-        /// alle Objekte einzeln zu iterieren, müsste man sie erst in einer HashTable (als Keys)
-        /// sammeln.
+        /// Enumerates all objects in the quadtree below a node, possibly returning the same object several times, since an
+        /// object may be contained in several leaves. To really iterate over each object only once, the objects would have to be
+        /// collected in a hashtable (as keys) first.
         /// </summary>
         internal class EnumerateNode : IEnumerator
         {
@@ -467,9 +466,11 @@ namespace CADability
             InitialSize = 0.0; // d.h. nicht gegeben
         }
         /// <summary>
-        /// Erzeugt einen neuen QuadTree, dessen (anfängliche) Ausdehnung gegeben ist.
+        /// Creates a new quadtree whose initial extent is given. The root square is chosen a little larger than the rectangle and
+        /// its center is shifted by a tiny amount, so that horizontal or vertical lines do not come to lie exactly on the inner
+        /// edges of the quadtree. The tree grows when objects outside of the initial extent are added.
         /// </summary>
-        /// <param name="InitialRect"></param>
+        /// <param name="InitialRect">The expected extent of the objects to be inserted</param>
         public QuadTree(BoundingRect InitialRect)
             : this()
         {

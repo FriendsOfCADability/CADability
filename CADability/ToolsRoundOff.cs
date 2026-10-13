@@ -9,7 +9,11 @@ using System.Collections;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Rounds the corner between two curves with a circular arc of a given radius (a fillet). The user selects the
+    /// first curve and, unless it is a path or polyline whose corner closest to the click is rounded, a second curve,
+    /// and enters the radius. The curves must lie in a common plane; they are shortened or extended to the tangent
+    /// points, the arc is inserted and, if the curves were segments of a path, the result is reassembled into a path.
+    /// Menu id: "ToolsRoundOff".
     /// </summary>
     internal class ToolsRoundOff : ConstructAction
     {
@@ -40,8 +44,15 @@ namespace CADability.Actions
 
 
         /// <summary>
-        /// 
+        /// Checks whether the planar path or polyline <paramref name="iCurveTest"/> intersects itself close to the pick
+        /// point <paramref name="objectPoint"/>. If the self intersection nearest to the pick point is closer than any
+        /// vertex of the path, the two parameters of this intersection are inserted as new vertices into the path, so
+        /// that the crossing can subsequently be rounded or chamfered like an ordinary corner. Used by the rounding
+        /// and chamfering tools.
         /// </summary>
+        /// <param name="iCurveTest">the path or polyline to test; it is modified when an intersection is found</param>
+        /// <param name="objectPoint">the pick point in model coordinates</param>
+        /// <returns>true if a self intersection was found and inserted into the path</returns>
         static public bool pathTestIntersection(ICurve iCurveTest, GeoPoint objectPoint)
         {	// jetzt getestet, ob der Pfad sich selbst überschneidet:
             //			owner = (iCurveTest as IGeoObject).Owner; // owner merken für löschen und Einfügen
@@ -695,9 +706,7 @@ namespace CADability.Actions
         //}
 
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnSetAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnSetAction()
         { // normales runden!!
             base.ActiveObject = null;
@@ -728,26 +737,19 @@ namespace CADability.Actions
             base.OnSetAction();
             base.ShowActiveObject = false;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnRemoveAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnRemoveAction()
         {
             base.OnRemoveAction();
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.GetID ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override string GetID()
         {
             return "ToolsRoundOff";
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnDone ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnDone()
         {
             if (base.ActiveObject != null)

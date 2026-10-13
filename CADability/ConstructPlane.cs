@@ -12,7 +12,11 @@ using Point = System.Drawing.Point;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Intermediate construction of a <see cref="Plane"/> from three points: the user picks the origin, a point on the
+    /// x-axis and a point in the plane that defines the y direction. While the points are entered the plane is shown as a
+    /// feedback rectangle, and each new plane is reported by the <see cref="PlaneChangedEvent"/>. It is used, for example,
+    /// to define the drawing plane interactively from a property entry (see <see cref="IIntermediateConstruction"/>).
+    /// Menu id: "Construct.Plane.3Points".
     /// </summary>
 
     public class ConstructPlane : ConstructAction, IIntermediateConstruction, IConstructPlane
@@ -68,18 +72,13 @@ namespace CADability.Actions
         {
             base.TitleId = resourceId;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.GetID ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override string GetID()
         {
             return "Construct.Plane.3Points";
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnSetAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnSetAction()
         {
 

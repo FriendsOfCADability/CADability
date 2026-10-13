@@ -396,9 +396,9 @@ namespace CADability
                     set { } // wird benötig wg. DataMember
                 }
                 /// <summary>
-                /// Liste von Indizes in das VertexArray vtx.
-                /// Wie diese Indizes zu verwenden sind, also tripel für Dreiecke, Paare für Linien u.s.w.
-                /// entscheiden die Intervalle tri, lin, pnt, edg
+                /// The element array: a list of indices into the vertex array <see cref="vtx"/>. How the indices are to
+                /// be interpreted (triples for triangles, pairs for lines, single indices for points) is defined by the
+                /// index ranges <see cref="tri"/>, <see cref="lin"/>, <see cref="pnt"/> and <see cref="edg"/>.
                 /// </summary>
                 [DataMember]
                 public int[] elt

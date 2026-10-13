@@ -857,10 +857,7 @@ namespace CADability.Attribute
             return res;
         }
         #region IPropertyEntry Members
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get

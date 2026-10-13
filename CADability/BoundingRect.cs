@@ -538,6 +538,10 @@ namespace CADability
         {   // der operator != kann hier nicht verwendet werden, denn er muss das Gegenteil von == sein
             return b1.Right <= b2.Left || b1.Top <= b2.Bottom || b2.Right <= b1.Left || b2.Top <= b1.Bottom;
         }
+        /// <summary>
+        /// The width of the rectangle, i.e. <see cref="Right"/> minus <see cref="Left"/>. It is negative for the
+        /// <see cref="EmptyBoundingRect"/>.
+        /// </summary>
         /// <value>
         /// The width of the rectangle
         /// </value>
@@ -548,6 +552,10 @@ namespace CADability
                 return Right - Left;
             }
         }
+        /// <summary>
+        /// The height of the rectangle, i.e. <see cref="Top"/> minus <see cref="Bottom"/>. It is negative for the
+        /// <see cref="EmptyBoundingRect"/>.
+        /// </summary>
         /// <value>
         /// The height of the rectangle
         /// </value>
@@ -837,10 +845,11 @@ namespace CADability
             Top = (double)info.GetValue("Top", typeof(double));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Left", Left);

@@ -1473,10 +1473,11 @@ namespace CADability.Curve2D
         /// </summary>
         private double SingularOffset => (endParam - startParam) * 1e-8;
         /// <summary>
-        /// The inner knots where the first derivative vanishes, at least on one side (see
-        /// <see cref="NegligibleDerivative"/>). On one side only is possible where the multiplicity of the knot leaves
-        /// the curve only continuous, not its tangent, e.g. between two Bézier segments of which only one starts with
-        /// coinciding poles. The derivative at the knot itself is the one of a single side there.
+        /// The inner knots where the curve has a corner: where the first derivative vanishes, at least on one side (see
+        /// <see cref="NegligibleDerivative"/>), or where the multiplicity of the knot leaves the curve only continuous, not
+        /// its tangent, and the tangents of the two sides differ. On one side only is possible there as well, e.g. between
+        /// two Bézier segments of which only one starts with coinciding poles. The derivative at the knot itself is the
+        /// one of a single side there. The same as <see cref="BSpline.CornerParameters"/> for a 3d spline.
         /// </summary>
         private List<double> CornerKnots()
         {
@@ -1492,10 +1493,11 @@ namespace CADability.Curve2D
                 PointDerAt(knots[i], out _, out GeoVector2D dir);
                 if (dir.Length <= negligible) res.Add(knots[i]);
                 else if (multiplicities[i] >= degree)
-                {
+                {   // here the tangent may jump, also without a vanishing derivative, as in BSpline.CornerParameters (#416)
                     PointDerAt(knots[i] - SingularOffset, out _, out GeoVector2D dirBefore);
                     PointDerAt(knots[i] + SingularOffset, out _, out GeoVector2D dirAfter);
-                    if (dirBefore.Length <= vanishingSide || dirAfter.Length <= vanishingSide) res.Add(knots[i]);
+                    bool vanishes = dirBefore.Length <= vanishingSide || dirAfter.Length <= vanishingSide;
+                    if (vanishes || !Precision.SameDirection(dirBefore, dirAfter, false) || dirBefore * dirAfter <= 0.0) res.Add(knots[i]);
                 }
             }
             cornerKnots = res;
@@ -1525,9 +1527,9 @@ namespace CADability.Curve2D
                     add(tknots[i], point, dir);
                     continue;
                 }
-                // The derivative vanishes here, at least on one side. The triangles of the triangulation need the
-                // tangent though. It is the limit of the direction from either side, and at a corner the two sides
-                // differ. A base point has only one direction, so an inner point like this is replaced by two base
+                // A corner: the derivative vanishes here, at least on one side, or the tangent jumps. The triangles of
+                // the triangulation need the tangent though. It is the limit of the direction from either side, and at a
+                // corner the two sides differ. A base point has only one direction, so an inner point like this is replaced by two base
                 // points very close to it, each with the tangent of its own side. The end points keep their position
                 // and get the tangent from the inside of the curve.
                 double before = tknots[i] - SingularOffset;
@@ -2306,7 +2308,7 @@ namespace CADability.Curve2D
         }
         /// <summary>
         /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.MinDistance(GeoPoint2D)"/>. The base class looks for
-        /// perpendicular foot points. A corner where the derivative vanishes (see <see cref="CornerKnots"/>) has none
+        /// perpendicular foot points. A corner (see <see cref="CornerKnots"/>) has none
         /// for the points in front of it, the corner itself is the closest point there. And a point right at the
         /// corner is on the border of every test the search makes. So the corners are taken into account as well,
         /// they are points of the curve and can never make the distance too small.

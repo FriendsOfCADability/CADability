@@ -1834,9 +1834,20 @@ namespace CADability
             {   // shell2 has been reversed, so a pair of identical faces with the same orientation had opposite orientations: the shells
                 // touch there from both sides, and the face of shell1 stays as it is. The common part, which is made for overlapping faces,
                 // could not be connected to the rest of shell1, because each of its edges is also an edge of a face of shell2, and the result was empty.
+                // The pair is also removed from faceToOverlappingFaces, so that both describe the same pairs. Its readers
+                // (createEdgeFaceIntersections and SnapTangentialIntersection) run before this method, so this does not change the
+                // result; the debug note "BRepIntersection.OverlapsWith" in the UserData of the faces is kept (#416).
                 foreach (DoubleFaceKey dfk in overlappingFaces.Keys.ToList())
                 {
-                    if (new HashSet<Vertex>(dfk.face1.Vertices).SetEquals(dfk.face2.Vertices)) overlappingFaces.Remove(dfk);
+                    if (new HashSet<Vertex>(dfk.face1.Vertices).SetEquals(dfk.face2.Vertices))
+                    {
+                        overlappingFaces.Remove(dfk);
+                        if (faceToOverlappingFaces != null)
+                        {
+                            if (faceToOverlappingFaces.TryGetValue(dfk.face1, out HashSet<Face> of1)) of1.Remove(dfk.face2);
+                            if (faceToOverlappingFaces.TryGetValue(dfk.face2, out HashSet<Face> of2)) of2.Remove(dfk.face1);
+                        }
+                    }
                 }
             }
         }
@@ -3759,10 +3770,12 @@ namespace CADability
         }
 
         /// <summary>
-        /// A point of <paramref name="shell"/>, which is not on <paramref name="other"/>: a vertex or the middle of a face. Where the
-        /// shells touch, their common points cannot decide whether one shell contains the other.
+        /// A point of <paramref name="shell"/>, which is not on <paramref name="other"/>: a vertex, the middle of an edge, the middle
+        /// of a face or a point of a 3 by 3 grid inside a face. Where the shells touch, their common points cannot decide whether one
+        /// shell contains the other. Returns null, when all these points lie on <paramref name="other"/>: then the boundaries
+        /// coincide, and <paramref name="shell"/> counts as contained in <paramref name="other"/>.
         /// </summary>
-        private GeoPoint PointNotOn(Shell shell, Shell other)
+        private static GeoPoint? PointNotOn(Shell shell, Shell other, double precision)
         {
             BoundingCube otherExtent = other.GetExtent(precision);
             bool IsOnOther(GeoPoint p)
@@ -3783,7 +3796,24 @@ namespace CADability
                 GeoPoint2D c = face.Area.GetExtent().GetCenter();
                 if (face.Area.Contains(c, false) && !IsOnOther(face.Surface.PointAt(c))) return face.Surface.PointAt(c);
             }
-            return shell.Vertices[0].Position;
+            // Contains is undefined for a point on the boundary of the other shell (#416), so before giving up, more points are tried
+            foreach (Edge edge in shell.Edges)
+            {
+                if (edge.Curve3D != null && !IsOnOther(edge.Curve3D.PointAt(0.5))) return edge.Curve3D.PointAt(0.5);
+            }
+            foreach (Face face in shell.Faces)
+            {
+                BoundingRect ext = face.Area.GetExtent();
+                for (int i = 1; i <= 3; i++)
+                {
+                    for (int j = 1; j <= 3; j++)
+                    {
+                        GeoPoint2D uv = new GeoPoint2D(ext.Left + i * ext.Width / 4.0, ext.Bottom + j * ext.Height / 4.0);
+                        if (face.Area.Contains(uv, false) && !IsOnOther(face.Surface.PointAt(uv))) return face.Surface.PointAt(uv);
+                    }
+                }
+            }
+            return null;
         }
         public Shell[] Result()
         {
@@ -4567,8 +4597,10 @@ namespace CADability
             {   // the shells don't cross each other, but they may touch. When they touch, the faces of shell1 and shell2 have been split
                 // and taken apart by now, so the original shells are tested and returned. And a vertex, where the shells touch, lies on
                 // both shells, so it cannot tell whether one shell contains the other: a point is taken, which is not on the other shell.
-                bool oneInTwo = original2.Contains(PointNotOn(original1, original2));
-                bool twoInOne = original1.Contains(PointNotOn(original2, original1));
+                GeoPoint? notOn2 = PointNotOn(original1, original2, precision);
+                GeoPoint? notOn1 = PointNotOn(original2, original1, precision);
+                bool oneInTwo = !notOn2.HasValue || original2.Contains(notOn2.Value); // no such point: the boundaries coincide
+                bool twoInOne = !notOn1.HasValue || original1.Contains(notOn1.Value);
                 if (operation == Operation.union)
                 {
                     if (oneInTwo) res.Add(original2.Clone() as Shell);

@@ -94,6 +94,15 @@ namespace CADability.ImportTests
             AssertSameXData(PointXData(), XDataOf(ReimportSingleObject(file), "ACAD"));
         }
 
+        // The DWG export writes the same records through ACadSharp's DwgWriter.
+        [TestMethod]
+        public void dwg_export_writes_xdata_points()
+        {
+            Line line = MakeLine();
+            line.UserData.Add("ACAD", PointXData());
+            AssertSameXData(PointXData(), XDataOf(ReimportSingleObject(Export(line, "points", "dwg")), "ACAD"));
+        }
+
         // netDxf split a point into three records X, Y and Z with double values, which older cdb files still hold.
         // The export writes them as one point.
         [TestMethod]
@@ -176,18 +185,18 @@ namespace CADability.ImportTests
             return xData;
         }
 
-        private string Export(IGeoObject geoObject, string suffix)
+        private string Export(IGeoObject geoObject, string suffix, string format = "dxf")
         {
             Project project = Project.CreateSimpleProject();
             project.GetModel(0).Add(geoObject.Clone());
-            string file = this.TestContext.TestName + "_" + suffix + ".dxf";
-            Assert.IsTrue(project.Export(file, "dxf"), "export must succeed");
+            string file = this.TestContext.TestName + "_" + suffix + "." + format;
+            Assert.IsTrue(project.Export(file, format), "export must succeed");
             return file;
         }
 
         private static IGeoObject ReimportSingleObject(string file)
         {
-            Project project = Project.ReadFromFile(file, "dxf");
+            Project project = Project.ReadFromFile(file, System.IO.Path.GetExtension(file).TrimStart('.'));
             Assert.IsNotNull(project);
             Model model = project.GetActiveModel();
             Assert.AreEqual(1, model.AllObjects.Count, "one entity expected after re-import");

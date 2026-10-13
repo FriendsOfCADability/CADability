@@ -1038,7 +1038,8 @@ namespace CADability.GeoObject
 			splits.Add(0.0);
 			splits.Add(1.0);
 			// a whole circle would have a closed 2d curve: halve it when no split lies inside (a split at the start
-			// point, e.g. the seam the circle now starts at, is found at 0 or at 1)
+			// point, e.g. the seam the circle now starts at, is found at 0 or at 1). Parts are not halved otherwise:
+			// the caller does not trim a part that ends at an arbitrary point correctly (see above)
 			if (!splits.Exists(s => s > 1e-6 && s < 1.0 - 1e-6)) splits.Add(0.5);
 			splits.Sort();
 			List<IDualSurfaceCurve> res = new List<IDualSurfaceCurve>();

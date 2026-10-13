@@ -709,7 +709,9 @@ namespace CADability.Curve2D
                         a1 = a2d;
                         a2 = this;
                     }
-                    if (a1.sweepPar * a2.sweepPar < 0.0) a2.Reverse();
+                    // a full arc contains every arc of its ellipse, its start and end point say nothing about the other one
+                    if (a1.IsClosed) return a1.Clone();
+                    if (a1.sweepPar * a2.sweepPar < 0.0) a2 = (EllipseArc2D)a2.CloneReverse(true); // must not change one of the arcs to be fused
                     // a1 ist länger als a2. Wenn es verschmelzen soll, dann muss der Start- oder der Endpunkt von a2
                     // innerhalb von a1 liegen
 

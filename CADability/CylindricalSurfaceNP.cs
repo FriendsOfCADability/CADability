@@ -178,12 +178,12 @@ namespace CADability.GeoObject
 					// this is an ellipse in 3d
 					GeoPoint[] fp3d = new GeoPoint[5];
 					double n = 5.0;
-					if (elli2d is EllipseArc2D) n = 4.0;
+					if (!elli2d.IsClosed) n = 4.0; // a full EllipseArc2D is sampled like an ellipse
 					for (int i = 0; i < 5; i++)
 					{
 						fp3d[i] = PointAt(elli2d.PointAt(i / n));
 					}
-					Ellipse elli = Ellipse.FromFivePoints(fp3d, !(elli2d is EllipseArc2D));
+					Ellipse elli = Ellipse.FromFivePoints(fp3d, elli2d.IsClosed);
 					if (elli != null) return elli;
 				}
 			}
@@ -194,12 +194,12 @@ namespace CADability.GeoObject
 					// this is an ellipse in 3d
 					GeoPoint[] fp3d = new GeoPoint[5];
 					double n = 5.0;
-					if (circle2d is Arc2D) n = 4.0;
+					if (!circle2d.IsClosed) n = 4.0; // a full Arc2D is sampled like a circle
 					for (int i = 0; i < 5; i++)
 					{
 						fp3d[i] = PointAt(circle2d.PointAt(i / n));
 					}
-					Ellipse elli = Ellipse.FromFivePoints(fp3d, !(circle2d is Arc2D));
+					Ellipse elli = Ellipse.FromFivePoints(fp3d, circle2d.IsClosed);
 					if (elli != null) return elli;
 				}
 			}

@@ -507,29 +507,35 @@ namespace CADability
     /// way to use this class is the C# using statement. The constructor of this
     /// class overrides the values of <see cref="Precision"/> for the current thread, other threads
     /// keep their values. The <see cref="Dispose"/> method restores the previous values, it must be called
-    /// on the same thread (so there must be no await inside the using statement).
+    /// on the same thread (so there must be no await inside the using statement), otherwise it throws an
+    /// <see cref="InvalidOperationException"/>. A value that is not positive keeps the value that is valid when the
+    /// override is made.
     /// </summary>
 
     public class PrecisionOverride : IDisposable
     {
         private (double eps, double epsa) previous;
         private bool disposed;
+        private readonly int thread = Environment.CurrentManagedThreadId;
         /// <summary>
         /// Sets Precision.eps for the current thread.
         /// </summary>
-        /// <param name="eps">The new Precision.eps value</param>
-        public PrecisionOverride(double eps)
+        /// <param name="eps">The new Precision.eps value; a value that is not positive keeps the current one</param>
+        public PrecisionOverride(double eps) : this(eps, Precision.epsa)
         {
-            previous = Precision.BeginOverride(eps, Precision.epsa);
         }
 
         /// <summary>
         /// Sets Precision.eps and Precision.epsa for the current thread.
         /// </summary>
-        /// <param name="eps">The new Precision.eps value</param>
-        /// <param name="epsa">The new Precision.epsa value</param>
+        /// <param name="eps">The new Precision.eps value; a value that is not positive keeps the current one</param>
+        /// <param name="epsa">The new Precision.epsa value; a value that is not positive keeps the current one</param>
         public PrecisionOverride(double eps, double epsa)
         {
+            // 0.0 means "no override" for the thread static fields, so it would fall back to the global value and drop an
+            // enclosing override; Border.Clip of a border without extent passes it
+            if (!(eps > 0.0)) eps = Precision.eps;
+            if (!(epsa > 0.0)) epsa = Precision.epsa;
             previous = Precision.BeginOverride(eps, epsa);
         }
 
@@ -538,9 +544,14 @@ namespace CADability
         /// <summary>
         /// Restores the previous (at time of construction of this object) <see cref="Precision"/> values.
         /// </summary>
+        /// <exception cref="InvalidOperationException">when called on another thread than the one that made the override:
+        /// the values are thread static, so it would set the values of that thread and leave the override in place on
+        /// the thread that made it</exception>
         public void Dispose()
         {
             if (disposed) return;
+            if (Environment.CurrentManagedThreadId != thread)
+                throw new InvalidOperationException("A PrecisionOverride must be disposed on the thread that made it.");
             disposed = true;
             Precision.EndOverride(previous);
         }

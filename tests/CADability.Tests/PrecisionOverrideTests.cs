@@ -84,5 +84,52 @@ namespace CADability.Tests
             }
             Assert.AreEqual(2, border.Clip(line, true).Length, "the clipping itself still works");
         }
+
+        /// <summary>
+        /// #416, finding 1: disposing an override on another thread set the thread static values of that thread and left
+        /// the override in place on the thread that made it. It throws now, and the override can still be disposed
+        /// where it was made.
+        /// </summary>
+        [TestMethod]
+        public void disposing_on_another_thread_throws_and_changes_nothing()
+        {
+            double global = Precision.eps;
+            PrecisionOverride over = new PrecisionOverride(1e-9);
+            Exception thrown = null;
+            double seenThere = 0.0;
+            Task.Factory.StartNew(() =>
+            {
+                try { over.Dispose(); } catch (Exception e) { thrown = e; }
+                seenThere = Precision.eps;
+            }, TaskCreationOptions.LongRunning).Wait(10000);
+            Assert.IsInstanceOfType(thrown, typeof(InvalidOperationException));
+            Assert.AreEqual(global, seenThere, "the other thread keeps the global precision");
+            Assert.AreEqual(1e-9, Precision.eps, "the override is still in place here");
+            over.Dispose();
+            Assert.AreEqual(global, Precision.eps);
+        }
+
+        /// <summary>
+        /// #416, finding 1: 0.0 is what the thread static fields hold for "no override", so an override with 0.0 fell
+        /// back to the global value and dropped an enclosing override. A value that is not positive keeps the current one.
+        /// </summary>
+        [TestMethod]
+        public void a_value_that_is_not_positive_keeps_the_current_one()
+        {
+            using (new PrecisionOverride(1e-7, 1e-6))
+            {
+                using (new PrecisionOverride(0.0))
+                {
+                    Assert.AreEqual(1e-7, Precision.eps);
+                    Assert.AreEqual(1e-6, Precision.epsa);
+                }
+                using (new PrecisionOverride(-1.0, double.NaN))
+                {
+                    Assert.AreEqual(1e-7, Precision.eps);
+                    Assert.AreEqual(1e-6, Precision.epsa);
+                }
+                Assert.AreEqual(1e-7, Precision.eps);
+            }
+        }
     }
 }

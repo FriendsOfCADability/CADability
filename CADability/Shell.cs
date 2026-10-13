@@ -3694,6 +3694,7 @@ namespace CADability.GeoObject
                 if (edge.PrimaryFace.Surface == surface) c2d = edge.Curve2D(edge.PrimaryFace);
                 else
                 {
+                    if (edge.Curve3D == null) return false; // a pole edge has no curve to project
                     c2d = surface.GetProjectedCurve(edge.Curve3D, 0.0);
                     if (c2d != null && !edge.Forward(edge.PrimaryFace)) c2d.Reverse();
                 }

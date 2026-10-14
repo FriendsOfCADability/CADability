@@ -171,7 +171,7 @@ namespace CADability.GeoObject
     /// A shell is a set of connected <see cref="Face"/>s: neighbouring faces share their <see cref="Edge"/>s, and the faces
     /// are oriented consistently, so that the surface normals of all faces point to the same side (outward for the shell
     /// of a <see cref="Solid"/>). A shell is closed when every edge belongs to two faces (see <see cref="OpenEdges"/>);
-    /// a closed shell can bound a <see cref="Solid"/> (<see cref="Solid.MakeSolid"/>), an open shell is a free standing
+    /// a closed shell can bound a <see cref="Solid"/> (<see cref="Solid.MakeSolid(Shell)"/>), an open shell is a free standing
     /// surface, e.g. a sheet metal part. Shells are created by the methods of <see cref="Make3D"/> (extrusion, rotation,
     /// sewing of faces), by <see cref="FromFaces(Face[], bool)"/> from faces that already share their edges, or come
     /// from the file imports. A shell is also an <see cref="IGeoObject"/> that can be added to a <see cref="Model"/>.

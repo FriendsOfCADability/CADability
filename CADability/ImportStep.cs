@@ -2633,10 +2633,30 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 						}
 						break;
 					case Item.ItemType.brepWithVoids:
-						{   // a solid with other shells as holes. We currently only return the solid
+						{   // a solid with other shells as holes (cavities), which were dropped before (#416)
 							object shell = CreateEntity(item.parameter["outer"]);
 							List<Item> voids = item.parameter["voids"].val as List<Item>;
-							if (shell is GeoObjectList || shell is IGeoObject) item.val = shell;
+							if (shell is Solid outerSolid)
+							{
+								List<Shell> cavities = new List<Shell>();
+								for (int i = 0; i < voids.Count; i++)
+								{
+									object v = CreateEntity(voids[i]);
+									Shell cavity = v is Solid voidSolid ? voidSolid.Shells[0] : v as Shell;
+									if (cavity == null || cavity.OpenEdgesExceptPoles.Length > 0) continue;
+									// the faces of a cavity point into it, whatever the orientation in the file says
+									cavity.AssertOutwardOrientation();
+									cavity.ReverseOrientation();
+									cavities.Add(cavity);
+								}
+								Solid res = Solid.MakeSolid(outerSolid.Shells[0], cavities.ToArray());
+								res.Name = item.parameter["name"].sval;
+								if (outerSolid.ColorDef != null) res.ColorDef = outerSolid.ColorDef;
+								// scaled to the units of the file like a MANIFOLD_SOLID_BREP
+								if (context != null && context.factor != 1.0 && context.factor > 0.0) res.Modify(ModOp.Scale(context.factor));
+								item.val = res;
+							}
+							else if (shell is GeoObjectList || shell is IGeoObject) item.val = shell;
 							else
 							{
 								for (int i = 0; i < voids.Count; i++)

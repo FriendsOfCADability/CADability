@@ -1450,6 +1450,7 @@ namespace CADability
         private bool allowOpenEdges;
         private bool dontCombineConnectedFaces = false;
         private bool shellsAreUnchanged;
+        private List<Shell> cavities = new List<Shell>(); // see Cavities
         private List<Face> unusedFaces; // faces, which ware not used in the multipleFaces mode
         private HashSet<(Edge, Face)> dontIntersect = new HashSet<(Edge, Face)>(); // dont intersect these pairs of edges and faces
 
@@ -3677,6 +3678,11 @@ namespace CADability
             }
         }
         public bool Unchanged => shellsAreUnchanged;
+        /// <summary>
+        /// After <see cref="Result"/> of a difference: the shells that are cavities of the single result shell, because the
+        /// second shell lies inside the first one without touching it. Their faces point into the cavity. Empty otherwise.
+        /// </summary>
+        internal Shell[] Cavities => cavities.ToArray();
         public List<Face> UnusedFaces => unusedFaces;
         /// <summary>
         /// Get all face pairs, which intersect each other
@@ -3817,6 +3823,9 @@ namespace CADability
         }
         public Shell[] Result()
         {
+            // whether the shells meet: Result consumes the overlapping faces, so this is taken before
+            bool shellsMeet = (intersectionVertices != null && intersectionVertices.Count > 0)
+                || (overlappingFaces != null && overlappingFaces.Count > 0) || (oppositeFaces != null && oppositeFaces.Count > 0);
             // this method relies on
             // - faceToIntersectionEdges: contains all faces, which intersect with other faces as keys and all the intersection edges, 
             //   which are produced by other faces on this face as values.
@@ -4613,7 +4622,19 @@ namespace CADability
                 }
                 else if (operation == Operation.difference)
                 {
-                    if (!oneInTwo) res.Add(original1.Clone() as Shell); // shell1 remains unchanged, shell2 is outside or inside (a hole, which Solid cannot represent)
+                    if (!oneInTwo)
+                    {   // shell1 remains, shell2 is outside or inside
+                        res.Add(original1.Clone() as Shell);
+                        if (twoInOne && !shellsMeet)
+                        {   // shell2 lies inside shell1 without touching it: it is a cavity of the result (#416). A shell2 that
+                            // touches shell1 from inside would make a cavity touching the hull, which a Solid cannot have,
+                            // so shell1 is returned unchanged then.
+                            Shell cavity = original2.Clone() as Shell;
+                            cavity.ReverseOrientation(); // the faces of a cavity point into it
+                            cavities.Add(cavity);
+                            shellsAreUnchanged = false;
+                        }
+                    }
                     // else: the result is empty, because shell2 contains shell1 completely
                 }
                 else if (operation == Operation.intersection)

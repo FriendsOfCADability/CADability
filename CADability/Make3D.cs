@@ -1958,7 +1958,7 @@ namespace CADability.GeoObject
         /// and each set of faces connected this way is returned as a <see cref="Shell"/>. The faces are modified (their
         /// edges and vertices are replaced), connections to faces not in the array are cut first. The shells are oriented
         /// outward. A shell without open edges (<see cref="Shell.OpenEdges"/>) bounds a volume and can be turned into a
-        /// solid with <see cref="Solid.MakeSolid"/>. This is how the primitives of this class and the STL import build their
+        /// solid with <see cref="Solid.MakeSolid(Shell)"/>. This is how the primitives of this class and the STL import build their
         /// solids.
         /// </summary>
         /// <param name="faces">the faces to sew</param>

@@ -216,7 +216,7 @@ namespace CADability.GeoObject
         public static ConstructionDelegate Constructor;
         /// <summary>
         /// Creates an empty solid, or an instance of the class <see cref="Constructor"/> provides. Set its shell with
-        /// <see cref="SetShell"/>, or use <see cref="MakeSolid"/>, which does both.
+        /// <see cref="SetShell"/>, or use <see cref="MakeSolid(Shell)"/>, which does both.
         /// </summary>
         /// <returns>the new solid</returns>
         public static Solid Construct()
@@ -342,6 +342,27 @@ namespace CADability.GeoObject
             Solid res = Solid.Construct();
             res.SetShell(sh);
             res.colorDef = sh.ColorDef;
+            return res;
+        }
+        /// <summary>
+        /// Creates a solid bounded by the outer shell <paramref name="outer"/> and the <paramref name="cavities"/>, closed
+        /// shells inside it, which neither touch each other nor the outer shell, with their faces pointing into the cavity.
+        /// This is not checked. The solid becomes the owner of the shells.
+        /// </summary>
+        internal static Solid MakeSolid(Shell outer, Shell[] cavities)
+        {
+            Solid res = MakeSolid(outer);
+            if (cavities == null || cavities.Length == 0) return res;
+            res.shells = new Shell[cavities.Length + 1];
+            res.shells[0] = outer;
+            Array.Copy(cavities, 0, res.shells, 1, cavities.Length);
+            for (int i = 1; i < res.shells.Length; i++)
+            {
+                res.shells[i].Owner = res;
+                res.shells[i].WillChangeEvent += new ChangeDelegate(res.OnWillChange);
+                res.shells[i].DidChangeEvent += new ChangeDelegate(res.OnDidChange);
+            }
+            res.edges = null;
             return res;
         }
         /// <summary>
@@ -770,7 +791,10 @@ namespace CADability.GeoObject
         /// <summary>
         /// Returns the difference of two solids as new solids: the second solid is removed from the first solid; the
         /// operands are not modified. If the solids are disjunct, a copy of the first solid is returned. If the second
-        /// solid contains the first solid, an empty array is returned. Subtracting may split the first solid into
+        /// solid lies inside the first one without touching it, the result is the first solid with the second one as a
+        /// cavity (a second entry of <see cref="Shells"/>); if it touches the first one from inside, a copy of the first
+        /// solid is returned, because a cavity must not touch the hull. If the second solid contains the first solid, an
+        /// empty array is returned. Subtracting may split the first solid into
         /// several parts. Only the outer shell of each solid takes part in the operation, cavities (further entries of
         /// <see cref="Shells"/>) are ignored. The result has no layer or colour, use <see cref="Project.SetDefaults"/>
         /// or <see cref="IGeoObject.CopyAttributes"/> to set them.
@@ -788,6 +812,8 @@ namespace CADability.GeoObject
             {
                 sres[i] = MakeSolid(res[i]);
             }
+            Shell[] cavities = bro.Cavities;
+            if (sres.Length == 1 && cavities.Length > 0) sres[0] = MakeSolid(res[0], cavities); // the second solid is a cavity
             if (sres.Length == 1 && bro.Unchanged) sres[0].flags |= Flags.unchanged;
             return sres;
         }
@@ -1072,7 +1098,24 @@ namespace CADability.GeoObject
         {   // MANIFOLD_SOLID_BREP is a Geometric_Representation_Item
             if (string.IsNullOrEmpty(shells[0].Name)) shells[0].Name = NameOrEmpty;
             int shellnr = (shells[0] as IExportStep).Export(export, false);
-            int msb = export.WriteDefinition("MANIFOLD_SOLID_BREP('" + NameOrEmpty + "',#" + shellnr.ToString() + ")");
+            int msb;
+            if (shells.Length > 1)
+            {   // BREP_WITH_VOIDS (#416): each cavity is an ORIENTED_CLOSED_SHELL with orientation .F. of a closed shell
+                // facing away from the cavity, so the faces of the cavity shell, which point into it, are written reversed
+                System.Text.StringBuilder voids = new System.Text.StringBuilder();
+                for (int i = 1; i < shells.Length; i++)
+                {
+                    Shell reversed = shells[i].Clone() as Shell;
+                    reversed.ReverseOrientation();
+                    reversed.Owner = this; // the style of the solid applies
+                    int closedShell = (reversed as IExportStep).Export(export, false);
+                    int oriented = export.WriteDefinition("ORIENTED_CLOSED_SHELL('',*,#" + closedShell.ToString() + ",.F.)");
+                    if (voids.Length > 0) voids.Append(",");
+                    voids.Append("#" + oriented.ToString());
+                }
+                msb = export.WriteDefinition("BREP_WITH_VOIDS('" + NameOrEmpty + "',#" + shellnr.ToString() + ",(" + voids.ToString() + "))");
+            }
+            else msb = export.WriteDefinition("MANIFOLD_SOLID_BREP('" + NameOrEmpty + "',#" + shellnr.ToString() + ")");
             if (colorDef != null)
             {
                 colorDef.MakeStepStyle(msb, export);

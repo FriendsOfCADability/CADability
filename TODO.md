@@ -170,8 +170,10 @@ None left: all of them have been fixed.
   and tools 1e6 times smaller than the other solid. Solids touching only in
   an edge, a line or a point have no union (`Solid.Unite` returns null, the
   result would not be a manifold), and a solid touching the inside of another
-  one cannot be subtracted (the result would have a cavity, which a `Solid`
-  cannot have; the other solid is returned unchanged).
+  one, where the shells do not cross, cannot be subtracted (the result would
+  have a cavity touching the hull; the other solid is returned unchanged). A
+  solid inside another one without touching it becomes a cavity (#416), but
+  the boolean operations take only the outer shell of a solid into account.
   Unions of spheres with offset axes measure 0.03 to 0.05 % too small or too
   large, while both differences are exact. In the union, the hole edges of the merged faces
   have `Path2D` curves, and these faces triangulate to a slightly smaller area

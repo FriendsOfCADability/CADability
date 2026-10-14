@@ -9,7 +9,7 @@ namespace CADability
     /// <summary>
     /// Reads STL files, ASCII or binary, and returns their triangles as <see cref="Shell"/>s of planar triangular
     /// faces. Adjacent triangles are connected, so every set of connected triangles becomes one shell. A shell without
-    /// open edges can be turned into a solid with <see cref="Solid.MakeSolid"/>, which
+    /// open edges can be turned into a solid with <see cref="Solid.MakeSolid(Shell)"/>, which
     /// <see cref="Project.ReadFromFile(string, string)"/> with the format "stl" does.
     /// </summary>
     public class ImportSTL

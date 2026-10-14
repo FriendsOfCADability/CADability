@@ -86,3 +86,21 @@ History:
   cylinders of equal radius fixed, none broken.
 
 Replace it with the `sweep.csv` of a newer run when a change fixes cases, so the next comparison starts from there.
+## Open: crossing cylinders of almost equal radius (#458)
+
+The remaining failures, at offsets from 1e-7 to 1e-5. What is known so far:
+
+- The intersection curves turn sharply close to the points where the cylinders touch, within sqrt(r2² - r1²) / r1 in the
+  angle of the smaller cylinder. `CylindricalSurface.GetDualSurfaceCurves` makes base points only every 45°, so between
+  two base points a plane perpendicular to the approximating polynom cuts the curve twice, and
+  `InterpolatedDualSurfaceCurve.ApproximatePosition` jumps between both cuts.
+- `ApproximatePosition` finds the point on the plane through the point of the polynom, but where intersecting the curves
+  on that plane fails, Newton's method finds it on a parallel plane through the chord of the base points. Using the same
+  plane in both fixed five of these cases, but made others break later (a face with an outline whose seam edges carried
+  each other's 2d curves; `Face.RepairConnected` then merges vertices 10 apart, without a distance check, and the next
+  `TetraederHull` does not finish). Inserting base points where the curve turns by more than 15° helped some cases, but
+  the constructor of `InterpolatedDualSurfaceCurve` removes base points closer than a tenth of the mean distance, and
+  keeping them broke others. `ShellMetrics.IntegratedVolume` evaluates the curve consistently on its own
+  (`InterpolatedDualSurfaceCurve.SmoothPosition`), without changing `ApproximatePosition`.
+- At ±1e-7 and ±3e-7 no intersection curve is found at all, and the cylinders are taken as nested or apart.
+

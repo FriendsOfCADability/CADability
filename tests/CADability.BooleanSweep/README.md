@@ -56,7 +56,7 @@ small offsets lie at and below it.
 | `EMPTY` | no result, although the exact one is not empty |
 | `OPEN` | the result has open edges |
 | `EXCEPTION`, `TIMEOUT`, `CRASH` | the operation threw, did not finish, or ended the process |
-| `LIMITATION` | a documented limitation, not a failure: `Solid.Unite` returns null for disjoint solids and for solids touching only in a line or a point, and a solid touching the inside of another one cannot be subtracted (the first one is returned unchanged) |
+| `LIMITATION` | a documented limitation, not a failure: `Solid.Unite` returns null for disjoint solids and for solids touching only in a line or a point, and a solid touching the inside of another one cannot be subtracted (the first one is returned unchanged). Offsets up to 1e-5 count as touching here too. |
 
 The tolerance is 1e-7 of the larger operand plus 1e-6 of the result. For offsets up to 1e-5 the result at d = 0 is accepted as
 well, i.e. solids that are that close may be taken as touching.
@@ -67,6 +67,12 @@ triangulation matched the exact volume to 1e-8. A large difference between the t
 
 ## baseline.csv
 
-The result on `master` at a96f42bd (14 October 2026): 594 OK, 58 VOLUME, 63 EMPTY, 33 LIMITATION, no exceptions, timeouts or
-crashes. All failures are at offsets of 1e-5 and below, and one at 0 (the union of the crossing cylinders of equal radius).
+The latest result: 639 OK, 18 VOLUME, 50 EMPTY, 41 LIMITATION, no exceptions, timeouts or crashes. All failures are at
+offsets of 1e-5 and below, and one at 0 (the union of the crossing cylinders of equal radius).
+
+History:
+- `master` at a96f42bd (14 October 2026): 594 OK, 58 VOLUME, 63 EMPTY, 33 LIMITATION.
+- Touching solids taken for nested ones, and edges ending within the precision of a face that did not intersect it: 45
+  cases fixed, none broken.
+
 Replace it with the `sweep.csv` of a newer run when a change fixes cases, so the next comparison starts from there.

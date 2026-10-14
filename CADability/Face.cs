@@ -8944,9 +8944,13 @@ namespace CADability.GeoObject
             List<GeoPoint2D> luvOnFace = new List<GeoPoint2D>();
             List<double> luOnCurve3D = new List<double>();
             List<Border.Position> lposition = new List<Shapes.Border.Position>();
+            // A point up to prec beyond the end of the edge still belongs to it: the edge ends on this face within prec. A fixed
+            // tolerance of the parameter dropped it when prec / length exceeded 1e-6, e.g. for an edge of 5 ending 1e-5 above a face
+            // with prec 1.7e-5, while the faces of the two edges were already taken as overlapping with that prec.
+            double uPrec = Math.Max(1e-6, prec / Math.Max(edg.Curve3D.Length, Precision.eps));
             for (int i = 0; i < ips.Length; ++i)
             {
-                if (Contains(ref uvOnFaces[i], true) && uOnCurve3Ds[i] >= -1e-6 && uOnCurve3Ds[i] <= 1.0 + 1e-6) // geändert auf 1e-6, da wir in BRepIntersection das so brauchen
+                if (Contains(ref uvOnFaces[i], true) && uOnCurve3Ds[i] >= -uPrec && uOnCurve3Ds[i] <= 1.0 + uPrec)
                 {
                     if (lip.Count == 0 || !Precision.IsEqual(lip.Last(), ips[i]))
                     {
@@ -8956,7 +8960,7 @@ namespace CADability.GeoObject
                         lposition.Add(Area.GetPosition(uvOnFaces[i], prec));
                     }
                 }
-                else if (uOnCurve3Ds[i] >= -1e-6 && uOnCurve3Ds[i] <= 1.0 + 1e-6) // check on border or edge
+                else if (uOnCurve3Ds[i] >= -uPrec && uOnCurve3Ds[i] <= 1.0 + uPrec) // check on border or edge
                 {
                     bool added = false;
                     foreach (Vertex vtx in Vertices)

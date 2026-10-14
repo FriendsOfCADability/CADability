@@ -68,12 +68,13 @@ namespace CADability.BooleanSweep
                 {
                     if (expected <= tolerance) status = "OK";
                     // Solid.Unite returns null for disjoint solids and for solids that touch only in a line or a point (no manifold)
-                    else if (c.Operation == Operation.Union && (c.Offset > 0.0 || (c.Offset == 0.0 && c.Variant.LineOrPointContact))) status = "LIMITATION";
+                    // (also for an overlap up to 1e-5, which may be taken as touching)
+                    else if (c.Operation == Operation.Union && (c.Offset > 0.0 || (c.Offset >= -1e-5 && c.Variant.LineOrPointContact))) status = "LIMITATION";
                     else status = "EMPTY";
                 }
                 else if (open > 0) status = "OPEN";
                 // a solid touching the inside of another one cannot be subtracted, the first one is returned unchanged (#449)
-                else if (c.Operation == Operation.AMinusB && c.Variant.BInsideA && c.Offset >= 0.0 && c.Offset <= 1e-5 &&
+                else if (c.Operation == Operation.AMinusB && c.Variant.BInsideA && Math.Abs(c.Offset) <= 1e-5 &&
                     Math.Abs(volume - c.Variant.VolumeA(c.Offset)) <= tolerance) status = "LIMITATION";
                 else if (Math.Abs(volume - expected) > tolerance) status = "VOLUME";
                 else status = "OK";

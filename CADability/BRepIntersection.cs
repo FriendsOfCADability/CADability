@@ -3827,10 +3827,11 @@ namespace CADability
             BoundingCube otherExtent = other.GetExtent(precision);
             bool IsOnOther(GeoPoint p)
             {
-                if (!otherExtent.Contains(p)) return false;
+                // the extent of a planar face has no thickness, a point within precision beside it is outside of it
+                if (!otherExtent.Contains(p, precision)) return false;
                 foreach (Face face in other.Faces)
                 {
-                    if (face.GetExtent(precision).Contains(p) && Math.Abs(face.Distance(p)) < precision) return true;
+                    if (face.GetExtent(precision).Contains(p, precision) && Math.Abs(face.Distance(p)) < precision) return true;
                 }
                 return false;
             }

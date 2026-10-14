@@ -92,5 +92,66 @@ namespace CADability.Tests
             double common = 30 * (200 - (9 - 9 * Math.PI / 4));
             AssertBooleans(box, bar, common, 1e-3);
         }
+
+        private static double VolumeOf(Solid[] result, string what)
+        {
+            Assert.IsNotNull(result, what);
+            foreach (Solid solid in result) Assert.AreEqual(0, solid.Shells[0].OpenEdges.Length, what + ": open edges");
+            return result.Sum(s => s.Volume(1e-4));
+        }
+
+        /// <summary>
+        /// A box reaching into the top face of a cube by less than the precision of the operation (about 1.7e-5 here) touches it.
+        /// No face of either solid was left over, and the test, whether one solid contains the other, took a vertex of the box
+        /// 1e-7 below the top face for a point not on the cube, because the extent of the planar face had no thickness: the
+        /// intersection was the whole box (issue #400, found by tests/CADability.BooleanSweep).
+        /// </summary>
+        [DataTestMethod]
+        [DataRow(1e-7)]
+        [DataRow(1e-6)]
+        [DataRow(1e-5)]
+        public void a_box_reaching_into_a_face_by_less_than_the_precision_touches_it(double depth)
+        {
+            Solid cube = Box(0, 0, 0, 10, 10, 10);
+            Solid box = Box(2, 2, 10 - depth, 6, 6, 5);
+            Assert.AreEqual(0.0, VolumeOf(Solid.Intersect(cube, box), "cube * box"), 36 * depth + 1e-6, "cube * box");
+            Assert.AreEqual(1000.0, Single(Solid.Subtract(cube, box), "cube - box").Volume(1e-4), 36 * depth + 1e-6, "cube - box");
+            Assert.AreEqual(180.0, Single(Solid.Subtract(box, cube), "box - cube").Volume(1e-4), 36 * depth + 1e-6, "box - cube");
+        }
+
+        /// <summary>
+        /// A box 1e-5 above the top face of a cube, within the precision of the operation (1.7e-5). The faces were taken as
+        /// overlapping, but the vertical edges of the box, which end 1e-5 above the face, did not intersect it: the tolerance of
+        /// their parameter was fixed at 1e-6, i.e. 5e-6 for an edge of 5. Without the intersection points the top face of the
+        /// cube was not split, cube - box gave the reversed box, a negative volume, and the union was null (issue #400).
+        /// </summary>
+        [TestMethod]
+        public void a_box_at_the_precision_above_a_face_touches_it()
+        {
+            Solid cube = Box(0, 0, 0, 10, 10, 10);
+            Solid box = Box(2, 2, 10 + 1e-5, 6, 6, 5);
+            Assert.AreEqual(1000.0, Single(Solid.Subtract(cube, box), "cube - box").Volume(1e-4), 1e-3, "cube - box");
+            Assert.AreEqual(180.0, Single(Solid.Subtract(box, cube), "box - cube").Volume(1e-4), 1e-3, "box - cube");
+            Solid union = Solid.Unite(cube, box);
+            Assert.IsNotNull(union, "cube + box");
+            Assert.AreEqual(1180.0, Single(new[] { union }, "cube + box").Volume(1e-4), 1e-3, "cube + box");
+        }
+
+        /// <summary>
+        /// A blind hole whose top is 1e-5 below the top face of the box, within the precision of the operation (1.4e-5): the
+        /// difference was the unchanged box and the union the cylinder alone, for the same reason as in
+        /// <see cref="a_box_at_the_precision_above_a_face_touches_it"/>.
+        /// </summary>
+        [TestMethod]
+        public void a_blind_hole_ending_at_the_precision_below_a_face()
+        {
+            Solid cube = Box(0, 0, 0, 10, 10, 10);
+            Solid cylinder = Make3D.MakeCylinder(new GeoPoint(5, 5, 4), 2 * GeoVector.XAxis, (6 - 1e-5) * GeoVector.ZAxis);
+            double hole = 4 * Math.PI * 6;
+            Assert.AreEqual(1000.0 - hole, VolumeOf(Solid.Subtract(cube, cylinder), "cube - cylinder"), 1e-3, "cube - cylinder");
+            Solid union = Solid.Unite(cube, cylinder);
+            Assert.IsNotNull(union, "cube + cylinder");
+            Assert.AreEqual(1000.0, Single(new[] { union }, "cube + cylinder").Volume(1e-4), 1e-3, "cube + cylinder");
+        }
     }
 }

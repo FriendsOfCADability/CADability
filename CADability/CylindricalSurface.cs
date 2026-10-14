@@ -2226,10 +2226,13 @@ namespace CADability.GeoObject
             if (other is CylindricalSurface)
             {
                 CylindricalSurface othercylinder = other as CylindricalSurface;
-                if (Math.Abs(XAxis.Length - othercylinder.XAxis.Length) < Precision.eps &&
-                Math.Abs(YAxis.Length - othercylinder.YAxis.Length) < Precision.eps &&
+                // the precision passed in, like the other surfaces: with Precision.eps, two cylinders whose radii differ by 1e-6 were
+                // different for a boolean operation with a precision of 3e-5, which then found no intersection curve of them (#400)
+                double prec = precision > 0.0 ? precision : Precision.eps;
+                if (Math.Abs(XAxis.Length - othercylinder.XAxis.Length) < prec &&
+                Math.Abs(YAxis.Length - othercylinder.YAxis.Length) < prec &&
                 Precision.SameDirection(ZAxis, othercylinder.ZAxis, false) &&
-                Geometry.DistPL(othercylinder.Location, Location, ZAxis) < Precision.eps)
+                Geometry.DistPL(othercylinder.Location, Location, ZAxis) < prec)
                 {
                     GeoPoint2D[] src = new GeoPoint2D[3];
                     GeoPoint2D[] dst = new GeoPoint2D[3];

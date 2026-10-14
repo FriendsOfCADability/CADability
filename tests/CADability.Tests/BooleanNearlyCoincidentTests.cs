@@ -161,5 +161,36 @@ namespace CADability.Tests
             Assert.IsNotNull(union, "cube + cylinder");
             Assert.AreEqual(1000.0, Single(new[] { union }, "cube + cylinder").Volume(1e-4), 1e-3, "cube + cylinder");
         }
+
+        /// <summary>
+        /// Two cylinders of radius 5 and 5 + <paramref name="dr"/> on the same axis, the longer one around the shorter one (or inside
+        /// it): within the precision of the operation (3e-5 here) the mantles coincide. CylindricalSurface.SameGeometry compared the
+        /// radii with Precision.eps instead of the precision passed in, so for 1e-6 and 1e-5 the mantles were neither overlapping nor
+        /// intersecting, and the intersection was empty (issue #400).
+        /// </summary>
+        [DataTestMethod]
+        [DataRow(1e-6)]
+        [DataRow(-1e-6)]
+        [DataRow(1e-5)]
+        [DataRow(-1e-5)]
+        public void coaxial_cylinders_whose_radii_differ_by_less_than_the_precision(double dr)
+        {
+            Solid shorter = Make3D.MakeCylinder(GeoPoint.Origin, 5 * GeoVector.XAxis, 10 * GeoVector.ZAxis);
+            Solid longer = Make3D.MakeCylinder(new GeoPoint(0, 0, -5), (5 + dr) * GeoVector.XAxis, 20 * GeoVector.ZAxis);
+            double common = 10 * Math.PI * Math.Pow(Math.Min(5, 5 + dr), 2);
+            double tolerance = 1e-3 + 2 * Math.PI * 5 * 20 * Math.Abs(dr); // the mantle dr thick
+            Assert.AreEqual(common, Single(Solid.Intersect(shorter, longer), "shorter * longer").Volume(1e-4), tolerance, "shorter * longer");
+            Assert.AreEqual(longer.Volume(1e-4) - common, VolumeOf(Solid.Subtract(longer, shorter), "longer - shorter"), tolerance, "longer - shorter");
+        }
+
+        [TestMethod]
+        public void cylinders_are_the_same_geometry_within_the_precision()
+        {
+            CylindricalSurface a = new CylindricalSurface(GeoPoint.Origin, 5 * GeoVector.XAxis, 5 * GeoVector.YAxis, GeoVector.ZAxis);
+            CylindricalSurface b = new CylindricalSurface(new GeoPoint(1e-6, 0, 0), (5 + 1e-6) * GeoVector.XAxis, (5 + 1e-6) * GeoVector.YAxis, GeoVector.ZAxis);
+            BoundingRect bounds = new BoundingRect(0, 0, Math.PI, 10);
+            Assert.IsTrue(a.SameGeometry(bounds, b, bounds, 1e-5, out _), "within 1e-5");
+            Assert.IsFalse(a.SameGeometry(bounds, b, bounds, 1e-7, out _), "not within 1e-7");
+        }
     }
 }

@@ -67,7 +67,7 @@ triangulation matched the exact volume to 1e-8. A large difference between the t
 
 ## baseline.csv
 
-The latest result: 653 OK, 18 VOLUME, 39 EMPTY, 38 LIMITATION, no exceptions, timeouts or crashes. All failures are at
+The latest result: 671 OK, 16 VOLUME, 24 EMPTY, 37 LIMITATION, no exceptions, timeouts or crashes. All failures are at
 offsets of 1e-5 and below, and one at 0 (the union of the crossing cylinders of equal radius).
 
 History:
@@ -76,5 +76,7 @@ History:
   cases fixed, none broken.
 - A box within the precision of the plane a rounded edge is tangent to, not split along the tangent edge: 14 cases fixed,
   none broken.
+- Cylinders whose radii or axes differ by less than the precision not taken as the same surface: 18 cases fixed, none
+  broken.
 
 Replace it with the `sweep.csv` of a newer run when a change fixes cases, so the next comparison starts from there.

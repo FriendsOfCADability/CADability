@@ -68,9 +68,9 @@ namespace CADability.Tests
         }
 
         /// <summary>
-        /// OffsetSurface.GetModified throws for a modification that is not isogonal. A non-uniform scaling counted as
-        /// isogonal before, so scaling a face on an offset surface (e.g. from a STEP OFFSET_SURFACE) non-uniformly must
-        /// still work, with the same approximate offset as before (issue #415), instead of throwing now.
+        /// A non-uniform scaling counted as isogonal before, so scaling a face on an offset surface (e.g. from a STEP
+        /// OFFSET_SURFACE) non-uniformly must still work. Its image is no offset surface; it is approximated now (issue #415).
+        /// <see cref="OffsetSurfaceModifyTests"/> checks the approximation.
         /// </summary>
         [TestMethod]
         public void OffsetSurfaceCanStillBeScaledNonUniformly()
@@ -86,7 +86,8 @@ namespace CADability.Tests
 
             GeoObject.Face nonUniform = face.Clone() as GeoObject.Face;
             nonUniform.Modify(ModOp.Scale(1.0, 2.0, 1.0));
-            Assert.IsInstanceOfType(nonUniform.Surface, typeof(GeoObject.OffsetSurface));
+            Assert.IsInstanceOfType(nonUniform.Surface, typeof(GeoObject.NurbsSurface));
+            Assert.AreEqual(0.0, nonUniform.Surface.PointAt(new GeoPoint2D(0.3, 5)) | ModOp.Scale(1.0, 2.0, 1.0) * before, 1e-5, "non-uniform scaling");
         }
 
         [TestMethod]

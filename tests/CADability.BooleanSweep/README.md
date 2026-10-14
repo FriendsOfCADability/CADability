@@ -62,8 +62,9 @@ The tolerance is 1e-7 of the larger operand plus 1e-6 of the result. For offsets
 well, i.e. solids that are that close may be taken as touching.
 
 The volume is that of a fine triangulation, `Solid.Volume(1e-4)`. `ShellMetrics.IntegratedVolume` is written to the CSV too
-(column `integrated`), but not used: on faces bounded by intersection curves it was up to 1e-4 relative off, where the
-triangulation matched the exact volume to 1e-8. A large difference between the two columns shows a broken result.
+(column `integrated`) for comparison. On faces bounded by intersection curves it was up to 1e-4 relative off until #459;
+on the correct results of the crossing cylinders both now agree to about 1e-9. A large difference between the two columns
+shows a broken result, where some faces of it cannot be integrated and fall back to their triangles.
 
 ## baseline.csv
 

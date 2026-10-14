@@ -68,8 +68,8 @@ shows a broken result, where some faces of it cannot be integrated and fall back
 
 ## baseline.csv
 
-The latest result: 671 OK, 16 VOLUME, 24 EMPTY, 37 LIMITATION, no exceptions, timeouts or crashes. All failures are at
-offsets of 1e-5 and below, and one at 0 (the union of the crossing cylinders of equal radius).
+The latest result: 691 OK, 16 VOLUME, 4 EMPTY, 37 LIMITATION, no exceptions, timeouts or crashes. All failures are those of
+the crossing cylinders of (almost) equal radius (#458), at offsets of 1e-5 and below, and one at 0 (their union).
 
 History:
 - `master` at a96f42bd (14 October 2026): 594 OK, 58 VOLUME, 63 EMPTY, 33 LIMITATION.
@@ -79,5 +79,8 @@ History:
   none broken.
 - Cylinders whose radii or axes differ by less than the precision not taken as the same surface: 18 cases fixed, none
   broken.
+- Grazing contacts below the precision (#457): grazing intersection points of an edge dropped where the edge stays within
+  the precision of the other shell, tangential contacts at edge ends and at borders of overlapping faces added, open edges
+  connected within the precision of the operation: 20 cases fixed, none broken.
 
 Replace it with the `sweep.csv` of a newer run when a change fixes cases, so the next comparison starts from there.

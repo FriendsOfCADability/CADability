@@ -29,6 +29,43 @@ namespace CADability.Tests
             return s * h / 3;
         }
 
+        /// <summary>
+        /// A union reverses both shells and reverses the result back. Reversing a face replaced the ProjectedCurves of its edges by a
+        /// coarse approximation with arcs, so the union of two crossing cylinders of equal radius was 0.05 % too large (#458) and
+        /// the union of two spheres with offset centres 0.03 % too small (#459), while the differences and the intersection were exact.
+        /// </summary>
+        [TestMethod]
+        public void the_union_of_crossing_cylinders_of_equal_radius_is_exact()
+        {
+            Solid a = Make3D.MakeCylinder(new GeoPoint(0, 0, -10), 5 * GeoVector.XAxis, 20 * GeoVector.ZAxis);
+            Solid b = Make3D.MakeCylinder(new GeoPoint(-10, 0, 0), 5 * GeoVector.YAxis, 20 * GeoVector.XAxis);
+            double expected = 1000 * Math.PI - 16.0 * 125 / 3; // two cylinders minus the Steinmetz solid
+            Solid union = Solid.Unite(a, b);
+            Assert.IsNotNull(union);
+            Assert.AreEqual(expected, ShellMetrics.IntegratedVolume(union.Shells[0]), 1e-6 * expected, "integrated");
+            Assert.AreEqual(expected, union.Volume(1e-4), 1e-6 * expected, "triangulated");
+        }
+
+        [DataTestMethod]
+        [DataRow(2.0, 1.0, 5.0, 5.0, 1.0, 0.3, 0.2, 70.0, DisplayName = "axes offset")]
+        [DataRow(1.0, 2.0, 6.0, 3.0, 0.0, 0.0, 1.0, 0.0, DisplayName = "different radii")]
+        [DataRow(0.0, 0.0, 6.0, 5.0, 1.0, 0.3, 0.2, 30.0, DisplayName = "coaxial, the second sphere tilted")]
+        public void the_union_of_two_spheres_is_exact(double x, double y, double z, double radius, double ax, double ay, double az, double degrees)
+        {
+            GeoPoint center = new GeoPoint(x, y, z);
+            Solid a = Make3D.MakeSphere(GeoPoint.Origin, 5.0);
+            Solid b = Make3D.MakeSphere(center, radius);
+            if (degrees != 0.0) b.Modify(ModOp.Rotate(center, new GeoVector(ax, ay, az), SweepAngle.Deg(degrees)));
+            double d = center.ToVector().Length, r1 = 5.0, r2 = radius;
+            double lens = Math.PI * Math.Pow(r1 + r2 - d, 2) * (d * d + 2 * d * r2 - 3 * r2 * r2 + 2 * d * r1 + 6 * r2 * r1 - 3 * r1 * r1) / (12 * d);
+            double expected = 4.0 / 3.0 * Math.PI * (r1 * r1 * r1 + r2 * r2 * r2) - lens;
+            Solid union = Solid.Unite(a, b);
+            Assert.IsNotNull(union);
+            // was 2e-4 to 4e-4 relative off with both methods
+            Assert.AreEqual(expected, ShellMetrics.IntegratedVolume(union.Shells[0]), 1e-6 * expected, "integrated");
+            Assert.AreEqual(expected, union.Volume(1e-4), 1e-5 * expected, "triangulated");
+        }
+
         [DataTestMethod]
         [DataRow(2.5e-3, DisplayName = "B slightly wider")]
         [DataRow(-2.5e-3, DisplayName = "B slightly narrower")]

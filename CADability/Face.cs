@@ -9267,6 +9267,15 @@ namespace CADability.GeoObject
             GeoPoint2D dbgv1 = surface.PositionOf(Vertices[0].Position);
 #endif
             BoundingRect modifiedBounds = Area.GetExtent();
+            // ModifyCurve2D replaces a ProjectedCurve by an approximation with arcs (GeneralCurve2D.GetModified), which was up to
+            // 1e-3 off: the union of two spheres, which reverses both shells, was 0.03 % too small (#459), and that of two crossing
+            // cylinders of equal radius 0.05 % too large (#458). Such a curve is approximated again below from its 3d curve, much
+            // finer. Not for a seam, whose two 2d curves on this face are told apart by the order they are modified in.
+            HashSet<Edge> projected = new HashSet<Edge>();
+            foreach (Edge edg in AllEdges)
+            {
+                if (edg.PrimaryFace != edg.SecondaryFace && edg.Curve3D != null && edg.Curve2D(this) is ProjectedCurve) projected.Add(edg);
+            }
             ModOp2D m = surface.ReverseOrientation();
             modifiedBounds.Modify(m);
             ICurve2D[] segments = new ICurve2D[outline.Length];
@@ -9339,6 +9348,36 @@ namespace CADability.GeoObject
                 else if (edg.Curve3D is CurveOnSurface cons && cons.Surface == Surface)
                 {   // the 2d curve of a CurveOnSurface lives in the parameter system of the surface, which has changed
                     cons.SurfaceModified(m);
+                }
+                else if (projected.Contains(edg))
+                {
+                    ICurve2D approximated = edg.Curve2D(this);
+                    ICurve2D exact = new ProjectedCurve(edg.Curve3D, surface, true, modifiedBounds); // every point in the period of this face
+                    if (approximated != null && exact != null)
+                    {
+                        SurfaceHelper.AdjustPeriodic(surface, modifiedBounds, exact);
+                        if ((exact.StartPoint | approximated.EndPoint) < (exact.StartPoint | approximated.StartPoint)) exact.Reverse();
+                        double tolerance = 1e-6 * Math.Max(modifiedBounds.Size, 1e-6);
+                        // the same ends, and the same way between them, not the other way around a periodic surface
+                        bool same = (exact.StartPoint | approximated.StartPoint) < tolerance && (exact.EndPoint | approximated.EndPoint) < tolerance &&
+                            (exact.StartPoint | exact.EndPoint) > tolerance; // a closed curve could go either way
+                        for (int k = 1; k < 8 && same; k++)
+                        {
+                            same = approximated.MinDistance(exact.PointAt(k / 8.0)) < 1e-2 * Math.Max(approximated.Length, 1e-6) &&
+                                exact.MinDistance(approximated.PointAt(k / 8.0)) < 1e-2 * Math.Max(approximated.Length, 1e-6);
+                        }
+                        if (same)
+                        {   // arcs like before, but within 1e-7 of the domain. Not the ProjectedCurve itself: it keeps the surface, which
+                            // is changed in place when the face is reversed again, and close to the pole of a sphere it made the
+                            // triangulation of the face fail at a coarse precision
+                            ICurve2D fine = exact.Approximate(false, 1e-7 * Math.Max(modifiedBounds.Size, 1e-6));
+                            if (fine != null)
+                            {
+                                if (edg.PrimaryFace == this) edg.PrimaryCurve2D = fine;
+                                else edg.SecondaryCurve2D = fine;
+                            }
+                        }
+                    }
                 }
             }
             area = null;

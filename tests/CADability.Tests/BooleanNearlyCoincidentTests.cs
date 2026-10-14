@@ -83,6 +83,12 @@ namespace CADability.Tests
         [DataRow(3e-8, 3e-7)]
         [DataRow(3e-8, -3e-7)]
         [DataRow(3e-8, 1e-6)]
+        // below the tangent plane the box does not cut the rounding, and 1e-5 above it, the cut is too far from the tangent edge to
+        // be moved onto it: the bottom of the box was not split along the tangent edge, box - bar was empty (issue #400)
+        [DataRow(0.0, -1e-7)]
+        [DataRow(0.0, -3e-7)]
+        [DataRow(0.0, 1e-5)]
+        [DataRow(3e-8, 1e-5)]
         public void a_box_nearly_on_the_tangent_plane_of_a_rounded_edge(double tilt, double dz)
         {
             Solid bar = FilletBar(100);
@@ -90,7 +96,9 @@ namespace CADability.Tests
             if (tilt != 0.0) box.Modify(ModOp.Rotate(new GeoPoint(0, -10, dz), GeoVector.XAxis, new SweepAngle(tilt)));
             // the common part is 20 x 10 of the profile, without the corner outside the rounding, and 30 long
             double common = 30 * (200 - (9 - 9 * Math.PI / 4));
-            AssertBooleans(box, bar, common, 1e-3);
+            // within the precision of the operation (1.1e-4), the box may also be taken as lying on the plane: a slab of the
+            // contact area (20 x 30) and dz thick
+            AssertBooleans(box, bar, common, Math.Max(1e-3, 600 * Math.Abs(dz)));
         }
 
         private static double VolumeOf(Solid[] result, string what)

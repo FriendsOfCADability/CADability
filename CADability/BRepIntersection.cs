@@ -1639,6 +1639,7 @@ namespace CADability
                                 if (!edgesToSplit.ContainsKey(touchedEdges[j])) edgesToSplit[touchedEdges[j]] = new List<Vertex>();
                                 edgesToSplit[touchedEdges[j]].Add(v);
                             }
+                            AddToNeighbourOfOverlappingFace(ef.edge, touchedEdges[j].OtherFace(ef.face), iv);
                         }
                     }
                     if (operation == Operation.testonly) return; // ein Schnittpunkt reicht hier
@@ -1662,6 +1663,114 @@ namespace CADability
                 if (pos >= 0.0 && pos <= 1.0) res = Math.Max(res, face.Surface.PointAt(c2d.PointAt(pos)) | p);
             }
             return res;
+        }
+        /// <summary>
+        /// <paramref name="iv"/> is an intersection point of <paramref name="edge"/> with a face on its border, which it shares with
+        /// <paramref name="neighbour"/>, so the point also lies on <paramref name="neighbour"/>. The edge is not intersected with
+        /// <paramref name="neighbour"/>, when one of the faces of the edge overlaps it (the edge lies in it); then the point is added
+        /// here for the other face of the edge. E.g. where the tangent edge of a rounding leaves the side of a box whose bottom lies
+        /// within the precision in the plane the rounding is tangent to: the point on the border between the side and the bottom of
+        /// the box is needed on the bottom too, to intersect the bottom with the rounding along the tangent edge and split it there.
+        /// </summary>
+        private void AddToNeighbourOfOverlappingFace(Edge edge, Face neighbour, IntersectionVertex iv)
+        {
+            if (neighbour == null || !faceToOverlappingFaces.TryGetValue(neighbour, out HashSet<Face> overlapping)) return;
+            if (!overlapping.Contains(edge.PrimaryFace) && (edge.SecondaryFace == null || !overlapping.Contains(edge.SecondaryFace))) return;
+            foreach (Face face in new Face[] { edge.PrimaryFace, edge.SecondaryFace })
+            {
+                if (face == null || overlapping.Contains(face)) continue;
+                iv.v.AddPositionOnFace(neighbour, neighbour.Surface.PositionOf(iv.v.Position));
+                IntersectionVertex onNeighbour = new IntersectionVertex
+                {
+                    v = iv.v, edge = edge, face = neighbour, uOnEdge = iv.uOnEdge, edgeIsOn1 = iv.edgeIsOn1, isOnFaceBorder = true,
+                };
+                if (iv.edgeIsOn1) AddFacesToIntersectionVertices(face, neighbour, onNeighbour);
+                else AddFacesToIntersectionVertices(neighbour, face, onNeighbour);
+                intersectionVertices.Add(onNeighbour);
+            }
+        }
+        private static bool HasCurveThroughTwoPoints(double[,] params3d)
+        {
+            if (params3d == null) return false;
+            for (int i = 0; i < params3d.GetLength(0); i++)
+            {
+                int n = 0;
+                for (int j = 0; j < params3d.GetLength(1); j++) if (params3d[i, j] != double.MinValue) ++n;
+                if (n >= 2) return true;
+            }
+            return false;
+        }
+        /// <summary>
+        /// The surfaces of <paramref name="face1"/> and <paramref name="face2"/> have no intersection curve through the intersection
+        /// <paramref name="points"/>, but one of the faces is tangent to the other one along one of its edges, where it meets a face
+        /// that overlaps the other one: e.g. a rounding is tangent along its edge to the bottom of a box, which lies 1e-5 above the
+        /// plane of the rounding. 1e-7 above it would cut the rounding close to the edge, and the intersection points would be moved
+        /// onto the edge (<see cref="SnapTangentialIntersection"/>); further away the surfaces do not meet, but the face of the box
+        /// still has to be split along that edge. Returns the curve of the edge as the intersection curve, in the form
+        /// Surfaces.Intersect returns it.
+        /// </summary>
+        private bool TangentialContactAlongEdge(Face face1, Face face2, List<GeoPoint> points, out ICurve[] c3ds, out ICurve2D[] crvsOnSurface1, out ICurve2D[] crvsOnSurface2,
+            out double[,] params3d, out double[,] params2dFace1, out double[,] params2dFace2, out GeoPoint2D[] paramsuvsurf1, out GeoPoint2D[] paramsuvsurf2)
+        {
+            c3ds = null; crvsOnSurface1 = null; crvsOnSurface2 = null; params3d = null; params2dFace1 = null; params2dFace2 = null; paramsuvsurf1 = null; paramsuvsurf2 = null;
+            if (points.Count < 2) return false;
+            foreach ((Face onFace, Face other) in new[] { (face1, face2), (face2, face1) })
+            {
+                if (!faceToOverlappingFaces.TryGetValue(other, out HashSet<Face> overlappingOther)) continue;
+                foreach (Edge edge in onFace.AllEdges)
+                {
+                    ICurve curve = edge.Curve3D;
+                    if (curve == null || !overlappingOther.Contains(edge.OtherFace(onFace))) continue; // only an edge to a face overlapping the other face
+                    double[] u = new double[points.Count];
+                    int onCurve = 0;
+                    for (int j = 0; j < points.Count; j++)
+                    {
+                        u[j] = double.MinValue;
+                        if (curve.DistanceTo(points[j]) < precision)
+                        {
+                            u[j] = curve.PositionOf(points[j]);
+                            ++onCurve;
+                        }
+                    }
+                    if (onCurve < 2) continue;
+                    double umin = u.Where(x => x != double.MinValue).Min(), umax = u.Where(x => x != double.MinValue).Max();
+                    // the part of the edge between the points lies on the other surface, which is tangent there
+                    bool tangent = true;
+                    for (int k = 0; k <= 4 && tangent; k++)
+                    {
+                        GeoPoint p = curve.PointAt(umin + k * (umax - umin) / 4);
+                        tangent = Math.Abs(other.Surface.GetDistance(p)) < precision &&
+                            Precision.SameDirection(face1.Surface.GetNormal(face1.Surface.PositionOf(p)), face2.Surface.GetNormal(face2.Surface.PositionOf(p)), false);
+                    }
+                    if (!tangent) continue;
+                    ICurve c3d = curve.Clone();
+                    ICurve2D c1 = face1.Surface.GetProjectedCurve(c3d, 0.0);
+                    ICurve2D c2 = face2.Surface.GetProjectedCurve(c3d, 0.0);
+                    if (c1 == null || c2 == null) continue;
+                    SurfaceHelper.AdjustPeriodic(face1.Surface, face1.Domain, c1);
+                    SurfaceHelper.AdjustPeriodic(face2.Surface, face2.Domain, c2);
+                    c3ds = new ICurve[] { c3d };
+                    crvsOnSurface1 = new ICurve2D[] { c1 };
+                    crvsOnSurface2 = new ICurve2D[] { c2 };
+                    params3d = new double[1, points.Count];
+                    params2dFace1 = new double[1, points.Count];
+                    params2dFace2 = new double[1, points.Count];
+                    paramsuvsurf1 = new GeoPoint2D[points.Count];
+                    paramsuvsurf2 = new GeoPoint2D[points.Count];
+                    for (int j = 0; j < points.Count; j++)
+                    {
+                        paramsuvsurf1[j] = face1.Surface.PositionOf(points[j]);
+                        paramsuvsurf2[j] = face2.Surface.PositionOf(points[j]);
+                        SurfaceHelper.AdjustPeriodic(face1.Surface, face1.Domain, ref paramsuvsurf1[j]);
+                        SurfaceHelper.AdjustPeriodic(face2.Surface, face2.Domain, ref paramsuvsurf2[j]);
+                        params3d[0, j] = u[j];
+                        params2dFace1[0, j] = u[j] == double.MinValue ? double.MinValue : c1.PositionOf(paramsuvsurf1[j]);
+                        params2dFace2[0, j] = u[j] == double.MinValue ? double.MinValue : c2.PositionOf(paramsuvsurf2[j]);
+                    }
+                    return true;
+                }
+            }
+            return false;
         }
         /// <summary>
         /// How far the intersection curve of the surfaces of <paramref name="face1"/> and <paramref name="face2"/> may be from <paramref name="p"/>,
@@ -9554,7 +9663,14 @@ namespace CADability
                 double[,] params2dFace2;
                 GeoPoint2D[] paramsuvsurf1;
                 GeoPoint2D[] paramsuvsurf2;
-                if (Surfaces.Intersect(item.Key.face1.Surface, item.Key.face1.Area.GetExtent(), item.Key.face2.Surface, item.Key.face2.Area.GetExtent(), points, out c3ds, out crvsOnSurface1, out crvsOnSurface2, out params3d, out params2dFace1, out params2dFace2, out paramsuvsurf1, out paramsuvsurf2, precision, pointPrecision))
+                bool intersects = Surfaces.Intersect(item.Key.face1.Surface, item.Key.face1.Area.GetExtent(), item.Key.face2.Surface, item.Key.face2.Area.GetExtent(), points, out c3ds, out crvsOnSurface1, out crvsOnSurface2, out params3d, out params2dFace1, out params2dFace2, out paramsuvsurf1, out paramsuvsurf2, precision, pointPrecision);
+                if ((!intersects || !HasCurveThroughTwoPoints(params3d)) &&
+                    TangentialContactAlongEdge(item.Key.face1, item.Key.face2, points, out ICurve[] tc3ds, out ICurve2D[] tcrvs1, out ICurve2D[] tcrvs2, out double[,] tparams3d, out double[,] tparams2d1, out double[,] tparams2d2, out GeoPoint2D[] tuv1, out GeoPoint2D[] tuv2))
+                {
+                    intersects = true;
+                    c3ds = tc3ds; crvsOnSurface1 = tcrvs1; crvsOnSurface2 = tcrvs2; params3d = tparams3d; params2dFace1 = tparams2d1; params2dFace2 = tparams2d2; paramsuvsurf1 = tuv1; paramsuvsurf2 = tuv2;
+                }
+                if (intersects)
                 {
                     if (usedVertices.Count < points.Count)
                     {

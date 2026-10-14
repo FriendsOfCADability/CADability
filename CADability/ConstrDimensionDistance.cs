@@ -4,7 +4,11 @@ using CADability.GeoObject;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a distance dimension (<see cref="Dimension.EDimType.DimPoints"/>) between two curves.
+    /// The user picks two objects that lie in a common plane; the dimension measures the minimum distance
+    /// between them near the pick positions. If there is no object under the cursor, the mouse position
+    /// itself is used as one end of the distance. The optional third input moves the dimension line.
+    /// Started with the action id "Constr.Dimension.Distance" (menu command "MenuId.Constr.Distance.Dimension").
     /// </summary>
     internal class ConstrDimensionDistance : ConstructAction
     {

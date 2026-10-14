@@ -5,9 +5,6 @@ using System.Runtime.Serialization;
 using CADability.UserInterface;
 
 
-/// <summary>
-/// Namespace GeoObject
-/// </summary>
 namespace CADability.GeoObject
 {
     using System.Collections.Generic;
@@ -24,8 +21,27 @@ namespace CADability.GeoObject
     public delegate void ChangeDelegate(IGeoObject Sender, GeoObjectChange Change);
 
 
+    /// <summary>
+    /// Receives the objects of a <see cref="Model"/> sorted into the display lists that the renderer paints one after
+    /// the other: <see cref="IGeoObject.PaintTo3DList"/> of each object calls <see cref="Add"/> to say which lists the
+    /// object belongs to. The lists are kept per <see cref="Layer"/>, so that visibility and transparency of a layer can
+    /// be applied to all of its objects at once. Implemented by <see cref="Model"/>; not intended to be implemented by
+    /// user code.
+    /// </summary>
     public interface ICategorizedDislayLists
     {
+        /// <summary>
+        /// Adds <paramref name="go"/> to the display lists of <paramref name="layer"/>. With <paramref name="addToFace"/>
+        /// the object is painted together with the faces (opaque surfaces, painted first), with <paramref name="addToLinear"/>
+        /// together with the curves (painted after the faces, so they are not hidden by faces they lie on); both flags may be
+        /// set for an object that has faces and edges. With neither flag the object goes to the list of transparent objects,
+        /// which is painted last. An <see cref="UnscaledGeoObject"/> is always collected in a list of its own, regardless of
+        /// the flags.
+        /// </summary>
+        /// <param name="layer">the layer whose lists receive the object; null for objects without a layer</param>
+        /// <param name="addToFace">true to paint the object together with the faces</param>
+        /// <param name="addToLinear">true to paint the object together with the curves</param>
+        /// <param name="go">the object to add</param>
         void Add(Layer layer, bool addToFace, bool addToLinear, IGeoObject go);
     }
     internal struct DelayedDisplayObject
@@ -180,23 +196,70 @@ namespace CADability.GeoObject
         void Add(IGeoObject toAdd);
     }
 
+    /// <summary>
+    /// Flags that say which attributes an object takes from the <see cref="Block"/> it belongs to ("by block") instead
+    /// of carrying a value of its own. The values can be combined. Currently not evaluated by CADability: a color that
+    /// comes from the block is expressed by a <see cref="ColorDef"/> with <see cref="ColorDef.ColorSource.fromParent"/>.
+    /// </summary>
     public enum AttributeUsage
     {
-        ColorByBlock = 0x01, LayerByBlock = 0x02, LinePatternByBlock = 0x04,
+        /// <summary>
+        /// The color is taken from the block.
+        /// </summary>
+        ColorByBlock = 0x01,
+        /// <summary>
+        /// The layer is taken from the block.
+        /// </summary>
+        LayerByBlock = 0x02,
+        /// <summary>
+        /// The line pattern is taken from the block.
+        /// </summary>
+        LinePatternByBlock = 0x04,
+        /// <summary>
+        /// The line width is taken from the block.
+        /// </summary>
         LineWidthByBlock = 0x08
     }
 
-    public enum ExtentPrecision { Raw, Exact }
+    /// <summary>
+    /// Selects how precisely <see cref="IGeoObject.GetExtent(Projection, ExtentPrecision)"/> and
+    /// <see cref="IGeoObject.GetQuadTreeItem"/> compute the 2d extent of an object.
+    /// </summary>
+    public enum ExtentPrecision
+    {
+        /// <summary>
+        /// A quick estimate that may be larger than the real extent, e.g. the projection of the 3d bounding box
+        /// or of the control points. Sufficient for display lists, quad trees and similar purposes.
+        /// </summary>
+        Raw,
+        /// <summary>
+        /// The exact extent of the projected object.
+        /// </summary>
+        Exact
+    }
 
 
+    /// <summary>
+    /// An item of a 2d <see cref="QuadTree"/> of projected objects that also knows its depth: in addition to the 2d extent
+    /// and the hit test of <see cref="IQuadTreeInsertable"/> it tells how far in front of the viewer the object is at a
+    /// given 2d point, which decides which of several objects under the cursor is in front and gets picked.
+    /// <see cref="IGeoObject.GetQuadTreeItem"/> returns such an item; composite objects return a
+    /// <see cref="QuadTreeCollection"/> of the items of their parts.
+    /// </summary>
     public interface IQuadTreeInsertableZ : IQuadTreeInsertable
     {
+        /// <summary>
+        /// Returns the depth of the object at the 2d point <paramref name="p"/> of the projection: the z coordinate in the
+        /// coordinate system of the projection, larger values being closer to the viewer. For a collection of items it is
+        /// the maximum over the parts; where the object does not cover the point the value is not meaningful.
+        /// </summary>
+        /// <param name="p">the point in the 2d coordinates of the projection</param>
+        /// <returns>the z position of the object at that point</returns>
         double GetZPosition(GeoPoint2D p);
     }
 
     /// <summary>
-    /// IGeoObject is the interface that all geometric entities must support
-    /// (see <a href="c90ccd0b-e1de-4859-8d4d-20e516a766cd.htm">GeoObject</a>).
+    /// IGeoObject is the interface that all geometric entities must support.
     /// </summary>
 
     public interface IGeoObject : ILayer, IStyle, IOctTreeInsertable, IComparable
@@ -383,11 +446,20 @@ namespace CADability.GeoObject
         /// <param name="paintTo3D"></param>
         void PrePaintTo3D(IPaintTo3D paintTo3D);
         /// <summary>
-        /// Paint the object to the 3D display machine and returns a (possibly cached) displaylist
+        /// Paints the object with the methods of <paramref name="paintTo3D"/>: lines, triangles, text... The views implement
+        /// <see cref="IPaintTo3D"/> (with OpenGL or GDI) and collect what the object paints in a display list, so this is
+        /// called rarely, after <see cref="PrepareDisplayList"/> has done the expensive work (triangulation, approximation).
         /// </summary>
         /// <param name="paintTo3D">where to paint</param>
-        // IPaintTo3DList GetDisplayList(IPaintTo3D paintTo3D); // wird ersetzt durch folgendes:
         void PaintTo3D(IPaintTo3D paintTo3D);
+        /// <summary>
+        /// Paints the object into the display lists of a view, sorted by category: the object adds itself, or its parts,
+        /// to <paramref name="lists"/> as faces, edges, curves, text... with their layer, so that the view can draw the categories
+        /// in the right order and with the right settings (e.g. edges on top of faces). Simple objects add themselves as a whole,
+        /// solids and shells add their faces and edges separately.
+        /// </summary>
+        /// <param name="paintTo3D">the paint interface of the view</param>
+        /// <param name="lists">the display lists to add to</param>
         void PaintTo3DList(IPaintTo3D paintTo3D, ICategorizedDislayLists lists);
         /// <summary>
         /// This method will be called from a background thread when a higher precision
@@ -398,11 +470,42 @@ namespace CADability.GeoObject
         /// </summary>
         /// <param name="precision">The required precision</param>
         void PrepareDisplayList(double precision);
+        /// <summary>
+        /// A number that is unique among all objects of this process. Used to identify objects, e.g. as keys in dictionaries.
+        /// </summary>
         int UniqueId { get; }
+        /// <summary>
+        /// The kind of object for the purpose of the default styles (see <see cref="Style.EDefaultFor"/>):
+        /// <see cref="Project.SetDefaults"/> gives the object the default style of this kind.
+        /// </summary>
         Style.EDefaultFor PreferredStyle { get; }
+        /// <summary>
+        /// Returns the 2d extent of the object as it appears in the given projection, in the coordinates of the
+        /// projection's plane (not in pixels).
+        /// </summary>
+        /// <param name="projection">the projection</param>
+        /// <param name="extentPrecision"><see cref="ExtentPrecision.Exact"/> for the exact extent, <see cref="ExtentPrecision.Raw"/>
+        /// for a quick estimate that may be larger</param>
+        /// <returns>the extent in the projection's 2d coordinates</returns>
         BoundingRect GetExtent(Projection projection, ExtentPrecision extentPrecision);
+        /// <summary>
+        /// Returns an item for a 2d quad tree of the projected objects, used for hit tests in a projection: it knows the
+        /// 2d extent of the object, whether a 2d rectangle hits it, and the depth (z position) of the object at a 2d point.
+        /// Composite objects (blocks, solids, paths) return a collection of the items of their parts.
+        /// </summary>
+        /// <param name="projection">the projection</param>
+        /// <param name="extentPrecision">precision of the extent, see <see cref="GetExtent(Projection, ExtentPrecision)"/></param>
+        /// <returns>the item for the quad tree</returns>
         IQuadTreeInsertableZ GetQuadTreeItem(Projection projection, ExtentPrecision extentPrecision);
+        /// <summary>
+        /// The objects this object consists of and owns, e.g. the shells of a solid or the faces of a shell. Empty for
+        /// simple objects.
+        /// </summary>
         IGeoObject[] OwnedItems { get; }
+        /// <summary>
+        /// Whether the object is displayed. Invisible objects stay in the model, are saved and take part in the extent, but
+        /// are not drawn and not picked.
+        /// </summary>
         bool IsVisible { get; set; }
         /// <summary>
         /// Propagates the layer and color from the owner (usually a <see cref="BlockRef"/>) to this object.
@@ -410,6 +513,11 @@ namespace CADability.GeoObject
         /// <param name="layer">The layer</param>
         /// <param name="colorDef">The color</param>
         void PropagateAttributes(Layer layer, ColorDef colorDef);
+        /// <summary>
+        /// Decomposes the object into simpler objects, e.g. a block into its children, a path into its curves or a shell into
+        /// its faces. Returns null when there is nothing simpler.
+        /// </summary>
+        /// <returns>the parts, or null</returns>
         GeoObjectList Decompose();
         /// <summary>
         /// Gets or sets an actuator or drive that defines the mechanical constraint or degree of freedom for this object
@@ -544,6 +652,18 @@ namespace CADability.GeoObject
         /// </summary>
         protected class ChangingAttribute : Changing
         {
+            /// <summary>
+            /// Creates a <see cref="Changing{T}"/> for the change of an attribute of <paramref name="geoObject"/>: the change is
+            /// reported with <see cref="GeoObjectChange.OnlyAttributeChanged"/> set, and undo restores <paramref name="oldValue"/>
+            /// through the property <paramref name="propertyName"/>. Use it as
+            /// <c>using (ChangingAttribute.Create(this, colorDef)) { colorDef = value; }</c> in the setter of the attribute
+            /// property; the compiler supplies the property name.
+            /// </summary>
+            /// <typeparam name="T">the type of the attribute</typeparam>
+            /// <param name="geoObject">the object being changed</param>
+            /// <param name="oldValue">the value of the attribute before the change</param>
+            /// <param name="propertyName">the name of the property being set; supplied by the compiler when omitted</param>
+            /// <returns>the object to dispose when the change is done</returns>
             new public static Changing<T> Create<T>(IGeoObjectImpl geoObject, T oldValue, [CallerMemberName] string propertyName = null) where T : INamedAttribute
                 => new Changing<T>(geoObject, oldValue, true, propertyName);
 
@@ -559,6 +679,15 @@ namespace CADability.GeoObject
             {
             }
         }
+        /// <summary>
+        /// Wraps a change of the property <paramref name="propertyName"/> of <paramref name="geoObject"/> for code outside
+        /// the class of the object: the returned object raises <see cref="WillChangeEvent"/> at once, with the current value
+        /// of the property (read by reflection) as the value to restore on undo, and raises <see cref="DidChangeEvent"/> when
+        /// it is disposed. Not used within CADability itself.
+        /// </summary>
+        /// <param name="geoObject">the object to change</param>
+        /// <param name="propertyName">the name of a public property of the object that has a getter and a setter</param>
+        /// <returns>the object to dispose when the change is done</returns>
         public static IDisposable MakeChange(IGeoObjectImpl geoObject, string propertyName)
         {
             return new Changing(geoObject, propertyName);
@@ -576,6 +705,16 @@ namespace CADability.GeoObject
             private readonly string _propertyName;
             private readonly GeoObjectChange _change;
 
+            /// <summary>
+            /// Starts a change of <paramref name="geoObject"/>. Changes may be nested; if this is the outermost change and
+            /// someone listens, <see cref="IGeoObjectImpl.FireWillChange"/> is called with a <see cref="GeoObjectChange"/> that
+            /// names the property and its old value, so that undo can set the property back. Dispose the struct when the change
+            /// is done. Usually created through <see cref="Changing.Create{T}"/> or <see cref="ChangingAttribute.Create{T}"/>.
+            /// </summary>
+            /// <param name="geoObject">the object being changed</param>
+            /// <param name="oldValue">the value of the property before the change</param>
+            /// <param name="isAttribute">true if only an attribute changes and not the geometry, see <see cref="GeoObjectChange.OnlyAttributeChanged"/></param>
+            /// <param name="propertyName">the name of the property being changed; supplied by the compiler when omitted</param>
             public Changing(IGeoObjectImpl geoObject, T oldValue, bool isAttribute, [CallerMemberName] string propertyName = null)
             {
                 _geoObject = geoObject;
@@ -591,6 +730,10 @@ namespace CADability.GeoObject
                 }
             }
 
+            /// <summary>
+            /// Ends the change. When this was the outermost change, <see cref="IGeoObjectImpl.FireDidChange"/> is called, which
+            /// raises <see cref="IGeoObjectImpl.DidChangeEvent"/> and <see cref="IGeoObjectImpl.FeedBackChangedEvent"/>.
+            /// </summary>
             public void Dispose()
             {
                 if (--_geoObject.isChanging == 0 && (_geoObject.DidChangeEvent != null || _geoObject.FeedBackChangedEvent != null || _geoObject.owner is Edge))
@@ -614,6 +757,18 @@ namespace CADability.GeoObject
         /// </summary>
         protected class Changing : IDisposable
         {
+            /// <summary>
+            /// Creates a <see cref="Changing{T}"/> for a change of the geometry of <paramref name="geoObject"/> through the
+            /// property <paramref name="propertyName"/>: undo sets the property back to <paramref name="oldValue"/>. Use it as
+            /// <c>using (Changing.Create(this, startPoint)) { startPoint = value; }</c> in the setter of the property; the
+            /// compiler supplies the property name. Unlike the constructors of <see cref="Changing"/> it uses no reflection and
+            /// allocates only when the events are actually raised.
+            /// </summary>
+            /// <typeparam name="T">the type of the property</typeparam>
+            /// <param name="geoObject">the object being changed</param>
+            /// <param name="oldValue">the value of the property before the change</param>
+            /// <param name="propertyName">the name of the property being set; supplied by the compiler when omitted</param>
+            /// <returns>the object to dispose when the change is done</returns>
             public static Changing<T> Create<T>(IGeoObjectImpl geoObject, T oldValue, [CallerMemberName] string propertyName = null)
                 => new Changing<T>(geoObject, oldValue, false, propertyName);
 
@@ -712,6 +867,8 @@ namespace CADability.GeoObject
             /// when there is an undo.
             /// </summary>
             /// <param name="geoObject">the GeoObject</param>
+            /// <param name="UndoNecessary">true, if undo is required</param>
+            /// <param name="onlyAttribute">true, if only an attribute is changed in contrast to a change of the geometry</param>
             public Changing(IGeoObjectImpl geoObject, bool UndoNecessary, bool onlyAttribute)
             {
                 ++geoObject.isChanging;
@@ -831,7 +988,9 @@ namespace CADability.GeoObject
             //paintFacesCache = new Dictionary<IPaintTo3D, IPaintTo3DList>();
             //paintCurvesCache = new Dictionary<IPaintTo3D, IPaintTo3DList>();
             isModifyingWithMouse = false;
-            uniqueId = ++UniqueIdCounter; // kann der Counter überlaufen? Wie geht das Increment mit Überlauf?
+            // objects created at the same time on different threads (parallel STEP import, boolean operations) must
+            // not share an id: UniqueId orders objects in CompareTo and identifies them in the display lists
+            uniqueId = System.Threading.Interlocked.Increment(ref UniqueIdCounter);
             visible = true;
 #if DEBUG
             if (5845 == uniqueId)
@@ -903,11 +1062,25 @@ namespace CADability.GeoObject
             //    visible = true;
             //}
         }
+        /// <summary>
+        /// Constructor for derived classes that read the legacy binary serialization themselves by enumerating the
+        /// <see cref="SerializationInfo"/>, which is faster than looking up each value by name. They call this constructor
+        /// instead of <see cref="IGeoObjectImpl(SerializationInfo, StreamingContext)"/> and pass the entries that belong to
+        /// this base class to <see cref="SetSerializationValue"/>.
+        /// </summary>
+        /// <param name="context">the context of the deserialization</param>
         protected IGeoObjectImpl(StreamingContext context)
             : this()
         {   // nur für das tabellarische Einlesen
         }
 
+        /// <summary>
+        /// Stores one entry of the legacy binary serialization that belongs to this base class ("UserData", "Layer",
+        /// "Style", "UserAttributes" or "Actuator"); entries with other names are ignored. Called by derived classes that
+        /// enumerate the <see cref="SerializationInfo"/> themselves, see <see cref="IGeoObjectImpl(StreamingContext)"/>.
+        /// </summary>
+        /// <param name="Name">the name of the entry</param>
+        /// <param name="Value">the deserialized value of the entry</param>
         protected void SetSerializationValue(string Name, object Value)
         {
             switch (Name)
@@ -935,6 +1108,11 @@ namespace CADability.GeoObject
             --InstanceCounter;
         }
 #endif
+        /// <summary>
+        /// A number that is unique among all GeoObjects of this process. It is assigned when the object is constructed and
+        /// is not saved. It orders objects in <see cref="IComparable.CompareTo(object)"/> and identifies them, e.g. as keys
+        /// in dictionaries and in display lists.
+        /// </summary>
         public int UniqueId { get { return uniqueId; } }
         /// <summary>
         /// Event that is raised when the GeoObject is about to change.
@@ -944,6 +1122,11 @@ namespace CADability.GeoObject
         /// Event that is raised when the GeoObject did change.
         /// </summary>
         public event ChangeDelegate DidChangeEvent;
+        /// <summary>
+        /// Raised after every change of this object, together with <see cref="DidChangeEvent"/>, but without the details of
+        /// the change. Implements <see cref="IFeedBack.FeedBackChangedEvent"/>, so that any GeoObject can serve as the
+        /// feedback object of an <see cref="Actions.Action"/>, which repaints the feedback when the event is raised.
+        /// </summary>
         public event FeedBackChangedDelegate FeedBackChangedEvent;
         /// <summary>
         /// Helper method to rais the <see cref="WillChangeEvent"/>.
@@ -982,11 +1165,7 @@ namespace CADability.GeoObject
             }
             return null;
         }
-        /// <summary>
-        /// Overrides <see cref="IGeoObject.Modify"/>. Must be implemented by each GeoObject.
-        /// No default implementation.
-        /// </summary>
-        /// <param name="m">the modification</param>
+        /// <inheritdoc/>
         public abstract void Modify(ModOp m);
         /// <summary>
         /// Modify with the inverse modification. Calls Modify(m.GetInverse());
@@ -996,10 +1175,7 @@ namespace CADability.GeoObject
         {
             Modify(m.GetInverse());
         }
-        /// <summary>
-        /// Overrides <see cref="IGeoObject.Clone"/>. Must be implemented by each GeoObject. No default implementation.
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public abstract IGeoObject Clone();
         /// <summary>
         /// Overrides <see cref="IGeoObject.HasChildren"/>. The deafult implementation returns false.
@@ -1130,11 +1306,7 @@ namespace CADability.GeoObject
 
             return false;
         }
-        /// <summary>
-        /// Overrides <see cref="IGeoObject.CopyGeometry"/>, but doesn't implement it.
-        /// Must be implemented by each GeoObject.
-        /// </summary>
-        /// <param name="ToCopyFrom">GeoObject to copy geometrical data from</param>
+        /// <inheritdoc/>
         public abstract void CopyGeometry(IGeoObject ToCopyFrom);
         #region Handling Attributes
         /// <summary>
@@ -1232,6 +1404,11 @@ namespace CADability.GeoObject
                 return attributes.ToArray();
             }
         }
+        /// <summary>
+        /// The keys of the user defined attributes attached to this object with <see cref="SetNamedAttribute"/> (the
+        /// CADability attributes like layer and color are not included); an empty array when there are none. Derived classes
+        /// add the keys of attributes of their own, e.g. <see cref="Point"/> adds "PointSymbol".
+        /// </summary>
         public virtual string[] CustomAttributeKeys
         {
             get
@@ -1357,12 +1534,12 @@ namespace CADability.GeoObject
         }
         #endregion
         /// <summary>
-        /// Implements ISerializable.GetObjectData. Saves <see cref="UserData"/>, <see cref="Layer"/> and <see cref="Style"/>.
-        /// All other properties of the GeoObject must be saved by the derived class. don't forget
-        /// to call the base implementation
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
+        /// The base implementation saves <see cref="UserData"/>, <see cref="Layer"/> and <see cref="Style"/>; a derived class saves its own data and calls the base implementation.
         /// </summary>
-        /// <param name="info">info</param>
-        /// <param name="context">context</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public virtual void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("UserData", userData);
@@ -1429,11 +1606,7 @@ namespace CADability.GeoObject
             }
             return res.ToArray();
         }
-        /// <summary>
-        /// Implements <see cref="IGeoObject.GetBoundingCube"/> abstract.
-        /// Must be overridden.
-        /// </summary>
-        /// <returns>the bounding cube</returns>
+        /// <inheritdoc/>
         public abstract BoundingCube GetBoundingCube();
         /// <summary>
         /// Implements <see cref="IGeoObject.UpdateAttributes"/> for all CADability attributes.
@@ -1617,9 +1790,10 @@ namespace CADability.GeoObject
             return true; // Rückgabewert z.Z. noch ohne Bedeutung
         }
         /// <summary>
-        /// Implements <see cref="IGeoObject.FindSnapPoint"/>, but does nothing. Should be overridden.
+        /// Asks the object to add its snap points (end points, centres, intersections...) of the kinds that
+        /// <paramref name="spf"/> asks for. The default implementation adds none; objects with geometry override it.
         /// </summary>
-        /// <param name="spf"></param>
+        /// <param name="spf">definition and collection of the snap points</param>
         public virtual void FindSnapPoint(SnapPointFinder spf)
         {
         }
@@ -1639,10 +1813,7 @@ namespace CADability.GeoObject
                 return this.ToString();
             }
         }
-        /// <summary>
-        /// Patin the object to th <see cref="IPaintTo3D"/> interface.
-        /// </summary>
-        /// <param name="paintTo3D">Target for the paint operation</param>
+        /// <inheritdoc/>
         public abstract void PaintTo3D(IPaintTo3D paintTo3D);
         /// <summary>
         /// Called before <see cref="PaintTo3D"/> is called, should implement the time consuming work for the display (like calculationg the triangulation
@@ -1651,9 +1822,11 @@ namespace CADability.GeoObject
         /// <param name="precision">Required precision</param>
         public abstract void PrepareDisplayList(double precision);
         /// <summary>
-        /// Hier kann man Dinge vor OpenList tun (da sie selbst vielleicht ein OpenList benötigen)
+        /// Called before <see cref="PaintTo3D"/>, outside of the display list that collects what PaintTo3D paints.
+        /// Override it for work that must not go into that list, e.g. painting that needs a display list of its own.
+        /// The default implementation does nothing.
         /// </summary>
-        /// <param name="paintTo3D"></param>
+        /// <param name="paintTo3D">the paint interface of the view</param>
         public virtual void PrePaintTo3D(IPaintTo3D paintTo3D)
         {
         }
@@ -1675,10 +1848,11 @@ namespace CADability.GeoObject
                 return 0;
         }
         /// <summary>
-        /// Implements <see cref="CADability.GeoObject.IGeoObject.PaintTo3DList (IPaintTo3D, ICategorizedDislayLists)"/>
+        /// Adds this object as a whole to the display lists, in the category of its layer. Suitable for simple objects like
+        /// curves and text; composite objects (solids, shells, blocks) override it and add their parts by category.
         /// </summary>
-        /// <param name="paintTo3D"></param>
-        /// <param name="lists"></param>
+        /// <param name="paintTo3D">the paint interface of the view</param>
+        /// <param name="lists">the display lists to add to</param>
         public virtual void PaintTo3DList(IPaintTo3D paintTo3D, ICategorizedDislayLists lists)
         {   // muss von komplexen Objekten überschrieben werden, hier nur für linienartige
             PrePaintTo3D(paintTo3D);
@@ -1735,19 +1909,9 @@ namespace CADability.GeoObject
                 return (Style.EDefaultFor)0;
             }
         }
-        /// <summary>
-        /// Returns the 2 dimensional extent of objects for a specific projection.
-        /// </summary>
-        /// <param name="projection">The projection for which the extent is beeing queried</param>
-        /// <param name="extentPrecision">Raw or exact extent</param>
-        /// <returns>The 2 dimensional extent.</returns>
+        /// <inheritdoc/>
         public abstract BoundingRect GetExtent(Projection projection, ExtentPrecision extentPrecision);
-        /// <summary>
-        /// Deprecated.
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="extentPrecision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public abstract IQuadTreeInsertableZ GetQuadTreeItem(Projection projection, ExtentPrecision extentPrecision);
         /// <summary>
         /// Returns an array of objects owned by this object. E.g. a face is owned by a shell.
@@ -1802,9 +1966,10 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
-        /// Decomposes this GeoObject into simpler GeoObjects. May return null if there are no simpler objects.
+        /// Decomposes the object into simpler objects, see <see cref="IGeoObject.Decompose"/>. The default implementation
+        /// returns null: the object cannot be decomposed.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>the parts, or null</returns>
         public virtual GeoObjectList Decompose()
         {
             return null;
@@ -1838,10 +2003,11 @@ namespace CADability.GeoObject
         //}
 
         /// <summary>
-        /// Hilfsfunktion zum Setzen der Farbe und gleichzeitig die Events feuern
+        /// Helper for the implementation of <see cref="IColorDef.ColorDef"/>: sets the colour and raises the
+        /// <see cref="WillChangeEvent"/> and <see cref="DidChangeEvent"/> events, so that the change is displayed and can be undone.
         /// </summary>
-        /// <param name="color">Referenz auf die i.a. private Membervariable</param>
-        /// <param name="c">der neue Farbwert</param>
+        /// <param name="color">reference to the field that holds the colour</param>
+        /// <param name="c">the new colour; null is ignored</param>
         protected void SetColorDef(ref ColorDef color, ColorDef c)
         {
             if (c == null) return;
@@ -1930,10 +2096,15 @@ namespace CADability.GeoObject
             }
         }
         #region IOctTreeInsertable members
+        /// <inheritdoc/>
         public abstract BoundingCube GetExtent(double precision);
+        /// <inheritdoc/>
         public abstract bool HitTest(ref BoundingCube cube, double precision);
+        /// <inheritdoc/>
         public abstract bool HitTest(Projection projection, BoundingRect rect, bool onlyInside);
+        /// <inheritdoc/>
         public abstract bool HitTest(Projection.PickArea area, bool onlyInside);
+        /// <inheritdoc/>
         public abstract double Position(GeoPoint fromHere, GeoVector direction, double precision);
         #endregion
         #region Static Helper
@@ -1960,11 +2131,31 @@ namespace CADability.GeoObject
             if (res is IGeoObject) return IsOwnedByBlockRef(res as IGeoObject);
             return false;
         }
+        /// <summary>
+        /// Wraps a change of an entry of the <see cref="UserData"/> of <paramref name="involved"/>: the returned object
+        /// raises <see cref="WillChangeEvent"/> at once and <see cref="DidChangeEvent"/> when it is disposed, both as a change
+        /// of an attribute only (<see cref="GeoObjectChange.OnlyAttributeChanged"/>) and without an undo step.
+        /// <paramref name="key"/> and <paramref name="oldValue"/> are not evaluated yet, so the change cannot be undone.
+        /// </summary>
+        /// <param name="involved">the object whose user data changes; must be an <see cref="IGeoObjectImpl"/></param>
+        /// <param name="key">the key of the user data entry that changes</param>
+        /// <param name="oldValue">the value of the entry before the change</param>
+        /// <returns>the object to dispose when the change is done</returns>
         public static IDisposable ChangingUserData(IGeoObject involved, string key, object oldValue)
         {   // das macht noch kein Undo bei Userdata, das muss noch implementiert werden
             Changing res = new Changing(involved as IGeoObjectImpl, false, true);
             return res;
         }
+        /// <summary>
+        /// Same as <see cref="ChangingUserData(IGeoObject, string, object)"/>, but <paramref name="onlyAttribute"/> decides
+        /// whether the change is reported as a change of an attribute only or as a change of the geometry.
+        /// </summary>
+        /// <param name="involved">the object whose user data changes; must be an <see cref="IGeoObjectImpl"/></param>
+        /// <param name="key">the key of the user data entry that changes</param>
+        /// <param name="oldValue">the value of the entry before the change</param>
+        /// <param name="onlyAttribute">true to report the change with <see cref="GeoObjectChange.OnlyAttributeChanged"/> set,
+        /// false to report it as a change of the geometry</param>
+        /// <returns>the object to dispose when the change is done</returns>
         public static IDisposable ChangingUserData(IGeoObject involved, string key, object oldValue, bool onlyAttribute)
         {   // das macht noch kein Undo bei Userdata, das muss noch implementiert werden
             Changing res = new Changing(involved as IGeoObjectImpl, false, onlyAttribute);
@@ -1984,7 +2175,19 @@ namespace CADability.GeoObject
             if (obj is IGeoObjectImpl) return (obj as IGeoObjectImpl).uniqueId.CompareTo(uniqueId);
             return 0;
         }
+        /// <summary>
+        /// Handler for <see cref="GetAdditionalContextMenueEvent"/>.
+        /// </summary>
+        /// <param name="sender">the object whose context menu is being built</param>
+        /// <returns>the id of a menu definition in the menu resources whose items are appended to the context menu, or null
+        /// or an empty string for none</returns>
         public delegate string GetAdditionalContextMenueDelegate(IGeoObject sender);
+        /// <summary>
+        /// Raised for any GeoObject when the context menu of its entry in the property grid is built. An application can
+        /// return the id of a menu definition of its own to add commands for the object; the items are loaded with
+        /// <see cref="MenuResource.LoadMenuDefinition(string, bool, ICommandHandler)"/> and appended to the menu. The event
+        /// is static, so one handler serves all objects.
+        /// </summary>
         public static event GetAdditionalContextMenueDelegate GetAdditionalContextMenueEvent;
         internal virtual void GetAdditionalContextMenue(IShowProperty sender, IFrame frame, List<MenuWithHandler> toManipulate)
         {
@@ -2010,6 +2213,12 @@ namespace CADability.GeoObject
             return this.GetExtent(1.0);
         }
 
+        /// <summary>
+        /// Writes the data of this base class (user data, layer, style, user attributes and actuator) for the JSON
+        /// serialization (<see cref="IJsonSerialize"/>). Derived classes override it, call the base implementation and add
+        /// their own properties.
+        /// </summary>
+        /// <param name="data">receives the data</param>
         public virtual void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("UserData", userData);
@@ -2020,15 +2229,27 @@ namespace CADability.GeoObject
         }
 
 
+        /// <summary>
+        /// Reads the data written by <see cref="GetObjectData(IJsonWriteData)"/> back from the JSON serialization. Derived
+        /// classes override it, call the base implementation and read their own properties. Objects referenced by the data
+        /// may still be incomplete at this time, see <see cref="IJsonSerializeDone"/>.
+        /// </summary>
+        /// <param name="data">provides the data</param>
         public virtual void SetObjectData(IJsonReadData data)
         {
-            userData = data.GetPropertyOrDefault<UserData>("UserData");
+            // never null: a type that did not write its base attributes before (HelicalCurve until 1.5.0) has no
+            // "UserData" in older files, and the empty UserData of the constructor must not be replaced by null then
+            userData = data.GetPropertyOrDefault<UserData>("UserData") ?? new UserData();
             layer = data.GetPropertyOrDefault<Layer>("Layer");
             style = data.GetPropertyOrDefault<Style>("Style");
             userAttributes = data.GetPropertyOrDefault<SortedList>("UserAttributes");
             actuator = data.GetPropertyOrDefault<IDrive>("Actuator");
         }
 
+        /// <summary>
+        /// Not implemented: throws a <see cref="NotImplementedException"/> and is not called anywhere. An object that needs
+        /// a callback when the JSON deserialization is complete implements <see cref="IJsonSerializeDone"/> instead.
+        /// </summary>
         protected void JsonSerializationDone()
         {
             throw new NotImplementedException();
@@ -2052,13 +2273,39 @@ namespace CADability.GeoObject
         }
 #endif
     }
+    /// <summary>
+    /// Handler for <see cref="IGeoObjectShowProperty.CreateContextMenueEvent"/>.
+    /// </summary>
+    /// <param name="sender">the property entry whose context menu is being built; <see cref="IGeoObjectShowProperty.GetGeoObject"/>
+    /// gives the object it shows</param>
+    /// <param name="toManipulate">the items of the context menu so far; the handler may add, remove or reorder items</param>
     public delegate void CreateContextMenueDelegate(IGeoObjectShowProperty sender, List<MenuWithHandler> toManipulate);
 
 
+    /// <summary>
+    /// Implemented by the property entries that show a GeoObject in the property grid, i.e. the entries returned by
+    /// <see cref="IGeoObject.GetShowProperties"/> (e.g. <see cref="ShowPropertyText"/> or <see cref="ShowPropertyPicture"/>).
+    /// It lets the <see cref="Actions.SelectObjectsAction"/> find the object an entry stands for and the id of the
+    /// object's context menu, and lets an application modify the context menu of the entry.
+    /// </summary>
     public interface IGeoObjectShowProperty
     {
+        /// <summary>
+        /// Raised when the context menu of this entry is built, after the default items of the object have been loaded. The
+        /// handler gets the list of items and may add, remove or reorder them.
+        /// </summary>
         event CreateContextMenueDelegate CreateContextMenueEvent;
+        /// <summary>
+        /// Returns the GeoObject this property entry shows.
+        /// </summary>
+        /// <returns>the object shown by this entry</returns>
         IGeoObject GetGeoObject();
+        /// <summary>
+        /// Returns the id of the menu definition in the menu resources (e.g. "MenuId.Object.Text") whose items form the
+        /// context menu of the object. The <see cref="Actions.SelectObjectsAction"/> uses it to offer the menu of a single
+        /// selected object within the context menu of the selection.
+        /// </summary>
+        /// <returns>the menu id, or null when the object has no menu of its own</returns>
         string GetContextMenuId();
     }
 }

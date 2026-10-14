@@ -4,7 +4,10 @@
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a rectangle (a closed <see cref="Polyline"/>) by two diagonally opposite corners. The user picks the first
+    /// corner and the diagonal corner; one side of the rectangle is parallel to the x-direction of the active drawing plane, the
+    /// other side goes from the foot point of the second corner on that direction to the second corner. Started with the menu id
+    /// "Constr.Rect.Rect2DiagonalPoints".
     /// </summary>
     internal class ConstrRect2DiagonalPoints : ConstructAction
     {

@@ -10,7 +10,7 @@ namespace CADability.Attribute
 {
     /// <summary>
     /// A FilterList is a list of <see cref="Filter"/>s. The <see cref="Project"/> owns a FilterList which is used
-    /// by the <see cref="CADAbility.Actions.SelectObjectsAction"/> to decide which <see cref="IGeoObject"/>s may be selected or must be rejected.
+    /// by the <see cref="CADability.Actions.SelectObjectsAction"/> to decide which <see cref="IGeoObject"/>s may be selected or must be rejected.
     /// You may add a handler to the <see cref="PreFilterEvent"/> event to do your own filtering or use the
     /// default filtering machanism (or both). The FilterList of the project is displayed in the ControlCenter
     /// and may be interactively manipulated.
@@ -102,6 +102,11 @@ namespace CADability.Attribute
                 return (Filter)entries.GetByIndex(index);
             }
         }
+        /// <summary>
+        /// Returns the filter with the given name.
+        /// </summary>
+        /// <param name="name">the name of the filter</param>
+        /// <returns>the filter, or null when there is no filter with that name</returns>
         public Filter FindFilter(string name)
         {
             foreach (DictionaryEntry de in entries)
@@ -139,11 +144,13 @@ namespace CADability.Attribute
         }
 #region IShowProperty Members
         private List<IPropertyPage> propertyPages;
+        /// <inheritdoc/>
         public override void Added(IPropertyPage pp)
         {
             propertyPages.Add(pp);
             base.Added(pp);
         }
+        /// <inheritdoc/>
         public override void Removed(IPropertyPage pp)
         {
             propertyPages.Remove(pp);
@@ -160,9 +167,7 @@ namespace CADability.Attribute
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -170,10 +175,7 @@ namespace CADability.Attribute
                 return ShowPropertyLabelFlags.ContextMenu | ShowPropertyLabelFlags.ContextMenu | ShowPropertyLabelFlags.Selectable;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -182,10 +184,7 @@ namespace CADability.Attribute
             }
         }
         IShowProperty[] subEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get
@@ -203,6 +202,7 @@ namespace CADability.Attribute
                 return subEntries;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -230,10 +230,11 @@ namespace CADability.Attribute
             }
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             // info.AddValue("Entries", entries);
@@ -279,6 +280,13 @@ namespace CADability.Attribute
             }
             return null;
         }
+        /// <summary>
+        /// Creates a new, active filter (via <see cref="Filter.Construct"/>, so an application-defined filter class is
+        /// used when one is registered) with a unique name made of the "Filter.NewFilter.Prefix" string and the first
+        /// free number, and adds it to the list. In the control center the list is expanded and the user can type the
+        /// name of the new filter right away. Used by the context menu of the list and by the select action.
+        /// </summary>
+        /// <returns>the new filter</returns>
         public Filter AddNewFilter()
         {
             Filter newFilter = Filter.Construct();
@@ -341,6 +349,14 @@ namespace CADability.Attribute
         #endregion
         #region INameChange Members
 
+        /// <summary>
+        /// Checks whether a filter of this list may take the given name: a name is only accepted when no other filter
+        /// of the list has it. The <see cref="Filter.Name"/> setter calls it and throws a
+        /// <see cref="NameAlreadyExistsException"/> when it returns false.
+        /// </summary>
+        /// <param name="namedObject">the <see cref="Filter"/> that is about to be renamed</param>
+        /// <param name="newName">the desired name</param>
+        /// <returns>true when the name may be used (or is unchanged), false when another filter already has it</returns>
         public bool MayChangeName(object namedObject, string newName)
         {
             Filter f = namedObject as Filter;
@@ -348,6 +364,12 @@ namespace CADability.Attribute
             return !entries.ContainsKey(newName); // OK, wenns den Namen nicht gibt
         }
 
+        /// <summary>
+        /// Called by the <see cref="Filter.Name"/> setter after a filter was renamed: re-sorts the filter under its new
+        /// name, refreshes the control center and selects the renamed filter there.
+        /// </summary>
+        /// <param name="namedObject">the <see cref="Filter"/> that was renamed; it already has its new name</param>
+        /// <param name="oldName">the name under which the filter was listed before</param>
         public void NameChanged(object namedObject, string oldName)
         {
             Filter f = namedObject as Filter;

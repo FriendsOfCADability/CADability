@@ -1,3 +1,4 @@
+using CADability.Curve2D;
 using CADability.GeoObject;
 using System;
 using System.Linq;
@@ -94,9 +95,6 @@ namespace CADability.Tests
             Assert.IsNotNull(res, "no result");
             Assert.IsTrue(res is Shell || res is Face, $"result is {res.GetType().Name}");
             AssertOnRotatedCurve(curve, res, sweep);
-            // the triangulation of a SurfaceOfRevolution overestimates its area (0.5 % for half a turn), so the area is
-            // only compared for lines and arcs, which give cylinders, cones, planes, spheres and tori
-            if (curve is BSpline) return;
             double expected = PappusArea(curve, sweep);
             Assert.AreEqual(expected, TriangulatedArea(res), 2e-3 * expected, "area");
         }
@@ -170,6 +168,45 @@ namespace CADability.Tests
         public void OtherObjectsGiveNull()
         {
             Assert.IsNull(Revolve(CADability.GeoObject.Point.Construct(), 2 * Math.PI));
+        }
+
+        /// <summary>
+        /// A face with an edge that is a spline with corners inside, as STEP files have them. The side faces of the
+        /// result are copies of the face, so the path made from its edges must not be split at the corners: its curves
+        /// and the edges of the copies got out of step, an IndexOutOfRangeException for every such face.
+        /// </summary>
+        [TestMethod]
+        public void FaceWithACornerSplineEdgeGivesASolid()
+        {
+            // two quadratic Bézier segments in the xz-plane from (10,0,0) over (20,0,5) to (10,0,10), bulging outwards:
+            // at the shared pole the tangents (1,0,4) and (-1,0,4) make a real corner, and the line back to the
+            // start closes the outline
+            GeoPoint[] poles = { new GeoPoint(10, 0, 0), new GeoPoint(19, 0, 1), new GeoPoint(20, 0, 5), new GeoPoint(19, 0, 9), new GeoPoint(10, 0, 10) };
+            BSpline spline = BSpline.Construct();
+            Assert.IsTrue(spline.SetData(2, poles, null, new double[] { 0, 1, 2 }, new int[] { 3, 2, 3 }, false));
+            Plane xz = new Plane(GeoPoint.Origin, GeoVector.XAxis, GeoVector.ZAxis);
+            ICurve2D outline = (spline as ICurve).GetProjectedCurve(xz);
+            ICurve2D closing = new Line2D(outline.EndPoint, outline.StartPoint);
+            Face face = Face.MakeFace(new PlaneSurface(xz), new System.Collections.Generic.List<System.Collections.Generic.List<ICurve2D>>
+                { new System.Collections.Generic.List<ICurve2D> { outline, closing } });
+            Assert.AreEqual(2, face.AllEdges.Length, "the spline stays one edge of the face");
+            Assert.AreEqual(2, spline.SplitAtCorners().Length, "the spline has a corner inside");
+
+            Solid solid = Revolve(face, 2 * Math.PI) as Solid;
+            Assert.IsNotNull(solid, "rotating the face gives a solid");
+            Assert.AreEqual(0, solid.Shells[0].OpenEdgesExceptPoles.Length, "open edges");
+            // Pappus: the volume is 2*pi times the first moment of the area about the axis, from a polygon of the outline
+            double area = 0.0, moment = 0.0;
+            GeoPoint2D[] polygon = new GeoPoint2D[2001];
+            for (int i = 0; i <= 2000; i++) polygon[i] = xz.Project((spline as ICurve).PointAt(i / 2000.0));
+            for (int i = 0; i < polygon.Length; i++)
+            {
+                GeoPoint2D p = polygon[i], q = polygon[(i + 1) % polygon.Length];
+                double cross = p.x * q.y - q.x * p.y;
+                area += cross / 2.0;
+                moment += cross * (p.x + q.x) / 6.0;
+            }
+            Assert.AreEqual(2 * Math.PI * Math.Abs(moment), solid.Volume(0.01), 1e-3 * 2 * Math.PI * Math.Abs(moment), "volume");
         }
     }
 }

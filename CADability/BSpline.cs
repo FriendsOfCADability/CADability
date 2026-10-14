@@ -17,8 +17,16 @@ using MathNet.Numerics.LinearAlgebra.Double;
 namespace CADability.GeoObject
 {
 
+    /// <summary>
+    /// Exception thrown when a B-spline computation fails. Currently only used by internal 2d spline computations; the
+    /// public methods of <see cref="BSpline"/> report failure by returning false instead.
+    /// </summary>
     public class BSplineException : ApplicationException
     {
+        /// <summary>
+        /// Creates the exception with a message.
+        /// </summary>
+        /// <param name="msg">Description of the failure</param>
         public BSplineException(string msg)
             : base(msg)
         {
@@ -121,6 +129,16 @@ namespace CADability.GeoObject
             }
         }
 
+        /// <summary>
+        /// Returns copies of the defining data of this spline with a flat knot vector: each knot is repeated according to its
+        /// multiplicity, as e.g. OpenGL evaluators and <see cref="NurbsSurface"/> expect it. See
+        /// <see cref="GetData(out int, out GeoPoint[], out double[], out double[], out int[])"/> for the form with separate
+        /// multiplicities.
+        /// </summary>
+        /// <param name="poles">The control points</param>
+        /// <param name="weights">The weight of each control point, all 1.0 for a non-rational spline</param>
+        /// <param name="knots">The flat knot vector; its length is the number of poles + <paramref name="degree"/> + 1</param>
+        /// <param name="degree">The degree of the spline</param>
         public void GetData(out GeoPoint[] poles, out double[] weights, out double[] knots, out int degree)
         {   // nur intern für OpenGL Test
             poles = (GeoPoint[])this.poles.Clone();
@@ -136,6 +154,9 @@ namespace CADability.GeoObject
             knots = lknots.ToArray();
             degree = this.degree;
         }
+        /// <summary>
+        /// true if all poles coincide, i.e. the spline degenerates to a single point.
+        /// </summary>
         public bool IsSingular
         {
             get
@@ -487,16 +508,44 @@ namespace CADability.GeoObject
         // auch überspringen und IGeoObjectImpl als Basis nehmen. Hier also erstmal
         // die quick-and-dirty Implementierung.
         #region polymorph construction
+        /// <summary>
+        /// Signature of the <see cref="Constructor"/> hook: creates a new, still undefined <see cref="BSpline"/> or an object of
+        /// a class derived from it.
+        /// </summary>
+        /// <returns>The newly created spline</returns>
         public delegate BSpline ConstructionDelegate();
+        /// <summary>
+        /// Optional hook for polymorphic construction. When set, <see cref="Construct"/> calls this delegate instead of creating
+        /// a plain <see cref="BSpline"/>, so that an application can have its own derived class instantiated wherever CADability
+        /// creates a spline.
+        /// </summary>
         public static ConstructionDelegate Constructor;
+        /// <summary>
+        /// Creates a new spline. This is the only way to create one, the constructor is protected. The returned spline has no
+        /// data yet; define it with one of the <see cref="ThroughPoints(GeoPoint[], int, bool, double[])"/> methods, with
+        /// <see cref="SetData(int, GeoPoint[], double[], double[], int[], bool)"/> or with <see cref="Approximate(GeoPoint[], double)"/>.
+        /// </summary>
+        /// <returns>A new <see cref="BSpline"/>, or an object of the derived class provided by <see cref="Constructor"/></returns>
         public static BSpline Construct()
         {
             if (Constructor != null) return Constructor();
             return new BSpline();
         }
+        /// <summary>
+        /// Signature of the handlers of the <see cref="Constructed"/> event.
+        /// </summary>
+        /// <param name="justConstructed">The spline that has just been created</param>
         public delegate void ConstructedDelegate(BSpline justConstructed);
+        /// <summary>
+        /// Raised from the constructor whenever a new spline is created, i.e. for every <see cref="Construct"/> call, every clone
+        /// and every spline read from a file. The handler gets the new object; when it comes from <see cref="Construct"/>, it has no data yet.
+        /// </summary>
         public static event ConstructedDelegate Constructed;
         #endregion
+        /// <summary>
+        /// Creates a spline without data and raises <see cref="Constructed"/>. Protected: use <see cref="Construct"/> to create a
+        /// spline.
+        /// </summary>
         protected BSpline()
             : base()
         {
@@ -776,6 +825,7 @@ namespace CADability.GeoObject
         /// <param name="points">List of points to pass through</param>
         /// <param name="maxDegree">maximum degree for the BSpline. Must be between 3 an 25</param>
         /// <param name="closed">true if the resulting BSpline should be closed</param>
+        /// <param name="throughPointKnots">Optional parameter values for the through points. If null, they are calculated from the distances of the points</param>
         /// <returns>success</returns>
         public bool ThroughPoints(GeoPoint[] points, int maxDegree, bool closed, double[] throughPointKnots = null)
         {
@@ -892,6 +942,20 @@ namespace CADability.GeoObject
         //				return false;
         //			}
         //		}
+        /// <summary>
+        /// Makes this spline interpolate the given points with prescribed tangents: the spline passes through
+        /// <paramref name="points"/>[i] with the tangent direction <paramref name="directions"/>[i] (the directions should be
+        /// unit vectors). Previous data is discarded; the points are remembered as through points (see
+        /// <see cref="ThroughPoint"/>) and all weights are 1. The degree is <paramref name="maxDegree"/>, limited to 2·n-1 for n
+        /// points; degrees 2 and 3 give the best results, high degrees behave badly near the ends. The change is undoable and
+        /// raises the change events.
+        /// </summary>
+        /// <param name="points">The points to interpolate, at least two</param>
+        /// <param name="directions">The tangent direction at each point, same length as <paramref name="points"/></param>
+        /// <param name="maxDegree">The degree of the spline</param>
+        /// <param name="closed">true for a closed (periodic) spline</param>
+        /// <returns>true on success, false when there are less than two points or the interpolation fails; the spline is then
+        /// unchanged</returns>
         public bool ThroughPoints(GeoPoint[] points, GeoVector[] directions, int maxDegree, bool closed)
         {
             try
@@ -983,6 +1047,17 @@ namespace CADability.GeoObject
                 return false;
             }
         }
+        /// <summary>
+        /// Not implemented: always returns false and leaves the spline unchanged. Convert the points and directions with
+        /// <see cref="Plane.ToGlobal(GeoPoint2D)"/> and <see cref="Plane.ToGlobal(GeoVector2D)"/> and use
+        /// <see cref="ThroughPoints(GeoPoint[], GeoVector[], int, bool)"/> instead.
+        /// </summary>
+        /// <param name="p">The plane of the points</param>
+        /// <param name="points">The points to interpolate, in <paramref name="p"/></param>
+        /// <param name="directions">The tangent direction at each point, in <paramref name="p"/></param>
+        /// <param name="maxDegree">The degree of the spline</param>
+        /// <param name="closed">true for a closed spline</param>
+        /// <returns>Always false</returns>
         public bool ThroughPoints(Plane p, GeoPoint2D[] points, GeoVector2D[] directions, int maxDegree, bool closed)
         {
             return false;
@@ -1033,14 +1108,26 @@ namespace CADability.GeoObject
                 throughPoints3d = null; // Durchgangspunkte werden ungültig!
             }
         }
+        /// <summary>
+        /// Returns the control point (pole) with the given index.
+        /// </summary>
+        /// <param name="Index">Index of the pole, 0 to <see cref="PoleCount"/>-1</param>
+        /// <returns>The pole</returns>
         public GeoPoint GetPole(int Index)
         {
             return poles[Index];
         }
+        /// <summary>
+        /// The number of control points (poles).
+        /// </summary>
         public int PoleCount
         {
             get { return poles.Length; }
         }
+        /// <summary>
+        /// The control points (poles) of this spline. The returned array is the internal one and must not be modified; use
+        /// <see cref="SetPole"/> or <see cref="SetData(int, GeoPoint[], double[], double[], int[], bool)"/> to change the poles.
+        /// </summary>
         public GeoPoint[] Poles
         {
             get
@@ -1048,6 +1135,11 @@ namespace CADability.GeoObject
                 return poles;
             }
         }
+        /// <summary>
+        /// The distinct knot values in ascending order; <see cref="Multiplicities"/> says how often each of them is repeated in
+        /// the flat knot vector. The curve parameter (as used by <see cref="PointAtParam"/> and <see cref="TrimParam"/>) runs
+        /// from the first to the last knot. The returned array is the internal one and must not be modified.
+        /// </summary>
         public double[] Knots
         {
             get
@@ -1055,6 +1147,10 @@ namespace CADability.GeoObject
                 return knots;
             }
         }
+        /// <summary>
+        /// The multiplicity of each entry of <see cref="Knots"/>. For a non-periodic spline the sum of all multiplicities is
+        /// <see cref="PoleCount"/> + <see cref="Degree"/> + 1. The returned array is the internal one and must not be modified.
+        /// </summary>
         public int[] Multiplicities
         {
             get
@@ -1062,6 +1158,10 @@ namespace CADability.GeoObject
                 return multiplicities;
             }
         }
+        /// <summary>
+        /// The weight of each pole, same length as <see cref="Poles"/>; all 1.0 for a non-rational spline (see
+        /// <see cref="HasWeights"/>). The returned array is the internal one and must not be modified.
+        /// </summary>
         public double[] Weights
         {
             get
@@ -1069,7 +1169,21 @@ namespace CADability.GeoObject
                 return weights;
             }
         }
+        /// <summary>
+        /// The polynomial degree of the spline: 1 for a spline that is a polyline through its poles, 3 for the usual cubic
+        /// spline.
+        /// </summary>
         public int Degree { get => degree; }
+        /// <summary>
+        /// Returns copies of the defining NURBS data of this spline: degree, poles, weights, distinct knots and their
+        /// multiplicities. The same data can be passed to
+        /// <see cref="SetData(int, GeoPoint[], double[], double[], int[], bool)"/> to define another spline.
+        /// </summary>
+        /// <param name="degree">The degree of the spline</param>
+        /// <param name="poles">The control points</param>
+        /// <param name="weights">The weight of each control point, all 1.0 for a non-rational spline</param>
+        /// <param name="knots">The distinct knot values in ascending order</param>
+        /// <param name="multiplicities">The multiplicity of each knot</param>
         public void GetData(out int degree, out GeoPoint[] poles, out double[] weights, out double[] knots, out int[] multiplicities)
         {
             degree = this.degree;
@@ -1078,15 +1192,58 @@ namespace CADability.GeoObject
             knots = (double[])this.knots.Clone();
             multiplicities = (int[])this.multiplicities.Clone();
         }
+        /// <summary>
+        /// true if this spline was defined by points it passes through (<see cref="ThroughPoints(GeoPoint[], int, bool, double[])"/>,
+        /// <see cref="Approximate(GeoPoint[], double)"/>) and those points are still valid. They become invalid when the poles are changed directly
+        /// (<see cref="SetPole"/>, <see cref="SetData(int, GeoPoint[], double[], double[], int[], bool)"/>). Only when this is
+        /// true, <see cref="ThroughPoint"/>, <see cref="GetThroughPoint"/> and <see cref="SetThroughPoint"/> may be used.
+        /// </summary>
         public bool ThroughPoints3dExist
         {
             get { return throughPoints3d != null; }
         }
+        /// <summary>
+        /// Defines this spline directly by its NURBS data, using the whole range from the first to the last knot. See
+        /// <see cref="SetData(int, GeoPoint[], double[], double[], int[], bool, double, double)"/> for the details.
+        /// </summary>
+        /// <param name="degree">The degree of the spline</param>
+        /// <param name="poles">The control points</param>
+        /// <param name="weights">The weight of each control point, or null for a non-rational spline</param>
+        /// <param name="knots">The distinct knot values in ascending order, or the flat knot vector when
+        /// <paramref name="multiplicities"/> is null</param>
+        /// <param name="multiplicities">The multiplicity of each knot, or null when <paramref name="knots"/> is a flat knot
+        /// vector</param>
+        /// <param name="periodic">true for a closed (periodic) spline</param>
+        /// <returns>true if the data is consistent, false otherwise</returns>
         public bool SetData(int degree, GeoPoint[] poles, double[] weights, double[] knots, int[] multiplicities, bool periodic)
         {
             return SetData(degree, poles, weights, knots, multiplicities, periodic, knots[0], knots[knots.Length - 1]);
 
         }
+        /// <summary>
+        /// Defines this spline directly by its NURBS data, e.g. when importing from a file. The data is checked and completed
+        /// where possible: null or wrongly sized <paramref name="weights"/> are replaced by weights of 1.0; when
+        /// <paramref name="multiplicities"/> is null or does not match <paramref name="knots"/>, <paramref name="knots"/> is
+        /// taken as a flat knot vector and the multiplicities are counted from it; for a non-periodic spline the first and last
+        /// multiplicities are raised or the end poles are duplicated so that the number of poles equals the sum of the
+        /// multiplicities minus <paramref name="degree"/> minus 1. If <paramref name="startParam"/> and
+        /// <paramref name="endParam"/> lie inside the knot range, the spline is trimmed to that range afterwards. Through points
+        /// of a previous definition are discarded. This is a low level setter: it does not raise the change events and is not
+        /// recorded for undo.
+        /// </summary>
+        /// <param name="degree">The degree of the spline</param>
+        /// <param name="poles">The control points</param>
+        /// <param name="weights">The weight of each control point, or null for a non-rational spline</param>
+        /// <param name="knots">The distinct knot values in ascending order, or the flat knot vector when
+        /// <paramref name="multiplicities"/> is null</param>
+        /// <param name="multiplicities">The multiplicity of each knot, or null when <paramref name="knots"/> is a flat knot
+        /// vector</param>
+        /// <param name="periodic">true for a closed (periodic) spline</param>
+        /// <param name="startParam">Parameter where the curve starts, at least the first knot</param>
+        /// <param name="endParam">Parameter where the curve ends, at most the last knot</param>
+        /// <returns>true if the data is consistent (number of poles = sum of multiplicities - degree - 1 after the completion),
+        /// false otherwise; the data is set in either case</returns>
+        /// <exception cref="ApplicationException">when the knots are not in ascending order</exception>
         public bool SetData(int degree, GeoPoint[] poles, double[] weights, double[] knots, int[] multiplicities, bool periodic, double startParam, double endParam)
         {
             for (int i = 1; i < knots.Length; ++i)
@@ -1244,6 +1401,13 @@ namespace CADability.GeoObject
             }
             return true;
         }
+        /// <summary>
+        /// Moves one of the through points and recomputes the spline through the modified points with the same degree and
+        /// closedness (see <see cref="ThroughPoints(GeoPoint[], int, bool, double[])"/>). Only valid when
+        /// <see cref="ThroughPoints3dExist"/> is true. The change is undoable and raises the change events.
+        /// </summary>
+        /// <param name="Index">Index of the through point, 0 to <see cref="ThroughPointCount"/>-1</param>
+        /// <param name="NewValue">New position of that point</param>
         public void SetThroughPoint(int Index, GeoPoint NewValue)
         {
             GeoPoint[] copy = (GeoPoint[])throughPoints3d.Clone();
@@ -1272,6 +1436,17 @@ namespace CADability.GeoObject
             //			{
             //			}
         }
+        /// <summary>
+        /// Makes this spline a cubic spline through a subset of the given points, chosen so that none of the given points is
+        /// farther than <paramref name="precision"/> from the spline: starting with the first and the last point (and the middle
+        /// one for a closed polygon), points are added where the deviation is too large, until the tolerance is met. If the first
+        /// and the last point coincide (within a tenth of the precision), the spline is closed. Used to simplify polylines and
+        /// splines with many poles, see <see cref="Polyline.ApproximateByBSpline"/> and <see cref="ReducePoles"/>. Raises the
+        /// change events.
+        /// </summary>
+        /// <param name="vertex">The points to approximate, in order</param>
+        /// <param name="precision">Maximum allowed distance of the points from the spline</param>
+        /// <returns>true on success, false when there are too few points (less than 2, or less than 3 for a closed polygon)</returns>
         public bool Approximate(GeoPoint[] vertex, double precision)
         {
             HashSet<int> selectedPoints = new HashSet<int>();
@@ -1335,6 +1510,13 @@ namespace CADability.GeoObject
             }
             return false; // darf nicht drankommen
         }
+        /// <summary>
+        /// Replaces this spline by an approximation with (usually) fewer poles: a cubic spline through a subset of its through
+        /// points, or of its knot points (<see cref="KnotPoints"/>) when it has no through points, that deviates less than
+        /// <paramref name="precision"/> from those points (see <see cref="Approximate(GeoPoint[], double)"/>). Useful for splines with many poles,
+        /// e.g. from imported data.
+        /// </summary>
+        /// <param name="precision">Maximum allowed distance of the original through or knot points from the new spline</param>
         public void ReducePoles(double precision)
         {
             GeoPoint[] vertices;
@@ -1361,10 +1543,18 @@ namespace CADability.GeoObject
             }
             return res;
         }
+        /// <summary>
+        /// Returns the through point with the given index. Only valid when <see cref="ThroughPoints3dExist"/> is true.
+        /// </summary>
+        /// <param name="Index">Index of the through point, 0 to <see cref="ThroughPointCount"/>-1</param>
+        /// <returns>The through point</returns>
         public GeoPoint GetThroughPoint(int Index)
         {
             return throughPoints3d[Index];
         }
+        /// <summary>
+        /// The number of through points, 0 when the spline has none (see <see cref="ThroughPoints3dExist"/>).
+        /// </summary>
         public int ThroughPointCount
         {
             get
@@ -1373,6 +1563,12 @@ namespace CADability.GeoObject
                 return throughPoints3d.Length;
             }
         }
+        /// <summary>
+        /// The points this spline was defined to pass through (see <see cref="ThroughPoints(GeoPoint[], int, bool, double[])"/>),
+        /// or null when it was defined otherwise or the through points were invalidated (see
+        /// <see cref="ThroughPoints3dExist"/>). The returned array is the internal one and must not be modified; use
+        /// <see cref="SetThroughPoint"/> to move a point.
+        /// </summary>
         public GeoPoint[] ThroughPoint
         {
             get
@@ -1380,6 +1576,10 @@ namespace CADability.GeoObject
                 return throughPoints3d;
             }
         }
+        /// <summary>
+        /// The points of the curve at the knot values (<see cref="PointAtParam"/> of each entry of <see cref="Knots"/>), i.e. the
+        /// junctions of the polynomial segments of the spline.
+        /// </summary>
         public GeoPoint[] KnotPoints
         {
             get
@@ -1392,6 +1592,11 @@ namespace CADability.GeoObject
                 return res;
             }
         }
+        /// <summary>
+        /// true for a periodic (closed) spline. Setting it closes or opens the spline: when through points exist, the spline is
+        /// recomputed through them with the new closedness; otherwise through points are derived from the curve first. If that
+        /// fails, the knot multiplicities are adapted directly. The change is undoable and raises the change events.
+        /// </summary>
         public bool IsClosed
         {
             get { return periodic; }
@@ -1754,6 +1959,13 @@ namespace CADability.GeoObject
         #endregion
         private enum DisplayMode { showThroughPoints = 0x01, showPoles = 0x02 };
         private DisplayMode displayMode;
+        /// <summary>
+        /// Controls whether the through points and the poles (the control polygon) are displayed together with the curve, e.g.
+        /// while the spline is being constructed interactively. This is a display setting only: it does not change the geometry
+        /// and is not saved with the object.
+        /// </summary>
+        /// <param name="showThroughPoints">true to display the through points</param>
+        /// <param name="showPoles">true to display the poles</param>
         public void ShowPoints(bool showThroughPoints, bool showPoles)
         {
             displayMode = (DisplayMode)0;
@@ -1767,10 +1979,7 @@ namespace CADability.GeoObject
             }
         }
         #region IGeoObject Members
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Modify (ModOp)"/>
-        /// </summary>
-        /// <param name="m"></param>
+        /// <inheritdoc/>
         public override void Modify(ModOp m)
         {
             using (new Changing(this, "ModifyInverse", m))
@@ -1788,10 +1997,7 @@ namespace CADability.GeoObject
                 }
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Clone ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IGeoObject Clone()
         {
             if (poles == null) return null; // es kommt ein Clone von einem noch nicht fertig initialisierten BSpline
@@ -1813,10 +2019,7 @@ namespace CADability.GeoObject
             --res.isChanging;
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.CopyGeometry (IGeoObject)"/>
-        /// </summary>
-        /// <param name="ToCopyFrom"></param>
+        /// <inheritdoc/>
         public override void CopyGeometry(IGeoObject ToCopyFrom)
         {
             using (new Changing(this))
@@ -1835,27 +2038,17 @@ namespace CADability.GeoObject
                 if (cpy.direction3D != null) direction3D = (GeoVector[])cpy.direction3D.Clone();
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetShowProperties (IFrame)"/>
-        /// </summary>
-        /// <param name="Frame"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IPropertyEntry GetShowProperties(IFrame Frame)
         {
             return new ShowPropertyBSpline(this, Frame);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.CopyAttributes (IGeoObject)"/>
-        /// </summary>
-        /// <param name="ToCopyFrom"></param>
+        /// <inheritdoc/>
         public override void CopyAttributes(IGeoObject ToCopyFrom)
         {
             base.CopyAttributes(ToCopyFrom);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.FindSnapPoint (SnapPointFinder)"/>
-        /// </summary>
-        /// <param name="spf"></param>
+        /// <inheritdoc/>
         public override void FindSnapPoint(SnapPointFinder spf)
         {
             if (!spf.Accept(this)) return;
@@ -1923,10 +2116,7 @@ namespace CADability.GeoObject
                 }
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingCube GetBoundingCube()
         {
             if (extent.IsEmpty && poles != null)
@@ -1964,12 +2154,20 @@ namespace CADability.GeoObject
             }
             return extent;
         }
-        public delegate bool PaintTo3DDelegate(BSpline toPaint, IPaintTo3D paintTo3D);
-        public static PaintTo3DDelegate OnPaintTo3D;
         /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3D (IPaintTo3D)"/>
+        /// Signature of the <see cref="OnPaintTo3D"/> hook. The handler returns true when it has painted the spline itself, false
+        /// to let the default painting in <see cref="PaintTo3D(IPaintTo3D)"/> proceed.
         /// </summary>
-        /// <param name="paintTo3D"></param>
+        /// <param name="toPaint">The spline to paint</param>
+        /// <param name="paintTo3D">The paint interface to paint to</param>
+        /// <returns>true if the painting is done, false for the default painting</returns>
+        public delegate bool PaintTo3DDelegate(BSpline toPaint, IPaintTo3D paintTo3D);
+        /// <summary>
+        /// Static hook called at the beginning of <see cref="PaintTo3D(IPaintTo3D)"/> for every spline. Set it to replace or
+        /// extend the way splines are displayed; when the handler returns true, the default painting is skipped.
+        /// </summary>
+        public static PaintTo3DDelegate OnPaintTo3D;
+        /// <inheritdoc/>
         public override void PaintTo3D(IPaintTo3D paintTo3D)
         {
             if (poles == null) return; // gibts noch nicht
@@ -1987,24 +2185,17 @@ namespace CADability.GeoObject
             }
             catch (ApplicationException) { }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PrepareDisplayList (double)"/>
-        /// </summary>
-        /// <param name="precision"></param>
+        /// <inheritdoc/>
         public override void PrepareDisplayList(double precision)
         {
             GetCashedApproximation(precision);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetQuadTreeItem (Projection, ExtentPrecision)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="extentPrecision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IQuadTreeInsertableZ GetQuadTreeItem(Projection projection, ExtentPrecision extentPrecision)
         {
             return new QuadTreeBSpline(this, (this as ICurve).GetProjectedCurve(projection.ProjectionPlane) as BSpline2D, projection);
         }
+        /// <inheritdoc/>
         public override Style.EDefaultFor PreferredStyle
         {
             get
@@ -2014,55 +2205,29 @@ namespace CADability.GeoObject
         }
         #endregion
         #region IOctTreeInsertable members
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (double)"/>
-        /// </summary>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingCube GetExtent(double precision)
         {
             return GetBoundingCube();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
-        /// </summary>
-        /// <param name="cube"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(ref BoundingCube cube, double precision)
         {
             return this.TetraederHull.HitTest(cube);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection, BoundingRect, bool)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="rect"></param>
-        /// <param name="onlyInside"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(Projection projection, BoundingRect rect, bool onlyInside)
         {
             ICurve2D c2d = (this as ICurve).GetProjectedCurve(projection.ProjectionPlane);
             if (onlyInside) return c2d.GetExtent() <= rect;
             else return c2d.HitTest(ref rect, false);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection.PickArea, bool)"/>
-        /// </summary>
-        /// <param name="area"></param>
-        /// <param name="onlyInside"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(Projection.PickArea area, bool onlyInside)
         {
             return this.TetraederHull.HitTest(area, onlyInside);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Position (GeoPoint, GeoVector, double)"/>
-        /// </summary>
-        /// <param name="fromHere"></param>
-        /// <param name="direction"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double Position(GeoPoint fromHere, GeoVector direction, double precision)
         {
             if ((this as ICurve).GetPlanarState() == PlanarState.Planar)
@@ -2168,10 +2333,11 @@ namespace CADability.GeoObject
             if (Constructed != null) Constructed(this);
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
@@ -2407,6 +2573,14 @@ namespace CADability.GeoObject
             BSpline2D bsp2d = (this as ICurve).GetProjectedCurve(pl) as BSpline2D;
             return bsp2d.PositionOf(pl.Project(p));
         }
+        /// <summary>
+        /// Returns the position on the curve (0 at the start point, 1 at the end point, as used by <see cref="ICurve.PointAt"/>)
+        /// of the through point with the given index. The positions are only known for splines created by
+        /// <see cref="ThroughPoints(GeoPoint[], int, bool, double[])"/>, which records the parameters of its through points;
+        /// for all other splines 0.0 is returned.
+        /// </summary>
+        /// <param name="ind">Index of the through point</param>
+        /// <returns>The position of that point on the curve, or 0.0 when unknown</returns>
         public double PositionOfThroughPoint(int ind)
         {
             if (throughPointsParam != null) return (throughPointsParam[ind] - startParam) / (endParam - startParam);
@@ -3149,23 +3323,33 @@ namespace CADability.GeoObject
             return (this as ICurve).GetPlane();
         }
         /// <summary>
-        /// The parameters of the inner knots where the curve may have a corner: knots with a multiplicity of at least the
-        /// degree, which leaves the curve only continuous, and knots where the first derivative vanishes, typically
-        /// because poles coincide (issue 173).
+        /// The parameters of the inner knots where the curve has a corner: knots where the first derivative vanishes,
+        /// typically because poles coincide (issue 173), and knots with a multiplicity of at least the degree, which
+        /// leaves the curve only continuous, when the tangents of the two sides differ there or the derivative vanishes
+        /// on one side. Two Bézier segments that meet smoothly, the usual form of DXF and STEP splines, are no corner.
         /// </summary>
         internal List<double> CornerParameters()
         {
             List<double> res = new List<double>();
             double negligible = NegligibleDerivative();
+            // close to a side where the derivative vanishes, the derivative is about singularOffset times smaller than
+            // elsewhere, so this threshold is far from both (as in BSpline2D.CornerKnots)
+            double singularOffset = (endParam - startParam) * 1e-8;
+            double vanishingSide = 1e5 * negligible;
             for (int i = 0; i < knots.Length; i++)
             {
                 if (knots[i] <= startParam || knots[i] >= endParam) continue;
-                if (multiplicities[i] >= degree) res.Add(knots[i]);
-                else
+                PointDirAtParam(knots[i], out _, out GeoVector dir);
+                if (dir.Length <= negligible)
                 {
-                    PointDirAtParam(knots[i], out _, out GeoVector dir);
-                    if (dir.Length <= negligible) res.Add(knots[i]);
+                    res.Add(knots[i]);
+                    continue;
                 }
+                if (multiplicities[i] < degree) continue; // the tangent is continuous there
+                PointDirAtParam(knots[i] - singularOffset, out _, out GeoVector dirBefore);
+                PointDirAtParam(knots[i] + singularOffset, out _, out GeoVector dirAfter);
+                bool vanishes = dirBefore.Length <= vanishingSide || dirAfter.Length <= vanishingSide;
+                if (vanishes || !Precision.SameDirection(dirBefore, dirAfter, false) || dirBefore * dirAfter <= 0.0) res.Add(knots[i]);
             }
             return res;
         }
@@ -3216,6 +3400,15 @@ namespace CADability.GeoObject
             line.SetTwoPoints(sp, ep);
             return line;
         }
+        /// <summary>
+        /// Returns a new spline that is the part of this spline between the two parameters. The parameters are given in the
+        /// parameter space of the knots (see <see cref="Knots"/>, <see cref="PointAtParam"/>), not as positions in [0, 1] like
+        /// <see cref="ICurve.Trim"/> expects them. If <paramref name="spar"/> is greater than <paramref name="epar"/>, the result
+        /// is reversed. This spline is not changed; only the geometry is copied, not the attributes.
+        /// </summary>
+        /// <param name="spar">Parameter where the new spline starts</param>
+        /// <param name="epar">Parameter where the new spline ends</param>
+        /// <returns>The trimmed spline</returns>
         public BSpline TrimParam(double spar, double epar)
         {
             BSpline clone = BSpline.Construct();
@@ -3910,6 +4103,10 @@ namespace CADability.GeoObject
         #endregion
         #region IColorDef Members
         private ColorDef colorDef;
+        /// <summary>
+        /// The color of this spline, null if it has none of its own. Setting it is an undoable attribute change that raises the
+        /// change events; a "color from parent" value is resolved against the <see cref="Block"/> that owns this object.
+        /// </summary>
         public ColorDef ColorDef
         {
             get => colorDef;
@@ -3932,6 +4129,10 @@ namespace CADability.GeoObject
         #endregion
         #region ILineWidth Members
         private LineWidth lineWidth;
+        /// <summary>
+        /// The line width used to display this spline, null for the default. Setting it is an undoable attribute change that
+        /// raises the change events.
+        /// </summary>
         public LineWidth LineWidth
         {
             get => lineWidth;
@@ -3946,6 +4147,10 @@ namespace CADability.GeoObject
         #endregion
         #region ILinePattern Members
         private LinePattern linePattern;
+        /// <summary>
+        /// The line pattern (dashes) used to display this spline, null for a solid line. Setting it is an undoable attribute
+        /// change that raises the change events.
+        /// </summary>
         public LinePattern LinePattern
         {
             get => linePattern;
@@ -4458,11 +4663,16 @@ namespace CADability.GeoObject
             return res;
         }
 
+        /// <inheritdoc/>
         public override BoundingRect GetExtent(Projection projection, ExtentPrecision extentPrecision)
         {
             return (this as ICurve).GetProjectedCurve(projection.ProjectionPlane).GetExtent();
         }
 
+        /// <summary>
+        /// true if this spline is rational, i.e. at least one weight differs from 1.0. Non-rational splines can be exported in
+        /// simpler forms (e.g. without the rational flag in DXF, as a plain B_SPLINE_CURVE_WITH_KNOTS in STEP).
+        /// </summary>
         public bool HasWeights
         {
             get
@@ -4521,9 +4731,7 @@ namespace CADability.GeoObject
             }
 
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.PointAndDerivativesAt(double, int)"/>.
-        /// </summary>
+        /// <inheritdoc/>
         public IReadOnlyList<GeoVector> PointAndDerivativesAt(double position, int grad)
         {
             return GeneralCurve.PointAndDerivativesAt(this, position, grad);

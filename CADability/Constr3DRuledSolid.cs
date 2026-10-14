@@ -5,6 +5,14 @@ using System.Collections;
 
 namespace CADability.Actions
 {
+    /// <summary>
+    /// Interactive construction of a ruled solid between two closed planar paths in different planes (a loft between two profiles):
+    /// the user picks the two paths (single curves are combined to paths with the connected curves of the model) and the solid created
+    /// by <see cref="Make3D.MakeRuledSolid(Path, Path, Project)"/> is inserted into the model, united with or subtracted from the
+    /// existing solids according to <see cref="IFrame.SolidModellingMode"/>. When two suitable paths are already selected,
+    /// <see cref="ruledSolidDo(GeoObjectList, IFrame)"/> creates the solid without further interaction. Started by the menu command
+    /// "MenuId.Constr.Solid.RuledSolid"; its id is "Constr.Solid.RuledSolid".
+    /// </summary>
     public class Constr3DRuledSolid : ConstructAction
     {
         private GeoObjectInput geoObjectInput1;
@@ -166,6 +174,7 @@ namespace CADability.Actions
             selectedMode = 0;
         }
 
+        /// <inheritdoc/>
         public override bool AutoRepeat()
         {   // only repeat, when this action was started without any objects selected
             return selectedMode == 0;
@@ -386,6 +395,7 @@ namespace CADability.Actions
         }
 
 
+        /// <inheritdoc/>
         public override void OnSetAction()
         {
             base.ActiveObject = Face.Construct();
@@ -411,9 +421,11 @@ namespace CADability.Actions
         }
 
 
+        /// <inheritdoc/>
         public override string GetID()
         { return "Constr.Solid.RuledSolid"; }
 
+        /// <inheritdoc/>
         public override void OnDone()
         {
             if (base.ShowActiveObject == true)

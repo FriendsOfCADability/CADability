@@ -7,7 +7,10 @@ using System.Collections.Generic;
 namespace CADability.UserInterface
 {
 	/// <summary>
-	/// 
+	/// Property entry of a <see cref="Block"/> in the control center. It shows the name and the reference
+	/// point of the block, the common attributes of its children for a combined change, one sub entry per
+	/// child object (unless the user data "Block.HideCommonProperties" suppresses these) and the attributes
+	/// of the block itself. The context menu offers the block commands and the commands of a selected child.
 	/// </summary>
 	internal class ShowPropertyBlock : PropertyEntryImpl, ICommandHandler, IGeoObjectShowProperty
 	{

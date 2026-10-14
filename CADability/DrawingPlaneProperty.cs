@@ -4,7 +4,10 @@ using CADability.Substitutes;
 namespace CADability.UserInterface
 {
     /// <summary>
-    ///
+    /// Property page entry for the drawing plane of a <see cref="Projection"/>, the plane in which 2d constructions
+    /// take place. It shows the origin and the x and y directions of the plane as editable sub entries and offers the
+    /// context menu "MenuId.DrawingPlane" to select one of the standard planes (optionally with an offset), to define
+    /// the plane by three points, by a curve or tangential to a surface, and to show or hide the plane.
     /// </summary>
 
     public class DrawingPlaneProperty : IShowPropertyImpl, ICommandHandler
@@ -16,6 +19,12 @@ namespace CADability.UserInterface
         GeoVectorProperty planeDirectionX;
         GeoVectorProperty planeDirectionY;
         GeoVector dirX, dirY;
+        /// <summary>
+        /// Creates the entry for the drawing plane of <paramref name="projection"/>, the projection of the view the entry
+        /// belongs to.
+        /// </summary>
+        /// <param name="projection">The projection whose <see cref="Projection.DrawingPlane"/> is edited</param>
+        /// <param name="frame">The frame, used to start the actions of the context menu and to access the project</param>
         public DrawingPlaneProperty(Projection projection, IFrame frame)
         {
             this.projection = projection;
@@ -36,6 +45,10 @@ namespace CADability.UserInterface
             subEntries[2] = planeDirectionY;
             resourceIdInternal = "DrawingPlane";
         }
+        /// <summary>
+        /// The origin of the drawing plane. Setting it moves the plane of the projection. The "DrawingPlane.Location" sub
+        /// entry accesses it via reflection.
+        /// </summary>
         public GeoPoint PlanePoint
         {
             get
@@ -49,6 +62,11 @@ namespace CADability.UserInterface
                 projection.DrawingPlane = pln;
             }
         }
+        /// <summary>
+        /// The x direction of the drawing plane as edited in the "DrawingPlane.DirectionX" sub entry (which accesses it via
+        /// reflection). Setting it only stores the value; the plane of the projection is updated when the sub entry loses the
+        /// focus.
+        /// </summary>
         public GeoVector PlaneDirectionX
         {
             get
@@ -60,6 +78,11 @@ namespace CADability.UserInterface
                 dirX = value;
             }
         }
+        /// <summary>
+        /// The y direction of the drawing plane as edited in the "DrawingPlane.DirectionY" sub entry (which accesses it via
+        /// reflection). Setting it only stores the value; the plane of the projection is updated when the sub entry loses the
+        /// focus.
+        /// </summary>
         public GeoVector PlaneDirectionY
         {
             get
@@ -72,6 +95,7 @@ namespace CADability.UserInterface
             }
         }
         #region IShowProperty Members
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -90,10 +114,7 @@ namespace CADability.UserInterface
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>,
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -101,10 +122,7 @@ namespace CADability.UserInterface
                 return subEntries.Length;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>,
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get
@@ -112,6 +130,7 @@ namespace CADability.UserInterface
                 return subEntries;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get

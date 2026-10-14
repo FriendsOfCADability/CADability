@@ -28,8 +28,10 @@ namespace CADability
      */
 
     /// <summary>
-    /// Mit dieser Klasse kann eine ICurve2D in einem Border verwurstet werden, also z.B. gesplittet werden
-    /// und man weiß imme noch aus welcher Edge es kommt.
+    /// User data attached to an <see cref="ICurve2D"/> (under the name <see cref="UserDataName"/>) that records the
+    /// <see cref="Edge"/> the 2d curve was derived from. It survives the processing of the curve in a
+    /// <see cref="CADability.Shapes.Border"/> (e.g. splitting), so the originating edge can still be found afterwards. When the user
+    /// data is overridden by another EdgeReference, the previous one is kept in <see cref="previous"/>.
     /// </summary>
     internal class EdgeReference : IManageUserData
     {
@@ -223,6 +225,9 @@ namespace CADability
         internal BRepOperation.EdgeInfo edgeInfo; // only used for BRepOperation
         // TODO: überprüfen, ob isPartOf und startAtOriginal, endAtOriginal noch gebraucht wird (evtl. zu einem Objekt machen)
         // TODO: ist owner nicht immer primaryFace?
+        /// <summary>
+        /// Intended to release cached data of this edge. Currently does nothing.
+        /// </summary>
         public void FreeCachedMemory()
         {
         }
@@ -568,6 +573,12 @@ namespace CADability
                 }
             }
         }
+        /// <summary>
+        /// The vertex at the start point of <see cref="Curve3D"/>, regardless of the orientation of the edge on its faces
+        /// (see <see cref="StartVertex(Face)"/> for that). For an edge whose curve is closed, and for a pole (an edge without
+        /// 3d curve, which collapses to a point), <see cref="Vertex1"/> and <see cref="Vertex2"/> are the same vertex. The
+        /// vertices are created from the curve on first access.
+        /// </summary>
         public Vertex Vertex1
         {
             get
@@ -596,6 +607,11 @@ namespace CADability
                 }
             }
         }
+        /// <summary>
+        /// The vertex at the end point of <see cref="Curve3D"/>, regardless of the orientation of the edge on its faces (see
+        /// <see cref="EndVertex(Face)"/> for that). For an edge whose curve is closed, and for a pole, this is the same vertex
+        /// as <see cref="Vertex1"/>. The vertices are created from the curve on first access.
+        /// </summary>
         public Vertex Vertex2
         {
             get
@@ -691,6 +707,14 @@ namespace CADability
             }
             throw new System.ApplicationException("Edge.StartPosition, wrong parameter");
         }
+        /// <summary>
+        /// Returns the vertex at the end of this edge in the direction of the edge on the provided face, i.e. the vertex at
+        /// which the edge arrives when the loop of the face is traversed counterclockwise (outline) or clockwise (hole).
+        /// This is <see cref="Vertex2"/> when <see cref="Forward(Face)"/> is true for the face, <see cref="Vertex1"/>
+        /// otherwise.
+        /// </summary>
+        /// <param name="onThisFace">the face that specifies the orientation</param>
+        /// <returns>the end vertex, or null when <paramref name="onThisFace"/> is not a face of this edge</returns>
         public Vertex EndVertex(Face onThisFace)
         {
             if (!oriented) Orient();
@@ -766,6 +790,15 @@ namespace CADability
             }
             oriented = true;
         }
+        /// <summary>
+        /// Creates an edge on <paramref name="onThisFace"/> from the curve <paramref name="curve"/> in the parameter (u/v)
+        /// space of its surface. The 3d curve is computed from the surface, the edge is oriented forward on the face (so
+        /// <paramref name="curve"/> must run in the direction of the loop of the face) and has no secondary face. The edge is
+        /// not inserted into the loops of the face.
+        /// </summary>
+        /// <param name="onThisFace">the face the edge belongs to</param>
+        /// <param name="curve">the 2d curve of the edge on the surface of the face</param>
+        /// <returns>the new edge</returns>
         public static Edge MakeEdge(Face onThisFace, ICurve2D curve)
         {
             Edge res = new Edge();
@@ -811,6 +844,7 @@ namespace CADability
             res.owner = onThisFace;
             return res;
         }
+        /// <inheritdoc/>
         public override int GetHashCode()
         {
             return hashCode;
@@ -850,11 +884,14 @@ namespace CADability
         /// <summary>
         /// Creates an edge which is the edge of two connected faces.
         /// </summary>
+        /// <param name="owner">the owner of the edge; since it belongs to two faces this is usually a <see cref="Shell"/></param>
         /// <param name="curve3d">the 3-dimensional curve</param>
         /// <param name="primaryFace">first face</param>
         /// <param name="curveOnPrimaryFace">2-d curve on first face</param>
+        /// <param name="forwardOnPrimaryFace">true, if the 3d curve has the same orientation as the 2d curve on the first face (which runs counterclockwise seen from outside)</param>
         /// <param name="secondaryFace">seconsd face</param>
         /// <param name="curveOnSecondaryFace">2-d curve on second face</param>
+        /// <param name="forwardOnSecondaryFace">true, if the 3d curve has the same orientation as the 2d curve on the second face</param>
         public Edge(IGeoObject owner, ICurve curve3d, Face primaryFace, ICurve2D curveOnPrimaryFace, bool forwardOnPrimaryFace, Face secondaryFace, ICurve2D curveOnSecondaryFace, bool forwardOnSecondaryFace)
             : this()
         {
@@ -873,9 +910,11 @@ namespace CADability
         /// <summary>
         /// Creates an edge which is the edge of two connected faces.
         /// </summary>
+        /// <param name="owner">the owner of the edge, the <see cref="Face"/> or the <see cref="Shell"/> it belongs to</param>
         /// <param name="curve3d">the 3-dimensional curve</param>
         /// <param name="primaryFace">first face</param>
         /// <param name="curveOnPrimaryFace">2-d curve on first face</param>
+        /// <param name="forwardOnPrimaryFace">true, if the 3d curve has the same orientation as the 2d curve on the first face (which runs counterclockwise seen from outside)</param>
         public Edge(IGeoObject owner, ICurve curve3d, Face primaryFace, ICurve2D curveOnPrimaryFace, bool forwardOnPrimaryFace)
             : this()
         {
@@ -900,6 +939,10 @@ namespace CADability
             }
             oriented = true;
         }
+        /// <summary>
+        /// Enumerates the faces of this edge: the <see cref="PrimaryFace"/> and, if there is one, the
+        /// <see cref="SecondaryFace"/>. Faces that are null are skipped.
+        /// </summary>
         public IEnumerable<Face> Faces
         {
             get
@@ -1018,6 +1061,9 @@ namespace CADability
             }
             return true;
         }
+        /// <summary>
+        /// Intended to recompute <see cref="Curve3D"/> from the surfaces of the faces. Currently does nothing.
+        /// </summary>
         public void RecalcCurve3D()
         {   // nur wenn die Kurve nicht in Ordnung ist, wird neu berechnet
             // das ist noch nicht gut! Nach dem Import sollten die Vertices zuerst bestimmt werden (aus 3 Flächen)
@@ -1064,6 +1110,7 @@ namespace CADability
         /// Use the vertices in the provided Set. If the endpoints of the curve don't coincide with one of the vertices, create a new one and add it to the set.
         /// </summary>
         /// <param name="toUse"></param>
+        /// <param name="precision">maximum distance of an end point of the curve to a vertex in the set for that vertex to be used</param>
         internal void UseVertices(HashSet<Vertex> toUse, double precision = 1e-6)
         {
             if (curve3d != null)
@@ -1144,6 +1191,13 @@ namespace CADability
             }
 
         }
+        /// <summary>
+        /// Replaces the vertices of this edge by those vertices in <paramref name="toUse"/> that lie at the start and the end
+        /// point of <see cref="Curve3D"/> (within <see cref="Precision.eps"/>). A vertex that is replaced is merged into the new
+        /// one, so that its other edges refer to the new vertex too. A vertex for which there is no match is kept. Used to
+        /// connect edges of different faces at common vertices, e.g. when importing.
+        /// </summary>
+        /// <param name="toUse">the vertices to use</param>
         public void UseVertices(params Vertex[] toUse)
         {
             if (curve3d != null)
@@ -1285,6 +1339,13 @@ namespace CADability
             return true;
         }
 
+        /// <summary>
+        /// Recomputes the 2d curve of this edge on <paramref name="onThisface"/> by projecting <see cref="Curve3D"/> onto the
+        /// surface of the face, keeping the orientation of the edge on that face. Needed after the 3d curve or the surface has
+        /// changed. Not suitable for a seam edge, whose two 2d curves lie on the same face.
+        /// </summary>
+        /// <param name="onThisface">the primary or secondary face of this edge</param>
+        /// <exception cref="ApplicationException">when <paramref name="onThisface"/> is not a face of this edge</exception>
         public void RecalcCurve2D(Face onThisface)
         {   // gefährlich, da Nähte zweimal auf dem selben Face!
             if (this.curve3d == null) return;
@@ -1648,6 +1709,13 @@ namespace CADability
             }
             return res;
         }
+        /// <summary>
+        /// Clones the 3d curve and the vertices of this edge; the clone has no faces yet. A vertex found in
+        /// <paramref name="clonedVertices"/> is reused, otherwise it is cloned and the pair original/clone is added to the
+        /// dictionary, so that edges of several faces that are cloned together share their vertices.
+        /// </summary>
+        /// <param name="clonedVertices">maps original vertices to their clones, extended by this call</param>
+        /// <returns>the cloned edge without faces</returns>
         public Edge Clone(Dictionary<Vertex, Vertex> clonedVertices)
         {
             Edge res = new Edge();
@@ -1671,6 +1739,17 @@ namespace CADability
             return res;
         }
 
+        /// <summary>
+        /// Clones this edge (with a cloned 3d curve, but the same vertices, which get the clone added) and replaces the face
+        /// <paramref name="toReplace"/> by <paramref name="replaceWith"/> in the clone, keeping the 2d curve and the
+        /// orientation of the replaced face. With <paramref name="removeOtherFace"/> the clone refers only to
+        /// <paramref name="replaceWith"/> (as its primary face), otherwise it keeps the other face of this edge as well.
+        /// Used when a face is replaced by a modified copy while its neighbours stay.
+        /// </summary>
+        /// <param name="toReplace">the primary or secondary face of this edge that is to be replaced</param>
+        /// <param name="replaceWith">the face that takes its place</param>
+        /// <param name="removeOtherFace">true: the clone gets only the new face, false: also the other face of this edge</param>
+        /// <returns>the cloned edge</returns>
         public Edge CloneReplaceFace(Face toReplace, Face replaceWith, bool removeOtherFace)
         {
             Edge res = new Edge();
@@ -1730,6 +1809,11 @@ namespace CADability
 #endif
             return res;
         }
+        /// <summary>
+        /// Clones the 3d curve of this edge; the clone uses the same vertices as this edge (which get the clone added to their
+        /// edges) and has no faces. Without a 3d curve the clone has no vertices either.
+        /// </summary>
+        /// <returns>the cloned edge without faces</returns>
         public Edge CloneWithVertices()
         {
             Edge res = new Edge();
@@ -1762,6 +1846,11 @@ namespace CADability
             if (onThisFace == secondaryFace) return forwardOnSecondaryFace;
             return false; // dürfte nicht vorkommen
         }
+        /// <summary>
+        /// The orientation on the primary face: true if <see cref="Curve3D"/> runs in the direction of the loop of the
+        /// <see cref="PrimaryFace"/>, see <see cref="Forward(Face)"/>. For a seam edge (primary and secondary face are the
+        /// same face) this is the orientation of the first occurrence of this edge in the loop of the face.
+        /// </summary>
         public bool ForwardOnPrimaryFace
         {
             get { return forwardOnPrimaryFace; }
@@ -1774,12 +1863,31 @@ namespace CADability
         {
             get { return forwardOnSecondaryFace; }
         }
+        /// <summary>
+        /// Returns true if the 3d curves of this edge and <paramref name="other"/> describe the same curve within
+        /// <paramref name="precision"/>, regardless of their direction.
+        /// </summary>
+        /// <param name="other">the other edge</param>
+        /// <param name="precision">maximum deviation</param>
+        /// <returns>true if the curves coincide</returns>
         public bool SameGeometry(Edge other, double precision)
         {
             // erstmal von offener Kurve ausgehen
             bool reverse;
             return Curves.SameGeometry(this.curve3d, other.curve3d, precision, out reverse);
         }
+        /// <summary>
+        /// Tests whether the 3d curves of this edge and <paramref name="other"/> overlap, i.e. have a common part. The common
+        /// part is returned as parameter intervals of both curves (see <see cref="Curves.Overlapping"/>). Returns false, with
+        /// all intervals 0, when one of the edges has no 3d curve (a pole).
+        /// </summary>
+        /// <param name="other">the other edge</param>
+        /// <param name="precision">maximum distance between the curves on the common part</param>
+        /// <param name="from">start parameter of the common part on this edge</param>
+        /// <param name="to">end parameter of the common part on this edge</param>
+        /// <param name="otherFrom">start parameter of the common part on the other edge</param>
+        /// <param name="otherTo">end parameter of the common part on the other edge</param>
+        /// <returns>true if the edges overlap</returns>
         public bool Overlaps(Edge other, double precision, out double from, out double to, out double otherFrom, out double otherTo)
         {
             if (this.curve3d != null && other.curve3d != null)
@@ -2094,6 +2202,11 @@ namespace CADability
             this.curveOnSecondaryFace = curveOnSecondaryFace;
             this.forwardOnSecondaryFace = forwardOnSecondaryFace;
         }
+        /// <summary>
+        /// The first face bounded by this edge. Every edge of a face has a primary face (only an edge that is still being
+        /// constructed has none); an edge of a shell that is shared by two faces has a <see cref="SecondaryFace"/> too. For
+        /// a seam edge both are the same face.
+        /// </summary>
         public Face PrimaryFace
         {
             get
@@ -2101,6 +2214,10 @@ namespace CADability
                 return primaryFace;
             }
         }
+        /// <summary>
+        /// The second face bounded by this edge, or null for an open edge that belongs to a single face. For a seam edge on
+        /// a periodic surface (e.g. the closing edge of a full cylinder) it is the same face as <see cref="PrimaryFace"/>.
+        /// </summary>
         public Face SecondaryFace
         {
             get
@@ -2112,6 +2229,10 @@ namespace CADability
                 secondaryFace = value;
             }
         }
+        /// <summary>
+        /// The owner of this edge as an <see cref="IGeoObject"/>, which is its <see cref="PrimaryFace"/>. Setting it is only
+        /// needed while reading files.
+        /// </summary>
         public IGeoObject Owner
         {
             get
@@ -2165,11 +2286,14 @@ namespace CADability
             }
         }
         /// <summary>
-        /// Stellt fest, ob diese Edge teil einer anderen Edge ist. Das das über geometrische Eigenschaften läuft
-        /// ist blöd, denn man könnte es besser beim Erzeugen (Face.Split) bestimmen, ist aber dort sehr umständlich
+        /// Determines whether this edge (which resulted from splitting a face and therefore has only a primary face) is
+        /// a part of the edge <paramref name="original"/>. The test is purely geometrical: both edges must lie on the
+        /// same surface and the 2d curve of this edge must lie on the 2d curve of the original. On success
+        /// <see cref="IsPartOf"/>, <see cref="StartAtOriginal"/> and <see cref="EndAtOriginal"/> are set. It would be
+        /// better to record this relation when the split is made, but that is cumbersome there.
         /// </summary>
-        /// <param name="original"></param>
-        /// <returns></returns>
+        /// <param name="original">the edge that may contain this edge</param>
+        /// <returns>true if this edge is a part of <paramref name="original"/></returns>
         internal bool CheckSplit(Edge original)
         {
             // this hat nur primaryFace, nicht secondary, da es ja beim splitten entstanden ist
@@ -2278,6 +2402,11 @@ namespace CADability
         }
 
         #region IJsonSerialize Members
+        /// <summary>
+        /// Writes this edge for the JSON serialization (<see cref="IJsonSerialize"/>): its 3d curve, its faces with the 2d
+        /// curves and orientations on them, and its vertices.
+        /// </summary>
+        /// <param name="data">receives the properties</param>
         public void GetObjectData(IJsonWriteData data)
         {
             owner = primaryFace;
@@ -2298,6 +2427,11 @@ namespace CADability
             if (v1 != null) data.AddProperty("Vertex1", v1);
             if (v2 != null) data.AddProperty("Vertex2", v2);
         }
+        /// <summary>
+        /// Reads this edge from the JSON serialization (<see cref="IJsonSerialize"/>), the counterpart of
+        /// <see cref="GetObjectData(IJsonWriteData)"/>.
+        /// </summary>
+        /// <param name="data">the properties to read</param>
         public void SetObjectData(IJsonReadData data)
         {
             curve3d = data.GetPropertyOrDefault<ICurve>("Curve3d");
@@ -2447,6 +2581,12 @@ namespace CADability
         {
             return primaryFace == secondaryFace;
         }
+        /// <summary>
+        /// Returns true if the two faces of this edge lie on geometrically identical surfaces (e.g. the two halves of a
+        /// cylinder split at its seam, or two coplanar faces), so that the edge is not a real edge of the shape. The result is
+        /// cached. False for an open edge.
+        /// </summary>
+        /// <returns>true if both faces have the same surface</returns>
         public bool ConnectsSameSurfaces()
         {
             if (kind == EdgeKind.unknown)
@@ -2845,6 +2985,17 @@ namespace CADability
             }
             else throw new System.ApplicationException("Edge.SetFace called with already two faces set");
         }
+        /// <summary>
+        /// Attaches this edge to <paramref name="face"/>: as its primary face when it has none yet, otherwise as its
+        /// secondary face. <paramref name="curve2D"/> is the edge in the parameter (u/v) space of the surface of the face, in
+        /// the direction of <see cref="Curve3D"/>; <paramref name="forward"/> tells whether <see cref="Curve3D"/> runs in the
+        /// direction of the loop of the face (if not, the 2d curve is reversed, so that the stored 2d curve always runs in the
+        /// direction of the loop). Used when building faces, e.g. before <see cref="Face.Set(ISurface, Edge[][], bool)"/>.
+        /// </summary>
+        /// <param name="face">the face to attach to</param>
+        /// <param name="curve2D">the 2d curve of the edge on the face, running in the direction of <see cref="Curve3D"/></param>
+        /// <param name="forward">true if the 3d curve runs in the direction of the loop of the face</param>
+        /// <exception cref="ApplicationException">when the edge already has two faces</exception>
         public void SetFace(Face face, ICurve2D curve2D, bool forward)
         {
             if (primaryFace == null)
@@ -3468,15 +3619,16 @@ namespace CADability
             if (secondaryFace != null) secondaryFace.ClearVertices();
         }
         /// <summary>
-        /// Stellt fest, ob die beiden geometrisch identisch sind. Die Endpunkte sind meist schon getestet,
-        /// die Richtung kann auch eine Rolle spielen.
+        /// Determines whether the two edges are geometrically identical. Assuming that the end points have already been
+        /// compared and that edges only intersect at their end points, it is sufficient to compare the midpoints of the
+        /// two 3d curves. <paramref name="vertexTested"/> and <paramref name="forward"/> are currently not evaluated.
         /// </summary>
-        /// <param name="e1"></param>
-        /// <param name="e2"></param>
-        /// <param name="vertexTested"></param>
-        /// <param name="forward"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <param name="e1">first edge</param>
+        /// <param name="e2">second edge</param>
+        /// <param name="vertexTested">true if the end points are already known to coincide</param>
+        /// <param name="forward">true if both edges are expected to have the same direction</param>
+        /// <param name="precision">maximum distance of the midpoints for the edges to be considered equal</param>
+        /// <returns>true if the edges are geometrically equal</returns>
         internal static bool IsGeometricallyEqual(Edge e1, Edge e2, bool vertexTested, bool forward, double precision)
         {   // hier einfach mal mit der Überlegung, dass Kanten sich nur in den Endpunkten schneiden der Test nach dem Mittelpunkt
             // vielleicht mit komplexen Kurven besser anders zu testen
@@ -3521,6 +3673,12 @@ namespace CADability
             if (thisFace == primaryFace) return secondaryFace;
             else return primaryFace;
         }
+        /// <summary>
+        /// Returns the vertex of this edge that is not <paramref name="v"/>: <see cref="Vertex2"/> when <paramref name="v"/> is
+        /// <see cref="Vertex1"/>, otherwise <see cref="Vertex1"/>.
+        /// </summary>
+        /// <param name="v">one of the vertices of this edge</param>
+        /// <returns>the other vertex</returns>
         public Vertex OtherVertex(Vertex v)
         {
             if (v == v1) return v2;
@@ -3679,10 +3837,21 @@ namespace CADability
 #endif
         }
 
+        /// <summary>
+        /// Returns true if this edge and <paramref name="other"/> have a common vertex.
+        /// </summary>
+        /// <param name="other">the other edge</param>
+        /// <returns>true if the edges share a vertex</returns>
         public bool IsConnected(Edge other)
         {
             return other.v1 == v1 || other.v1 == v2 || other.v2 == v1 || other.v2 == v2;
         }
+        /// <summary>
+        /// Returns true if the two faces of this edge join smoothly along it, i.e. have the same surface normal at the edge
+        /// (like the edge between a fillet and the face it blends into), false for a sharp edge or an open edge. The normals
+        /// are compared at the vertices and in the middle of the edge; faces on the same surface are always tangential.
+        /// </summary>
+        /// <returns>true for a tangential edge</returns>
         public bool IsTangentialEdge()
         {
             if (secondaryFace == null) return false;
@@ -3712,6 +3881,12 @@ namespace CADability
                 return Precision.SameNotOppositeDirection(n1, n2);
             }
         }
+        /// <summary>
+        /// Returns true if this edge belongs to one of the holes of <paramref name="onThisFace"/> (see
+        /// <see cref="Face.HoleEdges(int)"/>), false if it is part of the outline or does not belong to the face at all.
+        /// </summary>
+        /// <param name="onThisFace">the face to check</param>
+        /// <returns>true if the edge bounds a hole of the face</returns>
         public bool IsPartOfHole(Face onThisFace)
         {
             for (int i = 0; i < onThisFace.HoleCount; i++)

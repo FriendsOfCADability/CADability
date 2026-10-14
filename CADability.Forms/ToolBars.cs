@@ -178,6 +178,7 @@ namespace CADability.Forms
         /// Make a ToolStrip, which contains all the provided <paramref name="menuIds"/> and uses the provided <paramref name="commandHandler"/>
         /// </summary>
         /// <param name="menuIds">menu ids to display in thei toolstrip</param>
+        /// <param name="name">name of the ToolStrip (its <c>Name</c> property)</param>
         /// <param name="commandHandler">command handler to handle the clicks on the buttons</param>
         /// <returns></returns>
         public static ToolStrip MakeToolStrip(string[] menuIds, string name, ICommandHandler commandHandler)

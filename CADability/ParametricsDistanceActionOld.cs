@@ -148,10 +148,12 @@ namespace CADability
             facesToMoveIsFixed = true;
         }
 
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "Constr.Parametrics.DistanceTo";
         }
+        /// <inheritdoc/>
         public override bool OnCommand(string MenuId)
         {
             switch (MenuId)
@@ -162,6 +164,7 @@ namespace CADability
             }
             return false;
         }
+        /// <inheritdoc/>
         public override void OnSetAction()
         {
             base.TitleId = "Constr.Parametrics.DistanceTo";
@@ -286,6 +289,7 @@ namespace CADability
             Refresh();
         }
 
+        /// <inheritdoc/>
         public override void OnDone()
         {
             if (validResult && ActiveObject != null)
@@ -320,6 +324,7 @@ namespace CADability
             ActiveObject = null;
             base.OnDone();
         }
+        /// <inheritdoc/>
         public override void OnRemoveAction()
         {
             if (shell.Layer != null) shell.Layer.Transparency = 0; // make the layer opaque again

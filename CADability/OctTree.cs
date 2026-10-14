@@ -53,6 +53,13 @@ namespace CADability
     }
 #endif
 
+    /// <summary>
+    /// Implemented by objects which can be stored in an <see cref="OctTree{T}"/>: the tree asks the object for its extent and
+    /// whether it is hit by a cube when it sorts the object into its nodes, and whether it is hit by a projected rectangle or a
+    /// line when the tree is searched by a pick rectangle or a ray. All GeoObjects implement it
+    /// (<see cref="CADability.GeoObject.IGeoObject"/> extends it), as do <see cref="CADability.GeoObject.Face"/>, <see cref="Edge"/>,
+    /// <see cref="Vertex"/> and various internal helper objects.
+    /// </summary>
     public interface IOctTreeInsertable
     {
         /// <summary>
@@ -81,7 +88,6 @@ namespace CADability
         /// <summary>
         /// Tests whether an object is inside or touched by the provided area
         /// </summary>
-        /// <param name="projection">The projection for the test</param>
         /// <param name="area">The area to check for</param>
         /// <param name="onlyInside">true: the object must be totaly inside the area, false: 
         /// the object must be totaly or partially inside the area</param>
@@ -1098,11 +1104,19 @@ namespace CADability
             node = new Node<T>(this, center, size);
         }
         /// <summary>
+        /// Delegate definition of a criterion whether a node should be split when an object is added to it.
+        /// When provided to the constructor it replaces the default criterion of <see cref="SplitNode(Node{T}, T)"/>.
+        /// </summary>
+        /// <param name="node">The node beeing checked</param>
+        /// <param name="objectToAdd">The object beeing added</param>
+        /// <returns>true, if the node should be splitted, false otherwise</returns>
+        public delegate bool SplitTestFunction(Node<T> node, T objectToAdd);
+        /// <summary>
         /// Constructs an octtree providing an initial size and a precision
         /// </summary>
         /// <param name="ext">Initial size of the tree. Objects beeng added later may exceed this cube</param>
         /// <param name="precision">Precision, used internally</param>
-        public delegate bool SplitTestFunction(Node<T> node, T objectToAdd);
+        /// <param name="splitTest">Criterion whether to split a node when an object is added to it, null: use the default criterion of <see cref="SplitNode(Node{T}, T)"/></param>
         public OctTree(BoundingCube ext, double precision, SplitTestFunction splitTest = null)
         {
             this.precision = precision;
@@ -1354,7 +1368,7 @@ namespace CADability
         /// <returns>true if accepted, false if rejected</returns>
         public delegate bool Filter(T toCheck);
         /// <summary>
-        /// Delegate definition of a filtering method restricting <see cref="Node<typeparamref name="T"/>"/>s.
+        /// Delegate definition of a filtering method restricting <see cref="Node{T}"/>s.
         /// </summary>
         /// <param name="toCheck">The node beeing checked</param>
         /// <returns>true if accepted, false if rejected</returns>

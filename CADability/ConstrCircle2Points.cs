@@ -7,9 +7,10 @@ using MouseEventArgs = CADability.Substitutes.MouseEventArgs;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a circle from two diametrically opposite points: the user picks two points, the circle has their
+    /// connecting line as diameter and lies in the active drawing plane. Centre and radius are shown as read-only values.
+    /// Menu id: "Constr.Circle.2Points".
     /// </summary>
-    /// 
 
 
     internal class ConstrCircle2Points : ConstructAction

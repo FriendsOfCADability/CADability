@@ -5,7 +5,8 @@ using System;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a parallelogram (a closed <see cref="Polyline"/>) from a corner point and two vectors that define
+    /// the directions and lengths of its sides. Menu id: "Constr.Rect.Parallelogram".
     /// </summary>
     internal class ConstrRectParallelogram : ConstructAction
     {

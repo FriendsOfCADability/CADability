@@ -18,7 +18,7 @@ namespace CADability.Attribute
     /// <summary>
     /// List of <see cref="HatchStyle"/> derived objects. Typically a <see cref="Project"/>
     /// or the <see cref="Settings"/> maintain such a list.
-    /// The list is serializable and can be shown and modified in the <see cref="ControlCenter"/>.
+    /// The list is serializable and can be shown and modified in the <see cref="IControlCenter">ControlCenter</see>.
     /// There can not be two hatch-styles with the same name.
     /// </summary>
     [Serializable]
@@ -33,13 +33,32 @@ namespace CADability.Attribute
 
         IPropertyEntry[] showProperties;
 
+        /// <summary>
+        /// Signature of the handler of the <see cref="CreateHatchStyleListEvent"/>: creates and returns a (possibly
+        /// derived) <see cref="HatchStyleList"/>.
+        /// </summary>
+        /// <returns>the new list</returns>
         public delegate HatchStyleList CreateHatchStyleListDelegate();
+        /// <summary>
+        /// Lets an application substitute its own class derived from <see cref="HatchStyleList"/>: when a handler is
+        /// attached, <see cref="CreateHatchStyleList"/> returns the list the handler creates instead of a plain
+        /// <see cref="HatchStyleList"/>.
+        /// </summary>
         public static event CreateHatchStyleListDelegate CreateHatchStyleListEvent;
+        /// <summary>
+        /// Creates an empty hatch style list, either through the <see cref="CreateHatchStyleListEvent"/> when a handler
+        /// is attached or as a plain <see cref="HatchStyleList"/>. CADability itself creates its lists with the
+        /// constructor; this factory is provided for applications that want to use a derived list.
+        /// </summary>
+        /// <returns>the new, empty list</returns>
         public static HatchStyleList CreateHatchStyleList()
         {
             if (CreateHatchStyleListEvent != null) return CreateHatchStyleListEvent();
             return new HatchStyleList();
         }
+        /// <summary>
+        /// Creates an empty hatch style list that is not owned by a project or the settings.
+        /// </summary>
         public HatchStyleList()
         {
             entries = new SortedList();
@@ -48,8 +67,13 @@ namespace CADability.Attribute
         }
 
         /// <summary>
+        /// Creates a hatch style list with two default entries: a solid fill (<see cref="HatchStyleSolid"/>) in the
+        /// current color of the container and a line hatch (<see cref="HatchStyleLines"/>) with 45° lines at a distance
+        /// of 10 that uses the current color, line width and line pattern of the container. Used when neither the
+        /// project nor the global settings provide a hatch style list.
         /// </summary>
-        /// <returns></returns>
+        /// <param name="container">provides the color, line width and line pattern lists</param>
+        /// <returns>the default hatch style list</returns>
         public static HatchStyleList GetDefault(IAttributeListContainer container)
         {
             HatchStyleList res = new HatchStyleList();
@@ -101,6 +125,12 @@ namespace CADability.Attribute
             if (ind >= 0) return entries.GetByIndex(ind) as HatchStyle;
             else return null;
         }
+        /// <summary>
+        /// Returns the hatch style at the given index. The entries are ordered alphabetically by name, so the index of
+        /// a style changes when styles are added, removed or renamed.
+        /// </summary>
+        /// <param name="Index">index in the range 0 to <see cref="Count"/>-1</param>
+        /// <returns>the hatch style, or null when the index is out of range</returns>
         public HatchStyle this[int Index]
         {
             get
@@ -141,6 +171,12 @@ namespace CADability.Attribute
             showProperties = null;
             if (propertyPage != null) propertyPage.OpenSubEntries(this, false); // close
         }
+        /// <summary>
+        /// Creates a copy of this list in which every hatch style is cloned (see <see cref="HatchStyle.Clone"/>). The
+        /// <see cref="Current"/> entry of the copy corresponds to the current entry of this list. The copy has no
+        /// <see cref="Owner"/>.
+        /// </summary>
+        /// <returns>the copied list</returns>
         public HatchStyleList Clone()
         {
             HatchStyleList res = new HatchStyleList();
@@ -155,6 +191,11 @@ namespace CADability.Attribute
             }
             return res;
         }
+        /// <summary>
+        /// The current hatch style of the list: the style that <see cref="Project.SetDefaults(IGeoObject)"/> gives to a new
+        /// <see cref="Hatch"/>, shown in bold in the control center. When nothing has been set, it is the first entry,
+        /// or null for an empty list. Setting a style that is not yet in the list adds it; setting null is ignored.
+        /// </summary>
         public HatchStyle Current
         {
             get
@@ -175,13 +216,24 @@ namespace CADability.Attribute
                 }
             }
         }
+        /// <summary>
+        /// The <see cref="Project"/> or <see cref="Settings"/> that holds this list, or null. The container sets it
+        /// when the list is added to it. The list uses the owner to resolve the colours, line widths and line patterns
+        /// its styles refer to and asks it before an entry is removed (<see cref="IAttributeListContainer.RemovingItem"/>).
+        /// </summary>
         public IAttributeListContainer Owner
         {
             get { return owner; }
             set { owner = value; }
         }
+        /// <summary>
+        /// Raised after a hatch style has been added to or removed from the list. The handler receives this list as
+        /// sender and null as arguments. Property pages that offer the entries of the list for selection use it to
+        /// rebuild their choices.
+        /// </summary>
         public event CADability.DidModifyDelegate DidModifyEvent;
         #region IPropertyEntry Members
+        /// <inheritdoc/>
         public override PropertyEntryType Flags
         {
             get
@@ -189,6 +241,7 @@ namespace CADability.Attribute
                 return PropertyEntryType.ContextMenu | PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
             }
         }
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -207,6 +260,7 @@ namespace CADability.Attribute
                 return showProperties;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -216,10 +270,12 @@ namespace CADability.Attribute
                 return MenuResource.LoadMenuDefinition("MenuId.HatchStyleList", false, this);
             }
         }
+        /// <inheritdoc/>
         public override void Refresh()
         {
             if (propertyPage != null) propertyPage.Refresh(this);
         }
+        /// <inheritdoc/>
         public override void UnSelected(IPropertyEntry nowSelected)
         {
             if (needsUpdate && Settings.GlobalSettings.GetBoolValue("HatchStyle.AutoUpdate", true)) OnUpdateAllHatchs();

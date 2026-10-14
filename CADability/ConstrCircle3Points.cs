@@ -7,7 +7,8 @@ using MouseEventArgs = CADability.Substitutes.MouseEventArgs;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a circle through three points picked by the user. Centre and radius are shown as read-only values.
+    /// Menu id: "Constr.Circle.3Points".
     /// </summary>
     internal class ConstrCircle3Points : ConstructAction
     {

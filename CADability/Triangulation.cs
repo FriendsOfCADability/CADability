@@ -544,7 +544,7 @@ namespace CADability
                 connected = new List<ConnectionTree>();
             }
             /// <summary>
-            /// Liefert alle Items, also auch die der untergeordneten Äste
+            /// Returns this node and all nodes of the subordinate branches (the whole subtree, depth first).
             /// </summary>
             public IEnumerable<ConnectionTree> Items
             {
@@ -1226,6 +1226,19 @@ namespace CADability
             //System.Diagnostics.Trace.WriteLine("Austausch: " + t1ind.ToString() + "--" + t2ind.ToString() + " gegen " + edge.v1.ToString() + "--" + edge.v2.ToString() + " (" + Geometry.DistPL(frm, freet1.p3d, freet2.p3d).ToString() + " < " + Geometry.DistPL(vm, vertex[edge.v1].p3d, vertex[edge.v2].p3d).ToString() + " )");
             // if ((freet1.p3d | freet2.p3d) >= (vertex[edge.v1].p3d | vertex[edge.v2].p3d)) return false;
             ++exchangesuccess;
+            Flip(edge, t1, t1vert, t1ind, t2, t2vert, t2ind);
+            edge.maxDist = ndist;
+            edge.posMaxDist = -1; // edge.posMaxDist wird nicht berechnet, da nicht mehr benötigt, oder?
+            return true;
+        }
+        /// <summary>
+        /// Replaces <paramref name="edge"/>, the common edge of <paramref name="t1"/> and <paramref name="t2"/>, by the other
+        /// diagonal of the quadrilateral the two triangles form, which connects <paramref name="t1ind"/> and
+        /// <paramref name="t2ind"/>, the vertices of the triangles that are not on the edge. <paramref name="t1vert"/> and
+        /// <paramref name="t2vert"/> say which corner of the triangles these vertices are.
+        /// </summary>
+        private void Flip(Edge edge, Triangle t1, int t1vert, int t1ind, Triangle t2, int t2vert, int t2ind)
+        {
             // 3. jetzt gemäß <|> die "senkrechte" edge um 90° nach links drehen "<->" und die Dreiecke updaten
             // Kante umbiegen
             // die Kanten der beiden Dreiecke können anschließend suboptimal sein
@@ -1241,8 +1254,6 @@ namespace CADability
             double dbgd = vertex[edge.v1].p2d | vertex[edge.v2].p2d;
 #endif
             edge.isOptimal = true;
-            edge.maxDist = ndist;
-            edge.posMaxDist = -1; // edge.posMaxDist wird nicht berechnet, da nicht mehr benötigt, oder?
             // nicht benötigte kante freigeben
             Edge e1 = null;
             Edge e2 = null;
@@ -1315,7 +1326,91 @@ namespace CADability
                     t2.v2 = t1ind;
                     break;
             }
+        }
+        /// <summary>
+        /// Flips <paramref name="edge"/> when the two triangles it separates are badly shaped: when their angles opposite the
+        /// edge add up to clearly more than 180° in 3D, the other diagonal of the quadrilateral gives two better shaped
+        /// triangles (the Delaunay criterion). The ear clipping of a densely sampled outline produces long and thin fans,
+        /// and splitting their edges keeps the triangles thin. A thin triangle can stay within the maximum deflection along
+        /// its edges and still cover the surface badly, so that it overlaps or folds over its neighbours, which makes the
+        /// area of the triangulation too large. The quadrilateral must be convex in 2D, so that the new triangles are valid
+        /// in the parameter space, and the new diagonal must not deviate more from the surface than the old one: a long thin
+        /// triangle along a straight line of the surface, like a line of a cone, is exact and stays.
+        /// </summary>
+        private bool FlipToDelaunay(Edge edge)
+        {
+            Triangle t1 = edge.t1;
+            Triangle t2 = edge.t2;
+            if (t1 == null || t2 == null) return false;
+            int t1vert, t2vert, t1ind, t2ind;
+            if (t1.e1 == edge) { t1vert = 3; t1ind = t1.v3; }
+            else if (t1.e2 == edge) { t1vert = 1; t1ind = t1.v1; }
+            else { t1vert = 2; t1ind = t1.v2; }
+            if (t2.e1 == edge) { t2vert = 3; t2ind = t2.v3; }
+            else if (t2.e2 == edge) { t2vert = 1; t2ind = t2.v1; }
+            else { t2vert = 2; t2ind = t2.v2; }
+            Vertex free1 = vertex[t1ind];
+            Vertex free2 = vertex[t2ind];
+            Vertex ev1 = vertex[edge.v1];
+            Vertex ev2 = vertex[edge.v2];
+            // a quadrilateral that is almost a rectangle keeps the diagonal that was chosen for the smaller deviation
+            double opposite = Angle3D(free1.p3d, ev1.p3d, ev2.p3d) + Angle3D(free2.p3d, ev1.p3d, ev2.p3d);
+            if (opposite <= 1.25 * Math.PI) return false;
+            if (!Geometry.InnerIntersection(free1.p2d, free2.p2d, ev1.p2d, ev2.p2d)) return false;
+            if (surface.MaxDist(free1.p2d, free2.p2d, out _) > surface.MaxDist(ev1.p2d, ev2.p2d, out _)) return false;
+            Flip(edge, t1, t1vert, t1ind, t2, t2vert, t2ind);
             return true;
+        }
+        /// <summary>
+        /// The angle at <paramref name="apex"/> in the triangle with the other corners <paramref name="p1"/> and <paramref name="p2"/>.
+        /// </summary>
+        private static double Angle3D(GeoPoint apex, GeoPoint p1, GeoPoint p2)
+        {
+            GeoVector a = p1 - apex;
+            GeoVector b = p2 - apex;
+            return Math.Atan2((a ^ b).Length, a * b);
+        }
+        /// <summary>
+        /// Flips those of the edges in <paramref name="toCheck"/> and of the edges of their triangles that separate badly
+        /// shaped triangles (see <see cref="FlipToDelaunay"/>), and continues with the edges of the triangles of each flipped
+        /// edge. Returns the flipped edges, which connect other vertices now.
+        /// </summary>
+        private HashSet<Edge> MakeDelaunay(IEnumerable<Edge> toCheck)
+        {
+            Queue<Edge> queue = new Queue<Edge>();
+            HashSet<Edge> queued = new HashSet<Edge>();
+            void enqueue(Edge e)
+            {
+                if (e != null && e.t1 != null && e.t2 != null && queued.Add(e)) queue.Enqueue(e);
+            }
+            void enqueueTriangle(Triangle t)
+            {
+                if (t == null) return;
+                enqueue(t.e1);
+                enqueue(t.e2);
+                enqueue(t.e3);
+            }
+            foreach (Edge e in toCheck)
+            {
+                enqueue(e);
+                enqueueTriangle(e.t1);
+                enqueueTriangle(e.t2);
+            }
+            HashSet<Edge> flipped = new HashSet<Edge>();
+            // flipping to Delaunay terminates in the plane, the limit is for curved surfaces, where the angles are in 3D
+            int limit = 10 * queue.Count + 1000;
+            while (queue.Count > 0 && limit-- > 0)
+            {
+                Edge e = queue.Dequeue();
+                queued.Remove(e);
+                if (FlipToDelaunay(e))
+                {
+                    flipped.Add(e);
+                    enqueueTriangle(e.t1);
+                    enqueueTriangle(e.t2);
+                }
+            }
+            return flipped;
         }
         private void EarClipping()
         {
@@ -1871,6 +1966,7 @@ namespace CADability
                     sortededges.Add(edge);
                 }
             }
+            if (!noFlip) MakeDelaunay(sortededges);
 
             while (sortededges.Count > 0 && triangle.Count < 100000)
             {
@@ -1920,6 +2016,12 @@ namespace CADability
                     {
                         break; // jetzt kommen nur noch kleinere
                     }
+                }
+                if (!noFlip)
+                {   // the flipped edges connect other vertices now, their distance from the surface must be checked again
+                    HashSet<Edge> flipped = MakeDelaunay(toAdd);
+                    flipped.ExceptWith(toAdd);
+                    toAdd.AddRange(flipped);
                 }
                 // nur noch die neu entstandenen überprüfen, die anderen sind schon überprüft
                 sortededges.Clear();

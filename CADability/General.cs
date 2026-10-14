@@ -8,14 +8,13 @@ using System;
 namespace CADability
 {
     /// <summary>
-    /// Prototyp für die Mitteilung von Änderungen. Die Zeichnung verwendet es für
-    /// das IsModified Flag, welches gesetzt wird, wenn von irgendwo (GeoObjekte, Listen)
-    /// dieser event kommt
+    /// Prototype for the notification of modifications. The project uses it for its IsModified flag, which is set
+    /// whenever this event arrives from anywhere (GeoObjects, attribute lists).
     /// </summary>
     public delegate void DidModifyDelegate(object sender, EventArgs args);
     /// <summary>
-    /// Objekte, die dieses Interface implementieren, rufen bei relevanten Veränderungen
-    /// DidModifyDelegate auf.
+    /// Objects implementing this interface raise the <see cref="DidModifyEvent"/> (a <see cref="DidModifyDelegate"/>)
+    /// whenever they are modified in a relevant way.
     /// </summary>
 
     public interface INotifyModification
@@ -57,6 +56,8 @@ namespace CADability
         /// </summary>
         /// <param name="List">The List, from which the object is going to be removed</param>
         /// <param name="Item">The object that is going to be removed</param>
+        /// <param name="Name">Name of the item</param>
+        /// <param name="ResourceID">Resource ID for the messages displayed in <see cref="ItemIsUsed"/></param>
         public RemovingFromListEventArgs(object List, object Item, string Name, string ResourceID)
         {
             this.List = List;
@@ -116,7 +117,7 @@ namespace CADability
         /// </summary>
         /// <param name="key">The unique key of the attribute</param>
         /// <param name="project">The project that contains the attributeList</param>
-        /// <param name="geoObject">The object that keeps the attribute</param>
+        /// <param name="geoObjectList">The objects that keep the attribute</param>
         /// <returns></returns>
         IPropertyEntry GetSelectionProperty(string key, Project project, GeoObjectList geoObjectList);
     }

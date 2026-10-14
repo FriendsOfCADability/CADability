@@ -12,7 +12,9 @@ using MathNet.Numerics.LinearAlgebra.Factorization;
 namespace CADability
 {
     /// <summary>
-    /// Dient zur Manipulation von Polynomkoeffizienten, bevor aus Polynomen die Wurzel gezogen wird
+    /// A polynomial in a single variable, represented by its coefficients (the index in the coefficient array is the exponent,
+    /// so c[0] is the constant term). Serves to manipulate polynomial coefficients (multiplication, addition and powers of
+    /// polynomials) before the roots of the polynomial are computed.
     /// </summary>
     internal class PolynomSingleVariable
     {
@@ -700,6 +702,7 @@ namespace CADability
 
             return res;
         }
+        /// <inheritdoc/>
         public override string ToString()
         {
             StringBuilder res = new StringBuilder();
@@ -2099,6 +2102,7 @@ namespace CADability
         /// </summary>
         /// <param name="p"></param>
         /// <param name="startHere">initial guess for the parameter</param>
+        /// <param name="dist">distance of the curve point at the returned parameter to <paramref name="p"/>, double.MaxValue if not found</param>
         /// <returns>the parameter for the point p or double.MaxValue, if not found</returns>
         public double PositionOf(GeoPoint p, double startHere, out double dist)
         {
@@ -4270,14 +4274,32 @@ namespace CADability
     //    }
     //}
 
+    /// <summary>
+    /// Implemented by surfaces which can be described by an implicit polynomial equation P(x,y,z)=0 (currently
+    /// <see cref="ToroidalSurface"/>): <see cref="GetImplicitPSurface"/> returns that polynomial as an <see cref="ImplicitPSurface"/>.
+    /// Substituting a polynomial curve (<see cref="IExplicitPCurve3D"/>) into it yields a polynomial in one variable whose roots are
+    /// the parameters of the intersection points, which is how the intersections of such surfaces with splines are computed.
+    /// Internal helper of the intersection algorithms.
+    /// </summary>
     public interface IImplicitPSurface
     {
         ImplicitPSurface GetImplicitPSurface();
     }
+    /// <summary>
+    /// Implemented by 3d curves which can be represented piecewise by polynomials in their parameter (currently <see cref="BSpline"/>):
+    /// <see cref="GetExplicitPCurve3D"/> returns that representation as an <see cref="ExplicitPCurve3D"/>, which is used for
+    /// intersections with implicit polynomial surfaces (<see cref="IImplicitPSurface"/>) and for finding the position of a point on
+    /// the curve. Internal helper of the intersection algorithms.
+    /// </summary>
     public interface IExplicitPCurve3D
     {
         ExplicitPCurve3D GetExplicitPCurve3D();
     }
+    /// <summary>
+    /// Implemented by 2d curves which can be represented piecewise by polynomials in their parameter (currently
+    /// <see cref="CADability.Curve2D.BSpline2D"/>): <see cref="GetExplicitPCurve2D"/> returns that representation as an
+    /// <see cref="ExplicitPCurve2D"/>. Internal helper of the 2d intersection algorithms.
+    /// </summary>
     public interface IExplicitPCurve2D
     {
         ExplicitPCurve2D GetExplicitPCurve2D();

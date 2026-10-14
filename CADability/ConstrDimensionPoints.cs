@@ -4,7 +4,11 @@ using CADability.UserInterface;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a linear dimension between several points. The user picks any number of points (at least two) and
+    /// the location of the dimension line; the dimension line is horizontal, vertical or, for the sloping variant, in a
+    /// direction given by an additional input, according to the <see cref="DimDirection"/> passed to the constructor.
+    /// The optional "mode" input selects simple, continued (chain) or coordinate dimensioning. Menu ids:
+    /// "Constr.Dimension.Horizontal", "Constr.Dimension.Vertical" and "Constr.Dimension.Sloping".
     /// </summary>
     internal class ConstrDimensionPoints : ConstructAction, IIndexedGeoPoint
     {

@@ -5,7 +5,11 @@ using System;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a circle with a given radius through two points. The user picks the two points on the circle and the
+    /// radius or alternatively the diameter (which of the two is the primary input depends on the setting "Formatting.Radius");
+    /// the circle lies in the active drawing plane. There are two solutions (the center lies on either side of the connecting
+    /// line); the one closer to the mouse position is shown, the other can be selected with the multi-solution mechanism.
+    /// Started with the menu id "Constr.Circle.TwoPointsRadius".
     /// </summary>
     internal class ConstrCircleTwoPointsRadius : ConstructAction
     {

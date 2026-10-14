@@ -3,7 +3,8 @@
 namespace CADability.Actions
 {
     /// <summary>
-    /// Aktion zum editieren von Text in der Zeichenfläche
+    /// Action for editing a text object directly in the drawing area. Only a placeholder: the class is
+    /// empty and not used.
     /// </summary>
     internal class EditTextAction
     {

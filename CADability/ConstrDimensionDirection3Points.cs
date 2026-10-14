@@ -4,7 +4,9 @@
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of an angular dimension (<see cref="Dimension.EDimType.DimAngle"/>) defined by three points: the
+    /// apex of the angle, a point on the first leg and a point on the second leg, followed by the position of the
+    /// dimension line. The dimension lies in the active drawing plane. Menu id: "Constr.Dimension.Direction.3Points".
     /// </summary>
     internal class ConstrDimensionDirection3Points : ConstructAction
     {

@@ -2,6 +2,10 @@
 
 namespace CADability
 {
+    /// <summary>
+    /// String utilities: <see cref="RemoveExtraStrings"/> removes repeated occurrences of a substring, used when a typed number
+    /// contains the decimal separator more than once. Internal helper, not an entry point of the API.
+    /// </summary>
     public class StringHelper
     {
         /// <summary>

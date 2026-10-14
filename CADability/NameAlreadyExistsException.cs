@@ -1,29 +1,27 @@
 ﻿namespace CADability
 {
     /// <summary>
-    /// Bei der Namensänderung eines Objektes (z.B. Layer, Farbe u.s.w.) tritt diese
-    /// Exception auf, wenn eine nach Namen sortierte Liste (z.B. LayerList) 
-    /// ein Objekt mit diesen Namen bereits enthält. Diese Exception wird in CONDOR
-    /// bei Namensänderungen abgefangen und der alte Name wird wieder gesetzt.
-    /// 
+    /// Thrown when the name of an object (e.g. a layer or a colour) is changed and the list that holds the object (e.g. the
+    /// <see cref="CADability.Attribute.LayerList"/>), in which names must be unique, already contains an object with that
+    /// name. The user interface catches this exception when a name is edited and restores the old name.
     /// </summary>
 
     public class NameAlreadyExistsException : System.Exception
     {
         /// <summary>
-        /// Der neue Name, der versucht wurde zu setzen
+        /// The new name that was attempted to be set
         /// </summary>
         public string NewName;
         /// <summary>
-        /// Der alte Name, so wie er in Ordnung war
+        /// The old name, which was valid
         /// </summary>
         public string OldName;
         /// <summary>
-        /// Die Liste, die das Objekt enthält, und die bereits ein objekt mit neuem Namen enthält
+        /// The list that contains the object and that already contains another object with the new name
         /// </summary>
         public object ContainingList;
         /// <summary>
-        /// Das Objekt (z.B. Layer), welches den Verstoß ausgelöst hat
+        /// The object (e.g. a layer) whose renaming caused the conflict
         /// </summary>
         public object OffendingObject;
         public NameAlreadyExistsException(object ContainingList, object OffendingObject, string NewName, string OldName) : this(ContainingList, OffendingObject, NewName)

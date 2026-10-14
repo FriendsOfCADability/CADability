@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -70,13 +70,41 @@ namespace CADability.DXF
         /// </summary>
         private List<(Attribute.DimensionStyle pristine, Attribute.DimensionStyle used)> importedDimensionStyles;
 
+        /// <summary>
+        /// Reads the DXF file <paramref name="fileName"/> with ACadSharp. The file is read into memory first; when its OBJECTS
+        /// section, which holds no geometry, is malformed, the file is read again without that section. Nothing is converted yet:
+        /// get <see cref="Project"/> to convert the drawing. Reading errors propagate as the exceptions of ACadSharp. A DWG file
+        /// is recognized by its content and read with the DWG reader, whatever the extension of the file name.
+        /// </summary>
+        /// <param name="fileName">path of the DXF or DWG file</param>
         public Import(string fileName)
             : this(fileName, null)
         {
         }
+        /// <summary>
+        /// Reads the DXF or DWG file <paramref name="fileName"/> like <see cref="Import(string)"/> and reports the progress of
+        /// reading the file here and of converting it later in <see cref="Project"/> to <paramref name="progress"/>. Reading
+        /// takes the first 60 percent, converting the model space and the paper space 20 percent each.
+        /// <see cref="IDxfProgress.SetCompleted"/> is called when the conversion is done or when reading or converting fails.
+        /// </summary>
+        /// <param name="fileName">path of the DXF or DWG file</param>
+        /// <param name="progress">receives the progress, may be null</param>
         public Import(string fileName, IDxfProgress progress)
         {
             this.progress = progress;
+            try
+            {
+                Read(fileName);
+            }
+            catch
+            {
+                SetProcessCompleted();
+                throw;
+            }
+        }
+
+        private void Read(string fileName)
+        {
             SetProgressStepIncrement(30);
             ACadVersion version = GetDrawingVersion(fileName, out bool isDwg);
             byte[] raw;
@@ -409,11 +437,29 @@ namespace CADability.DXF
             model.Name = "*Paper_Space";
         }
 
+        /// <summary>
+        /// Converts the drawing into a new <see cref="CADability.Project"/> and returns it. The model space becomes the first
+        /// model of the project; a non-empty paper space is added as a second model named "*Paper_Space" (and shown instead when
+        /// the model space is empty). Layers and the other table entries become attributes of the project. Each access converts
+        /// the drawing again, so keep the result. Returns null when no document was read.
+        /// </summary>
         public Project Project { get => CreateProject(); }
 
         private Project CreateProject()
         {
             if (doc == null) return null;
+            try
+            {
+                return ConvertDocument();
+            }
+            finally
+            {
+                SetProcessCompleted();
+            }
+        }
+
+        private Project ConvertDocument()
+        {
             project = Project.CreateSimpleProject();
             blockTable = new Dictionary<string, GeoObject.Block>();
             layerColorTable = new Dictionary<string, ColorDef>();
@@ -454,7 +500,6 @@ namespace CADability.DXF
                 }
             }
             doc = null;
-            SetProcessCompleted();
             return project;
         }
 
@@ -767,13 +812,29 @@ namespace CADability.DXF
                 foreach (var record in kvp.Value.Records)
                 {
                     XDataCode code = (XDataCode)(int)record.Code;
-                    object value = record.RawValue;
-                    xdata.Data.Add(new KeyValuePair<XDataCode, object>(code, value));
+                    xdata.Data.Add(new KeyValuePair<XDataCode, object>(code, XDataValue(record)));
                 }
                 go.UserData.Add(entryName, xdata);
             }
+        }
 
-
+        /// <summary>
+        /// The value of an XData record as <see cref="ExtendedEntityData"/> keeps it: ACadSharp's raw value, except that
+        /// a point (1010, 1011) becomes a <see cref="GeoPoint"/>, a displacement or direction (1012, 1013) a
+        /// <see cref="GeoVector"/> and a layer reference (1003) the name of the layer. So no type of ACadSharp reaches
+        /// the public data, and the values survive a cdb file, which could not write ACadSharp's point (#373).
+        /// </summary>
+        private object XDataValue(ACadSharp.XData.ExtendedDataRecord record)
+        {
+            switch (record)
+            {
+                case ACadSharp.XData.ExtendedDataCoordinate c: return GeoPoint(c.Value);
+                case ACadSharp.XData.ExtendedDataWorldCoordinate w: return GeoPoint(w.Value);
+                case ACadSharp.XData.ExtendedDataDisplacement d: return GeoVector(d.Value);
+                case ACadSharp.XData.ExtendedDataDirection d: return GeoVector(d.Value);
+                case ACadSharp.XData.ExtendedDataLayer l: return l.ResolveReference(doc)?.Name ?? (object)l.Value;
+                default: return record.RawValue;
+            }
         }
 
         /// <summary>
@@ -2697,12 +2758,26 @@ namespace CADability.DXF
     }
 
     /// <summary>
-    /// Interface to feedback the import progress.
+    /// Receives the progress of a DXF or DWG import, see <see cref="Import(string, IDxfProgress)"/>. The progress runs
+    /// from 0 to 100 percent in phases: each phase sets the size of its steps with <see cref="SetStepIncrement"/> and
+    /// then reports the steps it has done with <see cref="DoStep"/>.
     /// </summary>
     public interface IDxfProgress
     {
+        /// <summary>
+        /// Starts a new phase at the current position, in which each step advances the progress by
+        /// <paramref name="increment"/> percent.
+        /// </summary>
+        /// <param name="increment">percent per step</param>
         void SetStepIncrement(double increment);
+        /// <summary>
+        /// Reports that <paramref name="doneSteps"/> more steps of the current phase are done.
+        /// </summary>
+        /// <param name="doneSteps">number of steps done since the last call</param>
         void DoStep(int doneSteps = 1);
+        /// <summary>
+        /// The import is finished or has failed; a progress display can be hidden.
+        /// </summary>
         void SetCompleted();
-}
+    }
 }

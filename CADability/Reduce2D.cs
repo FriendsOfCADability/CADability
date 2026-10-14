@@ -5,7 +5,7 @@ namespace CADability.Curve2D
 {
     /// <summary>
     /// Helper class to reduce duplicated or 2d connected curves. To use this class create an empty instance,
-    /// <see cref="Reduce2D.Add">Add</see>/> curves to it and access the <see cref="Reduce2D.Reduced">Reduced</see>/>
+    /// <see cref="Reduce2D.Add(ICurve2D)">Add</see> curves to it and access the <see cref="Reduce2D.Reduced">Reduced</see>
     /// property. Some flags add additional control on how the reduction is performed
     /// </summary>
 
@@ -16,7 +16,7 @@ namespace CADability.Curve2D
 
         private int curveId;
         /// <summary>
-        /// Empty constructor. Use <see cref="Add"/> to add curves.
+        /// Empty constructor. Use <see cref="Add(ICurve2D)"/> to add curves.
         /// </summary>
         public Reduce2D()
         {

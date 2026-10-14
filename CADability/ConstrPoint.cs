@@ -3,7 +3,8 @@
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a single <see cref="CADability.GeoObject.Point"/> object at a position entered by the user.
+    /// The point symbol is taken from the setting "KeepState.PointSymbol". Menu id: "Constr.Point".
     /// </summary>
     internal class ConstrPoint : ConstructAction
     {

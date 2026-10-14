@@ -146,6 +146,7 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <inheritdoc/>
         public override ICurve FixedU(double u, double vmin, double vmax)
         {
             Ellipse circle = Ellipse.Construct();
@@ -157,6 +158,7 @@ namespace CADability.GeoObject
             return circle;
         }
 
+        /// <inheritdoc/>
         public override ICurve FixedV(double v, double umin, double umax)
         {
             Ellipse circle = Ellipse.Construct();
@@ -168,11 +170,13 @@ namespace CADability.GeoObject
             return circle;
         }
 
+        /// <inheritdoc/>
         public override ISurface GetModified(ModOp m)
         {
             return new SphericalSurfaceNP(m * center, m * xAxis, m * yAxis, m * zAxis);
         }
 
+        /// <inheritdoc/>
         public override GeoPoint PointAt(GeoPoint2D uv)
         {
             double l = Math.Sqrt(uv.x * uv.x + uv.y * uv.y);
@@ -185,6 +189,7 @@ namespace CADability.GeoObject
                 c * zAxis.z + (uv.y * s * yAxis.z) / l + (uv.x * s * xAxis.z) / l + center.z);
         }
 
+        /// <inheritdoc/>
         public override GeoPoint2D PositionOf(GeoPoint p)
         {
             GeoVector pv = Geometry.ReBase(p - center, xAxis, yAxis, zAxis); // vector to the point in unit system
@@ -203,6 +208,7 @@ namespace CADability.GeoObject
         {
             return Math.Sqrt(x * x * x);
         }
+        /// <inheritdoc/>
         public override GeoVector UDirection(GeoPoint2D uv)
         {
             if (uv.x == 0) return new GeoVector(0, 0, 1);
@@ -218,6 +224,7 @@ namespace CADability.GeoObject
                 (-(2 * uv.x * s * zAxis.y) / (l * (uv2 + 1))) - (uv.x * uv.y * s * yAxis.y) / uv232 + (2 * uv.x * uv.y * c * yAxis.y) / (uv2 * (uv2 + 1)) + (s * xAxis.y) / l - (uv.x * uv.x * s * xAxis.y) / uv232 + (2 * uv.x * uv.x * c * xAxis.y) / (uv2 * (uv2 + 1)),
                 (-(2 * uv.x * s * zAxis.z) / (l * (uv2 + 1))) - (uv.x * uv.y * s * yAxis.z) / uv232 + (2 * uv.x * uv.y * c * yAxis.z) / (uv2 * (uv2 + 1)) + (s * xAxis.z) / l - (uv.x * uv.x * s * xAxis.z) / uv232 + (2 * uv.x * uv.x * c * xAxis.z) / (uv2 * (uv2 + 1)));
         }
+        /// <inheritdoc/>
         public override GeoVector VDirection(GeoPoint2D uv)
         {
             if (uv.y == 0) return new GeoVector(0, 0, 1);
@@ -233,6 +240,7 @@ namespace CADability.GeoObject
                 (-(2 * uv.y * s * zAxis.y) / (l * (uv2 + 1))) + (s * yAxis.y) / l - (uv.y * uv.y * s * yAxis.y) / uv232 + (2 * uv.y * uv.y * c * yAxis.y) / ((uv2) * (uv2 + 1)) - (uv.x * uv.y * s * xAxis.y) / uv232 + (2 * uv.x * uv.y * c * xAxis.y) / ((uv2) * (uv2 + 1)),
                 (-(2 * uv.y * s * zAxis.z) / (l * (uv2 + 1))) + (s * yAxis.z) / l - (uv.y * uv.y * s * yAxis.z) / uv232 + (2 * uv.y * uv.y * c * yAxis.z) / ((uv2) * (uv2 + 1)) - (uv.x * uv.y * s * xAxis.z) / uv232 + (2 * uv.x * uv.y * c * xAxis.z) / ((uv2) * (uv2 + 1)));
         }
+        /// <inheritdoc/>
         public override void Derivation2At(GeoPoint2D uv, out GeoPoint p, out GeoVector du, out GeoVector dv, out GeoVector duu, out GeoVector dvv, out GeoVector duv)
         {   // from maxima and common sub expression
             double u = uv.x;
@@ -261,6 +269,7 @@ namespace CADability.GeoObject
             dvv = sc1 + sc4 * sqr(v) * zAxis / sc7 + sc5 * sqr(v) * zAxis / sc6 - sc2 * sqr(v) * zAxis / sc9 - 3.0 * v * yAxis / sc15 + 3.0 * cube(v) * yAxis / sc16 - u * xAxis / sc15 + 3.0 * u * sqr(v) * xAxis / sc16;
             duv = sc3 * v * zAxis / sc7 + sc5 * u * v * zAxis / sc6 - sc2 * u * v * zAxis / sc9 - u * yAxis / sc15 + 3.0 * u * sqr(v) * yAxis / sc16 - v * xAxis / sc15 + 3.0 * sqr(u) * v * xAxis / sc16;
         }
+        /// <inheritdoc/>
         public override void GetNaturalBounds(out double umin, out double umax, out double vmin, out double vmax)
         {   // there are no natural bounds, this are the bounds of a little more than the half sphere
             umin = -1;
@@ -268,6 +277,7 @@ namespace CADability.GeoObject
             vmin = -1;
             vmax = 1;
         }
+        /// <inheritdoc/>
         public override ModOp2D ReverseOrientation()
         {   // flip x and y axis, keep z axis, left handed system
             GeoVector tmp = xAxis;
@@ -276,12 +286,16 @@ namespace CADability.GeoObject
             return new ModOp2D(0, 1, 0, 1, 0, 0);
 
         }
+        /// <inheritdoc/>
         public override bool IsUPeriodic => false;
+        /// <inheritdoc/>
         public override bool IsVPeriodic => false;
+        /// <inheritdoc/>
         public override ISurface Clone()
         {
             return new SphericalSurfaceNP(center, xAxis, yAxis, zAxis);
         }
+        /// <inheritdoc/>
         public override void CopyData(ISurface CopyFrom)
         {
             SphericalSurfaceNP snp = CopyFrom as SphericalSurfaceNP;
@@ -293,6 +307,7 @@ namespace CADability.GeoObject
                 zAxis = snp.zAxis;
             }
         }
+        /// <inheritdoc/>
         public override bool SameGeometry(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, double precision, out ModOp2D firstToSecond)
         {
             if (other is SphericalSurfaceNP snp)
@@ -307,6 +322,7 @@ namespace CADability.GeoObject
             }
             return base.SameGeometry(thisBounds, other, otherBounds, precision, out firstToSecond);
         }
+        /// <inheritdoc/>
         public override Polynom GetImplicitPolynomial()
         {
             if (implicitPolynomial == null)
@@ -321,6 +337,7 @@ namespace CADability.GeoObject
             }
             return implicitPolynomial;
         }
+        /// <inheritdoc/>
         public override bool UvChangesWithModification => true;
         public void GetObjectData(IJsonWriteData data)
         {
@@ -351,6 +368,7 @@ namespace CADability.GeoObject
             info.AddValue("YAxis", yAxis);
             info.AddValue("ZAxis", zAxis);
         }
+        /// <inheritdoc/>
         public override GeoPoint2D[] GetExtrema()
         {
             List<GeoPoint2D> res = new List<GeoPoint2D>();
@@ -370,6 +388,7 @@ namespace CADability.GeoObject
             if (p.IsValid) res.Add(p);
             return res.ToArray();
         }
+        /// <inheritdoc/>
         public override ICurve2D GetProjectedCurve(ICurve curve, double precision)
         {
             ICurve2D dbg = base.GetProjectedCurve(curve, precision);
@@ -419,6 +438,7 @@ namespace CADability.GeoObject
             }
             return base.GetProjectedCurve(curve, precision);
         }
+        /// <inheritdoc/>
         public override IPropertyEntry GetPropertyEntry(IFrame frame)
         {
             List<IPropertyEntry> se = new List<IPropertyEntry>();

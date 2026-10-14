@@ -7,7 +7,13 @@ using System;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Chamfers two curves at a common vertex. The user picks the first curve close to the corner; if it is
+    /// a path or polyline or connected to other curves in the model, the neighbouring segment at that corner
+    /// is taken as second curve, otherwise the second curve is picked too. Then the chamfer length, the angle
+    /// and the method are entered; the method says what the length means: the distance from the corner on the
+    /// first object, the length of the chamfer line or the distance along the bisector. The curves are
+    /// trimmed and the chamfer line inserted, joined into a <see cref="Path"/> when the setting
+    /// "Construct.MakePath" is on. Started with the menu command "MenuId.Cut.Off"; the action id is "ToolsCutOff".
     /// </summary>
     internal class ToolsCutOff : ConstructAction
     {

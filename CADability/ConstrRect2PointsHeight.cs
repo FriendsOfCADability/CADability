@@ -6,7 +6,12 @@ using MouseEventArgs = CADability.Substitutes.MouseEventArgs;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a rectangle (a closed <see cref="Polyline"/>) from the two end points of its base line
+    /// and its height. The user enters the start point and the second point, which give the direction and the
+    /// width of the base line, and then the height, measured perpendicular to the base line; a height entered
+    /// by a mouse position also tilts the rectangle towards that position in space. The diagonal corner
+    /// becomes the default start point of the next construction. Started with the action id
+    /// "Constr.Rect.Rect2PointsHeight" (menu command "MenuId.Constr.Rect.Rect2PointsHeight").
     /// </summary>
     internal class ConstrRect2PointsHeight : ConstructAction
     {

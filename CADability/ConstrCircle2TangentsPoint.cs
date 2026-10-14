@@ -7,7 +7,12 @@ using MouseEventArgs = CADability.Substitutes.MouseEventArgs;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a circle that is tangential to two curves and passes through a given point.
+    /// The user picks the two tangent objects (lines, arcs or other curves, which must lie in a common
+    /// plane together with the point) and then the point on the circle; the resulting radius is shown as a
+    /// read-only input. Of the possible circles the one closest to the pick positions is taken, the others
+    /// can be chosen with the next/previous solution commands. Started with the action id
+    /// "Constr.Circle.TwoTangentsPoint" (menu command "MenuId.Constr.Circle.TwoTangentsPoint").
     /// </summary>
     internal class ConstrCircle2TangentsPoint : ConstructAction
     {

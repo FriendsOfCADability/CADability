@@ -280,5 +280,22 @@ namespace CADability.Tests
             Assert.AreEqual("kept", restored.UserData.GetData("note"));
             Assert.AreEqual(h.Radius, restored.Radius, 1e-12);
         }
+
+        /// <summary>
+        /// Until 1.5.0 a helix did not write the attributes of its base class, so files from then hold no "UserData"
+        /// for it. Reading such a file must give the empty UserData every object starts with, not null.
+        /// </summary>
+        [TestMethod]
+        public void JsonWithoutUserDataGivesAnEmptyUserData()
+        {
+            string json = JsonSerialize.ToString(MakeTestHelix());
+            System.Text.RegularExpressions.Regex userData = new System.Text.RegularExpressions.Regex("\"UserData\":\"#\\d+\",");
+            Assert.AreEqual(1, userData.Matches(json).Count, "the helix writes its UserData once");
+            HelicalCurve restored = JsonSerialize.FromString(userData.Replace(json, "")) as HelicalCurve;
+            Assert.IsNotNull(restored);
+            Assert.IsNotNull(restored.UserData, "UserData");
+            Assert.AreEqual(0, restored.UserData.Count);
+            Assert.AreEqual(10.0, restored.Radius, 1e-12);
+        }
     }
 }

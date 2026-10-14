@@ -55,7 +55,16 @@ namespace CADability
         private Color? backgroundColor;
         // für andere Actionen
         //public event PaintView PaintDrawingEvent;
+        /// <summary>
+        /// Raised at the end of each paint cycle, after the <see cref="PaintActiveEvent"/> handlers. Handlers are registered with
+        /// <see cref="IView.SetPaintHandler(PaintBuffer.DrawingAspect, PaintView)"/> for <see cref="PaintBuffer.DrawingAspect.Select"/>.
+        /// </summary>
         public event PaintView PaintSelectEvent;
+        /// <summary>
+        /// Raised during each paint cycle after the model (with all drives at their current position), the selected and the highlighted objects
+        /// have been painted, before the <see cref="PaintSelectEvent"/> handlers. Handlers are registered with
+        /// <see cref="IView.SetPaintHandler(PaintBuffer.DrawingAspect, PaintView)"/> for <see cref="PaintBuffer.DrawingAspect.Active"/>.
+        /// </summary>
         public event PaintView PaintActiveEvent;
         //public event PaintView PaintBackgroundEvent;
         // Zoom und Scroll
@@ -141,6 +150,10 @@ namespace CADability
             #endregion
         }
         private NullDrive staticObjects;
+        /// <summary>
+        /// Common initialization for the public constructor and the deserialization constructor: creates the empty lists of selected and highlighted
+        /// objects, reads the selection color and widths from the frame and sets an isometric projection. Project and model are not set here.
+        /// </summary>
         protected AnimatedView()
         {
             staticObjects = new NullDrive();
@@ -234,6 +247,9 @@ namespace CADability
             highlightedObjects.Remove(toRemove);
             highlightList = null; // neu machen
         }
+        /// <summary>
+        /// Removes all objects that were added with <see cref="AddHighlightedObject(IGeoObject)"/>. The view is not repainted by itself.
+        /// </summary>
         public void ClearHighlightedObjects()
         {
             highlightedObjects.Clear();
@@ -253,6 +269,10 @@ namespace CADability
                 highlightColor = value;
             }
         }
+        /// <summary>
+        /// The width in pixels by which the highlighted objects are drawn thicker than normal (their display list is painted several times with small
+        /// offsets); 0 (the default) draws them with their normal width. See <see cref="HighlightColor"/>.
+        /// </summary>
         public int HighlightWidth
         {
             get
@@ -356,6 +376,7 @@ namespace CADability
         /// <see cref="NextStepEvent"/> to enable the user of this class to provide some
         /// additional display changes or other tasks.
         /// </summary>
+        /// <param name="schedule">The <see cref="ISchedule"/> which sets the positions of the drives for each point in time of the animation</param>
         /// <param name="startTime">Start time for the animation</param>
         /// <param name="endTime">Stop time for the animation</param>
         /// <param name="speed">Speed factor</param>
@@ -401,6 +422,10 @@ namespace CADability
             Frame.UIService.ApplicationIdle -= new EventHandler(OnApplicationIdle);
             canvas?.Invalidate();
         }
+        /// <summary>
+        /// Discards the display lists of the drives, so that they are rebuilt from the model on the next paint. Call it when objects have been added
+        /// to or removed from the model, or when the drive of an object (<see cref="IGeoObject.Actuator"/>) has changed, while the view is displayed.
+        /// </summary>
         public void ReassembleDisplayList()
         {
             displayLists = null;
@@ -412,7 +437,8 @@ namespace CADability
         /// takes place.
         /// </summary>
         /// <param name="firstObject">First Solid of the test</param>
-        /// <param name="secondObject">Sirst Solid of the test</param>
+        /// <param name="secondObject">Second Solid of the test</param>
+        /// <param name="precision">Precision of the collision test (used to partition the faces of the solids)</param>
         /// <param name="collisionPoint">Collision point</param>
         /// <returns>True if there is a collision, false otherwise</returns>
         public bool Collision(Solid firstObject, Solid secondObject, double precision, out GeoPoint collisionPoint)
@@ -509,11 +535,20 @@ namespace CADability
 
             return res;
         }
+        /// <summary>
+        /// If true, the user can select objects in this view with the mouse: a left click selects the object under the cursor (with Ctrl it is added
+        /// to the selection), and the cursor turns into a hand over selectable objects. The selected objects are drawn in the selection color while
+        /// the animation is not running and are available via <see cref="GetSelectedObjects"/>. The default is false.
+        /// </summary>
         public bool SelectionEnabled
         {
             get { return selectionEnabled; }
             set { selectionEnabled = value; }
         }
+        /// <summary>
+        /// The objects that were under the cursor at the last mouse down (null before the first click, empty when <see cref="SelectionEnabled"/> is
+        /// false). They are intended as the data of a drag and drop operation that starts when the mouse is moved with the left button pressed.
+        /// </summary>
         public GeoObjectList DraggingObjects
         {
             get
@@ -728,6 +763,9 @@ namespace CADability
 
 #pragma warning disable 67 // Suppress "event is never used" warning
 		//TODO: Use this event e.g. in RecalcScrollPosition() like other views did
+		/// <summary>
+		/// Not raised by this view: the animated view does not report its scroll position (see <see cref="IView.ScrollPositionChangedEvent"/>).
+		/// </summary>
 		public event CADability.ScrollPositionChanged ScrollPositionChangedEvent;
 #pragma warning restore 67
 
@@ -753,6 +791,13 @@ namespace CADability
         bool IView.AllowDrag => false;
 
         bool IView.AllowContextMenu => false;
+        /// <summary>
+        /// Returns <see cref="DragDropEffects.None"/> without starting a drag and drop operation; dragging objects out of this view is currently
+        /// not supported. The <see cref="IView"/> implementation of this view forwards to the canvas instead.
+        /// </summary>
+        /// <param name="dragList">Not evaluated</param>
+        /// <param name="all">Not evaluated</param>
+        /// <returns><see cref="DragDropEffects.None"/></returns>
         public Substitutes.DragDropEffects DoDragDrop(GeoObjectList dragList, Substitutes.DragDropEffects all)
         {
             return DragDropEffects.None;
@@ -978,6 +1023,7 @@ namespace CADability
             Rectangle clr = canvas.ClientRectangle;
             return projection.BoundingRectWorld2d(clr.Left, clr.Right, clr.Bottom, clr.Top);
         }
+        /// <inheritdoc/>
         public void ZoomToRect(BoundingRect visibleRect)
         {
             if (canvas != null)
@@ -1211,9 +1257,7 @@ namespace CADability
         }
         #endregion
         #region IShowProperty implementation
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -1226,6 +1270,7 @@ namespace CADability
                 return res;
             }
         }
+        /// <inheritdoc/>
         public override string LabelText
         {
             get
@@ -1239,6 +1284,7 @@ namespace CADability
                 name = value;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -1258,10 +1304,7 @@ namespace CADability
             }
         }
         IShowProperty[] subEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -1269,10 +1312,7 @@ namespace CADability
                 return SubEntries.Length;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get
@@ -1289,10 +1329,7 @@ namespace CADability
         string IView.Name => Name;
 
 
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.Added (IPropertyTreeView)"/>
-        /// </summary>
-        /// <param name="propertyTreeView"></param>
+        /// <inheritdoc/>
         public override void Added(IPropertyPage propertyTreeView)
         {
             base.Added(propertyTreeView);
@@ -1363,6 +1400,10 @@ namespace CADability
             //Application.DoEvents();
         }
         #endregion
+        /// <summary>
+        /// Makes the provided object the only selected object and repaints the view. The selection is shown while the animation is not running.
+        /// </summary>
+        /// <param name="go">The object to select</param>
         public void SetSelectedObject(IGeoObject go)
         {
             selectedObjects.Clear();
@@ -1370,6 +1411,10 @@ namespace CADability
             displayList = null;
             (this as IView).InvalidateAll();
         }
+        /// <summary>
+        /// Replaces the selection with the provided objects and repaints the view. The selection is shown while the animation is not running.
+        /// </summary>
+        /// <param name="l">The objects to select</param>
         public void SetSelectedObjects(GeoObjectList l)
         {
             selectedObjects.Clear();
@@ -1377,6 +1422,10 @@ namespace CADability
             displayList = null;
             (this as IView).InvalidateAll();
         }
+        /// <summary>
+        /// Returns the currently selected objects (the list itself, not a copy).
+        /// </summary>
+        /// <returns>The selected objects, empty if nothing is selected</returns>
         public GeoObjectList GetSelectedObjects()
         {
             return selectedObjects;
@@ -1391,6 +1440,11 @@ namespace CADability
         }
 
         #region ISerializable Members
+        /// <summary>
+        /// Constructor for the legacy binary deserialization (<see cref="ISerializable"/>): restores project, model, projection, visible layers and name.
+        /// </summary>
+        /// <param name="info">The serialized data</param>
+        /// <param name="context">The source of the deserialization</param>
         protected AnimatedView(SerializationInfo info, StreamingContext context)
             : this()
         {
@@ -1403,10 +1457,11 @@ namespace CADability
 
 
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("project", project, typeof(Project));

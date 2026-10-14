@@ -5,7 +5,8 @@ using System.Collections.Generic;
 namespace CADability.UserInterface
 {
     /// <summary>
-    /// 
+    /// Property entry for a <see cref="Hatch"/> object in the property grid: shows the area of the hatch (read-only) and the
+    /// attribute properties (hatch style, layer, colour etc.) and provides the context menu of the object.
     /// </summary>
     internal class ShowPropertyHatch : PropertyEntryImpl, ICommandHandler, IGeoObjectShowProperty
     {

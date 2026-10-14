@@ -7,7 +7,12 @@ using System.Collections;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Rounds all vertices of a polyline, a path or a chain of connected curves with one radius. The user
+    /// picks the object and enters the radius; every corner where two consecutive segments can be rounded
+    /// gets a tangential arc and the segments are trimmed accordingly, the other corners stay as they are.
+    /// The result replaces the original object (or the connected single objects), as one <see cref="Path"/>
+    /// when the setting "Construct.MakePath" is on. Started with the menu command "MenuId.RoundMultiple";
+    /// the action id is "ToolsRoundMultiple".
     /// </summary>
     internal class ToolsRoundMultiple : ConstructAction
     {
@@ -378,9 +383,7 @@ namespace CADability.Actions
         //			return roundRad;
         //		}
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnSetAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void OnSetAction()
         {
             base.ActiveObject = null;
@@ -404,26 +407,19 @@ namespace CADability.Actions
             base.ShowActiveObject = false;
             base.OnSetAction();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnRemoveAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnRemoveAction()
         {
             base.OnRemoveAction();
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.GetID ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override string GetID()
         {
             return "ToolsRoundMultiple";
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnDone ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnDone()
         {
             if (base.ActiveObject != null)

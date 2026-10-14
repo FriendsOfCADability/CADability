@@ -4,6 +4,12 @@ using System.Linq;
 
 namespace CADability.Actions
 {
+    /// <summary>
+    /// Construction action that rounds (fillets) edges of a solid or shell with a constant radius. The user picks
+    /// edges one by one, or all edges of a face, or all edges of a shell or solid, and enters the radius; connected
+    /// edges are rounded together. The owning shell is replaced by the result (see
+    /// <see cref="Make3D.MakeFillet(Edge[], double, out Shell)"/>). Menu id: "Constr.Fillet".
+    /// </summary>
     public class Constr3DFillet : ConstructAction
     {
         private GeoObjectInput geoObjectInput;
@@ -13,16 +19,25 @@ namespace CADability.Actions
         private List<Edge> edges;
         private double radius;
 
+        /// <summary>
+        /// Creates the action with no edges preselected; the user picks them in the view.
+        /// </summary>
         public Constr3DFillet()
         {
             edges = new List<Edge>();
         }
 
+        /// <summary>
+        /// Creates the action with the given edges already selected, e.g. from the context menu of a selection. The edge
+        /// input is then fixed and the focus starts at the radius input.
+        /// </summary>
+        /// <param name="preselected">The edges to round</param>
         public Constr3DFillet(IEnumerable<Edge> preselected)
         {
             edges = new List<Edge>(preselected);
         }
 
+        /// <inheritdoc/>
         public override void OnSetAction()
         {
             base.TitleId = "Constr.Fillet";
@@ -211,10 +226,12 @@ namespace CADability.Actions
             return ok;
         }
 
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "Constr.Fillet";
         }
+        /// <inheritdoc/>
         public override void OnDone()
         {
             if (edges.Count > 0)

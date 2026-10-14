@@ -12,7 +12,11 @@ using Point = System.Drawing.Point;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a full ellipse from two points on the ellipse and the tangent directions at these
+    /// points (see <see cref="Ellipse.SetEllipse2PointsDirections"/>). The user enters the first point, the
+    /// direction there, the second point and the direction there; the points are shown as feedback while
+    /// the ellipse is not yet defined. Started with the action id "Constr.Ellipse.2PointsDirections"
+    /// (menu command "MenuId.Constr.Ellipse.2PointsDirections").
     /// </summary>
     internal class ConstrEllipse2PointsDirections : ConstructAction
     {

@@ -1,3 +1,5 @@
+- name: Getting started
+  href: gettingstarted.md
 - name: Introduction
   href: general.md
 - name: Organizational classes

@@ -5,7 +5,11 @@ using System.Runtime.Serialization;
 namespace CADability
 {
     /// <summary>
-    /// 
+    /// The group "Action" of the <see cref="Settings.GlobalSettings"/>, which holds the settings that control how
+    /// actions behave: "RepeatConstruct" (a construction is repeated automatically until it is cancelled with ESC),
+    /// "PopProperties" (the input fields of the running construction or selection are automatically brought into view)
+    /// and "KeepStyle" (a newly constructed object gets the attributes the user last chose for this kind of object).
+    /// <see cref="Initialize"/> adds the settings that are still missing with their default values.
     /// </summary>
     [Serializable()]
     internal class ActionSettings : CADability.Settings, IJsonSerialize

@@ -4,7 +4,8 @@ using CADability.UserInterface;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a polyline through any number of points picked by the user; a boolean input decides whether the
+    /// polyline is closed. Menu id: "Constr.Polyline".
     /// </summary>
     internal class ConstrPolylinePoints : ConstructAction, IIndexedGeoPoint
     {

@@ -5,7 +5,10 @@ using CADability.UserInterface;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Tool which connects two open curves by extending them to their (possibly extrapolated) intersection point: the user picks
+    /// the two curves, the intersection point closest to the pick positions is determined and the start or end point of each
+    /// curve, whichever is nearer, is moved to that point. Only extensions are made; a curve which already reaches beyond the
+    /// intersection point is left unchanged. Started with the menu id "ToolsConnect".
     /// </summary>
     internal class ToolsConnect : ConstructAction
     {

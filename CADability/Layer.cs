@@ -50,10 +50,7 @@ namespace CADability.Attribute
 				return flags;
 			}
 		}
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
 		{
 			get
@@ -62,10 +59,7 @@ namespace CADability.Attribute
 				return 4;
 			}
 		}
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
 		{
 			get
@@ -187,9 +181,29 @@ namespace CADability.Attribute
 		#endregion
 	}
 */
-    public enum LayerUsage { UseAllLayer, OnlyVisible, OnlyPickable }
+    /// <summary>
+    /// Selects which layers an operation takes into account: all layers of a <see cref="LayerList"/>, only the layers
+    /// that are visible, or only the layers whose objects may be picked. The visibility of layers is kept per view
+    /// (see <see cref="CheckedLayerList"/>); CADability itself does not use this enumeration any more, it is kept for
+    /// applications built on it.
+    /// </summary>
+    public enum LayerUsage
+    {
+        /// <summary>All layers, regardless of their visibility or pickability.</summary>
+        UseAllLayer,
+        /// <summary>Only the layers that are visible.</summary>
+        OnlyVisible,
+        /// <summary>Only the layers whose objects can be picked.</summary>
+        OnlyPickable
+    }
 
 
+    /// <summary>
+    /// Equality comparer that treats two <see cref="Layer"/> objects as equal when they have the same <see cref="Layer.Name"/>,
+    /// regardless of whether they are the same instance. Useful as the comparer of a dictionary or hash set keyed by layer
+    /// when the layers may come from different lists (e.g. a project and its clone). A shared instance is available as
+    /// <see cref="Layer.LayerComparer"/>.
+    /// </summary>
     public class LayerComparer : IEqualityComparer<Layer>
     {
         #region IEqualityComparer<Layer> Members
@@ -223,10 +237,10 @@ namespace CADability.Attribute
         private int displayOrder;
         private int transparency;
         /// <summary>
-        /// Nach längerem hin und her scheint es am sinnvollsten, dass ein Layer
-        /// seine Liste kennt, in der er sich befindet. Alle Möglichkeiten mit events
-        /// sind auch nicht sparsamer, im Gegenteil. Und es darf immer nur eine Liste geben,
-        /// denn sonst ist auch z.B. die ColorList nicht dingfest zu machen.
+        /// The <see cref="LayerList"/> this layer belongs to. After some deliberation it seemed most sensible that a layer knows
+        /// the list it is contained in: all alternatives with events are not cheaper, on the contrary. And there must be exactly
+        /// one list, since otherwise e.g. the associated color list cannot be determined. Changes of the layer's properties are
+        /// forwarded to this list.
         /// </summary>
         private LayerList parent; // die Liste, in der der Layer steckt.
         private void FireDidChange(string propertyName, object propertyOldValue)
@@ -239,18 +253,37 @@ namespace CADability.Attribute
             }
         }
         private IPropertyEntry[] showProperties;
+        /// <summary>
+        /// Creates a layer without a name, with <see cref="DisplayOrder"/> and <see cref="Transparency"/> set to 0. Used by
+        /// the JSON deserialization and by <see cref="Clone"/>; set <see cref="Name"/> before adding the layer to a
+        /// <see cref="LayerList"/>.
+        /// </summary>
         public Layer()
         {	// kein Name
             displayOrder = 0;
             transparency = 0;
         }
+        /// <summary>
+        /// Creates a layer with the given name. The layer does not belong to a list yet; add it to the <see cref="LayerList"/>
+        /// of the project (or use <see cref="LayerList.CreateOrFind(string)"/>) before assigning it to objects.
+        /// </summary>
+        /// <param name="Name">the name of the layer, must be unique within the list it is added to</param>
         public Layer(string Name) : this()
         {
             name = Name;
         }
 
+        /// <summary>
+        /// A shared instance of <see cref="CADability.Attribute.LayerComparer"/>, which compares layers by name only.
+        /// </summary>
         public static LayerComparer LayerComparer = new LayerComparer();
 
+        /// <summary>
+        /// The name of the layer, which identifies it within its <see cref="LayerList"/> and is shown in the control center.
+        /// Setting a name that is already used by another layer of the list throws a <see cref="NameAlreadyExistsException"/>.
+        /// Otherwise the list is re-sorted and the change is forwarded to the owner of the list (the project), which records
+        /// it for undo.
+        /// </summary>
         public string Name
         {
             get { return name; }
@@ -266,6 +299,11 @@ namespace CADability.Attribute
                 FireDidChange("Name", OldName);
             }
         }
+        /// <summary>
+        /// Creates a copy of this layer with the same name, <see cref="DisplayOrder"/> and <see cref="Transparency"/>.
+        /// The copy does not belong to any <see cref="LayerList"/>.
+        /// </summary>
+        /// <returns>the copy</returns>
         public Layer Clone()
         {
             Layer res = new Layer();
@@ -290,6 +328,7 @@ namespace CADability.Attribute
         }
 
         #region IPropertyEntry Members
+        /// <inheritdoc/>
         public override PropertyEntryType Flags
         {
             get
@@ -299,14 +338,12 @@ namespace CADability.Attribute
                 return flags;
             }
         }
+        /// <inheritdoc/>
         public override string LabelText
         {
             get { return name; }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -345,14 +382,12 @@ namespace CADability.Attribute
         {
             return transparency;
         }
+        /// <inheritdoc/>
         public override bool EditTextChanged(string newValue)
         {
             return true;
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Added"/>
-        /// </summary>
-        /// <param name="propertyPage"></param>
+        /// <inheritdoc/>
         public override void Added(IPropertyPage propertyPage)
         {
             base.Added(propertyPage);
@@ -368,6 +403,7 @@ namespace CADability.Attribute
                 base.Removed (propertyPage);
             }
     */
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -375,6 +411,7 @@ namespace CADability.Attribute
                 return MenuResource.LoadMenuDefinition("MenuId.LayerListEntry", false, this);
             }
         }
+        /// <inheritdoc/>
         public override void EndEdit(bool aborted, bool modified, string newValue)
         {
             if (!aborted && newValue != Name)
@@ -420,10 +457,11 @@ namespace CADability.Attribute
             }
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Name", name);
@@ -433,12 +471,20 @@ namespace CADability.Attribute
 
         #endregion
         #region IJsonSerialize
+        /// <summary>
+        /// Writes the name, display order and transparency of this layer for the JSON serialization (<see cref="IJsonSerialize"/>).
+        /// </summary>
+        /// <param name="data">receives the data</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("Name", name);
             data.AddProperty("DisplayOrder", displayOrder);
             data.AddProperty("Transparency", transparency);
         }
+        /// <summary>
+        /// Restores this layer from the JSON data written by <see cref="GetObjectData(IJsonWriteData)"/> (<see cref="IJsonSerialize"/>).
+        /// </summary>
+        /// <param name="data">the data to read from</param>
         public void SetObjectData(IJsonReadData data)
         {
             name = data.GetProperty<string>("Name");
@@ -446,6 +492,12 @@ namespace CADability.Attribute
             transparency = data.GetProperty<int>("Transparency");
         }
         #endregion
+        /// <summary>
+        /// The z-index of the layer: when a view or a print-out is set to use the display order (e.g.
+        /// <see cref="GDI2DView.UseDisplayOrder"/>), the objects are painted in ascending order of the display order of their
+        /// layers, so objects on a layer with a higher value cover objects on a layer with a lower value. Layers without
+        /// special needs keep the default 0. Setting the value does not raise change notifications.
+        /// </summary>
         public int DisplayOrder
         {
             get
@@ -522,12 +574,25 @@ namespace CADability.Attribute
     }
 
 
+    /// <summary>
+    /// Property entry for the control center which lets the user choose a <see cref="Layer"/> from a <see cref="LayerList"/>
+    /// in a drop-down list. When constructed for an object implementing <see cref="ILayer"/>, the selection is assigned to
+    /// that object's <see cref="ILayer.Layer"/> and the entry follows changes of the object's layer; in any case the
+    /// selection is reported through <see cref="LayerChangedEvent"/>. GeoObjects show it among their attribute properties.
+    /// </summary>
     public class LayerSelectionProperty : MultipleChoiceProperty
     {
         private LayerList layerList;
         private ILayer objectWithLayer;
         private IGeoObject toWatch;
 
+        /// <summary>
+        /// Creates a layer selection that is not bound to an object. The choice of the user is only reported via
+        /// <see cref="LayerChangedEvent"/>; used e.g. to set the layer of several selected objects at once.
+        /// </summary>
+        /// <param name="resourceId">resource id of the label text (see <see cref="StringTable"/>)</param>
+        /// <param name="layerList">the list whose layers are offered</param>
+        /// <param name="select">the initially selected layer, or null for no selection</param>
         public LayerSelectionProperty(string resourceId, LayerList layerList, Layer select)
         {
             this.layerList = layerList;
@@ -542,9 +607,27 @@ namespace CADability.Attribute
             if (select != null) base.SelectedText = select.Name;
         }
 
+        /// <summary>
+        /// Creates a layer selection bound to <paramref name="ObjectWithLayer"/>, without the "undefined" entry. Same as
+        /// <see cref="LayerSelectionProperty(ILayer, string, LayerList, bool)"/> with <c>includeUndefined</c> set to false.
+        /// </summary>
+        /// <param name="ObjectWithLayer">the object whose layer is shown and set; usually a GeoObject</param>
+        /// <param name="resourceId">resource id of the label text (see <see cref="StringTable"/>)</param>
+        /// <param name="ll">the list whose layers are offered</param>
         public LayerSelectionProperty(ILayer ObjectWithLayer, string resourceId, LayerList ll) :
             this(ObjectWithLayer, resourceId, ll, false)
         { }
+        /// <summary>
+        /// Creates a layer selection bound to <paramref name="ObjectWithLayer"/>: the current layer of the object is
+        /// preselected, and when the user chooses an entry, the object's <see cref="ILayer.Layer"/> is set and
+        /// <see cref="LayerChangedEvent"/> is raised. With <paramref name="includeUndefined"/> the list starts with an
+        /// additional entry (string resource "Layer.Undefined") that stands for "no layer" (null) and is selected when the
+        /// object has no layer; a <see cref="Style"/> uses this to leave the layer open.
+        /// </summary>
+        /// <param name="ObjectWithLayer">the object whose layer is shown and set; may be null, then the selection is only reported by the event</param>
+        /// <param name="resourceId">resource id of the label text (see <see cref="StringTable"/>)</param>
+        /// <param name="ll">the list whose layers are offered</param>
+        /// <param name="includeUndefined">true to offer the additional "undefined" entry</param>
         public LayerSelectionProperty(ILayer ObjectWithLayer, string resourceId, LayerList ll, bool includeUndefined)
         {
             layerList = ll;
@@ -588,8 +671,17 @@ namespace CADability.Attribute
             toWatch = objectWithLayer as IGeoObject;
         }
 
+        /// <summary>
+        /// Handler for <see cref="LayerChangedEvent"/>.
+        /// </summary>
+        /// <param name="selected">the layer the user selected; null when the "undefined" entry was chosen</param>
         public delegate void LayerChangedDelegate(Layer selected);
+        /// <summary>
+        /// Raised when the user has selected an entry of the drop-down list, after the layer of the connected object (if any)
+        /// has been set.
+        /// </summary>
         public event LayerChangedDelegate LayerChangedEvent;
+        /// <inheritdoc/>
         protected override void OnSelectionChanged(string selected)
         {
             if (selected == null) return;
@@ -598,17 +690,14 @@ namespace CADability.Attribute
             base.OnSelectionChanged(selected);
             if (LayerChangedEvent != null) LayerChangedEvent(lay);
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Added"/>
-        /// </summary>
-        /// <param name="propertyPage"></param>
+        /// <inheritdoc/>
         public override void Added(IPropertyPage propertyPage)
         {
             base.Added(propertyPage);
             if (toWatch != null) toWatch.DidChangeEvent += new ChangeDelegate(GeoObjectDidChange);
         }
         /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Removed"/>
+        /// Overrides <see cref="IShowPropertyImpl.Removed(IPropertyPage)"/>
         /// </summary>
         /// <param name="propertyPage">the IPropertyTreeView from which it was removed</param>
         public override void Removed(IPropertyPage propertyPage)
@@ -629,6 +718,12 @@ namespace CADability.Attribute
                 }
             }
         }
+        /// <summary>
+        /// The GeoObject whose layer this entry shows and modifies (the object given to the constructor). Setting it
+        /// redirects the entry to another object, which must implement <see cref="ILayer"/>: the entry stops watching the
+        /// previous object and follows the layer changes of the new one. Used when the object under construction is replaced
+        /// while its properties are displayed.
+        /// </summary>
         public IGeoObject Connected
         {   // mit dieser Property kann man das kontrollierte Geoobjekt ändern
             get { return toWatch; }

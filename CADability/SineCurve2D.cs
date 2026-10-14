@@ -6,6 +6,13 @@ using System.Runtime.Serialization;
 
 namespace CADability.Curve2D
 {
+    /// <summary>
+    /// A 2d curve of the form y = a*sin(x - x0) + y0: the segment of the unit sine curve (u, sin(u)) for u from <see cref="UStart"/>
+    /// to <see cref="UStart"/> + <see cref="UDiff"/>, transformed by <see cref="FromUnit"/>. This is the shape of a planar section of
+    /// a cylinder (an ellipse) in the parameter space of the <see cref="CADability.GeoObject.CylindricalSurface"/>, which uses it as
+    /// the exact 2d curve of such intersections instead of an approximating spline. Create one with the constructor or, from four
+    /// points, with <see cref="Create"/>.
+    /// </summary>
     [Serializable()]
     public class SineCurve2D : GeneralCurve2D, ISerializable
     {
@@ -18,6 +25,7 @@ namespace CADability.Curve2D
             this.udiff = udiff;
             this.fromUnit = fromUnit;
         }
+        /// <inheritdoc/>
         public override ICurve2D Clone()
         {
             return new SineCurve2D(ustart, udiff, fromUnit);
@@ -131,6 +139,7 @@ namespace CADability.Curve2D
             ustart += d * udiff;
         }
 
+        /// <inheritdoc/>
         public override void Copy(ICurve2D toCopyFrom)
         {
             SineCurve2D other = toCopyFrom as SineCurve2D;
@@ -142,6 +151,7 @@ namespace CADability.Curve2D
             }
         }
 
+        /// <inheritdoc/>
         public override GeoVector2D DirectionAt(double pos)
         {
             double u = PosToPar(pos);
@@ -151,6 +161,7 @@ namespace CADability.Curve2D
             // and the result for the full period is 7.64039557805542, but does this help for the length of the direction???
             return fromUnit * (udiff * dir);
         }
+        /// <inheritdoc/>
         public override double PositionOf(GeoPoint2D p)
         {
             ModOp2D toUnit = fromUnit.GetInverse();
@@ -170,6 +181,7 @@ namespace CADability.Curve2D
             return ustart + pos * udiff;
         }
 
+        /// <inheritdoc/>
         public override double[] GetInflectionPoints()
         {
             List<double> infl = new List<double>();
@@ -198,6 +210,7 @@ namespace CADability.Curve2D
             return infl.ToArray();
         }
 
+        /// <inheritdoc/>
         public override GeoPoint2D PointAt(double pos)
         {
             double u = PosToPar(pos);
@@ -205,6 +218,7 @@ namespace CADability.Curve2D
             return fromUnit * p;
         }
 
+        /// <inheritdoc/>
         public override void Reverse()
         {
             ClearTriangulation();
@@ -212,15 +226,18 @@ namespace CADability.Curve2D
             udiff = -udiff;
         }
 
+        /// <inheritdoc/>
         public override ICurve2D GetModified(ModOp2D m)
         {
             return new SineCurve2D(ustart, udiff, m * fromUnit);
         }
+        /// <inheritdoc/>
         public override void Move(double x, double y)
         {
             ClearTriangulation();
             fromUnit = ModOp2D.Translate(x, y) * fromUnit;
         }
+        /// <inheritdoc/>
         public override double GetArea()
         {
             GeoPoint2D startPoint = StartPoint;
@@ -249,6 +266,7 @@ namespace CADability.Curve2D
             GetTriangulationBasis(out interpol, out _, out interparam);
         }
 
+        /// <inheritdoc/>
         protected override void GetTriangulationBasis(out GeoPoint2D[] points, out GeoVector2D[] directions, out double[] positions)
         {
             List<double> uvalues = new List<double>();
@@ -286,6 +304,7 @@ namespace CADability.Curve2D
                 directions[i] = DirectionAt(positions[i]);
             }
         }
+        /// <inheritdoc/>
         public override ICurve2D Trim(double StartPos, double EndPos)
         {
             double us = PosToPar(StartPos);
@@ -308,10 +327,11 @@ namespace CADability.Curve2D
             fromUnit = (ModOp2D)info.GetValue("FromUnit", typeof(ModOp2D));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
@@ -320,6 +340,7 @@ namespace CADability.Curve2D
             info.AddValue("FromUnit", fromUnit, typeof(ModOp2D));
         }
 
+        /// <inheritdoc/>
         public override bool TryPointDeriv2At(double position, out GeoPoint2D point, out GeoVector2D deriv, out GeoVector2D deriv2)
         {   // not yet tested
             point = fromUnit * new GeoPoint2D(position, Math.Sin(ustart + position * udiff));

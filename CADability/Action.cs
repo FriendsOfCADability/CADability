@@ -554,8 +554,8 @@ namespace CADability.Actions
             return ActiveDrawingPlane.ToGlobal(a.Direction);
         }
         /// <summary>
-        /// Liefert ein Größe im Koordinatensystem des Modells, die in etwa dem aktuell dargestellten
-        /// Ausschnitt entspricht.
+        /// A length in the coordinate system of the model that corresponds roughly to the part of the model currently
+        /// shown in the active view (the mean of the width and height of the view in model units).
         /// </summary>
         internal double WorldViewSize
         {
@@ -650,6 +650,10 @@ namespace CADability.Actions
                 actionStack.RemoveActiveAction();
             }
         }
+        /// <summary>
+        /// The action below this one on the action stack, i.e. the action that was active before this one was set and
+        /// becomes active again when this one is removed. Null if there is none or this action is not on the stack.
+        /// </summary>
         public Action PreviousAction
         {
             get
@@ -692,8 +696,8 @@ namespace CADability.Actions
         /// <summary>
         /// Override if your action needs to handle menu selection changes (very rare)
         /// </summary>
-        /// <param name="MenuId"></param>
-        /// <param name="selected"></param>
+        /// <param name="selectedMenuItem">the menu item that was selected or deselected</param>
+        /// <param name="selected">true, if selected, false if deselected</param>
         public virtual void OnSelected(MenuWithHandler selectedMenuItem, bool selected) { }
         #endregion
     }

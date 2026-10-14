@@ -4,6 +4,11 @@ using System.Security;
 
 namespace CADability
 {
+    /// <summary>
+    /// P/Invoke declarations of the Windows GDI functions (gdi32.dll) with the related constants and structures which the OpenGL
+    /// display and the text rendering need: choosing and setting the pixel format of a device context, creating fonts and querying
+    /// character widths and kerning pairs. Only usable on Windows. Internal helper, not an entry point of the API.
+    /// </summary>
     public static class Gdi
     {
         private const CallingConvention CALLING_CONVENTION = CallingConvention.StdCall;
@@ -135,7 +140,7 @@ namespace CADability
         ///         when in color-index mode.
         ///     </para>
         ///     <para>
-        ///         When this flag is set, you must call <see cref="SetSystemPaletteUse" /> in
+        ///         When this flag is set, you must call <c>SetSystemPaletteUse</c> in
         ///         your program to force a one-to-one mapping of the logical palette and the
         ///         system palette.  If your OpenGL hardware supports multiple hardware palettes
         ///         and the device driver can allocate spare hardware palettes for OpenGL, this
@@ -184,7 +189,7 @@ namespace CADability
         ///         Indicates whether a device can swap individual layer planes with pixel
         ///         formats that include double-buffered overlay or underlay planes.
         ///         Otherwise all layer planes are swapped together as a group.  When this
-        ///         flag is set, <see cref="Wgl.wglSwapLayerBuffers" /> is supported.
+        ///         flag is set, <c>wglSwapLayerBuffers</c> is supported.
         ///     </para>
         /// </summary>
         // #define PFD_SWAP_LAYER_BUFFERS      0x00000800
@@ -213,6 +218,11 @@ namespace CADability
         // #define PFD_SUPPORT_DIRECTDRAW      0x00002000
         public const int PFD_SUPPORT_DIRECTDRAW = 0x00002000;
         #endregion int PFD_SUPPORT_DIRECTDRAW
+        /// <summary>
+        /// Managed image of the Windows PIXELFORMATDESCRIPTOR structure, which describes the pixel format of a drawing surface (color
+        /// and depth buffer bits, double buffering, OpenGL support); used with <see cref="ChoosePixelFormat"/> and
+        /// <see cref="SetPixelFormat"/> when an OpenGL rendering context is created.
+        /// </summary>
         [StructLayout(LayoutKind.Sequential)]
         public struct PIXELFORMATDESCRIPTOR
         {
@@ -522,6 +532,10 @@ namespace CADability
             /// </remarks>
             public Int32 dwDamageMask;
         };
+        /// <summary>
+        /// Managed image of the Windows POINTFLOAT structure: a point with single precision coordinates, used in
+        /// <see cref="GLYPHMETRICSFLOAT"/>.
+        /// </summary>
         [StructLayout(LayoutKind.Sequential)]
         public struct POINTFLOAT
         {
@@ -535,6 +549,10 @@ namespace CADability
             /// </summary>
             public float Y;
         };
+        /// <summary>
+        /// Managed image of the Windows GLYPHMETRICSFLOAT structure, which describes the bounding box, origin and advance of a glyph of
+        /// an outline font as returned by wglUseFontOutlines.
+        /// </summary>
         [StructLayout(LayoutKind.Sequential)]
         public struct GLYPHMETRICSFLOAT
         {
@@ -584,6 +602,10 @@ namespace CADability
         public static extern int GetPixelFormat(IntPtr deviceContext);
         [DllImport(GDI_NATIVE_LIBRARY, SetLastError = true), SuppressUnmanagedCodeSecurity]
         public static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+        /// <summary>
+        /// Managed image of the Windows ABC structure: the width of a character as returned by <see cref="GetCharABCWidths"/>, where abcA
+        /// is the space before the glyph, abcB the width of the glyph itself and abcC the space after it.
+        /// </summary>
         [CLSCompliant(false)]
         public struct ABC
         {
@@ -597,6 +619,10 @@ namespace CADability
         public static extern bool GetCharWidth32(IntPtr hdc, uint uFirstChar, uint uLastChar, [Out] int[] lpwidth);
         [DllImport(GDI_NATIVE_LIBRARY, SetLastError = true), SuppressUnmanagedCodeSecurity]
         public static extern bool DeleteDC(IntPtr hdc);
+        /// <summary>
+        /// Managed image of the Windows KERNINGPAIR structure: the kerning amount for a pair of characters of a font, as returned by
+        /// <see cref="GetKerningPairs"/> and used by the text rendering to place the glyphs.
+        /// </summary>
         public struct KERNINGPAIR
         {
             public short wFirst;

@@ -5,7 +5,11 @@ using MouseEventArgs = CADability.Substitutes.MouseEventArgs;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// An action that lets the user modify a <see cref="LengthProperty"/> with the mouse. Depending on the constructor
+    /// the length is either the distance of the (snapped) mouse position from a fixed point or its distance from a line
+    /// given by a point and a direction. The length is updated on every mouse move; a mouse click accepts it, ESC (or
+    /// the activation of another action) restores the initial value and ends the action. Used e.g. by the radius
+    /// property of a circle or the size property of a text.
     /// </summary>
 
     public class GeneralLengthAction : Action
@@ -17,12 +21,26 @@ namespace CADability.Actions
         private readonly GeoVector lineDirection;
         private enum Mode { FromPoint, FromLine }
         private readonly Mode mode;
+        /// <summary>
+        /// Creates the action for <paramref name="lengthProperty"/>. The length is the distance of the (snapped) mouse
+        /// position from <paramref name="fixPoint"/>.
+        /// </summary>
+        /// <param name="lengthProperty">The property to modify</param>
+        /// <param name="fixPoint">The point the distance is measured from, e.g. the center of a circle for its radius</param>
         public GeneralLengthAction(LengthProperty lengthProperty, GeoPoint fixPoint)
         {
             this.lengthProperty = lengthProperty;
             this.fixPoint = fixPoint;
             mode = Mode.FromPoint;
         }
+        /// <summary>
+        /// Creates the action for <paramref name="lengthProperty"/> measuring from <paramref name="fixPoint"/> (see
+        /// <see cref="GeneralLengthAction(LengthProperty, GeoPoint)"/>) and excludes <paramref name="ignoreSnap"/> from the
+        /// snapping, which is usually the object that is being modified.
+        /// </summary>
+        /// <param name="lengthProperty">The property to modify</param>
+        /// <param name="fixPoint">The point the distance is measured from</param>
+        /// <param name="ignoreSnap">Object not to snap to, may be null</param>
         public GeneralLengthAction(LengthProperty lengthProperty, GeoPoint fixPoint, IGeoObject ignoreSnap) : this(lengthProperty, fixPoint)
         {
             if (ignoreSnap != null)
@@ -30,6 +48,15 @@ namespace CADability.Actions
                 base.IgnoreForSnap = new GeoObjectList(ignoreSnap);
             }
         }
+        /// <summary>
+        /// Creates the action for <paramref name="lengthProperty"/> measuring from a line (see
+        /// <see cref="GeneralLengthAction(LengthProperty, GeoPoint, GeoVector)"/>) and excludes <paramref name="ignoreSnap"/>
+        /// from the snapping, which is usually the object that is being modified.
+        /// </summary>
+        /// <param name="lengthProperty">The property to modify</param>
+        /// <param name="linePoint">A point on the line the distance is measured from</param>
+        /// <param name="lineDirection">The direction of that line</param>
+        /// <param name="ignoreSnap">Object not to snap to, may be null</param>
         public GeneralLengthAction(LengthProperty lengthProperty, GeoPoint linePoint, GeoVector lineDirection, IGeoObject ignoreSnap) : this(lengthProperty, linePoint, lineDirection)
         {
             if (ignoreSnap != null)
@@ -38,6 +65,14 @@ namespace CADability.Actions
             }
         }
 
+        /// <summary>
+        /// Creates the action for <paramref name="lengthProperty"/>. The length is the distance of the (snapped) mouse
+        /// position from the line through <paramref name="linePoint"/> with direction <paramref name="lineDirection"/>,
+        /// e.g. the height of a rectangle measured from its base line.
+        /// </summary>
+        /// <param name="lengthProperty">The property to modify</param>
+        /// <param name="linePoint">A point on the line the distance is measured from</param>
+        /// <param name="lineDirection">The direction of that line</param>
         public GeneralLengthAction(LengthProperty lengthProperty, GeoPoint linePoint, GeoVector lineDirection)
         {
             this.lengthProperty = lengthProperty;
@@ -68,8 +103,8 @@ namespace CADability.Actions
         /// Implements <see cref="Action.OnMouseMove"/>. If you override this method
         /// don't forget to call the bas implementation.
         /// </summary>
-        /// <param name="e"><paramref name="Action.OnMouseMove.e"/></param>
-        /// <param name="vw"><paramref name="Action.OnMouseMove.vw"/></param>
+        /// <param name="e">MouseEventArgs of the call</param>
+        /// <param name="vw">the IView which contains the mouse</param>
         public override void OnMouseMove(MouseEventArgs e, IView vw)
         {
             using (Frame.Project.Undo.ContextFrame(this))
@@ -86,17 +121,13 @@ namespace CADability.Actions
                 }
             }
         }
-        /// <summary>
-        /// Implements <see cref="Action.GetID"/>.
-        /// </summary>
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "GeneralLengthAction[LeaveSelectProperties]";
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.OnRemoveAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnRemoveAction()
         {
         }
@@ -105,8 +136,8 @@ namespace CADability.Actions
         /// Implements <see cref="Action.OnMouseUp"/>. If you override this method
         /// don't forget to call the bas implementation.
         /// </summary>
-        /// <param name="e"><paramref name="Action.OnMouseUp.e"/></param>
-        /// <param name="vw"><paramref name="Action.OnMouseUp.vw"/></param>
+        /// <param name="e">MouseEventArgs of the call</param>
+        /// <param name="vw">the IView which contains the mouse</param>
         public override void OnMouseUp(MouseEventArgs e, IView vw)
         {
             OnMouseMove(e, vw);
@@ -125,8 +156,8 @@ namespace CADability.Actions
         /// Implements <see cref="Action.OnInactivate"/>. If you override this method
         /// don't forget to call the bas implementation.
         /// </summary>
-        /// <param name="newActiveAction"><paramref name="Action.OnInactivate.NewActiveAction"/></param>
-        /// <param name="removingAction"><paramref name="Action.OnInactivate.RemovingAction"/></param>
+        /// <param name="newActiveAction">the action that will become active</param>
+        /// <param name="removingAction">true: if called because the action is removed, false: if called when a new action is set on top of this action</param>
         public override void OnInactivate(Action newActiveAction, bool removingAction)
         {
             lengthProperty.FireModifyWithMouse(false);
@@ -137,9 +168,7 @@ namespace CADability.Actions
             }
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.OnEscape ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override bool OnEscape()
         {
             SetLength(initialLengthValue);
@@ -147,9 +176,7 @@ namespace CADability.Actions
             return true;
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.OnEnter ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override bool OnEnter()
         {
             base.RemoveThisAction();

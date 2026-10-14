@@ -18,19 +18,45 @@ namespace CADability.GeoObject
 {
 
 
+	/// <summary>
+	/// Exception thrown by <see cref="Ellipse"/> when a <c>Set...</c> method cannot define the curve from the given input
+	/// (e.g. <see cref="Ellipse.SetArc3Points"/> with collinear points), when <see cref="Ellipse.Radius"/> is requested from
+	/// an ellipse that is not a circle, or when the <see cref="ICurve.StartPoint"/> or <see cref="ICurve.EndPoint"/> of an arc
+	/// is set to a point that does not allow an arc. <see cref="ExceptionType"/> tells which case occurred.
+	/// </summary>
 	public class EllipseException : ApplicationException
 	{
+		/// <summary>
+		/// The reason for an <see cref="EllipseException"/>.
+		/// </summary>
 		public enum tExceptionType
 		{
+			/// <summary><see cref="Ellipse.Radius"/> was read from an ellipse whose major and minor radius differ.</summary>
 			EllipseIsNotACircle,
+			/// <summary><see cref="Ellipse.SetCircle3Points"/> or <see cref="Ellipse.SetArc3Points"/> failed because the three points
+			/// are collinear or coincide.</summary>
 			SetCircle3PointsFailed,
+			/// <summary><see cref="Ellipse.SetCirclePlane2Points"/>, <see cref="Ellipse.SetArcPlane2Points"/> or
+			/// <see cref="Ellipse.SetArcPlane2PointsRadiusLocation"/> failed because of an invalid plane.</summary>
 			SetCirclePlane2PointsFailed,
+			/// <summary>The <see cref="ICurve.StartPoint"/> or <see cref="ICurve.EndPoint"/> setter of an arc was called with a
+			/// point that coincides with the other end or does not allow a circular arc.</summary>
 			SetStartPointFailed,
+			/// <summary>Reserved for <see cref="Ellipse.SetEllipse2PointsDirections"/> and
+			/// <see cref="Ellipse.SetEllipseArc2PointsDirections"/>; the current implementation returns false instead of
+			/// throwing.</summary>
 			SetEllipse2PointsDirectionsFailed
 		};
 
+		/// <summary>
+		/// The reason for this exception.
+		/// </summary>
 		public tExceptionType ExceptionType;
 
+		/// <summary>
+		/// Creates the exception with the given reason.
+		/// </summary>
+		/// <param name="ExceptionType">The reason for the exception</param>
 		public EllipseException(tExceptionType ExceptionType)
 		{
 			this.ExceptionType = ExceptionType;
@@ -109,7 +135,12 @@ namespace CADability.GeoObject
 	}
 
 	/// <summary>
-	///
+	/// A circle, circular arc, ellipse or elliptical arc as a <see cref="IGeoObject"/> implementing <see cref="ICurve"/>.
+	/// It is defined by a <see cref="Plane"/>, whose location is the centre and whose x and y directions are the directions
+	/// of the axes, by the major and the minor radius (equal for a circle), and by a start parameter and a sweep parameter
+	/// (angles in radians; a full circle or ellipse has a sweep of 2π, a negative sweep means clockwise). Create one with the
+	/// static <see cref="Construct"/> method and define it with one of the <c>Set...</c> methods, e.g.
+	/// <see cref="SetCirclePlaneCenterRadius"/> or <see cref="SetArc3Points"/>.
 	/// </summary>
 	[Serializable]
 	public class Ellipse : IGeoObjectImpl, IColorDef, ILineWidth, ILinePattern, ICurve, ISerializable,
@@ -478,18 +509,43 @@ namespace CADability.GeoObject
 
 		#region polymorph construction
 
+		/// <summary>
+		/// Signature of the <see cref="Constructor"/> hook: creates a new, still undefined <see cref="Ellipse"/> or an object of
+		/// a class derived from it.
+		/// </summary>
+		/// <returns>The newly created ellipse</returns>
 		public delegate Ellipse ConstructionDelegate();
 
+		/// <summary>
+		/// Optional hook for polymorphic construction. When set, <see cref="Construct"/> calls this delegate instead of creating
+		/// a plain <see cref="Ellipse"/>, so that an application can have its own derived class instantiated wherever CADability
+		/// creates an ellipse (construction actions, file import, splitting of curves etc.).
+		/// </summary>
 		public static ConstructionDelegate Constructor;
 
+		/// <summary>
+		/// Creates a new ellipse. This is the only way to create one, the constructor is protected. The returned object has no
+		/// usable geometry yet (the plane is the xy-plane, the radii are 0); define it with one of the <c>Set...</c> methods such
+		/// as <see cref="SetCirclePlaneCenterRadius"/>, <see cref="SetEllipseCenterAxis(GeoPoint, GeoVector, GeoVector)"/> or
+		/// <see cref="SetArc3Points"/>, or by setting <see cref="Center"/>, <see cref="MajorAxis"/> and the other properties.
+		/// </summary>
+		/// <returns>A new <see cref="Ellipse"/>, or an object of the derived class provided by <see cref="Constructor"/></returns>
 		public static Ellipse Construct()
 		{
 			if (Constructor != null) return Constructor();
 			return new Ellipse();
 		}
 
+		/// <summary>
+		/// Signature of the handlers of the <see cref="Constructed"/> event.
+		/// </summary>
+		/// <param name="justConstructed">The ellipse that has just been created</param>
 		public delegate void ConstructedDelegate(Ellipse justConstructed);
 
+		/// <summary>
+		/// Raised from the constructor whenever a new ellipse is created, i.e. for every <see cref="Construct"/> call, every clone
+		/// and every ellipse read from a file. The handler gets the new object; when it comes from <see cref="Construct"/>, it has no geometry yet.
+		/// </summary>
 		public static event ConstructedDelegate Constructed;
 
 		#endregion
@@ -687,6 +743,10 @@ namespace CADability.GeoObject
             m_MajorAngle = angle(m_Major,m_Center);
         }
 */
+		/// <summary>
+		/// Creates an undefined ellipse in the xy-plane and raises <see cref="Constructed"/>. Protected: use
+		/// <see cref="Construct"/> to create an ellipse.
+		/// </summary>
 		protected Ellipse()
 		{
 			lockApproximationRecalc = new object();
@@ -696,6 +756,14 @@ namespace CADability.GeoObject
 			if (Constructed != null) Constructed(this);
 		}
 
+		/// <summary>
+		/// Defines the plane and the two radii of this ellipse: the centre is the location of the plane, the major axis points in
+		/// its x-direction, the minor axis in its y-direction. Start and sweep parameter are not changed. Like all <c>Set...</c>
+		/// methods this is an undoable change that raises the change events.
+		/// </summary>
+		/// <param name="plane">Plane of the ellipse, its location is the centre</param>
+		/// <param name="majorRadius">Radius in the x-direction of the plane</param>
+		/// <param name="minorRadius">Radius in the y-direction of the plane</param>
 		public void SetPlaneRadius(Plane plane, double majorRadius, double minorRadius)
 		{
 			using (new Changing(this, "SetPlaneRadius", this.plane, this.majorRadius, this.minorRadius))
@@ -706,6 +774,14 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// Makes this object a full circle: the orientation is taken from <paramref name="plane"/>, the centre is
+		/// <paramref name="center"/>, both radii are set to <paramref name="majorRadius"/>, the start parameter to 0 and the sweep
+		/// to 2π (counterclockwise with respect to the normal of the plane).
+		/// </summary>
+		/// <param name="plane">Orientation of the circle; the location of the plane is replaced by <paramref name="center"/></param>
+		/// <param name="center">Centre of the circle</param>
+		/// <param name="majorRadius">Radius of the circle</param>
 		public void SetCirclePlaneCenterRadius(Plane plane, GeoPoint center, double majorRadius)
 		{
 			using (new Changing(this, "SetCirclePlaneCenterRadius", this.plane, this.plane.Location, this.majorRadius))
@@ -719,6 +795,14 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// Defines plane, centre and radius of a circular arc. Start and sweep parameter are left as they are, so set them
+		/// afterwards with <see cref="StartParameter"/> and <see cref="SweepParameter"/>, or use
+		/// <see cref="SetArcPlaneCenterRadiusAngles"/> to set everything at once.
+		/// </summary>
+		/// <param name="plane">Orientation of the arc; the location of the plane is replaced by <paramref name="center"/></param>
+		/// <param name="center">Centre of the arc</param>
+		/// <param name="majorRadius">Radius of the arc (used for both axes)</param>
 		public void SetArcPlaneCenterRadius(Plane plane, GeoPoint center, double majorRadius)
 		{
 			using (new Changing(this, "SetArcPlaneCenterRadius", this.plane, this.plane.Location, this.majorRadius))
@@ -730,6 +814,15 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// Defines a circular arc by plane, centre, radius, start angle and sweep angle.
+		/// </summary>
+		/// <param name="plane">Orientation of the arc; the location of the plane is replaced by <paramref name="center"/></param>
+		/// <param name="center">Centre of the arc</param>
+		/// <param name="majorRadius">Radius of the arc (used for both axes)</param>
+		/// <param name="startParameter">Angle of the start point in radians, measured from the x-direction of the plane</param>
+		/// <param name="sweepParameter">Angle swept by the arc in radians: positive for counterclockwise (with respect to the
+		/// normal of the plane), negative for clockwise, ±2π for a full circle</param>
 		public void SetArcPlaneCenterRadiusAngles(Plane plane, GeoPoint center, double majorRadius,
 			double startParameter, double sweepParameter)
 		{
@@ -745,6 +838,20 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// Defines a circular arc by its centre, start point and end point, all given as 2d points in
+		/// <paramref name="pointsPlane"/>. The plane of the arc is <paramref name="pointsPlane"/> moved to the centre and aligned
+		/// to <paramref name="alignTo"/> so that both normals point to the same side (see
+		/// <see cref="Plane.Align(Plane, bool, bool)"/>). The radius is the distance from the centre to the start point; the end
+		/// point only determines the end angle. Coinciding start and end point give a full circle.
+		/// </summary>
+		/// <param name="alignTo">Plane to align the orientation to, typically the drawing plane</param>
+		/// <param name="center">Centre of the arc, in <paramref name="pointsPlane"/></param>
+		/// <param name="startPoint">Start point of the arc, in <paramref name="pointsPlane"/></param>
+		/// <param name="endPoint">A point on the ray from the centre through the end point, in <paramref name="pointsPlane"/></param>
+		/// <param name="pointsPlane">Plane in which the three 2d points are given</param>
+		/// <param name="direction">true for a counterclockwise arc, false for a clockwise arc (with respect to the normal of
+		/// <paramref name="alignTo"/>)</param>
 		public void SetArcPlaneCenterStartEndPoint(Plane alignTo, GeoPoint2D center, GeoPoint2D startPoint,
 			GeoPoint2D endPoint, Plane pointsPlane, bool direction)
 		{
@@ -769,6 +876,17 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// Makes this object the full circle through three points. The plane of the circle is aligned to
+		/// <paramref name="alignTo"/> so that both normals point to the same side, and the circle is oriented so that the three
+		/// points follow each other in the direction of the curve.
+		/// </summary>
+		/// <param name="circlePoint1">First point on the circle</param>
+		/// <param name="circlePoint2">Second point on the circle</param>
+		/// <param name="circlePoint3">Third point on the circle</param>
+		/// <param name="alignTo">Plane to align the orientation to, typically the drawing plane</param>
+		/// <exception cref="EllipseException">with <see cref="EllipseException.tExceptionType.SetCircle3PointsFailed"/> when the
+		/// points are collinear or coincide</exception>
 		public void SetCircle3Points(GeoPoint circlePoint1, GeoPoint circlePoint2, GeoPoint circlePoint3, Plane alignTo)
 		{
 			using (new Changing(this, "SetArcPlaneCenterRadius", this.plane, this.plane.Location, this.majorRadius))
@@ -806,6 +924,18 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// Makes this object the circular arc that starts at <paramref name="circlePoint1"/>, passes through
+		/// <paramref name="circlePoint2"/> and ends at <paramref name="circlePoint3"/>. The plane of the arc is aligned to
+		/// <paramref name="alignTo"/> so that both normals point to the same side; the sweep direction follows from the position
+		/// of the middle point.
+		/// </summary>
+		/// <param name="circlePoint1">Start point of the arc</param>
+		/// <param name="circlePoint2">A point on the arc between start and end point</param>
+		/// <param name="circlePoint3">End point of the arc</param>
+		/// <param name="alignTo">Plane to align the orientation to, typically the drawing plane</param>
+		/// <exception cref="EllipseException">with <see cref="EllipseException.tExceptionType.SetCircle3PointsFailed"/> when the
+		/// points are collinear or coincide</exception>
 		public void SetArc3Points(GeoPoint circlePoint1, GeoPoint circlePoint2, GeoPoint circlePoint3, Plane alignTo)
 		{
 			using (new Changing(this, "SetArcPlaneCenterRadius", this.plane, this.plane.Location, this.majorRadius,
@@ -850,11 +980,12 @@ namespace CADability.GeoObject
 		}
 
 		/// <summary>
-		/// Kreis aus Ebene und zwei gegenüberliegenden Punkten auf dem Kreis
+		/// Defines the circle by a plane and two diametrically opposite points on the circle: the centre is the midpoint of
+		/// the two points, the radius is half their distance. Start and sweep parameter are not changed.
 		/// </summary>
-		/// <param name="p">Die Ebene des Kreises (3D-Parameter)</param>
-		/// <param name="circlePoint1">1. Punkt des Kreises</param>
-		/// <param name="circlePoint2">2. Punkt des Kreises</param>
+		/// <param name="p">The plane of the circle (only its orientation is used, the location is replaced by the centre)</param>
+		/// <param name="circlePoint1">First point on the circle</param>
+		/// <param name="circlePoint2">Second point on the circle, opposite to the first one</param>
 		public void SetCirclePlane2Points(Plane p, GeoPoint circlePoint1, GeoPoint circlePoint2)
 		{
 			using (new Changing(this, "SetArcPlaneCenterRadius", this.plane, this.plane.Location, this.majorRadius))
@@ -873,6 +1004,14 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// Makes this object a half circle: the centre is the midpoint of the two points, the radius is half their distance, the
+		/// arc starts at <paramref name="circlePoint1"/> and sweeps counterclockwise (with respect to the normal of
+		/// <paramref name="p"/>) by π to <paramref name="circlePoint2"/>.
+		/// </summary>
+		/// <param name="p">The plane of the arc (only its orientation is used, the location is replaced by the centre)</param>
+		/// <param name="circlePoint1">Start point of the arc</param>
+		/// <param name="circlePoint2">End point of the arc, diametrically opposite to the start point</param>
 		public void SetArcPlane2Points(Plane p, GeoPoint circlePoint1, GeoPoint circlePoint2)
 		{
 			using (new Changing(this, "SetArcPlaneCenterRadius", this.plane, this.plane.Location, this.majorRadius,
@@ -894,6 +1033,22 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// Defines a circular arc in plane <paramref name="p"/> from <paramref name="arcPoint1"/> to <paramref name="arcPoint2"/>
+		/// with the given radius. In general there are two circles with that radius through the two points and two arcs on each
+		/// of them, i.e. four solutions. <paramref name="locationP"/> selects the natural one, as a user picking that point in a
+		/// construction action would expect: the arc bulges to the side of the chord on which <paramref name="locationP"/> lies,
+		/// and it is the larger of the two arcs when <paramref name="locationP"/> is farther away from the chord than half of its
+		/// length, the smaller one otherwise. <paramref name="selSol"/> switches to one of the other solutions. If the radius is
+		/// smaller than half the distance of the points, it is enlarged to that value and the result is a half circle.
+		/// </summary>
+		/// <param name="p">Plane of the arc, only its orientation is used</param>
+		/// <param name="arcPoint1">Start point of the arc</param>
+		/// <param name="arcPoint2">End point of the arc</param>
+		/// <param name="radius">Radius of the arc</param>
+		/// <param name="locationP">A point that selects the solution, see above</param>
+		/// <param name="selSol">0 for the solution selected by <paramref name="locationP"/>; bit 0 set takes the other centre,
+		/// bit 1 set the opposite sweep direction</param>
 		public void SetArcPlane2PointsRadiusLocation(Plane p, GeoPoint arcPoint1, GeoPoint arcPoint2, double radius,
 			GeoPoint locationP, int selSol)
 		{
@@ -977,6 +1132,13 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// Sets the plane (i.e. the directions of the axes) and the centre of this ellipse, keeping the radii, the start and the
+		/// sweep parameter.
+		/// </summary>
+		/// <param name="center">New centre</param>
+		/// <param name="plane">New plane; its x- and y-direction become the directions of the major and minor axis, its location
+		/// is replaced by <paramref name="center"/></param>
 		public void SetEllipseCenterPlane(GeoPoint center, Plane plane)
 		{
 			using (new Changing(this, "SetEllipseCenter", center, plane))
@@ -986,6 +1148,15 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// Makes this object a full ellipse with the given centre and axes: the lengths of the axis vectors are the radii, their
+		/// directions the directions of the axes. The two vectors should be perpendicular; if they are not, the direction of the
+		/// minor axis is made perpendicular to the major axis in the plane of both vectors, its length is kept. The major axis
+		/// need not be the longer one. The start parameter is set to 0, the sweep to 2π.
+		/// </summary>
+		/// <param name="Center">Centre of the ellipse</param>
+		/// <param name="MajorAxis">Major axis as a vector from the centre</param>
+		/// <param name="MinorAxis">Minor axis as a vector from the centre</param>
 		public void SetEllipseCenterAxis(GeoPoint Center, GeoVector MajorAxis, GeoVector MinorAxis)
 		{
 			using (new Changing(this)) // mit allen Parametern bringt auch nichts
@@ -1041,6 +1212,16 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// Defines an elliptical arc by centre, axes, start and sweep parameter. The lengths of the axis vectors are the radii,
+		/// their directions the directions of the axes (see <see cref="SetEllipseCenterAxis(GeoPoint, GeoVector, GeoVector)"/>).
+		/// </summary>
+		/// <param name="center">Centre of the ellipse</param>
+		/// <param name="majorAxis">Major axis as a vector from the centre</param>
+		/// <param name="minorAxis">Minor axis as a vector from the centre</param>
+		/// <param name="startParameter">Parameter of the start point in radians, see <see cref="StartParameter"/></param>
+		/// <param name="sweepParameter">Parameter range swept by the arc in radians, positive for counterclockwise, see
+		/// <see cref="SweepParameter"/></param>
 		public void SetEllipseArcCenterAxis(GeoPoint center, GeoVector majorAxis, GeoVector minorAxis,
 			double startParameter, double sweepParameter)
 		{
@@ -1054,6 +1235,16 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// Makes this object a full ellipse with the given centre and axes, like
+		/// <see cref="SetEllipseCenterAxis(GeoPoint, GeoVector, GeoVector)"/>, but additionally aligns the plane of the ellipse to
+		/// <paramref name="alignTo"/> so that both normals point to the same side. This fixes the orientation (the sense of the
+		/// positive sweep) e.g. when importing from a file.
+		/// </summary>
+		/// <param name="Center">Centre of the ellipse</param>
+		/// <param name="MajorAxis">Major axis as a vector from the centre</param>
+		/// <param name="MinorAxis">Minor axis as a vector from the centre</param>
+		/// <param name="alignTo">Plane to align the orientation to, typically the drawing plane</param>
 		public void SetEllipseCenterAxis(GeoPoint Center, GeoVector MajorAxis, GeoVector MinorAxis, Plane alignTo)
 		{
 			using (new Changing(this)) // mit allen Parametern bringt auch nichts
@@ -1067,6 +1258,19 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// Tries to make this object the full ellipse that passes through <paramref name="point1"/> with the tangent direction
+		/// <paramref name="direction1"/> and through <paramref name="point2"/> with the tangent direction
+		/// <paramref name="direction2"/>. The points and directions must lie in a common plane; among the many ellipses that
+		/// satisfy the condition one is chosen whose axes are determined by the two points and tangents. Note that the method
+		/// also requires <paramref name="point2"/> to lie in the plane this ellipse currently has (e.g. the xy-plane of a freshly
+		/// constructed ellipse) and fails otherwise.
+		/// </summary>
+		/// <param name="point1">First point on the ellipse</param>
+		/// <param name="direction1">Tangent direction at <paramref name="point1"/></param>
+		/// <param name="point2">Second point on the ellipse</param>
+		/// <param name="direction2">Tangent direction at <paramref name="point2"/></param>
+		/// <returns>true on success; false when no ellipse could be found, the object is then unchanged</returns>
 		public Boolean SetEllipse2PointsDirections(GeoPoint point1, GeoVector direction1, GeoPoint point2,
 			GeoVector direction2)
 		{
@@ -1101,6 +1305,20 @@ namespace CADability.GeoObject
 			return false;
 		}
 
+		/// <summary>
+		/// Tries to make this object an elliptical arc from <paramref name="point1"/> to <paramref name="point2"/> with the given
+		/// tangent directions at both points, see <see cref="SetEllipse2PointsDirections"/>. The plane of the ellipse is aligned
+		/// to <paramref name="alignTo"/> so that both normals point to the same side, and the arc runs counterclockwise or
+		/// clockwise with respect to that normal as <paramref name="arcDir"/> says. As with
+		/// <see cref="SetEllipse2PointsDirections"/>, <paramref name="point2"/> must lie in the plane this ellipse currently has.
+		/// </summary>
+		/// <param name="point1">Start point of the arc</param>
+		/// <param name="direction1">Tangent direction at <paramref name="point1"/></param>
+		/// <param name="point2">End point of the arc</param>
+		/// <param name="direction2">Tangent direction at <paramref name="point2"/></param>
+		/// <param name="arcDir">true for a counterclockwise arc, false for a clockwise arc</param>
+		/// <param name="alignTo">Plane to align the orientation to, typically the drawing plane</param>
+		/// <returns>true on success; false when no ellipse could be found, the object is then unchanged</returns>
 		public Boolean SetEllipseArc2PointsDirections(GeoPoint point1, GeoVector direction1, GeoPoint point2,
 			GeoVector direction2, Boolean arcDir, Plane alignTo)
 		{
@@ -1139,9 +1357,12 @@ namespace CADability.GeoObject
 		}
 
 		/// <summary>
-		/// Tangentenpunkte der Ellipse bei vorgegebener Richtung
+		/// Returns the parameter of the point where the tangent of the ellipse is parallel to the given direction. The second
+		/// point with a tangent in that direction has the parameter u + π. The direction is projected into the plane of the
+		/// ellipse first.
 		/// </summary>
-		/// <param name="Direction">Richtung der Tangente</param>
+		/// <param name="Direction">Direction of the tangent</param>
+		/// <returns>The parameter, an angle in radians as used by <see cref="Point(double)"/></returns>
 		public double TangentParameter(GeoVector Direction)
 		{
 			ModOp Transform = ModOp.Transform(CoordSys.StandardCoordSys, plane.CoordSys);
@@ -1158,6 +1379,14 @@ namespace CADability.GeoObject
 			return Math.Atan2(dir.x, -dir.y);
 		}
 
+		/// <summary>
+		/// Returns the point of the ellipse at the parameter <paramref name="u"/>, i.e.
+		/// <see cref="Center"/> + cos(u)·<see cref="MajorAxis"/> + sin(u)·<see cref="MinorAxis"/>. The parameter is an angle in
+		/// radians as used by <see cref="StartParameter"/> and returned by <see cref="ParameterOf(GeoPoint)"/>. Start and sweep
+		/// of an arc are ignored, any value gives a point on the full ellipse.
+		/// </summary>
+		/// <param name="u">Parameter (angle in radians)</param>
+		/// <returns>The point at that parameter</returns>
 		public GeoPoint Point(double u)
 		{
 			return (plane.Location + Math.Cos(u) * majorRadius * plane.DirectionX) +
@@ -1180,6 +1409,11 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// The radius in the direction of the major axis, which is the x-direction of <see cref="Plane"/>. It is not necessarily
+		/// the larger of the two radii. Setting it keeps the direction of the axis; the change is undoable and raises the change
+		/// events.
+		/// </summary>
 		public virtual double MajorRadius
 		{
 			get { return majorRadius; }
@@ -1193,6 +1427,11 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// The radius in the direction of the minor axis, which is the y-direction of <see cref="Plane"/>. It is not necessarily
+		/// the smaller of the two radii. Setting it keeps the direction of the axis; the change is undoable and raises the change
+		/// events.
+		/// </summary>
 		public virtual double MinorRadius
 		{
 			get { return minorRadius; }
@@ -1206,6 +1445,13 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// The major axis as a vector from the centre: its direction is the x-direction of <see cref="Plane"/>, its length is
+		/// <see cref="MajorRadius"/>. Setting it changes both direction and radius of the major axis. When the new vector lies in
+		/// the plane of the ellipse, the ellipse is rotated in its plane (the minor axis is made perpendicular to the new major
+		/// axis, keeping its length); otherwise a new plane is spanned by the new major axis and the old minor axis. The change
+		/// is undoable and raises the change events.
+		/// </summary>
 		public GeoVector MajorAxis
 		{
 			get { return majorRadius * plane.DirectionX; }
@@ -1231,6 +1477,13 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// The minor axis as a vector from the centre: its direction is the y-direction of <see cref="Plane"/>, its length is
+		/// <see cref="MinorRadius"/>. Setting it changes both direction and radius of the minor axis. When the new vector lies in
+		/// the plane of the ellipse, the plane is rotated about the normal (the x-direction is made perpendicular to the new
+		/// minor axis, the major radius is kept); otherwise a new plane is spanned by the old major axis and the new minor axis.
+		/// The change is undoable and raises the change events.
+		/// </summary>
 		public GeoVector MinorAxis
 		{
 			get { return minorRadius * plane.DirectionY; }
@@ -1254,6 +1507,11 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// The normal of the plane of the ellipse (<see cref="Plane.Normal"/>): a positive sweep runs counterclockwise when seen
+		/// from the side the normal points to. Setting it tilts the plane about the centre, the axis directions are recalculated
+		/// as described at <see cref="Plane.Normal"/>. The change is undoable and raises the change events.
+		/// </summary>
 		public GeoVector Normal
 		{
 			get { return plane.Normal; }
@@ -1267,6 +1525,11 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// The plane that defines this ellipse: its location is the centre, its x-direction the direction of the major axis and
+		/// its y-direction the direction of the minor axis. Setting it moves and rotates the ellipse; radii, start and sweep
+		/// parameter are kept. The change is undoable and raises the change events.
+		/// </summary>
 		public Plane Plane
 		{
 			get { return plane; }
@@ -1280,6 +1543,12 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// The modification that maps world coordinates into the local coordinate system of <see cref="Plane"/>: the centre goes
+		/// to the origin, the major axis onto the x-axis and the minor axis onto the y-axis. The radii are not scaled, so a circle
+		/// of radius r is mapped onto the circle of radius r around the origin; scale the result by 1/<see cref="Radius"/> to get
+		/// the unit circle.
+		/// </summary>
 		public ModOp ToUnitCircle
 		{
 			get { return plane.CoordSys.GlobalToLocal; }
@@ -1380,10 +1649,7 @@ namespace CADability.GeoObject
 
 		#region IGeoObject
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.CopyGeometry (IGeoObject)"/>
-		/// </summary>
-		/// <param name="ToCopyFrom"></param>
+		/// <inheritdoc/>
 		public override void CopyGeometry(IGeoObject ToCopyFrom)
 		{
 			using (new Changing(this, "CopyGeometry", Clone()))
@@ -1398,10 +1664,7 @@ namespace CADability.GeoObject
 			}
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Modify (ModOp)"/>
-		/// </summary>
-		/// <param name="m"></param>
+		/// <inheritdoc/>
 		public override void Modify(ModOp m)
 		{
 			using (new Changing(this, "ModifyInverse", m))
@@ -1466,10 +1729,7 @@ namespace CADability.GeoObject
 			}
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Clone ()"/>
-		/// </summary>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override IGeoObject Clone()
 		{
 			Ellipse result = Construct();
@@ -1483,10 +1743,7 @@ namespace CADability.GeoObject
 			return result;
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.FindSnapPoint (SnapPointFinder)"/>
-		/// </summary>
-		/// <param name="spf"></param>
+		/// <inheritdoc/>
 		public override void FindSnapPoint(SnapPointFinder spf)
 		{
 			if (!spf.Accept(this)) return;
@@ -1594,11 +1851,7 @@ namespace CADability.GeoObject
 			}
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.AttributeChanged (INamedAttribute)"/>
-		/// </summary>
-		/// <param name="attribute"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override bool AttributeChanged(INamedAttribute attribute)
 		{
 			if (attribute == colorDef || attribute == Layer)
@@ -1612,10 +1865,7 @@ namespace CADability.GeoObject
 			return false;
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HasValidData ()"/>
-		/// </summary>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override bool HasValidData()
 		{
 			if (majorRadius < Precision.eps) return false;
@@ -1624,11 +1874,7 @@ namespace CADability.GeoObject
 			return true;
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetShowProperties (IFrame)"/>
-		/// </summary>
-		/// <param name="Frame"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override IPropertyEntry GetShowProperties(IFrame Frame)
 		{
 			if (IsCircle)
@@ -1641,10 +1887,7 @@ namespace CADability.GeoObject
 			}
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
-		/// </summary>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override BoundingCube GetBoundingCube()
 		{
 			// es hilft nichts, man muss in 2-dimensionalen 2Mal die BoundingBox bestimmen
@@ -1673,14 +1916,22 @@ namespace CADability.GeoObject
 			return extent;
 		}
 
+		/// <summary>
+		/// Signature of the <see cref="OnPaintTo3D"/> hook. The handler returns true when it has painted the ellipse itself, false
+		/// to let the default painting in <see cref="PaintTo3D(IPaintTo3D)"/> proceed.
+		/// </summary>
+		/// <param name="toPaint">The ellipse to paint</param>
+		/// <param name="paintTo3D">The paint interface to paint to</param>
+		/// <returns>true if the painting is done, false for the default painting</returns>
 		public delegate bool PaintTo3DDelegate(Ellipse toPaint, IPaintTo3D paintTo3D);
 
+		/// <summary>
+		/// Static hook called at the beginning of <see cref="PaintTo3D(IPaintTo3D)"/> for every ellipse. Set it to replace or
+		/// extend the way ellipses are displayed; when the handler returns true, the default painting is skipped.
+		/// </summary>
 		public static PaintTo3DDelegate OnPaintTo3D;
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3D (IPaintTo3D)"/>
-		/// </summary>
-		/// <param name="paintTo3D"></param>
+		/// <inheritdoc/>
 		public override void PaintTo3D(IPaintTo3D paintTo3D)
 		{
 			if (OnPaintTo3D != null && OnPaintTo3D(this, paintTo3D)) return;
@@ -1707,26 +1958,19 @@ namespace CADability.GeoObject
 			}
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PrepareDisplayList (double)"/>
-		/// </summary>
-		/// <param name="precision"></param>
+		/// <inheritdoc/>
 		public override void PrepareDisplayList(double precision)
 		{
 			GetCashedApproximation(precision);
 		}
 
+		/// <inheritdoc/>
 		public override Style.EDefaultFor PreferredStyle
 		{
 			get { return Style.EDefaultFor.Curves; }
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetQuadTreeItem (Projection, ExtentPrecision)"/>
-		/// </summary>
-		/// <param name="projection"></param>
-		/// <param name="extentPrecision"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override IQuadTreeInsertableZ GetQuadTreeItem(Projection projection, ExtentPrecision extentPrecision)
 		{
 			EllipseData2D d2d = CalculateProjectionData(projection.ProjectionPlane);
@@ -1734,12 +1978,7 @@ namespace CADability.GeoObject
 			return new QuadTreeEllipse(this, this.plane, c2d, projection);
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (Projection, ExtentPrecision)"/>
-		/// </summary>
-		/// <param name="projection"></param>
-		/// <param name="extentPrecision"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override BoundingRect GetExtent(Projection projection, ExtentPrecision extentPrecision)
 		{
 			ICurve2D c2d = (this as ICurve).GetProjectedCurve(projection.ProjectionPlane);
@@ -1750,11 +1989,7 @@ namespace CADability.GeoObject
 
 		#region IOctTreeInsertable members
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (double)"/>
-		/// </summary>
-		/// <param name="precision"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override BoundingCube GetExtent(double precision)
 		{
 			return GetBoundingCube();
@@ -1767,24 +2002,13 @@ namespace CADability.GeoObject
 			//return res;
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
-		/// </summary>
-		/// <param name="cube"></param>
-		/// <param name="precision"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override bool HitTest(ref BoundingCube cube, double precision)
 		{
 			return (this as ICurve).HitTest(cube);
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection, BoundingRect, bool)"/>
-		/// </summary>
-		/// <param name="projection"></param>
-		/// <param name="rect"></param>
-		/// <param name="onlyInside"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override bool HitTest(Projection projection, BoundingRect rect, bool onlyInside)
 		{
 			ICurve2D c2d = (this as ICurve).GetProjectedCurve(projection.ProjectionPlane);
@@ -1798,12 +2022,7 @@ namespace CADability.GeoObject
 			}
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection.PickArea, bool)"/>
-		/// </summary>
-		/// <param name="area"></param>
-		/// <param name="onlyInside"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override bool HitTest(Projection.PickArea area, bool onlyInside)
 		{
 			GeoPoint unitCenter = area.ToUnitBox * Center;
@@ -1843,13 +2062,7 @@ namespace CADability.GeoObject
 			}
 		}
 
-		/// <summary>
-		/// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Position (GeoPoint, GeoVector, double)"/>
-		/// </summary>
-		/// <param name="fromHere"></param>
-		/// <param name="direction"></param>
-		/// <param name="precision"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override double Position(GeoPoint fromHere, GeoVector direction, double precision)
 		{
 			// noch nicht getestet
@@ -1919,6 +2132,13 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// The radius of this circle or circular arc. Reading it throws an <see cref="EllipseException"/> when the major and the
+		/// minor radius differ, so check <see cref="IsCircle"/> first. Setting it sets both radii to the absolute value, i.e. it
+		/// turns an ellipse into a circle. The change is undoable and raises the change events.
+		/// </summary>
+		/// <exception cref="EllipseException">with <see cref="EllipseException.tExceptionType.EllipseIsNotACircle"/> on reading,
+		/// when this ellipse is not a circle</exception>
 		public double Radius
 		{
 			get
@@ -1964,6 +2184,10 @@ namespace CADability.GeoObject
 
 		private ColorDef colorDef;
 
+		/// <summary>
+		/// The color of this ellipse, null if it has none of its own. Setting it is an undoable attribute change that raises the
+		/// change events; a "color from parent" value is resolved against the <see cref="Block"/> that owns this object.
+		/// </summary>
 		public ColorDef ColorDef
         {
             get => colorDef;
@@ -1992,6 +2216,10 @@ namespace CADability.GeoObject
 
 		private LineWidth lineWidth;
 
+		/// <summary>
+		/// The line width used to display this ellipse, null for the default. Setting it is an undoable attribute change that
+		/// raises the change events.
+		/// </summary>
 		public LineWidth LineWidth
 		{
 			get => lineWidth;
@@ -2010,6 +2238,10 @@ namespace CADability.GeoObject
 
 		private LinePattern linePattern;
 
+		/// <summary>
+		/// The line pattern (dashes) used to display this ellipse, null for a solid line. Setting it is an undoable attribute
+		/// change that raises the change events.
+		/// </summary>
 		public LinePattern LinePattern
 		{
 			get => linePattern;
@@ -2063,6 +2295,13 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// The start point of the arc, i.e. the point at <see cref="StartParameter"/>. Setting it moves the start parameter to the
+		/// parameter of the given point (which is projected onto the ellipse, plane and radii do not change): for an arc the end
+		/// point stays where it is and the sweep is adapted; a full circle or ellipse stays closed and only its start point moves.
+		/// Note that the explicit <see cref="ICurve.StartPoint"/> implementation behaves differently: it keeps end point and
+		/// sweep and may change the plane. The change is undoable and raises the change events.
+		/// </summary>
 		public GeoPoint StartPoint
 		{
 			get
@@ -2089,6 +2328,12 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// The end point of the arc, i.e. the point at <see cref="StartParameter"/> + <see cref="SweepParameter"/>. Setting it
+		/// changes the sweep so that the arc ends at the parameter of the given point (which is projected onto the ellipse),
+		/// keeping the start point and the sweep direction; for a full circle or ellipse it is the same as setting
+		/// <see cref="StartPoint"/>, since start and end point coincide. The change is undoable and raises the change events.
+		/// </summary>
 		public GeoPoint EndPoint
 		{
 			get
@@ -2125,6 +2370,11 @@ namespace CADability.GeoObject
 				else sweepParameter = sweepParameter - 2 * Math.PI;
 			}
 		}
+		/// <summary>
+		/// true if the sweep is positive, i.e. the curve runs counterclockwise when seen from the side the <see cref="Normal"/>
+		/// points to. Setting it reverses the sign of the sweep when necessary, keeping the start point: an arc then becomes its
+		/// complementary arc. The change is undoable and raises the change events.
+		/// </summary>
 		public bool CounterClockWise
 		{
 			get { return sweepParameter > 0.0; }
@@ -2152,6 +2402,10 @@ namespace CADability.GeoObject
 
 		#region ICurve Members
 
+		/// <summary>
+		/// The tangent at the start point, pointing in the direction of the curve (the same as
+		/// <see cref="DirectionAt(double)"/> with 0).
+		/// </summary>
 		public GeoVector StartDirection
 		{
 			get
@@ -2165,6 +2419,10 @@ namespace CADability.GeoObject
 			}
 		}
 
+		/// <summary>
+		/// The tangent at the end point, pointing in the direction of the curve (the same as <see cref="DirectionAt(double)"/>
+		/// with 1).
+		/// </summary>
 		public GeoVector EndDirection
 		{
 			get
@@ -2178,11 +2436,7 @@ namespace CADability.GeoObject
 			}
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.DirectionAt (double)"/>
-		/// </summary>
-		/// <param name="Position"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public GeoVector DirectionAt(double Position)
 		{
 			Angle a = startParameter + Position * sweepParameter;
@@ -2214,11 +2468,7 @@ namespace CADability.GeoObject
 			return true;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.PointAt (double)"/>
-		/// </summary>
-		/// <param name="Position"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public GeoPoint PointAt(double Position)
 		{
 			// TODO: Ellipsenbogen (und Kreisbogen) müssen sich konsistent verhalten
@@ -2241,11 +2491,7 @@ namespace CADability.GeoObject
 			       Math.Sin(ea) * minorRadius * plane.DirectionY;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.PositionOf (GeoPoint)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public double PositionOf(GeoPoint p)
 		{
 			GeoPoint2D p2d = plane.Project(p);
@@ -2266,12 +2512,7 @@ namespace CADability.GeoObject
 			return ax;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.PositionOf (GeoPoint, double)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <param name="prefer"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public double PositionOf(GeoPoint p, double prefer)
 		{
 			GeoPoint2D p2d = plane.Project(p);
@@ -2289,12 +2530,7 @@ namespace CADability.GeoObject
 			return ax;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.PositionOf (GeoPoint, Plane)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <param name="pl"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public double PositionOf(GeoPoint p, Plane pl)
 		{
 			// das müsste stimmen, solange es in 2d ein Kreis- oder Ellipsenbogen ist
@@ -2495,6 +2731,10 @@ namespace CADability.GeoObject
 			return aa;
 		}
 
+		/// <summary>
+		/// The arc length of this circle, ellipse or arc. For an ellipse it is computed from the incomplete elliptic integral of
+		/// the second kind.
+		/// </summary>
 		public double Length
 		{
 			get
@@ -2519,11 +2759,7 @@ namespace CADability.GeoObject
 			}
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.Split (double)"/>
-		/// </summary>
-		/// <param name="Position"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public ICurve[] Split(double Position)
 		{
 			// Wozu war diese Einschränkung mit IsClosed? Sie stört in Face.GetProjectedArea
@@ -2536,12 +2772,7 @@ namespace CADability.GeoObject
 			return new ICurve[] { e1, e2 };
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.Split (double, double)"/>
-		/// </summary>
-		/// <param name="Position1"></param>
-		/// <param name="Position2"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public ICurve[] Split(double Position1, double Position2)
 		{
 			if (!IsClosed) return null;
@@ -2561,11 +2792,7 @@ namespace CADability.GeoObject
 			return new ICurve[] { e1, e2 };
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.Trim (double, double)"/>
-		/// </summary>
-		/// <param name="StartPos"></param>
-		/// <param name="EndPos"></param>
+		/// <inheritdoc/>
 		public void Trim(double StartPos, double EndPos)
 		{
 			if (StartPos == 0 && EndPos == 1) return; // kommt oft vor
@@ -2591,49 +2818,41 @@ namespace CADability.GeoObject
 			return (ICurve)clone;
 		}
 
+		/// <summary>
+		/// true for a full circle or ellipse (the sweep is ±2π), false for an arc; the opposite of <see cref="IsArc"/>.
+		/// </summary>
 		public bool IsClosed
 		{
 			get { return !IsArc; }
 		}
 
+		/// <summary>
+		/// true if the sweep is 0, i.e. the arc degenerates to a single point.
+		/// </summary>
 		public bool IsSingular
 		{
 			get { return sweepParameter == 0.0; }
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.GetPlanarState ()"/>
-		/// </summary>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public PlanarState GetPlanarState()
 		{
 			return PlanarState.Planar;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.GetPlane ()"/>
-		/// </summary>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public Plane GetPlane()
 		{
 			return this.plane;
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.IsInPlane (Plane)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public bool IsInPlane(Plane p)
 		{
 			return Precision.IsEqual(p, this.plane);
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.GetProjectedCurve (Plane)"/>
-		/// </summary>
-		/// <param name="p"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public ICurve2D GetProjectedCurve(Plane p)
 		{
 			EllipseData2D d2d = CalculateProjectionData(p);
@@ -2641,6 +2860,7 @@ namespace CADability.GeoObject
 			return res;
 		}
 
+		/// <inheritdoc/>
 		public override string Description
 		{
 			get
@@ -3004,14 +3224,7 @@ namespace CADability.GeoObject
 			}
 		}
 
-		/// <summary>
-		/// Implements <see cref="CADability.GeoObject.ICurve.TryPointDeriv2At (double, out GeoPoint, out GeoVector, out GeoVector)"/>
-		/// </summary>
-		/// <param name="position"></param>
-		/// <param name="point"></param>
-		/// <param name="deriv"></param>
-		/// <param name="deriv2"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public virtual bool TryPointDeriv2At(double position, out GeoPoint point, out GeoVector deriv,
 			out GeoVector deriv2)
 		{
@@ -3106,10 +3319,11 @@ namespace CADability.GeoObject
 		}
 
 		/// <summary>
-		/// Implements <see cref="ISerializable.GetObjectData"/>
+		/// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+		/// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
 		/// </summary>
-		/// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-		/// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+		/// <param name="info">receives the data</param>
+		/// <param name="context">the destination of the serialization</param>
 		public override void GetObjectData(SerializationInfo info, StreamingContext context)
 		{
 			base.GetObjectData(info, context);
@@ -3123,6 +3337,7 @@ namespace CADability.GeoObject
 			info.AddValue("LinePattern", linePattern);
 		}
 
+		/// <inheritdoc/>
 		public override void GetObjectData(IJsonWriteData data)
 		{
 			base.GetObjectData(data);
@@ -3136,6 +3351,7 @@ namespace CADability.GeoObject
 			if (linePattern != null) data.AddProperty("LinePattern", linePattern);
 		}
 
+		/// <inheritdoc/>
 		public override void SetObjectData(IJsonReadData data)
 		{
 			base.SetObjectData(data);

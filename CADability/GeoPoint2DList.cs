@@ -3,6 +3,11 @@
 namespace CADability
 {
 
+    /// <summary>
+    /// Collects 2d points and removes near duplicates: <see cref="GetReduced"/> returns only those points which are not closer than
+    /// the given precision to a point already kept, using a <see cref="QuadTree{T}"/> to find the neighbours. Internal helper,
+    /// currently not used by the kernel.
+    /// </summary>
     public class GeoPoint2DList
     {
         class GeoPoint2DQt : IQuadTreeInsertable

@@ -72,6 +72,13 @@ namespace CADability.GeoObject
     /// </summary>
     public interface IOrientation
     {
+        /// <summary>
+        /// Returns the direction of the x-axis of the moving coordinate system at the curve parameter <paramref name="u"/>
+        /// (0.0 at the start point, 1.0 at the end point). Implementations return a direction perpendicular to the curve at
+        /// that point; it is used e.g. to orient a profile that is swept along the curve.
+        /// </summary>
+        /// <param name="u">the curve parameter</param>
+        /// <returns>the x-direction at that parameter</returns>
         GeoVector OrientationAt(double u);
     }
     /// <summary>
@@ -378,8 +385,9 @@ namespace CADability.GeoObject
     }
 
     /// <summary>
-    /// Wird von einfachen Kurven implementiert um schnellere Schnitte berechnen zu können.
-    /// Das kann auch noch aufgebohrt werden
+    /// Implemented by simple analytic curves (<see cref="Line"/>, <see cref="Ellipse"/> and the internal
+    /// infinite ray) so that intersections, e.g. with surfaces, can be computed faster than through the
+    /// general <see cref="ICurve"/> interface. May be extended by further methods.
     /// </summary>
     internal interface ISimpleCurve
     {
@@ -813,6 +821,7 @@ namespace CADability.GeoObject
         /// </summary>
         /// <param name="crv1"></param>
         /// <param name="crv2"></param>
+        /// <param name="precision">Maximum distance between the endpoint of crv1 and the startpoint of crv2, also used as the tolerance when comparing the geometry of the curves</param>
         /// <returns>the combined curve or null, if not possible</returns>
         public static ICurve Combine(ICurve crv1, ICurve crv2, double precision)
         {
@@ -958,6 +967,20 @@ namespace CADability.GeoObject
             to2 = c2[1];
             return true;
         }
+        /// <summary>
+        /// Finds by Newton iteration a pair of parameters where the line connecting the two curves is perpendicular to
+        /// both curves, i.e. a local minimum (or maximum) of the distance between the curves. Starting from the given
+        /// parameters, the curves are replaced by their tangents and the closest points of the tangents
+        /// (<see cref="Geometry.DistLL(GeoPoint, GeoVector, GeoPoint, GeoVector, out double, out double)"/>) yield the next
+        /// parameters. On closed curves the parameters wrap around. There is no iteration limit except that the iteration is
+        /// given up when the parameters leave the range [0,1] three times, so the start values should be close to the solution.
+        /// </summary>
+        /// <param name="curve1">first curve</param>
+        /// <param name="par1">on input the start parameter on <paramref name="curve1"/>, on output the parameter of the found point</param>
+        /// <param name="curve2">second curve</param>
+        /// <param name="par2">on input the start parameter on <paramref name="curve2"/>, on output the parameter of the found point</param>
+        /// <returns>true, if the iteration converged (both parameter changes below 1e-6); false if it diverged, the
+        /// parameters are then meaningless</returns>
         public static bool NewtonMinDist(ICurve curve1, ref double par1, ICurve curve2, ref double par2)
         {   // find the points on both curves where the connecting line of the two curves is perpendicular on both
             int numoutside = 0;

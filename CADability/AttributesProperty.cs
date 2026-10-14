@@ -4,13 +4,23 @@ using CADability.GeoObject;
 namespace CADability.UserInterface
 {
     /// <summary>
-    /// Verbindet die Eigenschaften Layer, ColorDef, Style für die Aktionen
+    /// Property entry that groups the attribute properties of an <see cref="IGeoObject"/> (its colour via a
+    /// <see cref="ColorSelectionProperty"/>, when the object implements <see cref="IColorDef"/>, and its layer via a
+    /// <see cref="LayerSelectionProperty"/>) under one "Attributes" title. It is used by the construction actions to show
+    /// the attributes of the object being constructed in the property grid.
     /// </summary>
 
     public class AttributesProperty : IShowPropertyImpl
     {
         private ColorSelectionProperty colorSelectProp;
         private LayerSelectionProperty layerSelectProp;
+        /// <summary>
+        /// Creates the attribute entries for <paramref name="o"/>: a color entry when the object implements
+        /// <see cref="IColorDef"/>, and a layer entry. Both are connected to the respective property of the object via
+        /// reflection.
+        /// </summary>
+        /// <param name="o">The object whose attributes are shown</param>
+        /// <param name="frame">The frame whose project provides the color and layer lists</param>
         public AttributesProperty(IGeoObject o, IFrame frame)
         {
             IColorDef clr = o as IColorDef;
@@ -33,10 +43,7 @@ namespace CADability.UserInterface
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -47,10 +54,7 @@ namespace CADability.UserInterface
                     return 1;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get

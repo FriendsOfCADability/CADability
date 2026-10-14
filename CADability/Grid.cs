@@ -12,9 +12,18 @@ namespace CADability
     {
         private double dx;
         private double dy;
+        /// <summary>
+        /// How the grid is displayed in a view: dots (a dot at each grid point), marks (a small cross at each grid point), lines
+        /// (horizontal and vertical lines through the grid points) or fields (the grid cells shaded like a checkerboard).
+        /// </summary>
         public enum Appearance { dots, marks, lines, fields };
         private Appearance displayMode;
         private bool show;
+        /// <summary>
+        /// Signature of the handlers of <see cref="GridChangedEvent"/>, which is raised when the user changes the appearance, the
+        /// visibility or the distances of the grid in the property page.
+        /// </summary>
+        /// <param name="sender">The grid that changed</param>
         public delegate void GridChangedDelegate(Grid sender);
         public event GridChangedDelegate GridChangedEvent;
         public Grid()
@@ -84,10 +93,7 @@ namespace CADability
         private DoubleProperty dxProperty;
         private DoubleProperty dyProperty;
         private MultipleChoiceProperty displayModeProperty;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>,
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get
@@ -115,10 +121,7 @@ namespace CADability
                 return subEntries;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>,
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount => SubEntries.Length;
 
         #endregion
@@ -137,10 +140,11 @@ namespace CADability
             show = (bool)info.GetValue("Show", typeof(bool));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("XDistance", dx);

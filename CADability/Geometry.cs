@@ -33,22 +33,25 @@ namespace CADability
             }
         }
 
+        /// <summary>
+        /// Creates an instance. There is no need to do so, all members of this class are static.
+        /// </summary>
         public Geometry()
         {
         }
 
 
         /// <summary>
-        /// Liefert das Quadrat.
+        /// Returns the square.
         /// </summary>
-        /// <param name=a>Zu quadrierender Wert</param>
+        /// <param name="a">Value to be squared</param>
         internal static double sqr(double a) { return a * a; }
 
         /// <summary>
-        /// "sign liefert den Betrag von a mit dem Vorzeichen von b"
+        /// sign returns the absolute value of a with the sign of b
         /// </summary>
-        /// <param name=a>nur der Betrag wird</param>
-        /// <param name=b>nur das Vorzeichen wird ausgewertet</param>
+        /// <param name="a">only the absolute value is used</param>
+        /// <param name="b">only the sign is evaluated</param>
         internal static double sign(double a, double b)
         {
             if (b < 0)
@@ -57,13 +60,14 @@ namespace CADability
         }
 
         /// <summary>
-        /// Summary of quadgl.
+        /// Computes the real solutions of the quadratic equation a*x^2 + b*x + c = 0.
         /// </summary>
-        /// <param name=a></param>
-        /// <param name=b></param>
-        /// <param name=c></param>
-        /// <param name=x></param>
-        /// <param name=y></param>
+        /// <param name="a">coefficient of x^2</param>
+        /// <param name="b">coefficient of x</param>
+        /// <param name="c">constant term</param>
+        /// <param name="x">receives the first real solution, 0.0 if there is none</param>
+        /// <param name="y">receives the second real solution (equal to x if there is only one), 0.0 if there is none</param>
+        /// <returns>number of real solutions (0, 1 or 2)</returns>
         internal static int quadgl(double a, double b, double c, out double x, out double y)
         {
             double d;
@@ -107,12 +111,13 @@ namespace CADability
         }
 
         /// <summary>
-        /// Summary of ragbq.
+        /// Computes the real solutions of the biquadratic equation a*x^4 + b*x^2 + c = 0.
         /// </summary>
-        /// <param name=a></param>
-        /// <param name=b></param>
-        /// <param name=c></param>
-        /// <param name=x></param>
+        /// <param name="a">coefficient of x^4</param>
+        /// <param name="b">coefficient of x^2</param>
+        /// <param name="c">constant term</param>
+        /// <param name="x">receives the real solutions (at most 4)</param>
+        /// <returns>number of real solutions</returns>
         internal static int ragbq(double a, double b, double c, double[] x)
         // reelle loesungen der biquadratischen gleichung  a*x**4 + b*x**2 + c = 0. 
         {
@@ -144,13 +149,14 @@ namespace CADability
         }
 
         /// <summary>
-        /// ragle3 berechnet die REELLEN Loesungen einer Gleichung 3. Grades
+        /// ragle3 computes the REAL solutions of the cubic equation a*x^3 + b*x^2 + c*x + d = 0
         /// </summary>
-        /// <param name=a></param>
-        /// <param name=b></param>
-        /// <param name=c></param>
-        /// <param name=d></param>
-        /// <param name=x></param>
+        /// <param name="a">coefficient of x^3</param>
+        /// <param name="b">coefficient of x^2</param>
+        /// <param name="c">coefficient of x</param>
+        /// <param name="d">constant term</param>
+        /// <param name="x">receives the real solutions (at most 3)</param>
+        /// <returns>number of real solutions</returns>
         internal static int ragle3(double a, double b, double c, double d, double[] x)
         {
             if (x == null) x = new double[4];
@@ -313,15 +319,18 @@ namespace CADability
         }  // ragle3 
 
         /// <summary>
-        /// ragle4 berechnet die reellen loesungen einer gleichung 4. Grades, 
-        /// maximal 4 Lösungen in x.
+        /// ragle4 computes the real solutions of the quartic equation a*x^4 + b*x^3 + c*x^2 + d*x + e = 0,
+        /// at most 4 solutions in x.
         /// </summary>
-        /// <param name=a></param>
-        /// <param name=b></param>
-        /// <param name=c></param>
-        /// <param name=d></param>
-        /// <param name=e></param>
-        /// <param name=x></param>
+        /// <param name="a">coefficient of x^4</param>
+        /// <param name="b">coefficient of x^3</param>
+        /// <param name="c">coefficient of x^2</param>
+        /// <param name="d">coefficient of x</param>
+        /// <param name="e">constant term</param>
+        /// <param name="x">receives the real solutions (at most 4)</param>
+        /// <param name="newton">true: refine the solutions by a Newton iteration between the extrema of the polynomial,
+        /// false: discard solutions which do not satisfy the equation within <see cref="Precision.eps"/></param>
+        /// <returns>number of real solutions</returns>
         internal static int ragle4(double a, double b, double c, double d, double e, double[] x, bool newton = false)
         {
             if (x == null) x = new double[4]; // stimmt das mit 4 Lösungen ?
@@ -480,15 +489,16 @@ namespace CADability
             return nl;
         }  // ragle4 
         /// <summary>
-        /// Lösung für eine Gleichung 4. Grades, wobei jeweils zwischen gegebenen Segmentgrenzen eine Lösung sein muss
+        /// Solves the quartic equation a*x^4 + b*x^3 + c*x^2 + d*x + e = 0, where there must be exactly one solution
+        /// between each pair of consecutive segment bounds
         /// </summary>
-        /// <param name="a"></param>
-        /// <param name="b"></param>
-        /// <param name="c"></param>
-        /// <param name="d"></param>
-        /// <param name="e"></param>
-        /// <param name="segments"></param>
-        /// <param name="x"></param>
+        /// <param name="a">coefficient of x^4</param>
+        /// <param name="b">coefficient of x^3</param>
+        /// <param name="c">coefficient of x^2</param>
+        /// <param name="d">coefficient of x</param>
+        /// <param name="e">constant term</param>
+        /// <param name="segments">ascending bounds of the segments, each segment [segments[i], segments[i+1]] contains one solution</param>
+        /// <param name="xx">receives the solution of each segment, xx[i] is the solution in the i-th segment</param>
         private static void FindSegmentsSolutionQuad(double a, double b, double c, double d, double e, List<double> segments, double[] xx)
         {
             for (int i = 0; i < segments.Count - 1; i++)
@@ -1000,17 +1010,30 @@ namespace CADability
             //return !double.IsInfinity(x) && !double.IsInfinity(y);
         }
         /// <summary>
-        /// Liefert den Parameter des gegebenen Punktes auf der gegebenen Linie
+        /// Returns the parameter of the given point on the given (infinite) 2d line, i.e. the factor t with p = sp + t*dir. The
+        /// point is assumed to lie on the line; for a point off the line only its major coordinate is evaluated, so the result is
+        /// not the parameter of the perpendicular foot point.
         /// </summary>
-        /// <param name="sp">Startpunkt der Linie</param>
-        /// <param name="dir">Richtung der Linie</param>
-        /// <param name="p">zu testender Punkt</param>
-        /// <returns>der Parameter, z.B. 0.0==StartPunkt</returns>
+        /// <param name="sp">Start point of the line</param>
+        /// <param name="dir">Direction of the line (need not be normalized)</param>
+        /// <param name="p">The point whose parameter is requested</param>
+        /// <returns>The parameter, e.g. 0.0 for the start point, 1.0 for sp+dir</returns>
         public static double LinePar(GeoPoint2D sp, GeoVector2D dir, GeoPoint2D p)
         {
             if (Math.Abs(dir.x) > Math.Abs(dir.y)) return (p.x - sp.x) / dir.x;
             else return (p.y - sp.y) / dir.y;
         }
+        /// <summary>
+        /// Returns the parameter of the given point on the (infinite) 2d line through <paramref name="sp"/> and <paramref name="ep"/>,
+        /// i.e. the factor t with p = sp + t*(ep-sp): 0.0 for the start point, 1.0 for the end point. The point is assumed
+        /// to lie on the line; for a point off the line only its major coordinate is evaluated, so the result is not the
+        /// parameter of the perpendicular foot point (see <see cref="LinePar(GeoPoint2D, GeoVector2D, GeoPoint2D)"/>).
+        /// Returns 0.5 when start and end point coincide.
+        /// </summary>
+        /// <param name="sp">Start point of the line</param>
+        /// <param name="ep">End point of the line</param>
+        /// <param name="p">The point whose parameter is requested</param>
+        /// <returns>The parameter of the point</returns>
         public static double LinePar(GeoPoint2D sp, GeoPoint2D ep, GeoPoint2D p)
         {
             double dx = ep.x - sp.x;
@@ -1019,6 +1042,16 @@ namespace CADability
             if (Math.Abs(dx) > Math.Abs(dy)) return (p.x - sp.x) / dx;
             else return (p.y - sp.y) / dy;
         }
+        /// <summary>
+        /// Returns the parameter of the given point on the (infinite) 3d line through <paramref name="sp"/> and <paramref name="ep"/>,
+        /// i.e. the factor t for which sp + t*(ep-sp) is the perpendicular foot point of <paramref name="p"/> on the line:
+        /// 0.0 for the start point, 1.0 for the end point. Unlike the 2d overloads the point need not lie on the line.
+        /// The result is NaN when start and end point coincide.
+        /// </summary>
+        /// <param name="sp">Start point of the line</param>
+        /// <param name="ep">End point of the line</param>
+        /// <param name="p">The point whose parameter is requested</param>
+        /// <returns>The parameter of the foot point</returns>
         public static double LinePar(GeoPoint sp, GeoPoint ep, GeoPoint p)
         {
             double dx = ep.x - sp.x;
@@ -1027,22 +1060,64 @@ namespace CADability
             return ((dx * p.x + dy * p.y + dz * p.z) - (dx * sp.x + dy * sp.y + dz * sp.z)) / (dx * dx + dy * dy + dz * dz);
 
         }
+        /// <summary>
+        /// Returns the parameter of the given point on the (infinite) 3d line given by <paramref name="sp"/> and <paramref name="dir"/>,
+        /// i.e. the factor t for which sp + t*dir is the perpendicular foot point of <paramref name="p"/> on the line:
+        /// 0.0 for the start point, 1.0 for sp+dir. The point need not lie on the line. The result is NaN for a null vector.
+        /// </summary>
+        /// <param name="sp">Start point of the line</param>
+        /// <param name="dir">Direction of the line (need not be normalized)</param>
+        /// <param name="p">The point whose parameter is requested</param>
+        /// <returns>The parameter of the foot point</returns>
         public static double LinePar(GeoPoint sp, GeoVector dir, GeoPoint p)
         {
             return ((dir.x * p.x + dir.y * p.y + dir.z * p.z) - (dir.x * sp.x + dir.y * sp.y + dir.z * sp.z)) / (dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
         }
+        /// <summary>
+        /// Returns the point with the parameter <paramref name="pos"/> on the line through <paramref name="sp"/> and
+        /// <paramref name="ep"/>, i.e. sp + pos*(ep-sp). The inverse of <see cref="LinePar(GeoPoint, GeoPoint, GeoPoint)"/>.
+        /// </summary>
+        /// <param name="sp">Start point of the line (parameter 0.0)</param>
+        /// <param name="ep">End point of the line (parameter 1.0)</param>
+        /// <param name="pos">The parameter, may be outside [0,1]</param>
+        /// <returns>The point on the line</returns>
         public static GeoPoint LinePos(GeoPoint sp, GeoPoint ep, double pos)
         {
             return sp + pos * (ep - sp);
         }
+        /// <summary>
+        /// Returns the point with the parameter <paramref name="pos"/> on the line given by <paramref name="sp"/> and
+        /// <paramref name="dir"/>, i.e. sp + pos*dir. The inverse of <see cref="LinePar(GeoPoint, GeoVector, GeoPoint)"/>.
+        /// </summary>
+        /// <param name="sp">Start point of the line (parameter 0.0)</param>
+        /// <param name="dir">Direction of the line (sp+dir has the parameter 1.0)</param>
+        /// <param name="pos">The parameter</param>
+        /// <returns>The point on the line</returns>
         public static GeoPoint LinePos(GeoPoint sp, GeoVector dir, double pos)
         {
             return sp + pos * dir;
         }
+        /// <summary>
+        /// Returns the 2d point with the parameter <paramref name="pos"/> on the line through <paramref name="sp"/> and
+        /// <paramref name="ep"/>, i.e. sp + pos*(ep-sp). The inverse of <see cref="LinePar(GeoPoint2D, GeoPoint2D, GeoPoint2D)"/>.
+        /// </summary>
+        /// <param name="sp">Start point of the line (parameter 0.0)</param>
+        /// <param name="ep">End point of the line (parameter 1.0)</param>
+        /// <param name="pos">The parameter, may be outside [0,1]</param>
+        /// <returns>The point on the line</returns>
         public static GeoPoint2D LinePos(GeoPoint2D sp, GeoPoint2D ep, double pos)
         {
             return sp + pos * (ep - sp);
         }
+        /// <summary>
+        /// Returns the perpendicular foot point of <paramref name="toProject"/> on the line given by <paramref name="sp"/>
+        /// and <paramref name="dir"/>, i.e. the point of the line closest to <paramref name="toProject"/>. Same as
+        /// <see cref="DropPL(GeoPoint, GeoPoint, GeoVector)"/>.
+        /// </summary>
+        /// <param name="sp">Start point of the line</param>
+        /// <param name="dir">Direction of the line</param>
+        /// <param name="toProject">The point to project onto the line</param>
+        /// <returns>The foot point on the line</returns>
         public static GeoPoint LinePos(GeoPoint sp, GeoVector dir, GeoPoint toProject)
         {
             double par = LinePar(sp, dir, toProject);
@@ -1369,6 +1444,15 @@ namespace CADability
         {	// spart zu distPL die Division durch die Länge. Noch testen, ob <0.0 oder >0.0
             return (ldir.y * P.x - ldir.x * P.y + lstart.y * ldir.x - lstart.x * ldir.y) < 0.0;
         }
+        /// <summary>
+        /// Checks whether the point P is on the left side of the line from <paramref name="lstart"/> to <paramref name="lend"/>
+        /// (left when looking from lstart towards lend). If the point lies exactly on the line, the result is false.
+        /// There is no precision or epsilon test.
+        /// </summary>
+        /// <param name="P">The point to test</param>
+        /// <param name="lstart">Startpoint of the line</param>
+        /// <param name="lend">Endpoint of the line</param>
+        /// <returns>true, if P is on the left side, false otherwise</returns>
         public static bool OnLeftSide(GeoPoint2D P, GeoPoint2D lstart, GeoPoint2D lend)
         {	// spart zu distPL die Division durch die Länge. Noch testen, ob <0.0 oder >0.0
             return ((lend.y - lstart.y) * P.x - (lend.x - lstart.x) * P.y + lstart.y * lend.x - lstart.x * lend.y) < 0.0;
@@ -1415,6 +1499,17 @@ namespace CADability
             double d1 = (dy * p1.x - dx * p1.y + c);
             return Math.Sign(d0) == Math.Sign(d1);
         }
+        /// <summary>
+        /// Returns true, if <paramref name="p0"/> and <paramref name="p1"/> are on the same side of the line through
+        /// <paramref name="p2"/> with the direction <paramref name="v2"/>. Also returns true if one of the two points lies on
+        /// the line (within a small tolerance relative to the length of <paramref name="v2"/>). Same as
+        /// <see cref="OnSameSide(GeoPoint2D, GeoPoint2D, GeoPoint2D, GeoPoint2D)"/> with the line given by a point and a direction.
+        /// </summary>
+        /// <param name="p0">first testpoint</param>
+        /// <param name="p1">second testpoint</param>
+        /// <param name="p2">point on the line</param>
+        /// <param name="v2">direction of the line</param>
+        /// <returns>true if on the same side</returns>
         public static bool OnSameSide(GeoPoint2D p0, GeoPoint2D p1, GeoPoint2D p2, GeoVector2D v2)
         {	// liegen p0 und p1 auf der selben Seite der Linie inclusive epsilon
             double dx = v2.x;
@@ -1434,6 +1529,17 @@ namespace CADability
                 else return d0 < eps;
             }
         }
+        /// <summary>
+        /// Returns true, if <paramref name="p0"/> and <paramref name="p1"/> are strictly on the same side of the line through
+        /// <paramref name="p2"/> and <paramref name="p3"/>. Unlike <see cref="OnSameSide(GeoPoint2D, GeoPoint2D, GeoPoint2D, GeoPoint2D)"/>
+        /// the result is false when one of the two points lies on the line, within a tolerance of 1e-6 relative to the
+        /// length of the line. Currently not used.
+        /// </summary>
+        /// <param name="p0">first testpoint</param>
+        /// <param name="p1">second testpoint</param>
+        /// <param name="p2">first linepoint</param>
+        /// <param name="p3">second linepoint</param>
+        /// <returns>true if strictly on the same side</returns>
         public static bool OnSameSideStrict(GeoPoint2D p0, GeoPoint2D p1, GeoPoint2D p2, GeoPoint2D p3)
         {	// wie OnSameSide, aber false, wenn ein Punkt draufliegt
             double dx = p3.x - p2.x;
@@ -1551,6 +1657,13 @@ namespace CADability
         {
             return -((ldir.y * P.x - ldir.x * P.y + lstart.y * (lstart.x + ldir.x) - lstart.x * (lstart.y + ldir.y)) / Math.Sqrt(sqr(ldir.x) + sqr(ldir.y)));
         }
+        /// <summary>
+        /// Returns the distance of a point from the infinite 3d line given by the axis, see
+        /// <see cref="DistPL(GeoPoint, GeoPoint, GeoVector)"/>.
+        /// </summary>
+        /// <param name="P">the point</param>
+        /// <param name="ax">the line as location and direction</param>
+        /// <returns>distance, never negative</returns>
         public static double DistPL(GeoPoint P, Axis ax)
         {
             return DistPL(P, ax.Location, ax.Direction);
@@ -1634,7 +1747,7 @@ namespace CADability
         /// <summary>
         /// Returns the perpendicular foot point of point p on the line (s,e)
         /// </summary>
-        /// <param name="P">The source point</param>
+        /// <param name="p">The source point</param>
         /// <param name="s">Startpoint of the line</param>
         /// <param name="e">Endpoint of the line</param>
         /// <returns>Footpoint</returns>
@@ -1652,7 +1765,7 @@ namespace CADability
         /// Returns the perpendicular foot point of point p on the line through s
         /// with direction v
         /// </summary>
-        /// <param name="P">The source point</param>
+        /// <param name="p">The source point</param>
         /// <param name="s">Startpoint of the line</param>
         /// <param name="v">Direction of the line</param>
         /// <returns>Footpoint</returns>
@@ -1669,7 +1782,7 @@ namespace CADability
         /// Returns the perpendicular foot point of point p on the line through s
         /// with direction v
         /// </summary>
-        /// <param name="P">The source point</param>
+        /// <param name="p">The source point</param>
         /// <param name="s">Startpoint of the line</param>
         /// <param name="v">Direction of the line</param>
         /// <returns>Footpoint</returns>
@@ -1681,6 +1794,15 @@ namespace CADability
             double lambda = -((s.x - p.x) * v.x + (s.y - p.y) * v.y) / d;
             return s + lambda * v;
         }
+        /// <summary>
+        /// Computes the points on the circle with the center <paramref name="c"/> and the radius <paramref name="radius"/>
+        /// where the tangents through the point <paramref name="p"/> touch the circle.
+        /// </summary>
+        /// <param name="p">the point from which the tangents start, must be outside of the circle</param>
+        /// <param name="c">center of the circle</param>
+        /// <param name="radius">radius of the circle</param>
+        /// <returns>the two touching points (which coincide when <paramref name="p"/> is on the circle), or an empty array
+        /// when <paramref name="p"/> is inside the circle or coincides with its center</returns>
         public static GeoPoint2D[] TangentPointCircle(GeoPoint2D p, GeoPoint2D c, double radius)
         {
             // from https://stackoverflow.com/questions/1351746/find-a-tangent-point-on-circle
@@ -2024,8 +2146,8 @@ namespace CADability
         /// Returns the intersection points of a circle and a line in 2d.
         /// The result may contain 0 to 2 points.
         /// </summary>
-        /// <param name="lstart">point of the line</param>
-        /// <param name="lend">direction of the line</param>
+        /// <param name="pointofline">point of the line</param>
+        /// <param name="direction">direction of the line</param>
         /// <param name="center">center of the cricle</param>
         /// <param name="radius">radius of the circle</param>
         /// <returns>intersctione points</returns>
@@ -2422,6 +2544,8 @@ namespace CADability
         /// <param name="right">resulting right extremum</param>
         /// <param name="bottom">resulting bottom extremum</param>
         /// <param name="top">resulting top extremum</param>
+        /// <param name="forceRightHanded">true: the resulting majorAxis and minorAxis always form a right handed system,
+        /// false: they form a right handed system if and only if axis1 and axis2 do</param>
         internal static void PrincipalAxis(GeoPoint2D center, GeoVector2D axis1, GeoVector2D axis2, out GeoVector2D majorAxis, out GeoVector2D minorAxis, out GeoPoint2D left, out GeoPoint2D right, out GeoPoint2D bottom, out GeoPoint2D top, bool forceRightHanded)
         {
             // sog. Hauptachsentransformation: gesucht sind die beiden Hauptachsen, die 
@@ -2682,6 +2806,17 @@ namespace CADability
             return res;
         }
 
+        /// <summary>
+        /// Checks whether the point <paramref name="p"/> lies inside the triangle with the vertices <paramref name="p1"/>,
+        /// <paramref name="p2"/> and <paramref name="p3"/>, which may be given in either orientation: the point is inside
+        /// when it lies on the same side of all three edges. There is no epsilon test, a point exactly on an edge may be
+        /// reported either way.
+        /// </summary>
+        /// <param name="p1">first vertex of the triangle</param>
+        /// <param name="p2">second vertex of the triangle</param>
+        /// <param name="p3">third vertex of the triangle</param>
+        /// <param name="p">the point to test</param>
+        /// <returns>true, if the point is inside the triangle</returns>
         public static bool PointInsideTriangle(GeoPoint2D p1, GeoPoint2D p2, GeoPoint2D p3, GeoPoint2D p)
         {
             bool OnLeftSidep2p3 = Geometry.OnLeftSide(p, p2, p3 - p2);
@@ -2691,6 +2826,15 @@ namespace CADability
 
         }
 
+        /// <summary>
+        /// Checks whether the point <paramref name="p"/> lies inside the convex polygon with the vertices <paramref name="cp"/>
+        /// (in either orientation, the polygon is closed implicitly): the point is inside when it lies on the same side of
+        /// all edges. This is only correct for convex polygons, use <see cref="PointInsidePolygon(GeoPoint2D[], GeoPoint2D)"/>
+        /// for arbitrary polygons. There is no epsilon test.
+        /// </summary>
+        /// <param name="cp">the vertices of the convex polygon</param>
+        /// <param name="p">the point to test</param>
+        /// <returns>true, if the point is inside the polygon</returns>
         public static bool PointInsideConvexPolygon(GeoPoint2D[] cp, GeoPoint2D p)
         {
 #if DEBUG
@@ -2710,6 +2854,15 @@ namespace CADability
             return true;
         }
 
+        /// <summary>
+        /// Computes the winding number of the closed polygon with the vertices <paramref name="cp"/> around the point
+        /// <paramref name="p"/>. The polygon may be arbitrary (concave or self intersecting). The result is 0 when the point
+        /// is outside, +1 inside a counterclockwise polygon, -1 inside a clockwise polygon, and other values where the
+        /// polygon winds around the point more than once.
+        /// </summary>
+        /// <param name="cp">the vertices of the polygon, which is closed implicitly</param>
+        /// <param name="p">the point to test</param>
+        /// <returns>the winding number, 0 for a point outside</returns>
         public static int PointInsidePolygon(GeoPoint2D[] cp, GeoPoint2D p)
         {   // von http://geomalgorithms.com/a03-_inclusion.html
             int wn = 0;    // the  winding number counter
@@ -2856,20 +3009,21 @@ namespace CADability
             return Math.Sqrt(dDelta0 * dDelta0 + dDelta1 * dDelta1);
         }
         /// <summary>
-        /// Abstand Punkt Ellipse für ungederhte Ellipse mit x-Achse größer y-Achse aus
-        /// http://www.geometrictools.com/Documentation/DistancePointToEllipse2.pdf
-        /// kommt i.A. mit wenigen Iterationsschritten aus (maximal 7 bis jetzt gesehen
+        /// Distance of a point from an axis aligned ellipse (x/a)^2 + (y/b)^2 = 1 centered at the origin, computed with Newton's
+        /// method as described in http://www.geometrictools.com/Documentation/DistancePointToEllipse2.pdf. Usually converges in a
+        /// few iterations (at most 7 observed so far). The test point is reflected into the first quadrant internally, the closest
+        /// point is returned reflected back to the original quadrant. The special case of a circle is handled directly.
         /// </summary>
-        /// <param name="dU"></param>
-        /// <param name="dV"></param>
-        /// <param name="dA"></param>
-        /// <param name="dB"></param>
-        /// <param name="dEpsilon"></param>
-        /// <param name="iMax"></param>
-        /// <param name="riIFinal"></param>
-        /// <param name="rdX"></param>
-        /// <param name="rdY"></param>
-        /// <returns></returns>
+        /// <param name="dU">x-coordinate of the test point</param>
+        /// <param name="dV">y-coordinate of the test point</param>
+        /// <param name="dA">Semi-axis of the ellipse in x-direction</param>
+        /// <param name="dB">Semi-axis of the ellipse in y-direction</param>
+        /// <param name="dEpsilon">Zero tolerance for Newton's method</param>
+        /// <param name="iMax">Maximum number of iterations for Newton's method</param>
+        /// <param name="riIFinal">Receives the number of iterations used, -1 if the method failed to converge</param>
+        /// <param name="rdX">Receives the x-coordinate of the closest point on the ellipse</param>
+        /// <param name="rdY">Receives the y-coordinate of the closest point on the ellipse</param>
+        /// <returns>The distance of the point from the ellipse, or double.MinValue if the method failed to converge</returns>
         internal static double DistancePointEllipse(
             double dU, double dV, // test point (u,v)
             double dA, double dB, // ellipse is (x/a)^2 + (y/b)^2 = 1
@@ -3189,6 +3343,9 @@ namespace CADability
         /// relative to <paramref name="p1"/>, which keeps it well conditioned for points far from the
         /// coordinate origin.
         /// </summary>
+        /// <param name="p1">first point on the circle</param>
+        /// <param name="p2">second point on the circle</param>
+        /// <param name="p3">third point on the circle</param>
         /// <param name="center">center of the circle through the three points</param>
         /// <param name="radius">its radius</param>
         /// <returns>false, if the three points are colinear and there is no such circle</returns>
@@ -3409,6 +3566,16 @@ namespace CADability
             return residual;
         }
 
+        /// <summary>
+        /// Fits a sphere through the given points by an algebraic least squares method (as in the Geometric Tools library).
+        /// At least four points that do not lie in a common plane are needed. For an iterative fit with a start value see
+        /// <see cref="GaussNewtonMinimizer.SphereFit(IArray{GeoPoint}, GeoPoint, double, double, out SphericalSurface)"/>.
+        /// </summary>
+        /// <param name="points">the points to fit</param>
+        /// <param name="center">the center of the fitted sphere, <see cref="GeoPoint.Invalid"/> when the fit fails</param>
+        /// <param name="radius">the radius of the fitted sphere, <see cref="double.MaxValue"/> when the fit fails</param>
+        /// <returns>the sum of the absolute distances of the points from the sphere (0.0 for a perfect fit), or
+        /// <see cref="double.MaxValue"/> when the points do not determine a sphere, e.g. because they are coplanar</returns>
         public static double SphereFit(GeoPoint[] points, out GeoPoint center, out double radius)
         {   // see GeometricTools: GTE\Mathematics\ApprCylinder3.h
             GeoPoint s = new GeoPoint(points);
@@ -3469,6 +3636,15 @@ namespace CADability
                 return double.MaxValue;
             }
         }
+        /// <summary>
+        /// Fits a line through the given 2d points: the location is their centroid, the direction is the principal direction
+        /// of the points found by a singular value decomposition. Throws an <see cref="ApplicationException"/> when fewer
+        /// than three points are given. The fit is not always optimal; it is mainly used to test whether points are collinear.
+        /// </summary>
+        /// <param name="points">the points to fit, at least three</param>
+        /// <param name="location">a point on the fitted line (the centroid of the points)</param>
+        /// <param name="direction">direction of the fitted line (normalized)</param>
+        /// <returns>the maximum distance of a point from the fitted line, 0.0 when the points are exactly collinear</returns>
         public static double LineFit(GeoPoint2D[] points, out GeoPoint2D location, out GeoVector2D direction)
         {   // nach http://stackoverflow.com/questions/2352256/fit-a-3d-line-to-3d-point-data-in-java
             if (points.Length < 3) throw new ApplicationException("Invalid parameter at LineFit: points must contain more than two points");
@@ -3498,6 +3674,16 @@ namespace CADability
             }
             return double.MaxValue;
         }
+        /// <summary>
+        /// Fits a line through the given 3d points: the location is their centroid, the direction is the principal direction
+        /// of the points found by a singular value decomposition. Throws an <see cref="ApplicationException"/> when fewer
+        /// than three points are given. The fit is not always optimal; it is mainly used to test whether points are collinear,
+        /// for a better fit see <see cref="GaussNewtonMinimizer.LineFit(IArray{GeoPoint}, double, out GeoPoint, out GeoVector)"/>.
+        /// </summary>
+        /// <param name="points">the points to fit, at least three</param>
+        /// <param name="location">a point on the fitted line (the centroid of the points)</param>
+        /// <param name="direction">direction of the fitted line (normalized)</param>
+        /// <returns>the maximum distance of a point from the fitted line, 0.0 when the points are exactly collinear</returns>
         public static double LineFit(GeoPoint[] points, out GeoPoint location, out GeoVector direction)
         {   // nach http://stackoverflow.com/questions/2352256/fit-a-3d-line-to-3d-point-data-in-java
             // better use GaussNewtonMinimizer.LineFit
@@ -3530,6 +3716,17 @@ namespace CADability
             }
             return double.MaxValue;
         }
+        /// <summary>
+        /// Expresses the point <paramref name="p"/> in the 2d coordinate system given by its origin <paramref name="sysLoc"/>
+        /// and its axis vectors <paramref name="sysDirx"/> and <paramref name="sysDiry"/>, which need not be perpendicular or
+        /// normalized: finds (u,v) with p = sysLoc + u*sysDirx + v*sysDiry.
+        /// </summary>
+        /// <param name="p">the point in global coordinates</param>
+        /// <param name="sysLoc">origin of the coordinate system</param>
+        /// <param name="sysDirx">direction of the x-axis of the coordinate system</param>
+        /// <param name="sysDiry">direction of the y-axis of the coordinate system</param>
+        /// <returns>the coordinates (u,v) of the point in that system</returns>
+        /// <exception cref="GeometryException">when the axis vectors are linearly dependent</exception>
         public static GeoPoint2D GetPosition(GeoPoint2D p, GeoPoint2D sysLoc, GeoVector2D sysDirx, GeoVector2D sysDiry)
         {
             Matrix m = DenseMatrix.OfRowArrays(sysDirx, sysDiry);
@@ -3559,6 +3756,18 @@ namespace CADability
             //}
             //else throw new GeometryException("no solution: linear dependent coordinate system");
         }
+        /// <summary>
+        /// Expresses the vector <paramref name="toRebase"/> in the base given by the three vectors, i.e. finds (a,b,c) with
+        /// toRebase = a*sysDirx + b*sysDiry + c*sysDirz by solving the linear system. Unlike
+        /// <see cref="ReBase(GeoVector, GeoVector, GeoVector, GeoVector)"/> this is also correct for a base whose vectors
+        /// are not perpendicular to each other. The base vectors must be linearly independent.
+        /// </summary>
+        /// <param name="toRebase">the vector to express in the base</param>
+        /// <param name="sysDirx">first base vector</param>
+        /// <param name="sysDiry">second base vector</param>
+        /// <param name="sysDirz">third base vector</param>
+        /// <returns>the coefficients (a,b,c) as a vector</returns>
+        /// <exception cref="GeometryException">when no solution is found</exception>
         public static GeoVector ReBaseX(GeoVector toRebase, GeoVector sysDirx, GeoVector sysDiry, GeoVector sysDirz)
         {
             Matrix m = DenseMatrix.OfColumnArrays(sysDirx, sysDiry, sysDirz);
@@ -3569,6 +3778,18 @@ namespace CADability
             }
             else throw new GeometryException("no solution: linear dependent coordinate system");
         }
+        /// <summary>
+        /// Converts a 3d direction into a 2d direction in the (u,v) system of a surface or plane whose u- and v-axis have
+        /// the 3d directions <paramref name="dirx"/> and <paramref name="diry"/>: the result (a,b) satisfies
+        /// a*dirx + b*diry = the component of <paramref name="toConvert"/> in the plane spanned by dirx and diry, the
+        /// component along the normal dirx^diry is dropped. Used e.g. to turn the 3d direction of a curve on a surface
+        /// into a direction in the parameter space of the surface. Throws a <see cref="ModOpException"/> when
+        /// <paramref name="dirx"/> and <paramref name="diry"/> are parallel.
+        /// </summary>
+        /// <param name="dirx">3d direction of the u-axis</param>
+        /// <param name="diry">3d direction of the v-axis</param>
+        /// <param name="toConvert">the 3d direction to convert</param>
+        /// <returns>the direction in the (u,v) system</returns>
         public static GeoVector2D Dir2D(GeoVector dirx, GeoVector diry, GeoVector toConvert)
         {
             ModOp fromUnitPlane = new ModOp(dirx, diry, dirx ^ diry, GeoPoint.Origin);
@@ -3911,6 +4132,13 @@ namespace CADability
             return res;
         }
 
+        /// <summary>
+        /// Unfinished experiment: was intended to find an implicit polynomial f(x,y,z)=0 of the given degree that approximates
+        /// the surface in the given parameter range. The method computes nothing and has no effect; do not use it.
+        /// </summary>
+        /// <param name="uv">parameter range of the surface</param>
+        /// <param name="surface">the surface to approximate</param>
+        /// <param name="maxDegree">maximum degree of the polynomial</param>
         public static void FindImplicitPolynomialForm(BoundingRect uv, ISurface surface, int maxDegree)
         {
             // maxDegree==6: 89 Koeffizienten, 2: 11 Koeffizienten
@@ -3928,6 +4156,13 @@ namespace CADability
 
         }
 
+        /// <summary>
+        /// Returns the smallest double that is greater than <paramref name="value"/>, i.e. the next representable floating
+        /// point number in positive direction. Used to round limits up, e.g. for the cubes of an <see cref="OctTree{T}"/>,
+        /// so that adjacent intervals have no gaps.
+        /// </summary>
+        /// <param name="value">the value</param>
+        /// <returns>the next greater double</returns>
         public static double NextDouble(double value)
         {   // from https://stackoverflow.com/questions/1245870/next-higher-lower-ieee-double-precision-number?rq=1
 
@@ -4039,6 +4274,19 @@ namespace CADability
             }
             return false;
         }
+        /// <summary>
+        /// Finds the points where the distance between a circle and an infinite line is locally extremal, i.e. where the
+        /// connecting line is perpendicular to both the circle and the line (there are up to four such pairs). The problem
+        /// is transformed to the unit circle and solved as a quartic equation. <paramref name="circle"/> must be a circle,
+        /// not an ellipse. The case of a line perpendicular to the plane of the circle is not implemented and yields an
+        /// empty array. See also <see cref="CircleLinePerpDist(Ellipse, GeoPoint, GeoVector)"/>, an alternative
+        /// implementation of the same task.
+        /// </summary>
+        /// <param name="circle">the circle</param>
+        /// <param name="lineLocation">a point on the line</param>
+        /// <param name="lineDirection">direction of the line</param>
+        /// <returns>pairs of points with extremal distance: the point on the circle at index 2*i, the corresponding point on
+        /// the line at index 2*i+1; an empty array if none was found</returns>
         public static GeoPoint[] CircleLineDist(Ellipse circle, GeoPoint lineLocation, GeoVector lineDirection)
         {
             Ellipse uc = circle.Clone() as Ellipse;
@@ -4125,6 +4373,19 @@ namespace CADability
 #endif
             return res.ToArray();
         }
+        /// <summary>
+        /// Finds the points where the distance between a circle and an infinite line is locally extremal, i.e. where the
+        /// connecting line is perpendicular to both the circle and the line. The parameter on the line is found as the root
+        /// of a polynomial (according to the Geometric Tools paper "Distance to Circle in 3D"), the point on the circle by
+        /// intersecting the circle with the plane perpendicular to the line at that parameter. <paramref name="circle"/>
+        /// must be a circle, not an ellipse. See also <see cref="CircleLineDist(Ellipse, GeoPoint, GeoVector)"/>.
+        /// </summary>
+        /// <param name="circle">the circle</param>
+        /// <param name="lineLocation">a point on the line</param>
+        /// <param name="lineDirection">direction of the line</param>
+        /// <returns>pairs of points with extremal distance: the point on the circle followed by the corresponding point on
+        /// the line (in the rare case that the perpendicular plane only touches the circle, the single touching point
+        /// without a partner); an empty array if none was found</returns>
         public static GeoPoint[] CircleLinePerpDist(Ellipse circle, GeoPoint lineLocation, GeoVector lineDirection)
         {   // according to https://www.geometrictools.com/Documentation/DistanceToCircle3.pdf
             GeoVector n = (circle.MajorAxis ^ circle.MinorAxis).Normalized;

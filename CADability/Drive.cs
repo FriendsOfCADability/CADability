@@ -35,6 +35,11 @@ namespace CADability
         List<IGeoObject> MovedObjects { get; }
     }
 
+    /// <summary>
+    /// The list of the <see cref="IDrive"/>s of a <see cref="Model"/> (see <see cref="Model.AllDrives"/>), which move objects in the
+    /// <see cref="AnimatedView"/>. Drives are added with <see cref="Add"/> and removed with <see cref="Remove"/>; the list is serialized
+    /// together with the model.
+    /// </summary>
     [Serializable]
     public class DriveList : IEnumerable<IDrive>, ISerializable, IDeserializationCallback, IJsonSerialize
     {
@@ -170,13 +175,13 @@ namespace CADability
         // und deren XAchse die Richtung der Kurve in diesem Punkt
 
         /// <summary>
-        /// Defines a CurveDrive providing the curve for the movement and the object beeing moved.
+        /// Defines a CurveDrive providing the curve for the movement. The objects being moved are
+        /// specified by <see cref="IDrive.MovedObjects"/>.
         /// The currentPosition describes the position of the object as it is defined in the model
         /// relative to the startpoint of the curve. It must be between 0.0 and the
         /// <see cref="ICurve.Length">length</see> of the curve.
         /// </summary>
         /// <param name="along">Curve for the movement</param>
-        /// <param name="toMove">Object beeing moved</param>
         /// <param name="currentPosition">Current position of the object</param>
         public CurveDrive(ICurve along, double currentPosition)
             : this()
@@ -407,7 +412,9 @@ namespace CADability
         }
         #endregion
         #region IPropertyEntry implementation
+        /// <inheritdoc/>
         public override PropertyEntryType Flags => PropertyEntryType.Selectable | PropertyEntryType.ContextMenu | PropertyEntryType.LabelEditable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
+        /// <inheritdoc/>
         public override string LabelText
         {
             get
@@ -419,6 +426,7 @@ namespace CADability
                 base.LabelText = value;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -427,10 +435,7 @@ namespace CADability
             }
         }
         IPropertyEntry[] subEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>,
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -480,6 +485,7 @@ namespace CADability
                 }
             }
         }
+        /// <inheritdoc/>
         public override void EndEdit(bool aborted, bool modified, string newValue)
         {
             ShowPropertyDrives spd = propertyPage.GetParent(this) as ShowPropertyDrives;
@@ -491,9 +497,7 @@ namespace CADability
                 }
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.Refresh ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void Refresh()
         {
             subEntries = null;
@@ -619,6 +623,12 @@ namespace CADability
         #endregion
     }
 
+    /// <summary>
+    /// A drive (see <see cref="IDrive"/>) defined by two <see cref="CurveDrive"/>s: the objects are moved by the rigid motion (with
+    /// <see cref="Stretch"/> also scaled) which maps the start points of the two curve drives onto their current positions, like a
+    /// rod whose ends run along two curves. It has no position of its own, it only follows its two drives. It is also the property
+    /// entry which shows the drive in the control center.
+    /// </summary>
     [Serializable]
     public class DualCurveDrive : PropertyEntryImpl, IDrive, ICommandHandler, ISerializable, IDeserializationCallback, IJsonSerialize, IJsonSerializeDone
     {
@@ -745,10 +755,9 @@ namespace CADability
         }
         #endregion
         #region IPropertyEntry implementation
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override PropertyEntryType Flags => PropertyEntryType.ContextMenu | PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries | PropertyEntryType.LabelEditable;
+        /// <inheritdoc/>
         public override string LabelText
         {
             get
@@ -760,6 +769,7 @@ namespace CADability
                 base.LabelText = value;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -768,10 +778,7 @@ namespace CADability
             }
         }
         IPropertyEntry[] subEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>,
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -837,6 +844,7 @@ namespace CADability
                 }
             }
         }
+        /// <inheritdoc/>
         public override void EndEdit(bool aborted, bool modified, string newValue)
         {
             ShowPropertyDrives spd = propertyPage.GetParent(this) as ShowPropertyDrives;
@@ -848,9 +856,7 @@ namespace CADability
                 }
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.Refresh ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void Refresh()
         {
             subEntries = null;
@@ -961,13 +967,12 @@ namespace CADability
         IGeoObject[] movedObjectsDeserialized;
         private ListWithEvents<IGeoObject> movedObjects;
         /// <summary>
-        /// Defines a AxisDrive object. The axis and the driven objects must be provided. The
-        /// position is meassured in radians.
+        /// Defines a AxisDrive object. The axis must be provided, the driven objects are specified
+        /// by <see cref="IDrive.MovedObjects"/>. The position is meassured in radians.
         /// </summary>
         /// <param name="location">Location of the axis</param>
         /// <param name="direction">Direction of the axis</param>
         /// <param name="currentPosition">Current position of the object</param>
-        /// <param name="toRotate">Objects to rotate</param>
         public AxisDrive(GeoPoint location, GeoVector direction, double currentPosition)
         {
             this.location = location;
@@ -1113,10 +1118,9 @@ namespace CADability
 
         #endregion
         #region IPropertyEntry implementation
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override PropertyEntryType Flags => PropertyEntryType.ContextMenu | PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries | PropertyEntryType.LabelEditable;
+        /// <inheritdoc/>
         public override string LabelText
         {
             get
@@ -1128,6 +1132,7 @@ namespace CADability
                 base.LabelText = value;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -1140,10 +1145,7 @@ namespace CADability
         /// returns <see cref="ShowPropertyEntryType.GroupTitle"/>.
         /// </summary>
         IPropertyEntry[] subEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>,
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -1192,6 +1194,7 @@ namespace CADability
                 }
             }
         }
+        /// <inheritdoc/>
         public override void EndEdit(bool aborted, bool modified, string newValue)
         {
             ShowPropertyDrives spd = propertyPage.GetParent(this) as ShowPropertyDrives;
@@ -1203,9 +1206,7 @@ namespace CADability
                 }
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.Refresh ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void Refresh()
         {
             subEntries = null;
@@ -1470,10 +1471,7 @@ namespace CADability
             }
         }
         IPropertyEntry[] subEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>,
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -1562,10 +1560,7 @@ namespace CADability
             }
         }
         IPropertyEntry[] subEntries;
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>,
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get

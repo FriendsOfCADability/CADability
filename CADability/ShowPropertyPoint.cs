@@ -36,7 +36,9 @@ namespace CADability.UserInterface
 		}
 
 		#region PropertyEntryImpl Overrides
+		/// <inheritdoc/>
 		public override PropertyEntryType Flags => PropertyEntryType.ContextMenu | PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
+		/// <inheritdoc/>
 		public override IPropertyEntry[] SubItems
 		{
 			get
@@ -49,6 +51,7 @@ namespace CADability.UserInterface
 				return subEntries;
 			}
 		}
+		/// <inheritdoc/>
 		public override MenuWithHandler[] ContextMenu
 		{
 			get
@@ -59,6 +62,7 @@ namespace CADability.UserInterface
 				return items.ToArray();
 			}
 		}
+		/// <inheritdoc/>
 		public override void Opened(bool IsOpen)
 		{   // dient dazu, die Hotspots anzuzeigen bzw. zu verstecken wenn die SubProperties
 			// aufgeklappt bzw. zugeklappt werden. Wenn also mehrere Objekte markiert sind
@@ -76,6 +80,7 @@ namespace CADability.UserInterface
 			}
 			base.Opened(IsOpen);
 		}
+		/// <inheritdoc/>
 		public override void Added(IPropertyPage propertyPage)
 		{   // die events müssen in Added angemeldet und in Removed wieder abgemeldet werden,
 			// sonst bleibt die ganze ShowProperty für immer an der Linie hängen
@@ -90,6 +95,7 @@ namespace CADability.UserInterface
 			attributeProperties = point.GetAttributeProperties(Frame);
 			propertyPage.Refresh(this);
 		}
+		/// <inheritdoc/>
 		public override void Removed(IPropertyPage propertyPage)
 		{
 			this.point.DidChangeEvent -= OnPointDidChange;

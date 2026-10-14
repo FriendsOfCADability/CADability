@@ -33,10 +33,7 @@ namespace CADability.GeoObject
                 base.LabelText = value;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.Added"/>
-        /// </summary>
-        /// <param name="page"></param>
+        /// <inheritdoc/>
         public override void Added(IPropertyPage page)
         {
             base.Added(page);
@@ -50,10 +47,7 @@ namespace CADability.GeoObject
 
 
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.UserInterface.IShowPropertyImpl.Removed (IPropertyTreeView)"/>
-        /// </summary>
-        /// <param name="page"></param>
+        /// <inheritdoc/>
         public override void Removed(IPropertyTreeView page)
         {
             positionProp.OnGetValue = null;
@@ -82,9 +76,7 @@ namespace CADability.GeoObject
 
         public override ShowPropertyEntryType EntryType => ShowPropertyEntryType.GroupTitle;
 
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType => ShowPropertyLabelFlags.ContextMenu | ShowPropertyLabelFlags.Selectable;
 
         public override MenuWithHandler[] ContextMenu
@@ -116,11 +108,7 @@ namespace CADability.GeoObject
 
         #region ICommandHandler Members
 
-        /// <summary>
-        /// Implements <see cref="CADability.UserInterface.ICommandHandler.OnCommand (string)"/>
-        /// </summary>
-        /// <param name="menuId"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual bool OnCommand(string menuId)
         {
             switch (menuId)
@@ -142,12 +130,7 @@ namespace CADability.GeoObject
             return false;
         }
 
-        /// <summary>
-        /// Implements <see cref="CADability.UserInterface.ICommandHandler.OnUpdateCommand (string, CommandState)"/>
-        /// </summary>
-        /// <param name="menuId"></param>
-        /// <param name="commandState"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual bool OnUpdateCommand(string menuId, CommandState commandState)
         {
             switch (menuId)
@@ -176,7 +159,11 @@ namespace CADability.GeoObject
         #endregion
     }
     /// <summary>
-    ///
+    /// A reference to a <see cref="Block"/> that is placed in the model with a modification (<see cref="Insertion"/>),
+    /// comparable to a block insert in DXF. The referenced block is shared and not owned by the reference, so several
+    /// references may show the same block at different positions. For display, hit testing, extent and
+    /// <see cref="Decompose"/> the reference lazily creates a flattened copy of the block transformed by the insertion,
+    /// which is discarded whenever the block or the insertion changes.
     /// </summary>
     [Serializable()]
     public class BlockRef : IGeoObjectImpl, IColorDef, IGeoObjectOwner
@@ -186,14 +173,37 @@ namespace CADability.GeoObject
         private WeakReference flattened, flattenedP;
         private BoundingCube? extent;
         #region polymorph construction
+        /// <summary>
+        /// Signature of the factory method that <see cref="Construct"/> calls when one is registered in <see cref="Constructor"/>.
+        /// </summary>
+        /// <param name="referredBlock">The block the new reference refers to</param>
+        /// <returns>A new <see cref="BlockRef"/> or an object of a class derived from BlockRef</returns>
         public delegate BlockRef ConstructionDelegate(Block referredBlock);
+        /// <summary>
+        /// Optional factory for block references: when set, <see cref="Construct"/> calls this delegate instead of creating
+        /// a plain <see cref="BlockRef"/>, so that every reference CADability creates is an instance of your derived class.
+        /// Null by default.
+        /// </summary>
         public static ConstructionDelegate Constructor;
+        /// <summary>
+        /// Creates a reference to the given block with the identity as <see cref="Insertion"/>, i.e. the block appears where
+        /// it is defined; move it with <see cref="Modify"/>, <see cref="Insertion"/> or <see cref="RefPoint"/>. This is the
+        /// only public way to create a block reference. If a <see cref="Constructor"/> is registered, the reference is created
+        /// by that delegate.
+        /// </summary>
+        /// <param name="referredBlock">The block to refer to; it is shared with other references, not copied</param>
+        /// <returns>The new block reference</returns>
         public static BlockRef Construct(Block referredBlock)
         {
             if (Constructor != null) return Constructor(referredBlock);
             return new BlockRef(referredBlock);
         }
         #endregion
+        /// <summary>
+        /// Creates a reference to the given block with the identity as insertion. Protected so that references are created
+        /// via <see cref="Construct"/>; derived classes call it from their own constructors.
+        /// </summary>
+        /// <param name="referredBlock">The block to refer to</param>
         protected BlockRef(Block referredBlock)
         {
             idea = referredBlock;
@@ -210,10 +220,7 @@ namespace CADability.GeoObject
             FireDidChange(change);
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Modify (ModOp)"/>
-        /// </summary>
-        /// <param name="m"></param>
+        /// <inheritdoc/>
         public override void Modify(ModOp m)
         {
             using (new Changing(this, "ModifyInverse", m))
@@ -230,10 +237,7 @@ namespace CADability.GeoObject
             }
 
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Clone ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IGeoObject Clone()
         {
             BlockRef result = Construct(idea);
@@ -241,10 +245,7 @@ namespace CADability.GeoObject
             result.CopyAttributes(this);
             return result;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingCube GetBoundingCube()
         {
             if (!extent.HasValue)
@@ -254,19 +255,13 @@ namespace CADability.GeoObject
             return extent.Value;
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Decompose ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoObjectList Decompose()
         {
             return new GeoObjectList(Flattened);
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.CopyGeometry (IGeoObject)"/>
-        /// </summary>
-        /// <param name="toCopyFrom"></param>
+        /// <inheritdoc/>
         public override void CopyGeometry(IGeoObject toCopyFrom)
         {
             using (new Changing(this))
@@ -278,15 +273,12 @@ namespace CADability.GeoObject
                 extent = null;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetShowProperties (IFrame)"/>
-        /// </summary>
-        /// <param name="frame"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IPropertyEntry GetShowProperties(IFrame frame)
         {
             return new ShowPropertyBlockRef(this, frame);
         }
+        /// <inheritdoc/>
         public override string Description
         {
             get
@@ -294,11 +286,7 @@ namespace CADability.GeoObject
                 return StringTable.GetString("BlockRef.Description");
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3DList (IPaintTo3D, ICategorizedDislayLists)"/>
-        /// </summary>
-        /// <param name="paintTo3D"></param>
-        /// <param name="lists"></param>
+        /// <inheritdoc/>
         public override void PaintTo3DList(IPaintTo3D paintTo3D, ICategorizedDislayLists lists)
         {
             // paintTo3D.PushMultModOp(insertion);
@@ -313,20 +301,25 @@ namespace CADability.GeoObject
             blk.PaintTo3DList(paintTo3D, lists);
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PrePaintTo3D (IPaintTo3D)"/>
-        /// </summary>
-        /// <param name="paintTo3D"></param>
+        /// <inheritdoc/>
         public override void PrePaintTo3D(IPaintTo3D paintTo3D)
         {
             idea.PrePaintTo3D(paintTo3D);
         }
-        public delegate bool PaintTo3DDelegate(BlockRef toPaint, IPaintTo3D paintTo3D);
-        public static PaintTo3DDelegate OnPaintTo3D;
         /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3D (IPaintTo3D)"/>
+        /// Signature of the handler for <see cref="OnPaintTo3D"/>.
         /// </summary>
-        /// <param name="paintTo3D"></param>
+        /// <param name="toPaint">The block reference that is about to be painted</param>
+        /// <param name="paintTo3D">The paint interface to paint to</param>
+        /// <returns>true if the handler has painted the reference itself and the default painting must be skipped, false to
+        /// let the reference paint the referenced block as usual</returns>
+        public delegate bool PaintTo3DDelegate(BlockRef toPaint, IPaintTo3D paintTo3D);
+        /// <summary>
+        /// Hook to replace the painting of block references: when set, <see cref="PaintTo3D"/> calls this delegate first and
+        /// does nothing more if it returns true. Applies to all block references. Null by default.
+        /// </summary>
+        public static PaintTo3DDelegate OnPaintTo3D;
+        /// <inheritdoc/>
         public override void PaintTo3D(IPaintTo3D paintTo3D)
         {
             if (OnPaintTo3D != null && OnPaintTo3D(this, paintTo3D)) return;
@@ -340,31 +333,20 @@ namespace CADability.GeoObject
             blk.PaintTo3D(paintTo3D);
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PrepareDisplayList (double)"/>
-        /// </summary>
-        /// <param name="precision"></param>
+        /// <inheritdoc/>
         public override void PrepareDisplayList(double precision)
         {
             Flattened.PrepareDisplayList(precision); // Might get lost again, but should last until painting???
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.FindSnapPoint (SnapPointFinder)"/>
-        /// </summary>
-        /// <param name="spf"></param>
+        /// <inheritdoc/>
         public override void FindSnapPoint(SnapPointFinder spf)
         {
             // It would be better to equip the SnapPointFinder with a ModOp that can be overridden
             Flattened.FindSnapPoint(spf);
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetQuadTreeItem (Projection, ExtentPrecision)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="extentPrecision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IQuadTreeInsertableZ GetQuadTreeItem(Projection projection, ExtentPrecision extentPrecision)
         {
             Block blk = Flattened;
@@ -372,69 +354,44 @@ namespace CADability.GeoObject
             res.SetOwner(this);
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (Projection, ExtentPrecision)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="extentPrecision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingRect GetExtent(Projection projection, ExtentPrecision extentPrecision)
         {
             return Flattened.GetExtent(projection, extentPrecision);
         }
         #region IOctTreeInsertable members
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (double)"/>
-        /// </summary>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingCube GetExtent(double precision)
         {
             return GetBoundingCube();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
-        /// </summary>
-        /// <param name="cube"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(ref BoundingCube cube, double precision)
         {
             return Flattened.HitTest(ref cube, precision);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection, BoundingRect, bool)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="rect"></param>
-        /// <param name="onlyInside"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(Projection projection, BoundingRect rect, bool onlyInside)
         {
             return Flattened.HitTest(projection, rect, onlyInside);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection.PickArea, bool)"/>
-        /// </summary>
-        /// <param name="area"></param>
-        /// <param name="onlyInside"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(Projection.PickArea area, bool onlyInside)
         {
             return Flattened.HitTest(area, onlyInside);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Position (GeoPoint, GeoVector, double)"/>
-        /// </summary>
-        /// <param name="fromHere"></param>
-        /// <param name="direction"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double Position(GeoPoint fromHere, GeoVector direction, double precision)
         {
             return Flattened.Position(fromHere, direction, precision);
         }
         #endregion
+        /// <summary>
+        /// The modification (translation, rotation, scaling ...) that places the referenced block in the model: the reference
+        /// displays the block as it is defined, transformed by this operation. It is the identity after <see cref="Construct"/>,
+        /// and <see cref="Modify"/> prepends its operation. Setting it discards the cached flattened block, raises the change
+        /// events and is undoable.
+        /// </summary>
         public ModOp Insertion
         {
             get
@@ -451,6 +408,11 @@ namespace CADability.GeoObject
                 }
             }
         }
+        /// <summary>
+        /// The position of the reference point of the referenced block (<see cref="Block.RefPoint"/>) in the model, i.e. that
+        /// point transformed by <see cref="Insertion"/>. Setting it translates the reference so that the reference point comes
+        /// to lie at the given point; this changes <see cref="Insertion"/>, raises the change events and is undoable.
+        /// </summary>
         public GeoPoint RefPoint
         {
             get { return insertion * idea.RefPoint; }
@@ -460,6 +422,11 @@ namespace CADability.GeoObject
                 Insertion = ModOp.Translate(move) * insertion;
             }
         }
+        /// <summary>
+        /// The block definition this reference displays. The block is shared with other references and is not owned by the
+        /// reference, so modifying it changes all references. Setting it subscribes the reference to the change events of the
+        /// new block (changes of the block discard the cached flattened copy), raises the change events and is undoable.
+        /// </summary>
         public Block ReferencedBlock
         {
             get
@@ -588,11 +555,7 @@ namespace CADability.GeoObject
         }
 
 
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.AttributeChanged (INamedAttribute)"/>
-        /// </summary>
-        /// <param name="attribute"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool AttributeChanged(INamedAttribute attribute)
         {
             if (idea.AttributeChanged(attribute))
@@ -607,6 +570,11 @@ namespace CADability.GeoObject
         }
         #region IColorDef Members
         private ColorDef colorDef;
+        /// <summary>
+        /// The color of the reference. It is given to those objects of the displayed block that have no color of their own or
+        /// whose color is "from parent" (see <see cref="Flattened"/>); objects with a color of their own keep it. May be null.
+        /// Setting it raises the change events and is undoable.
+        /// </summary>
         public ColorDef ColorDef
         {
             get => colorDef;
@@ -628,10 +596,22 @@ namespace CADability.GeoObject
         }
         #endregion
         #region IGeoObjectOwner Members
+        /// <summary>
+        /// Implements <see cref="IGeoObjectOwner.Remove"/>. The reference owns only the temporary flattened copy of its block
+        /// (see <see cref="Flattened"/>), so this merely clears the <see cref="IGeoObject.Owner"/> of the given object. The
+        /// referenced block is not changed.
+        /// </summary>
+        /// <param name="toRemove">The object that is no longer owned by this reference</param>
         public void Remove(IGeoObject toRemove)
         {
             toRemove.Owner = null;
         }
+        /// <summary>
+        /// Implements <see cref="IGeoObjectOwner.Add"/>. Only sets the <see cref="IGeoObject.Owner"/> of the given object to
+        /// this reference, the object is not added to the referenced block. This is how the flattened copy of the block
+        /// (see <see cref="Flattened"/>) is owned.
+        /// </summary>
+        /// <param name="toAdd">The object to be owned by this reference</param>
         public void Add(IGeoObject toAdd)
         {
             toAdd.Owner = this;
@@ -652,10 +632,11 @@ namespace CADability.GeoObject
         }
 
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);

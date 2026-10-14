@@ -19,7 +19,10 @@ namespace CADability
      */
 
     /// <summary>
-    /// 
+    /// Evaluates formulas entered by the user (e.g. "2*sin(30)" or expressions that use named values) by compiling them
+    /// with the C# compiler into a small in-memory assembly and executing it. It is used by the property entries that accept
+    /// formulas; <see cref="GetDouble"/>, <see cref="GetGeoPoint"/> and <see cref="GetGeoVector"/> return the value of a
+    /// formula in the context of a <see cref="NamedValuesProperty"/>.
     /// </summary>
     internal class Scripting
     {

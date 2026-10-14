@@ -4,7 +4,11 @@ using System.Collections;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of an angle dimension from existing objects. Either the user picks a circular arc, which is dimensioned
+    /// directly (the vertex of the angle is the center of the arc, the legs go through its start and end point), or the user
+    /// picks two lines and the location of the dimension line: the vertex is the intersection point of the lines and the pick
+    /// positions decide which of the four angles between the lines is dimensioned. Polylines and paths are decomposed into their
+    /// single elements. Started with the menu id "Constr.Dimension.Direction.Objects".
     /// </summary>
     internal class ConstrDimensionDirectionObjects : ConstructAction
     {

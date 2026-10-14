@@ -6,9 +6,9 @@ using System.Collections.Generic;
 namespace CADability
 {
     /// <summary>
-    /// Tangentiale Triangulierung:
-    /// Am gegebenen Rand und ggf. an weiteren inneren Stellen werden tangentiale Ebenen aufgespannt und miteinander verschnitten. So entstehen (konvexe) Polygone,
-    /// die zusammen die Fläche triangulieren
+    /// Tangential triangulation of a surface patch: at the given boundary (and, where needed, at additional interior points)
+    /// tangent planes of the surface are set up and intersected with each other. This yields (convex) polygons, which
+    /// together triangulate the patch within the given deflection and bending tolerances.
     /// </summary>
     class Tangulation
     {

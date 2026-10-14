@@ -5,7 +5,10 @@ using MouseEventArgs = CADability.Substitutes.MouseEventArgs;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a rectangle (a closed <see cref="Polyline"/>) from a corner point, width, height and rotation
+    /// angle: the user picks the start point and enters the width, the height and the angle of the width direction, each
+    /// of which can also be picked with the mouse. The rectangle lies in the active drawing plane.
+    /// Menu id: "Constr.Rect.PointWidthHeightAngle".
     /// </summary>
     internal class ConstrRectPointWidthHeightAngle : ConstructAction
     {

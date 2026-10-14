@@ -48,6 +48,17 @@ csproj is the single source of truth for what gets published.
    release was started with `workflow_dispatch`, create and push the matching
    `vX.Y.Z` tag afterwards from a normal clone so the history keeps marking the
    released commits.
+6. **Publish release notes. Every release gets them, without exception.**
+   Create a GitHub release for the tag (Releases → *Draft a new release* →
+   choose `vX.Y.Z`, title `CADability X.Y.Z`) whose text says what is new,
+   which issues are fixed, what changed in behaviour, and whether consumers
+   have to recompile (a public field turned into a property, for example, is
+   a binary break that the notes must state prominently). The merged pull
+   requests' descriptions and `TODO.md` are the sources. Write the notes
+   while the changes are fresh, at the latest when the tag is pushed; a
+   release without notes is not finished. Claude Code cloud sessions cannot
+   create the GitHub release themselves, so they prepare the text as a
+   Markdown file for the person doing the release.
 
 ## Known limitation: tags cannot be pushed from Claude Code cloud sessions
 

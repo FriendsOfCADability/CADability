@@ -35,6 +35,9 @@ namespace CADability
             this.project = project;
             patches = new LayoutPatch[0];
         }
+        /// <summary>
+        /// Finalizer without effect; the layout does not own unmanaged resources.
+        /// </summary>
         ~Layout()
         {
         }
@@ -59,6 +62,14 @@ namespace CADability
         {
             AddPatch(model, projection, area, null);
         }
+        /// <summary>
+        /// Adds a patch to the layout like <see cref="AddPatch(Model, Projection, Border)"/> (all layers of the project visible) and connects it to
+        /// a <see cref="LayoutView"/> that is currently showing this layout, so that the new patch appears in the property page of that view.
+        /// </summary>
+        /// <param name="model">The model for the patch</param>
+        /// <param name="projection">The projection for the model, including the scaling and the placement on the paper</param>
+        /// <param name="area">The area on the paper to which the patch is clipped, null for the whole paper</param>
+        /// <param name="layoutView">The view to connect the patch with, may be null</param>
         public void AddPatch(Model model, Projection projection, Border area, LayoutView layoutView)
         {
             ArrayList al = new ArrayList(patches);
@@ -123,11 +134,31 @@ namespace CADability
         /// <summary>
         /// Horizontal positioning
         /// </summary>
-        public enum HorizontalCenter { left, center, right, unchanged }
+        public enum HorizontalCenter
+        {
+            /// <summary>Align the left edge of the model extent with the left edge of the area</summary>
+            left,
+            /// <summary>Center the model extent horizontally in the area</summary>
+            center,
+            /// <summary>Align the right edge of the model extent with the right edge of the area</summary>
+            right,
+            /// <summary>Keep the current horizontal position</summary>
+            unchanged
+        }
         /// <summary>
         /// Vertical positioning
         /// </summary>
-        public enum VerticalCenter { bottom, center, top, unchanged }
+        public enum VerticalCenter
+        {
+            /// <summary>Align the bottom edge of the model extent with the bottom edge of the area</summary>
+            bottom,
+            /// <summary>Center the model extent vertically in the area</summary>
+            center,
+            /// <summary>Align the top edge of the model extent with the top edge of the area</summary>
+            top,
+            /// <summary>Keep the current vertical position</summary>
+            unchanged
+        }
         /// <summary>
         /// Centers the patch with the given index according to the horizontal and vertical 
         /// center mode. If scale is 0.0 the current scaling remains unchanged.
@@ -194,6 +225,7 @@ namespace CADability
         /// Places the patch on the paper leaving the scalinfactor unchanged. The parameters 
         /// specify the position of the model origin on the paper.
         /// </summary>
+        /// <param name="index">Index of the patch in the list of patches of this layout</param>
         /// <param name="xPos">horizontal position of the origin</param>
         /// <param name="yPos">vertical position of the origin</param>
         public void MovePatch(int index, double xPos, double yPos)
@@ -209,6 +241,7 @@ namespace CADability
         /// <summary>
         /// Marks the given Layer as visible in the context of this ProjectedModel.
         /// </summary>
+        /// <param name="index">Index of the patch in the list of patches of this layout</param>
         /// <param name="l">The layer</param>
         public void AddVisibleLayer(int index, Layer l)
         {
@@ -217,6 +250,7 @@ namespace CADability
         /// <summary>
         /// Marks the given Layer as invisible in the context of this ProjectedModel.
         /// </summary>
+        /// <param name="index">Index of the patch in the list of patches of this layout</param>
         /// <param name="l">The layer</param>
         public void RemoveVisibleLayer(int index, Layer l)
         {
@@ -225,6 +259,7 @@ namespace CADability
         /// <summary>
         /// Determins whether the given <see cref="Layer"/> is marked visible in the context of this ProjectedModel.
         /// </summary>
+        /// <param name="index">Index of the patch in the list of patches of this layout</param>
         /// <param name="l">The layer</param>
         public bool IsLayerVisible(int index, Layer l)
         {
@@ -285,6 +320,12 @@ namespace CADability
             }
         }
 #region ISerializable Members
+        /// <summary>
+        /// Constructor for the legacy binary deserialization (<see cref="ISerializable"/>): restores the name, the patches, the paper size and the
+        /// page settings. The project is set by the <see cref="Project"/> that contains the layout.
+        /// </summary>
+        /// <param name="info">The serialized data</param>
+        /// <param name="context">The source of the deserialization</param>
         protected Layout(SerializationInfo info, StreamingContext context)
         {
             SerializationInfoEnumerator e = info.GetEnumerator();

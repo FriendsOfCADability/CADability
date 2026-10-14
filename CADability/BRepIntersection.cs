@@ -234,12 +234,25 @@ namespace CADability
     {
         public VertexIsOnCubeBoundsException() : base() { }
     }
+    /// <summary>
+    /// An entry of the <see cref="OctTree{T}"/> which <see cref="BRepOperation"/> uses to find the intersections of two shells: it
+    /// wraps a <see cref="Vertex"/>, an <see cref="Edge"/> or a <see cref="Face"/> of one of the shells (<see cref="Type"/> tells which)
+    /// and implements the extent and hit tests of <see cref="IOctTreeInsertable"/> for it, so that only edges and faces whose cubes
+    /// overlap are intersected. A vertex item may also be an intersection vertex produced by intersecting an edge with a face; then
+    /// <see cref="isIntersection"/> is set and <see cref="edge"/> and <see cref="face"/> refer to the edge and the face which created it.
+    /// Internal helper of the boolean operations, not an entry point of the API.
+    /// </summary>
 #if DEBUG
     public class BRepItem : IOctTreeInsertable, IDebuggerVisualizer
 #else
     public class BRepItem : IOctTreeInsertable
 #endif
     {
+        /// <summary>
+        /// The kind of topological object a <see cref="BRepItem"/> stands for: Vertex (the <see cref="vertex"/> field is set, for an
+        /// intersection vertex also <see cref="edge"/> and <see cref="face"/>), Edge (<see cref="edge"/> is set) or Face
+        /// (<see cref="face"/> is set).
+        /// </summary>
         public enum ItemType { Vertex, Edge, Face };
         public ItemType Type;
         static int hashCodeCounter = 0;
@@ -1357,6 +1370,11 @@ namespace CADability
             }
         }
     }
+    /// <summary>
+    /// Extension methods used by <see cref="BRepOperation"/>; currently only <see cref="ContainsSameFace"/>, which tests whether a
+    /// face is completely covered by the overlapping faces of the other shell stored in a dictionary. Internal helper of the boolean
+    /// operations, not an entry point of the API.
+    /// </summary>
     public static class Extension
     {
         /// <summary>
@@ -1410,6 +1428,18 @@ namespace CADability
         }
 
     }
+    /// <summary>
+    /// The boolean operations on BRep shells: union, intersection and difference of two closed shells, splitting a shell by a plane
+    /// or a face, clipping a face by a shell and connecting a set of intersecting faces to shells. It is an <see cref="OctTree{T}"/>
+    /// of <see cref="BRepItem"/>s: the vertices, edges and faces of both shells are inserted so that only nearby edge/face pairs are
+    /// intersected; the intersection edges split the faces, the parts are classified as inside or outside the other shell and
+    /// recombined to the resulting shells according to the <see cref="Operation"/> passed to the constructor. Create one with the
+    /// two shells and the operation and call <see cref="Result()"/> for the resulting shells. Applications usually call it through
+    /// <see cref="Solid.Unite(Solid, Solid)"/>, <see cref="Solid.Intersect(Solid, Solid)"/>, <see cref="Solid.Subtract(Solid, Solid)"/>
+    /// and the static methods <see cref="SplitByPlane(Shell, Plane)"/>, <see cref="SplitByFace(Shell, Face)"/>,
+    /// <see cref="RoundEdges(Shell, Edge[], double)"/>, <see cref="ChamferEdges(Face, Edge[], double, double)"/> and
+    /// <see cref="ClipFace(Face, Shell)"/>.
+    /// </summary>
     public class BRepOperation : OctTree<BRepItem>
     {
         private Shell shell1; // the two shells, which are intersected
@@ -1840,6 +1870,13 @@ namespace CADability
             }
         }
 
+        /// <summary>
+        /// Selects what a <see cref="BRepOperation"/> computes: union (the hull of both shells, see <see cref="Solid.Unite(Solid, Solid)"/>),
+        /// intersection (the common part, see <see cref="Solid.Intersect(Solid, Solid)"/>), difference (the first shell minus the second,
+        /// see <see cref="Solid.Subtract(Solid, Solid)"/>), clip (a face is clipped by a shell, see <see cref="ClipFace(Face, Shell)"/>),
+        /// connectMultiple (a set of faces is intersected and connected to shells, see <see cref="BRepOperation(IEnumerable{Face})"/>)
+        /// and testonly (stop at the first intersection found; used to test whether two shells collide).
+        /// </summary>
         public enum Operation { union, intersection, difference, clip, connectMultiple, testonly }
         Operation operation;
         /// <summary>
@@ -1968,7 +2005,7 @@ namespace CADability
         /// <summary>
         /// Connect all provided faces, remove the overhangs. Used by Shell.GetOffset.
         /// </summary>
-        /// <param name="shellsToConnect"></param>
+        /// <param name="facesToConnect">the faces to connect; they are used directly, not cloned</param>
         public BRepOperation(IEnumerable<Face> facesToConnect)
         {
             operation = Operation.connectMultiple;
@@ -3451,8 +3488,11 @@ namespace CADability
 
         }
         /// <summary>
-        /// Beschreibt ein Objekt, welches an Edge hängt und für alle möglichen Zusatzinfos bezüglich der Edge während der BRepOperation verwendet werden kann
-        /// Damit kann man die umständliche Speicherung von Extras per UserData umgehen, und ist schneller.
+        /// Additional data attached to an <see cref="Edge"/> for the duration of a <see cref="BRepOperation"/>: the
+        /// <see cref="EdgeOnFace"/> entries for the primary and the secondary face, whether the edge is an intersection edge or
+        /// lies on overlapping faces, and the neighbouring edges used while building the cycles of new faces. Keeping this in a
+        /// dedicated object (reachable through <c>Edge.edgeInfo</c>) avoids the slower and more cumbersome storage of such
+        /// extras in the edge's UserData.
         /// </summary>
         internal class EdgeInfo
         {
@@ -6384,6 +6424,9 @@ namespace CADability
         /// <param name="face1"></param>
         /// <param name="face2"></param>
         /// <param name="secondToFirst"></param>
+        /// <param name="secondIsOpposite">true, if <paramref name="face2"/> is oriented opposite to <paramref name="face1"/> (marked by the
+        /// user data "BRepIntersection.IsOpposite"); its edges are then used as they are and common edges are matched with opposite start vertices,
+        /// otherwise its edges are reversed</param>
         /// <returns></returns>
         private Dictionary<Face, HashSet<Edge>> DifferenceDeprecated(Face face1, Face face2, ModOp2D secondToFirst, bool secondIsOpposite)
         {
@@ -6498,6 +6541,9 @@ namespace CADability
         /// <param name="face1"></param>
         /// <param name="face2"></param>
         /// <param name="secondToFirst"></param>
+        /// <param name="secondIsOpposite">true, if <paramref name="face2"/> is oriented opposite to <paramref name="face1"/> (marked by the
+        /// user data "BRepIntersection.IsOpposite"); its edges are then used as they are and common edges are matched with opposite start vertices,
+        /// otherwise its edges are reversed</param>
         /// <returns></returns>
         private List<Face> Difference(Face face1, Face face2, ModOp2D secondToFirst, bool secondIsOpposite)
         {
@@ -9119,7 +9165,7 @@ namespace CADability
         /// </summary>
         /// <param name="allFaces"></param>
         /// <param name="startWith"></param>
-        /// <param name="result"></param>
+        /// <returns>the faces connected to <paramref name="startWith"/>, including it; they are removed from <paramref name="allFaces"/></returns>
         internal static HashSet<Face> extractConnectedFaces(HashSet<Face> allFaces, Face startWith)
         {
             HashSet<Face> result = new HashSet<Face>();
@@ -9140,9 +9186,14 @@ namespace CADability
         }
 
         /// <summary>
-        /// Liefert die Vereinigung der beiden Shells. Das können mehrere Shells sein, denn es kann eine innere Höhlung entstehen.
+        /// Returns the pairs of faces of the two shells that lie on the same surface and overlap (or coincide), as found when
+        /// the operation was prepared. Such faces are not intersected with each other but handled separately.
         /// </summary>
-        /// <returns></returns>
+        /// <param name="onShell1">The overlapping faces belonging to the first shell</param>
+        /// <param name="onShell2">The corresponding faces belonging to the second shell, in the same order as <paramref name="onShell1"/></param>
+        /// <param name="firstToSecond">For each pair the 2d transformation that maps the parameter space of the face on the first shell
+        /// to the parameter space of the face on the second shell</param>
+        /// <returns>The number of overlapping face pairs, i.e. the length of the three arrays</returns>
         public int GetOverlappingFaces(out Face[] onShell1, out Face[] onShell2, out ModOp2D[] firstToSecond)
         {
             onShell1 = new Face[overlappingFaces.Count];
@@ -9917,6 +9968,7 @@ namespace CADability
             }
             return !Border.CounterClockwise(curves);
         }
+        /// <inheritdoc/>
         protected override bool SplitNode(Node<BRepItem> node, BRepItem objectToAdd)
         {
 #if DEBUG
@@ -10043,9 +10095,8 @@ namespace CADability
     }
 
     /// <summary>
-    /// Analog zu Border, jedoch nicht zwangsweise linksrum orientiert.
-    /// Als innen wird alles betrachtet, was links von den Kurven liegt, also auch inverse Border möglich, die ein Loch im Unendlichen darstellen.
-    /// Unveränderlich!
+    /// Like <see cref="Border"/>, but not necessarily oriented counterclockwise: everything to the left of the curves counts as
+    /// inside, so an inverted border, which describes a hole in the infinite plane, is possible as well. Immutable.
     /// </summary>
     //internal class Cycle
     //{
@@ -10165,8 +10216,13 @@ namespace CADability
         /// surface at index 2.
         /// </summary>
         /// <param name="etr"></param>
-        /// <param name="edgeOnPrimary"></param>
-        /// <param name="edgeOnSecondary"></param>
+        /// <param name="radius">the radius of the rounding; the side to which the edge is rounded follows from the orientation of its faces</param>
+        /// <param name="curveOnPrimary">the 2d curves on the primary face of the edge, along which the returned surfaces touch it, indexed like the returned surfaces</param>
+        /// <param name="curveOnSecondary">the same for the secondary face of the edge</param>
+        /// <param name="curveOnRuledSurfaceP">the 2d curves on the returned surfaces, along which they touch the primary face (only set for the middle surface [2])</param>
+        /// <param name="curveOnRuledSurfaceS">the same for the secondary face</param>
+        /// <param name="openAtStart">true, if the start vertex of the edge is not shared with another edge to be rounded, so the rounding is open there (currently not used)</param>
+        /// <param name="openAtEnd">the same for the end vertex of the edge (currently not used)</param>
         /// <returns></returns>
         private ISurface[] RoundEdge(Edge etr, double radius, out ICurve2D[] curveOnPrimary, out ICurve2D[] curveOnSecondary, out ICurve2D[] curveOnRuledSurfaceP, out ICurve2D[] curveOnRuledSurfaceS, bool openAtStart, bool openAtEnd)
         {
@@ -10346,6 +10402,7 @@ namespace CADability
         /// <param name="along"></param>
         /// <param name="startDir"></param>
         /// <param name="endDir"></param>
+        /// <param name="radius">the radius of the arc that is swept, i.e. the radius of the cylindrical or the minor radius of the toroidal surface</param>
         /// <returns></returns>
         static public ISurface ExtrudeArc(ICurve along, GeoVector startDir, GeoVector endDir, double radius)
         {
@@ -10936,8 +10993,10 @@ namespace CADability
             }
         }
         /// <summary>
-        /// Erzeuge die Schnitte zwischen Edges und Faces von verschiedenen shells.
-        /// edgesToSplit, intersectionVertices und facesToIntersectionVertices werden gesetzt
+        /// Computes the intersections of the edges of the shell with the faces of the same shell (an edge is not intersected
+        /// with the faces it belongs to, and faces that overlap each other are skipped). The candidate pairs come from the
+        /// leaves of the octree. Fills <c>edgesToSplit</c> (the vertices each edge has to be split at),
+        /// <c>intersectionVertices</c> and <c>facesToIntersectionVertices</c>.
         /// </summary>
         private void createEdgeFaceIntersections()
         {

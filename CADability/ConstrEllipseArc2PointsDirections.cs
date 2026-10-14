@@ -12,7 +12,10 @@ using Point = System.Drawing.Point;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of an elliptical arc from two points on the ellipse and the tangent directions at these points.
+    /// The user enters the first point and its direction, the second point and its direction and the direction of the
+    /// arc (counterclockwise or clockwise); the ellipse lies in the active drawing plane.
+    /// Menu id: "Constr.Ellipsearc.2PointsDirections".
     /// </summary>
     internal class ConstrEllipseArc2PointsDirections : ConstructAction
     {

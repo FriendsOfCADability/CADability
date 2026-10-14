@@ -138,5 +138,39 @@ namespace CADability.Tests
             // a cone on the axis (1, 1, 1): the extreme positions of a cone and a sphere on its axis divided by a null vector
             AssertConsistent(Sphere, () => Make3D.MakeCone(GeoPoint.Origin, new GeoVector(1, -1, 0), 10 * new GeoVector(1, 1, 1).Normalized, 3, 1), "a cone on a tilted axis");
         }
+
+        /// <summary>
+        /// No part of the intersection circle crosses the seam of the sphere, whatever the domain of the face: the seam
+        /// was looked for at the natural bounds of the surface, which are the used area of a face or unbounded, instead
+        /// of where the surface places it. A face whose domain straddles the seam, as STEP spheres have it, got a part
+        /// that jumped from u = 2 pi to u = 0 inside.
+        /// </summary>
+        [DataTestMethod]
+        [DataRow(0.0, 2 * Math.PI, DisplayName = "the domain starts at the seam")]
+        [DataRow(1.5 * Math.PI, 2.5 * Math.PI, DisplayName = "the domain straddles the seam")]
+        [DataRow(double.NaN, double.NaN, DisplayName = "no bounds")]
+        public void intersection_circle_parts_do_not_cross_the_seam(double umin, double umax)
+        {
+            SphericalSurface sphere = new SphericalSurface(GeoPoint.Origin, 5 * GeoVector.XAxis, 5 * GeoVector.YAxis, 5 * GeoVector.ZAxis);
+            PlaneSurface plane = new PlaneSurface(new Plane(new GeoPoint(0, 0, 2), GeoVector.ZAxis));
+            BoundingRect bounds = double.IsNaN(umin) ? BoundingRect.EmptyBoundingRect : new BoundingRect(umin, -Math.PI / 2, umax, Math.PI / 2);
+            IDualSurfaceCurve[] parts = sphere.GetDualSurfaceCurves(bounds, plane, BoundingRect.EmptyBoundingRect, null, null);
+            Assert.IsTrue(parts.Length >= 2, "parts: " + parts.Length);
+            double sweep = 0.0;
+            foreach (IDualSurfaceCurve part in parts)
+            {
+                ICurve curve = part.Curve3D;
+                GeoPoint2D previous = sphere.PositionOf(curve.PointAt(0.01));
+                for (int i = 2; i < 100; i++)
+                {
+                    GeoPoint2D uv = sphere.PositionOf(curve.PointAt(i / 100.0));
+                    Assert.IsTrue(Math.Abs(uv.x - previous.x) < Math.PI, "a part crosses the seam, u from " + previous.x + " to " + uv.x);
+                    previous = uv;
+                }
+                sweep += Math.Abs((curve as Ellipse).SweepParameter);
+            }
+            // a circle of latitude: the part inside the domain of the face is as long as the domain is wide
+            Assert.AreEqual(double.IsNaN(umin) ? 2 * Math.PI : umax - umin, sweep, 1e-6, "the parts make up the circle inside the bounds");
+        }
     }
 }

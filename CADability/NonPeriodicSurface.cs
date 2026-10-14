@@ -46,10 +46,12 @@ namespace CADability.GeoObject
         bool hasPole, fullPeriod;
         ModOp2D toNonPeriodicBounds, toPeriodicBounds;
         /// <summary>
+        /// Creates a non-periodic surface which describes the same geometry as the provided periodic surface (or surface with a pole)
+        /// with a different parametric system.
         /// </summary>
-        /// <param name="periodicSurface"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
+        /// <param name="periodicSurface">the periodic surface (or surface with a pole) to be reparameterized</param>
+        /// <param name="bounds">the part of the parameter space of <paramref name="periodicSurface"/> to be covered by this surface;
+        /// in the periodic direction the full period is used instead of the provided interval</param>
         public NonPeriodicSurface(ISurface periodicSurface, BoundingRect bounds)
         {
             this.periodicSurface = periodicSurface;
@@ -231,6 +233,7 @@ namespace CADability.GeoObject
             //GeoObjectList dbgp = (this.periodicSurface as ISurfaceImpl).DebugGrid;
 #endif
         }
+        /// <inheritdoc/>
         public override GeoVector UDirection(GeoPoint2D uv)
         {
             periodicSurface.DerivationAt(toPeriodic(uv), out GeoPoint ploc, out GeoVector pdu, out GeoVector pdv);
@@ -252,6 +255,7 @@ namespace CADability.GeoObject
                 return dsdu * pdu + dtdu * pdv;
             }
         }
+        /// <inheritdoc/>
         public override GeoVector VDirection(GeoPoint2D uv)
         {
             double l = uv.x * uv.x + uv.y * uv.y;
@@ -274,6 +278,7 @@ namespace CADability.GeoObject
             }
         }
 
+        /// <inheritdoc/>
         public override void DerivationAt(GeoPoint2D uv, out GeoPoint location, out GeoVector du, out GeoVector dv)
         {
             periodicSurface.DerivationAt(toPeriodic(uv), out GeoPoint ploc, out GeoVector pdu, out GeoVector pdv);
@@ -303,10 +308,12 @@ namespace CADability.GeoObject
             }
 
         }
+        /// <inheritdoc/>
         public override GeoPoint PointAt(GeoPoint2D uv)
         {
             return periodicSurface.PointAt(toPeriodic(uv));
         }
+        /// <inheritdoc/>
         public override void Derivation2At(GeoPoint2D uv, out GeoPoint location, out GeoVector du, out GeoVector dv, out GeoVector duu, out GeoVector dvv, out GeoVector duv)
         {
             periodicSurface.Derivation2At(toPeriodic(uv), out GeoPoint ploc, out GeoVector pdu, out GeoVector pdv, out GeoVector pduu, out GeoVector pdvv, out GeoVector pduv);
@@ -344,20 +351,24 @@ namespace CADability.GeoObject
             dvv = dsdvdv * pdu + dsdv * (dsdv * pduu + dtdv * pduv) + dtdvdv * pdv + dtdv * (dsdv * pduv + dtdv * pdvv);
             duv = dsdudv * pdu + dsdu * (dsdv * pduu + dtdv * pduv) + dtdudv * pdv + dtdu * (dsdu * pduv + dtdu * pdvv);
         }
+        /// <inheritdoc/>
         public override ICurve FixedU(double u, double vmin, double vmax)
         {
             Line2D l2d = new Line2D(new GeoPoint2D(u, vmin), new GeoPoint2D(u, vmax));
             return new SurfaceCurve(this, l2d);
         }
+        /// <inheritdoc/>
         public override ICurve FixedV(double v, double umin, double umax)
         {
             Line2D l2d = new Line2D(new GeoPoint2D(umin, v), new GeoPoint2D(umax, v));
             return new SurfaceCurve(this, l2d);
         }
+        /// <inheritdoc/>
         public override ISurface GetModified(ModOp m)
         {
             return new NonPeriodicSurface(periodicSurface.GetModified(m), periodicBounds);
         }
+        /// <inheritdoc/>
         public override void GetSafeParameterSteps(double umin, double umax, double vmin, double vmax, out double[] intu, out double[] intv)
         {   // here we want to provide parameter steps so that there are invalid patches, which are completely outside the annulus or circle.
             // The boxed surface ignores patches which return false for "IsInside" for all its vertices. And with this segmentation, 
@@ -398,6 +409,7 @@ namespace CADability.GeoObject
                 intv = vsteps.ToArray();
             }
         }
+        /// <inheritdoc/>
         public override void GetNaturalBounds(out double umin, out double umax, out double vmin, out double vmax)
         {   // The periodic surface (or the surface with a pole) comes with the periodic bounds: typically in the periodic direction this is [0..2*pi] or [0..1]
             // and in the non periodic direction it is some min and max value.
@@ -518,8 +530,11 @@ namespace CADability.GeoObject
             }
         }
 #endif
+        /// <inheritdoc/>
         public override bool IsUPeriodic => false;
+        /// <inheritdoc/>
         public override bool IsVPeriodic => false;
+        /// <inheritdoc/>
         public override ModOp2D ReverseOrientation()
         {
             GeoPoint2D[] from = new GeoPoint2D[3];
@@ -542,6 +557,7 @@ namespace CADability.GeoObject
             }
             return ModOp2D.Fit(from, to, true);
         }
+        /// <inheritdoc/>
         public override bool SameGeometry(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, double precision, out ModOp2D firstToSecond)
         {
             if (other is NonPeriodicSurface nps)
@@ -556,6 +572,7 @@ namespace CADability.GeoObject
             }
             return base.SameGeometry(thisBounds, other, otherBounds, precision, out firstToSecond);
         }
+        /// <inheritdoc/>
         public override IPropertyEntry GetPropertyEntry(IFrame frame)
         {
             return periodicSurface.GetPropertyEntry(frame);
@@ -578,6 +595,7 @@ namespace CADability.GeoObject
             GeoVector2D np = toNonPeriodicBounds * uv;
             return new GeoVector2D(np.y * Math.Cos(np.x), np.y * Math.Sin(np.x));
         }
+        /// <inheritdoc/>
         public override ISurface Clone()
         {
             NonPeriodicSurface res = new NonPeriodicSurface();
@@ -589,6 +607,7 @@ namespace CADability.GeoObject
             res.toPeriodicBounds = toPeriodicBounds;
             return res;
         }
+        /// <inheritdoc/>
         public override void CopyData(ISurface CopyFrom)
         {
             NonPeriodicSurface nps = CopyFrom as NonPeriodicSurface;
@@ -602,6 +621,7 @@ namespace CADability.GeoObject
                 toPeriodicBounds = nps.toPeriodicBounds;
             }
         }
+        /// <inheritdoc/>
         public override GeoPoint2D PositionOf(GeoPoint p)
         {
             GeoPoint2D uvp = periodicSurface.PositionOf(p);

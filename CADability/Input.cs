@@ -14,7 +14,12 @@ namespace CdlToCSharp
 	}
 
 	/// <summary>
-	/// 
+	/// Tokenizer for CDL files (the class definition language of Open CASCADE), a leftover of the
+	/// CdlToCSharp tool that converted CDL class definitions to C#; not used by CADability itself. It reads
+	/// a file into a list of tokens (identifiers, numbers, string literals, special characters and "--"
+	/// comments) and offers a cursor (<see cref="Index"/>) with helpers to consume tokens, to recognize
+	/// keywords and to collect the "---Purpose" comments in <see cref="Comment"/> so that they can be
+	/// turned into C# documentation comments.
 	/// </summary>
 	public class Input
 	{

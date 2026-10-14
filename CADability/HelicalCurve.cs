@@ -53,6 +53,10 @@ namespace CADability.GeoObject
             if (Constructor != null) return Constructor();
             return new HelicalCurve();
         }
+        /// <summary>
+        /// Signature of the handlers of the <see cref="Constructed"/> event.
+        /// </summary>
+        /// <param name="justConstructed">The helical curve that has just been created</param>
         public delegate void ConstructedDelegate(HelicalCurve justConstructed);
         public static event ConstructedDelegate Constructed;
         #endregion
@@ -313,6 +317,7 @@ namespace CADability.GeoObject
         #endregion
 
         #region IGeoObjectImpl overrides
+        /// <inheritdoc/>
         public override IGeoObject Clone()
         {
             HelicalCurve res = Construct();
@@ -324,6 +329,7 @@ namespace CADability.GeoObject
             res.CopyAttributes(this);
             return res;
         }
+        /// <inheritdoc/>
         public override void CopyGeometry(IGeoObject ToCopyFrom)
         {
             HelicalCurve other = ToCopyFrom as HelicalCurve;
@@ -372,24 +378,18 @@ namespace CADability.GeoObject
         #endregion
 
         #region ICurve implementation
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.PointAt (double)"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override GeoPoint PointAt(double Position)
         {
             return plane.ToGlobal(LocalPointAt(ParameterAt(Position)));
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.DirectionAt (double)"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override GeoVector DirectionAt(double Position)
         {
             double a = ParameterAt(Position);
             return sweepParameter * plane.ToGlobal(new GeoVector(-radius * Math.Sin(a), radius * Math.Cos(a), AxialFactor));
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.Reverse ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void Reverse()
         {
             using (new Changing(this, typeof(ICurve), "Reverse", new object[0]))
@@ -399,9 +399,7 @@ namespace CADability.GeoObject
                 InvalidateSecondaryData();
             }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.Split (double)"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override ICurve[] Split(double Position)
         {
             if (Position <= 0.0 || Position >= 1.0) return new ICurve[] { (ICurve)Clone() };
@@ -412,9 +410,7 @@ namespace CADability.GeoObject
             h2.sweepParameter = sweepParameter * (1.0 - Position);
             return new ICurve[] { h1, h2 };
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.Trim (double, double)"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void Trim(double StartPos, double EndPos)
         {
             if (StartPos == EndPos) return;
@@ -439,9 +435,7 @@ namespace CADability.GeoObject
                 return Math.Abs(sweepParameter) * Math.Sqrt(radius * radius + h * h);
             }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.PositionOf (GeoPoint)"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override double PositionOf(GeoPoint p)
         {
             return PositionOf(p, double.NaN);
@@ -492,9 +486,7 @@ namespace CADability.GeoObject
             }
             return (bestAngle - startParameter) / sweepParameter;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.IsClosed"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override bool IsClosed
         {
             get
@@ -503,22 +495,19 @@ namespace CADability.GeoObject
                 return Precision.IsEqual(StartPoint, EndPoint);
             }
         }
+        /// <inheritdoc/>
         public override bool IsSingular
         {
             get { return Length < Precision.eps; }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.GetPlanarState ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override PlanarState GetPlanarState()
         {
             if (radius < Precision.eps) return PlanarState.UnderDetermined; // a straight line along the axis or a single point
             if (Math.Abs(Height) < Precision.eps) return PlanarState.Planar; // no advance along the axis: a circular arc
             return PlanarState.NonPlanar;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.GetPlane ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override Plane GetPlane()
         {
             if (GetPlanarState() != PlanarState.Planar) return base.GetPlane();
@@ -526,9 +515,7 @@ namespace CADability.GeoObject
             double zMiddle = AxialFactor * (startParameter + sweepParameter / 2.0);
             return new Plane(plane.ToGlobal(new GeoPoint(0.0, 0.0, zMiddle)), plane.DirectionX, plane.DirectionY);
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.IsInPlane (Plane)"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override bool IsInPlane(Plane p)
         {
             switch (GetPlanarState())
@@ -599,9 +586,7 @@ namespace CADability.GeoObject
         {
             return ParameterAt(position);
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.TryPointDeriv2At (double, out GeoPoint, out GeoVector, out GeoVector)"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override bool TryPointDeriv2At(double u, out GeoPoint point, out GeoVector deriv, out GeoVector deriv2)
         {
             double a = ParameterAt(u);
@@ -697,10 +682,11 @@ namespace CADability.GeoObject
             sweepParameter = (double)info.GetValue("SweepParameter", typeof(double));
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
@@ -713,6 +699,7 @@ namespace CADability.GeoObject
         #endregion
 
         #region IJsonSerialize Members
+        /// <inheritdoc/>
         public override void GetObjectData(IJsonWriteData data)
         {
             base.GetObjectData(data); // layer, style, user data and attributes
@@ -726,6 +713,7 @@ namespace CADability.GeoObject
             if (LineWidth != null) data.AddProperty("LineWidth", LineWidth);
             if (LinePattern != null) data.AddProperty("LinePattern", LinePattern);
         }
+        /// <inheritdoc/>
         public override void SetObjectData(IJsonReadData data)
         {
             base.SetObjectData(data);

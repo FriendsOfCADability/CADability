@@ -7,7 +7,9 @@ using MouseEventArgs = CADability.Substitutes.MouseEventArgs;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a circular arc in the active drawing plane by its center, its radius (or diameter), the start
+    /// angle and the end angle (both entered as directions from the center) and the direction of the arc
+    /// (counterclockwise or clockwise). Menu id: "Constr.Arc.CenterRadius".
     /// </summary>
     internal class ConstrArcCenterRadius : ConstructAction
     {

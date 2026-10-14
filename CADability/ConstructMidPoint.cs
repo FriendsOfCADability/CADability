@@ -99,9 +99,7 @@ namespace CADability.Actions
             return actualPoint;
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnSetAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnSetAction()
         {
             base.TitleId = "Construct.MidPoint";
@@ -145,28 +143,25 @@ namespace CADability.Actions
 
             base.OnSetAction();
         }
+        /// <inheritdoc/>
         public override void OnRemoveAction()
         {
             base.OnRemoveAction();
             Frame.Project.Undo.ClearContext();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.GetID ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
 		public override string GetID()
         {
             return "Construct.MidPoint";
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnDone ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnDone()
         {
             succeeded = true;
             if (geoPointProperty != null) geoPointProperty.ModifiedByAction(this);
             base.OnDone();
         }
+        /// <inheritdoc/>
         public override bool OnEscape()
         {
             if (geoPointProperty != null)

@@ -4,7 +4,10 @@ using System;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a full ellipse by its center and two axis points. The user picks the center, a point which defines the
+    /// direction and length of the major axis (the ellipse lies in the active drawing plane) and a point whose distance from the
+    /// major axis defines the length of the minor axis; the major and minor radius can optionally be entered numerically instead.
+    /// Started with the menu id "Constr.Ellipse.CenterRadius".
     /// </summary>
     internal class ConstrEllipseCenterRadius : ConstructAction
     {

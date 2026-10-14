@@ -18,6 +18,19 @@ namespace CADability.GeoObject
         private ModOp toUnit; // die inverse ModOp zum schnelleren Rechnen
         private double minorRadius; // im Unit-System. majorRadius ist dort immer 1
         Polynom imlicitPolynomial; // cached but not serialized implicit polynomial (degree 4)
+        /// <summary>
+        /// Creates a toroidal surface. The u parameter is the angle around the main axis <paramref name="dirz"/> (0 at <paramref name="dirx"/>),
+        /// the v parameter the angle on the small circle (0 at the outside, π/2 in direction of <paramref name="dirz"/>, π at the inside),
+        /// both in [0, 2π]: the point at (u, v) is loc + (majorRadius + minorRadius*cos(v))*(cos(u)*dirx + sin(u)*diry) + minorRadius*sin(v)*dirz
+        /// when the directions are normalized. When <paramref name="minorRadius"/> is greater than <paramref name="majorRadius"/> the
+        /// torus intersects itself (spindle torus).
+        /// </summary>
+        /// <param name="loc">The center of the torus</param>
+        /// <param name="dirx">The direction where u = 0; should be perpendicular to <paramref name="dirz"/> and normalized</param>
+        /// <param name="diry">The direction where u = π/2</param>
+        /// <param name="dirz">The direction of the main axis</param>
+        /// <param name="majorRadius">The radius of the circle along which the small circle moves (the ring radius)</param>
+        /// <param name="minorRadius">The radius of the small circle (the tube radius)</param>
         public ToroidalSurface(GeoPoint loc, GeoVector dirx, GeoVector diry, GeoVector dirz, double majorRadius, double minorRadius)
         {
             ModOp m1 = ModOp.Fit(new GeoVector[] { GeoVector.XAxis, GeoVector.YAxis, GeoVector.ZAxis },
@@ -34,6 +47,10 @@ namespace CADability.GeoObject
             this.minorRadius = minorRadius;
             toUnit = toTorus.GetInverse();
         }
+        /// <summary>
+        /// The center of the torus: the center of the circle returned by <see cref="GetAxisEllipse"/>. Read only; use
+        /// <see cref="ISurface.Modify(ModOp)"/> to move the surface.
+        /// </summary>
         public GeoPoint Location
         {
             get
@@ -41,6 +58,9 @@ namespace CADability.GeoObject
                 return toTorus * GeoPoint.Origin;
             }
         }
+        /// <summary>
+        /// The direction of the main axis, identical to <see cref="ZAxis"/>; its length is the major radius.
+        /// </summary>
         public GeoVector Axis
         {
             get
@@ -48,6 +68,10 @@ namespace CADability.GeoObject
                 return toTorus * GeoVector.ZAxis;
             }
         }
+        /// <summary>
+        /// The vector from the center in the direction where u = 0. Its length is <see cref="MajorRadius"/>: <see cref="Location"/> + XAxis
+        /// is the center of the small circle at u = 0.
+        /// </summary>
         public GeoVector XAxis
         {
             get
@@ -55,6 +79,10 @@ namespace CADability.GeoObject
                 return toTorus * GeoVector.XAxis;
             }
         }
+        /// <summary>
+        /// The vector from the center in the direction where u = π/2. Its length is <see cref="MajorRadius"/>: <see cref="Location"/> + YAxis
+        /// is the center of the small circle at u = π/2.
+        /// </summary>
         public GeoVector YAxis
         {
             get
@@ -62,6 +90,10 @@ namespace CADability.GeoObject
                 return toTorus * GeoVector.YAxis;
             }
         }
+        /// <summary>
+        /// The direction of the main axis, around which the small circle is rotated, scaled by the major radius. The v parameter is π/2
+        /// on the side of the tube this vector points to.
+        /// </summary>
         public GeoVector ZAxis
         {
             get
@@ -69,6 +101,9 @@ namespace CADability.GeoObject
                 return toTorus * GeoVector.ZAxis;
             }
         }
+        /// <summary>
+        /// The radius of the small circle (the tube radius) in world units. <see cref="MajorRadius"/> is the ring radius.
+        /// </summary>
         public double MinorRadius
         {
             get
@@ -96,11 +131,7 @@ namespace CADability.GeoObject
         }
         #region ISurfaceImpl Overrides
         // im Folgenden noch mehr überschreiben, das hier ist erst der Anfang:
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.PointAt (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint PointAt(GeoPoint2D uv)
         {
             GeoPoint punit = GeoPoint.Origin + (1 + minorRadius * Math.Cos(uv.y)) * (Math.Cos(uv.x) * GeoVector.XAxis + Math.Sin(uv.x) * GeoVector.YAxis) + minorRadius * Math.Sin(uv.y) * GeoVector.ZAxis;
@@ -110,11 +141,7 @@ namespace CADability.GeoObject
             // z = minorRadius * Math.Sin(uv.y)
             // Torus(u,v) := [(1 + minorRadius * cos(v))*cos(u),(1 + minorRadius * cos(v))*sin(u),minorRadius * sin(v)];
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.PositionOf (GeoPoint)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D PositionOf(GeoPoint p)
         {
             GeoPoint pu = toUnit * p;
@@ -151,43 +178,24 @@ namespace CADability.GeoObject
                 return new GeoPoint2D(u, v);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetZMinMax (Projection, double, double, double, double, ref double, ref double)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <param name="zMin"></param>
-        /// <param name="zMax"></param>
+        /// <inheritdoc/>
         public override void GetZMinMax(Projection p, double umin, double umax, double vmin, double vmax, ref double zMin, ref double zMax)
         {
             // wird das noch gebraucht?
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Clone ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ISurface Clone()
         {
             return new ToroidalSurface(toTorus, minorRadius);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Modify (ModOp)"/>
-        /// </summary>
-        /// <param name="m"></param>
+        /// <inheritdoc/>
         public override void Modify(ModOp m)
         {
             boxedSurfaceEx = null;
             toTorus = m * toTorus;
             toUnit = toTorus.GetInverse();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetModified (ModOp)"/>
-        /// </summary>
-        /// <param name="m"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ISurface GetModified(ModOp m)
         {
             ISurface res = Clone();
@@ -195,15 +203,7 @@ namespace CADability.GeoObject
             (res as ISurfaceImpl).usedArea = usedArea;
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetTangentCurves (GeoVector, double, double, double, double)"/>
-        /// </summary>
-        /// <param name="direction"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D[] GetTangentCurves(GeoVector direction, double umin, double umax, double vmin, double vmax)
         {
             GeoVector unitDir = ToUnit * direction;
@@ -231,11 +231,7 @@ namespace CADability.GeoObject
             }
             return base.GetTangentCurves(direction, umin, umax, vmin, vmax);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.UDirection (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoVector UDirection(GeoPoint2D uv)
         {
             return toTorus * new GeoVector(
@@ -251,11 +247,7 @@ namespace CADability.GeoObject
                 0);
         }
         static double Sqrt2 = Math.Sqrt(2.0);
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.VDirection (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoVector VDirection(GeoPoint2D uv)
         {
             return toTorus * new GeoVector(
@@ -264,6 +256,7 @@ namespace CADability.GeoObject
                 minorRadius * Math.Cos(uv.y));
 
         }
+        /// <inheritdoc/>
         public override void Derivation2At(GeoPoint2D uv, out GeoPoint location, out GeoVector du, out GeoVector dv, out GeoVector duu, out GeoVector dvv, out GeoVector duv)
         {
             location = PointAt(uv);
@@ -282,11 +275,7 @@ namespace CADability.GeoObject
                 );
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetNormal (GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoVector GetNormal(GeoPoint2D uv)
         {   // At a pole of a spindle torus (minorRadius > 1) the u-direction is the nullvector, so the cross product
             // UDirection ^ VDirection cannot be used there. But there still is a normal vector, which we calculate
@@ -308,11 +297,7 @@ namespace CADability.GeoObject
             // the normal should always be normalized per definition
             return n.Normalized;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Make3dCurve (ICurve2D)"/>
-        /// </summary>
-        /// <param name="curve2d"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve Make3dCurve(ICurve2D curve2d)
         {
             if (Curve3dOfProjected<ToroidalSurface>(curve2d) is ICurve onThisSurface) return onThisSurface;
@@ -329,6 +314,7 @@ namespace CADability.GeoObject
             }
             return base.Make3dCurve(curve2d);
         }
+        /// <inheritdoc/>
         public override bool IsUPeriodic
         {
             get
@@ -336,6 +322,7 @@ namespace CADability.GeoObject
                 return true;
             }
         }
+        /// <inheritdoc/>
         public override bool IsVPeriodic
         {
             get
@@ -343,6 +330,7 @@ namespace CADability.GeoObject
                 return true;
             }
         }
+        /// <inheritdoc/>
         public override double UPeriod
         {
             get
@@ -350,6 +338,7 @@ namespace CADability.GeoObject
                 return Math.PI * 2.0;
             }
         }
+        /// <inheritdoc/>
         public override double VPeriod
         {
             get
@@ -357,13 +346,7 @@ namespace CADability.GeoObject
                 return Math.PI * 2.0;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.FixedU (double, double, double)"/>
-        /// </summary>
-        /// <param name="u"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve FixedU(double u, double vmin, double vmax)
         {
             Ellipse e = Ellipse.Construct();
@@ -384,13 +367,7 @@ namespace CADability.GeoObject
             return e;
 
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.FixedV (double, double, double)"/>
-        /// </summary>
-        /// <param name="v"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve FixedV(double v, double umin, double umax)
         {
             Ellipse e = Ellipse.Construct();
@@ -402,12 +379,7 @@ namespace CADability.GeoObject
             e.Modify(toTorus);
             return e;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetLineIntersection (GeoPoint, GeoVector)"/>
-        /// </summary>
-        /// <param name="startPoint"></param>
-        /// <param name="direction"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D[] GetLineIntersection(GeoPoint startPoint, GeoVector direction)
         {
             GeoPoint[] ga = GetLineIntersection3D(startPoint, direction);
@@ -479,16 +451,7 @@ namespace CADability.GeoObject
             catch (ApplicationException) { }
             return sol.ToArray();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetPlaneIntersection (PlaneSurface, double, double, double, double, double)"/>
-        /// </summary>
-        /// <param name="pl"></param>
-        /// <param name="umin"></param>
-        /// <param name="umax"></param>
-        /// <param name="vmin"></param>
-        /// <param name="vmax"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IDualSurfaceCurve[] GetPlaneIntersection(PlaneSurface pl, double umin, double umax, double vmin, double vmax, double precision)
         {
             BoundingRect domain = new BoundingRect(umin, vmin, umax, vmax);
@@ -1787,6 +1750,7 @@ namespace CADability.GeoObject
             #endregion
         }
 
+        /// <inheritdoc/>
         public override Polynom GetImplicitPolynomial()
         {
             if (imlicitPolynomial == null)
@@ -1812,6 +1776,12 @@ namespace CADability.GeoObject
             }
             return imlicitPolynomial;
         }
+        /// <summary>
+        /// Returns the circle in the middle of the tube as a full <see cref="Ellipse"/>: the path of the center of the small circle, lying
+        /// in the plane of <see cref="XAxis"/> and <see cref="YAxis"/> with the major radius around <see cref="Location"/>. It is used for
+        /// exact intersections with lines and other surfaces.
+        /// </summary>
+        /// <returns>The axis circle of the torus</returns>
         public Ellipse GetAxisEllipse()
         {
             Ellipse e = Ellipse.Construct();
@@ -1823,14 +1793,7 @@ namespace CADability.GeoObject
             return e;
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Intersect (ICurve, BoundingRect, out GeoPoint[], out GeoPoint2D[], out double[])"/>
-        /// </summary>
-        /// <param name="curve"></param>
-        /// <param name="uvExtent"></param>
-        /// <param name="ips"></param>
-        /// <param name="uvOnFaces"></param>
-        /// <param name="uOnCurve3Ds"></param>
+        /// <inheritdoc/>
         public override void Intersect(ICurve curve, BoundingRect uvExtent, out GeoPoint[] ips, out GeoPoint2D[] uvOnFaces, out double[] uOnCurve3Ds)
         {
             GeoPoint tangentialFound = GeoPoint.Invalid;
@@ -2103,6 +2066,7 @@ namespace CADability.GeoObject
             //}
             base.Intersect(curve, uvExtent, out ips, out uvOnFaces, out uOnCurve3Ds);
         }
+        /// <inheritdoc/>
         public override ICurve[] Intersect(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds)
         {   // fill in more special cases
             if (other is PlaneSurface ps)
@@ -2118,6 +2082,7 @@ namespace CADability.GeoObject
             else if (other is CylindricalSurface) return other.Intersect(otherBounds, this, thisBounds);
             return base.Intersect(thisBounds, other, otherBounds);
         }
+        /// <inheritdoc/>
         public override ICurve Intersect(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, GeoPoint seed)
         {
             ICurve[] crvs = Intersect(thisBounds, other, otherBounds);
@@ -2127,10 +2092,7 @@ namespace CADability.GeoObject
             }
             return base.Intersect(thisBounds, other, otherBounds, seed);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.CopyData (ISurface)"/>
-        /// </summary>
-        /// <param name="CopyFrom"></param>
+        /// <inheritdoc/>
         public override void CopyData(ISurface CopyFrom)
         {
             ToroidalSurface cc = CopyFrom as ToroidalSurface;
@@ -2141,6 +2103,7 @@ namespace CADability.GeoObject
                 this.minorRadius = cc.minorRadius;
             }
         }
+        /// <inheritdoc/>
         public override bool Oriented
         {
             get
@@ -2148,10 +2111,7 @@ namespace CADability.GeoObject
                 return true;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetExtrema ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override GeoPoint2D[] GetExtrema()
         {   // noch nicht getestet
             // Extrema in den Richtungen der Hauptachsen
@@ -2194,12 +2154,7 @@ namespace CADability.GeoObject
             }
             return res.ToArray();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetProjectedCurve (ICurve, double)"/>
-        /// </summary>
-        /// <param name="curve"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ICurve2D GetProjectedCurve(ICurve curve, double precision)
         {
             if (curve is Ellipse)
@@ -2349,11 +2304,7 @@ namespace CADability.GeoObject
         //    }
         //}
 
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.Orientation (GeoPoint)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double Orientation(GeoPoint p)
         {
             GeoPoint q = toUnit * p;
@@ -2366,10 +2317,7 @@ namespace CADability.GeoObject
                 return -d;
             return d;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.ReverseOrientation ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override ModOp2D ReverseOrientation()
         {
             boxedSurfaceEx = null;
@@ -2378,12 +2326,7 @@ namespace CADability.GeoObject
             return new ModOp2D(-1, 0, 2.0 * Math.PI, 0, 1, 0);
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.HitTest (BoundingCube, out GeoPoint2D)"/>
-        /// </summary>
-        /// <param name="bc"></param>
-        /// <param name="uv"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(BoundingCube bc, out GeoPoint2D uv)
         {
             // any vertex of the cube on the torus?
@@ -2478,36 +2421,23 @@ namespace CADability.GeoObject
             return false;
         }
 
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetSaveUSteps ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         protected override double[] GetSaveUSteps()
         {
             return new double[] { 0.0, Math.PI / 2.0, Math.PI, 3 * Math.PI / 2, 2 * Math.PI };
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.GetSaveVSteps ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         protected override double[] GetSaveVSteps()
         {
             return new double[] { 0.0, Math.PI / 2.0, Math.PI, 3 * Math.PI / 2, 2 * Math.PI };
         }
+        /// <inheritdoc/>
         public override void GetNaturalBounds(out double umin, out double umax, out double vmin, out double vmax)
         {
             umin = vmin = 0.0;
             umax = vmax = Math.PI * 2.0;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.SameGeometry (BoundingRect, ISurface, BoundingRect, double, out ModOp2D)"/>
-        /// </summary>
-        /// <param name="thisBounds"></param>
-        /// <param name="other"></param>
-        /// <param name="otherBounds"></param>
-        /// <param name="precision"></param>
-        /// <param name="firstToSecond"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool SameGeometry(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, double precision, out ModOp2D firstToSecond)
         {
             if (other is ToroidalSurface)
@@ -2542,6 +2472,7 @@ namespace CADability.GeoObject
             }
             return base.SameGeometry(thisBounds, other, otherBounds, precision, out firstToSecond);
         }
+        /// <inheritdoc/>
         public override double MaxDist(GeoPoint2D sp, GeoPoint2D ep, out GeoPoint2D mp)
         {
             mp = new GeoPoint2D(sp, ep);
@@ -2549,6 +2480,7 @@ namespace CADability.GeoObject
             // ansonsten wäre ja auch nicht klar, welche 2d-Linie gemeint ist
             return Geometry.DistPL(PointAt(mp), PointAt(sp), PointAt(ep));
         }
+        /// <inheritdoc/>
         public override ISurface GetOffsetSurface(double offset)
         {
             double det = toUnit.Determinant;
@@ -2556,6 +2488,7 @@ namespace CADability.GeoObject
             double unitoffset = f * offset; // sowohl offset als auch f können negativ sein
             return new ToroidalSurface(toTorus, minorRadius + unitoffset);
         }
+        /// <inheritdoc/>
         public override ICurve2D[] GetSelfIntersections(BoundingRect bounds)
         {
             List<ICurve2D> res = new List<ICurve2D>();
@@ -2573,6 +2506,7 @@ namespace CADability.GeoObject
             }
             return res.ToArray();
         }
+        /// <inheritdoc/>
         public override double[] GetVSingularities()
         {
             if (Math.Abs(minorRadius) > 1.0)
@@ -2586,6 +2520,7 @@ namespace CADability.GeoObject
             }
             return new double[0];
         }
+        /// <inheritdoc/>
         public override IDualSurfaceCurve[] GetDualSurfaceCurves(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, List<GeoPoint> seeds, List<Tuple<double, double, double, double>> extremePositions)
         {
             if (other is ToroidalSurface)
@@ -2705,6 +2640,7 @@ namespace CADability.GeoObject
             return base.GetDualSurfaceCurves(thisBounds, other, otherBounds, seeds, extremePositions);
         }
 
+        /// <inheritdoc/>
         public override ISurface GetNonPeriodicSurface(ICurve[] orientedCurves)
         {
             BoundingRect ext = BoundingRect.EmptyBoundingRect;
@@ -2724,6 +2660,11 @@ namespace CADability.GeoObject
         }
         #endregion
         #region ISerializable Members
+        /// <summary>
+        /// Constructor for the legacy binary deserialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// </summary>
+        /// <param name="info">The serialized data</param>
+        /// <param name="context">The source of the deserialization</param>
         protected ToroidalSurface(SerializationInfo info, StreamingContext context)
         {
             toTorus = (ModOp)info.GetValue("ToTorus", typeof(ModOp));
@@ -2741,13 +2682,24 @@ namespace CADability.GeoObject
             toUnit = toTorus.GetInverse();
         }
         #endregion
+        /// <summary>
+        /// Empty constructor for the JSON deserialization (<see cref="IJsonSerialize"/>); the data is set by <see cref="SetObjectData(IJsonReadData)"/>.
+        /// </summary>
         protected ToroidalSurface() { } // we need this for JsonSerialisation
+        /// <summary>
+        /// Writes the data of this surface for the JSON serialization (<see cref="IJsonSerialize"/>).
+        /// </summary>
+        /// <param name="data">Receives the data</param>
         public void GetObjectData(IJsonWriteData data)
         {
             data.AddProperty("ToTorus", toTorus);
             data.AddProperty("MinorRadius", minorRadius);
         }
 
+        /// <summary>
+        /// Restores this surface from the JSON data written by <see cref="GetObjectData(IJsonWriteData)"/> (<see cref="IJsonSerialize"/>).
+        /// </summary>
+        /// <param name="data">The data to read</param>
         public void SetObjectData(IJsonReadData data)
         {
             toTorus = data.GetProperty<ModOp>("ToTorus");
@@ -2755,6 +2707,7 @@ namespace CADability.GeoObject
             toUnit = toTorus.GetInverse();
         }
 
+        /// <inheritdoc/>
         public override IPropertyEntry GetPropertyEntry(IFrame frame)
         {
             List<IPropertyEntry> se = new List<IPropertyEntry>();

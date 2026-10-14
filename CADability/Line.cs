@@ -17,7 +17,7 @@ namespace CADability.GeoObject
     using CADability.UserInterface;
 
     /// <summary>
-    /// The line is a <see href="GeoObject.html">IGeoObject</see>. It is actually a line segment
+    /// The line is a <see cref="IGeoObject"/>. It is actually a line segment
     /// not an infinite line.
     /// </summary>
     [Serializable()]
@@ -49,7 +49,15 @@ namespace CADability.GeoObject
             if (Constructor != null) return Constructor();
             return new Line();
         }
+        /// <summary>
+        /// Handler for <see cref="Constructed"/>.
+        /// </summary>
+        /// <param name="justConstructed">the line that was just created</param>
         public delegate void ConstructedDelegate(Line justConstructed);
+        /// <summary>
+        /// Raised from the constructor whenever a line is created, be it by <see cref="Construct"/>, by cloning or by
+        /// deserialization, before its geometry is set. An application can use it to attach data of its own to every line.
+        /// </summary>
         public static event ConstructedDelegate Constructed;
         #endregion
         /// <summary>
@@ -60,6 +68,13 @@ namespace CADability.GeoObject
             colorDef = new ColorDef(null, Color.Black);
             if (Constructed != null) Constructed(this);
         }
+        /// <summary>
+        /// Creates a line from <paramref name="sp"/> to <paramref name="ep"/>. The line is created with <see cref="Construct"/>,
+        /// so a registered <see cref="Constructor"/> is honored. Same as <see cref="MakeLine"/>.
+        /// </summary>
+        /// <param name="sp">the start point</param>
+        /// <param name="ep">the end point</param>
+        /// <returns>the new line</returns>
         public static Line TwoPoints(GeoPoint sp, GeoPoint ep)
         {
             Line res = Line.Construct();
@@ -180,10 +195,7 @@ namespace CADability.GeoObject
                 endPoint = ((Line)ToCopyFrom).endPoint;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.FindSnapPoint (SnapPointFinder)"/>
-        /// </summary>
-        /// <param name="spf"></param>
+        /// <inheritdoc/>
         public override void FindSnapPoint(SnapPointFinder spf)
         {
             if (!spf.Accept(this)) return;
@@ -212,10 +224,7 @@ namespace CADability.GeoObject
                 }
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetBoundingCube ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingCube GetBoundingCube()
         {
             BoundingCube res = BoundingCube.EmptyBoundingCube;
@@ -223,21 +232,26 @@ namespace CADability.GeoObject
             res.MinMax(endPoint);
             return res;
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HasValidData ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HasValidData()
         {
             if (Precision.IsEqual(startPoint, endPoint)) return false;
             return true;
         }
-        public delegate bool PaintTo3DDelegate(Line toPaint, IPaintTo3D paintTo3D);
-        public static PaintTo3DDelegate OnPaintTo3D;
         /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PaintTo3D (IPaintTo3D)"/>
+        /// Handler for <see cref="OnPaintTo3D"/>.
         /// </summary>
-        /// <param name="paintTo3D"></param>
+        /// <param name="toPaint">the line being painted</param>
+        /// <param name="paintTo3D">the paint interface to paint to</param>
+        /// <returns>true if the handler painted the line itself and the default painting is to be skipped, false to let the
+        /// line paint itself as usual</returns>
+        public delegate bool PaintTo3DDelegate(Line toPaint, IPaintTo3D paintTo3D);
+        /// <summary>
+        /// Hook to replace the painting of lines: when set, <see cref="PaintTo3D"/> calls it first and does nothing more
+        /// when it returns true. The hook is static, so it applies to every line of the process.
+        /// </summary>
+        public static PaintTo3DDelegate OnPaintTo3D;
+        /// <inheritdoc/>
         public override void PaintTo3D(IPaintTo3D paintTo3D)
         {
             if (OnPaintTo3D != null && OnPaintTo3D(this, paintTo3D)) return;
@@ -250,14 +264,12 @@ namespace CADability.GeoObject
             else paintTo3D.SetLinePattern(null);
             paintTo3D.Polyline(new GeoPoint[] { startPoint, endPoint });
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.PrepareDisplayList (double)"/>
-        /// </summary>
-        /// <param name="precision"></param>
+        /// <inheritdoc/>
         public override void PrepareDisplayList(double precision)
         {
             // nichts zu tun
         }
+        /// <inheritdoc/>
         public override Style.EDefaultFor PreferredStyle
         {
             get
@@ -265,53 +277,28 @@ namespace CADability.GeoObject
                 return Style.EDefaultFor.Curves;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetQuadTreeItem (Projection, ExtentPrecision)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="extentPrecision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override IQuadTreeInsertableZ GetQuadTreeItem(Projection projection, ExtentPrecision extentPrecision)
         {
             return new QuadTreeLine(this, startPoint, endPoint, projection);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (Projection, ExtentPrecision)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="extentPrecision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingRect GetExtent(Projection projection, ExtentPrecision extentPrecision)
         {
             return new BoundingRect(projection.ProjectUnscaled(startPoint), projection.ProjectUnscaled(endPoint));
         }
         #region IOctTreeInsertable members
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.GetExtent (double)"/>
-        /// </summary>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override BoundingCube GetExtent(double precision)
         {
             return GetBoundingCube();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (ref BoundingCube, double)"/>
-        /// </summary>
-        /// <param name="cube"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(ref BoundingCube cube, double precision)
         {
             return cube.Interferes(ref startPoint, ref endPoint);
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection, BoundingRect, bool)"/>
-        /// </summary>
-        /// <param name="projection"></param>
-        /// <param name="rect"></param>
-        /// <param name="onlyInside"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(Projection projection, BoundingRect rect, bool onlyInside)
         {
             if (onlyInside)
@@ -324,12 +311,7 @@ namespace CADability.GeoObject
                 return clr.LineHitTest(projection.ProjectUnscaled(startPoint), projection.ProjectUnscaled(endPoint));
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.HitTest (Projection.PickArea, bool)"/>
-        /// </summary>
-        /// <param name="area"></param>
-        /// <param name="onlyInside"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override bool HitTest(Projection.PickArea area, bool onlyInside)
         {
             GeoPoint sp = area.ToUnitBox * startPoint;
@@ -344,13 +326,7 @@ namespace CADability.GeoObject
                 return BoundingCube.UnitBoundingCube.Interferes(ref sp, ref ep);
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.GeoObject.IGeoObjectImpl.Position (GeoPoint, GeoVector, double)"/>
-        /// </summary>
-        /// <param name="fromHere"></param>
-        /// <param name="direction"></param>
-        /// <param name="precision"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override double Position(GeoPoint fromHere, GeoVector direction, double precision)
         {   // noch nicht getestet
             double pos1, pos2;
@@ -395,10 +371,11 @@ namespace CADability.GeoObject
         }
 
         /// <summary>
-        /// Implements ISerializable:GetObjectData
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info"></param>
-        /// <param name="context"></param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
@@ -408,6 +385,7 @@ namespace CADability.GeoObject
             info.AddValue("LineWidth", lineWidth);
             info.AddValue("LinePattern", linePattern);
         }
+        /// <inheritdoc/>
         public override void GetObjectData(IJsonWriteData data)
         {
             base.GetObjectData(data);
@@ -418,6 +396,7 @@ namespace CADability.GeoObject
             if (linePattern != null) data.AddProperty("LinePattern", linePattern);
         }
 
+        /// <inheritdoc/>
         public override void SetObjectData(IJsonReadData data)
         {
             base.SetObjectData(data);
@@ -429,7 +408,8 @@ namespace CADability.GeoObject
         }
         #endregion
         /// <summary>
-        /// Liefert die Liste aller anzuzeigenden Properties
+        /// Returns the property entry (a <see cref="ShowPropertyLine"/>) that shows and edits this line, i.e. its start and
+        /// end point, length and direction and its attributes, in the property grid.
         /// </summary>
         public override IPropertyEntry GetShowProperties(IFrame Frame)
         {
@@ -437,6 +417,11 @@ namespace CADability.GeoObject
         }
         #region IColorDef Members
         private ColorDef colorDef;
+        /// <summary>
+        /// The color of the line, see <see cref="IColorDef.ColorDef"/>. Setting it raises the change events as a change of
+        /// an attribute and is undoable. A color with <see cref="ColorDef.ColorSource.fromParent"/> is replaced by the
+        /// corresponding color of the <see cref="Block"/> the line belongs to.
+        /// </summary>
         public ColorDef ColorDef
         {
             get => colorDef;
@@ -463,6 +448,10 @@ namespace CADability.GeoObject
         #endregion
 
         #region ICurve Members
+        /// <summary>
+        /// The direction from the start point to the end point. Its length is the length of the line, and it is the same
+        /// for every point of the line.
+        /// </summary>
         public GeoVector StartDirection
         {
             get
@@ -470,6 +459,9 @@ namespace CADability.GeoObject
                 return endPoint - startPoint;
             }
         }
+        /// <summary>
+        /// The direction from the start point to the end point, the same as <see cref="StartDirection"/>.
+        /// </summary>
         public GeoVector EndDirection
         {
             get
@@ -477,49 +469,27 @@ namespace CADability.GeoObject
                 return endPoint - startPoint;
             }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.DirectionAt (double)"/>
-        /// </summary>
-        /// <param name="Position"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public GeoVector DirectionAt(double Position)
         {
             return endPoint - startPoint;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.PointAt (double)"/>
-        /// </summary>
-        /// <param name="Position"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public GeoPoint PointAt(double Position)
         {
             return startPoint + Position * (endPoint - startPoint);
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.PositionOf (GeoPoint)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public double PositionOf(GeoPoint p)
         {
             return Geometry.LinePar(startPoint, endPoint, p);
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.PositionOf (GeoPoint, double)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <param name="prefer"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public double PositionOf(GeoPoint p, double prefer)
         {
             return PositionOf(p);
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.PositionOf (GeoPoint, Plane)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <param name="pl"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public double PositionOf(GeoPoint p, Plane pl)
         {
             Line2D l2d = new Line2D(pl.Project(startPoint), pl.Project(endPoint));
@@ -541,11 +511,7 @@ namespace CADability.GeoObject
                 startPoint = tmp;
             }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.Split (double)"/>
-        /// </summary>
-        /// <param name="Position"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public ICurve[] Split(double Position)
         {
             if (Position <= 0.0 || Position >= 1.0)
@@ -556,21 +522,12 @@ namespace CADability.GeoObject
             l2.StartPoint = l1.EndPoint;
             return new ICurve[2] { l1, l2 };
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.Split (double, double)"/>
-        /// </summary>
-        /// <param name="Position1"></param>
-        /// <param name="Position2"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public ICurve[] Split(double Position1, double Position2)
         {
             return null; // geht nur für geschlossene
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.Trim (double, double)"/>
-        /// </summary>
-        /// <param name="StartPos"></param>
-        /// <param name="EndPos"></param>
+        /// <inheritdoc/>
         public void Trim(double StartPos, double EndPos)
         {
             GeoPoint newStartPoint = PointAt(StartPos);
@@ -588,6 +545,9 @@ namespace CADability.GeoObject
             clone.Modify(m);
             return (ICurve)clone;
         }
+        /// <summary>
+        /// Always false: a line is never closed.
+        /// </summary>
         public bool IsClosed
         {
             get
@@ -595,6 +555,10 @@ namespace CADability.GeoObject
                 return false;
             }
         }
+        /// <summary>
+        /// True if start point and end point coincide within <see cref="Precision"/>, i.e. the line has no length and no
+        /// direction. Such a line is not valid, see <see cref="HasValidData"/>.
+        /// </summary>
         public bool IsSingular
         {
             get
@@ -602,36 +566,22 @@ namespace CADability.GeoObject
                 return Precision.IsEqual(startPoint, endPoint);
             }
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.GetPlanarState ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public PlanarState GetPlanarState()
         {
             return PlanarState.UnderDetermined;
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.GetPlane ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public Plane GetPlane()
         {
             throw new CurveException(CurveException.Mode.NoPlane);
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.IsInPlane (Plane)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public bool IsInPlane(Plane p)
         {
             return Precision.IsPointOnPlane(startPoint, p) && Precision.IsPointOnPlane(endPoint, p);
         }
-        /// <summary>
-        /// Implements <see cref="CADability.GeoObject.ICurve.GetProjectedCurve (Plane)"/>
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public ICurve2D GetProjectedCurve(Plane p)
         {
             GeoPoint sp = p.ToLocal(startPoint);
@@ -639,6 +589,7 @@ namespace CADability.GeoObject
             Line2D res = new Line2D(sp.To2D(), ep.To2D());
             return res;
         }
+        /// <inheritdoc/>
         public override string Description
         {
             get
@@ -756,6 +707,10 @@ namespace CADability.GeoObject
         #endregion
 
         #region ILineWidth Members
+        /// <summary>
+        /// The line width attribute of the line, see <see cref="ILineWidth.LineWidth"/>; null means the default width.
+        /// Setting it raises the change events as a change of an attribute and is undoable.
+        /// </summary>
         public LineWidth LineWidth
         {
             get => lineWidth;
@@ -771,6 +726,10 @@ namespace CADability.GeoObject
 
         #region ILinePattern Members
 
+        /// <summary>
+        /// The line pattern attribute of the line, see <see cref="ILinePattern.LinePattern"/>; null means a solid line.
+        /// Setting it raises the change events as a change of an attribute and is undoable.
+        /// </summary>
         public LinePattern LinePattern
         {
             get => linePattern;
@@ -806,6 +765,12 @@ namespace CADability.GeoObject
 
         #endregion
 
+        /// <summary>
+        /// Creates a line from <paramref name="p1"/> to <paramref name="p2"/>. Identical to <see cref="TwoPoints"/>.
+        /// </summary>
+        /// <param name="p1">the start point</param>
+        /// <param name="p2">the end point</param>
+        /// <returns>the new line</returns>
         public static Line MakeLine(GeoPoint p1, GeoPoint p2)
         {
             Line res = Line.Construct();

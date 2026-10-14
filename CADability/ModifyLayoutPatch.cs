@@ -10,7 +10,12 @@ using Keys = CADability.Substitutes.Keys;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Mouse action of a <see cref="LayoutView"/> that lets the user change the area of a
+    /// <see cref="LayoutPatch"/> on the paper by dragging: dragging inside the area moves the model within
+    /// it, dragging outside moves the whole area with its model, dragging an edge moves that edge. The
+    /// cursor shows which of these would happen. The action is set while the patch's property entry has the
+    /// focus in the control center and removes itself when another action takes over or the views change.
+    /// Its id is "ModifyLayoutPatch".
     /// </summary>
     internal class ModifyLayoutPatch : CADability.Actions.Action
     {

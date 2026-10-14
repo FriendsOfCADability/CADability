@@ -14,7 +14,10 @@ using Keys = CADability.Substitutes.Keys;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// The interactive zoom action ("zoom window"): the user clicks the first corner of a rectangle in a view (a cross
+    /// hair follows the mouse) and then the opposite corner (the rectangle is drawn while the mouse moves); the view is
+    /// zoomed so that the rectangle fills it. Only the view in which the first point was set is zoomed.
+    /// Id: "Zoom[LeaveSelectProperties]".
     /// </summary>
 
     public class ZoomAction : Action, IIntermediateConstruction
@@ -22,6 +25,9 @@ namespace CADability.Actions
         private int Mode; // 0: 1. Punkt setzen, 2: 2. Punkt setzen, -1: nicht aktiv
         Point FirstPoint, SecondPoint;
         private IView activeView; // nur dort wird gezoomt. Dort, wo der erste Punkt gesetzt wurde
+        /// <summary>
+        /// Creates the zoom action in its inactive state. Start it with <see cref="IFrame.SetAction"/>.
+        /// </summary>
         public ZoomAction()
         {
             Mode = -1;
@@ -51,9 +57,7 @@ namespace CADability.Actions
                     break;
             }
         }
-        /// <summary>
-        /// Implements <see cref="Action.GetID"/>.
-        /// </summary>
+        /// <inheritdoc/>
         public override string GetID()
         {
             return "Zoom[LeaveSelectProperties]";
@@ -67,9 +71,7 @@ namespace CADability.Actions
             Mode = 0;
             base.OnSetAction();
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.OnRemoveAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override void OnRemoveAction()
         {
             Mode = -1;
@@ -78,8 +80,8 @@ namespace CADability.Actions
         /// Implements <see cref="Action.OnMouseMove"/>. If you override this method
         /// don't forget to call the bas implementation.
         /// </summary>
-        /// <param name="e"><paramref name="Action.OnMouseMove.e"/></param>
-        /// <param name="vw"><paramref name="Action.OnMouseMove.vw"/></param>
+        /// <param name="e">MouseEventArgs of the call</param>
+        /// <param name="vw">the IView which contains the mouse</param>
         public override void OnMouseMove(MouseEventArgs e, IView vw)
         {
             switch (Mode)
@@ -101,11 +103,7 @@ namespace CADability.Actions
                     break;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.OnMouseUp (MouseEventArgs, IView)"/>
-        /// </summary>
-        /// <param name="e"></param>
-        /// <param name="vw"></param>
+        /// <inheritdoc/>
 		public override void OnMouseUp(MouseEventArgs e, IView vw)
         {
             OnMouseMove(e, vw); // damit wird Invalidate... aufgerufen
@@ -130,8 +128,8 @@ namespace CADability.Actions
         /// Implements <see cref="Action.OnMouseDown"/>. If you override this method
         /// don't forget to call the bas implementation.
         /// </summary>
-        /// <param name="e"><paramref name="Action.OnMouseDown.e"/></param>
-        /// <param name="vw"><paramref name="Action.OnMouseDown.vw"/></param>
+        /// <param name="e">MouseEventArgs of the call</param>
+        /// <param name="vw">the IView which contains the mouse</param>
         public override void OnMouseDown(MouseEventArgs e, IView vw)
         {
             if (Mode == 0 && Frame.GetBooleanSetting("ZoomAction.SingleClick", false))
@@ -169,8 +167,8 @@ namespace CADability.Actions
         /// Implements <see cref="Action.OnInactivate"/>. If you override this method
         /// don't forget to call the bas implementation.
         /// </summary>
-        /// <param name="NewActiveAction"><paramref name="Action.OnInactivate.NewActiveAction"/></param>
-        /// <param name="RemovingAction"><paramref name="Action.OnInactivate.RemovingAction"/></param>
+        /// <param name="NewActiveAction">the action that will become active</param>
+        /// <param name="RemovingAction">true: if called because the action is removed, false: if called when a new action is set on top of this action</param>
         public override void OnInactivate(Action NewActiveAction, bool RemovingAction)
         {
             foreach (IView vw in Frame.AllViews)
@@ -183,9 +181,7 @@ namespace CADability.Actions
                 base.RemoveThisAction();
             }
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.OnEscape ()"/>
-        /// </summary>
+        /// <inheritdoc/>
 		public override bool OnEscape()
         {
             base.RemoveThisAction();

@@ -270,7 +270,9 @@ namespace CADability.UserInterface
 		}
 
 		#region IShowPropertyImpl Overrides
+		/// <inheritdoc/>
 		public override PropertyEntryType Flags => PropertyEntryType.ContextMenu | PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
+		/// <inheritdoc/>
 		public override MenuWithHandler[] ContextMenu
 		{
 			get
@@ -281,6 +283,7 @@ namespace CADability.UserInterface
 				return items.ToArray();
 			}
 		}
+		/// <inheritdoc/>
 		public override IPropertyEntry[] SubItems
 		{
 			get
@@ -288,6 +291,7 @@ namespace CADability.UserInterface
 				return PropertyEntryImpl.Concat(subEntries, attributeProperties);
 			}
 		}
+		/// <inheritdoc/>
 		public override void Added(IPropertyPage page)
 		{
 			base.Added(page);
@@ -295,6 +299,7 @@ namespace CADability.UserInterface
 			polyline.UserData.UserDataRemovedEvent += OnUserDataAdded;
 			polyline.DidChangeEvent += PolylineDidChange;
 		}
+		/// <inheritdoc/>
 		public override void Removed(IPropertyPage page)
 		{
 			polyline.DidChangeEvent -= PolylineDidChange;
@@ -478,6 +483,7 @@ namespace CADability.UserInterface
 			}
 		}
 
+		/// <inheritdoc/>
 		public override void Opened(bool IsOpen)
 		{
 			base.Opened(IsOpen);

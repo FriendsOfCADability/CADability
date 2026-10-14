@@ -272,21 +272,23 @@ namespace CADability
     }
 
     /// <summary>
-    /// Diese Klasse bildet die NURBS Funktionalität aus OpenCascade nach.
-    /// Vielleicht wird mal mehr draus...
+    /// Static helper functions for NURBS curves (knot span search, basis functions, curve points, derivatives and knot insertion),
+    /// implemented after "The NURBS Book" and modelled on the NURBS functionality of OpenCascade. The generic class
+    /// <see cref="Nurbs{T, C}"/> is the more complete implementation used for curves and surfaces.
     /// </summary>
     internal class Nurbs
     {
         /// <summary>
-        /// NURBS Buch S. 68,
-        /// knot (U) ist der flache Knotenvektor (mit Wiederholungen)
-        /// n ist noch nicht ganz klar, aber hat mit der Länge des Knotenvectors zu tun
+        /// NURBS book p. 68 (FindSpan): binary search for the knot span containing u.
+        /// knot (U) is the flat knot vector (with repetitions).
+        /// The search is restricted to the index range [low, high]; callers pass the degree as low
+        /// and the number of poles (knot.Length - degree - 1) as high.
         /// </summary>
-        /// <param name="n"></param>
-        /// <param name="degree"></param>
-        /// <param name="u"></param>
-        /// <param name="knot"></param>
-        /// <returns></returns>
+        /// <param name="high">upper index of the search range (the number of poles)</param>
+        /// <param name="low">lower index of the search range (the degree)</param>
+        /// <param name="u">the parameter value to locate</param>
+        /// <param name="knot">the flat knot vector (with repetitions)</param>
+        /// <returns>the index i of the span with knot[i] &lt;= u &lt; knot[i+1], or high-1 if u is at or beyond knot[high]</returns>
         static int FindSpan(int high, int low, double u, double[] knot)
         {
             if (u >= knot[high]) return high - 1; // Sonderfall
@@ -300,10 +302,15 @@ namespace CADability
             return mid;
         }
         /// <summary>
-        /// NURBS Buch S. 70.
-        /// Hier ein Versuch mit unsafe, wg fixed bzw. stackalloc
-        /// Das muss noch genauer ausgemessen werden, was es an Verbesserung bringt...
+        /// NURBS book p. 70 (BasisFuns): computes the degree+1 non-vanishing B-spline basis functions at the parameter u in the
+        /// knot span <paramref name="span"/>. This is an attempt with unsafe code (fixed and stackalloc for the temporary arrays);
+        /// how much it improves performance still has to be measured more precisely.
         /// </summary>
+        /// <param name="span">Index of the knot span containing u, as returned by <see cref="FindSpan"/></param>
+        /// <param name="u">The parameter value</param>
+        /// <param name="degree">The degree of the B-spline</param>
+        /// <param name="knot">The flat knot vector (with repetitions)</param>
+        /// <param name="N">Receives the degree+1 values of the basis functions N[span-degree..span] at u</param>
         static unsafe void BasisFuns(int span, double u, int degree, double[] knot, out double[] N)
         {
             N = new double[degree + 1];
@@ -710,7 +717,8 @@ namespace CADability
     }
 
     /// <summary>
-    /// Interner homogener 2D Punkt für die Verwendung in Nurbs&lt;T, C&gt;
+    /// Internal homogeneous 2d point (x, y and weight w, with x and y already multiplied by w) for use in <see cref="Nurbs{T, C}"/>.
+    /// Implicitly converts to a <see cref="GeoPoint2D"/> (dividing by w) and to a <see cref="GeoVector2D"/> (not dividing by w).
     /// </summary>
     internal struct GeoPoint2DH
     {
@@ -738,7 +746,9 @@ namespace CADability
         }
     }
     /// <summary>
-    /// Interner homogener Punkt für die Verwendung in Nurbs&lt;T, C&gt;
+    /// Internal homogeneous 3d point (x, y, z and weight w, with the coordinates already multiplied by w) for use in
+    /// <see cref="Nurbs{T, C}"/>. Implicitly converts to a <see cref="GeoPoint"/> (dividing by w) and to a <see cref="GeoVector"/>
+    /// (not dividing by w).
     /// </summary>
     internal struct GeoPointH
     {
@@ -912,12 +922,14 @@ namespace CADability
         int Length { get; }
     }
     /// <summary>
-    /// Implementiert nach "The NURBS Book" (Piegl, Tiller) und nach Ideen aus
-    /// http://www.codeproject.com/csharp/genericnumerics.asp
-    /// Helferklasse für 2 und 3 dimensionale NURBS Kurven und für Nurbsflächen rational oder nicht rational.
+    /// Helper class for 2- and 3-dimensional NURBS curves and for NURBS surfaces, rational or non-rational, implemented after
+    /// "The NURBS Book" (Piegl, Tiller) and after ideas from http://www.codeproject.com/csharp/genericnumerics.asp. It holds the
+    /// poles, the flat knot vectors and the poles of the derivatives and evaluates points and derivatives. The type of the poles
+    /// and the arithmetic on it are given as type parameters, so the same code serves <see cref="GeoPoint2D"/>, <see cref="GeoPoint"/>
+    /// and the homogeneous points <see cref="GeoPoint2DH"/> and <see cref="GeoPointH"/>.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <typeparam name="C"></typeparam>
+    /// <typeparam name="T">The type of the poles (<see cref="GeoPoint2D"/>, <see cref="GeoPoint"/>, <see cref="GeoPoint2DH"/> or <see cref="GeoPointH"/>)</typeparam>
+    /// <typeparam name="C">The calculator which implements the arithmetic on <typeparamref name="T"/> (see <see cref="IPoleCalculator{T}"/>)</typeparam>
     internal class Nurbs<T, C>
         where T : new()
         where C : IPoleCalculator<T>, new()
@@ -1624,7 +1636,7 @@ namespace CADability
         /// The knot span that contains <paramref name="u"/>, i.e. the index i with
         /// knots[i] &lt;= u &lt; knots[i+1] (NURBS book p. 68, A2.1), clamped to the range the curve is
         /// defined on. The span returned is never empty: an empty one would make
-        /// <see cref="BasisFunsU"/> divide by zero.
+        /// <see cref="BasisFunsU(int, double, int, out double[])"/> divide by zero.
         /// </summary>
         /// <param name="knots">the knot vector to search</param>
         /// <param name="degree">the degree, which is also the index of the first usable span</param>
@@ -2277,7 +2289,7 @@ namespace CADability
         /// Returns a nurbs curve of a surface with fixed v parameter. The type of the poles of the returned curve is the same 
         /// as the type of poles of the surface (rational/nonrational)
         /// </summary>
-        /// <param name="u">Fixed v parameter</param>
+        /// <param name="v">Fixed v parameter</param>
         /// <returns>the nurbs curve</returns>
         public Nurbs<T, C> FixedV(double v)
         {

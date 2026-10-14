@@ -7,7 +7,9 @@ using MouseEventArgs = CADability.Substitutes.MouseEventArgs;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a line parallel to an existing line through a given point: the user picks the line (polylines are
+    /// decomposed into their segments, only lines are accepted) and the point the parallel has to pass through. The result
+    /// has the same length as the original line. Menu id: "Constr.Line.ParallelPoint".
     /// </summary>
     internal class ConstrLineParallelPoint : ConstructAction
     {

@@ -6,7 +6,11 @@ using System.Collections;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a circle with a given radius which is tangent to a curve and passes through a given point. The user picks
+    /// the tangent object (polylines and paths are decomposed into their single elements), the point on the circle and the radius
+    /// or alternatively the diameter (which of the two is the primary input depends on the setting "Formatting.Radius"). Among the
+    /// possible solutions the one closest to the pick position is chosen, the others can be selected with the multi-solution
+    /// mechanism. Started with the menu id "Constr.Circle.TangentPointRadius".
     /// </summary>
     internal class ConstrCircleTangentPointRadius : ConstructAction
     {

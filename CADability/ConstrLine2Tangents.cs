@@ -6,7 +6,10 @@ using System.Collections;
 namespace CADability.Actions
 {
     /// <summary>
-    /// 
+    /// Construction of a line that is tangent to two curves: the user picks the two curves (polylines and paths are
+    /// decomposed into their segments), which must lie in a common plane. Of the possible tangent lines the one closest to
+    /// the pick positions is shown, the others can be selected with the "next solution" command.
+    /// Menu id: "Constr.Line.TwoTangents".
     /// </summary>
     internal class ConstrLine2Tangents : ConstructAction
     {

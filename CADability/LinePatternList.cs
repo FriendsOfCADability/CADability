@@ -9,7 +9,10 @@ using System.Runtime.Serialization;
 namespace CADability.Attribute
 {
     /// <summary>
-    /// 
+    /// The list of <see cref="LinePattern"/> attributes (dash patterns) available in a <see cref="Project"/>
+    /// or in the global <see cref="Settings"/>. The entries are identified by their unique names, one of
+    /// them is the current pattern that newly constructed objects get, and the list is shown as an editable
+    /// group in the control center. A new project gets a clone of the global default list.
     /// </summary>
     [Serializable()]
     public class LinePatternList : IShowPropertyImpl, IAttributeList, ISerializable, ICommandHandler, IDeserializationCallback
@@ -145,6 +148,14 @@ namespace CADability.Attribute
                 return entries[Index] as LinePattern;
             }
         }
+        /// <summary>
+        /// Returns the line pattern with the given name; when there is none, a new <see cref="LinePattern"/> with that name
+        /// and the given stroke/gap lengths (see <see cref="LinePattern.LinePattern(string, double[])"/>, layout scaling) is
+        /// added to the list and returned. The pattern of an existing entry is left as it is.
+        /// </summary>
+        /// <param name="Name">the name of the line pattern</param>
+        /// <param name="pattern">alternating stroke and gap lengths for a newly created entry; empty for a solid line</param>
+        /// <returns>the existing or newly created LinePattern</returns>
         public LinePattern CreateOrFind(string Name, params double[] pattern)
         {
             LinePattern res = Find(Name);
@@ -227,6 +238,10 @@ namespace CADability.Attribute
             }
             return res;
         }
+        /// <summary>
+        /// Raised when a line pattern is added to or removed from the list. Changes of the properties of a line pattern are
+        /// forwarded to the owner of the list (the project) instead.
+        /// </summary>
         public event CADability.DidModifyDelegate DidModifyEvent;
         //Hilfsfunktion für Import
         internal LinePattern CreateOrFind(double[] pattern, LinePattern.Scaling scale)
@@ -268,9 +283,7 @@ namespace CADability.Attribute
                 return ShowPropertyEntryType.GroupTitle;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.LabelType"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override ShowPropertyLabelFlags LabelType
         {
             get
@@ -278,20 +291,19 @@ namespace CADability.Attribute
                 return ShowPropertyLabelFlags.ContextMenu | ShowPropertyLabelFlags.ContextMenu | ShowPropertyLabelFlags.Selectable;
             }
         }
+        /// <inheritdoc/>
         public override void Added(IPropertyPage pp)
         {
             base.resourceIdInternal = "LinePatternList";
             base.Added(pp);
         }
+        /// <inheritdoc/>
         public override void Removed(IPropertyPage pp)
         {
             base.Removed(pp);
             subEntries = null;
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IShowProperty[] SubEntries
         {
             get
@@ -307,10 +319,7 @@ namespace CADability.Attribute
                 return subEntries;
             }
         }
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntriesCount"/>, 
-        /// returns the number of subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override int SubEntriesCount
         {
             get
@@ -318,6 +327,7 @@ namespace CADability.Attribute
                 return SubEntries.Length;
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get

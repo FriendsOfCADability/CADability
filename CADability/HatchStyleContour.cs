@@ -117,6 +117,12 @@ namespace CADability.Attribute
             linePattern = pr.LinePatternList.Current;
             colorDef = pr.ColorList.Current;
         }
+        /// <summary>
+        /// Creates a contour hatch style with all values at their defaults: distances 0, <see cref="EHoleMode.circumscribe"/>,
+        /// <see cref="ESpiralMode.Parallel"/>, <see cref="CounterClock"/> and <see cref="Inbound"/> false, and no colour,
+        /// line width or line pattern. Set at least <see cref="LineDistance"/> before the style is used; a hatch style
+        /// created from the control center gets sensible defaults instead.
+        /// </summary>
         public HatchStyleContour()
         {
             resourceIdInternal = "HatchStyleNameContour";
@@ -163,6 +169,10 @@ namespace CADability.Attribute
                 holeMode = value;
             }
         }
+        /// <summary>
+        /// Selects how the contours fill the area: separate parallel contours, one or more continuous spiral paths
+        /// built from them, or a round spiral clipped by the shape (see <see cref="ESpiralMode"/>).
+        /// </summary>
         public ESpiralMode SpiralMode
         {
             get
@@ -591,9 +601,9 @@ namespace CADability.Attribute
         }
         /// <summary>
         /// This method is used by a <see cref="Hatch"/> object to calculate its contents. It generates a
-        /// set of parallel lines according to <see cref="LineDistance"/> and <see cref="LineAngle"/> 
-        /// and clips them with the given shape. The lines are projected into the 3D world
-        /// by the given plane. <seealso cref="CompoundShape.Clip"/>
+        /// set of contours parallel to the border of the shape according to <see cref="LineDistance"/>,
+        /// <see cref="FirstDistance"/>, <see cref="HoleMode"/> and <see cref="SpiralMode"/>. The contours
+        /// are projected into the 3D world by the given plane.
         /// </summary>
         /// <param name="shape">shape of the hatch object</param>
         /// <param name="plane">local plane of the hatch object</param>
@@ -837,10 +847,12 @@ namespace CADability.Attribute
             }
             return res;
         }
+        /// <inheritdoc/>
         public override IShowProperty GetShowProperty()
         {
             return null;
         }
+        /// <inheritdoc/>
         public override HatchStyle Clone()
         {
             HatchStyleContour res = new HatchStyleContour();
@@ -857,10 +869,7 @@ namespace CADability.Attribute
             return res;
         }
         #region IPropertyEntry Members
-        /// <summary>
-        /// Overrides <see cref="IShowPropertyImpl.SubEntries"/>, 
-        /// returns the subentries in this property view.
-        /// </summary>
+        /// <inheritdoc/>
         public override IPropertyEntry[] SubItems
         {
             get
@@ -930,6 +939,7 @@ namespace CADability.Attribute
         {
             spiralMode = (ESpiralMode)(sender as MultipleChoiceProperty).CurrentIndex;
         }
+        /// <inheritdoc/>
         public override void Removed(IPropertyPage pp)
         {
             subItems = null;

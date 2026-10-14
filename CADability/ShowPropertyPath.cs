@@ -128,6 +128,7 @@ namespace CADability.UserInterface
 		{
 			area.Refresh();
 		}
+		/// <inheritdoc/>
 		public override void Opened(bool isOpen)
 		{
 			if (HotspotChangedEvent != null)
@@ -143,7 +144,9 @@ namespace CADability.UserInterface
 			base.Opened(isOpen);
 		}
 		#region PropertyEntryImpl Overrides
+		/// <inheritdoc/>
 		public override PropertyEntryType Flags => PropertyEntryType.ContextMenu | PropertyEntryType.Selectable | PropertyEntryType.GroupTitle | PropertyEntryType.HasSubEntries;
+		/// <inheritdoc/>
 		public override MenuWithHandler[] ContextMenu
 		{
 			get
@@ -154,6 +157,7 @@ namespace CADability.UserInterface
 				return items.ToArray();
 			}
 		}
+		/// <inheritdoc/>
 		public override IPropertyEntry[] SubItems
 		{
 			get
@@ -162,6 +166,7 @@ namespace CADability.UserInterface
 				else return PropertyEntryImpl.Concat(subEntries, attributeProperties);
 			}
 		}
+		/// <inheritdoc/>
 		public override void Added(IPropertyPage propertyPage)
 		{   // die events müssen in Added angemeldet und in Removed wieder abgemeldet werden,
 			// sonst bleibt die ganze ShowProperty für immer an der Linie hängen
@@ -177,6 +182,7 @@ namespace CADability.UserInterface
 			attributeProperties = path.GetAttributeProperties(Frame);
 			propertyPage.Refresh(this);
 		}
+		/// <inheritdoc/>
 		public override void Removed(IPropertyPage propertyPage)
 		{
 			path.DidChangeEvent -= PathDidChange;

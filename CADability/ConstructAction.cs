@@ -35,6 +35,12 @@ namespace CADability.Actions
 		/// </summary>
 		/// <returns></returns>
 		IPropertyEntry GetHandledProperty();
+		/// <summary>
+		/// True when the intermediate construction produced a valid result, false when it was cancelled or could not be
+		/// completed. When the <see cref="ConstructAction"/> that started it becomes active again, it marks the input
+		/// returned by <see cref="GetHandledProperty"/> as fixed according to this value and proceeds to the next input
+		/// only when it is true.
+		/// </summary>
 		bool Succeeded
 		{
 			get;
@@ -706,13 +712,14 @@ namespace CADability.Actions
 		/// <param name="View"></param>
 		public delegate void MouseClickDelegate(bool up, GeoPoint MousePosition, IView View);
 		/// <summary>
-		/// Der Zustand der linken Maustaste
+		/// The state of the left mouse button while the action runs.
 		/// </summary>
 		private enum MouseState { ClickDown, MoveDown, ClickUp, MoveUp, RightUp }
 		private enum ActivationMode { Inactivate, BySelection, ByHotspot }
 		/// <summary>
-		/// Dieses Interface dient der inneren Kommunikation dieser Klasse mit den
-		/// Input Objekten. Es ist nicht nach außen sichtbar 
+		/// The internal interface between the construct action and its input objects (<see cref="GeoPointInput"/>,
+		/// <see cref="LengthInput"/> etc.): the action initializes them, lets them build their entry in the property page,
+		/// forwards the mouse to them and asks them whether they are fixed. Not visible outside.
 		/// </summary>
 		private interface IInputObject
 		{
@@ -779,6 +786,12 @@ namespace CADability.Actions
 				}
 				get { return isfixed; }
 			}
+			/// <summary>
+			/// Called whenever <see cref="ReadOnly"/>, <see cref="Optional"/> or <see cref="Fixed"/> changes, so that the input
+			/// can update the highlight of its entry in the property page: an input is highlighted while it still expects a
+			/// value, i.e. while it is neither optional, fixed nor read-only. The default implementation does nothing; the
+			/// concrete input objects override it.
+			/// </summary>
 			protected virtual void AdjustHighlight()
 			{
 			}
@@ -861,6 +874,12 @@ namespace CADability.Actions
 					return GeoPoint.Origin;
 				}
 			}
+			/// <summary>
+			/// Shows <paramref name="errorMessage"/> as an error on the entry of this input in the property page, e.g. when
+			/// the value entered by the user is not acceptable for the action. The default implementation does nothing; inputs
+			/// with an edit field forward the message to their property entry, inputs without one ignore it.
+			/// </summary>
+			/// <param name="errorMessage">The text to display, or an empty string to clear the error</param>
 			public virtual void SetError(string errorMessage)
 			{
 
@@ -868,8 +887,18 @@ namespace CADability.Actions
 
 			#endregion
 		}
+		/// <summary>
+		/// An input object that does not take any input but shows a separator with a caption in the property page of the
+		/// action, to group the inputs that follow it (e.g. the lengths and the directions of a box). It is always fixed
+		/// and never receives the mouse or the keyboard. Add it to the action with <see cref="ConstructAction.SetInput"/>
+		/// like any other input.
+		/// </summary>
 		public class SeparatorInput : InputObject, IInputObject
 		{
+			/// <summary>
+			/// Creates a separator whose caption is the string table entry <paramref name="resourceId"/>.
+			/// </summary>
+			/// <param name="resourceId">Resource id of the caption in the <see cref="StringTable"/></param>
 			public SeparatorInput(string resourceId)
 				: base(resourceId)
 			{
@@ -942,6 +971,7 @@ namespace CADability.Actions
 			{
 			}
 
+			/// <inheritdoc/>
 			public override void SetError(string errorMessage)
 			{
 				// no error on this input possible
@@ -949,18 +979,30 @@ namespace CADability.Actions
 
 			#endregion
 		}
-		public class InputContainer : InputObject, IInputObject
 		/// <summary>
-		/// Input object for the ConstructAction that yields an <see cref="Angle"/>.
-		/// See <see cref="ConstructAction.SetInput"/>
+		/// An input object that groups other property entries under one expandable node in the property page of the
+		/// action. It does not take input itself; the entries to show are provided with <see cref="SetShowProperties"/>
+		/// and may be replaced while the action runs (e.g. the split curve action shows one entry per section of the
+		/// curve). Add it to the action with <see cref="ConstructAction.SetInput"/>.
 		/// </summary>
+		public class InputContainer : InputObject, IInputObject
 		{
 			SimplePropertyGroup simplePropertyGroup; // der Container
 			IPropertyEntry[] contents; // der Inhalt, wenn es noch keinen Container gibt
+			/// <summary>
+			/// Creates an empty container whose caption is the string table entry <paramref name="resourceId"/>.
+			/// </summary>
+			/// <param name="resourceId">Resource id of the caption in the <see cref="StringTable"/></param>
 			public InputContainer(string resourceId)
 				: base(resourceId)
 			{
 			}
+			/// <summary>
+			/// Sets the property entries shown as sub-entries of this container, replacing the previous ones. May be called
+			/// before the action is displayed (the entries are shown when the property page is built) as well as while the
+			/// action runs, in which case the property page is refreshed.
+			/// </summary>
+			/// <param name="contents">The entries to show</param>
 			public void SetShowProperties(IPropertyEntry[] contents)
 			{
 				if (simplePropertyGroup == null)
@@ -977,6 +1019,10 @@ namespace CADability.Actions
 					}
 				}
 			}
+			/// <summary>
+			/// Expands or collapses the container in the property page. Has no effect before the action is displayed.
+			/// </summary>
+			/// <param name="open">true to show the sub-entries, false to collapse them</param>
 			public void Open(bool open)
 			{
 				if (constructAction.propertyTreeView != null && simplePropertyGroup != null)
@@ -984,6 +1030,10 @@ namespace CADability.Actions
 					constructAction.propertyTreeView.OpenSubEntries(simplePropertyGroup, open);
 				}
 			}
+			/// <summary>
+			/// Returns the property entries currently shown in this container, as set by <see cref="SetShowProperties"/>.
+			/// </summary>
+			/// <returns>The sub-entries of the container, or null if none have been set</returns>
 			public IPropertyEntry[] GetShowProperties()
 			{
 				if (simplePropertyGroup == null)
@@ -1070,6 +1120,7 @@ namespace CADability.Actions
 			void IInputObject.SetFixed(bool isFixed)
 			{
 			}
+			/// <inheritdoc/>
 			public override void SetError(string errorMessage)
 			{
 
@@ -1077,6 +1128,10 @@ namespace CADability.Actions
 
 			#endregion
 		}
+		/// <summary>
+		/// Input object for the ConstructAction that yields an <see cref="Angle"/>.
+		/// See <see cref="ConstructAction.SetInput"/>
+		/// </summary>
 		public class AngleInput : InputObject, IInputObject
 		{
 			/// <summary>
@@ -1101,6 +1156,11 @@ namespace CADability.Actions
 			private AngleProperty angleProperty; // die Anzeige desselben
 
 			private Angle angle;
+			/// <summary>
+			/// The current value of this input (see <see cref="CADability.Angle"/>). It is updated by mouse and keyboard input
+			/// and by <see cref="ForceValue"/>; each change raises <see cref="InputValueChangedEvent"/>. It cannot be set
+			/// directly, use <see cref="ForceValue"/>.
+			/// </summary>
 			public Angle Angle
 			{
 				get
@@ -1241,7 +1301,7 @@ namespace CADability.Actions
 			/// <summary>
 			/// Delegate definiation for <see cref="InputValueChangedEvent"/>
 			/// </summary>
-			/// <param name="length">New length value</param>
+			/// <param name="angle">New angle value</param>
 			public delegate void InputValueChangedDelegate(Angle angle);
 			/// <summary>
 			/// Event will be rasied if the Angle property changed
@@ -1436,6 +1496,7 @@ namespace CADability.Actions
 			{
 				return Fixed;
 			}
+			/// <inheritdoc/>
 			protected override void AdjustHighlight()
 			{
 				if (angleProperty != null) angleProperty.Highlight = !Optional && !Fixed && !ReadOnly;
@@ -1444,6 +1505,7 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			/// <inheritdoc/>
 			public override void SetError(string errorMessage)
 			{
 				angleProperty.ErrorMessage = errorMessage;
@@ -1624,6 +1686,11 @@ namespace CADability.Actions
 			public event InputValueChangedDelegate InputValueChangedEvent;
 
 			private double length;
+			/// <summary>
+			/// The current value of this input in model units. It is updated by mouse and keyboard input and by
+			/// <see cref="ForceValue"/>; each change raises <see cref="InputValueChangedEvent"/>. It cannot be set directly,
+			/// use <see cref="ForceValue"/>.
+			/// </summary>
 			public double Length
 			{
 				get
@@ -1872,6 +1939,7 @@ namespace CADability.Actions
 			{
 				return Fixed;
 			}
+			/// <inheritdoc/>
 			protected override void AdjustHighlight()
 			{
 				if (lengthProperty != null) lengthProperty.Highlight = !Optional && !Fixed && !ReadOnly;
@@ -1880,6 +1948,7 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			/// <inheritdoc/>
 			public override void SetError(string errorMessage)
 			{
 				lengthProperty.ErrorMessage = errorMessage;
@@ -1979,13 +2048,17 @@ namespace CADability.Actions
 			/// <summary>
 			/// Delegate definiation for <see cref="InputValueChangedEvent"/>
 			/// </summary>
-			/// <param name="length">New length value</param>
+			/// <param name="newValue">New double value</param>
 			public delegate void InputValueChangedDelegate(double newValue);
 			/// <summary>
 			/// Event will be rasied if the Length property changed
 			/// </summary>
 			public event InputValueChangedDelegate InputValueChangedEvent;
 			private double val;
+			/// <summary>
+			/// The current value of this input. It is updated by mouse and keyboard input and by <see cref="ForceValue"/>;
+			/// each change raises <see cref="InputValueChangedEvent"/>. It cannot be set directly, use <see cref="ForceValue"/>.
+			/// </summary>
 			public double DoubleValue
 			{
 				get => val;
@@ -2202,6 +2275,7 @@ namespace CADability.Actions
 			{
 				return Fixed;
 			}
+			/// <inheritdoc/>
 			protected override void AdjustHighlight()
 			{
 				if (doubleProperty != null) doubleProperty.Highlight = !Optional && !Fixed && !ReadOnly;
@@ -2210,6 +2284,7 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			/// <inheritdoc/>
 			public override void SetError(string errorMessage)
 			{
 				doubleProperty.ErrorMessage = errorMessage;
@@ -2332,6 +2407,11 @@ namespace CADability.Actions
 			public event InputValueChangedDelegate InputValueChangedEvent;
 
 			private GeoPoint point; // der aktuelle Wert des Punktes
+			/// <summary>
+			/// The current point of this input in model coordinates. It is updated by mouse and keyboard input and by
+			/// <see cref="ForceValue"/>; each change raises <see cref="InputValueChangedEvent"/>. It cannot be set directly,
+			/// use <see cref="ForceValue"/>.
+			/// </summary>
 			public GeoPoint Point
 			{
 				get
@@ -2668,6 +2748,7 @@ namespace CADability.Actions
 			{
 				return Fixed;
 			}
+			/// <inheritdoc/>
 			protected override void AdjustHighlight()
 			{
 				if (geoPointProperty != null) geoPointProperty.Highlight = !Optional && !Fixed && !ReadOnly;
@@ -2676,6 +2757,7 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			/// <inheritdoc/>
 			public override void SetError(string errorMessage)
 			{
 				geoPointProperty.ErrorMessage = errorMessage;
@@ -2715,6 +2797,9 @@ namespace CADability.Actions
 				set { defaultGeoVector = value; }
 			}
 			private bool isAngle;
+			/// <summary>
+			/// Whether the vector is interpreted as an angle (true) or as a direction (false).
+			/// </summary>
 			/// <value>
 			/// The vector should be interpreted as an angle (IsAngle==true) or as
 			/// a direction (IsAngle==false). For an angle there is no vector length,
@@ -2835,6 +2920,11 @@ namespace CADability.Actions
 			public event InputValueChangedDelegate InputValueChangedEvent;
 
 			private GeoVector vector;
+			/// <summary>
+			/// The current vector of this input in model coordinates. It is updated by mouse and keyboard input and by
+			/// <see cref="ForceValue"/>; each change raises <see cref="InputValueChangedEvent"/>. It cannot be set directly,
+			/// use <see cref="ForceValue"/>.
+			/// </summary>
 			public GeoVector Vector
 			{
 				get => vector;
@@ -3131,6 +3221,7 @@ namespace CADability.Actions
 			{
 				return Fixed;
 			}
+			/// <inheritdoc/>
 			protected override void AdjustHighlight()
 			{
 				if (geoVectorProperty != null) geoVectorProperty.Highlight = !Optional && !Fixed && !ReadOnly;
@@ -3139,6 +3230,7 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			/// <inheritdoc/>
 			public override void SetError(string errorMessage)
 			{
 				geoVectorProperty.ErrorMessage = errorMessage;
@@ -3435,6 +3527,7 @@ namespace CADability.Actions
 			{
 				return Fixed;
 			}
+			/// <inheritdoc/>
 			protected override void AdjustHighlight()
 			{
 				if (lengthProperty != null) lengthProperty.Highlight = !Optional && !Fixed && !ReadOnly;
@@ -3443,6 +3536,7 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			/// <inheritdoc/>
 			public override void SetError(string errorMessage)
 			{
 			}
@@ -3560,13 +3654,17 @@ namespace CADability.Actions
 			/// <summary>
 			/// Delegate definiation for <see cref="InputValueChangedEvent"/>
 			/// </summary>
-			/// <param name="length">New length value</param>
+			/// <param name="newValue">New boolean value</param>
 			public delegate void InputValueChangedDelegate(bool newValue);
 			/// <summary>
 			/// Event will be rasied if the Length property changed
 			/// </summary>
 			public event InputValueChangedDelegate InputValueChangedEvent;
 			bool boolval;
+			/// <summary>
+			/// The current value of this input. It is updated by the user's selection and by <see cref="ForceValue"/>; each
+			/// change raises <see cref="InputValueChangedEvent"/>. It cannot be set directly, use <see cref="ForceValue"/>.
+			/// </summary>
 			public bool Value
 			{
 				get
@@ -3764,6 +3862,7 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			/// <inheritdoc/>
 			public override void SetError(string errorMessage)
 			{
 			}
@@ -3822,13 +3921,18 @@ namespace CADability.Actions
 			/// <summary>
 			/// Delegate definiation for <see cref="InputValueChangedEvent"/>
 			/// </summary>
-			/// <param name="length">New length value</param>
+			/// <param name="newValue">Index of the newly selected choice</param>
 			public delegate void InputValueChangedDelegate(int newValue);
 			/// <summary>
 			/// Event will be rasied if the Length property changed
 			/// </summary>
 			public event InputValueChangedDelegate InputValueChangedEvent;
 			int choice;
+			/// <summary>
+			/// The 0-based index of the currently selected choice (into the choices given to the constructor or to
+			/// <see cref="SetChoices"/>). It is updated by the user's selection and by <see cref="ForceValue"/>; each change
+			/// raises <see cref="InputValueChangedEvent"/>. It cannot be set directly, use <see cref="ForceValue"/>.
+			/// </summary>
 			public int Choice
 			{
 				get
@@ -3845,6 +3949,12 @@ namespace CADability.Actions
 				}
 			}
 
+			/// <summary>
+			/// Selects the choice with index <paramref name="val"/> as if the user had selected it: <see cref="SetChoiceEvent"/>
+			/// is raised (a handler must be attached), <see cref="Choice"/> is set and the dependent properties of the action
+			/// are refreshed. Does nothing when the input is <see cref="InputObject.ReadOnly"/>.
+			/// </summary>
+			/// <param name="val">0-based index of the choice to select</param>
 			public void ForceValue(int val)
 			{
 				if (ReadOnly) return;
@@ -3914,6 +4024,17 @@ namespace CADability.Actions
 			{
 				Choice = StartValue;
 			}
+			/// <summary>
+			/// Constructs a MultipleChoiceInput whose choices are given directly as strings instead of being taken from
+			/// the string table.
+			/// </summary>
+			/// <param name="resourceId">the resource id to specify a string from the StringTable.
+			/// ResourceId+".Label": the Label left of the
+			/// edit box. ResourceId+".ShortInfo": a short tooltip text ResourceId+"DetailedInfo":
+			/// a longer tooltip text.
+			/// </param>
+			/// <param name="values">the texts of the choices, in the order in which they are offered</param>
+			/// <param name="StartValue">0-based index of the initially selected choice</param>
 			public MultipleChoiceInput(string resourceId, string[] values, int StartValue)
 				: base(resourceId)
 			{
@@ -4060,6 +4181,7 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			/// <inheritdoc/>
 			public override void SetError(string errorMessage)
 			{
 			}
@@ -4071,6 +4193,7 @@ namespace CADability.Actions
 				constructAction.RefreshDependantProperties();
 				if (SetChoiceEvent != null) SetChoiceEvent(val);
 			}
+			/// <inheritdoc/>
 			public override bool ReadOnly
 			{
 				get
@@ -4132,8 +4255,11 @@ namespace CADability.Actions
 			/// </summary>
 			public enum ChangeType
 			{
+				/// <summary>A point was inserted at the given index.</summary>
 				Insert = 0,
+				/// <summary>The point at the given index was removed; the point passed with the event is invalid.</summary>
 				Remove = 1,
+				/// <summary>The point at the given index was moved or replaced.</summary>
 				Modify = 3
 			}
 
@@ -4283,6 +4409,7 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			/// <inheritdoc/>
 			public override void SetError(string errorMessage)
 			{
 			}
@@ -4419,6 +4546,11 @@ namespace CADability.Actions
 			public bool ModifiableOnly;
 
 			private ICurve[] curves;
+			/// <summary>
+			/// The curves currently offered by this input: the curves under the cursor, or the curves set with
+			/// <see cref="SetCurves"/>. One of them is the <see cref="SelectedCurve"/>. Each change raises
+			/// <see cref="InputValueCurvesChangedEvent"/>.
+			/// </summary>
 			public ICurve[] Curves
 			{
 				get => curves;
@@ -4433,6 +4565,11 @@ namespace CADability.Actions
 			}
 
 			private ICurve selectedCurve;
+			/// <summary>
+			/// The curve selected from <see cref="Curves"/> (shown highlighted in the view), or null if there is none. Each
+			/// change raises <see cref="InputValueSelectedCurveChangedEvent"/>. Use <see cref="SetSelectedCurve"/> or
+			/// <see cref="SetCurves"/> to change it.
+			/// </summary>
 			public ICurve SelectedCurve
 			{
 				get => selectedCurve;
@@ -4477,6 +4614,10 @@ namespace CADability.Actions
 			{
 				return Curves;
 			}
+			/// <summary>
+			/// Returns the currently selected curve, see <see cref="SelectedCurve"/>.
+			/// </summary>
+			/// <returns>The selected curve, or null if there is none</returns>
 			public ICurve GetSelectedCurve()
 			{
 				return SelectedCurve;
@@ -4784,6 +4925,7 @@ namespace CADability.Actions
 			{
 				return Fixed;
 			}
+			/// <inheritdoc/>
 			protected override void AdjustHighlight()
 			{
 				if (curvesProperty != null) curvesProperty.Highlight = !Optional && !Fixed && !ReadOnly;
@@ -4792,6 +4934,7 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			/// <inheritdoc/>
 			public override void SetError(string errorMessage)
 			{
 			}
@@ -4803,6 +4946,13 @@ namespace CADability.Actions
 				if (SelectedCurve != null) constructAction.feedBack.AddSelected(SelectedCurve);
 				constructAction.RefreshDependantProperties();
 			}
+			/// <summary>
+			/// Attaches a context menu to the entry of this input in the property page. The menu is loaded from the menu
+			/// resource by <paramref name="menuId"/> and its commands are sent to <paramref name="handler"/>. May only be
+			/// called after the entry has been built, i.e. when the action is active.
+			/// </summary>
+			/// <param name="menuId">Id of a popup menu in the menu resource</param>
+			/// <param name="handler">Receives the commands of the menu</param>
 			public void SetContextMenu(string menuId, ICommandHandler handler)
 			{
 				curvesProperty.SetContextMenu(menuId, handler);
@@ -4867,10 +5017,32 @@ namespace CADability.Actions
 			/// false: any kind of curves curves are yielded
 			/// </summary>
 			public bool ModifiableOnly;
+			/// <summary>
+			/// If true, only edges of faces, shells and solids are picked (<see cref="PickMode.singleEdge"/>), e.g. for a
+			/// fillet. May be combined with <see cref="FacesOnly"/>. Default: false.
+			/// </summary>
 			public bool EdgesOnly = false;
+			/// <summary>
+			/// If true, only faces are picked (<see cref="PickMode.singleFace"/>). May be combined with <see cref="EdgesOnly"/>.
+			/// Default: false.
+			/// </summary>
 			public bool FacesOnly = false;
+			/// <summary>
+			/// If true and the mouse snaps to a point, that snap point is offered to the <see cref="MouseOverGeoObjectsEvent"/>
+			/// as an additional <see cref="CADability.GeoObject.Point"/> object, so that the user can also pick a point, e.g.
+			/// a vertex. Default: false.
+			/// </summary>
 			public bool Points = false;
+			/// <summary>
+			/// If true, the input is not fixed by an accepted click, so the user can go on picking further objects (the
+			/// <see cref="MouseOverGeoObjectsEvent"/> handler collects them) until the action is finished explicitly. If false
+			/// (the default), the first accepted click fixes the input and the action proceeds to the next one.
+			/// </summary>
 			public bool MultipleInput;
+			/// <summary>
+			/// The mouse position (in pixels of the view) of the last mouse event this input processed. Internal state that
+			/// a <see cref="MouseOverGeoObjectsEvent"/> handler may use to pick additional objects at that position.
+			/// </summary>
 			public Point currentMousePoint;
 			private IGeoObject[] geoObjects;
 			private IGeoObject selectedGeoObject;
@@ -4893,7 +5065,7 @@ namespace CADability.Actions
 			/// <summary>
 			/// Set the selected GeoObject
 			/// </summary>
-			/// <param name="curve">this curve should be selected</param>
+			/// <param name="geoObject">this GeoObject should be selected</param>
 			public void SetSelectedGeoObject(IGeoObject geoObject)
 			{
 				geoObjectProperty.SetSelectedGeoObject(geoObject);
@@ -4919,7 +5091,7 @@ namespace CADability.Actions
 			/// </summary>
 			public event MouseOverGeoObjectsDelegate MouseOverGeoObjectsEvent;
 			/// <summary>
-			/// Delegate definition for <see cref="CurveSelectionChangedEvent"/>
+			/// Delegate definition for <see cref="GeoObjectSelectionChangedEvent"/>
 			/// </summary>
 			/// <param name="sender">this object</param>
 			/// <param name="SelectedGeoObject">the user selected GeoObject</param>
@@ -5097,6 +5269,7 @@ namespace CADability.Actions
 			{
 				return Fixed;
 			}
+			/// <inheritdoc/>
 			protected override void AdjustHighlight()
 			{
 				if (geoObjectProperty != null) geoObjectProperty.Highlight = !Optional && !Fixed && !ReadOnly;
@@ -5105,6 +5278,7 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			/// <inheritdoc/>
 			public override void SetError(string errorMessage)
 			{
 			}
@@ -5118,6 +5292,14 @@ namespace CADability.Actions
 				constructAction.RefreshDependantProperties();
 			}
 		}
+		/// <summary>
+		/// Input object for the ConstructAction that lets the user pick a BRep object with the mouse: a <see cref="Face"/>,
+		/// an <see cref="Edge"/>, a <see cref="Vertex"/> (when the mouse snaps to the start or end point of an edge) or an
+		/// axis (a <see cref="Line"/> carrying the user data "CADability.AxisOf"). The objects under the cursor are offered
+		/// to the <see cref="MouseOverBRepObjectsEvent"/>, whose handler decides whether to accept them. Used by the
+		/// parametric actions, e.g. to specify the object up to which a distance is measured. See
+		/// <see cref="ConstructAction.SetInput"/>.
+		/// </summary>
 		public class BRepObjectInput : InputObject, IInputObject
 		{
 			private string hitCursor, failCursor;
@@ -5152,7 +5334,16 @@ namespace CADability.Actions
 			{
 				set { failCursor = value; }
 			}
+			/// <summary>
+			/// If true, the input is not fixed by an accepted click, so the user can go on picking further objects (the
+			/// <see cref="MouseOverBRepObjectsEvent"/> handler collects them) until the action is finished explicitly. If false
+			/// (the default), the first accepted click fixes the input and the action proceeds to the next one.
+			/// </summary>
 			public bool MultipleInput;
+			/// <summary>
+			/// The mouse position (in pixels of the view) of the last mouse event this input processed. Internal state that
+			/// a <see cref="MouseOverBRepObjectsEvent"/> handler may use to pick additional objects at that position.
+			/// </summary>
 			public Point currentMousePoint;
 			private object[] bRepObjects;
 			private object selectedBRepObject;
@@ -5174,8 +5365,8 @@ namespace CADability.Actions
 			/// <summary>
 			/// Forces the given geoObjects to be displayed
 			/// </summary>
-			/// <param name="GeoObjects">array of GeoObjects</param>
-			/// <param name="selectedGeoObject">currently selected GeoObject</param>
+			/// <param name="objects">array of BRep objects (faces, edges or vertices)</param>
+			/// <param name="selectedBRepObject">currently selected BRep object</param>
 			public void SetBRepObject(object[] objects, object selectedBRepObject)
 			{
 				if (this.selectedBRepObject != null) constructAction.feedBack.RemoveSelected(BRepObjectToGeoObject(this.selectedBRepObject));
@@ -5190,7 +5381,7 @@ namespace CADability.Actions
 			/// <summary>
 			/// Set the selected GeoObject
 			/// </summary>
-			/// <param name="curve">this curve should be selected</param>
+			/// <param name="bRepObject">this BRep object should be selected</param>
 			public void SetSelectedBRepObject(object bRepObject)
 			{
 				bRepObjectProperty.SetSelectedBRepObject(bRepObject);
@@ -5204,22 +5395,22 @@ namespace CADability.Actions
 				return bRepObjects;
 			}
 			/// <summary>
-			/// Delegate definition for <see cref="MouseOverGeoObjectsEvent"/>
+			/// Delegate definition for <see cref="MouseOverBRepObjectsEvent"/>
 			/// </summary>
 			/// <param name="sender">this object</param>
-			/// <param name="TheGeoObjects">GeoObjects under the cursor</param>
+			/// <param name="bRepObjects">BRep objects under the cursor</param>
 			/// <param name="up">mous was clicked</param>
-			/// <returns>true, if you accept (one of the) GeoObjects</returns>
+			/// <returns>true, if you accept (one of the) BRep objects</returns>
 			public delegate bool MouseOverBRepObjectsDelegate(BRepObjectInput sender, object[] bRepObjects, bool up);
 			/// <summary>
 			/// Provide a method here to react on the user moving the cursor over GeoObjects.
 			/// </summary>
 			public event MouseOverBRepObjectsDelegate MouseOverBRepObjectsEvent;
 			/// <summary>
-			/// Delegate definition for <see cref="CurveSelectionChangedEvent"/>
+			/// Delegate definition for <see cref="BRepObjectSelectionChangedEvent"/>
 			/// </summary>
 			/// <param name="sender">this object</param>
-			/// <param name="SelectedGeoObject">the user selected GeoObject</param>
+			/// <param name="SelectedBRepObject">the user selected BRep object</param>
 			public delegate void BRepObjectSelectionChangedDelegate(BRepObjectInput sender, object SelectedBRepObject);
 			/// <summary>
 			/// Provide a method here to react on the user selecting a different curve
@@ -5382,6 +5573,7 @@ namespace CADability.Actions
 			{
 				return Fixed;
 			}
+			/// <inheritdoc/>
 			protected override void AdjustHighlight()
 			{
 				if (bRepObjectProperty != null) bRepObjectProperty.Highlight = !Optional && !Fixed && !ReadOnly;
@@ -5390,6 +5582,7 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			/// <inheritdoc/>
 			public override void SetError(string errorMessage)
 			{
 			}
@@ -5432,7 +5625,7 @@ namespace CADability.Actions
 			/// <summary>
 			/// Delegate definiation for <see cref="InputValueChangedEvent"/>
 			/// </summary>
-			/// <param name="length">New length value</param>
+			/// <param name="newValue">New string value</param>
 			public delegate void InputValueChangedDelegate(string newValue);
 			/// <summary>
 			/// Event will be rasied if the Length property changed
@@ -5462,6 +5655,10 @@ namespace CADability.Actions
 			/// file open dialog.
 			/// </summary>
 			public string FileNameFilter;
+			/// <summary>
+			/// If true, <see cref="SetStringEvent"/> is raised only when the edit field loses the focus or Enter is pressed,
+			/// not on every keystroke. Must be set before the action is displayed. Default: false.
+			/// </summary>
 			public bool NotifyOnLostFocusOnly = false;
 			string stringval;
 			/// <summary>
@@ -5477,6 +5674,12 @@ namespace CADability.Actions
 			{
 				IsFileNameInput = false;
 			}
+			/// <summary>
+			/// The text of this input as last obtained from <see cref="GetStringEvent"/> or set by <see cref="ForceValue"/>;
+			/// it is also the initial text of the edit field. Each change refreshes the edit field and raises
+			/// <see cref="InputValueChangedEvent"/>. Text typed by the user is delivered by <see cref="SetStringEvent"/> and is
+			/// not stored here unless <see cref="GetStringEvent"/> returns it. It cannot be set directly, use <see cref="ForceValue"/>.
+			/// </summary>
 			public string Content
 			{
 				get
@@ -5491,6 +5694,12 @@ namespace CADability.Actions
 				}
 			}
 
+			/// <summary>
+			/// Sets <see cref="Content"/> to <paramref name="val"/>, which refreshes the edit field and the dependent properties
+			/// of the action. <see cref="SetStringEvent"/> is not raised. Does nothing when the input is
+			/// <see cref="InputObject.ReadOnly"/>.
+			/// </summary>
+			/// <param name="val">the text to set</param>
 			public void ForceValue(string val)
 			{
 				//No InternalSetString implemented
@@ -5650,6 +5859,7 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			/// <inheritdoc/>
 			public override void SetError(string errorMessage)
 			{
 				stringProperty.ErrorMessage = errorMessage;
@@ -5736,11 +5946,19 @@ namespace CADability.Actions
 				isfixed = false;
 			}
 
+			/// <summary>
+			/// The current text of the <see cref="Text"/> object this input is connected with.
+			/// </summary>
 			public string Value
 			{
 				get { return text.TextString; }
 			}
 
+			/// <summary>
+			/// Replaces the text of the connected <see cref="Text"/> object by <paramref name="val"/>. Does nothing when the
+			/// input is <see cref="InputObject.ReadOnly"/>.
+			/// </summary>
+			/// <param name="val">the new text</param>
 			public void ForceValue(string val)
 			{
 				//No InternalSetEdit implemented
@@ -5782,7 +6000,7 @@ namespace CADability.Actions
 			/// <summary>
 			/// Delegate definiation for <see cref="InputValueChangedEvent"/>
 			/// </summary>
-			/// <param name="length">New length value</param>
+			/// <param name="newValue">New string value</param>
 			public delegate void InputValueChangedDelegate(string newValue);
 			/// <summary>
 			/// Event will be rasied if the Length property changed
@@ -5918,6 +6136,7 @@ namespace CADability.Actions
 				isfixed = isFixed;
 				editBox.Highlight = !isFixed;
 			}
+			/// <inheritdoc/>
 			public override void SetError(string errorMessage)
 			{
 				editBox.ErrorMessage = errorMessage;
@@ -5990,7 +6209,7 @@ namespace CADability.Actions
 			/// <summary>
 			/// Delegate definiation for <see cref="InputValueChangedEvent"/>
 			/// </summary>
-			/// <param name="length">New length value</param>
+			/// <param name="intValue">New integer value</param>
 			public delegate void InputValueChangedDelegate(int intValue);
 			/// <summary>
 			/// Event will be rasied if the Angle property changed
@@ -5998,6 +6217,10 @@ namespace CADability.Actions
 			public event InputValueChangedDelegate InputValueChangedEvent;
 
 			int intval;
+			/// <summary>
+			/// The current value of this input. Setting it refreshes the edit field and raises <see cref="InputValueChangedEvent"/>,
+			/// but does not raise <see cref="SetIntEvent"/> and does not fix the input.
+			/// </summary>
 			public int IntValue
 			{
 				get
@@ -6200,6 +6423,7 @@ namespace CADability.Actions
 			{
 				return Fixed;
 			}
+			/// <inheritdoc/>
 			protected override void AdjustHighlight()
 			{
 				if (intProperty != null) intProperty.Highlight = !Optional && !Fixed && !ReadOnly;
@@ -6208,6 +6432,7 @@ namespace CADability.Actions
 			{
 				Fixed = isFixed;
 			}
+			/// <inheritdoc/>
 			public override void SetError(string errorMessage)
 			{
 				intProperty.ErrorMessage = errorMessage;
@@ -6246,6 +6471,11 @@ namespace CADability.Actions
 		}
 		#endregion
 		private IInputObject[] InputDefinitions; // das sind die Eingabemöglichkeiten der Aktion (IInputObject)
+		/// <summary>
+		/// Returns the input objects of this action in the order in which they were passed to <see cref="SetInput"/>.
+		/// Must not be called before <see cref="SetInput"/>.
+		/// </summary>
+		/// <returns>A new list with the input objects</returns>
 		public List<InputObject> GetInputObjects()
 		{
 			List<InputObject> listInputObjectsInternal = new List<InputObject>(InputDefinitions.Length);
@@ -6397,9 +6627,8 @@ namespace CADability.Actions
 			}
 		}
 		/// <summary>
-		/// Dieses Objekt wird über der Zeichnung dargestellt. Kann auch auf null gesetzt werden
-		/// um kein Objekt (mehr) darzustallen. Mehrere Objekte können nur als Block dargestellt 
-		/// werden.
+		/// The object that is displayed on top of the drawing while the action runs, usually the object under construction.
+		/// Set it to null to display nothing. Several objects can only be displayed as a <see cref="Block"/>.
 		/// </summary>
 		public IGeoObject ActiveObject
 		{
@@ -6506,6 +6735,11 @@ namespace CADability.Actions
 				if (activeObject != null) OnActiveObjectChange(activeObject);
 			}
 		}
+		/// <summary>
+		/// If true and the <see cref="ActiveObject"/> is a <see cref="Block"/>, <see cref="OnDone"/> adds the children of
+		/// the block to the model as individual objects instead of the block itself. Used by actions that compose their
+		/// result in a block only for the feedback, e.g. the extrusion of several faces. Default: false.
+		/// </summary>
 		public bool DisassembleBlock
 		{
 			get
@@ -6755,6 +6989,11 @@ namespace CADability.Actions
 				InputDefinitions[currentInputIndex].OnMouse(e, mouseState, vw);
 			}
 		}
+		/// <summary>
+		/// The input object that currently has the focus, i.e. receives the mouse and keyboard input, or null if there
+		/// is none. Derived actions compare it with their inputs to find out what the mouse currently defines (e.g. the
+		/// radius or the center of a circle).
+		/// </summary>
 		protected object CurrentInput
 		{
 			get
@@ -6795,8 +7034,8 @@ namespace CADability.Actions
 		/// Implements <see cref="Action.OnMouseMove"/>. If you override this method
 		/// don't forget to call the bas implementation.
 		/// </summary>
-		/// <param name="e"><paramref name="Action.OnMouseMove.e"/></param>
-		/// <param name="vw"><paramref name="Action.OnMouseMove.vw"/></param>
+		/// <param name="e">MouseEventArgs of the call</param>
+		/// <param name="vw">the IView which contains the mouse</param>
 		public override void OnMouseMove(MouseEventArgs e, IView vw)
 		{
 			CurrentMousePoint = new Point(e.X, e.Y);
@@ -6817,8 +7056,8 @@ namespace CADability.Actions
 		/// Implements <see cref="Action.OnMouseUp"/>. If you override this method
 		/// don't forget to call the bas implementation.
 		/// </summary>
-		/// <param name="e"><paramref name="Action.OnMouseUp.e"/></param>
-		/// <param name="vw"><paramref name="Action.OnMouseUp.vw"/></param>
+		/// <param name="e">MouseEventArgs of the call</param>
+		/// <param name="vw">the IView which contains the mouse</param>
 		public override void OnMouseUp(MouseEventArgs e, IView vw)
 		{
 			CurrentMousePoint = new Point(e.X, e.Y);
@@ -6907,6 +7146,13 @@ namespace CADability.Actions
 		//        }
 		//    }
 		//}
+		/// <summary>
+		/// Tells whether the action could be finished in its current state: true when all inputs other than the one that
+		/// currently has the focus are fixed, optional or read-only, and the <see cref="ActiveObject"/> has valid data;
+		/// false when there is no active object. Available to derived actions; ConstructAction itself does not call it
+		/// at present.
+		/// </summary>
+		/// <returns>true if the action could be finished now</returns>
 		protected virtual bool MayFinish()
 		{
 			for (int i = 0; i < InputDefinitions.Length; ++i)
@@ -6926,8 +7172,8 @@ namespace CADability.Actions
 		/// Implements <see cref="Action.OnMouseDown"/>. If you override this method
 		/// don't forget to call the bas implementation.
 		/// </summary>
-		/// <param name="e"><paramref name="Action.OnMouseDown.e"/></param>
-		/// <param name="vw"><paramref name="Action.OnMouseDown.vw"/></param>
+		/// <param name="e">MouseEventArgs of the call</param>
+		/// <param name="vw">the IView which contains the mouse</param>
 		public override void OnMouseDown(MouseEventArgs e, IView vw)
 		{
 			CurrentMousePoint = new Point(e.X, e.Y);
@@ -6962,7 +7208,7 @@ namespace CADability.Actions
 			}
 		}
 		/// <summary>
-		/// Overrides <see cref="Action.OnEscape"/>. Usually you don't override this
+		/// Overrides <see cref="Action.OnEscape(object)"/>. Usually you don't override this
 		/// method, but handle the appropriate events of the input objects.
 		/// </summary>
 		public override bool OnEscape(object sender)
@@ -6974,15 +7220,13 @@ namespace CADability.Actions
 			RemoveThisAction();
 			return true;
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.Actions.Action.OnEscape ()"/>
-		/// </summary>
+		/// <inheritdoc/>
 		public override bool OnEscape()
 		{
 			return OnEscape(null);
 		}
 		/// <summary>
-		/// Overrides <see cref="Action.OnEnter"/>. Usually you don't override this
+		/// Overrides <see cref="Action.OnEnter(object)"/>. Usually you don't override this
 		/// method, but handle the appropriate events of the input objects.
 		/// </summary>
 		public override bool OnEnter(object sender)
@@ -7025,9 +7269,7 @@ namespace CADability.Actions
 				return false;
 			}
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.Actions.Action.OnEnter ()"/>
-		/// </summary>
+		/// <inheritdoc/>
 		public override bool OnEnter()
 		{
 			return OnEnter(null);
@@ -7287,8 +7529,8 @@ namespace CADability.Actions
 		/// Implements <see cref="Action.OnInactivate"/>. If you override this method
 		/// don't forget to call the bas implementation.
 		/// </summary>
-		/// <param name="NewActiveAction"><paramref name="Action.OnInactivate.NewActiveAction"/></param>
-		/// <param name="RemovingAction"><paramref name="Action.OnInactivate.RemovingAction"/></param>
+		/// <param name="NewActiveAction">the action that will become active</param>
+		/// <param name="RemovingAction">true: if called because the action is removed, false: if called when a new action is set on top of this action</param>
 		public override void OnInactivate(Action NewActiveAction, bool RemovingAction)
 		{
 			if (!RemovingAction)
@@ -7371,6 +7613,7 @@ namespace CADability.Actions
 		/// </summary>
 		/// <param name="e">MouseEventArgs with the mouse position</param>
 		/// <param name="vw">the view</param>
+		/// <param name="DidSnap">returns the snap mode that was applied, i.e. the reason why the point was snapped, or <see cref="SnapPointFinder.DidSnapModes.DidNotSnap"/> if no snapping took place</param>
 		/// <returns>point in model space</returns>
 		public virtual new GeoPoint SnapPoint(MouseEventArgs e, IView vw, out SnapPointFinder.DidSnapModes DidSnap)
 		{
@@ -7389,6 +7632,17 @@ namespace CADability.Actions
 			}
 			return res;
 		}
+		/// <summary>
+		/// Gets a point from the MouseEventArgs and the view, snapped according to the view's snap settings, with
+		/// <paramref name="basePoint"/> as the base point for the snap modes that need one (perpendicular foot point,
+		/// tangent point, orthogonal adjustment). Like <see cref="SnapPoint(MouseEventArgs, IView, out SnapPointFinder.DidSnapModes)"/>
+		/// it also takes a tangential point from <see cref="FindTangentialPoint"/> into account.
+		/// </summary>
+		/// <param name="e">MouseEventArgs with the mouse position</param>
+		/// <param name="basePoint">the base point for the snapping, in model coordinates</param>
+		/// <param name="vw">the view</param>
+		/// <param name="DidSnap">returns the snap mode that was applied, or <see cref="SnapPointFinder.DidSnapModes.DidNotSnap"/> if no snapping took place</param>
+		/// <returns>point in model space</returns>
 		public virtual new GeoPoint SnapPoint(MouseEventArgs e, GeoPoint basePoint, IView vw, out SnapPointFinder.DidSnapModes DidSnap)
 		{
 			GeoPoint res;
@@ -7461,12 +7715,7 @@ namespace CADability.Actions
 			}
 			return base.OnCommand(MenuId);
 		}
-		/// <summary>
-		/// Overrides <see cref="CADability.Actions.Action.OnUpdateCommand (string, CommandState)"/>
-		/// </summary>
-		/// <param name="MenuId"></param>
-		/// <param name="CommandState"></param>
-		/// <returns></returns>
+		/// <inheritdoc/>
 		public override bool OnUpdateCommand(string MenuId, CommandState CommandState)
 		{
 			switch (MenuId)
@@ -7560,6 +7809,17 @@ namespace CADability.Actions
 			backgroundTask = null; // um anzuzeigen, dass wir fertig sind
 								   //System.Diagnostics.Trace.WriteLine("StartThread-Done");
 		}
+		/// <summary>
+		/// Runs <paramref name="MethodToInvoke"/> on a separate thread, e.g. to compute a new active object while the user
+		/// goes on moving the mouse, and invokes <paramref name="CallbackOnDone"/> once it has completed. The callback runs on
+		/// the background thread as well (or on the calling thread when <see cref="WaitForBackgroundTask"/> finishes the
+		/// task), so UI work must be marshalled by the caller. Only one background task per action is supported: check
+		/// <see cref="IsBackgroundTaskActive"/> and call <see cref="CancelBackgroundTask"/> before starting a new one. If
+		/// the method throws, the task ends without invoking the callback.
+		/// </summary>
+		/// <param name="MethodToInvoke">The method to run in the background; it receives <paramref name="invokeParameters"/></param>
+		/// <param name="CallbackOnDone">Parameterless method invoked after <paramref name="MethodToInvoke"/> has completed</param>
+		/// <param name="invokeParameters">The arguments passed to <paramref name="MethodToInvoke"/></param>
 		protected void StartBackgroundTask(Delegate MethodToInvoke, Delegate CallbackOnDone, params object[] invokeParameters)
 		{
 			//System.Diagnostics.Trace.WriteLine("StartBackgroundTask");
@@ -7567,6 +7827,9 @@ namespace CADability.Actions
 			backgroundTask.Start(new object[] { MethodToInvoke, CallbackOnDone, invokeParameters });
 			//System.Diagnostics.Trace.WriteLine("StartBackgroundTask-Done");
 		}
+		/// <summary>
+		/// True while a task started with <see cref="StartBackgroundTask"/> is running (including its callback).
+		/// </summary>
 		protected bool IsBackgroundTaskActive
 		{
 			get
@@ -7574,6 +7837,10 @@ namespace CADability.Actions
 				return backgroundTask != null;
 			}
 		}
+		/// <summary>
+		/// Aborts the running background task (see <see cref="StartBackgroundTask"/>) and waits until its thread has ended.
+		/// The callback is not invoked. Does nothing when no task is running.
+		/// </summary>
 		protected void CancelBackgroundTask()
 		{
 			//System.Diagnostics.Trace.WriteLine("CancelBackgroundTask");
@@ -7585,6 +7852,11 @@ namespace CADability.Actions
 			}
 			//System.Diagnostics.Trace.WriteLine("CancelBackgroundTask-Done");
 		}
+		/// <summary>
+		/// Blocks, showing the wait cursor, until the running background task has finished, so that its result is
+		/// available, e.g. in <see cref="OnDone"/>. If the computation has already completed but the callback has not run
+		/// yet, the callback is invoked here on the calling thread. Does nothing when no task is running.
+		/// </summary>
 		protected void WaitForBackgroundTask()
 		{
 			//System.Diagnostics.Trace.WriteLine("WaitForBackgroundTask");
@@ -7614,6 +7886,11 @@ namespace CADability.Actions
 		#endregion
 
 		bool IPropertyEntry.IsOpen { get; set; }
+		/// <summary>
+		/// Raised when the entry of this action in the property page is expanded or collapsed, with
+		/// <see cref="StateChangedArgs.State.OpenSubEntries"/> or <see cref="StateChangedArgs.State.CollapseSubEntries"/>.
+		/// Part of the <see cref="IPropertyEntry"/> implementation of the action.
+		/// </summary>
 		public event PropertyEntryChangedStateDelegate StateChangedEvent;
 		void IPropertyEntry.Opened(bool isOpen)
 		{
@@ -7625,6 +7902,11 @@ namespace CADability.Actions
 					StateChangedEvent(this, new StateChangedArgs(StateChangedArgs.State.CollapseSubEntries));
 			}
 		}
+		/// <summary>
+		/// If true, the OK and Cancel buttons are not shown in the title entry of the action in the property page; the
+		/// action is then finished with Enter or the mouse and cancelled with Escape. Must be set before the action is
+		/// displayed. Default: false.
+		/// </summary>
 		public bool HideButtons { get; set; } = false;
 		PropertyEntryType IPropertyEntry.Flags
 		{

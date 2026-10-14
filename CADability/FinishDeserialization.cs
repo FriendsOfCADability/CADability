@@ -78,6 +78,7 @@ namespace CADability
         /// Add an object to the list.
         /// </summary>
         /// <param name="toAdd">The object to add</param>
+        /// <param name="data">Additional data which is supplied at the call to DeserializationDone</param>
         public void Add(IFinishDeserialization toAdd, params object[] data)
         {
             objectsToCall.Add(toAdd);   // beide Arrays müssen synchron bleiben

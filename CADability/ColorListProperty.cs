@@ -11,13 +11,21 @@ using Point = System.Drawing.Point;
 namespace CADability.UserInterface
 {
     /// <summary>
-    /// 
+    /// The entry of a single color in the property page display of a <see cref="ColorList"/>. The label shows the
+    /// name of the color (editable unless the color is static), the value shows a color box; clicking on it opens
+    /// the color dialog. The context menu ("MenuId.ColorListEntry") allows to delete the color, to make it the
+    /// current color of the list, to change the color or to rename it. The entry of the current color is shown in bold.
     /// </summary>
 
     public class ColorListProperty : PropertyEntryImpl, ICommandHandler
     {
         private ColorList colorList; // the ColorList in which it is contained
         private int index; // index in the ColorList
+        /// <summary>
+        /// Creates the entry for the color with the given index in <paramref name="ColorList"/>.
+        /// </summary>
+        /// <param name="ColorList">The list containing the color</param>
+        /// <param name="Index">Index of the color in the list</param>
         public ColorListProperty(ColorList ColorList, int Index)
         {
             colorList = ColorList;
@@ -25,6 +33,7 @@ namespace CADability.UserInterface
             base.resourceIdInternal = "ColorName";
         }
         #region PropertyEntry
+        /// <inheritdoc/>
         public override PropertyEntryType Flags
         {
             get
@@ -35,6 +44,7 @@ namespace CADability.UserInterface
                 return flags;
             }
         }
+        /// <inheritdoc/>
         public override string LabelText
         {
             get
@@ -42,6 +52,7 @@ namespace CADability.UserInterface
                 return colorList.GetName(index);
             }
         }
+        /// <inheritdoc/>
         public override MenuWithHandler[] ContextMenu
         {
             get
@@ -49,10 +60,12 @@ namespace CADability.UserInterface
                 return MenuResource.LoadMenuDefinition("MenuId.ColorListEntry", false, this);
             }
         }
+        /// <inheritdoc/>
         public override void ButtonClicked(PropertyEntryButton button)
         {
                     OnClick(null, null);
         }
+        /// <inheritdoc/>
         public override string[] GetDropDownList()
         {
             string[] res = new string[colorList.Count];
@@ -62,6 +75,7 @@ namespace CADability.UserInterface
             }
             return res;
         }
+        /// <inheritdoc/>
         public override string Value
         {
             get
@@ -70,10 +84,12 @@ namespace CADability.UserInterface
                 return "[[ColorBox:" + colorList[index].Color.R.ToString() + ":" + colorList[index].Color.G.ToString() + ":" + colorList[index].Color.B.ToString() + "]]" + colorList[index].Name;
             }
         }
+        /// <inheritdoc/>
         public override bool EditTextChanged(string newValue)
         {
             return true;
         }
+        /// <inheritdoc/>
         public override void EndEdit(bool aborted, bool modified, string newValue)
         {
             if (!aborted && !colorList.IsStatic(index))
@@ -141,6 +157,7 @@ namespace CADability.UserInterface
         void ICommandHandler.OnSelected(MenuWithHandler selectedMenuItem, bool selected) { }
         #endregion
 
+        /// <inheritdoc/>
         public override void ListBoxSelected(int selectedIndex)
         {
         }

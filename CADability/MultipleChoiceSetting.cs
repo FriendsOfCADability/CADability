@@ -9,7 +9,7 @@ namespace CADability
     /// It represents a setting defined by a name and a value.
     /// This setting can be displayed and modified in the control center. 
     /// It is represented as a combo box. The label left of the combo box is given
-    /// by the resourceId <see cref="StringTable.GetString"/>, the values are
+    /// by the resourceId <see cref="StringTable.GetString(string)"/>, the values are
     /// </summary>
     [Serializable()]
     public class MultipleChoiceSetting : MultipleChoiceProperty, ISerializable, ISettingChanged, IJsonSerialize
@@ -55,6 +55,7 @@ namespace CADability
                 base.SetSelection(selected);
             }
         }
+        /// <inheritdoc/>
         public override void SetSelection(int toSelect)
         {
             base.SetSelection(toSelect);
@@ -77,10 +78,11 @@ namespace CADability
             if (selected >= 0 && selected < base.choices.Length) base.SelectedText = base.choices[selected];
         }
         /// <summary>
-        /// Implements <see cref="ISerializable.GetObjectData"/>
+        /// Writes the data of this object for the legacy binary serialization (<see cref="System.Runtime.Serialization.ISerializable"/>).
+        /// Files are written in the JSON format (<see cref="IJsonSerialize"/>) now; the binary format is still read.
         /// </summary>
-        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo"/> to populate with data.</param>
-        /// <param name="context">The destination (<see cref="System.Runtime.Serialization.StreamingContext"/>) for this serialization.</param>
+        /// <param name="info">receives the data</param>
+        /// <param name="context">the destination of the serialization</param>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Selected", selected, selected.GetType());
@@ -105,6 +107,7 @@ namespace CADability
         }
         protected MultipleChoiceSetting() { }
         #endregion
+        /// <inheritdoc/>
         protected override void OnSelectionChanged(string selected)
         {
             base.OnSelectionChanged(selected);

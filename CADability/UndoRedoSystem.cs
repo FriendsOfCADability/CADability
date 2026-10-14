@@ -467,11 +467,31 @@ namespace CADability
                 }
             }
         }
+        /// <summary>
+        /// Signature of the handlers of <see cref="BeginContinousChangesEvent"/>, raised when a sequence of continuous changes starts,
+        /// i.e. at the first change within a new context (see <see cref="ContextFrame"/>), e.g. when the user starts dragging an object.
+        /// </summary>
+        /// <param name="source">The <see cref="UndoRedoSystem"/> raising the event</param>
         public delegate void BeginContinousChangesDelegate(object source);
+        /// <summary>
+        /// Signature of the handlers of <see cref="EndContinousChangesEvent"/>, raised when a sequence of continuous changes ends, i.e.
+        /// when a change with a different context (see <see cref="ContextFrame"/>) occurs or <see cref="ClearContext"/> is called.
+        /// </summary>
+        /// <param name="source">The <see cref="UndoRedoSystem"/> raising the event</param>
         public delegate void EndContinousChangesDelegate(object source);
         public event BeginContinousChangesDelegate BeginContinousChangesEvent;
         public event EndContinousChangesDelegate EndContinousChangesEvent;
+        /// <summary>
+        /// Signature of the handlers of <see cref="OpeningUndoFrameEvent"/>, raised when an undo frame is opened (see
+        /// <see cref="OpenUndoFrame"/> and <see cref="UndoFrame"/>); all changes until the frame is closed form a single undo step.
+        /// </summary>
+        /// <param name="source">The frame object, the same which <see cref="OpenUndoFrame"/> returns</param>
         public delegate void OpeningUndoFrameDelegate(object source);
+        /// <summary>
+        /// Signature of the handlers of <see cref="ClosingUndoFrameEvent"/>, raised when an undo frame is closed (see
+        /// <see cref="CloseUndoFrame"/>).
+        /// </summary>
+        /// <param name="source">The frame object that was closed</param>
         public delegate void ClosingUndoFrameDelegate(object source);
         public event OpeningUndoFrameDelegate OpeningUndoFrameEvent;
         public event ClosingUndoFrameDelegate ClosingUndoFrameEvent;

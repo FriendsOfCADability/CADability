@@ -5,6 +5,16 @@ using System.Collections.Generic;
 
 namespace CADability.Actions
 {
+    /// <summary>
+    /// Interactive construction of solids by extrusion: the user picks one or more closed planar paths, closed curves or faces
+    /// (the current selection is used when the action is started with it) and defines the extrusion by a height perpendicular to
+    /// the plane of the curve or to the drawing plane, by a vector or by a pipe path along which the shape is swept; an optional
+    /// second height or vector offsets the base of the solid. The solids (see
+    /// <see cref="Make3D.MakePrism(IGeoObject, GeoVector, Project, bool)"/> and <see cref="Make3D.MakePipe(IGeoObject, Path, Project)"/>)
+    /// are inserted into the model, united with or subtracted from the existing solids according to
+    /// <see cref="IFrame.SolidModellingMode"/>. Started by the menu command "MenuId.Constr.Solid.FaceExtrude"; its id is
+    /// "Constr.Solid.FaceExtrude".
+    /// </summary>
     public class Constr3DFaceExtrude : ConstructAction
     {
         private GeoObjectInput geoObjectInput;
@@ -605,9 +615,7 @@ namespace CADability.Actions
         }
 
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnSetAction ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void OnSetAction()
         {
             base.ActiveObject = Face.Construct();
@@ -684,20 +692,16 @@ namespace CADability.Actions
         }
 
 
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.Action.GetID ()"/>
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public override string GetID()
         { return "Constr.Solid.FaceExtrude"; }
 
+        /// <inheritdoc/>
         public override bool AutoRepeat()
         {
             return false; // autorepeating this action seems not pracitcable
         }
-        /// <summary>
-        /// Overrides <see cref="CADability.Actions.ConstructAction.OnDone ()"/>
-        /// </summary>
+        /// <inheritdoc/>
         public override void OnDone()
         {
             if (base.ShowActiveObject == true)

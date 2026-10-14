@@ -1461,6 +1461,12 @@ namespace CADability
         Dictionary<Face, HashSet<Edge>> faceToIntersectionEdges; // faces of both shells with their intersection edges
         Dictionary<Face, HashSet<Face>> faceToCommonFaces; // faces which have overlapping common parts on them
         Dictionary<Edge, List<Vertex>> edgesToSplit;
+        /// <summary>
+        /// The deviation of intersection vertices on an edge from the surfaces of the edge (<see cref="DeviationOfEdge"/>), only where it matters for <c>precision</c>. The edges of
+        /// imported shells are often only as precise as the tolerance of the file, e.g. 1e-5 m in a STEP file. A vertex on such an edge
+        /// is not that close to the intersection curves of the faces of the edge with the other face, which must end in this vertex.
+        /// </summary>
+        Dictionary<Vertex, double> vertexTolerance = new Dictionary<Vertex, double>();
         HashSet<Edge> edgesNotToUse; // these edges are identical to intersection edges, but are original edges. They must not be used when collecting faces
         HashSet<IntersectionVertex> intersectionVertices; // die Mange aller gefundenen Schnittpunkte (mit Rückverweis zu Kante und face)
         Dictionary<DoubleFaceKey, List<IntersectionVertex>> facesToIntersectionVertices; // Faces mit den zugehörigen Schnittpunkt
@@ -1596,6 +1602,8 @@ namespace CADability
                     }
                     Vertex v = new Vertex(ip[i]);
                     v.AddPositionOnFace(ef.face, uvOnFace[i]);
+                    double deviation = DeviationOfEdge(ef.edge, ip[i]);
+                    if (deviation * MaxToleranceFactor > precision) vertexTolerance[v] = deviation;
                     IntersectionVertex iv = new IntersectionVertex();
                     iv.v = v;
                     iv.edge = ef.edge;
@@ -1636,6 +1644,39 @@ namespace CADability
                 }
             }
         }
+        /// <summary>
+        /// How far <paramref name="p"/>, a point on the curve of <paramref name="edge"/>, is from the surfaces of the faces of the edge and from
+        /// the curves of the edge on these faces, where the edge is split at this point.
+        /// </summary>
+        private static double DeviationOfEdge(Edge edge, GeoPoint p)
+        {
+            double res = 0.0;
+            foreach (Face face in new Face[] { edge.PrimaryFace, edge.SecondaryFace })
+            {
+                if (face == null) continue;
+                res = Math.Max(res, Math.Abs(face.Surface.GetDistance(p)));
+                ICurve2D c2d = edge.Curve2D(face);
+                if (c2d == null) continue;
+                double pos = edge.FindPeriodicPosition(c2d, face.Surface.PositionOf(p), face.Surface);
+                if (pos >= 0.0 && pos <= 1.0) res = Math.Max(res, face.Surface.PointAt(c2d.PointAt(pos)) | p);
+            }
+            return res;
+        }
+        /// <summary>
+        /// How far the intersection curve of the surfaces of <paramref name="face1"/> and <paramref name="face2"/> may be from <paramref name="p"/>,
+        /// a point which is up to <paramref name="deviation"/> away from these surfaces: deviation / sin(angle between the surfaces), with some margin.
+        /// </summary>
+        private static double DistanceToIntersection(Face face1, Face face2, GeoPoint p, double deviation)
+        {
+            GeoVector n1 = face1.Surface.GetNormal(face1.Surface.PositionOf(p));
+            GeoVector n2 = face2.Surface.GetNormal(face2.Surface.PositionOf(p));
+            double sin = Precision.IsNullVector(n1) || Precision.IsNullVector(n2) ? 0.0 : (n1.Normalized ^ n2.Normalized).Length;
+            return 2.0 * deviation / Math.Max(sin, 2.0 / MaxToleranceFactor);
+        }
+        /// <summary>
+        /// <see cref="DistanceToIntersection"/> is at most this multiple of the deviation.
+        /// </summary>
+        private const double MaxToleranceFactor = 20.0;
         /// <summary>
         /// An edge, which grazes the surface of a face, has an ill-conditioned intersection point with it: when the edge enters a cylinder
         /// of radius r at a depth d near a tangent line, the intersection point moves by sqrt(2*r*d) along the surface, i.e. by 1.3e-3 for
@@ -4381,7 +4422,10 @@ namespace CADability
                     fc.CopyAttributes(faceToSplit);
                     if (faceToSplit.Owner != null) fc.UserData["BRepIntersection.IsPartOf"] = faceToSplit.Owner.GetHashCode(); // only hash code here to avoid cloning user data of damaged faces
 #if DEBUG
-                    System.Diagnostics.Debug.Assert(fc.CheckConsistency());
+                    // where an edge deviates from its surfaces, the curves of the new edges end up to that deviation (times the factor) away from the vertex
+                    double vertexPrecision = 1e-4;
+                    foreach (Vertex vtx in fc.Vertices) if (vertexTolerance.TryGetValue(vtx, out double deviation)) vertexPrecision = Math.Max(vertexPrecision, MaxToleranceFactor * deviation);
+                    System.Diagnostics.Debug.Assert(fc.CheckConsistency(vertexPrecision));
                     if (fc.GetHashCode() == 115)
                     {
                         SimpleShape ss = fc.Area;
@@ -9427,10 +9471,12 @@ namespace CADability
 
                 List<Vertex> usedVertices = new List<Vertex>(involvedVertices.Count);
                 List<GeoPoint> points = new List<GeoPoint>(involvedVertices.Count); // usedVertices and points are synchronous arrays, so we later can find the vertex from a point (index)
+                List<double> pointPrecision = new List<double>(involvedVertices.Count);
                 foreach (Vertex v in involvedVertices)
                 {
                     usedVertices.Add(v);
                     points.Add(v.Position);
+                    pointPrecision.Add(vertexTolerance.TryGetValue(v, out double deviation) ? DistanceToIntersection(item.Key.face1, item.Key.face2, v.Position, deviation) : precision);
                 }
 
                 if (involvedVertices.Count == 2 && knownIntersections != null)
@@ -9486,7 +9532,7 @@ namespace CADability
                 double[,] params2dFace2;
                 GeoPoint2D[] paramsuvsurf1;
                 GeoPoint2D[] paramsuvsurf2;
-                if (Surfaces.Intersect(item.Key.face1.Surface, item.Key.face1.Area.GetExtent(), item.Key.face2.Surface, item.Key.face2.Area.GetExtent(), points, out c3ds, out crvsOnSurface1, out crvsOnSurface2, out params3d, out params2dFace1, out params2dFace2, out paramsuvsurf1, out paramsuvsurf2, precision))
+                if (Surfaces.Intersect(item.Key.face1.Surface, item.Key.face1.Area.GetExtent(), item.Key.face2.Surface, item.Key.face2.Area.GetExtent(), points, out c3ds, out crvsOnSurface1, out crvsOnSurface2, out params3d, out params2dFace1, out params2dFace2, out paramsuvsurf1, out paramsuvsurf2, precision, pointPrecision))
                 {
                     if (usedVertices.Count < points.Count)
                     {

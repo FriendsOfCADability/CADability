@@ -5657,8 +5657,11 @@ namespace CADability.GeoObject
         }
         internal static bool Intersect(ISurface surface1, BoundingRect bounds1, ISurface surface2, BoundingRect bounds2, List<GeoPoint> points,
             out ICurve[] crvs3d, out ICurve2D[] crvsOnSurface1, out ICurve2D[] crvsOnSurface2, out double[,] params3d, out double[,] params2dsurf1, out double[,] params2dsurf2,
-            out GeoPoint2D[] paramsuvsurf1, out GeoPoint2D[] paramsuvsurf2, double precision)
+            out GeoPoint2D[] paramsuvsurf1, out GeoPoint2D[] paramsuvsurf2, double precision, IList<double> pointPrecision = null)
         {   // vor allem für BRepOperation.
+            // pointPrecision: optional, a larger precision for individual points, e.g. for a point on an imported edge, which deviates from its surfaces.
+            // Such a point belongs to the intersection curve, if it is that close to it.
+            double PrecisionOf(int j) => pointPrecision != null && j < pointPrecision.Count ? Math.Max(precision, pointPrecision[j]) : precision;
             // es dient z.Z. vor allem dafür, einfache Schnitte schnell zu berechnen und das Ergebnis in 3d und 2d mit allen u und uv Werten für die gegebenen Punkte zu liefern,
             // damit diese nicht hinterher mehrfach neu berechnet werden müssen.
             // ein Schnitt zweier surfaces kann auch mehrere Schnittlinien liefern (vor allem bei NURBS, aber auch Zylinder/Ebene, Zylinder Kugel u.s.w.)
@@ -5703,7 +5706,7 @@ namespace CADability.GeoObject
                     List<GeoPoint> pointsOnCurve = new List<GeoPoint>();
                     for (int j = 0; j < points.Count; j++)
                     {
-                        if (dscs[i].Curve3D.DistanceTo(points[j]) < precision)
+                        if (dscs[i].Curve3D.DistanceTo(points[j]) < PrecisionOf(j))
                         {
                             pointsOnCurve.Add(points[j]);
                         }
@@ -5746,7 +5749,7 @@ namespace CADability.GeoObject
                 for (int j = 0; j < points.Count; j++)
                 {
                     double d = cv.DistanceTo(points[j]);
-                    if (d < precision) // auf die nächstgelegene Kurve mappen
+                    if (d < PrecisionOf(j)) // auf die nächstgelegene Kurve mappen
                     {
                         params3d[i, j] = cv.PositionOf(points[j]);
                         params2dsurf1[i, j] = cvons1.PositionOf(paramsuvsurf1[j]);

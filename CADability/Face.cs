@@ -10922,6 +10922,14 @@ namespace CADability.GeoObject
         /// </summary>
         /// <returns>true if the face is consistent, false if a violation was found</returns>
         public bool CheckConsistency()
+        {
+            return CheckConsistency(1e-4);
+        }
+        /// <summary>
+        /// <see cref="CheckConsistency()"/>, where the ends of the curves of an edge may be <paramref name="vertexPrecision"/> away from
+        /// the vertices of the edge.
+        /// </summary>
+        internal bool CheckConsistency(double vertexPrecision)
         {   // consistency check
             if (!IsConnectedLoop(outline)) return false;
             for (int i = 0; i < holes.Length; i++)
@@ -10944,11 +10952,11 @@ namespace CADability.GeoObject
             // sind die 2d Kurven richtig orientiert?
             foreach (Edge edg in Edges)
             {
-                if (edg.Curve3D != null && (edg.Curve3D.StartPoint | edg.Vertex1.Position) > 1e-4)
+                if (edg.Curve3D != null && (edg.Curve3D.StartPoint | edg.Vertex1.Position) > vertexPrecision)
                 {
                     return false;
                 }
-                if (edg.Curve3D != null && (edg.Curve3D.EndPoint | edg.Vertex2.Position) > 1e-4)
+                if (edg.Curve3D != null && (edg.Curve3D.EndPoint | edg.Vertex2.Position) > vertexPrecision)
                 {
                     return false;
                 }
@@ -10957,11 +10965,11 @@ namespace CADability.GeoObject
                 GeoPoint sp, ep;
                 sp = surface.PointAt(c2d.StartPoint);
                 ep = surface.PointAt(c2d.EndPoint);
-                if ((sp | edg.StartVertex(this).Position) > 1e-4)
+                if ((sp | edg.StartVertex(this).Position) > vertexPrecision)
                 {
                     return false;
                 }
-                if ((ep | edg.EndVertex(this).Position) > 1e-4)
+                if ((ep | edg.EndVertex(this).Position) > vertexPrecision)
                 {
                     return false;
                 }

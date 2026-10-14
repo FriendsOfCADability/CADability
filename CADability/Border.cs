@@ -1407,12 +1407,18 @@ namespace CADability.Shapes
 
 		internal static double SignedArea(ICurve2D[] curves)
 		{
+			// The area is taken relative to a point of the loop, not to the origin: the curves of a loop do not always meet exactly,
+			// e.g. on a face of an imported shell, whose edges deviate from its surface, after it was split at such an edge.
+			// Relative to the origin each gap adds the triangle of the origin and the gap, which can exceed the area of a narrow loop
+			// far from the origin and turn its sign. For a closed loop both are the same.
 			double a = 0.0;
 			double maxa = double.MinValue;
+			GeoPoint2D r = curves.Length > 0 ? curves[0].StartPoint : GeoPoint2D.Origin;
 			for (int i = 0; i < curves.Length; ++i)
 			{
 				double aa = curves[i].GetArea();
-				a += aa;
+				GeoVector2D chord = curves[i].EndPoint - curves[i].StartPoint;
+				a += aa - (r.x * chord.y - r.y * chord.x) / 2.0;
 				maxa = Math.Max(maxa, Math.Abs(aa));
 			}
 			if (Math.Abs(a) < maxa * 1e-5)

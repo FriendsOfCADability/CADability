@@ -14,8 +14,8 @@ namespace CADability.Tests
     /// those into project files, so that projects with pictures open on every platform (issue #412, step 7). The kernel
     /// reads only the size from the header; GDI+ decodes the image for painting where it is available.
     /// pictures-1x.cdb and pictures-1x.cdb.json were written by CADability 1.x before this change (on Windows and .NET 8,
-    /// with GDI+ bitmaps): a 7×5 picture, a 9×4 picture loaded from a JPEG and a 4×3 icon, whose pixel (x, y) is
-    /// RGB (28x, 50y, 128).
+    /// with GDI+ bitmaps), pictures-1x-net48.cdb and pictures-1x-net48.cdb.json by the same code on .NET Framework 4.8:
+    /// a 7×5 picture, a 9×4 picture loaded from a JPEG and a 4×3 icon, whose pixel (x, y) is RGB (28x, 50y, 128).
     /// </summary>
     [TestClass]
     public class PictureImageTests
@@ -116,7 +116,7 @@ namespace CADability.Tests
             Assert.AreEqual(new GeoPoint(4, 5, 6), readIcon.Location);
         }
 
-        private static void AssertLegacyPictures(Project project, string file)
+        private static void AssertLegacyPictures(Project project, string file, bool jpegKept)
         {
             Assert.IsNotNull(project, "could not read " + file);
             Picture[] pictures = project.GetActiveModel().AllObjects.OfType<Picture>().ToArray();
@@ -126,9 +126,9 @@ namespace CADability.Tests
             Assert.AreEqual((7, 5), (png.PixelWidth, png.PixelHeight), file);
             Assert.AreEqual(new GeoPoint(1, 2, 3), png.Location, file);
             Assert.AreEqual(new GeoVector(70, 0, 0), png.DirectionWidth, file);
-            // the JPEG bitmap was serialized by System.Drawing.Common on .NET 8, which stores every image as PNG
+            // GDI+ on .NET Framework serializes a bitmap in its own format, System.Drawing.Common on .NET 8 every bitmap as PNG
             Picture jpeg = pictures.Single(p => p.Path == "pattern.jpg");
-            Assert.IsNotNull(EncodedImage.FormatOf(jpeg.ImageData), file);
+            Assert.AreEqual(jpegKept ? "jpeg" : "png", EncodedImage.FormatOf(jpeg.ImageData), file);
             Assert.AreEqual((9, 4), (jpeg.PixelWidth, jpeg.PixelHeight), file);
             Icon icon = project.GetActiveModel().AllObjects.OfType<Icon>().Single();
             Assert.AreEqual((4, 3), (icon.PixelWidth, icon.PixelHeight), file);
@@ -145,14 +145,18 @@ namespace CADability.Tests
         }
 
         [TestMethod]
-        public void A1xJsonFileWithPicturesOpens()
+        [DataRow("pictures-1x.cdb.json", false)]
+        [DataRow("pictures-1x-net48.cdb.json", true)]
+        public void A1xJsonFileWithPicturesOpens(string file, bool jpegKept)
         {
-            AssertLegacyPictures(Project.ReadFromFile(CdbFile("pictures-1x.cdb.json"), "cdb"), "pictures-1x.cdb.json");
+            AssertLegacyPictures(Project.ReadFromFile(CdbFile(file), "cdb"), file, jpegKept);
         }
 
         [TestMethod]
         [DoNotParallelize] // enables the BinaryFormatter for the process
-        public void A1xBinaryFileWithPicturesOpens()
+        [DataRow("pictures-1x.cdb", false)]
+        [DataRow("pictures-1x-net48.cdb", true)]
+        public void A1xBinaryFileWithPicturesOpens(string file, bool jpegKept)
         {
             AppContext.SetSwitch("System.Runtime.Serialization.EnableUnsafeBinaryFormatterSerialization", true);
             try
@@ -165,10 +169,10 @@ namespace CADability.Tests
             {
                 Assert.Inconclusive("this runtime has no BinaryFormatter: " + e.Message);
             }
-            using (FileStream stream = File.OpenRead(CdbFile("pictures-1x.cdb")))
+            using (FileStream stream = File.OpenRead(CdbFile(file)))
             {
 #pragma warning disable CS0618 // ReadFromStream is kept for old binary files
-                AssertLegacyPictures(Project.ReadFromStream(stream), "pictures-1x.cdb");
+                AssertLegacyPictures(Project.ReadFromStream(stream), file, jpegKept);
 #pragma warning restore CS0618
             }
         }

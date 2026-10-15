@@ -29,3 +29,14 @@ path = [
 	"CADability/Strings.cs",
 	"CADability/Util.cs",
 ]
+
+[[annotations]]
+path = [
+	"tests/CADability.Tests/Files/Fonts/LiberationSans-Regular.ttf",
+	"tests/CADability.Tests/Files/Fonts/LiberationSans-Regular.reference.json",
+]
+SPDX-FileCopyrightText = [
+	"2010 Google Corporation with Reserved Font Arimo, Tinos and Cousine",
+	"2012 Red Hat, Inc. with Reserved Font Name Liberation",
+]
+SPDX-License-Identifier = "OFL-1.1"

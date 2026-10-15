@@ -582,6 +582,11 @@ namespace CADability
         Dictionary<string, int> typeVersions;
         Dictionary<int, int> typeIndexToVersion;
         Queue<Tuple<IJsonSerialize, JsonDict>> deferred;
+        /// <summary>
+        /// The entities of the last <see cref="FromStream(Stream, IJsonProgress)"/> that could not be created and were read
+        /// as null. Each entry names the entity and its type and carries the original exception as its inner exception.
+        /// </summary>
+        internal List<SerializationException> ReadErrors { get; } = new List<SerializationException>();
         private bool verbose;
         private string fileVersion;
 
@@ -766,6 +771,7 @@ namespace CADability
         public object FromStream(Stream stream, IJsonProgress progress)
         {
             this.progress = progress;
+            ReadErrors.Clear();
             tk = new Tokenizer(stream, progress);
             string line;
             int start, length;
@@ -1128,11 +1134,26 @@ namespace CADability
                             {
                                 return ci.Invoke(new object[] { si, new StreamingContext() });
                             }
-                            catch { return null; }
+                            catch (Exception e)
+                            {
+                                // The entity is read as null, as before, so that the rest of the file can still be read. But the cause is
+                                // kept and reported, otherwise the only symptom is a NullReferenceException in the object that refers to it.
+                                ReportReadError(index, tp, ci == null ? new MissingMethodException(tp.FullName, ".ctor(SerializationInfo, StreamingContext)") : e);
+                                return null;
+                            }
                         };
                     }
                 }
             }
+        }
+        private void ReportReadError(ulong index, Type type, Exception error)
+        {
+            if (error is TargetInvocationException tie && tie.InnerException != null) error = tie.InnerException;
+            SerializationException readError = new SerializationException("Entity " + index.ToString() + " of type " + type.FullName + " could not be read: "
+                + error.GetType().FullName + ": " + error.Message, error);
+            ReadErrors.Add(readError);
+            // Debugger.Log is not removed in Release builds, unlike Trace and Debug, and costs nothing without an attached debugger
+            if (System.Diagnostics.Debugger.IsLogging()) System.Diagnostics.Debugger.Log(0, nameof(JsonSerialize), readError.Message + Environment.NewLine);
         }
         private void CreateDeferred(IJsonSerialize obj, JsonDict data, List<object> entities, HashSet<ulong> underConstruction)
         {

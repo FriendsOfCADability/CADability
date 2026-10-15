@@ -1553,6 +1553,7 @@ namespace CADability
                 if (ef.edge.PrimaryFace.Surface.SameGeometry(ef.edge.PrimaryFace.Domain, ef.face.Surface, ef.face.Domain, precision, out ModOp2D _)) continue;
                 if (ef.edge.SecondaryFace!=null && ef.edge.SecondaryFace.Surface.SameGeometry(ef.edge.SecondaryFace.Domain, ef.face.Surface, ef.face.Domain, precision, out ModOp2D _)) continue;
                 ef.face.IntersectAndPosition(ef.edge, out ip, out uvOnFace, out uOnCurve3D, out position, precision);
+                int firstOfPair = found.Count;
                 for (int i = 0; i < ip.Length; ++i)
                 {
                     if (uOnCurve3D[i] < -prec || uOnCurve3D[i] > 1.0 + prec || position[i] == Border.Position.Outside)
@@ -1564,7 +1565,7 @@ namespace CADability
                     SnapTangentialIntersection(ef.edge, ef.face, ref ip[i], ref uvOnFace[i], ref uOnCurve3D[i], ref position[i]);
                     found.Add(new EdgeFaceIntersection(ef.edge, ef.face, ip[i], uvOnFace[i], uOnCurve3D[i], position[i]));
                 }
-                if (operation != Operation.testonly) AddGrazingContacts(ef.edge, ef.face, found);
+                if (operation != Operation.testonly) AddGrazingContacts(ef.edge, ef.face, found, firstOfPair);
                 if (operation == Operation.testonly && found.Count > 0) break; // one intersection point is enough
             }
             if (operation != Operation.testonly) DropGrazingIntersections(found);
@@ -1695,7 +1696,12 @@ namespace CADability
         /// </summary>
         private void DropGrazingIntersections(List<EdgeFaceIntersection> found)
         {
-            foreach (IGrouping<Edge, EdgeFaceIntersection> onEdge in found.GroupBy(f => f.Edge).ToList())
+            // only the grazing points are candidates; they are looked up by edge and by vertex, so this is linear in the number of
+            // intersection points, which may be thousands for a big model
+            List<EdgeFaceIntersection> grazing = found.Where(f => IsGrazing(f.Edge.Curve3D, f)).ToList();
+            if (grazing.Count < 2) return;
+            HashSet<EdgeFaceIntersection> dropped = new HashSet<EdgeFaceIntersection>();
+            foreach (IGrouping<Edge, EdgeFaceIntersection> onEdge in found.GroupBy(f => f.Edge))
             {
                 if (onEdge.Count() < 2) continue;
                 Edge edge = onEdge.Key;
@@ -1717,22 +1723,31 @@ namespace CADability
                     // where the surfaces really intersect in curves through the points (two cylinders of almost the same radius crossing
                     // each other), the points are needed
                     if (!MissesSurfaceIntersection(edge, a) && !MissesSurfaceIntersection(edge, b)) continue;
-                    found.Remove(a);
-                    found.Remove(b);
+                    dropped.Add(a);
+                    dropped.Add(b);
                     ++i; // b is used up
                 }
             }
             // A grazing contact across a vertex: the edge is split where it is closest to the other shell, e.g. the circle at the end of a
             // cylinder at its seam, so each of the two edges has one of the two grazing points.
-            foreach (EdgeFaceIntersection a in found.ToList())
+            Dictionary<Vertex, List<EdgeFaceIntersection>> atVertex = new Dictionary<Vertex, List<EdgeFaceIntersection>>();
+            foreach (EdgeFaceIntersection g in grazing)
             {
-                if (!found.Contains(a) || !IsGrazing(a.Edge.Curve3D, a)) continue;
+                foreach (Vertex vertex in new[] { g.Edge.Vertex1, g.Edge.Vertex2 })
+                {
+                    if (!atVertex.TryGetValue(vertex, out List<EdgeFaceIntersection> list)) atVertex[vertex] = list = new List<EdgeFaceIntersection>();
+                    if (!list.Contains(g)) list.Add(g); // a closed edge has the same vertex twice
+                }
+            }
+            foreach (EdgeFaceIntersection a in grazing)
+            {
+                if (dropped.Contains(a)) continue;
                 foreach (Vertex vertex in new[] { a.Edge.Vertex1, a.Edge.Vertex2 })
                 {
                     EdgeFaceIntersection partner = null;
-                    foreach (EdgeFaceIntersection b in found)
+                    foreach (EdgeFaceIntersection b in atVertex[vertex])
                     {
-                        if (b == a || b.Edge == a.Edge || (b.Edge.Vertex1 != vertex && b.Edge.Vertex2 != vertex) || !IsGrazing(b.Edge.Curve3D, b)) continue;
+                        if (b == a || b.Edge == a.Edge || dropped.Contains(b)) continue;
                         if ((a.Point | b.Point) < precision) continue;
                         if (StaysOnSurfaces(a, vertex, a.Face, b.Face) && StaysOnSurfaces(b, vertex, a.Face, b.Face) &&
                             (MissesSurfaceIntersection(a.Edge, a) || MissesSurfaceIntersection(b.Edge, b)))
@@ -1743,12 +1758,13 @@ namespace CADability
                     }
                     if (partner != null)
                     {
-                        found.Remove(a);
-                        found.Remove(partner);
+                        dropped.Add(a);
+                        dropped.Add(partner);
                         break;
                     }
                 }
             }
+            if (dropped.Count > 0) found.RemoveAll(dropped.Contains);
         }
         /// <summary>
         /// Points where <paramref name="edge"/> touches <paramref name="face"/> within a small fraction of the precision
@@ -1761,14 +1777,19 @@ namespace CADability
         /// that box passing the tangent edge of the rounding, while the bottom of the box overlaps the bottom of the rounded bar.</item>
         /// </list>
         /// Only tangential contacts are added: taking every end of an edge within the precision of a face as an intersection point
-        /// broke other cases.
+        /// broke other cases. The points of this pair of edge and face are the last ones in <paramref name="found"/>, from
+        /// <paramref name="firstOfPair"/> on.
         /// </summary>
-        private void AddGrazingContacts(Edge edge, Face face, List<EdgeFaceIntersection> found)
+        private void AddGrazingContacts(Edge edge, Face face, List<EdgeFaceIntersection> found, int firstOfPair)
         {
             ICurve curve = edge.Curve3D;
             if (curve == null) return;
             double depth = MaxGrazingDepth * precision;
-            bool Known(GeoPoint p) => found.Any(f => f.Edge == edge && f.Face == face && (f.Point | p) < precision);
+            bool Known(GeoPoint p)
+            {   // the points of this pair of edge and face are the last ones in the list, from firstOfPair on
+                for (int i = firstOfPair; i < found.Count; i++) if ((found[i].Point | p) < precision) return true;
+                return false;
+            }
             void AddIfGrazing(GeoPoint p, double u, bool onBorder)
             {
                 GeoPoint2D uv = face.Surface.PositionOf(p);

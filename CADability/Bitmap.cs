@@ -66,7 +66,7 @@ namespace CADability.GeoObject
         #endregion
         /// <summary>
         /// Protected constructor: raises <see cref="Constructed"/>. Use <see cref="Construct"/> to create a picture and
-        /// <see cref="Set"/> to define it.
+        /// <see cref="Set(byte[], GeoPoint, GeoVector, GeoVector)"/> to define it.
         /// </summary>
         protected Picture()
         {

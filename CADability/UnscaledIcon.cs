@@ -59,7 +59,7 @@ namespace CADability.GeoObject
         #endregion
         /// <summary>
         /// Protected constructor: raises <see cref="Constructed"/>. Use <see cref="Construct"/> to create an icon and
-        /// <see cref="Set"/> to define it.
+        /// <see cref="Set(byte[], GeoPoint, int, int)"/> to define it.
         /// </summary>
         protected Icon()
         {
@@ -141,7 +141,7 @@ namespace CADability.GeoObject
         }
         /// <summary>
         /// The point in world coordinates at which the icon is displayed: the pixel of the bitmap given by the offsets in
-        /// <see cref="Set"/> is placed at this point. Setting it raises the change events and is undoable.
+        /// <see cref="Set(byte[], GeoPoint, int, int)"/> is placed at this point. Setting it raises the change events and is undoable.
         /// </summary>
         public GeoPoint Location
         {

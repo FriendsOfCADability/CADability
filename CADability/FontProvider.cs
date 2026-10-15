@@ -115,10 +115,11 @@ namespace CADability
     }
 
     /// <summary>
-    /// The default <see cref="FontProvider"/>: reads TrueType font files (.ttf, .ttc) itself, so it needs neither GDI nor any
-    /// other part of the operating system and works on Windows, Linux, macOS and in the browser. By default it uses the font
-    /// directories of the system; more files or directories can be added. OpenType fonts with CFF outlines are not supported
-    /// and are left out. A bold or italic face that a family does not have is not synthesized: the closest face is used.
+    /// The default <see cref="FontProvider"/>: reads TrueType and OpenType font files (.ttf, .ttc, .otf, .otc) itself, so it
+    /// needs neither GDI nor any other part of the operating system and works on Windows, Linux, macOS and in the browser. By
+    /// default it uses the font directories of the system; more files or directories can be added. Bitmap fonts and variable
+    /// OpenType fonts with CFF2 outlines are left out. A bold or italic face that a family does not have is not synthesized:
+    /// the closest face is used.
     /// </summary>
     public class ManagedFontProvider : FontProvider
     {
@@ -173,7 +174,7 @@ namespace CADability
             }
         }
         /// <summary>
-        /// Adds the fonts of a font file (.ttf or .ttc).
+        /// Adds the fonts of a font file (.ttf, .ttc, .otf or .otc).
         /// </summary>
         public void AddFontFile(string fileName)
         {
@@ -228,7 +229,7 @@ namespace CADability
 
         private static void AddEntry(Entry entry, TrueTypeFont font, List<Entry> list)
         {
-            if (!font.HasTrueTypeOutlines || string.IsNullOrEmpty(font.FamilyName)) return; // CFF or bitmap fonts cannot be used
+            if (!font.HasOutlines || string.IsNullOrEmpty(font.FamilyName)) return; // bitmap fonts and CFF2 cannot be used
             entry.Family = font.FamilyName;
             entry.Bold = font.IsBold;
             entry.Italic = font.IsItalic;
@@ -254,7 +255,7 @@ namespace CADability
                 foreach (string file in files)
                 {
                     string ext = Path.GetExtension(file).ToLowerInvariant();
-                    if (ext != ".ttf" && ext != ".ttc") continue;
+                    if (ext != ".ttf" && ext != ".ttc" && ext != ".otf" && ext != ".otc") continue;
                     if (!seen.Add(Path.GetFullPath(file))) continue;
                     try
                     {

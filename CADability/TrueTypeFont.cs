@@ -26,8 +26,8 @@ namespace CADability
     /// Reads a TrueType font (.ttf, or one font of a .ttc collection) without any help of the operating system, so that text
     /// works on every platform (issue #412). It reads the glyph outlines (exact quadratic curves from the "glyf" table,
     /// composite glyphs included), the advance widths, the metrics, the kerning pairs of the "kern" table and the names.
-    /// OpenType fonts with CFF outlines (some .otf files) are recognized, but their outlines cannot be read
-    /// (<see cref="HasTrueTypeOutlines"/> is false).
+    /// OpenType fonts with CFF outlines (most .otf files) are read with <see cref="CffOutlines"/>: their cubic curves go into
+    /// the path data unchanged.
     /// </summary>
     internal sealed class TrueTypeFont
     {
@@ -81,6 +81,16 @@ namespace CADability
         /// False for an OpenType font with CFF outlines and for a bitmap font, whose glyphs cannot be read.
         /// </summary>
         public bool HasTrueTypeOutlines { get; }
+        /// <summary>
+        /// True for an OpenType font with outlines in the "CFF " table (Compact Font Format, cubic curves).
+        /// </summary>
+        public bool HasCffOutlines { get; }
+        /// <summary>
+        /// True if the glyph outlines can be read: TrueType or CFF outlines. False for bitmap fonts and for CFF2 (variable
+        /// OpenType fonts).
+        /// </summary>
+        public bool HasOutlines => HasTrueTypeOutlines || HasCffOutlines;
+        private CffOutlines cff; // created on demand
         public int GlyphCount => numGlyphs;
 
         /// <summary>
@@ -123,6 +133,7 @@ namespace CADability
             }
             // a TrueType font without outlines is a bitmap font (e.g. color emoji)
             HasTrueTypeOutlines = trueType && tables.ContainsKey("glyf") && tables.ContainsKey("loca");
+            HasCffOutlines = !trueType && tables.ContainsKey("CFF ");
             int head = Table("head");
             UnitsPerEm = U16(head + 18);
             if (UnitsPerEm == 0) UnitsPerEm = 1000;
@@ -228,8 +239,8 @@ namespace CADability
                     if (length > stream.Length) throw new InvalidDataException("table " + tag + " exceeds the file");
                     copied.Add((record, ReadBytes(stream, ReadU32(records, 16 * i + 8), (int)length)));
                 }
-                else if (tag == "glyf" || tag == "loca")
-                {   // only their presence matters (HasTrueTypeOutlines)
+                else if (tag == "glyf" || tag == "loca" || tag == "CFF ")
+                {   // only their presence matters (HasTrueTypeOutlines, HasCffOutlines)
                     for (int k = 8; k < 16; ++k) record[k] = 0;
                     copied.Add((record, new byte[0]));
                 }
@@ -351,7 +362,8 @@ namespace CADability
             List<byte> tps = new List<byte>();
             double scale = 1.0 / UnitsPerEm;
             PointF Map(double x, double y) => new PointF((float)(x * scale), (float)((CellAscent - y) * scale));
-            foreach (GlyphPoint[] contour in GetContours(glyph))
+            if (HasCffOutlines) DrawCff(glyph, new PathDataSink(pts, tps, Map));
+            else foreach (GlyphPoint[] contour in GetContours(glyph))
             {
                 if (contour.Length < 2) continue;
                 int n = contour.Length;
@@ -443,6 +455,78 @@ namespace CADability
             types = tps.ToArray();
         }
 
+        /// <summary>
+        /// Sends the outline of a glyph of a font with CFF outlines to <paramref name="sink"/>, in font units.
+        /// </summary>
+        internal void DrawCff(int glyph, IGlyphOutlineSink sink)
+        {
+            if (IsHeaderOnly) throw new InvalidOperationException("The font \"" + FullName + "\" was read by ReadHeaders and has no glyphs, load it with Load");
+            if (!HasCffOutlines) throw new NotSupportedException("The font \"" + FullName + "\" has no CFF outlines");
+            if (cff == null)
+            {
+                var t = tables["CFF "];
+                cff = new CffOutlines(data, t.offset, t.length, UnitsPerEm);
+            }
+            cff.Draw(glyph, sink);
+        }
+        /// <summary>
+        /// Collects an outline as GDI+ path data (see <see cref="GetPathData(int, out PointF[], out byte[])"/>).
+        /// </summary>
+        private sealed class PathDataSink : IGlyphOutlineSink
+        {
+            private readonly List<PointF> pts;
+            private readonly List<byte> tps;
+            private readonly Func<double, double, PointF> map;
+            private int start = -1; // index of the start point of the open figure
+            private double cx, cy;
+            public PathDataSink(List<PointF> pts, List<byte> tps, Func<double, double, PointF> map)
+            {
+                this.pts = pts;
+                this.tps = tps;
+                this.map = map;
+            }
+            public void MoveTo(double x, double y)
+            {
+                ClosePath();
+                start = pts.Count;
+                pts.Add(map(x, y));
+                tps.Add(0);
+                cx = x;
+                cy = y;
+            }
+            public void LineTo(double x, double y)
+            {
+                if (start < 0 || (x == cx && y == cy)) return;
+                pts.Add(map(x, y));
+                tps.Add(1);
+                cx = x;
+                cy = y;
+            }
+            public void CurveTo(double x1, double y1, double x2, double y2, double x3, double y3)
+            {
+                if (start < 0) return;
+                if (x1 == cx && y1 == cy && x2 == cx && y2 == cy && x3 == cx && y3 == cy) return; // no length
+                pts.Add(map(x1, y1));
+                pts.Add(map(x2, y2));
+                pts.Add(map(x3, y3));
+                tps.Add(3);
+                tps.Add(3);
+                tps.Add(3);
+                cx = x3;
+                cy = y3;
+            }
+            public void ClosePath()
+            {
+                if (start < 0) return;
+                if (pts.Count - start < 2)
+                {   // nothing but the start point
+                    pts.RemoveRange(start, pts.Count - start);
+                    tps.RemoveRange(start, tps.Count - start);
+                }
+                else tps[tps.Count - 1] |= 0x80;
+                start = -1;
+            }
+        }
         private void AddContours(int glyph, List<GlyphPoint[]> res, int depth)
         {
             if (glyph < 0 || glyph >= numGlyphs || depth > 8) return; // a deeper nesting is a broken (or malicious) font

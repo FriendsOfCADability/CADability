@@ -90,7 +90,6 @@ namespace CADability.ImportTests
         [TestMethod]
         public void export_dxf_flipped_text_keeps_position()
         {
-            RequireGdi();
             foreach (bool aligned in new[] { false, true })
             {
                 Text text = MakeText("Flipped", new GeoPoint(10, 5, 2));
@@ -119,7 +118,6 @@ namespace CADability.ImportTests
         [TestMethod]
         public void export_dxf_tilted_text_keeps_position()
         {
-            RequireGdi();
             Text text = MakeText("Tilted", new GeoPoint(-3, 8, 1));
             text.Modify(ModOp.Rotate(new GeoPoint(2, 3, 4), new GeoVector(1, 1, 0.3), new SweepAngle(0.65)));
             AssertSameText(text, ReimportSingle<Text>(Export(text)));
@@ -130,7 +128,6 @@ namespace CADability.ImportTests
         [TestMethod]
         public void export_dxf_flipped_and_tilted_mtext_keep_position()
         {
-            RequireGdi();
             Text text = MakeText("first line\nsecond line", new GeoPoint(10, 5, 2));
             text.Modify(ModOp.Rotate(GeoPoint.Origin, GeoVector.XAxis, new SweepAngle(Math.PI)));
             string file = Export(text);
@@ -150,13 +147,6 @@ namespace CADability.ImportTests
         }
 
         // --- helpers -------------------------------------------------------------------------
-
-        // Adding a Text to a model computes its extent through GDI, which only exists on Windows.
-        private static void RequireGdi()
-        {
-            if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
-                Assert.Inconclusive("text needs GDI, which is only available on Windows");
-        }
 
         private static Text MakeText(string value, GeoPoint location)
         {

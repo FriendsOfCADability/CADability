@@ -64,6 +64,20 @@ namespace CADability
         public int WinAscent { get; }
         public int WinDescent { get; }
         /// <summary>
+        /// The top of the underline above the baseline in font units (negative: below), from the "post" table.
+        /// </summary>
+        public int UnderlinePosition { get; }
+        public int UnderlineThickness { get; }
+        /// <summary>
+        /// The top of the strikeout line above the baseline in font units, from the "OS/2" table.
+        /// </summary>
+        public int StrikeoutPosition { get; }
+        public int StrikeoutSize { get; }
+        /// <summary>
+        /// True for a font read by <see cref="ReadHeaders"/>: it knows its names, style and metrics, but has no glyphs.
+        /// </summary>
+        public bool IsHeaderOnly { get; private set; }
+        /// <summary>
         /// False for an OpenType font with CFF outlines and for a bitmap font, whose glyphs cannot be read.
         /// </summary>
         public bool HasTrueTypeOutlines { get; }
@@ -123,13 +137,25 @@ namespace CADability
             bool bold = (macStyle & 1) != 0, italic = (macStyle & 2) != 0;
             WinAscent = Ascender;
             WinDescent = -Descender;
+            // defaults like the ones GDI uses when the tables are missing
+            UnderlineThickness = Math.Max(1, UnitsPerEm / 14);
+            UnderlinePosition = -UnitsPerEm / 10;
+            StrikeoutSize = UnderlineThickness;
+            StrikeoutPosition = UnitsPerEm / 4;
             if (tables.TryGetValue("OS/2", out var os2) && os2.length >= 78)
             {
+                StrikeoutSize = S16(os2.offset + 26);
+                StrikeoutPosition = S16(os2.offset + 28);
                 int fsSelection = U16(os2.offset + 62);
                 italic = (fsSelection & 1) != 0;
                 bold = (fsSelection & 0x20) != 0;
                 WinAscent = U16(os2.offset + 74);
                 WinDescent = U16(os2.offset + 76);
+            }
+            if (tables.TryGetValue("post", out var post) && post.length >= 12)
+            {
+                UnderlinePosition = S16(post.offset + 8);
+                UnderlineThickness = S16(post.offset + 10);
             }
             IsBold = bold;
             IsItalic = italic;
@@ -158,6 +184,91 @@ namespace CADability
                 return res;
             }
             return new TrueTypeFont[] { new TrueTypeFont(data, 0) };
+        }
+        /// <summary>
+        /// Reads the names, styles and metrics of all fonts of a font file without reading the whole file: only the tables
+        /// "head", "hhea", "maxp", "OS/2", "post" and "name" are read. This is how a directory with hundreds of fonts is indexed
+        /// quickly. The fonts returned have <see cref="IsHeaderOnly"/> set; load the file with <see cref="Load(string)"/> to
+        /// get the glyphs.
+        /// </summary>
+        public static TrueTypeFont[] ReadHeaders(string fileName)
+        {
+            using (FileStream stream = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                byte[] head = ReadBytes(stream, 0, 12);
+                if (head[0] == 't' && head[1] == 't' && head[2] == 'c' && head[3] == 'f')
+                {
+                    int count = (int)ReadU32(head, 8);
+                    if (count <= 0 || count > 10000) throw new InvalidDataException("invalid font collection");
+                    byte[] offsets = ReadBytes(stream, 12, 4 * count);
+                    TrueTypeFont[] res = new TrueTypeFont[count];
+                    for (int i = 0; i < count; ++i) res[i] = ReadHeader(stream, ReadU32(offsets, 4 * i));
+                    return res;
+                }
+                return new TrueTypeFont[] { ReadHeader(stream, 0) };
+            }
+        }
+        private static TrueTypeFont ReadHeader(FileStream stream, uint offset)
+        {
+            // a small font made of the needed tables only, with the same table directory layout, so that the constructor reads it
+            byte[] directory = ReadBytes(stream, offset, 12);
+            int numTables = (directory[4] << 8) | directory[5];
+            if (numTables > 1000) throw new InvalidDataException("invalid table directory");
+            byte[] records = ReadBytes(stream, offset + 12, 16 * numTables);
+            string[] needed = { "head", "hhea", "maxp", "OS/2", "post", "name" };
+            List<(byte[] record, byte[] content)> copied = new List<(byte[], byte[])>();
+            for (int i = 0; i < numTables; ++i)
+            {
+                string tag = Encoding.ASCII.GetString(records, 16 * i, 4);
+                byte[] record = new byte[16];
+                Array.Copy(records, 16 * i, record, 0, 16);
+                if (Array.IndexOf(needed, tag) >= 0)
+                {
+                    uint length = ReadU32(records, 16 * i + 12);
+                    if (length > stream.Length) throw new InvalidDataException("table " + tag + " exceeds the file");
+                    copied.Add((record, ReadBytes(stream, ReadU32(records, 16 * i + 8), (int)length)));
+                }
+                else if (tag == "glyf" || tag == "loca")
+                {   // only their presence matters (HasTrueTypeOutlines)
+                    for (int k = 8; k < 16; ++k) record[k] = 0;
+                    copied.Add((record, new byte[0]));
+                }
+            }
+            int size = 12 + 16 * copied.Count;
+            foreach (var (_, content) in copied) size += content.Length;
+            byte[] data = new byte[size];
+            Array.Copy(directory, data, 12);
+            data[4] = (byte)(copied.Count >> 8);
+            data[5] = (byte)copied.Count;
+            int pos = 12 + 16 * copied.Count;
+            for (int i = 0; i < copied.Count; ++i)
+            {
+                byte[] record = copied[i].record, content = copied[i].content;
+                if (content.Length > 0)
+                {
+                    record[8] = (byte)(pos >> 24); record[9] = (byte)(pos >> 16); record[10] = (byte)(pos >> 8); record[11] = (byte)pos;
+                }
+                Array.Copy(record, 0, data, 12 + 16 * i, 16);
+                Array.Copy(content, 0, data, pos, content.Length);
+                pos += content.Length;
+            }
+            TrueTypeFont res = new TrueTypeFont(data, 0);
+            res.IsHeaderOnly = true;
+            return res;
+        }
+        private static byte[] ReadBytes(FileStream stream, long offset, int count)
+        {
+            if (count < 0 || offset + count > stream.Length) throw new InvalidDataException("unexpected end of the font file");
+            byte[] res = new byte[count];
+            stream.Seek(offset, SeekOrigin.Begin);
+            int read = 0;
+            while (read < count)
+            {
+                int n = stream.Read(res, read, count - read);
+                if (n <= 0) throw new InvalidDataException("unexpected end of the font file");
+                read += n;
+            }
+            return res;
         }
         /// <summary>
         /// Reads all fonts of the font file <paramref name="fileName"/>, see <see cref="Load(byte[])"/>.
@@ -213,6 +324,7 @@ namespace CADability
         public List<GlyphPoint[]> GetContours(int glyph)
         {
             if (!HasTrueTypeOutlines) throw new NotSupportedException("The outlines of the font \"" + FullName + "\" cannot be read: they are in CFF format or the font has bitmaps only");
+            if (IsHeaderOnly) throw new InvalidOperationException("The font \"" + FullName + "\" was read by ReadHeaders and has no glyphs, load it with Load");
             List<GlyphPoint[]> res = new List<GlyphPoint[]>();
             AddContours(glyph, res, 0);
             return res;
@@ -226,6 +338,14 @@ namespace CADability
         /// 0 start, 1 line, 3 Bezier, 0x80 closes the figure. This is the input of GlyphShapeBuilder.PathDataToPath2D.
         /// </summary>
         public void GetPathData(int glyph, out PointF[] points, out byte[] types)
+        {
+            GetPathData(glyph, false, false, out points, out types);
+        }
+        /// <summary>
+        /// Like <see cref="GetPathData(int, out PointF[], out byte[])"/>, and adds the underline and the strikeout line as
+        /// rectangles over the advance width of the glyph, as GDI+ does for an underlined or struck out font.
+        /// </summary>
+        public void GetPathData(int glyph, bool underline, bool strikeout, out PointF[] points, out byte[] types)
         {
             List<PointF> pts = new List<PointF>();
             List<byte> tps = new List<byte>();
@@ -308,6 +428,17 @@ namespace CADability
                 }
                 tps[tps.Count - 1] |= 0x80;
             }
+            void AddBar(int top, int thickness)
+            {
+                if (thickness <= 0) return;
+                double width = GetAdvanceWidth(glyph);
+                pts.Add(Map(0, top)); tps.Add(0);
+                pts.Add(Map(width, top)); tps.Add(1);
+                pts.Add(Map(width, top - thickness)); tps.Add(1);
+                pts.Add(Map(0, top - thickness)); tps.Add(0x81);
+            }
+            if (underline) AddBar(UnderlinePosition, UnderlineThickness);
+            if (strikeout) AddBar(StrikeoutPosition, StrikeoutSize);
             points = pts.ToArray();
             types = tps.ToArray();
         }

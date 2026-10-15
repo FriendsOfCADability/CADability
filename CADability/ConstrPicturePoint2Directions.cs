@@ -136,16 +136,15 @@ namespace CADability.Actions
         void OnSetFileName(string val)
         {
             fileName = val; // save the name
-            Bitmap bmp = Picture.CopyFrom(fileName); // load the bitmap
-            picture.Bitmap = bmp; // set the bitmap to the picture object
+            picture.ImageData = Picture.ReadImageFile(fileName); // load the image
             picture.Path = fileName; // set the name to the picture object
             base.ActiveObject = picture; // set the active object:
                                          // now that we have a bitmap we set this object as the active object, which means
                                          // that is will be displayed while the location is positioned and at the end of the
                                          // action it will automatically be inserted into the model
 #if !WEBASSEMBLY
-            widthValue = picture.Bitmap.PhysicalDimension.Width;
-            heightValue = picture.Bitmap.PhysicalDimension.Height;
+            widthValue = picture.PixelWidth;
+            heightValue = picture.PixelHeight;
 #endif
         }
 
@@ -238,7 +237,7 @@ namespace CADability.Actions
             }
             if (keepAspectRatioValue)
             {
-                picture.DirectionHeight = picture.DirectionWidth.Length * picture.Bitmap.Height / picture.Bitmap.Width * picture.DirectionHeight.Normalized;
+                picture.DirectionHeight = picture.DirectionWidth.Length * ShowPropertyPicture.PixelRatio(picture, false) * picture.DirectionHeight.Normalized;
             }
             return true;
         }
@@ -268,7 +267,7 @@ namespace CADability.Actions
             }
             if (keepAspectRatioValue)
             {
-                picture.DirectionWidth = picture.DirectionHeight.Length / picture.Bitmap.Height * picture.Bitmap.Width * picture.DirectionWidth.Normalized;
+                picture.DirectionWidth = picture.DirectionHeight.Length * ShowPropertyPicture.PixelRatio(picture, true) * picture.DirectionWidth.Normalized;
             }
             return true;
         }
@@ -293,7 +292,7 @@ namespace CADability.Actions
             keepAspectRatioValue = NewValue;
             if (NewValue)
             {
-                picture.DirectionHeight = picture.DirectionWidth.Length * picture.Bitmap.Height / picture.Bitmap.Width * picture.DirectionHeight.Normalized;
+                picture.DirectionHeight = picture.DirectionWidth.Length * ShowPropertyPicture.PixelRatio(picture, false) * picture.DirectionHeight.Normalized;
                 dirHeight.Optional = true;
             }
             else dirHeight.Optional = false;
@@ -381,7 +380,7 @@ namespace CADability.Actions
         //        picture.DirectionWidth = widthValue * picture.DirectionWidth.Normalized;
         //        if (keepAspectRatioValue)
         //        {
-        //            picture.DirectionHeight = l * picture.Bitmap.Height / picture.Bitmap.Width * picture.DirectionHeight.Normalized;
+        //            picture.DirectionHeight = l * ShowPropertyPicture.PixelRatio(picture, false) * picture.DirectionHeight.Normalized;
         //            heightValue = picture.DirectionHeight.Length;
         //        }
         //        return true;
@@ -397,7 +396,7 @@ namespace CADability.Actions
         //        picture.DirectionHeight = heightValue * picture.DirectionHeight.Normalized;
         //        if (keepAspectRatioValue)
         //        {
-        //            picture.DirectionWidth = l * picture.Bitmap.Width / picture.Bitmap.Height * picture.DirectionWidth.Normalized;
+        //            picture.DirectionWidth = l * ShowPropertyPicture.PixelRatio(picture, true) * picture.DirectionWidth.Normalized;
         //            widthValue = picture.DirectionWidth.Length;
         //        }
         //        return true;

@@ -1046,8 +1046,11 @@ namespace CADability
                 }
 
                 Type tp = null;
-                if (assemblyName == null && typeName.StartsWith("System.Drawing.")) assemblyName = "System.Drawing"; // this is for old files, where System.Drawing objects where handled different
-                if (assemblyName == null) tp = Type.GetType(typeName);
+                // a GDI+ bitmap of a picture or icon in a file of CADability 1.x: only its image file bytes are read, so that
+                // the file opens without GDI+ (issue #412)
+                if (LegacyImageData.IsGdiImageType(typeName)) tp = typeof(LegacyImageData);
+                if (tp == null && assemblyName == null && typeName.StartsWith("System.Drawing.")) assemblyName = "System.Drawing"; // this is for old files, where System.Drawing objects where handled different
+                if (tp == null && assemblyName == null) tp = Type.GetType(typeName);
                 if (tp == null)
                 {
                     if (loadedAssemblies.TryGetValue(assemblyName, out Assembly assembly)) tp = assembly.GetType(typeName);

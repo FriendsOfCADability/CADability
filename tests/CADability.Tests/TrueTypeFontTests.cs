@@ -215,6 +215,25 @@ namespace CADability.Tests
         }
 
         [TestMethod]
+        public void ACompositeWithUseMyMetricsHasTheOriginOfThatComponent()
+        {
+            // 'Ü' of Liberation Sans is 'U' (with USE_MY_METRICS) and the dieresis. Times New Roman Bold has an 'Ü' whose left side
+            // bearing differs from its xMin, and Windows draws it like its 'U'; the test gives 'Ü' such a left side bearing.
+            TrueTypeFont font = LoadLiberationSans();
+            int glyph = font.GetGlyphIndex('Ü');
+            TrueTypeFont patched = PatchedLiberationSans("hmtx", (data, hmtx) =>
+            {
+                int lsb = (short)(data[hmtx + 4 * glyph + 2] << 8 | data[hmtx + 4 * glyph + 3]) + 100;
+                data[hmtx + 4 * glyph + 2] = (byte)(lsb >> 8);
+                data[hmtx + 4 * glyph + 3] = (byte)lsb;
+            });
+            List<GlyphPoint[]> original = font.GetContours(glyph), unchanged = patched.GetContours(glyph);
+            Assert.AreEqual(3, original.Count);
+            for (int c = 0; c < original.Count; ++c)
+                for (int i = 0; i < original[c].Length; ++i) Assert.AreEqual(original[c][i].X, unchanged[c][i].X);
+        }
+
+        [TestMethod]
         public void UseTypoMetricsSwitchesTheCellToTheTypographicMetrics()
         {
             // Bahnschrift, Cascadia, Sitka and Cambria Math set USE_TYPO_METRICS (bit 7 of fsSelection), and GDI+ then takes

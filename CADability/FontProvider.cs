@@ -246,7 +246,7 @@ namespace CADability
             // a variable font: every named instance is a face, named like GDI names it
             foreach (NamedInstance instance in instances)
             {
-                InstanceFamily(font.TypographicFamilyName, instance.SubfamilyName, out string family, out bool bold, out bool italic);
+                InstanceFamily(font.TypographicFamilyName, font.InstanceName(instance), out string family, out bool bold, out bool italic);
                 italic |= font.IsItalic; // the instances of an italic font are italic, whether their names say so or not
                 list.Add(new Entry
                 {

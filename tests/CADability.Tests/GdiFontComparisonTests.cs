@@ -47,6 +47,7 @@ namespace CADability.Tests
         [DataRow("Bahnschrift")] // variable: the default instance
         [DataRow("Bahnschrift Light Condensed")] // variable: a named instance
         [DataRow("Segoe UI Variable Display")] // variable, Windows 11 only
+        [DataRow("Segoe UI Variable Text Light")] // named from "STAT": "Light Text" in "fvar"
         public void FacesMatchGdi(string family)
         {
             if (gdi.GetFace(family, false, false) == null) Assert.Inconclusive(family + " is not installed");
@@ -159,13 +160,17 @@ namespace CADability.Tests
             [DllImport("gdi32.dll")] private static extern bool DeleteDC(IntPtr hdc);
             [DllImport("gdi32.dll")] private static extern IntPtr SelectObject(IntPtr hdc, IntPtr obj);
             [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr obj);
+            [DllImport("gdi32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr CreateFontW(int height, int width, int escapement, int orientation, int weight, uint italic, uint underline, uint strikeOut, uint charSet, uint outPrecision, uint clipPrecision, uint quality, uint pitchAndFamily, string faceName);
             [DllImport("gdi32.dll", CharSet = CharSet.Unicode)] private static extern uint GetGlyphOutlineW(IntPtr hdc, uint c, uint format, out GLYPHMETRICS metrics, uint size, byte[] buffer, ref MAT2 matrix);
             private const uint GGO_NATIVE = 2, GGO_UNHINTED = 0x100;
 
             private readonly IntPtr hdc, hfont, oldFont;
             public GdiGlyphOutlines(string family, FontStyle style, int em)
             {
-                using (Font font = new Font(family, em, style, GraphicsUnit.Pixel)) hfont = font.ToHfont();
+                // the weight of a regular face is FW_DONTCARE: with FW_NORMAL GDI would embolden a lighter face, e.g. the
+                // instance "Cascadia Code ExtraLight"
+                int weight = (style & FontStyle.Bold) != 0 ? 700 : 0;
+                hfont = CreateFontW(-em, 0, 0, 0, weight, (style & FontStyle.Italic) != 0 ? 1u : 0u, 0, 0, 1 /* DEFAULT_CHARSET */, 0, 0, 0, 0, family);
                 hdc = CreateCompatibleDC(IntPtr.Zero);
                 oldFont = SelectObject(hdc, hfont);
             }

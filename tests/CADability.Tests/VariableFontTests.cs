@@ -79,6 +79,59 @@ namespace CADability.Tests
         }
 
         [TestMethod]
+        public void TheStrikeoutLineVariesWithMvar()
+        {
+            // "MVAR" of the test fonts varies the strikeout position ("stro"); the reference has the values of fontTools'
+            // instancer. Bahnschrift varies the strikeout size ("strs") this way.
+            foreach (string file in new[] { "VarTestSans.ttf", "VarTestSans.otf" })
+            {
+                TrueTypeFont font = TrueTypeFont.Load(FontFile(file)).Single();
+                foreach (JsonElement instance in Reference(file).GetProperty("advances").EnumerateArray())
+                {
+                    double[] coordinates = Numbers(instance.GetProperty("coordinates"));
+                    double[] strikeout = Numbers(instance.GetProperty("strikeout"));
+                    TrueTypeFont varied = font.WithVariation(coordinates);
+                    Assert.AreEqual(strikeout[0], varied.StrikeoutPosition, $"{file} wght {coordinates[0]}");
+                    Assert.AreEqual(strikeout[1], varied.StrikeoutSize, $"{file} wght {coordinates[0]}");
+                }
+            }
+        }
+
+        [TestMethod]
+        public void InstancesAreNamedInTheAxisOrderingOfStat()
+        {
+            // Windows names the instances from "STAT": the names of the axis values in the axis ordering, without the elidable
+            // ones. Segoe UI Variable has the instance "Light Display" in "fvar", which Windows calls "Display Light". The test
+            // font has the axes wght (ordering 0) and ital (ordering 1, not in "fvar", its only value "Regular" is elidable).
+            byte[] data = File.ReadAllBytes(FontFile("VarTestSans.ttf"));
+            Assert.AreEqual("Light", TrueTypeFont.Load(data).Single().InstanceName(TrueTypeFont.Load(data).Single().NamedInstances[1]));
+            int stat = TableOffset(data, "STAT");
+            int axisSize = U16(data, stat + 4), axes = stat + U32(data, stat + 8);
+            int values = stat + U32(data, stat + 14), valueCount = U16(data, stat + 12);
+            for (int v = 0; v < valueCount; ++v)
+            {   // make the value of ital not elidable
+                int p = values + U16(data, values + 2 * v);
+                if (U16(data, p) == 3) data[p + 5] = 0;
+            }
+            TrueTypeFont font = TrueTypeFont.Load((byte[])data.Clone()).Single();
+            Assert.AreEqual("Light Regular", font.InstanceName(font.NamedInstances[1]));
+            // swap the ordering of the axes
+            data[axes + 7] = 1;
+            data[axes + axisSize + 7] = 0;
+            font = TrueTypeFont.Load(data).Single();
+            Assert.AreEqual("Regular Light", font.InstanceName(font.NamedInstances[1]));
+            Assert.AreEqual("Regular", font.InstanceName(font.NamedInstances[2]), "the elidable Regular of wght is left out");
+        }
+        private static int U16(byte[] data, int p) => data[p] << 8 | data[p + 1];
+        private static int U32(byte[] data, int p) => data[p] << 24 | data[p + 1] << 16 | data[p + 2] << 8 | data[p + 3];
+        private static int TableOffset(byte[] data, string tag)
+        {
+            for (int i = 0; i < U16(data, 4); ++i)
+                if (System.Text.Encoding.ASCII.GetString(data, 12 + 16 * i, 4) == tag) return U32(data, 12 + 16 * i + 8);
+            throw new AssertFailedException("no table " + tag);
+        }
+
+        [TestMethod]
         public void Cff2OutlinesMatchFontTools()
         {
             JsonElement reference = Reference("VarTestSans.otf");

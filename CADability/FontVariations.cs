@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace CADability
 {
@@ -25,8 +26,8 @@ namespace CADability
     /// <summary>
     /// The variation data of a variable OpenType font: the axes and named instances ("fvar"), the axis mapping ("avar"), the
     /// glyph variations of TrueType outlines ("gvar", with the interpolation of untouched points), the advance width variations
-    /// ("HVAR") and the item variation store that CFF2 outlines use for their blend operator. Variations of the font wide metrics
-    /// ("MVAR") are not applied.
+    /// ("HVAR"), the variations of the font wide metrics ("MVAR"), the item variation store that CFF2 outlines use for their
+    /// blend operator and the names of the instances from the style attributes ("STAT").
     /// </summary>
     internal sealed class FontVariations
     {
@@ -38,6 +39,10 @@ namespace CADability
         private readonly bool gvarLongOffsets;
         private readonly ItemVariationStore hvarStore;
         private readonly int hvarAdvanceMap = -1;
+        private readonly ItemVariationStore mvarStore;
+        private readonly Dictionary<string, (int outer, int inner)> mvarRecords = new Dictionary<string, (int, int)>();
+        private readonly int statOffset = -1;
+        private readonly Func<int, string> nameOf;
 
         /// <param name="data">the font file</param>
         /// <param name="tables">offset and length of the tables of the font</param>
@@ -45,6 +50,7 @@ namespace CADability
         public FontVariations(byte[] data, Dictionary<string, (int offset, int length)> tables, Func<int, string> nameOf)
         {
             this.data = data;
+            this.nameOf = nameOf;
             var fvar = tables["fvar"];
             int f = fvar.offset;
             int axesOffset = f + U16(f + 4), axisCount = U16(f + 8), axisSize = U16(f + 10), instanceCount = U16(f + 12), instanceSize = U16(f + 14);
@@ -106,6 +112,115 @@ namespace CADability
                 hvarStore = new ItemVariationStore(data, h + (int)U32(h + 4), axisCount);
                 uint map = U32(h + 8);
                 if (map != 0) hvarAdvanceMap = h + (int)map;
+            }
+            if (tables.TryGetValue("MVAR", out var mv) && mv.length >= 12)
+            {
+                int m = mv.offset;
+                int recordSize = U16(m + 6), recordCount = U16(m + 8), store = U16(m + 10);
+                if (store != 0 && recordSize >= 8)
+                {
+                    mvarStore = new ItemVariationStore(data, m + store, axisCount);
+                    for (int i = 0; i < recordCount; ++i)
+                    {
+                        int r = m + 12 + i * recordSize;
+                        mvarRecords[System.Text.Encoding.ASCII.GetString(data, r, 4)] = (U16(r + 4), U16(r + 6));
+                    }
+                }
+            }
+            if (tables.TryGetValue("STAT", out var st) && st.length >= 18) statOffset = st.offset;
+        }
+
+        /// <summary>
+        /// The change of a font wide metric from "MVAR" at the normalized coordinates, e.g. "strs" for the size of the strikeout
+        /// line, 0 if the font does not vary it.
+        /// </summary>
+        public double GetMetricDelta(string tag, double[] coords)
+        {
+            if (mvarStore == null || coords == null || !mvarRecords.TryGetValue(tag, out var record)) return 0.0;
+            return mvarStore.GetDelta(record.outer, record.inner, coords);
+        }
+
+        /// <summary>
+        /// The name of an instance (coordinates in user units) as the style attributes of "STAT" make it, e.g. "Display Light"
+        /// for wght 300 and opsz 36 of Segoe UI Variable: the names of the axis values of the instance in the axis ordering of
+        /// "STAT", without the elidable ones like "Regular". This is how Windows names the instances, while the subfamily name
+        /// in "fvar" may have another order ("Light Display"). Null if the font has no "STAT" table or an axis has no value
+        /// for the instance.
+        /// </summary>
+        public string StatInstanceName(double[] userCoordinates)
+        {
+            if (statOffset < 0) return null;
+            try
+            {
+                int t = statOffset;
+                int designAxisSize = U16(t + 4), designAxisCount = U16(t + 6), designAxes = t + (int)U32(t + 8);
+                int valueCount = U16(t + 12), valueOffsets = t + (int)U32(t + 14);
+                // the coordinate of the instance on every design axis (NaN for an axis "fvar" does not have)
+                double[] coordinate = new double[designAxisCount];
+                int[] ordering = new int[designAxisCount];
+                for (int i = 0; i < designAxisCount; ++i)
+                {
+                    int a = designAxes + i * designAxisSize;
+                    string tag = System.Text.Encoding.ASCII.GetString(data, a, 4);
+                    ordering[i] = U16(a + 6);
+                    coordinate[i] = double.NaN;
+                    for (int k = 0; k < Axes.Length; ++k) if (Axes[k].Tag == tag) coordinate[i] = userCoordinates[k];
+                }
+                bool Matches(int axis, double value) => axis < designAxisCount && Math.Abs(coordinate[axis] - value) < 1e-3;
+                string[] names = new string[designAxisCount];
+                bool[] resolved = new bool[designAxisCount];
+                List<(int axis, int nameId, bool elidable)> single = new List<(int, int, bool)>();
+                for (int v = 0; v < valueCount; ++v)
+                {
+                    int p = valueOffsets + U16(valueOffsets + 2 * v);
+                    int format = U16(p);
+                    if (format == 4)
+                    {   // a combination of values on several axes, e.g. "Condensed Bold", which wins over the single values
+                        int count = U16(p + 2), flags = U16(p + 4), nameId = U16(p + 6);
+                        List<int> axes = new List<int>();
+                        bool all = count > 0;
+                        for (int k = 0; k < count; ++k)
+                        {
+                            int axis = U16(p + 8 + 6 * k);
+                            if (!Matches(axis, Fixed(p + 10 + 6 * k))) all = false;
+                            axes.Add(axis);
+                        }
+                        if (!all || axes.Any(axis => resolved[axis])) continue;
+                        int first = axes.OrderBy(axis => ordering[axis]).First();
+                        foreach (int axis in axes) resolved[axis] = true;
+                        names[first] = (flags & 2) != 0 ? "" : nameOf(nameId);
+                        continue;
+                    }
+                    if (format < 1 || format > 3) continue;
+                    int ax = U16(p + 2), fl = U16(p + 4), id = U16(p + 6);
+                    if (ax >= designAxisCount) continue;
+                    bool match;
+                    if (double.IsNaN(coordinate[ax])) match = false; // an axis without variation: see below
+                    else if (format == 2) match = Fixed(p + 12) <= coordinate[ax] && coordinate[ax] <= Fixed(p + 16);
+                    else match = Matches(ax, Fixed(p + 8));
+                    if (match && !resolved[ax])
+                    {
+                        resolved[ax] = true;
+                        names[ax] = (fl & 2) != 0 ? "" : nameOf(id);
+                    }
+                    single.Add((ax, id, (fl & 2) != 0));
+                }
+                for (int i = 0; i < designAxisCount; ++i)
+                {
+                    if (resolved[i]) continue;
+                    if (!double.IsNaN(coordinate[i])) return null; // an axis of "fvar" without a value for this instance
+                    // an axis the font does not vary, e.g. "ital" of an upright font: its only value, if it has exactly one
+                    List<(int axis, int nameId, bool elidable)> values = single.Where(x => x.axis == i).ToList();
+                    if (values.Count == 1 && !values[0].elidable) names[i] = nameOf(values[0].nameId);
+                }
+                for (int i = 0; i < designAxisCount; ++i) if (resolved[i] && names[i] == null) return null; // a name is missing
+                IEnumerable<string> parts = Enumerable.Range(0, designAxisCount).OrderBy(i => ordering[i]).Select(i => names[i]).Where(n => !string.IsNullOrEmpty(n));
+                string res = string.Join(" ", parts);
+                return res.Length == 0 ? "Regular" : res;
+            }
+            catch (IndexOutOfRangeException)
+            {
+                return null; // a broken "STAT" table: the names of "fvar" are used
             }
         }
 

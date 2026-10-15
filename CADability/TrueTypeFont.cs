@@ -66,14 +66,14 @@ namespace CADability
         public int Ascender { get; }
         public int Descender { get; }
         public int LineGap { get; }
-        public int WinAscent { get; }
-        public int WinDescent { get; }
+        public int WinAscent { get; private set; }
+        public int WinDescent { get; private set; }
         /// <summary>
         /// The typographic ascender, descender (negative) and line gap of the "OS/2" table.
         /// </summary>
-        public int TypoAscender { get; }
-        public int TypoDescender { get; }
-        public int TypoLineGap { get; }
+        public int TypoAscender { get; private set; }
+        public int TypoDescender { get; private set; }
+        public int TypoLineGap { get; private set; }
         /// <summary>
         /// True if the font asks for its typographic metrics to be used for the line layout (USE_TYPO_METRICS, bit 7 of
         /// fsSelection in "OS/2"), as GDI+ does: then they are the cell and the line spacing instead of usWinAscent and
@@ -84,14 +84,14 @@ namespace CADability
         /// The middle of the underline above the baseline in font units (negative: below), from the "post" table. GDI+ centers
         /// the underline on it.
         /// </summary>
-        public int UnderlinePosition { get; }
-        public int UnderlineThickness { get; }
+        public int UnderlinePosition { get; private set; }
+        public int UnderlineThickness { get; private set; }
         /// <summary>
         /// The middle of the strikeout line above the baseline in font units, from the "OS/2" table. GDI+ centers the
         /// strikeout line on it.
         /// </summary>
-        public int StrikeoutPosition { get; }
-        public int StrikeoutSize { get; }
+        public int StrikeoutPosition { get; private set; }
+        public int StrikeoutSize { get; private set; }
         /// <summary>
         /// True for a font read by <see cref="ReadHeaders"/>: it knows its names, style and metrics, but has no glyphs.
         /// </summary>
@@ -233,6 +233,12 @@ namespace CADability
         /// </summary>
         public NamedInstance[] NamedInstances => variations?.Instances ?? new NamedInstance[0];
         /// <summary>
+        /// The name of a named instance as Windows makes it from the style attributes ("STAT"), e.g. "Display Light" for an
+        /// instance of Segoe UI Variable whose subfamily name in "fvar" is "Light Display". The subfamily name of "fvar" when
+        /// the font has no usable "STAT" table.
+        /// </summary>
+        public string InstanceName(NamedInstance instance) => variations?.StatInstanceName(instance.Coordinates) ?? instance.SubfamilyName;
+        /// <summary>
         /// The normalized coordinates of this instance, null for the default instance.
         /// </summary>
         public double[] NormalizedCoordinates => coords == null ? null : (double[])coords.Clone();
@@ -248,6 +254,19 @@ namespace CADability
             res.IsHeaderOnly = IsHeaderOnly;
             double[] normalized = res.variations.Normalize(userCoordinates);
             res.coords = normalized.Any(c => c != 0.0) ? normalized : null;
+            if (res.coords != null)
+            {   // the font wide metrics of the instance ("MVAR"), rounded like the values of the tables
+                int Varied(int value, string tag) => (int)Math.Floor(value + res.variations.GetMetricDelta(tag, res.coords) + 0.5);
+                res.TypoAscender = Varied(res.TypoAscender, "hasc");
+                res.TypoDescender = Varied(res.TypoDescender, "hdsc");
+                res.TypoLineGap = Varied(res.TypoLineGap, "hlgp");
+                res.WinAscent = Varied(res.WinAscent, "hcla");
+                res.WinDescent = Varied(res.WinDescent, "hcld");
+                res.UnderlinePosition = Varied(res.UnderlinePosition, "undo");
+                res.UnderlineThickness = Varied(res.UnderlineThickness, "unds");
+                res.StrikeoutPosition = Varied(res.StrikeoutPosition, "stro");
+                res.StrikeoutSize = Varied(res.StrikeoutSize, "strs");
+            }
             return res;
         }
 
@@ -299,7 +318,7 @@ namespace CADability
             int numTables = (directory[4] << 8) | directory[5];
             if (numTables > 1000) throw new InvalidDataException("invalid table directory");
             byte[] records = ReadBytes(stream, offset + 12, 16 * numTables);
-            string[] needed = { "head", "hhea", "maxp", "OS/2", "post", "name", "fvar" };
+            string[] needed = { "head", "hhea", "maxp", "OS/2", "post", "name", "fvar", "STAT" };
             List<(byte[] record, byte[] content)> copied = new List<(byte[], byte[])>();
             for (int i = 0; i < numTables; ++i)
             {
@@ -431,12 +450,19 @@ namespace CADability
         /// The x coordinate of the origin of a glyph in the coordinates of "glyf": the first phantom point, xMin of the glyph
         /// minus its left side bearing from "hmtx". It is 0 in almost every font. When it is not, the rasterizers of Windows
         /// and FreeType (and fontTools) move the outline so that the origin is at 0, which puts the glyph at its left side
-        /// bearing. Times New Roman Italic and Symbol have such glyphs.
+        /// bearing. Times New Roman Italic and Symbol have such glyphs. A composite glyph with USE_MY_METRICS has the origin
+        /// of that component.
         /// </summary>
-        private double HorizontalOrigin(int glyph)
+        private double HorizontalOrigin(int glyph, int depth = 0)
         {
             int g = GlyphOffset(glyph, out int length);
             if (length == 0) return 0.0; // no outline to move
+            if (S16(g) < 0 && depth < 8)
+            {   // a composite glyph with USE_MY_METRICS takes the metrics, and so the origin, of that component (Times New
+                // Roman Bold 'Ü' has another left side bearing than its 'U', and Windows draws it like the 'U')
+                foreach (Component component in CompositeComponents(g))
+                    if ((component.Flags & 0x200) != 0) return HorizontalOrigin(component.Glyph, depth + 1);
+            }
             PhantomDeltas(glyph, out double left, out _);
             return S16(g + 2) - LeftSideBearing(glyph) + left;
         }

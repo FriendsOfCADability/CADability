@@ -172,6 +172,64 @@ namespace CADability.Tests
             }
         }
 
+        /// <summary>
+        /// Liberation Sans with one table changed: <paramref name="patch"/> gets the font data and the offset of the table.
+        /// </summary>
+        private static TrueTypeFont PatchedLiberationSans(string table, Action<byte[], int> patch)
+        {
+            byte[] data = File.ReadAllBytes(FontFile("LiberationSans-Regular.ttf"));
+            int numTables = data[4] << 8 | data[5];
+            for (int i = 0; i < numTables; ++i)
+            {
+                int record = 12 + 16 * i;
+                if (System.Text.Encoding.ASCII.GetString(data, record, 4) != table) continue;
+                patch(data, data[record + 8] << 24 | data[record + 9] << 16 | data[record + 10] << 8 | data[record + 11]);
+                return TrueTypeFont.Load(data).Single();
+            }
+            throw new AssertFailedException("no table " + table);
+        }
+
+        [TestMethod]
+        public void TheOutlineStartsAtTheLeftSideBearingOfHmtx()
+        {
+            // Times New Roman Italic and Symbol have glyphs whose xMin is not the left side bearing in "hmtx". Windows (and
+            // FreeType) move such a glyph so that its left edge is at the left side bearing; the test makes 'H' such a glyph.
+            TrueTypeFont font = LoadLiberationSans();
+            int glyph = font.GetGlyphIndex('H');
+            Assert.IsTrue(glyph < font.GlyphCount);
+            TrueTypeFont patched = PatchedLiberationSans("hmtx", (data, hmtx) =>
+            {
+                int lsb = (short)(data[hmtx + 4 * glyph + 2] << 8 | data[hmtx + 4 * glyph + 3]) + 100;
+                data[hmtx + 4 * glyph + 2] = (byte)(lsb >> 8);
+                data[hmtx + 4 * glyph + 3] = (byte)lsb;
+            });
+            List<GlyphPoint[]> original = font.GetContours(glyph), moved = patched.GetContours(glyph);
+            Assert.AreEqual(original.Count, moved.Count);
+            for (int c = 0; c < original.Count; ++c)
+                for (int i = 0; i < original[c].Length; ++i)
+                {
+                    Assert.AreEqual(original[c][i].X + 100, moved[c][i].X);
+                    Assert.AreEqual(original[c][i].Y, moved[c][i].Y);
+                }
+            Assert.AreEqual(font.GetAdvanceWidth(glyph), patched.GetAdvanceWidth(glyph), "the advance width stays");
+        }
+
+        [TestMethod]
+        public void UseTypoMetricsSwitchesTheCellToTheTypographicMetrics()
+        {
+            // Bahnschrift, Cascadia, Sitka and Cambria Math set USE_TYPO_METRICS (bit 7 of fsSelection), and GDI+ then takes
+            // the cell and the line spacing from the typographic metrics; the test sets the bit in Liberation Sans
+            TrueTypeFont font = LoadLiberationSans();
+            Assert.IsFalse(font.UseTypoMetrics);
+            Assert.AreEqual(font.WinAscent, font.CellAscent);
+            Assert.AreEqual(font.WinDescent, font.CellDescent);
+            TrueTypeFont patched = PatchedLiberationSans("OS/2", (data, os2) => data[os2 + 63] |= 0x80);
+            Assert.IsTrue(patched.UseTypoMetrics);
+            Assert.AreEqual(1491, patched.CellAscent);
+            Assert.AreEqual(431, patched.CellDescent);
+            Assert.AreEqual(1491 + 431 + 307, patched.LineSpacing);
+        }
+
         [TestMethod]
         public void InvalidDataIsRejected()
         {

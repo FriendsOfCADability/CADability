@@ -69,12 +69,26 @@ namespace CADability
         public int WinAscent { get; }
         public int WinDescent { get; }
         /// <summary>
-        /// The top of the underline above the baseline in font units (negative: below), from the "post" table.
+        /// The typographic ascender, descender (negative) and line gap of the "OS/2" table.
+        /// </summary>
+        public int TypoAscender { get; }
+        public int TypoDescender { get; }
+        public int TypoLineGap { get; }
+        /// <summary>
+        /// True if the font asks for its typographic metrics to be used for the line layout (USE_TYPO_METRICS, bit 7 of
+        /// fsSelection in "OS/2"), as GDI+ does: then they are the cell and the line spacing instead of usWinAscent and
+        /// usWinDescent. Bahnschrift, Cascadia, Sitka and Cambria Math are such fonts.
+        /// </summary>
+        public bool UseTypoMetrics { get; }
+        /// <summary>
+        /// The middle of the underline above the baseline in font units (negative: below), from the "post" table. GDI+ centers
+        /// the underline on it.
         /// </summary>
         public int UnderlinePosition { get; }
         public int UnderlineThickness { get; }
         /// <summary>
-        /// The top of the strikeout line above the baseline in font units, from the "OS/2" table.
+        /// The middle of the strikeout line above the baseline in font units, from the "OS/2" table. GDI+ centers the
+        /// strikeout line on it.
         /// </summary>
         public int StrikeoutPosition { get; }
         public int StrikeoutSize { get; }
@@ -103,21 +117,25 @@ namespace CADability
         public int GlyphCount => numGlyphs;
 
         /// <summary>
-        /// The ascent of the character cell in font units, as GDI and GDI+ use it for TrueType fonts (usWinAscent).
+        /// The ascent of the character cell in font units, as GDI+ uses it: usWinAscent, or the typographic ascender when
+        /// <see cref="UseTypoMetrics"/> is set.
         /// </summary>
-        public int CellAscent => WinAscent;
+        public int CellAscent => UseTypoMetrics ? TypoAscender : WinAscent;
         /// <summary>
-        /// The descent of the character cell in font units, positive downwards (usWinDescent).
+        /// The descent of the character cell in font units, positive downwards: usWinDescent, or the typographic descender
+        /// when <see cref="UseTypoMetrics"/> is set.
         /// </summary>
-        public int CellDescent => WinDescent;
+        public int CellDescent => UseTypoMetrics ? -TypoDescender : WinDescent;
         /// <summary>
-        /// The distance between two lines in font units, computed like GDI does: the cell height plus the external leading,
-        /// which is the part of the line gap of the "hhea" table that is not already part of the cell.
+        /// The distance between two lines in font units, computed like GDI+ does. With <see cref="UseTypoMetrics"/> it is the
+        /// typographic ascender, descender and line gap. Otherwise it is the cell height plus the external leading, which is
+        /// the part of the line gap of the "hhea" table that is not already part of the cell.
         /// </summary>
         public int LineSpacing
         {
             get
             {
+                if (UseTypoMetrics) return TypoAscender - TypoDescender + TypoLineGap;
                 int cell = WinAscent + WinDescent;
                 int external = Math.Max(0, LineGap - (cell - (Ascender - Descender)));
                 return cell + external;
@@ -171,6 +189,10 @@ namespace CADability
                 int fsSelection = U16(os2.offset + 62);
                 italic = (fsSelection & 1) != 0;
                 bold = (fsSelection & 0x20) != 0;
+                TypoAscender = S16(os2.offset + 68);
+                TypoDescender = S16(os2.offset + 70);
+                TypoLineGap = S16(os2.offset + 72);
+                UseTypoMetrics = (fsSelection & 0x80) != 0 && TypoAscender - TypoDescender > 0;
                 WinAscent = U16(os2.offset + 74);
                 WinDescent = U16(os2.offset + 76);
             }
@@ -379,7 +401,16 @@ namespace CADability
         /// </summary>
         private double PhantomAdvanceDelta(int glyph)
         {
-            if (!HasTrueTypeOutlines) return 0.0;
+            PhantomDeltas(glyph, out double left, out double right);
+            return right - left;
+        }
+        /// <summary>
+        /// The deltas of "gvar" for the two horizontal phantom points (the origin and the advance) of a glyph.
+        /// </summary>
+        private void PhantomDeltas(int glyph, out double left, out double right)
+        {
+            left = right = 0.0;
+            if (!HasTrueTypeOutlines || coords == null) return;
             int g = GlyphOffset(glyph, out int length);
             int pointCount = 0;
             int xMin = 0;
@@ -393,7 +424,21 @@ namespace CADability
             double[] x = new double[pointCount + 4], y = new double[pointCount + 4], dx = new double[pointCount + 4], dy = new double[pointCount + 4];
             x[pointCount] = xMin - LeftSideBearing(glyph);
             variations.AddGlyphDeltas(glyph, x, y, null, coords, dx, dy);
-            return dx[pointCount + 1] - dx[pointCount];
+            left = dx[pointCount];
+            right = dx[pointCount + 1];
+        }
+        /// <summary>
+        /// The x coordinate of the origin of a glyph in the coordinates of "glyf": the first phantom point, xMin of the glyph
+        /// minus its left side bearing from "hmtx". It is 0 in almost every font. When it is not, the rasterizers of Windows
+        /// and FreeType (and fontTools) move the outline so that the origin is at 0, which puts the glyph at its left side
+        /// bearing. Times New Roman Italic and Symbol have such glyphs.
+        /// </summary>
+        private double HorizontalOrigin(int glyph)
+        {
+            int g = GlyphOffset(glyph, out int length);
+            if (length == 0) return 0.0; // no outline to move
+            PhantomDeltas(glyph, out double left, out _);
+            return S16(g + 2) - LeftSideBearing(glyph) + left;
         }
         /// <summary>
         /// Returns the kerning between two glyphs in font units from the "kern" table, 0 if there is none. Kerning that only
@@ -415,7 +460,8 @@ namespace CADability
         }
 
         /// <summary>
-        /// Returns the contours of a glyph in font units (y upwards), with the components of a composite glyph resolved.
+        /// Returns the contours of a glyph in font units (y upwards), with the components of a composite glyph resolved and the
+        /// origin of the glyph at x = 0 (see <see cref="HorizontalOrigin"/>).
         /// </summary>
         public List<GlyphPoint[]> GetContours(int glyph)
         {
@@ -423,6 +469,12 @@ namespace CADability
             if (IsHeaderOnly) throw new InvalidOperationException("The font \"" + FullName + "\" was read by ReadHeaders and has no glyphs, load it with Load");
             List<GlyphPoint[]> res = new List<GlyphPoint[]>();
             AddContours(glyph, res, 0);
+            double origin = glyph >= 0 && glyph < numGlyphs ? HorizontalOrigin(glyph) : 0.0;
+            if (origin != 0.0)
+            {
+                foreach (GlyphPoint[] contour in res)
+                    for (int i = 0; i < contour.Length; ++i) contour[i] = new GlyphPoint(contour[i].X - origin, contour[i].Y, contour[i].OnCurve);
+            }
             return res;
         }
 
@@ -525,10 +577,11 @@ namespace CADability
                 }
                 tps[tps.Count - 1] |= 0x80;
             }
-            void AddBar(int top, int thickness)
-            {
+            void AddBar(int middle, int thickness)
+            {   // centered on the position, as GDI+ does
                 if (thickness <= 0) return;
                 double width = GetAdvanceWidth(glyph);
+                double top = middle + thickness / 2.0;
                 pts.Add(Map(0, top)); tps.Add(0);
                 pts.Add(Map(width, top)); tps.Add(1);
                 pts.Add(Map(width, top - thickness)); tps.Add(1);

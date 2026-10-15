@@ -1,6 +1,7 @@
 #if WINDOWS
 using CADability.Forms;
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace CADability.Tests
@@ -8,8 +9,8 @@ namespace CADability.Tests
     /// <summary>
     /// Compares the managed font reader (<see cref="ManagedFontProvider"/>, the default since issue #412) with GDI and GDI+
     /// (<see cref="GdiFontProvider"/>, how CADability got its fonts before) on the fonts installed on Windows: the families,
-    /// the metrics, the advance widths and the glyph outlines must be the same. Texts in existing drawings must look as
-    /// they did before.
+    /// the metrics, the advance widths, the underline and strikeout lines and the glyph outlines must be the same, so that
+    /// texts in existing drawings keep their layout. The outlines are compared with the unhinted outlines of GDI.
     /// </summary>
     [TestClass]
     public class GdiFontComparisonTests
@@ -104,31 +105,134 @@ namespace CADability.Tests
                 double gw = g.GetAdvanceWidth(c) * em, mw = m.GetAdvanceWidth(c) * em;
                 if (Math.Abs(gw - mw) > WidthTolerance) Fail($"advance width of '{c}' GDI {gw}, managed {mw}");
             }
-            foreach (char c in outlineCharacters.Where(c => m.Font.GetGlyphIndex(c) != 0))
+            FontStyle style = (g.IsBold ? FontStyle.Bold : FontStyle.Regular) | (g.IsItalic ? FontStyle.Italic : FontStyle.Regular);
+            using (GdiGlyphOutlines outlines = new GdiGlyphOutlines(g.FamilyName, style, m.EmHeight))
             {
-                CompareOutline(g, m, c, false, false, Fail);
+                foreach (char c in outlineCharacters.Where(c => m.Font.GetGlyphIndex(c) != 0))
+                {
+                    m.GetGlyphPath(c, false, false, out PointF[] mp, out byte[] mt);
+                    CompareOutlines($"outline of '{c}'", outlines.Get(c, m.CellAscent), Flatten(mp, mt, em), Fail);
+                }
             }
             if (decorations)
             {
-                CompareOutline(g, m, 'H', true, false, Fail);
-                CompareOutline(g, m, 'H', false, true, Fail);
+                CompareBar(g, m, true, Fail);
+                CompareBar(g, m, false, Fail);
             }
         }
 
-        private static void CompareOutline(FontFace g, FontFace m, char c, bool underline, bool strikeout, Action<string> fail)
+        /// <summary>
+        /// The underline or the strikeout line, which is the last figure of the path data of GDI+ and of the managed reader.
+        /// </summary>
+        private static void CompareBar(FontFace g, FontFace m, bool underline, Action<string> fail)
         {
-            string what = $"outline of '{c}'{(underline ? " underlined" : "")}{(strikeout ? " struck out" : "")}";
-            g.GetGlyphPath(c, underline, strikeout, out PointF[] gp, out byte[] gt);
-            m.GetGlyphPath(c, underline, strikeout, out PointF[] mp, out byte[] mt);
+            g.GetGlyphPath('H', underline, !underline, out PointF[] gp, out byte[] gt);
+            m.GetGlyphPath('H', underline, !underline, out PointF[] mp, out byte[] mt);
             List<List<(double x, double y)>> a = Flatten(gp, gt, m.EmHeight), b = Flatten(mp, mt, m.EmHeight);
-            if (a.Count != b.Count)
+            if (a.Count == 0 || b.Count == 0) fail((underline ? "underline" : "strikeout") + " is missing");
+            else CompareOutlines(underline ? "underline" : "strikeout", a.GetRange(a.Count - 1, 1), b.GetRange(b.Count - 1, 1), fail);
+        }
+
+        private static void CompareOutlines(string what, List<List<(double x, double y)>> gdi, List<List<(double x, double y)>> managed, Action<string> fail)
+        {
+            if (gdi.Count != managed.Count)
             {
-                fail($"{what}: GDI {a.Count} contours, managed {b.Count}");
+                fail($"{what}: GDI {gdi.Count} contours, managed {managed.Count}");
                 return;
             }
             // the contours may start at different points, so the outlines are compared as point sets (Hausdorff distance)
-            double distance = Math.Max(Directed(a, b), Directed(b, a));
+            double distance = Math.Max(Directed(gdi, managed), Directed(managed, gdi));
             if (distance > OutlineTolerance) fail($"{what}: distance {distance:0.###} font units");
+        }
+
+        /// <summary>
+        /// The unhinted glyph outlines of GDI (GetGlyphOutline with GGO_NATIVE | GGO_UNHINTED) at the em height as pixel size,
+        /// so in font units. GDI+ (<see cref="GdiFontProvider"/>) is not the reference for the outlines: AddString gives the
+        /// hinted outlines, which differ from the design by a few font units in strongly hinted fonts (e.g. 17 units for '2'
+        /// of Calibri) and are wrong for Segoe Script.
+        /// </summary>
+        private sealed class GdiGlyphOutlines : IDisposable
+        {
+            [StructLayout(LayoutKind.Sequential)] private struct GLYPHMETRICS { public uint bx, by; public int ox, oy; public short cx, cy; }
+            [StructLayout(LayoutKind.Sequential)] private struct MAT2 { public int m11, m12, m21, m22; }
+            [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+            [DllImport("gdi32.dll")] private static extern bool DeleteDC(IntPtr hdc);
+            [DllImport("gdi32.dll")] private static extern IntPtr SelectObject(IntPtr hdc, IntPtr obj);
+            [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr obj);
+            [DllImport("gdi32.dll", CharSet = CharSet.Unicode)] private static extern uint GetGlyphOutlineW(IntPtr hdc, uint c, uint format, out GLYPHMETRICS metrics, uint size, byte[] buffer, ref MAT2 matrix);
+            private const uint GGO_NATIVE = 2, GGO_UNHINTED = 0x100;
+
+            private readonly IntPtr hdc, hfont, oldFont;
+            public GdiGlyphOutlines(string family, FontStyle style, int em)
+            {
+                using (Font font = new Font(family, em, style, GraphicsUnit.Pixel)) hfont = font.ToHfont();
+                hdc = CreateCompatibleDC(IntPtr.Zero);
+                oldFont = SelectObject(hdc, hfont);
+            }
+            public void Dispose()
+            {
+                SelectObject(hdc, oldFont);
+                DeleteObject(hfont);
+                DeleteDC(hdc);
+            }
+            private static double Fixed(byte[] b, int offset) => BitConverter.ToInt16(b, offset + 2) + BitConverter.ToUInt16(b, offset) / 65536.0;
+            /// <summary>
+            /// The contours of a character as polylines in the layout of <see cref="Flatten"/>: font units, y downwards, the
+            /// top of the cell at 0.
+            /// </summary>
+            public List<List<(double x, double y)>> Get(char c, int cellAscent)
+            {
+                const int n = 16;
+                MAT2 identity = new MAT2 { m11 = 0x10000, m22 = 0x10000 };
+                List<List<(double x, double y)>> res = new List<List<(double, double)>>();
+                uint size = GetGlyphOutlineW(hdc, c, GGO_NATIVE | GGO_UNHINTED, out GLYPHMETRICS metrics, 0, null, ref identity);
+                if (size == 0 || size == uint.MaxValue) return res;
+                byte[] b = new byte[size];
+                GetGlyphOutlineW(hdc, c, GGO_NATIVE | GGO_UNHINTED, out metrics, size, b, ref identity);
+                (double x, double y) Point(int offset) => (Fixed(b, offset), cellAscent - Fixed(b, offset + 4));
+                int pos = 0;
+                while (pos < size)
+                {   // TTPOLYGONHEADER: cb, dwType, pfxStart, then TTPOLYCURVEs: wType, cpfx, apfx[cpfx]
+                    int cb = BitConverter.ToInt32(b, pos);
+                    List<(double x, double y)> contour = new List<(double, double)> { Point(pos + 8) };
+                    for (int p = pos + 16; p < pos + cb;)
+                    {
+                        int type = BitConverter.ToUInt16(b, p), count = BitConverter.ToUInt16(b, p + 2);
+                        if (type == 1) for (int k = 0; k < count; ++k) contour.Add(Point(p + 4 + 8 * k)); // lines
+                        else if (type == 2)
+                        {   // quadratic B-spline: the on-curve points between the control points are implied
+                            for (int k = 0; k < count - 1; ++k)
+                            {
+                                (double x, double y) p0 = contour[contour.Count - 1], c1 = Point(p + 4 + 8 * k), next = Point(p + 12 + 8 * k);
+                                (double x, double y) e = k == count - 2 ? next : ((c1.x + next.x) / 2, (c1.y + next.y) / 2);
+                                for (int s = 1; s <= n; ++s)
+                                {
+                                    double t = (double)s / n, u = 1 - t;
+                                    contour.Add((u * u * p0.x + 2 * u * t * c1.x + t * t * e.x, u * u * p0.y + 2 * u * t * c1.y + t * t * e.y));
+                                }
+                            }
+                        }
+                        else
+                        {   // cubic Bezier segments (fonts with CFF outlines)
+                            for (int k = 0; k + 2 < count; k += 3)
+                            {
+                                (double x, double y) p0 = contour[contour.Count - 1], p1 = Point(p + 4 + 8 * k), p2 = Point(p + 12 + 8 * k), p3 = Point(p + 20 + 8 * k);
+                                for (int s = 1; s <= n; ++s)
+                                {
+                                    double t = (double)s / n, u = 1 - t;
+                                    contour.Add((u * u * u * p0.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t * t * t * p3.x,
+                                                 u * u * u * p0.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t * t * t * p3.y));
+                                }
+                            }
+                        }
+                        p += 4 + 8 * count;
+                    }
+                    contour.Add(contour[0]);
+                    res.Add(contour);
+                    pos += cb;
+                }
+                return res;
+            }
         }
 
         /// <summary>

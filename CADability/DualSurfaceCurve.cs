@@ -499,6 +499,7 @@ namespace CADability
         {
             return theCurve.Project(fromPlane, toPlane);
         }
+        [Obsolete("Use the GraphicsPath extension AddCurve2D of CADability.Forms.GdiExtensions instead. GDI+ leaves the kernel in CADability 2.0, see issue #412.")]
         void ICurve2D.AddToGraphicsPath(System.Drawing.Drawing2D.GraphicsPath path, bool forward)
         {
             theCurve.AddToGraphicsPath(path, forward);

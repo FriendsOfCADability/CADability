@@ -223,7 +223,9 @@ namespace CADability.GeoObject
             prsh = prsh.GetModified(m);
             m = ModOp2D.Translate(0, bitmap.Height);
             prsh = prsh.GetModified(m);
+#pragma warning disable CS0618 // Picture moves away from GDI+ in issue #412, step 7
             GraphicsPath gp = prsh.CreateGraphicsPath();
+#pragma warning restore CS0618
             using (new Changing(this))
             {
                 Region rg = new Region(gp);

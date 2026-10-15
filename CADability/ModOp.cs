@@ -657,6 +657,7 @@ namespace CADability
         /// Returns the <see cref="System.Drawing.Drawing2D.Matrix"/> object equivalent to this
         /// modification.
         /// </value>
+        [Obsolete("Use the extension ToGdiMatrix of CADability.Forms.GdiExtensions instead. GDI+ leaves the kernel in CADability 2.0, see issue #412.")]
         public System.Drawing.Drawing2D.Matrix Matrix2D
         {
             get
@@ -1980,13 +1981,6 @@ namespace CADability
             {
                 if (e is ThreadAbortException) throw (e);
                 throw new ModOpException(ModOpException.tExceptionType.InversionFailed);
-            }
-        }
-        internal System.Drawing.Drawing2D.Matrix Matrix2D
-        {
-            get
-            {
-                return new System.Drawing.Drawing2D.Matrix((float)Matrix00, (float)Matrix01, (float)Matrix10, (float)Matrix11, (float)Matrix12, (float)Matrix02);
             }
         }
         /// <summary>

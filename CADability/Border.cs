@@ -3904,6 +3904,7 @@ namespace CADability.Shapes
 		/// </summary>
 		/// <param name="path">The graphics path to append to</param>
 		/// <param name="counterClockWise">true: add in the direction of the border, false: add reversed</param>
+		[Obsolete("Use the GraphicsPath extension AddBorder of CADability.Forms.GdiExtensions instead. GDI+ leaves the kernel in CADability 2.0, see issue #412.")]
 		public void AddToGraphicsPath(System.Drawing.Drawing2D.GraphicsPath path, bool counterClockWise)
 		{
 			if (counterClockWise)

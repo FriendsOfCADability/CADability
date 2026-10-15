@@ -598,6 +598,7 @@ namespace CADability.Curve2D
             return res;
         }
         /// <inheritdoc/>
+        [Obsolete("Use the GraphicsPath extension AddCurve2D of CADability.Forms.GdiExtensions instead. GDI+ leaves the kernel in CADability 2.0, see issue #412.")]
         public override void AddToGraphicsPath(System.Drawing.Drawing2D.GraphicsPath path, bool forward)
         {	// es wird ein Spline erzeugt in 10° Schritten
             // hier sollte man überlegen, ob man nicht mit einer Kreisbogenannäherung

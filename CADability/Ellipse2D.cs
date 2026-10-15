@@ -807,6 +807,7 @@ namespace CADability.Curve2D
             Recalc();
         }
         /// <inheritdoc/>
+        [Obsolete("Use the GraphicsPath extension AddCurve2D of CADability.Forms.GdiExtensions instead. GDI+ leaves the kernel in CADability 2.0, see issue #412.")]
         public override void AddToGraphicsPath(System.Drawing.Drawing2D.GraphicsPath path, bool forward)
         {
             // aus dem Bogen übernommen, evtl besser in Kreisbögen zerlegen...

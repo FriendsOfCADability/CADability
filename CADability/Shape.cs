@@ -1054,6 +1054,7 @@ namespace CADability.Shapes
             }
             return new SimpleShape(o, h);
         }
+        [Obsolete("Use the GraphicsPath extension AddShape of CADability.Forms.GdiExtensions instead.")]
         internal void AddToGraphicsPath(System.Drawing.Drawing2D.GraphicsPath path)
         {
             outline.AddToGraphicsPath(path, true);
@@ -3160,6 +3161,7 @@ namespace CADability.Shapes
         /// holes empty.
         /// </summary>
         /// <returns>The graphics path</returns>
+        [Obsolete("Use the extension ToGraphicsPath of CADability.Forms.GdiExtensions instead. GDI+ leaves the kernel in CADability 2.0, see issue #412.")]
         public System.Drawing.Drawing2D.GraphicsPath CreateGraphicsPath()
         {
             System.Drawing.Drawing2D.GraphicsPath res = new System.Drawing.Drawing2D.GraphicsPath();

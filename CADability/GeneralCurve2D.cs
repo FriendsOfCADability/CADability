@@ -416,6 +416,7 @@ namespace CADability.Curve2D
 		/// <param name="path">the path to append to</param>
 		/// <param name="forward">true to append the curve in its own direction, false to append it reversed (from the end point to
 		/// the start point)</param>
+		[Obsolete("Use the GraphicsPath extension AddCurve2D of CADability.Forms.GdiExtensions instead. GDI+ leaves the kernel in CADability 2.0, see issue #412.")]
 		void AddToGraphicsPath(System.Drawing.Drawing2D.GraphicsPath path, bool forward);
 		/// <summary>
 		/// Determines, whether the given parameter denotes a point inside the bounds of the curve.
@@ -2436,6 +2437,7 @@ namespace CADability.Curve2D
 		}
 
 		/// <inheritdoc/>
+		[Obsolete("Use the GraphicsPath extension AddCurve2D of CADability.Forms.GdiExtensions instead. GDI+ leaves the kernel in CADability 2.0, see issue #412.")]
 		public virtual void AddToGraphicsPath(System.Drawing.Drawing2D.GraphicsPath path, bool forward)
 		{
 			throw new Exception("The method or operation is not implemented.");

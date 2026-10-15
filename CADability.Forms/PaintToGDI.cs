@@ -866,7 +866,7 @@ namespace CADability.Forms
                     }
                     try
                     {
-                        Matrix r = fromHorizontal.Matrix2D;
+                        Matrix r = fromHorizontal.ToGdiMatrix();
                         double maxRad = prmaj2D.Length;
                         double minRad = prmin2D.Length;
                         if ((maxRad + minRad) * Projection.WorldToDeviceFactor < 1)

@@ -2732,7 +2732,9 @@ namespace CADability
                     float stPar = (float)(ea2d.axisStart / Math.PI * 180);
                     try
                     {
+#pragma warning disable CS0618 // PrintToGDI moves to CADability.Forms with the printing (issue #412, step 7)
                         Matrix r = fromHorizontal.Matrix2D;
+#pragma warning restore CS0618
                         double maxRad = prmaj2D.Length;
                         double minRad = prmin2D.Length;
                         if (graphicsPath != null)

@@ -496,6 +496,7 @@ namespace CADability.Curve2D
             return e.GetProjectedCurve(toPlane);
         }
         /// <inheritdoc/>
+        [Obsolete("Use the GraphicsPath extension AddCurve2D of CADability.Forms.GdiExtensions instead. GDI+ leaves the kernel in CADability 2.0, see issue #412.")]
         public override void AddToGraphicsPath(System.Drawing.Drawing2D.GraphicsPath path, bool forward)
         {	// forward oder nicht ist doch egal, oder?
             // im Modus "System.Drawing.Drawing2D.FillMode.Alternate" scheint es egal zu sein,

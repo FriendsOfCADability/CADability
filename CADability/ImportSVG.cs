@@ -10,7 +10,6 @@ using CADability.Curve2D;
 using System.Runtime.InteropServices.ComTypes;
 using CADability.Attribute;
 using MathNet.Numerics.LinearAlgebra.Factorization;
-using static CADability.PrintToGDI;
 using System.Numerics;
 
 namespace CADability

@@ -22,9 +22,15 @@ namespace CADability
         private double paperWidth;
         private double paperHeight;
         /// <summary>
-        /// The printer settings.
+        /// The printer settings. Not used by CADability any more and not saved; see <see cref="PageSetup"/>.
         /// </summary>
-        public PageSettings pageSettings; // kommt vom PrintDocument, kann auch null sein, ist Serializable
+        [Obsolete("Use PageSetup. The GDI+ PageSettings cannot be saved on .NET Core and are removed from the kernel in CADability 2.0 (issue #412).")]
+        public PageSettings pageSettings; // kommt vom PrintDocument, kann auch null sein
+        /// <summary>
+        /// The page settings of this layout for printing, saved with the layout. Null if the layout has none: then the
+        /// page settings of the project (<see cref="Project.DefaultPageSetup"/>) are used.
+        /// </summary>
+        public PageSetup PageSetup { get; set; }
         internal Project project;
         /// <summary>
         /// Creates an empty Layout
@@ -345,8 +351,11 @@ namespace CADability
                     case "paperHeight":
                         paperHeight = (double)e.Value;
                         break;
-                    case "PageSettings":
-                        pageSettings = e.Value as PageSettings;
+                    case "PageSetup":
+                        PageSetup = e.Value as PageSetup;
+                        break;
+                    case "PageSettings": // 1.x: a serialized GDI+ PageSettings
+                        if (PageSetup == null) PageSetup = PageSetup.FromSerialized(e.Value);
                         break;
                 }
             }
@@ -359,7 +368,7 @@ namespace CADability
             info.AddValue("Patches", patches, typeof(LayoutPatch[]));
             info.AddValue("paperWidth", paperWidth, typeof(double));
             info.AddValue("paperHeight", paperHeight, typeof(double));
-            if (pageSettings != null) info.AddValue("PageSettings", pageSettings);
+            if (PageSetup != null) info.AddValue("PageSetup", PageSetup);
         }
 
 #endregion

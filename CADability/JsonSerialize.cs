@@ -1049,6 +1049,8 @@ namespace CADability
                 // a GDI+ bitmap of a picture or icon in a file of CADability 1.x: only its image file bytes are read, so that
                 // the file opens without GDI+ (issue #412)
                 if (LegacyImageData.IsGdiImageType(typeName)) tp = typeof(LegacyImageData);
+                // the page settings in a file of CADability 1.x: their values are read into a PageSetup (issue #412)
+                if (LegacyPrintingData.IsPrintingType(typeName)) tp = typeof(LegacyPrintingData);
                 if (tp == null && assemblyName == null && typeName.StartsWith("System.Drawing.")) assemblyName = "System.Drawing"; // this is for old files, where System.Drawing objects where handled different
                 if (tp == null && assemblyName == null) tp = Type.GetType(typeName);
                 if (tp == null)

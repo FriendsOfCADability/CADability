@@ -3,11 +3,7 @@ using System.Runtime.Serialization;
 using CADability.GeoObject;
 using CADability.Shapes;
 using System.Collections.Generic;
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-#else
 using System.Drawing;
-#endif
 using MathNet.Numerics.LinearAlgebra.Double;
 
 namespace CADability

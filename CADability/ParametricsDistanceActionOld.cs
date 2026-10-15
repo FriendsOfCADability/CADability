@@ -4,13 +4,8 @@ using CADability.GeoObject;
 using CADability.Attribute;
 using System.Collections.Generic;
 using System;
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-using Point = CADability.WebDrawing.Point;
-#else
 using System.Drawing;
 using Point = System.Drawing.Point;
-#endif
 
 namespace CADability
 {

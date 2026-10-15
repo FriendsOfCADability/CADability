@@ -1,5 +1,4 @@
-﻿#if !WEBASSEMBLY
-using CADability.Attribute;
+﻿using CADability.Attribute;
 using CADability.Curve2D;
 using CADability.GeoObject;
 using CADability.Shapes;
@@ -2867,4 +2866,3 @@ namespace CADability
 #endif
     }
 }
-#endif

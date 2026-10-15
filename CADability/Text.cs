@@ -5,14 +5,6 @@ using CADability.Shapes;
 using CADability.UserInterface;
 using System;
 using System.Collections.Generic;
-// some work to do to implement text for webassembly
-//#if WEBASSEMBLY
-//using CADability.WebDrawing;
-//using Point = CADability.WebDrawing.Point;
-//#else
-//using System.Drawing;
-//using Point = System.Drawing.Point;
-//#endif
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
@@ -2635,11 +2627,7 @@ namespace CADability.GeoObject
                 }
                 else
                 {
-#if WEBASSEMBLY
-                    paintTo3D.PrepareText(fontName, textString, CADability.WebDrawing.FontStyle.Regular);
-#else
                     paintTo3D.PrepareText(fontName, textString, fontStyle);
-#endif
                 }
             }
         }
@@ -2828,11 +2816,7 @@ namespace CADability.GeoObject
             else
             {
                 string wrapped = GetDisplayString((int)fontStyle); // apply automatic line wrapping here as well
-#if WEBASSEMBLY
-                paintTo3D.Text(lineDirection, glyphDirection, location, fontName, wrapped, CADability.WebDrawing.FontStyle.Regular, alignment, lineAlignment);
-#else
                 paintTo3D.Text(lineDirection, glyphDirection, location, fontName, wrapped, fontStyle, alignment, lineAlignment);
-#endif
             }
         }
         /// <inheritdoc/>

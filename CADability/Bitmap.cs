@@ -4,13 +4,8 @@ using CADability.Shapes;
 using CADability.UserInterface;
 using System;
 using System.Collections.Generic;
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-using Point = CADability.WebDrawing.Point;
-#else
 using System.Drawing;
 using Point = System.Drawing.Point;
-#endif
 using System.Drawing.Drawing2D;
 using System.IO;
 using System.Runtime.Serialization;
@@ -216,7 +211,6 @@ namespace CADability.GeoObject
         /// <param name="shape">The shape for the clip operation</param>
         public void Clip(Plane plane, CompoundShape shape)
         {
-#if !WEBASSEMBLY
             Plane pln = new Plane(location, directionWidth, directionHeight);
             CompoundShape prsh = shape.Project(plane, pln);
             ModOp2D m = ModOp2D.Scale(bitmap.Width / directionWidth.Length, -bitmap.Height / directionHeight.Length);
@@ -234,7 +228,6 @@ namespace CADability.GeoObject
                 graphics.DrawImage(clone, new System.Drawing.Point(0, 0));
                 graphics.Dispose();
             }
-#endif
         }
 
         /// <summary>

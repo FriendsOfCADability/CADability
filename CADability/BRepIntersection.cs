@@ -9,11 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using static CADability.BRepOperation;
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-#else
 using Color = System.Drawing.Color;
-#endif
 
 /* SO GEHTS WEITER:
  * Die Triangulierung der beteiligten Faces muss vermieden werden, dauert zu lange.

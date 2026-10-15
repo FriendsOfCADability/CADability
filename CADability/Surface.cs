@@ -9,11 +9,7 @@ using System;
 using System.Collections.Generic;
 using MathNet.Numerics.LinearAlgebra.Factorization;
 using System.Linq;
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-#else
 using System.Drawing;
-#endif
 
 namespace CADability.GeoObject
 {

@@ -55,8 +55,8 @@ namespace CADability.BooleanSweep
                 sw.Stop();
                 int solids = res?.Length ?? 0;
                 int open = res?.Sum(s => s.Shells.Sum(sh => sh.OpenEdgesExceptPoles.Length)) ?? 0;
-                // the volume from a fine triangulation; ShellMetrics.IntegratedVolume is up to about 1e-4 relative off for faces
-                // bounded by intersection curves, it is only written for comparison: a large difference shows a broken result
+                // the volume from a fine triangulation; ShellMetrics.IntegratedVolume is only written for comparison: a large
+                // difference shows a broken result
                 double volume = res?.Sum(s => s.Volume(1e-4)) ?? 0.0;
                 double integrated = res?.Sum(s => s.Shells.Sum(sh => ShellMetrics.IntegratedVolume(sh))) ?? 0.0;
                 r["integrated"] = integrated.ToString("R", Inv);

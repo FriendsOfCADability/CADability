@@ -9267,6 +9267,15 @@ namespace CADability.GeoObject
             GeoPoint2D dbgv1 = surface.PositionOf(Vertices[0].Position);
 #endif
             BoundingRect modifiedBounds = Area.GetExtent();
+            // ModifyCurve2D replaces a ProjectedCurve by an approximation with arcs (GeneralCurve2D.GetModified), which was up to
+            // 1e-3 off: the union of two spheres, which reverses both shells, was 0.03 % too small (#459), and that of two crossing
+            // cylinders of equal radius 0.05 % too large (#458). Such a curve is approximated again below from its 3d curve, much
+            // finer. Not for a seam, whose two 2d curves on this face are told apart by the order they are modified in.
+            HashSet<Edge> projected = new HashSet<Edge>();
+            foreach (Edge edg in AllEdges)
+            {
+                if (edg.PrimaryFace != edg.SecondaryFace && edg.Curve3D != null && edg.Curve2D(this) is ProjectedCurve) projected.Add(edg);
+            }
             ModOp2D m = surface.ReverseOrientation();
             modifiedBounds.Modify(m);
             ICurve2D[] segments = new ICurve2D[outline.Length];
@@ -9340,6 +9349,44 @@ namespace CADability.GeoObject
                 {   // the 2d curve of a CurveOnSurface lives in the parameter system of the surface, which has changed
                     cons.SurfaceModified(m);
                 }
+                else if (projected.Contains(edg))
+                {
+                    ICurve2D approximated = edg.Curve2D(this);
+                    ICurve2D exact = new ProjectedCurve(edg.Curve3D, surface, true, modifiedBounds); // every point in the period of this face
+                    if (approximated != null && exact != null)
+                    {
+                        SurfaceHelper.AdjustPeriodic(surface, modifiedBounds, exact);
+                        if ((exact.StartPoint | approximated.EndPoint) < (exact.StartPoint | approximated.StartPoint)) exact.Reverse();
+                        double tolerance = 1e-6 * Math.Max(modifiedBounds.Size, 1e-6);
+                        // the same ends, and the same way between them, not the other way around a periodic surface
+                        bool same = (exact.StartPoint | approximated.StartPoint) < tolerance && (exact.EndPoint | approximated.EndPoint) < tolerance &&
+                            (exact.StartPoint | exact.EndPoint) > tolerance; // a closed curve could go either way
+                        for (int k = 1; k < 8 && same; k++)
+                        {
+                            same = approximated.MinDistance(exact.PointAt(k / 8.0)) < 1e-2 * Math.Max(approximated.Length, 1e-6) &&
+                                exact.MinDistance(approximated.PointAt(k / 8.0)) < 1e-2 * Math.Max(approximated.Length, 1e-6);
+                        }
+                        if (same)
+                        {   // A spline within 1e-6 of the domain, with the ends of the coarse approximation, so that the curve still
+                            // connects to its neighbours. Not the ProjectedCurve itself: it keeps the surface, which is changed in place
+                            // when the face is reversed again, and close to the pole of a sphere it made the triangulation of the face
+                            // fail at a coarse precision. Arcs within 1e-7 were about 50 times as many segments as a spline has poles,
+                            // and made the union of two spheres 8 times slower; within 1e-6 the volume of that union is 3e-8 off. The spline is parametrized by the length of
+                            // the curve in uv: Edge.GetTriangulationBasis samples a circle evenly in its parameter, and with the
+                            // parameter of the 3d circle, the samples jumped across the domain close to the pole of a sphere, and the
+                            // border of the face crossed itself.
+                            double fineTolerance = 1e-6 * Math.Max(modifiedBounds.Size, 1e-6);
+                            ICurve2D fine = BSpline2D.Approximate(ByArcLength(exact), fineTolerance);
+                            if (fine == null || (fine.StartPoint | approximated.StartPoint) > tolerance || (fine.EndPoint | approximated.EndPoint) > tolerance)
+                                fine = exact.Approximate(false, fineTolerance);
+                            if (fine != null)
+                            {
+                                if (edg.PrimaryFace == this) edg.PrimaryCurve2D = fine;
+                                else edg.SecondaryCurve2D = fine;
+                            }
+                        }
+                    }
+                }
             }
             area = null;
             SimpleShape ss = Area; // force area recalc
@@ -9365,6 +9412,51 @@ namespace CADability.GeoObject
                 dc.Add(surface.Make3dCurve(sss[i]));
             }
 #endif
+        }
+        /// <summary>
+        /// The points of <paramref name="curve"/> as a function of the normalized length along it. The length is measured at 32 points
+        /// and the parameter of the curve interpolated by a monotone cubic (Fritsch-Carlson), so that the function stays smooth and a
+        /// spline approximating it needs few poles.
+        /// </summary>
+        private static Func<double, GeoPoint2D> ByArcLength(ICurve2D curve)
+        {
+            const int n = 32;
+            double[] s = new double[n + 1]; // the length at the parameter i / n
+            GeoPoint2D last = curve.PointAt(0.0);
+            for (int i = 1; i <= n; i++)
+            {
+                GeoPoint2D p = curve.PointAt((double)i / n);
+                s[i] = s[i - 1] + (p | last);
+                last = p;
+            }
+            if (!(s[n] > 0.0)) return curve.PointAt;
+            for (int i = 1; i < n; i++)
+            {
+                s[i] /= s[n];
+                if (!(s[i] > s[i - 1])) return curve.PointAt; // a curve that stands still: no reparametrization
+            }
+            s[n] = 1.0;
+            // the parameter t(s) through (s[i], i / n), with slopes that keep it monotone
+            double[] slope = new double[n + 1];
+            double Secant(int i) => (1.0 / n) / (s[i + 1] - s[i]);
+            slope[0] = Secant(0);
+            slope[n] = Secant(n - 1);
+            for (int i = 1; i < n; i++)
+            {
+                double a = Secant(i - 1), b = Secant(i);
+                slope[i] = 2.0 / (1.0 / a + 1.0 / b); // the harmonic mean is monotone for positive secants
+            }
+            return x =>
+            {
+                x = Math.Max(0.0, Math.Min(1.0, x));
+                int i = Array.BinarySearch(s, x);
+                if (i >= 0) return curve.PointAt((double)i / n);
+                i = ~i - 1; // s[i] < x < s[i + 1]
+                double h = s[i + 1] - s[i], u = (x - s[i]) / h;
+                double h00 = (1 + 2 * u) * (1 - u) * (1 - u), h10 = u * (1 - u) * (1 - u), h01 = u * u * (3 - 2 * u), h11 = u * u * (u - 1);
+                double t = h00 * i / n + h10 * h * slope[i] + h01 * (i + 1.0) / n + h11 * h * slope[i + 1];
+                return curve.PointAt(t);
+            };
         }
         internal void MakeInverseOrientation()
         {   // Das Innere wird nach außen gekehrt

@@ -207,7 +207,11 @@ namespace CADability.GeoObject
         /// </para>
         /// <para>
         /// What no quadrature can remove is the domain D itself, whose boundary is only as good as the 2d
-        /// curves of the face, and a ProjectedCurve is an approximation. That is the floor.
+        /// curves of the face. A ProjectedCurve is replaced by a spline through its points, within 1e-7 of the size
+        /// of the domain. The curve of an intersection edge (InterpolatedDualSurfaceCurve.ProjectedCurve) is
+        /// integrated with its exact points, see <see cref="DifferencedDerivative"/>; until October 2026 it was
+        /// replaced by a spline too, and faces bounded by intersection curves of crossing cylinders were up to 1e-4
+        /// relative off, where they are now within about 1e-9 (#459).
         /// </para>
         /// </summary>
         public static double IntegratedVolume(Shell shell) => IntegratedVolume(shell, PrecisionFor(shell));
@@ -481,25 +485,44 @@ namespace CADability.GeoObject
             for (int i = 0; i < border.Count; i++)
             {
                 ICurve2D segment = border[i];
+                Func<double, GeoPoint2D> point = segment.PointAt;
+                Func<double, GeoVector2D> derivative = segment.DirectionAt;
+                double[] breaks;
                 // The DirectionAt of a projected curve (the plain one and the one of an intersection curve) comes from the
-                // 3d curve, normalized and in another parametrization - not the derivative of PointAt. A spline through its
-                // points has both.
-                if (segment is ProjectedCurve || segment is InterpolatedDualSurfaceCurve.ProjectedCurve)
+                // 3d curve, normalized and in another parametrization - not the derivative of PointAt.
+                if (segment is InterpolatedDualSurfaceCurve.ProjectedCurve onIntersection)
+                {   // exact points of the intersection curve, smooth between two base points of the 3d curve: integrated
+                    // directly, with the derivative from differences and the base points as breaks, see DifferencedDerivative
+                    double[] smoothPieces = onIntersection.SmoothSegmentBreaks;
+                    point = onIntersection.SmoothPointAt;
+                    derivative = t => DifferencedDerivative(onIntersection.SmoothPointAt, t, smoothPieces);
+                    breaks = smoothPieces.Concat(KnotCrossings(segment, uKnots, vKnots)).Distinct().OrderBy(t => t).ToArray();
+                }
+                else
                 {
-                    BSpline2D approx = BSpline2D.Approximate(segment.PointAt, 1e-7 * Math.Max(uvScale, 1e-12));
-                    if (approx != null) segment = approx;
+                    if (segment is ProjectedCurve)
+                    {   // a spline through its points has both. PointAt may jump close to a pole, so it is not differenced.
+                        BSpline2D approx = BSpline2D.Approximate(segment.PointAt, 1e-7 * Math.Max(uvScale, 1e-12));
+                        if (approx != null)
+                        {
+                            segment = approx;
+                            point = segment.PointAt;
+                            derivative = segment.DirectionAt;
+                        }
+                    }
+                    breaks = KnotCrossings(segment, uKnots, vKnots);
                 }
                 Vector4 part = GaussKronrod(t =>
                 {
-                    GeoPoint2D p = segment.PointAt(t);
-                    GeoVector2D d = segment.DirectionAt(t);
+                    GeoPoint2D p = point(t);
+                    GeoVector2D d = derivative(t);
                     double flux = d.y == 0.0 ? 0.0 : antiderivative(p.x, p.y) * d.y;
                     return new Vector4(flux, (p.x - u0) * d.y, d.x, d.y);
-                }, 0.0, 1.0, tolerance, 0.1 * derivativeTolerance, KnotCrossings(segment, uKnots, vKnots));
+                }, 0.0, 1.0, tolerance, 0.1 * derivativeTolerance, breaks);
                 if (double.IsNaN(part.A) || double.IsNaN(part.B)) return double.NaN;
                 // against the ends of what was integrated: the end points a curve reports may be snapped to its
                 // vertex, a ProjectedCurve does that, and differ from PointAt(1.0) by the approximation error
-                GeoVector2D chord = segment.PointAt(1.0) - segment.PointAt(0.0);
+                GeoVector2D chord = point(1.0) - point(0.0);
                 if (!(Math.Abs(part.C - chord.x) <= derivativeTolerance && Math.Abs(part.D - chord.y) <= derivativeTolerance))
                     return double.NaN;
                 sum += part.A;
@@ -507,6 +530,42 @@ namespace CADability.GeoObject
             }
             return sum;
         }
+
+        /// <summary>
+        /// The derivative of the curve <paramref name="point"/> at <paramref name="t"/> from differences, for a curve whose DirectionAt
+        /// is not the derivative of its points. The curve is smooth between the sorted <paramref name="breaks"/>, but not across them, so
+        /// the difference never reaches over a break: central where there is room, one sided of second order next to a break.
+        /// <para>
+        /// Until October 2026 an intersection curve was replaced by a spline approximation here, with a deviation of up to 1e-7 of
+        /// the size of the domain, and hundreds of knots, which the quadrature could not resolve within its panel limit. On faces bounded
+        /// by intersection curves the volume was up to 1e-4 relative off (#459).
+        /// </para>
+        /// </summary>
+        private static GeoVector2D DifferencedDerivative(Func<double, GeoPoint2D> point, double t, double[] breaks)
+        {
+            int index = Array.BinarySearch(breaks, t);
+            int above; // the first break above the smooth piece t lies in
+            if (index < 0) above = ~index;
+            else above = t > 0.5 ? index : index + 1; // exactly on a break: the piece towards the middle
+            double low = above > 0 ? breaks[above - 1] : 0.0;
+            double high = above < breaks.Length ? breaks[above] : 1.0;
+            double h = CurveDifferenceStep * (high - low);
+            if (t - low >= h && high - t >= h) return (1.0 / (2.0 * h)) * (point(t + h) - point(t - h));
+            GeoPoint2D p0 = point(t);
+            if (t - low < high - t)
+            {   // forward: (-3 f(t) + 4 f(t + h) - f(t + 2h)) / 2h
+                GeoPoint2D p1 = point(t + h), p2 = point(t + 2 * h);
+                return new GeoVector2D((-3 * p0.x + 4 * p1.x - p2.x) / (2 * h), (-3 * p0.y + 4 * p1.y - p2.y) / (2 * h));
+            }
+            else
+            {   // backward
+                GeoPoint2D p1 = point(t - h), p2 = point(t - 2 * h);
+                return new GeoVector2D((3 * p0.x - 4 * p1.x + p2.x) / (2 * h), (3 * p0.y - 4 * p1.y + p2.y) / (2 * h));
+            }
+        }
+
+        /// <summary>The step of <see cref="DifferencedDerivative"/>, relative to the smooth piece of the curve it lies in.</summary>
+        private const double CurveDifferenceStep = 1e-4;
 
         /// <summary>
         /// The knot lines of a spline surface inside the domain rectangle, as sorted distinct values of u and of v.

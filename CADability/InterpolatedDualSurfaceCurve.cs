@@ -142,6 +142,32 @@ namespace CADability
                 BSpline2D res = base.ToBspline(0.0);
                 return res;
             }
+            /// <summary>
+            /// The positions of the inner base points of the 3d curve on this curve, sorted. <see cref="SmoothPointAt"/> is smooth between
+            /// two of them, but not across one: each segment is evaluated on planes perpendicular to the approximating polynom of the 3d
+            /// curve, which is only once continuously differentiable at a base point.
+            /// </summary>
+            internal double[] SmoothSegmentBreaks
+            {
+                get
+                {
+                    int n = curve3d.basePoints.Length - 1;
+                    double[] res = new double[Math.Max(n - 1, 0)];
+                    for (int i = 1; i < n; i++) res[i - 1] = (double)i / n;
+                    return res; // symmetric, so it does not depend on reversed
+                }
+            }
+            /// <summary>
+            /// The point of this curve at <paramref name="par"/>, like <see cref="PointAt"/>, but as a smooth function of the position
+            /// between two of the <see cref="SmoothSegmentBreaks"/>, see <see cref="InterpolatedDualSurfaceCurve.SmoothPosition"/>.
+            /// For an integral along the curve.
+            /// </summary>
+            internal GeoPoint2D SmoothPointAt(double par)
+            {
+                if (reversed) par = 1.0 - par;
+                curve3d.SmoothPosition(par, out GeoPoint2D uv1, out GeoPoint2D uv2);
+                return onSurface1 ? uv1 : uv2;
+            }
             /// <inheritdoc/>
             protected override void GetTriangulationBasis(out GeoPoint2D[] points, out GeoVector2D[] directions, out double[] parameters)
             {
@@ -2246,6 +2272,83 @@ namespace CADability
                 uv2 = sp.psurface2;
                 hashedPositions[position] = sp;
             }
+        }
+        /// <summary>
+        /// The point of the curve at <paramref name="position"/> as a smooth function of the position between two base points.
+        /// <para>
+        /// <see cref="ApproximatePosition(double, out GeoPoint2D, out GeoPoint2D, out GeoPoint)"/> is not: it intersects the curves of
+        /// both surfaces on the plane through the point of the approximating polynom, perpendicular to it, and takes the cut closest to the
+        /// chord of the base points. Where that fails, Newton's method finds the point on a parallel plane through the chord, and where the
+        /// curve turns sharply between two base points, the cut closest to the chord may lie on the other side of the turn. The points it
+        /// returns lie on the curve, but their position along the curve jumps, and so does an integral along the curve (#459).
+        /// </para>
+        /// <para>
+        /// Here the point is always the one on the plane through the point of the polynom closest to that point: Newton's method on that
+        /// plane, starting there. Where it does not converge to a point within the distance of the base points, the result of
+        /// ApproximatePosition is returned. The result is not cached, and neither the base points nor what ApproximatePosition returns
+        /// are changed, so this has no influence on other operations with this curve.
+        /// </para>
+        /// </summary>
+        internal void SmoothPosition(double position, out GeoPoint2D uv1, out GeoPoint2D uv2)
+        {
+            ApproximatePosition(position, out uv1, out uv2, out GeoPoint _); // exact at the base points, the period for the others
+            int n = basePoints.Length - 1;
+            double scaled = position * n;
+            if (n < 2 || scaled <= 0.0 || scaled >= n || scaled == Math.Floor(scaled)) return;
+            ExplicitPCurve3D polynom = approxPolynom;
+            if (polynom == null)
+            {
+                lock (hashedPositions) InitApproxPolynom();
+                polynom = approxPolynom;
+                if (polynom == null) return;
+            }
+            int ind = (int)Math.Floor(scaled);
+            double chord = basePoints[ind].p3d | basePoints[ind + 1].p3d;
+            GeoPoint onPlane = polynom.PointAt(position);
+            Plane pln;
+            try { pln = new Plane(onPlane, polynom.DirectionAt(position)); }
+            catch (PlaneException) { return; }
+            GeoPoint2D s1 = NearestPeriod(surface1, surface1.PositionOf(onPlane), uv1);
+            GeoPoint2D s2 = NearestPeriod(surface2, surface2.PositionOf(onPlane), uv2);
+            GeoPoint p1 = surface1.PointAt(s1), p2 = surface2.PointAt(s2);
+            double tolerance = Math.Max(chord, Precision.eps) * 1e-12;
+            bool converged = false;
+            for (int i = 0; i < 32 && !converged; i++)
+            {   // the tangent planes of both surfaces at p1 and p2 and the plane pln meet in one point, see ApproximatePosition
+                GeoVector du1 = surface1.UDirection(s1), dv1 = surface1.VDirection(s1);
+                GeoVector du2 = surface2.UDirection(s2), dv2 = surface2.VDirection(s2);
+                GeoVector du3 = pln.DirectionX, dv3 = pln.DirectionY;
+                Matrix m = DenseMatrix.OfArray(new double[,]
+                {
+                    {du1.x,dv1.x,0,0,du3.x,dv3.x},
+                    {du1.y,dv1.y,0,0,du3.y,dv3.y},
+                    {du1.z,dv1.z,0,0,du3.z,dv3.z},
+                    {0,0,du2.x,dv2.x,du3.x,dv3.x},
+                    {0,0,du2.y,dv2.y,du3.y,dv3.y},
+                    {0,0,du2.z,dv2.z,du3.z,dv3.z},
+                });
+                Matrix sol = (Matrix)m.Solve(DenseMatrix.OfArray(new double[,] { { onPlane.x - p1.x }, { onPlane.y - p1.y }, { onPlane.z - p1.z },
+                    { onPlane.x - p2.x }, { onPlane.y - p2.y }, { onPlane.z - p2.z } }));
+                if (!sol.IsValid()) return;
+                s1 = new GeoPoint2D(s1.x + sol[0, 0], s1.y + sol[1, 0]);
+                s2 = new GeoPoint2D(s2.x + sol[2, 0], s2.y + sol[3, 0]);
+                GeoPoint q1 = surface1.PointAt(s1), q2 = surface2.PointAt(s2);
+                if (!q1.IsValid || !q2.IsValid) return;
+                converged = (q1 | p1) < tolerance && (q2 | p2) < tolerance;
+                p1 = q1;
+                p2 = q2;
+            }
+            if (!converged || (p1 | p2) > Precision.eps || Math.Abs(pln.Distance(p1)) > Precision.eps) return;
+            if ((p1 | onPlane) > chord || (p1 | basePoints[ind].p3d) > 2 * chord || (p1 | basePoints[ind + 1].p3d) > 2 * chord) return;
+            uv1 = NearestPeriod(surface1, s1, uv1);
+            uv2 = NearestPeriod(surface2, s2, uv2);
+        }
+        /// <summary><paramref name="uv"/> moved by whole periods of <paramref name="surface"/> as close as possible to <paramref name="near"/>.</summary>
+        private static GeoPoint2D NearestPeriod(ISurface surface, GeoPoint2D uv, GeoPoint2D near)
+        {
+            if (surface.IsUPeriodic) uv.x += surface.UPeriod * Math.Round((near.x - uv.x) / surface.UPeriod);
+            if (surface.IsVPeriodic) uv.y += surface.VPeriod * Math.Round((near.y - uv.y) / surface.VPeriod);
+            return uv;
         }
         internal BoundingRect Domain1
         {

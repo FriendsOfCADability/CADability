@@ -928,6 +928,75 @@ namespace CADability.GeoObject
                 return new ICurve2D[] { c2dpl };
             }
         }
+        /// <summary>
+        /// The intersection of two cylinders of the same radius, whose axes intersect: four half ellipses from one of the two points,
+        /// where the cylinders touch each other, to the other one. These two points are added to <paramref name="seeds"/>, because the
+        /// curves meet there. Radii, which differ by less than <paramref name="precision"/>, are taken as the same, so the ellipses lie
+        /// within the precision of both cylinders: the exact intersection curves of cylinders of almost the same radius turn too sharply
+        /// close to these points to be approximated (issue #458). Returns null, when the cylinders are not such a pair.
+        /// </summary>
+        internal IDualSurfaceCurve[] CrossingWithSameRadius(BoundingRect thisBounds, CylindricalSurface cyl2, BoundingRect otherBounds, List<GeoPoint> seeds, double precision)
+        {
+            if (!cyl2.IsRealCylinder || !this.IsRealCylinder || Math.Abs(XAxis.Length - cyl2.XAxis.Length) >= Math.Max(precision, Precision.eps)) return null;
+            if (Precision.SameDirection(Axis, cyl2.Axis, false)) return null;
+            double par1, par2;
+            if (Geometry.DistLL(Location, ZAxis, cyl2.Location, cyl2.ZAxis, out par1, out par2) >= Precision.eps) return null;
+            // Sonderfall: zwei Zylinder mit gleichem Durchmesser schneiden sich mit ihren Achsen, dann ist das Ergebnis eine Ellipse
+            GeoPoint ip = Location + par1 * ZAxis;
+            ip = cyl2.Location + par2 * cyl2.ZAxis;
+            GeoVector perp = RadiusX * (ZAxis ^ cyl2.ZAxis).Normalized;
+            GeoPoint top = ip + perp;
+            GeoPoint bottom = ip - perp;
+            Plane pln = new Plane(ip, ZAxis, cyl2.ZAxis); // die Ebene der beiden Achsen
+            GeoVector2D perp1 = pln.Project(RadiusX * (ZAxis ^ perp).Normalized); // senkrecht zur 1. Achse in der gemeinsamen Ebene
+            GeoVector2D perp2 = pln.Project(cyl2.RadiusX * (cyl2.ZAxis ^ perp).Normalized); // senkrecht zur 2. Achse in der gemeinsamen Ebene
+            GeoVector2D ax1 = pln.Project(ZAxis);
+            GeoVector2D ax2 = pln.Project(cyl2.ZAxis); // die Zylinderachsen in der gemeinsamen Ebene
+                                                       // der Nullpunkt der Ebene ist ja der Schnittpunkt der Zylinderachsen
+            GeoPoint2D[] ip2d = new CADability.GeoPoint2D[4]; // die 4 Schnittpunkte
+            bool ok = Geometry.IntersectLL(GeoPoint2D.Origin + perp1, ax1, GeoPoint2D.Origin + perp2, ax2, out ip2d[0]) &&
+                Geometry.IntersectLL(GeoPoint2D.Origin - perp1, ax1, GeoPoint2D.Origin + perp2, ax2, out ip2d[1]) &&
+                Geometry.IntersectLL(GeoPoint2D.Origin + perp1, ax1, GeoPoint2D.Origin - perp2, ax2, out ip2d[2]) &&
+                Geometry.IntersectLL(GeoPoint2D.Origin - perp1, ax1, GeoPoint2D.Origin - perp2, ax2, out ip2d[3]);
+            if (ok) // das muss immer der Fall sein
+            {   // es gibt 4 halb-Ellipsen (oder 2 ganze Ellipsen, die sich aber schneiden, und das ist hier nicht erwünscht)
+                // die gehen alle von "oben", wo sich die beiden Zylinder tangential schneiden, nach "unten", dem gegenüberliegenden Berührpunkt
+                // über den Außenpunkt in der gemeinsamen Ebene
+                List<IDualSurfaceCurve> lres = new List<IDualSurfaceCurve>();
+                for (int i = 0; i < 4; i++)
+                {
+                    GeoPoint maxpnt = pln.ToGlobal(ip2d[i]); // Schnittpunkt der beiden Zylinder mit der Ebene durch beide Achsen
+                    Ellipse elli = Ellipse.Construct();
+                    elli.SetEllipseArcCenterAxis(ip, maxpnt - ip, top - ip, Math.PI * 2.0 - Math.PI / 2.0, Math.PI);
+                    if (i == 0)
+                    {   // these two points are the points where the two ellipses intersect. We return 4 ellipse arcs
+                        // BRepIntersection needs this two points as additional vertices
+                        if (seeds == null) seeds = new List<GeoPoint>();
+                        seeds.Add(elli.StartPoint);
+                        seeds.Add(elli.EndPoint);
+                    }
+                    //ICurve dbg3 = (elli as ICurve).Approximate(true, 0.1);
+                    //DebuggerContainer dbg4 = new CADability.DebuggerContainer();
+                    //GeoVector dbg5 = elli.StartDirection;
+                    //GeoVector dbg6 = elli.EndDirection;
+                    //BoundingCube dbg7 = elli.GetExtent(0.0);
+                    //dbg4.Add(elli);
+                    ProjectedCurve pc1 = new CADability.ProjectedCurve(elli, this, true, thisBounds);
+                    BoundingRect common = BoundingRect.Common(pc1.GetExtent(), thisBounds);
+                    if (common.Width * common.Height > Precision.eps)
+                    {
+                        ProjectedCurve pc2 = new CADability.ProjectedCurve(elli, cyl2, true, otherBounds);
+                        common = BoundingRect.Common(pc2.GetExtent(), otherBounds);
+                        if (common.Width * common.Height > Precision.eps)
+                        {
+                            lres.Add(new DualSurfaceCurve(elli, this, pc1, cyl2, pc2));
+                        }
+                    }
+                }
+                return lres.ToArray();
+            }
+            return null;
+        }
         /// <inheritdoc/>
         public override IDualSurfaceCurve[] GetDualSurfaceCurves(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, List<GeoPoint> seeds, List<Tuple<double, double, double, double>> extremePositions)
         {
@@ -995,64 +1064,8 @@ namespace CADability.GeoObject
                 }
                 else
                 {
-                    double par1, par2;
-                    if (Geometry.DistLL(Location, ZAxis, cyl2.Location, cyl2.ZAxis, out par1, out par2) < Precision.eps && cyl2.IsRealCylinder && this.IsRealCylinder && Math.Abs(XAxis.Length - cyl2.XAxis.Length) < Precision.eps)
-                    {
-                        // Sonderfall: zwei Zylinder mit gleichem Durchmesser schneiden sich mit ihren Achsen, dann ist das Ergebnis eine Ellipse
-                        GeoPoint ip = Location + par1 * ZAxis;
-                        ip = cyl2.Location + par2 * cyl2.ZAxis;
-                        GeoVector perp = RadiusX * (ZAxis ^ cyl2.ZAxis).Normalized;
-                        GeoPoint top = ip + perp;
-                        GeoPoint bottom = ip - perp;
-                        Plane pln = new Plane(ip, ZAxis, cyl2.ZAxis); // die Ebene der beiden Achsen
-                        GeoVector2D perp1 = pln.Project(RadiusX * (ZAxis ^ perp).Normalized); // senkrecht zur 1. Achse in der gemeinsamen Ebene
-                        GeoVector2D perp2 = pln.Project(cyl2.RadiusX * (cyl2.ZAxis ^ perp).Normalized); // senkrecht zur 2. Achse in der gemeinsamen Ebene
-                        GeoVector2D ax1 = pln.Project(ZAxis);
-                        GeoVector2D ax2 = pln.Project(cyl2.ZAxis); // die Zylinderachsen in der gemeinsamen Ebene
-                                                                   // der Nullpunkt der Ebene ist ja der Schnittpunkt der Zylinderachsen
-                        GeoPoint2D[] ip2d = new CADability.GeoPoint2D[4]; // die 4 Schnittpunkte
-                        bool ok = Geometry.IntersectLL(GeoPoint2D.Origin + perp1, ax1, GeoPoint2D.Origin + perp2, ax2, out ip2d[0]) &&
-                            Geometry.IntersectLL(GeoPoint2D.Origin - perp1, ax1, GeoPoint2D.Origin + perp2, ax2, out ip2d[1]) &&
-                            Geometry.IntersectLL(GeoPoint2D.Origin + perp1, ax1, GeoPoint2D.Origin - perp2, ax2, out ip2d[2]) &&
-                            Geometry.IntersectLL(GeoPoint2D.Origin - perp1, ax1, GeoPoint2D.Origin - perp2, ax2, out ip2d[3]);
-                        if (ok) // das muss immer der Fall sein
-                        {   // es gibt 4 halb-Ellipsen (oder 2 ganze Ellipsen, die sich aber schneiden, und das ist hier nicht erwünscht)
-                            // die gehen alle von "oben", wo sich die beiden Zylinder tangential schneiden, nach "unten", dem gegenüberliegenden Berührpunkt
-                            // über den Außenpunkt in der gemeinsamen Ebene
-                            List<IDualSurfaceCurve> lres = new List<IDualSurfaceCurve>();
-                            for (int i = 0; i < 4; i++)
-                            {
-                                GeoPoint maxpnt = pln.ToGlobal(ip2d[i]); // Schnittpunkt der beiden Zylinder mit der Ebene durch beide Achsen
-                                Ellipse elli = Ellipse.Construct();
-                                elli.SetEllipseArcCenterAxis(ip, maxpnt - ip, top - ip, Math.PI * 2.0 - Math.PI / 2.0, Math.PI);
-                                if (i == 0)
-                                {   // these two points are the points where the two ellipses intersect. We return 4 ellipse arcs
-                                    // BRepIntersection needs this two points as additional vertices
-                                    if (seeds == null) seeds = new List<GeoPoint>();
-                                    seeds.Add(elli.StartPoint);
-                                    seeds.Add(elli.EndPoint);
-                                }
-                                //ICurve dbg3 = (elli as ICurve).Approximate(true, 0.1);
-                                //DebuggerContainer dbg4 = new CADability.DebuggerContainer();
-                                //GeoVector dbg5 = elli.StartDirection;
-                                //GeoVector dbg6 = elli.EndDirection;
-                                //BoundingCube dbg7 = elli.GetExtent(0.0);
-                                //dbg4.Add(elli);
-                                ProjectedCurve pc1 = new CADability.ProjectedCurve(elli, this, true, thisBounds);
-                                BoundingRect common = BoundingRect.Common(pc1.GetExtent(), thisBounds);
-                                if (common.Width * common.Height > Precision.eps)
-                                {
-                                    ProjectedCurve pc2 = new CADability.ProjectedCurve(elli, cyl2, true, otherBounds);
-                                    common = BoundingRect.Common(pc2.GetExtent(), otherBounds);
-                                    if (common.Width * common.Height > Precision.eps)
-                                    {
-                                        lres.Add(new DualSurfaceCurve(elli, this, pc1, cyl2, pc2));
-                                    }
-                                }
-                            }
-                            return lres.ToArray();
-                        }
-                    }
+                    IDualSurfaceCurve[] ellipses = CrossingWithSameRadius(thisBounds, cyl2, otherBounds, seeds, Precision.eps);
+                    if (ellipses != null) return ellipses;
                 }
                 // two cylinders intersect: 
                 // There are two interseciont curves when the distance between the axis is less than the difference of the radii

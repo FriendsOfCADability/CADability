@@ -214,7 +214,7 @@ namespace CADability
             Entry best;
             lock (locker)
             {
-                if (!Families().TryGetValue(familyName.ToUpperInvariant(), out List<Entry> faces)) return null;
+                if (!Families().TryGetValue(familyName.ToUpperInvariant(), out List<Entry> faces) && !TruncatedFamily(familyName, out faces)) return null;
                 // the exact style, then the same weight, then regular, then any face
                 best = faces.FirstOrDefault(f => f.Bold == bold && f.Italic == italic)
                     ?? faces.FirstOrDefault(f => f.Bold == bold)
@@ -277,6 +277,21 @@ namespace CADability
             }
             family = rest.Count == 0 ? baseFamily : baseFamily + " " + string.Join(" ", rest);
         }
+        /// <summary>
+        /// GDI cuts family names to 31 characters (LF_FACESIZE), e.g. "Bahnschrift SemiBold SemiConden", and texts saved with
+        /// GDI keep that name. Such a name stands for the only family whose name starts with it.
+        /// </summary>
+        private bool TruncatedFamily(string familyName, out List<Entry> faces)
+        {
+            faces = null;
+            if (familyName.Length != GdiFaceNameLength) return false;
+            string prefix = familyName.ToUpperInvariant();
+            List<string> candidates = Families().Keys.Where(name => name.StartsWith(prefix, StringComparison.Ordinal)).Take(2).ToList();
+            if (candidates.Count != 1) return false;
+            faces = Families()[candidates[0]];
+            return true;
+        }
+        private const int GdiFaceNameLength = 31;
         private Dictionary<string, List<Entry>> Families()
         {
             if (families != null) return families;

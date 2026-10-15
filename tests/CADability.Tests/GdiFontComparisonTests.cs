@@ -29,8 +29,8 @@ namespace CADability.Tests
         [TestMethod]
         public void TheManagedProviderKnowsAllFamiliesOfGdi()
         {
-            HashSet<string> known = new HashSet<string>(managed.GetFamilyNames(), StringComparer.OrdinalIgnoreCase);
-            string[] missing = gdi.GetFamilyNames().Where(name => !known.Contains(name)).OrderBy(name => name).ToArray();
+            // GDI cuts the names to 31 characters, the managed provider also finds the family by such a name
+            string[] missing = gdi.GetFamilyNames().Where(name => managed.GetFace(name, false, false) == null).OrderBy(name => name).ToArray();
             Assert.AreEqual(0, missing.Length, "families of GDI the managed provider does not know: " + string.Join(", ", missing));
         }
 

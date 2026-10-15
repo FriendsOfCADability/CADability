@@ -81,7 +81,8 @@ namespace CADability.Tests
             PointF[] points = New(bsp, true).PathPoints;
             Assert.AreEqual(bsp.StartPoint.PointF, points[0]);
             Assert.AreEqual(bsp.EndPoint.PointF, points[points.Length - 1]);
-            foreach (PointF p in points) Assert.AreEqual(0.0, bsp.Distance(new GeoPoint2D(p.X, p.Y)), 1e-4);
+            // MinDistance and not Distance: BSpline2D.Distance returns double.MaxValue for these points
+            foreach (PointF p in points) Assert.AreEqual(0.0, bsp.MinDistance(new GeoPoint2D(p.X, p.Y)), 1e-4);
             AssertSamePath(Old(bsp, true), New(bsp, true), "the obsolete member is fixed as well");
         }
 

@@ -101,7 +101,7 @@ namespace CADability
         /// </summary>
         public bool HasTrueTypeOutlines { get; }
         /// <summary>
-        /// True for an OpenType font with outlines in the "CFF " table (Compact Font Format, cubic curves).
+        /// True for an OpenType font with outlines in the "CFF " or "CFF2" table (Compact Font Format, cubic curves).
         /// </summary>
         public bool HasCffOutlines { get; }
         /// <summary>
@@ -109,8 +109,7 @@ namespace CADability
         /// </summary>
         public bool IsCff2 { get; }
         /// <summary>
-        /// True if the glyph outlines can be read: TrueType or CFF outlines. False for bitmap fonts and for CFF2 (variable
-        /// OpenType fonts).
+        /// True if the glyph outlines can be read: TrueType, CFF or CFF2 outlines. False for bitmap fonts.
         /// </summary>
         public bool HasOutlines => HasTrueTypeOutlines || HasCffOutlines;
         private CffOutlines cff; // created on demand

@@ -117,9 +117,10 @@ namespace CADability
     /// <summary>
     /// The default <see cref="FontProvider"/>: reads TrueType and OpenType font files (.ttf, .ttc, .otf, .otc) itself, so it
     /// needs neither GDI nor any other part of the operating system and works on Windows, Linux, macOS and in the browser. By
-    /// default it uses the font directories of the system; more files or directories can be added. Bitmap fonts and variable
-    /// OpenType fonts with CFF2 outlines are left out. A bold or italic face that a family does not have is not synthesized:
-    /// the closest face is used.
+    /// default it uses the font directories of the system; more files or directories can be added. The named instances of a
+    /// variable font (TrueType with "gvar" or OpenType with "CFF2") are faces of their own, with family names as GDI makes
+    /// them, e.g. "Bahnschrift Light Condensed". Bitmap fonts are left out. A bold or italic face that a family does not have
+    /// is not synthesized: the closest face is used.
     /// </summary>
     public class ManagedFontProvider : FontProvider
     {
@@ -130,6 +131,7 @@ namespace CADability
             public int Index; // in a collection
             public string Family;
             public bool Bold, Italic;
+            public double[] Coordinates; // the named instance of a variable font, null for a font that is not variable
             public ManagedFontFace Face; // loaded on demand
         }
         private readonly object locker = new object();
@@ -221,7 +223,9 @@ namespace CADability
                 if (best.Face == null)
                 {
                     TrueTypeFont[] fonts = best.Data != null ? TrueTypeFont.Load(best.Data) : TrueTypeFont.Load(best.FileName);
-                    best.Face = new ManagedFontFace(fonts[best.Index]);
+                    TrueTypeFont font = fonts[best.Index];
+                    if (best.Coordinates != null) font = font.WithVariation(best.Coordinates);
+                    best.Face = new ManagedFontFace(font, best.Family, best.Bold, best.Italic);
                 }
             }
             return best.Face;
@@ -229,11 +233,49 @@ namespace CADability
 
         private static void AddEntry(Entry entry, TrueTypeFont font, List<Entry> list)
         {
-            if (!font.HasOutlines || string.IsNullOrEmpty(font.FamilyName)) return; // bitmap fonts and CFF2 cannot be used
-            entry.Family = font.FamilyName;
-            entry.Bold = font.IsBold;
-            entry.Italic = font.IsItalic;
-            list.Add(entry);
+            if (!font.HasOutlines || string.IsNullOrEmpty(font.FamilyName)) return; // bitmap fonts cannot be used
+            NamedInstance[] instances = font.NamedInstances;
+            if (instances.Length == 0)
+            {
+                entry.Family = font.FamilyName;
+                entry.Bold = font.IsBold;
+                entry.Italic = font.IsItalic;
+                list.Add(entry);
+                return;
+            }
+            // a variable font: every named instance is a face, named like GDI names it
+            foreach (NamedInstance instance in instances)
+            {
+                InstanceFamily(font.TypographicFamilyName, instance.SubfamilyName, out string family, out bool bold, out bool italic);
+                italic |= font.IsItalic; // the instances of an italic font are italic, whether their names say so or not
+                list.Add(new Entry
+                {
+                    FileName = entry.FileName,
+                    Data = entry.Data,
+                    Index = entry.Index,
+                    Family = family,
+                    Bold = bold,
+                    Italic = italic,
+                    Coordinates = instance.Coordinates,
+                });
+            }
+        }
+        /// <summary>
+        /// The family and style of a named instance of a variable font, as GDI presents them: "Bold" and "Italic" (or "Oblique")
+        /// in the name of the instance become the style, "Regular" is left out, and the other words are added to the family
+        /// name. "Light Condensed" of "Bahnschrift" is the family "Bahnschrift Light Condensed", "Bold" is "Bahnschrift" bold.
+        /// </summary>
+        internal static void InstanceFamily(string baseFamily, string instanceName, out string family, out bool bold, out bool italic)
+        {
+            bold = italic = false;
+            List<string> rest = new List<string>();
+            foreach (string word in (instanceName ?? "").Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (word.Equals("Bold", StringComparison.OrdinalIgnoreCase)) bold = true;
+                else if (word.Equals("Italic", StringComparison.OrdinalIgnoreCase) || word.Equals("Oblique", StringComparison.OrdinalIgnoreCase)) italic = true;
+                else if (!word.Equals("Regular", StringComparison.OrdinalIgnoreCase)) rest.Add(word);
+            }
+            family = rest.Count == 0 ? baseFamily : baseFamily + " " + string.Join(" ", rest);
         }
         private Dictionary<string, List<Entry>> Families()
         {
@@ -286,14 +328,26 @@ namespace CADability
     {
         private readonly TrueTypeFont font;
         private readonly object locker = new object();
-        public ManagedFontFace(TrueTypeFont font)
+        private readonly string family;
+        private readonly bool bold, italic;
+        public ManagedFontFace(TrueTypeFont font) : this(font, font.FamilyName, font.IsBold, font.IsItalic)
+        {
+        }
+        /// <param name="font">the font, for a variable font the instance</param>
+        /// <param name="family">the family name, for the instance of a variable font the name of the instance's family</param>
+        /// <param name="bold">bold face</param>
+        /// <param name="italic">italic face</param>
+        public ManagedFontFace(TrueTypeFont font, string family, bool bold, bool italic)
         {
             this.font = font;
+            this.family = family;
+            this.bold = bold;
+            this.italic = italic;
         }
         internal TrueTypeFont Font => font;
-        public override string FamilyName => font.FamilyName;
-        public override bool IsBold => font.IsBold;
-        public override bool IsItalic => font.IsItalic;
+        public override string FamilyName => family;
+        public override bool IsBold => bold;
+        public override bool IsItalic => italic;
         public override int EmHeight => font.UnitsPerEm;
         public override int CellAscent => font.CellAscent;
         public override int CellDescent => font.CellDescent;

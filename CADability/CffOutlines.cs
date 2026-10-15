@@ -17,9 +17,10 @@ namespace CADability
 
     /// <summary>
     /// Reads the glyph outlines of the "CFF " table of an OpenType font: the Compact Font Format with Type 2 charstrings, as used
-    /// by many .otf files. Name-keyed and CID-keyed fonts (FDArray, FDSelect) are supported, with local and global subroutines,
-    /// hint masks and the flex operators. Hints are skipped, they do not change the outline. Not supported: CFF2 (variable fonts)
-    /// and the deprecated accent composition of endchar (seac), which modern fonts do not use.
+    /// by many .otf files, and of the "CFF2" table of variable OpenType fonts. Name-keyed and CID-keyed fonts (FDArray, FDSelect)
+    /// are supported, with local and global subroutines, hint masks and the flex operators; CFF2 adds the blend and vsindex
+    /// operators, which vary the outline with the item variation store of the table. Hints are skipped, they do not change the
+    /// outline. Not supported: the deprecated accent composition of endchar (seac), which modern fonts do not use.
     /// </summary>
     internal sealed class CffOutlines
     {
@@ -29,6 +30,9 @@ namespace CADability
         private readonly List<List<(int start, int length)>> localSubrs = new List<List<(int start, int length)>>(); // per font dict
         private readonly byte[] fdSelect; // font dict index per glyph, null for a name-keyed font
         private readonly double scale; // FontMatrix * units per em, 1 in almost all fonts
+        private readonly bool cff2;
+        private readonly ItemVariationStore variationStore; // CFF2 only
+        private readonly List<int> defaultVsIndex = new List<int>(); // CFF2: the vsindex of the private dict per font dict
 
         /// <summary>
         /// The number of glyphs (charstrings).
@@ -76,9 +80,52 @@ namespace CADability
         }
 
         /// <summary>
+        /// Reads a "CFF2" table, the outlines of a variable OpenType font.
+        /// </summary>
+        /// <param name="data">the font file</param>
+        /// <param name="offset">the start of the "CFF2" table</param>
+        /// <param name="length">its length</param>
+        /// <param name="unitsPerEm">from the "head" table, to check the FontMatrix</param>
+        /// <param name="variations">the variations of the font, for the item variation store; null when the font has no "fvar"</param>
+        public CffOutlines(byte[] data, int offset, int length, int unitsPerEm, FontVariations variations)
+        {
+            this.data = data;
+            cff2 = true;
+            int end = offset + length;
+            if (length < 5 || data[offset] != 2) throw new InvalidDataException("not a CFF2 table");
+            int headerSize = data[offset + 2], topDictLength = U16(offset + 3);
+            Dictionary<int, double[]> top = ReadDict(offset + headerSize, topDictLength);
+            int pos = offset + headerSize + topDictLength;
+            globalSubrs = ReadIndex(ref pos, end);
+            if (!top.TryGetValue(17, out double[] charStringsOffset)) throw new InvalidDataException("CFF2 font without charstrings");
+            int csPos = offset + (int)charStringsOffset[0];
+            charStrings = ReadIndex(ref csPos, end);
+            scale = 1.0;
+            if (top.TryGetValue(1207, out double[] fontMatrix) && fontMatrix.Length >= 4 && fontMatrix[0] != 0)
+            {
+                double s = fontMatrix[0] * unitsPerEm;
+                if (Math.Abs(s - 1.0) > 1e-3) scale = s;
+            }
+            if (!top.TryGetValue(1236, out double[] fdArrayOffset)) throw new InvalidDataException("CFF2 font without FDArray");
+            int fdPos = offset + (int)fdArrayOffset[0];
+            foreach (var fd in ReadIndex(ref fdPos, end))
+            {
+                Dictionary<int, double[]> fontDict = ReadDict(fd.start, fd.length);
+                localSubrs.Add(ReadLocalSubrs(offset, fontDict, end, out int vsIndex));
+                defaultVsIndex.Add(vsIndex);
+            }
+            if (localSubrs.Count == 0) throw new InvalidDataException("CFF2 font without font dicts");
+            if (top.TryGetValue(1237, out double[] fdSelectOffset)) fdSelect = ReadFdSelect(offset + (int)fdSelectOffset[0], charStrings.Count, end);
+            if (top.TryGetValue(24, out double[] vstore) && variations != null)
+            {   // the variation store starts with its length (uint16)
+                variationStore = variations.ReadItemVariationStore(offset + (int)vstore[0] + 2);
+            }
+        }
+
+        /// <summary>
         /// Sends the outline of <paramref name="glyph"/> to <paramref name="sink"/>.
         /// </summary>
-        public void Draw(int glyph, IGlyphOutlineSink sink)
+        public void Draw(int glyph, IGlyphOutlineSink sink, double[] coords = null)
         {
             if (glyph < 0 || glyph >= charStrings.Count) return;
             int fd = 0;
@@ -87,15 +134,23 @@ namespace CADability
                 fd = fdSelect[glyph];
                 if (fd >= localSubrs.Count) throw new InvalidDataException("invalid FDSelect");
             }
-            new Interpreter(this, localSubrs[fd], scale == 1.0 ? sink : new ScalingSink(sink, scale)).Run(charStrings[glyph]);
+            Interpreter interpreter = new Interpreter(this, localSubrs[fd], scale == 1.0 ? sink : new ScalingSink(sink, scale));
+            if (cff2) interpreter.SetVariation(fd < defaultVsIndex.Count ? defaultVsIndex[fd] : 0, coords);
+            interpreter.Run(charStrings[glyph]);
         }
 
         private List<(int start, int length)> ReadLocalSubrs(int cffOffset, Dictionary<int, double[]> dict, int end)
         {
+            return ReadLocalSubrs(cffOffset, dict, end, out _);
+        }
+        private List<(int start, int length)> ReadLocalSubrs(int cffOffset, Dictionary<int, double[]> dict, int end, out int vsIndex)
+        {
+            vsIndex = 0;
             if (!dict.TryGetValue(18, out double[] priv) || priv.Length < 2) return new List<(int, int)>();
             int privSize = (int)priv[0], privOffset = cffOffset + (int)priv[1];
             if (privSize <= 0) return new List<(int, int)>();
             Dictionary<int, double[]> privateDict = ReadDict(privOffset, privSize);
+            if (privateDict.TryGetValue(22, out double[] vs) && vs.Length > 0) vsIndex = (int)vs[0]; // CFF2: vsindex
             if (!privateDict.TryGetValue(19, out double[] subrs)) return new List<(int, int)>();
             int pos = privOffset + (int)subrs[0]; // relative to the private dict
             return ReadIndex(ref pos, end);
@@ -119,22 +174,34 @@ namespace CADability
                     for (int g = first; g < next && g < numGlyphs; ++g) res[g] = (byte)fd;
                 }
             }
+            else if (format == 4)
+            {   // CFF2: 32 bit glyph ids
+                int nRanges = (int)U32(pos + 1);
+                for (int i = 0; i < nRanges; ++i)
+                {
+                    int r = pos + 5 + 6 * i;
+                    int first = (int)U32(r), fd = U16(r + 4), next = (int)U32(r + 6);
+                    for (int g = first; g < next && g < numGlyphs; ++g) res[g] = (byte)fd;
+                }
+            }
             else throw new InvalidDataException("unsupported FDSelect format " + format);
             return res;
         }
         private List<(int start, int length)> ReadIndex(ref int pos, int end)
         {
             List<(int, int)> res = new List<(int, int)>();
-            if (pos + 2 > end) throw new InvalidDataException("CFF INDEX exceeds the table");
-            int count = U16(pos);
+            int countSize = cff2 ? 4 : 2; // CFF2 counts with 32 bits
+            if (pos + countSize > end) throw new InvalidDataException("CFF INDEX exceeds the table");
+            int count = cff2 ? (int)U32(pos) : U16(pos);
             if (count == 0)
             {
-                pos += 2;
+                pos += countSize;
                 return res;
             }
-            int offSize = data[pos + 2];
+            if (count < 0) throw new InvalidDataException("invalid CFF INDEX");
+            int offSize = data[pos + countSize];
             if (offSize < 1 || offSize > 4) throw new InvalidDataException("invalid CFF INDEX");
-            int offsets = pos + 3;
+            int offsets = pos + countSize + 1;
             int dataStart = offsets + (count + 1) * offSize - 1; // offsets count from 1
             int Offset(int i)
             {
@@ -163,8 +230,9 @@ namespace CADability
             while (pos < end)
             {
                 int b0 = data[pos++];
-                if (b0 <= 21)
-                {
+                if (b0 <= 27)
+                {   // operators; 22 (vsindex), 23 (blend) and 24 (vstore) exist in CFF2 only. The values of a blended operand
+                    // are not needed for the outlines: they are replaced by those of the default instance (dropped)
                     int op = b0;
                     if (b0 == 12) op = 1200 + data[pos++];
                     res[op] = operands.ToArray();
@@ -202,6 +270,7 @@ namespace CADability
             }
         }
         private int U16(int pos) => (data[pos] << 8) | data[pos + 1];
+        private uint U32(int pos) => (uint)((data[pos] << 24) | (data[pos + 1] << 16) | (data[pos + 2] << 8) | data[pos + 3]);
         private static int Bias(int count) => count < 1240 ? 107 : count < 33900 ? 1131 : 32768;
 
         private sealed class ScalingSink : IGlyphOutlineSink
@@ -230,12 +299,47 @@ namespace CADability
             private bool haveWidth, open, finished;
             private int depth;
             private readonly Random random = new Random(0);
+            private int vsIndex; // CFF2
+            private double[] coords; // CFF2, normalized, null for the default instance
+            private double[] scalars; // CFF2: the region factors of the item variation data vsIndex
 
             public Interpreter(CffOutlines font, List<(int start, int length)> local, IGlyphOutlineSink sink)
             {
                 this.font = font;
                 this.local = local;
                 this.sink = sink;
+            }
+            /// <summary>
+            /// CFF2: the initial vsindex (from the private dict) and the variation coordinates. A CFF2 charstring has no width.
+            /// </summary>
+            public void SetVariation(int vsIndex, double[] coords)
+            {
+                this.vsIndex = vsIndex;
+                this.coords = coords;
+                haveWidth = true;
+            }
+            private double[] Scalars()
+            {
+                if (scalars != null) return scalars;
+                ItemVariationStore store = font.variationStore;
+                if (store == null || vsIndex < 0 || vsIndex >= store.DataCount) return scalars = new double[0];
+                scalars = store.GetScalars(vsIndex, coords ?? new double[0]);
+                return scalars;
+            }
+            private void Blend()
+            {
+                int n = (int)Pop();
+                int k = Scalars().Length;
+                int total = n * (k + 1);
+                if (n < 0 || total > stack.Count) throw new InvalidDataException("invalid CFF2 blend");
+                int first = stack.Count - total;
+                for (int i = 0; i < n; ++i)
+                {
+                    double v = stack[first + i];
+                    for (int j = 0; j < k; ++j) v += stack[first + n + i * k + j] * scalars[j];
+                    stack[first + i] = v;
+                }
+                stack.RemoveRange(first + n, n * k);
             }
             public void Run((int start, int length) charString)
             {
@@ -388,6 +492,14 @@ namespace CADability
                             break;
                         case 12:
                             Escape(d[pos++]);
+                            break;
+                        case 15: // vsindex (CFF2)
+                            vsIndex = (int)Pop();
+                            scalars = null;
+                            stack.Clear();
+                            break;
+                        case 16: // blend (CFF2)
+                            Blend();
                             break;
                         default: // reserved operators are ignored
                             stack.Clear();

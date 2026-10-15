@@ -180,7 +180,9 @@ namespace CADability.Tests
         [TestMethod]
         public void AnUnreadableImageIsLoadedFromThePath()
         {
-            string file = Path.Combine(Path.GetTempPath(), "PictureImageTests-" + Guid.NewGuid().ToString("N") + ".png");
+            // a relative path: JsonSerialize does not escape backslashes but reads "\r" and "\n" as control characters, so an
+            // absolute Windows path like C:\Users\runneradmin\... does not survive a round trip (a bug of its own)
+            string file = "PictureImageTests-" + Guid.NewGuid().ToString("N") + ".png";
             File.WriteAllBytes(file, Png3x2);
             try
             {

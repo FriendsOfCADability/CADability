@@ -228,6 +228,37 @@ namespace CADability.Tests
             Assert.AreEqual(longer.Volume(1e-4) - common, VolumeOf(Solid.Subtract(longer, shorter), "longer - shorter"), tolerance, "longer - shorter");
         }
 
+        /// <summary>
+        /// Two cylinders crossing at right angles with axes that meet, A with radius 5 along z, B with radius 5 + <paramref name="d"/>
+        /// along x, both 20 long. Within the precision of the operation (2.5e-5 here) the radii are the same, and the cylinders intersect
+        /// in four half ellipses, which meet where the cylinders touch. The exact intersection curves turn too sharply there to be
+        /// followed, and the edges of B at these points only touch A within the precision, so no vertex was made there: the results were
+        /// empty, a whole cylinder or wrong (issue #458).
+        /// </summary>
+        [DataTestMethod]
+        [DataRow(1e-7)]
+        [DataRow(-1e-7)]
+        [DataRow(3e-7)]
+        [DataRow(-3e-7)]
+        [DataRow(1e-6)]
+        [DataRow(-1e-6)]
+        [DataRow(1e-5)]
+        [DataRow(-1e-5)]
+        public void crossing_cylinders_whose_radii_differ_by_less_than_the_precision(double d)
+        {
+            Solid A() => Make3D.MakeCylinder(new GeoPoint(0, 0, -10), 5 * GeoVector.XAxis, 20 * GeoVector.ZAxis);
+            Solid B() => Make3D.MakeCylinder(new GeoPoint(-10, 0, 0), (5 + d) * GeoVector.YAxis, 20 * GeoVector.XAxis);
+            double va = 500 * Math.PI, vb = 20 * Math.PI * (5 + d) * (5 + d);
+            double common = IntersectionCurveVolumeTests.Common(5, 5 + d);
+            double tolerance = 1e-3 + 2 * Math.PI * 5 * 20 * Math.Abs(d); // a mantle d thick
+            Assert.AreEqual(common, VolumeOf(Solid.Intersect(A(), B()), "a * b"), tolerance, "a * b");
+            Assert.AreEqual(va - common, VolumeOf(Solid.Subtract(A(), B()), "a - b"), tolerance, "a - b");
+            Assert.AreEqual(vb - common, VolumeOf(Solid.Subtract(B(), A()), "b - a"), tolerance, "b - a");
+            Solid union = Solid.Unite(A(), B());
+            Assert.IsNotNull(union, "a + b");
+            Assert.AreEqual(va + vb - common, union.Volume(1e-4), tolerance, "a + b");
+        }
+
         [TestMethod]
         public void cylinders_are_the_same_geometry_within_the_precision()
         {

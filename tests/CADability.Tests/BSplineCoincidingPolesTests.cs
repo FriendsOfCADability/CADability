@@ -570,6 +570,58 @@ namespace CADability.Tests
             }
         }
 
+        /// <summary>
+        /// BSpline2D.GetExplicitPCurve2D returned null as long as the polynomial form it had made was still alive, so
+        /// <see cref="ICurve2D.PositionOf"/> took the polynomial form only on the first call and after the garbage
+        /// collector had freed it. The polynomial form missed the corners of the issue 173 spline, and Issue173Spline
+        /// failed now and then in the parallel test run. Every call takes the same way now, and both find the points.
+        /// </summary>
+        [TestMethod]
+        [DeploymentItem(@"Files/Dxf/issue173.dxf", nameof(Issue173PositionOfDoesNotDependOnTheGarbageCollector))]
+        public void Issue173PositionOfDoesNotDependOnTheGarbageCollector()
+        {
+            string file = System.IO.Path.Combine(TestContext.DeploymentDirectory, TestContext.TestName, "issue173.dxf");
+            ICurve kept = ReadSpline(file);
+            for (int i = 0; i < issue173KnotPoints.Length; i++)
+            {
+                GeoPoint p = new GeoPoint(issue173KnotPoints[i].x, issue173KnotPoints[i].y, 0.0);
+                // a spline that never computed anything, as after the polynomial form has been collected
+                Assert.IsTrue((ReadSpline(file) as ICurve).DistanceTo(p) < 1e-6, $"a new spline misses point {i}");
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                Assert.IsTrue(kept.DistanceTo(p) < 1e-6, $"the spline misses point {i} after a garbage collection");
+            }
+        }
+
+        /// <summary>
+        /// The polynomial form of a rational <see cref="BSpline2D"/> looked for the foot point with the derivative of the
+        /// numerators instead of the derivative of the curve, and found nothing or the wrong point.
+        /// </summary>
+        [TestMethod]
+        public void PositionOfOnARationalSpline()
+        {
+            // a half circle of radius 10 around (3, 4), two rational quadratic segments, with knot values far from 0
+            double w = Math.Sqrt(0.5);
+            GeoPoint2D center = new GeoPoint2D(3, 4);
+            GeoPoint2D[] poles = { center + new GeoVector2D(10, 0), center + new GeoVector2D(10, 10), center + new GeoVector2D(0, 10),
+                center + new GeoVector2D(-10, 10), center + new GeoVector2D(-10, 0) };
+            BSpline2D halfCircle = new BSpline2D(poles, new[] { 1, w, 1, w, 1 }, new double[] { 100, 101, 102 }, new[] { 3, 2, 3 }, 2, false, 100, 102);
+            ExplicitPCurve2D polynomial = (halfCircle as IExplicitPCurve2D).GetExplicitPCurve2D();
+            Assert.IsTrue(polynomial.IsRational);
+            for (int i = 0; i <= 36; i++)
+            {
+                GeoVector2D dir = new GeoVector2D(Math.Cos(Math.PI * i / 36.0), Math.Sin(Math.PI * i / 36.0));
+                foreach (double r in new[] { 5.0, 10.0, 13.0 })
+                {
+                    GeoPoint2D p = center + r * dir;
+                    GeoPoint2D expected = center + 10 * dir;
+                    Assert.AreEqual(0.0, halfCircle.PointAt(halfCircle.PositionOf(p)) | expected, 1e-9, $"PositionOf at {i * 5}°, distance {r}");
+                    double u = polynomial.PositionOf(p, out double dist);
+                    Assert.AreEqual(0.0, polynomial.PointAt(u) | expected, 1e-9, $"the polynomial form at {i * 5}°, distance {r}");
+                }
+            }
+        }
+
         [TestMethod]
         [DeploymentItem(@"Files/Dxf/issue173.dxf", nameof(Issue173Import))]
         public void Issue173Import()

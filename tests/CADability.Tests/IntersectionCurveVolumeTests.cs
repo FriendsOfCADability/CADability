@@ -15,7 +15,7 @@ namespace CADability.Tests
         /// The common volume of the two cylinders: the integral of 4 sqrt(r1² - y²) sqrt(r2² - y²) over |y| &lt; min(r1, r2),
         /// with y = m sin t (Simpson).
         /// </summary>
-        private static double Common(double r1, double r2)
+        internal static double Common(double r1, double r2)
         {
             double m = Math.Min(r1, r2);
             double f(double t)

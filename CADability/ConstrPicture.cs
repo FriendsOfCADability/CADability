@@ -230,7 +230,6 @@ namespace CADability.Actions
         /// <param name="val">The new file name</param>
         void OnSetFileName(string val)
         {
-#if !WEBASSEMBLY
             fileName = val; // save the name
             picture.ImageData = Picture.ReadImageFile(fileName); // load the image
             picture.Path = fileName; // set the name to the picture object
@@ -240,7 +239,6 @@ namespace CADability.Actions
             // action it will automatically be inserted into the model
             widthValue = picture.PixelWidth;
             heightValue = picture.PixelHeight;
-#endif
         }
         
         /// <summary>

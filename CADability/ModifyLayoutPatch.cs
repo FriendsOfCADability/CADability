@@ -1,5 +1,4 @@
-﻿#if !WEBASSEMBLY
-using System;
+﻿using System;
 using System.Drawing;
 using MouseEventArgs = CADability.Substitutes.MouseEventArgs;
 using DragEventArgs = CADability.Substitutes.DragEventArgs;
@@ -196,4 +195,3 @@ namespace CADability.Actions
         }
     }
 }
-#endif

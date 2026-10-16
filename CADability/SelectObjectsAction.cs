@@ -2,13 +2,8 @@
 using CADability.Shapes;
 using System;
 using System.Collections;
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-using Point = CADability.WebDrawing.Point;
-#else
 using System.Drawing;
 using Point = System.Drawing.Point;
-#endif
 using System.Runtime.Serialization;
 
 using MouseEventArgs = CADability.Substitutes.MouseEventArgs;

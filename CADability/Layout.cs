@@ -23,7 +23,7 @@ namespace CADability
         /// <summary>
         /// The printer settings. Not used by CADability any more and not saved; see <see cref="PageSetup"/>.
         /// </summary>
-        [Obsolete("Use PageSetup. The GDI+ PageSettings cannot be saved on .NET Core and are removed from the kernel in CADability 2.0 (issue #412).")]
+        [Obsolete("Use PageSetup. The GDI+ PageSettings cannot be saved on .NET Core (issue #412).")]
         public PageSettings pageSettings; // kommt vom PrintDocument, kann auch null sein
         /// <summary>
         /// The page settings of this layout for printing, saved with the layout. Null if the layout has none: then the

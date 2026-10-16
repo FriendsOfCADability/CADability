@@ -147,7 +147,6 @@ namespace CADability
         /// the printing system are swallowed.
         /// </summary>
         /// <param name="pd">The print document to print to, with the printer and page settings already set</param>
-        [Obsolete("Printing with GDI+ moves into CADability.Forms in CADability 2.0 (issue #412).")]
         public void Print(PrintDocument pd)
         {
             bool printToGDI = Settings.GlobalSettings.GetIntValue("Printing.PrintingMode", 0) == 1;
@@ -1043,9 +1042,7 @@ namespace CADability
         private void OnPrint()
         {
             if (printDocument == null) printDocument = project.PrintDocument;
-#pragma warning disable CS0618 // printing moves into CADability.Forms in 2.0 (issue #412)
             Print(printDocument);
-#pragma warning restore CS0618
         }
         private void OnPrintSetup()
         {
@@ -1054,9 +1051,7 @@ namespace CADability
             if (printDocument == null) printDocument = project.PrintDocument;
             if (layout.PageSetup != null) layout.PageSetup.ApplyTo(printDocument);
 
-#pragma warning disable CS0618 // the dialogs move into CADability.Forms in 2.0 (issue #412)
             if (Frame.UIService.ShowPageSetupDlg(ref printDocument, printDocument.DefaultPageSettings, out int width, out int height, out bool landscape) == DialogResult.OK)
-#pragma warning restore CS0618
             {
                 layout.PageSetup = PageSetup.FromPageSettings(printDocument.DefaultPageSettings); // saved with the layout
                 //psd.Document.OriginAtMargins = false;
@@ -1086,9 +1081,7 @@ namespace CADability
             //printDialog.AllowCurrentPage = false;
             //printDialog.AllowSelection = false;
             //printDialog.AllowPrintToFile = false;
-#pragma warning disable CS0618 // the dialogs move into CADability.Forms in 2.0 (issue #412)
             if (Frame.UIService.ShowPrintDlg(ref printDocument) == DialogResult.OK)
-#pragma warning restore CS0618
             {
                 // printDocument = printDialog.Document; update in ShowPrintDlg
                 layout.PageSetup = PageSetup.FromPageSettings(printDocument.DefaultPageSettings); // the printer is saved with the layout

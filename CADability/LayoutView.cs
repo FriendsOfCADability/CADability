@@ -148,7 +148,7 @@ namespace CADability
         /// the printing system are swallowed.
         /// </summary>
         /// <param name="pd">The print document to print to, with the printer and page settings already set</param>
-        [Obsolete("Printing with GDI+ moves into CADability.Forms in CADability 2.0 (issue #412).")]
+        [Obsolete("Use the PrintDocument extension Print(LayoutView) of CADability.Forms.GdiPrinting instead. Printing with GDI+ moves into CADability.Forms in CADability 2.0 (issue #412).")]
         public void Print(PrintDocument pd)
         {
             bool printToGDI = Settings.GlobalSettings.GetIntValue("Printing.PrintingMode", 0) == 1;

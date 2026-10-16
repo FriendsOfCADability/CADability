@@ -1453,7 +1453,7 @@ namespace CADability
     /// <see cref="OnPrintPage"/>), to render a model into a <see cref="Bitmap"/> (<see cref="PrintToBitmap"/>) and for the display of
     /// the <see cref="GDI2DView"/>. Not available in the WebAssembly build.
     /// </summary>
-    [Obsolete("Printing with GDI+ moves into CADability.Forms in CADability 2.0 (issue #412).")]
+    [Obsolete("Use the extensions of CADability.Forms.GdiPrinting instead: PrintDocument.Print(LayoutView), PrintDocument.PrintSinglePage(GDI2DView) or PrintSinglePage(Project, string, bool), and Bitmap.DrawModel(...). Printing with GDI+ moves into CADability.Forms in CADability 2.0 (issue #412).")]
     public class PrintToGDI : IPaintTo3D, QuadTree<IPrintItemImpl>.IIterateQuadTreeLists
     {
 

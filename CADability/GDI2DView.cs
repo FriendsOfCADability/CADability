@@ -348,7 +348,7 @@ namespace CADability
         /// is fitted onto the page, so the paper size should be set. Exceptions of the printing system are swallowed.
         /// </summary>
         /// <param name="pd">The print document to print to, with the printer and page settings already set</param>
-        [Obsolete("Printing with GDI+ moves into CADability.Forms in CADability 2.0 (issue #412).")]
+        [Obsolete("Use the PrintDocument extension PrintSinglePage(GDI2DView) of CADability.Forms.GdiPrinting instead. Printing with GDI+ moves into CADability.Forms in CADability 2.0 (issue #412).")]
         public void PrintSinglePage(PrintDocument pd)
         {
             PrintToGDI pdg = new PrintToGDI(this);

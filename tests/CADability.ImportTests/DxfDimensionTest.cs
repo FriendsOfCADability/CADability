@@ -367,7 +367,6 @@ Dimensions
         [TestMethod]
         public void import_dxf_dimension_without_block_shows_its_measurement()
         {
-            RequireGdi();
             string dxf = Header + Tables + EntitiesStart + AlignedDimension(null) + Epilogue;
             Block block = AssertRegeneratedDimension(ImportDxf(dxf).GetActiveModel());
             Text text = block.Children.OfType<Text>().SingleOrDefault();
@@ -759,7 +758,6 @@ Dimensions
         [TestMethod]
         public void export_dimension_round_trips_as_a_dxf_dimension()
         {
-            RequireGdi();
             Project project = MakeProjectWithDimension(new GeoPoint(0, 0, 0), new GeoPoint(100, 0, 0));
             Model reimported = WithChoice("DxfDwg.ExportDimension", 1, () => ExportAndImport(project));
 
@@ -1605,13 +1603,6 @@ AcDbArcDimension
             Block block = model[0] as Block;
             Assert.IsNotNull(block, "a DIMENSION imports as the block that holds its picture");
             return block;
-        }
-
-        // Adding a Text to a model computes its extent through GDI, which only exists on Windows.
-        private static void RequireGdi()
-        {
-            if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
-                Assert.Inconclusive("text needs GDI, which is only available on Windows");
         }
 
         private Project ImportDxf(string dxf)

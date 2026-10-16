@@ -8,6 +8,7 @@ using System.Drawing;
 using Point = System.Drawing.Point;
 using System.Drawing.Drawing2D;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Threading;
 
@@ -15,13 +16,16 @@ namespace CADability.GeoObject
 {
     /// <summary>
     /// A bitmap as a rectangular or rhombiod face in 3D space. This object is mainly used for illustration or 
-    /// as a background in a model. It is a GeoObject and may be part of a model. It is defined by the bitmap 
-    /// bits and the location in space.
+    /// as a background in a model. It is a GeoObject and may be part of a model. It is defined by the image and the
+    /// location in space. The image is kept as the bytes of a PNG, JPEG, GIF or BMP file (<see cref="ImageData"/>), which
+    /// is also what project files contain; the kernel does not decode it (issue #412).
     /// </summary>
     [Serializable()]
     public class Picture : IGeoObjectImpl, ISerializable
     {
-        private Bitmap bitmap;
+        private byte[] imageData; // the bytes of the image file, null for no image
+        private Bitmap gdiBitmap; // decoded from imageData with GDI+ for painting (Windows), created on demand
+        private bool gdiFailed; // GDI+ cannot decode imageData (no GDI+ on this platform, or a format GDI+ does not know)
         private GeoPoint location;
         private GeoVector directionWidth, directionHeight;
         #region polymorph construction
@@ -57,7 +61,7 @@ namespace CADability.GeoObject
         #endregion
         /// <summary>
         /// Protected constructor: raises <see cref="Constructed"/>. Use <see cref="Construct"/> to create a picture and
-        /// <see cref="Set"/> to define it.
+        /// <see cref="Set(byte[], GeoPoint, GeoVector, GeoVector)"/> to define it.
         /// </summary>
         protected Picture()
         {
@@ -68,38 +72,118 @@ namespace CADability.GeoObject
         //    System.Diagnostics.Trace.WriteLine("Destruktor von Picture");
         //}
         /// <summary>
-        /// Sets the Data of the Bitmap.
+        /// Sets the image and the position of the picture.
         /// </summary>
-        /// <param name="bitmap">The bitmap to be displayed</param>
-        /// <param name="location">Position where the lower left point of the bitmap will be displayed</param>
-        /// <param name="directionWidth">Vector specifying the baseline of the bitmap</param>
-        /// <param name="directionHeight">Vector specifying the left side of the bitmap</param>
-        public void Set(Bitmap bitmap, GeoPoint location, GeoVector directionWidth, GeoVector directionHeight)
+        /// <param name="imageData">The bytes of a PNG, JPEG, GIF or BMP file, e.g. from <see cref="File.ReadAllBytes(string)"/>;
+        /// null for no image. The array is kept, so it must not be changed afterwards.</param>
+        /// <param name="location">Position where the lower left point of the image will be displayed</param>
+        /// <param name="directionWidth">Vector specifying the baseline of the image</param>
+        /// <param name="directionHeight">Vector specifying the left side of the image</param>
+        /// <exception cref="ArgumentException">The data is not a PNG, JPEG, GIF or BMP file</exception>
+        public void Set(byte[] imageData, GeoPoint location, GeoVector directionWidth, GeoVector directionHeight)
         {
+            EncodedImage.Validate(imageData, nameof(imageData));
             using (new Changing(this))
             {
-                this.bitmap = bitmap;
+                SetImage(imageData, null);
                 this.location = location;
                 this.directionWidth = directionWidth;
                 this.directionHeight = directionHeight;
             }
         }
         /// <summary>
-        /// The bitmap, the contents of the Picture
+        /// Sets the Data of the Bitmap. The bitmap is encoded into <see cref="ImageData"/>: PNG, JPEG, GIF and BMP images keep
+        /// their format, any other image becomes PNG. Needs GDI+, i.e. Windows.
         /// </summary>
+        /// <param name="bitmap">The bitmap to be displayed</param>
+        /// <param name="location">Position where the lower left point of the bitmap will be displayed</param>
+        /// <param name="directionWidth">Vector specifying the baseline of the bitmap</param>
+        /// <param name="directionHeight">Vector specifying the left side of the bitmap</param>
+        [Obsolete("Use Set(byte[], GeoPoint, GeoVector, GeoVector) with the bytes of the image file. GDI+ is removed from the kernel in CADability 2.0 (issue #412).")]
+        public void Set(Bitmap bitmap, GeoPoint location, GeoVector directionWidth, GeoVector directionHeight)
+        {
+            using (new Changing(this))
+            {
+                SetImage(EncodedImage.FromGdiImage(bitmap), bitmap);
+                this.location = location;
+                this.directionWidth = directionWidth;
+                this.directionHeight = directionHeight;
+            }
+        }
+        /// <summary>
+        /// The image of the picture as the bytes of a PNG, JPEG, GIF or BMP file, null if the picture has no image. This is
+        /// what project files contain. The array must not be changed; set a new array instead. Setting it raises the change
+        /// events and is undoable.
+        /// </summary>
+        /// <exception cref="ArgumentException">The data is not a PNG, JPEG, GIF or BMP file</exception>
+        public byte[] ImageData
+        {
+            get
+            {
+                return imageData;
+            }
+            set
+            {
+                EncodedImage.Validate(value, nameof(value));
+                using (new Changing(this))
+                {
+                    SetImage(value, null);
+                }
+            }
+        }
+        /// <summary>
+        /// The width of the image in pixels, read from the header of <see cref="ImageData"/>; 0 without an image.
+        /// </summary>
+        public int PixelWidth => EncodedImage.TryGetSize(imageData, out int width, out _) ? width : 0;
+        /// <summary>
+        /// The height of the image in pixels, read from the header of <see cref="ImageData"/>; 0 without an image.
+        /// </summary>
+        public int PixelHeight => EncodedImage.TryGetSize(imageData, out _, out int height) ? height : 0;
+        /// <summary>
+        /// Width divided by height of the image in pixels, 1 without an image.
+        /// </summary>
+        private double AspectRatio => PixelWidth > 0 && PixelHeight > 0 ? PixelWidth / (double)PixelHeight : 1.0;
+        /// <summary>
+        /// The bitmap, the contents of the Picture, decoded from <see cref="ImageData"/> with GDI+. Setting it encodes the
+        /// bitmap into <see cref="ImageData"/>. Needs GDI+, i.e. Windows.
+        /// </summary>
+        [Obsolete("Use ImageData, the bytes of the image file. GDI+ is removed from the kernel in CADability 2.0 (issue #412).")]
         public Bitmap Bitmap
         {
             get
             {
-                return bitmap;
+                if (imageData != null && gdiBitmap == null) gdiBitmap = EncodedImage.ToGdiBitmap(imageData);
+                return gdiBitmap;
             }
             set
             {
                 using (new Changing(this))
                 {
-                    bitmap = value;
+                    SetImage(EncodedImage.FromGdiImage(value), value);
                 }
             }
+        }
+        private void SetImage(byte[] data, Bitmap decoded)
+        {
+            imageData = data;
+            gdiBitmap = decoded;
+            gdiFailed = false;
+        }
+        /// <summary>
+        /// The GDI+ bitmap to paint, null where GDI+ is not available or cannot decode the image.
+        /// </summary>
+        private Bitmap BitmapForPainting()
+        {
+            if (gdiBitmap != null || imageData == null || gdiFailed) return gdiBitmap;
+            try
+            {
+                gdiBitmap = EncodedImage.ToGdiBitmap(imageData);
+            }
+            catch (Exception e) when (e is PlatformNotSupportedException || e is TypeInitializationException || e is DllNotFoundException || e is ArgumentException || e is ExternalException)
+            {
+                gdiFailed = true; // e.g. on Linux: the picture is painted as its outline
+            }
+            return gdiBitmap;
         }
         /// <summary>
         /// Position of the lower left point of the bitmap
@@ -165,7 +249,7 @@ namespace CADability.GeoObject
             if (l == 0.0) return;
             using (new Changing(this))
             {
-                double ar = Bitmap.Width / (double)Bitmap.Height;
+                double ar = AspectRatio;
                 directionHeight = l * directionHeight.Normalized;
                 if (keepAspectRatio)
                 {
@@ -186,7 +270,7 @@ namespace CADability.GeoObject
             if (l == 0.0) return;
             using (new Changing(this))
             {
-                double ar = Bitmap.Width / (double)Bitmap.Height;
+                double ar = AspectRatio;
                 directionWidth = l * directionWidth.Normalized;
                 if (keepAspectRatio)
                 {
@@ -195,10 +279,11 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
-        /// The path where the Bitmap is located. This value is not used by the Picture object and may have any content.
+        /// The path where the image file is located. This value is not used by the Picture object and may have any content.
         /// Usually it is the path and filename, especially when the object is being generated interactively 
-        /// by CADability's user interface. Setting the value does NOT load the specified bitmap. This must be done
-        /// separately by setting the <see cref="Bitmap"/> property
+        /// by CADability's user interface. Setting the value does NOT load the specified image. This must be done
+        /// separately by setting the <see cref="ImageData"/> property. When an old project file has a picture whose image
+        /// cannot be read, the picture is loaded from this path, if the file exists.
         /// </summary>
         public string Path { get; set; }
 
@@ -209,8 +294,12 @@ namespace CADability.GeoObject
         /// </summary>
         /// <param name="plane">The plane as a reference system for the shape</param>
         /// <param name="shape">The shape for the clip operation</param>
+        /// <remarks>Needs GDI+, i.e. Windows. The clipped image is stored as PNG.</remarks>
+        [Obsolete("Clip needs GDI+, which is removed from the kernel in CADability 2.0 (issue #412). Clip the image file before setting ImageData instead.")]
         public void Clip(Plane plane, CompoundShape shape)
         {
+            Bitmap bitmap = EncodedImage.ToGdiBitmap(imageData);
+            if (bitmap == null) return;
             Plane pln = new Plane(location, directionWidth, directionHeight);
             CompoundShape prsh = shape.Project(plane, pln);
             ModOp2D m = ModOp2D.Scale(bitmap.Width / directionWidth.Length, -bitmap.Height / directionHeight.Length);
@@ -227,6 +316,9 @@ namespace CADability.GeoObject
                 graphics.SetClip(rg, CombineMode.Replace);
                 graphics.DrawImage(clone, new System.Drawing.Point(0, 0));
                 graphics.Dispose();
+                clone.Dispose();
+                rg.Dispose();
+                SetImage(EncodedImage.FromGdiImage(bitmap), bitmap); // a bitmap made in memory: PNG
             }
         }
 
@@ -235,9 +327,21 @@ namespace CADability.GeoObject
         /// <see cref="Bitmap"/>. For callers that record the undo themselves. Not used within CADability.
         /// </summary>
         /// <param name="bmp">the new bitmap</param>
+        [Obsolete("Use SetImageDataNoUndo with the bytes of the image file. GDI+ is removed from the kernel in CADability 2.0 (issue #412).")]
         public void SetBitmapNoUndo(Bitmap bmp)
         {
-            bitmap = bmp;
+            SetImage(EncodedImage.FromGdiImage(bmp), bmp);
+        }
+        /// <summary>
+        /// Replaces the image without raising the change events and without an undo step, in contrast to setting
+        /// <see cref="ImageData"/>. For callers that record the undo themselves.
+        /// </summary>
+        /// <param name="imageData">the bytes of a PNG, JPEG, GIF or BMP file, or null</param>
+        /// <exception cref="ArgumentException">The data is not a PNG, JPEG, GIF or BMP file</exception>
+        public void SetImageDataNoUndo(byte[] imageData)
+        {
+            EncodedImage.Validate(imageData, nameof(imageData));
+            SetImage(imageData, null);
         }
         #region IGeoObject override
         /// <inheritdoc/>
@@ -255,8 +359,7 @@ namespace CADability.GeoObject
         {
             Picture res = Picture.Construct();
             res.location = location;
-            if (bitmap != null) res.bitmap = bitmap.Clone() as Bitmap;
-            else res.bitmap = null;
+            res.imageData = imageData; // never changed in place, so it can be shared
             res.directionWidth = directionWidth;
             res.directionHeight = directionHeight;
             return res;
@@ -269,7 +372,7 @@ namespace CADability.GeoObject
                 if (!(toCopyFrom is Picture from)) 
                     return;
                 this.location = from.location;
-                this.bitmap = from.bitmap;
+                SetImage(from.imageData, from.gdiBitmap);
                 this.directionWidth = from.directionWidth;
                 this.directionHeight = from.directionHeight;
             }
@@ -288,12 +391,18 @@ namespace CADability.GeoObject
         /// <inheritdoc/>
         public override void PaintTo3D(IPaintTo3D paintTo3D)
         {
-            paintTo3D.RectangularBitmap(bitmap, location, directionWidth, directionHeight);
+            Bitmap bitmap = BitmapForPainting();
+            if (bitmap != null) paintTo3D.RectangularBitmap(bitmap, location, directionWidth, directionHeight);
+            else
+            {   // no GDI+ (or no image): the outline shows where the picture is
+                paintTo3D.Polyline(new GeoPoint[] { location, location + directionWidth, location + directionWidth + directionHeight, location + directionHeight, location });
+            }
         }
         /// <inheritdoc/>
         public override void PrePaintTo3D(IPaintTo3D paintTo3D)
         {
-            paintTo3D.PrepareBitmap(bitmap);
+            Bitmap bitmap = BitmapForPainting();
+            if (bitmap != null) paintTo3D.PrepareBitmap(bitmap);
         }
         /// <inheritdoc/>
         public override void PrepareDisplayList(double precision)
@@ -406,34 +515,95 @@ namespace CADability.GeoObject
         protected Picture(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
-            bitmap = info.GetValue("Bitmap", typeof(Bitmap)) as Bitmap;
             location = (GeoPoint)info.GetValue("Location", typeof(GeoPoint));
             directionWidth = (GeoVector)info.GetValue("DirectionWidth", typeof(GeoVector));
             directionHeight = (GeoVector)info.GetValue("DirectionHeight", typeof(GeoVector));
             Path = info.GetString("Path");
+            imageData = ReadImage(info, Path, "Picture");
+        }
+        /// <summary>
+        /// The image of a picture or icon from a project file: "ImageData" (the image file as Base64) since #412 step 7, or
+        /// "Bitmap" (a serialized GDI+ bitmap) in files of CADability 1.x up to then. When the image cannot be read, the file
+        /// at <paramref name="path"/> is loaded instead, if there is one.
+        /// </summary>
+        internal static byte[] ReadImage(SerializationInfo info, string path, string objectName)
+        {
+            byte[] data = null;
+            bool found = false;
+            foreach (SerializationEntry entry in info)
+            {
+                if (entry.Name == "ImageData")
+                {
+                    found = entry.Value != null; // null: saved without an image
+                    if (entry.Value is string base64) data = Convert.FromBase64String(base64);
+                    else data = entry.Value as byte[];
+                }
+                else if (entry.Name == "Bitmap")
+                {
+                    found = true;
+                    try
+                    {
+                        data = EncodedImage.FromSerialized(entry.Value);
+                    }
+                    catch (Exception e) when (!(e is ThreadAbortException) && !(e is OutOfMemoryException))
+                    {
+                        data = null;
+                    }
+                }
+            }
+            if (data != null && EncodedImage.TryGetSize(data, out _, out _)) return data;
+            if (!found) return null; // an object without an image
+            if (!string.IsNullOrEmpty(path))
+            {
+                try
+                {
+                    if (File.Exists(path))
+                    {
+                        System.Diagnostics.Trace.TraceWarning($"{objectName}: the image in the project file cannot be read, it is loaded from \"{path}\".");
+                        return ReadImageFile(path);
+                    }
+                }
+                catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is ArgumentException || e is NotSupportedException)
+                {
+                }
+            }
+            if (data != null) System.Diagnostics.Trace.TraceWarning($"{objectName}: the image in the project file is not a PNG, JPEG, GIF or BMP file and cannot be shown.");
+            else System.Diagnostics.Trace.TraceWarning($"{objectName}: the image in the project file cannot be read and there is no file \"{path}\".");
+            return data;
         }
         /// <inheritdoc/>
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
-            info.AddValue("Bitmap", bitmap);
+            // Base64 rather than byte[]: JsonSerialize writes every element of an array as an object of its own
+            info.AddValue("ImageData", imageData == null ? null : Convert.ToBase64String(imageData));
             info.AddValue("Location", location);
             info.AddValue("DirectionWidth", directionWidth);
             info.AddValue("DirectionHeight", directionHeight);
             info.AddValue("Path", Path);
         }
         #endregion
-        internal static Bitmap CopyFrom(string filePath)
+        /// <summary>
+        /// The bytes of an image file for <see cref="ImageData"/>. A PNG, JPEG, GIF or BMP file is taken as it is. Any other
+        /// image format GDI+ knows (e.g. TIFF) is converted to PNG where GDI+ is available. The file is closed when this
+        /// method returns.
+        /// </summary>
+        /// <exception cref="ArgumentException">The file is not an image that can be used</exception>
+        internal static byte[] ReadImageFile(string filePath)
         {
-            //open file from the disk (file path is the path to the file to be opened)
-            using (FileStream fileStream = File.OpenRead(filePath))
+            byte[] data = File.ReadAllBytes(filePath);
+            if (EncodedImage.TryGetSize(data, out _, out _)) return data;
+            try
             {
-                //create new MemoryStream object
-                MemoryStream memStream = new MemoryStream();
-                memStream.SetLength(fileStream.Length);
-                //read file to MemoryStream
-                fileStream.Read(memStream.GetBuffer(), 0, (int)fileStream.Length);
-                return new Bitmap(memStream);
+                using (MemoryStream stream = new MemoryStream(data))
+                using (Bitmap bitmap = new Bitmap(stream))
+                {
+                    return EncodedImage.FromGdiImage(bitmap);
+                }
+            }
+            catch (Exception e) when (e is PlatformNotSupportedException || e is TypeInitializationException || e is DllNotFoundException || e is ArgumentException || e is ExternalException)
+            {
+                throw new ArgumentException("\"" + filePath + "\" is not a PNG, JPEG, GIF or BMP file.", nameof(filePath), e);
             }
         }
 
@@ -502,7 +672,7 @@ namespace CADability.GeoObject
 
             path.SetContextMenu("MenuId.Picture.Path", this);
             keepAspectRatio = new BooleanProperty("Picture.KeepAspectRatio", "YesNo.Values");
-            double p = picture.DirectionWidth.Length / picture.Bitmap.Width * picture.Bitmap.Height / picture.DirectionHeight.Length;
+            double p = picture.DirectionWidth.Length / Math.Max(1, picture.PixelWidth) * Math.Max(1, picture.PixelHeight) / picture.DirectionHeight.Length;
             keepAspectRatio.BooleanValue = Math.Abs(1.0 - p) < 1e-6;
             keepAspectRatio.BooleanChangedEvent += OnKeepAspectRatioChanged;
             rectangular = new BooleanProperty("Picture.Rectangular", "YesNo.Values");
@@ -514,11 +684,20 @@ namespace CADability.GeoObject
             dirHeightHotSpot.Position = picture.Location + picture.DirectionHeight;
         }
 
+        /// <summary>
+        /// Width / height of the picture's image in pixels (<paramref name="widthByHeight"/>), or height / width; 1 without
+        /// an image.
+        /// </summary>
+        internal static double PixelRatio(Picture picture, bool widthByHeight)
+        {
+            if (picture.PixelWidth <= 0 || picture.PixelHeight <= 0) return 1.0;
+            return widthByHeight ? picture.PixelWidth / (double)picture.PixelHeight : picture.PixelHeight / (double)picture.PixelWidth;
+        }
         private void OnKeepAspectRatioChanged(object sender, bool newValue)
         {
             if (keepAspectRatio.BooleanValue)
             {
-                picture.DirectionHeight = picture.DirectionWidth.Length * picture.Bitmap.Height / picture.Bitmap.Width * picture.DirectionHeight.Normalized;
+                picture.DirectionHeight = picture.DirectionWidth.Length * PixelRatio(picture, false) * picture.DirectionHeight.Normalized;
             }
         }
 
@@ -649,7 +828,7 @@ namespace CADability.GeoObject
                 }
                 if (keepAspectRatio.BooleanValue)
                 {
-                    picture.DirectionWidth = picture.DirectionHeight.Length / picture.Bitmap.Height * picture.Bitmap.Width * picture.DirectionWidth.Normalized;
+                    picture.DirectionWidth = picture.DirectionHeight.Length * PixelRatio(picture, true) * picture.DirectionWidth.Normalized;
                 }
             }
         }
@@ -672,7 +851,7 @@ namespace CADability.GeoObject
                 }
                 if (keepAspectRatio.BooleanValue)
                 {
-                    picture.DirectionHeight = picture.DirectionWidth.Length * picture.Bitmap.Height / picture.Bitmap.Width * picture.DirectionHeight.Normalized;
+                    picture.DirectionHeight = picture.DirectionWidth.Length * PixelRatio(picture, false) * picture.DirectionHeight.Normalized;
                 }
             }
         }
@@ -724,8 +903,7 @@ namespace CADability.GeoObject
                 case "MenuId.Picture.Path.Reload":
                     try
                     {
-                        Bitmap pix = new Bitmap(picture.Path);
-                        picture.Bitmap = pix;
+                        picture.ImageData = Picture.ReadImageFile(picture.Path);
                     }
                     catch (Exception e)
                     {
@@ -741,8 +919,7 @@ namespace CADability.GeoObject
                         {
                             try
                             {
-                                Bitmap pix = new Bitmap(fileName);
-                                picture.Bitmap = pix;
+                                picture.ImageData = Picture.ReadImageFile(fileName);
                                 picture.Path = fileName;
                             }
                             catch (Exception e)

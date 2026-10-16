@@ -672,12 +672,14 @@ namespace CADability.UserInterface
         /// <param name="height">the height of the paper in hundredths of an inch, 0 when the dialog was cancelled</param>
         /// <param name="landscape">true when landscape orientation was chosen, false otherwise or when the dialog was cancelled</param>
         /// <returns><see cref="DialogResult.OK"/> when the user confirmed, <see cref="DialogResult.Cancel"/> otherwise</returns>
+        [Obsolete("The GDI+ printing dialogs move into CADability.Forms in CADability 2.0 (issue #412).")]
         DialogResult ShowPageSetupDlg(ref PrintDocument printDocument1, PageSettings pageSettings, out int width, out int height, out bool landscape);
         /// <summary>
         /// Shows the print dialog (printer selection) for the document.
         /// </summary>
         /// <param name="printDocument">in: the document to print, out: the document with the chosen printer settings</param>
         /// <returns><see cref="DialogResult.OK"/> when the user confirmed and the document may be printed, <see cref="DialogResult.Cancel"/> otherwise</returns>
+        [Obsolete("The GDI+ printing dialogs move into CADability.Forms in CADability 2.0 (issue #412).")]
         DialogResult ShowPrintDlg(ref PrintDocument printDocument);
         /// <summary>
         /// Puts the objects on the clipboard, serialized in CADability's own format, so that they can be pasted with

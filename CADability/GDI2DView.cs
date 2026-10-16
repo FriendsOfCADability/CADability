@@ -347,6 +347,7 @@ namespace CADability
         /// is fitted onto the page, so the paper size should be set. Exceptions of the printing system are swallowed.
         /// </summary>
         /// <param name="pd">The print document to print to, with the printer and page settings already set</param>
+        [Obsolete("Printing with GDI+ moves into CADability.Forms in CADability 2.0 (issue #412).")]
         public void PrintSinglePage(PrintDocument pd)
         {
             PrintToGDI pdg = new PrintToGDI(this);
@@ -552,8 +553,9 @@ namespace CADability
                     }
                     return true;
                 case "MenuId.GDI2DView.Print":
-                    if (project.printDocument == null) project.printDocument = new PrintDocument();
-                    PrintSinglePage(project.printDocument);
+#pragma warning disable CS0618 // printing moves into CADability.Forms in 2.0 (issue #412)
+                    PrintSinglePage(project.PrintDocument);
+#pragma warning restore CS0618
                     return true;
                 case "MenuId.Zoom.Total":
                     ZoomToModelExtent(1.1);

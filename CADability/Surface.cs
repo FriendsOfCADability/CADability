@@ -9,11 +9,7 @@ using System;
 using System.Collections.Generic;
 using MathNet.Numerics.LinearAlgebra.Factorization;
 using System.Linq;
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-#else
 using System.Drawing;
-#endif
 
 namespace CADability.GeoObject
 {
@@ -5682,7 +5678,10 @@ namespace CADability.GeoObject
                 bounds1.MinMax(paramsuvsurf1[j]);
                 bounds2.MinMax(paramsuvsurf2[j]);
             }
-            IDualSurfaceCurve[] dscs = surface1.GetDualSurfaceCurves(bounds1, surface2, bounds2, points, null);
+            // crossing cylinders, whose radii differ by less than the precision, are taken as cylinders of the same radius (issue #458)
+            IDualSurfaceCurve[] dscs = null;
+            if (surface1 is CylindricalSurface cyl1 && surface2 is CylindricalSurface cyl2) dscs = cyl1.CrossingWithSameRadius(bounds1, cyl2, bounds2, points, precision);
+            if (dscs == null) dscs = surface1.GetDualSurfaceCurves(bounds1, surface2, bounds2, points, null);
 
             if (points.Count > paramsuvsurf1.Length)
             {   // there were points added by GetDualSurfaceCurves

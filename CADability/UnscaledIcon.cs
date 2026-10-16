@@ -2,13 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-using Point = CADability.WebDrawing.Point;
-#else
 using System.Drawing;
 using Point = System.Drawing.Point;
-#endif
 
 namespace CADability.GeoObject
 {

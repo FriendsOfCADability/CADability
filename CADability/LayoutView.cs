@@ -1,5 +1,4 @@
-﻿#if !WEBASSEMBLY
-using CADability.Attribute;
+﻿using CADability.Attribute;
 using CADability.GeoObject;
 using CADability.UserInterface;
 using System;
@@ -1116,4 +1115,3 @@ namespace CADability
         }
     }
 }
-#endif

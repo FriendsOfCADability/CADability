@@ -1,13 +1,8 @@
 ﻿using CADability.GeoObject;
 using CADability.UserInterface;
 using System;
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-using Point = CADability.WebDrawing.Point;
-#else
 using System.Drawing;
 using Point = System.Drawing.Point;
-#endif
 
 namespace CADability.Actions
 {
@@ -136,10 +131,8 @@ namespace CADability.Actions
                                          // now that we have a bitmap we set this object as the active object, which means
                                          // that is will be displayed while the location is positioned and at the end of the
                                          // action it will automatically be inserted into the model
-#if !WEBASSEMBLY
             widthValue = picture.PixelWidth;
             heightValue = picture.PixelHeight;
-#endif
             picture.DirectionWidth = ActiveDrawingPlane.DirectionX;
             picture.DirectionHeight = ActiveDrawingPlane.DirectionY;
         }

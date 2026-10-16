@@ -657,6 +657,7 @@ namespace CADability
         /// <param name="height">of the bitmap</param>
         /// <param name="extent">the extent to show in the bitmap; if null, the extent of the objects is used</param>
         /// <returns></returns>
+        [Obsolete("Not implemented in the kernel, always throws a NotImplementedException. Use CADability.Forms.PaintToOpenGL.PaintToBitmap with the same parameters instead. GDI+ is removed from the kernel in CADability 2.0 (issue #412).")]
         public static Bitmap PaintToBitmap(GeoObjectList list, GeoVector viewDirection, int width, int height, BoundingCube? extent = null)
         {
             throw new NotImplementedException("PaintToBitmap not implemented, maybe implement in CADability.Forms");

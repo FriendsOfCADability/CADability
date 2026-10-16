@@ -3013,6 +3013,7 @@ namespace CADability
 		/// Not implemented: always returns null. Kept for compatibility with earlier versions.
 		/// </summary>
 		/// <returns>null</returns>
+		[Obsolete("Not implemented, always returns null. Use CADability.Forms.PaintToOpenGL.PaintToBitmap to render the model into a bitmap. GDI+ is removed from the kernel in CADability 2.0 (issue #412).")]
 		public Bitmap GetContentsAsBitmap()
 		{
 			{

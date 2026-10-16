@@ -51,7 +51,9 @@ namespace CADability.Forms
             return new Substitutes.PaintEventArgs()
             {
                 ClipRectangle = v.ClipRectangle,
+#pragma warning disable CS0618 // still set for views of applications that read it, until CADability 2.0
                 Graphics = v.Graphics
+#pragma warning restore CS0618
             };
         }
         private IView view;

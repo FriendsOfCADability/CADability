@@ -74,6 +74,11 @@ namespace CADability.Substitutes
     public class PaintEventArgs 
     {
         public Rectangle ClipRectangle { get; set; }
+        /// <summary>
+        /// The GDI+ graphics of the paint event. No view of CADability reads it: views paint through
+        /// <see cref="ICanvas.PaintTo3D"/>.
+        /// </summary>
+        [Obsolete("No view of CADability uses it. Paint through ICanvas.PaintTo3D instead. GDI+ is removed from the kernel in CADability 2.0 (issue #412).")]
         public Graphics Graphics { get; set; }
     }
 

@@ -7,13 +7,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-using Point = CADability.WebDrawing.Point;
-#else
 using System.Drawing;
 using Point = System.Drawing.Point;
-#endif
 using System.Drawing.Printing;
 using System.Globalization;
 using System.IO;
@@ -248,10 +243,8 @@ namespace CADability
         // Die Views existieren also nur zur Laufzeit, die Layouts und projectedModels sind persistent
         private List<ProjectedModel> projectedModels; // die projectedModels
         private List<AnimatedView> animatedViews; // die AnimatedViews
-#if !WEBASSEMBLY
         private List<GDI2DView> gdiViews; // die AnimatedViews
         private List<Layout> layouts; // die zugehörigen Layouts
-#endif
         // für jedes Layout gibt es genau einen View, mehr macht ja keinen Sinn
         // für ein Modell allerdings kann es mehrere Projektionen bzw. Ansichten geben,
         // die hier in einer Liste gespeichert werden
@@ -341,10 +334,8 @@ namespace CADability
         private ArrayList ser_modelViews;
         private ProjectedModel[] ser_projectedModels;
         private AnimatedView[] ser_animatedViews;
-#if !WEBASSEMBLY
         private Layout[] ser_layouts;
         private GDI2DView[] ser_gdiViews;
-#endif
         private PrintDocument printDocument; // das PrintDocument zum Drucken, enthält die Druckereinstellungen; created on demand (Windows)
         private PageSetup defaultPageSetup; // the page settings as long as there is no printDocument
         /// <summary>
@@ -402,10 +393,8 @@ namespace CADability
             attributeLists = new Hashtable();
             activeModelIndex = -1;
 
-#if !WEBASSEMBLY
             layouts = new List<Layout>();
             gdiViews = new List<GDI2DView>();
-#endif
             //modelViews = new ArrayList();
             projectedModels = new List<ProjectedModel>();
             animatedViews = new List<AnimatedView>();
@@ -575,7 +564,6 @@ namespace CADability
                 return null;
             }
         }
-#if !WEBASSEMBLY
         /// <summary>
         /// Gets a default <see cref="Layout"/> for this project. If there is no layout
         /// in this project a standard Layout is created and adde to the project
@@ -626,7 +614,6 @@ namespace CADability
         {
             return layouts[index];
         }
-#endif
         /// <summary>
         /// Returns the number of model views (<see cref="ModelView"/>) in this project
         /// </summary>
@@ -650,7 +637,6 @@ namespace CADability
                 return animatedViews;
             }
         }
-#if !WEBASSEMBLY
         /// <summary>
         /// Gets a list of all defined GDI2DViews in this project.
         /// </summary>
@@ -662,7 +648,6 @@ namespace CADability
                 return gdiViews;
             }
         }
-#endif
         internal ProjectedModel GetProjectedModel(int index)
         {
             return projectedModels[index];
@@ -696,7 +681,6 @@ namespace CADability
             //mvdRename.Name = newName;
             return true;
         }
-#if !WEBASSEMBLY
         /// <summary>
         /// Removes the given <see cref="Layout"/> from the project. There must always be at least
         /// one layout, so you cannot remove the last layout.
@@ -730,7 +714,6 @@ namespace CADability
             }
             return found;
         }
-#endif
         /// <summary>
         /// Removes the given ModelView from the project. There must always be at least
         /// one modelview, so you cannot remove the last modelview.
@@ -809,7 +792,6 @@ namespace CADability
         //    }
         //    return null;
         //}
-#if !WEBASSEMBLY
         internal bool FindLayoutName(string name)
         {
             foreach (Layout l in layouts)
@@ -818,7 +800,6 @@ namespace CADability
             }
             return false;
         }
-#endif
         internal bool FindModelViewName(string name)
         {
             for (int i = 0; i < projectedModels.Count; ++i)
@@ -831,7 +812,6 @@ namespace CADability
             //}
             return false;
         }
-#if !WEBASSEMBLY
         /// <summary>
         /// Adds the specified <see cref="Layout"/> to the project.
         /// </summary>
@@ -861,7 +841,6 @@ namespace CADability
             l.Name = newName;
             return true;
         }
-#endif
         /// <summary>
         /// Adds a new <see cref="ProjectedModel"/>, the persistent part of a <see cref="ModelView"/> (the model, the
         /// projection and the visible layers), with the given name to the project. The name should be unique among the model
@@ -920,7 +899,6 @@ namespace CADability
         // hier fehlen noch die Add Methoden um neue Layouts und Modelviews zuzufügen
         internal void AssureViews()
         {	// stellt sicher, dass es wenigstens einen ModelView und einen LayoutView gibt
-#if !WEBASSEMBLY
             if (layouts.Count == 0)
             {
                 Layout l = new Layout(this);
@@ -955,7 +933,6 @@ namespace CADability
                 l.AddPatch(m, pr, null);
                 layouts.Add(l);
             }
-#endif
             if (projectedModels.Count == 0)
             {
                 ProjectedModel pm = new ProjectedModel(models[activeModelIndex] as Model, new Projection(Projection.StandardProjection.FromTop));
@@ -977,9 +954,7 @@ namespace CADability
         {
             //modelViews.Clear();
             projectedModels.Clear();
-#if !WEBASSEMBLY
             layouts.Clear();
-#endif
             AssureViews();
         }
         internal string ActiveViewName
@@ -1526,7 +1501,6 @@ namespace CADability
                 }
             }
         }
-#if !WEBASSEMBLY
         /// <summary>
         /// Writes the active model (<see cref="GetActiveModel"/>) as a HTML file that displays it with WebGL, see
         /// <see cref="CADability.ExportToWebGl"/>. The HTML template "WebGLS.html" is expected in the directory of the
@@ -1547,7 +1521,6 @@ namespace CADability
             wgl.HtmlTemplatePath = path;
             wgl.WriteToFile(fileName);
         }
-#endif
 
         /// <summary>
         /// Reads the GDI+ objects in binary project files of CADability 1.x without GDI+ (issue #412): the bitmaps of pictures
@@ -2626,7 +2599,6 @@ namespace CADability
             UserData.UserDataAddedEvent += new UserData.UserDataAddedDelegate(OnUserDataAdded);
             UserData.UserDataRemovedEvent += new UserData.UserDataRemovedDelegate(OnUserDataRemoved);
             symbolList = InfoReader.ReadOrCreate(info, "SymbolList", typeof(GeoObjectList), new object[] { }) as GeoObjectList;
-#if !WEBASSEMBLY
             try
             {
                 object ll = info.GetValue("Layouts", typeof(object));
@@ -2646,7 +2618,6 @@ namespace CADability
                 ser_layouts = new Layout[0]; // es gibt keine Layouts
                 ser_layoutlist = null;
             }
-#endif
             ser_modelViews = null;
             try
             {
@@ -2666,7 +2637,6 @@ namespace CADability
             catch (SerializationException)
             {
             }
-#if !WEBASSEMBLY
             try
             {
                 ser_gdiViews = info.GetValue("GdiViews", typeof(GDI2DView[])) as GDI2DView[];
@@ -2674,7 +2644,6 @@ namespace CADability
             catch (SerializationException)
             {
             }
-#endif
             try
             {
                 activeViewName = info.GetString("ActiveViewName");
@@ -2737,13 +2706,11 @@ namespace CADability
             info.AddValue("AttributeLists", attributeLists);
             info.AddValue("UserData", UserData);
             info.AddValue("SymbolList", symbolList);
-#if !WEBASSEMBLY
             if (!Settings.GlobalSettings.GetBoolValue("DontSave.System.Drawing", false))
             {
                 info.AddValue("Layouts", layouts.ToArray()); // Generics erwarten die exakte Version beim Deserialisieren, geht also nicht
                 info.AddValue("GdiViews", gdiViews.ToArray());
             }
-#endif
             info.AddValue("ProjectedModels", projectedModels.ToArray());
             info.AddValue("NamedValues", namedValues);
             info.AddValue("FilterList", filterList);
@@ -2767,13 +2734,11 @@ namespace CADability
             data.AddProperty("AttributeLists", attributeLists);
             data.AddProperty("UserData", UserData);
             data.AddProperty("SymbolList", symbolList);
-#if !WEBASSEMBLY
             if (!Settings.GlobalSettings.GetBoolValue("DontSave.System.Drawing", false))
             {
                 data.AddProperty("Layouts", layouts);
                 data.AddProperty("GdiViews", gdiViews);
             }
-#endif
             data.AddProperty("ProjectedModels", projectedModels);
             data.AddProperty("NamedValues", namedValues);
             data.AddProperty("FilterList", filterList);
@@ -2799,7 +2764,6 @@ namespace CADability
             attributeLists = data.GetPropertyOrDefault<Hashtable>("AttributeLists");
             UserData = data.GetPropertyOrDefault<UserData>("UserData");
             symbolList = data.GetPropertyOrDefault<GeoObjectList>("SymbolList");
-#if !WEBASSEMBLY
             try
             {
                 if (!Settings.GlobalSettings.GetBoolValue("DontSave.System.Drawing", false))
@@ -2809,7 +2773,6 @@ namespace CADability
                 }
             }
             catch (Exception e) when (IsSystemDrawingUnavailable(e)) { }
-#endif
             projectedModels = data.GetPropertyOrDefault<List<ProjectedModel>>("ProjectedModels");
             namedValues = data.GetPropertyOrDefault<NamedValuesProperty>("NamedValues");
             filterList = data.GetPropertyOrDefault<FilterList>("FilterList");
@@ -2871,17 +2834,14 @@ namespace CADability
                 m.GeoObjectDidChangeEvent += new ChangeDelegate(OnGeoObjectDidChange);
                 m.NameChangedEvent += new Model.NameChangedDelegate(OnModelNameChanged);
             }
-#if !WEBASSEMBLY
             if (layouts == null) layouts = new List<Layout>();
             foreach (Layout l in layouts)
             {
                 l.project = this;
             }
-#endif
         }
         #endregion
         #region ICommandHandler Members
-#if !WEBASSEMBLY
         private void OnNewLayout()
         {
             int i = 1;
@@ -2917,7 +2877,6 @@ namespace CADability
             }
             if (ViewChangedEvent != null) ViewChangedEvent(this, null);
         }
-#endif
         private string GetNewModelViewName()
         {
             int i = 1;
@@ -2929,7 +2888,6 @@ namespace CADability
             }
             return name;
         }
-#if !WEBASSEMBLY
         internal string GetNewGDI2DViewName()
         {
             int i = 1;
@@ -2951,7 +2909,6 @@ namespace CADability
             } while (found);
             return name;
         }
-#endif
         internal string GetNewAnimatedViewName()
         {
             int i = 1;
@@ -3011,11 +2968,9 @@ namespace CADability
                         (Frame as ICommandHandler).OnCommand(MenuId); // wird dort ausgeführt
                     }
                     return true;
-#if !WEBASSEMBLY
                 case "MenuId.View.Layout.NewLayout":
                     OnNewLayout();
                     return true;
-#endif
             }
             return false;
         }
@@ -3115,7 +3070,6 @@ namespace CADability
                 m.GeoObjectDidChangeEvent += new ChangeDelegate(OnGeoObjectDidChange);
                 m.NameChangedEvent += new Model.NameChangedDelegate(OnModelNameChanged);
             }
-#if !WEBASSEMBLY
             if (ser_layouts != null)
             {
                 layouts = new List<Layout>(ser_layouts);
@@ -3129,7 +3083,6 @@ namespace CADability
             {
                 l.project = this;
             }
-#endif
             if (ser_projectedModels != null)
             {
                 projectedModels = new List<ProjectedModel>(ser_projectedModels);
@@ -3153,7 +3106,6 @@ namespace CADability
             {
                 animatedViews = new List<AnimatedView>();
             }
-#if !WEBASSEMBLY
             if (ser_gdiViews != null)
             {
                 gdiViews = new List<GDI2DView>(ser_gdiViews);
@@ -3163,7 +3115,6 @@ namespace CADability
             {
                 gdiViews = new List<GDI2DView>();
             }
-#endif
         }
 
         #endregion

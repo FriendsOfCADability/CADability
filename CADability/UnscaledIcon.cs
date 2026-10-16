@@ -88,7 +88,7 @@ namespace CADability.GeoObject
         /// <param name="location">Position where the icon will be displayed</param>
         /// <param name="offsetx">X-Position in the icon where location is applied</param>
         /// <param name="offsety">Y-Position in the icon where location is applied. (0,0) is lower left of the icon</param>
-        [Obsolete("Use Set(byte[], GeoPoint, int, int) with the bytes of the image file. GDI+ is removed from the kernel in CADability 2.0 (issue #412).")]
+        [Obsolete("Use Set(byte[], GeoPoint, int, int) with the bytes of the image file. A GDI+ Bitmap only works on Windows (issue #412).")]
         public void Set(Bitmap bitmap, GeoPoint location, int offsetx, int offsety)
         {
             using (new Changing(this))

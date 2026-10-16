@@ -99,7 +99,7 @@ namespace CADability.GeoObject
         /// <param name="location">Position where the lower left point of the bitmap will be displayed</param>
         /// <param name="directionWidth">Vector specifying the baseline of the bitmap</param>
         /// <param name="directionHeight">Vector specifying the left side of the bitmap</param>
-        [Obsolete("Use Set(byte[], GeoPoint, GeoVector, GeoVector) with the bytes of the image file. GDI+ is removed from the kernel in CADability 2.0 (issue #412).")]
+        [Obsolete("Use Set(byte[], GeoPoint, GeoVector, GeoVector) with the bytes of the image file. A GDI+ Bitmap only works on Windows (issue #412).")]
         public void Set(Bitmap bitmap, GeoPoint location, GeoVector directionWidth, GeoVector directionHeight)
         {
             using (new Changing(this))
@@ -147,7 +147,7 @@ namespace CADability.GeoObject
         /// The bitmap, the contents of the Picture, decoded from <see cref="ImageData"/> with GDI+. Setting it encodes the
         /// bitmap into <see cref="ImageData"/>. Needs GDI+, i.e. Windows.
         /// </summary>
-        [Obsolete("Use ImageData, the bytes of the image file. GDI+ is removed from the kernel in CADability 2.0 (issue #412).")]
+        [Obsolete("Use ImageData, the bytes of the image file. A GDI+ Bitmap only works on Windows (issue #412).")]
         public Bitmap Bitmap
         {
             get
@@ -295,7 +295,6 @@ namespace CADability.GeoObject
         /// <param name="plane">The plane as a reference system for the shape</param>
         /// <param name="shape">The shape for the clip operation</param>
         /// <remarks>Needs GDI+, i.e. Windows. The clipped image is stored as PNG.</remarks>
-        [Obsolete("Clip needs GDI+, which is removed from the kernel in CADability 2.0 (issue #412). Clip the image file before setting ImageData instead.")]
         public void Clip(Plane plane, CompoundShape shape)
         {
             Bitmap bitmap = EncodedImage.ToGdiBitmap(imageData);
@@ -327,7 +326,7 @@ namespace CADability.GeoObject
         /// <see cref="Bitmap"/>. For callers that record the undo themselves. Not used within CADability.
         /// </summary>
         /// <param name="bmp">the new bitmap</param>
-        [Obsolete("Use SetImageDataNoUndo with the bytes of the image file. GDI+ is removed from the kernel in CADability 2.0 (issue #412).")]
+        [Obsolete("Use SetImageDataNoUndo with the bytes of the image file. A GDI+ Bitmap only works on Windows (issue #412).")]
         public void SetBitmapNoUndo(Bitmap bmp)
         {
             SetImage(EncodedImage.FromGdiImage(bmp), bmp);

@@ -351,6 +351,15 @@ namespace CADability
 			}
 		}
 
+		/// <summary>
+		/// Marks the display lists as invalid and notifies all connected <see cref="ProjectedModel"/>s, which record
+		/// them again with their next paint. Unlike <see cref="ClearDisplayLists"/> the OctTree is kept.
+		/// </summary>
+		internal void InvalidateDisplayLists()
+		{
+			displayListsDirty = true;
+			NewDisplaylistAvailableEvent?.Invoke(this);
+		}
 		internal void RecalcDisplayLists(IPaintTo3D paintTo3D)
 		{   // wird vom Paint in ProjectedModel aufgerufen, wenn dieser "dirty" ist
 			// kann aber nacheinander von mehreren ProjectedModels aufgerufen werden und soll nur einmal berechnet werden

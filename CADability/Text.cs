@@ -784,9 +784,23 @@ namespace CADability.GeoObject
             }
             return painted;
         }
+        /// <summary>
+        /// Disposes the cached glyph display lists and empties all caches. The glyphs are recorded again with the
+        /// <see cref="IPaintTo3D"/> that paints them next.
+        /// </summary>
         public void Clear()
         {
-            cache.Clear();
+            lock (this)
+            {
+                foreach (DictVal val in cache.Values)
+                {
+                    val.list?.Dispose();
+                }
+                cache.Clear();
+                centerLineCache.Clear();
+                fontCharacteristicsCache.Clear();
+                kerning.Clear();
+            }
         }
         public GeoObjectList GetCenterLines(string font, int fontStyle, char c, out double width)
         {
@@ -977,6 +991,19 @@ namespace CADability.GeoObject
         /// Provide a delegate here if you want your Text derived class to be created each time CADability creates a text.
         /// </summary>
         public static ConstructionDelegate Constructor;
+        /// <summary>
+        /// Releases the display lists of the text glyphs, which are shared by all texts and all views, and empties the
+        /// font cache. Call it when the <see cref="IPaintTo3D"/> that recorded the glyphs can no longer be used, i.e. when the
+        /// renderer is switched or its graphics device was lost. The glyph lists are disposed with
+        /// <see cref="IPaintTo3DList.Dispose"/>, so call it while the old renderer can still handle that (e.g. with its OpenGL
+        /// context current), or make its lists ignore a lost device.
+        /// The display lists of the models contain the glyph lists, so they must be rebuilt as well, see
+        /// <see cref="ProjectedModel.InvalidateDisplayLists"/>.
+        /// </summary>
+        public static void ClearFontCache()
+        {
+            FontCache.GlobalFontCache.Clear();
+        }
         /// <summary>
         /// The only way to create a text: there are no public constructors. Calls <see cref="Constructor"/> when one is
         /// registered, otherwise creates a <see cref="Text"/>. Set at least <see cref="Font"/>, <see cref="TextString"/>,

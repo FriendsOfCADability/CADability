@@ -68,8 +68,7 @@ shows a broken result, where some faces of it cannot be integrated and fall back
 
 ## baseline.csv
 
-The latest result: 692 OK, 15 VOLUME, 4 EMPTY, 37 LIMITATION, no exceptions, timeouts or crashes. All failures are those of
-the crossing cylinders of almost equal radius (#458), at offsets from 1e-7 to 1e-5.
+The latest result: 713 OK, 35 LIMITATION, no failures, exceptions, timeouts or crashes.
 
 History:
 - `master` at a96f42bd (14 October 2026): 594 OK, 58 VOLUME, 63 EMPTY, 33 LIMITATION.
@@ -84,23 +83,31 @@ History:
   connected within the precision of the operation: 20 cases fixed, none broken.
 - ProjectedCurves of a reversed face approximated finely instead of coarsely (#458, #459): the union of the crossing
   cylinders of equal radius fixed, none broken.
+- Crossing cylinders whose radii differ by less than the precision taken as cylinders of the same radius, and the points where
+  their intersection curves meet made vertices on the edges they lie on (#458): 21 cases fixed, none broken.
 
 Replace it with the `sweep.csv` of a newer run when a change fixes cases, so the next comparison starts from there.
-## Open: crossing cylinders of almost equal radius (#458)
 
-The remaining failures, at offsets from 1e-7 to 1e-5. What is known so far:
+## Crossing cylinders of almost equal radius (#458)
 
-- The intersection curves turn sharply close to the points where the cylinders touch, within sqrt(r2² - r1²) / r1 in the
-  angle of the smaller cylinder. `CylindricalSurface.GetDualSurfaceCurves` makes base points only every 45°, so between
-  two base points a plane perpendicular to the approximating polynom cuts the curve twice, and
-  `InterpolatedDualSurfaceCurve.ApproximatePosition` jumps between both cuts.
+Two cylinders whose axes meet and whose radii differ by less than the precision of the operation intersect in four half
+ellipses (`CylindricalSurface.CrossingWithSameRadius`, called by `Surfaces.Intersect` with that precision), which meet in the
+two points where the cylinders touch. The edges of the wider cylinder at these points only touch the narrower one, so the
+edge/face intersection finds no vertex there; `BRepOperation.VertexOnBorder` splits them where the ellipses end.
+
+The exact intersection curves of cylinders whose radii differ by more than the precision are still made of
+`InterpolatedDualSurfaceCurve`s, and they turn sharply close to the points where the cylinders touch, within
+sqrt(r2² - r1²) / r1 in the angle of the smaller cylinder. What is known about them:
+
+- `CylindricalSurface.GetDualSurfaceCurves` makes base points only every 45°, so between two base points a plane
+  perpendicular to the approximating polynom cuts the curve twice, and `InterpolatedDualSurfaceCurve.ApproximatePosition`
+  jumps between both cuts.
 - `ApproximatePosition` finds the point on the plane through the point of the polynom, but where intersecting the curves
   on that plane fails, Newton's method finds it on a parallel plane through the chord of the base points. Using the same
-  plane in both fixed five of these cases, but made others break later (a face with an outline whose seam edges carried
-  each other's 2d curves; `Face.RepairConnected` then merges vertices 10 apart, without a distance check, and the next
-  `TetraederHull` does not finish). Inserting base points where the curve turns by more than 15° helped some cases, but
-  the constructor of `InterpolatedDualSurfaceCurve` removes base points closer than a tenth of the mean distance, and
-  keeping them broke others. `ShellMetrics.IntegratedVolume` evaluates the curve consistently on its own
+  plane in both made other cases break later (a face with an outline whose seam edges carried each other's 2d curves;
+  `Face.RepairConnected` then merges vertices 10 apart, without a distance check, and the next `TetraederHull` does not
+  finish). Inserting base points where the curve turns by more than 15° helped some cases, but the constructor of
+  `InterpolatedDualSurfaceCurve` removes base points closer than a tenth of the mean distance, and keeping them broke
+  others. `ShellMetrics.IntegratedVolume` evaluates the curve consistently on its own
   (`InterpolatedDualSurfaceCurve.SmoothPosition`), without changing `ApproximatePosition`.
-- At ±1e-7 and ±3e-7 no intersection curve is found at all, and the cylinders are taken as nested or apart.
 

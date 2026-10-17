@@ -3,13 +3,8 @@ using CADability.GeoObject;
 using System;
 using System.Collections.Generic;
 using MouseEventArgs = CADability.Substitutes.MouseEventArgs;
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-using Point = CADability.WebDrawing.Point;
-#else
 using System.Drawing;
 using Point = System.Drawing.Point;
-#endif
 
 namespace CADability.UserInterface
 {

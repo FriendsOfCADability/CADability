@@ -2,13 +2,8 @@
 using CADability.Substitutes;
 using System;
 using System.Collections.Generic;
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-using Point = CADability.WebDrawing.Point;
-#else
 using System.Drawing;
 using Point = System.Drawing.Point;
-#endif
 using System.Drawing.Printing;
 
 /* Connection to the new user-interface provided by CADability.Forms

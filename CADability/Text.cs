@@ -5,16 +5,7 @@ using CADability.Shapes;
 using CADability.UserInterface;
 using System;
 using System.Collections.Generic;
-// some work to do to implement text for webassembly
-//#if WEBASSEMBLY
-//using CADability.WebDrawing;
-//using Point = CADability.WebDrawing.Point;
-//#else
-//using System.Drawing;
-//using Point = System.Drawing.Point;
-//#endif
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading;
@@ -44,15 +35,7 @@ namespace CADability.GeoObject
 
         private MultipleChoiceProperty InitFontList()
         {
-            FontFamily[] families = FontFamily.Families;
-            string[] choices = new string[families.Length];
-            for (int i = 0; i < families.Length; i++)
-            {
-                choices[i] = families[i].Name;
-                int emS = families[i].GetEmHeight(FontStyle.Regular);
-                int asc = families[i].GetCellAscent(FontStyle.Regular);
-                int desc = families[i].GetCellDescent(FontStyle.Regular);
-            }
+            string[] choices = FontProvider.Current.GetFamilyNames().OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase).ToArray();
             MultipleChoiceProperty res = new MultipleChoiceProperty("Text.Font", choices, text.Font);
             res.ValueChangedEvent += FontChanged;
             return res;
@@ -412,9 +395,8 @@ namespace CADability.GeoObject
 
     internal class FontCache
     {
-        // Holds CompoundShapes for all characters requested so far  
-        // and a kerning table for all fonts used so far  
-        // Maintains a DeviceContext throughout its lifetime, where only one font is switched.  
+        // Holds CompoundShapes for all characters requested so far
+        // and the font faces used so far, which come from FontProvider.Current (issue #412: no GDI here).
         // The unit of the font is size 1.0, allowing easy work without scaling.  
         // However, the faces are only generated when a string is created.  
         // It might also be possible to keep a list of faces for each character in different sizes,  
@@ -470,28 +452,6 @@ namespace CADability.GeoObject
                 return false;
             }
         }
-        struct KerningKey
-        {
-            public readonly string fontName;
-            public readonly int fontStyle;
-            public KerningKey(string fontName, int fontStyle)
-            {
-                this.fontName = fontName;
-                this.fontStyle = fontStyle;
-            }
-            public override int GetHashCode()
-            {
-                return fontName.GetHashCode() ^ fontStyle;
-            }
-            public override bool Equals(object obj)
-            {
-                if (obj is KerningKey other)
-                {
-                    return other.fontName == fontName && other.fontStyle == fontStyle;
-                }
-                return false;
-            }
-        }
         struct DictVal
         {
             public CompoundShape shape; // hat die Splines statt der Polygone
@@ -516,8 +476,7 @@ namespace CADability.GeoObject
         readonly Dictionary<DictKey, DictVal> cache; // Cache von CompundShapes und Breiten für einzelne zeichen
         readonly Dictionary<DictKey, CenterLineVal> centerLineCache; // Cache für die CenterLines, Größe 1
         readonly Dictionary<FontKey, FontCharacteristics> fontCharacteristicsCache; // Cache für die FontCharacteristics
-        readonly Dictionary<KerningKey, Dictionary<(char Left, char Right), double>> kerning; // Kerningtabellen
-        readonly IntPtr hDC; // fester DeviceContext (für die ganze Lebensdauer)
+        readonly Dictionary<FontKey, FontFace> faces; // the faces of FontProvider.Current, per font name and bold/italic
         public FontCache()
         {
             FontPrecision = Settings.GlobalSettings.GetIntValue("Font.Precision", 1); // |grob|mittel|fein
@@ -525,65 +484,56 @@ namespace CADability.GeoObject
             cache = new Dictionary<DictKey, DictVal>();
             centerLineCache = new Dictionary<DictKey, CenterLineVal>();
             fontCharacteristicsCache = new Dictionary<FontKey, FontCharacteristics>();
-            kerning = new Dictionary<KerningKey, Dictionary<(char Left, char Right), double>>();
-            hDC = Gdi.CreateCompatibleDC(IntPtr.Zero);
+            faces = new Dictionary<FontKey, FontFace>();
         }
-        ~FontCache()
+        /// <summary>
+        /// Returns the face of <see cref="FontProvider.Current"/> for a font name and a font style (the flags of
+        /// System.Drawing.FontStyle: 1 bold, 2 italic, 4 underline, 8 strikeout). An unknown font name gives the default face of
+        /// the provider.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">when the provider has no font at all</exception>
+        internal FontFace GetFace(string fontName, int fontStyle)
         {
-            // the constructor throws where there is no GDI (e.g. on Linux), and an exception in a finalizer ends the process
-            if (hDC != IntPtr.Zero) Gdi.DeleteDC(hDC);
+            bool bold = (fontStyle & 1) != 0, italic = (fontStyle & 2) != 0;
+            FontKey key = new FontKey(fontName ?? "", fontStyle & 3);
+            lock (faces)
+            {
+                if (faces.TryGetValue(key, out FontFace face)) return face;
+                FontProvider provider = FontProvider.Current;
+                face = provider.GetFace(fontName, bold, italic) ?? provider.GetDefaultFace(bold, italic);
+                if (face == null) throw new InvalidOperationException("No font is available for texts. Install TrueType fonts, add font files to a ManagedFontProvider or set FontProvider.Current.");
+                faces[key] = face;
+                return face;
+            }
         }
+        /// <summary>
+        /// Like <see cref="GetFace"/>, but returns null instead of throwing when there is no font at all: painting and the
+        /// extent of a text leave the text out then, instead of failing.
+        /// </summary>
+        internal FontFace TryGetFace(string fontName, int fontStyle)
+        {
+            try
+            {
+                return GetFace(fontName, fontStyle);
+            }
+            catch (InvalidOperationException)
+            {
+                return null;
+            }
+        }
+        // The caches are shared by all threads that measure or paint text, and Clear may empty them at any time: every access
+        // goes through lock (this). The lock is reentrant, Get and GetCenterLines call GetOutline2D. The faces are locked
+        // separately and always after this, so the two locks are taken in the same order everywhere.
         public Path2D[] GetOutline2D(string fontName, int fontStyle, char c, out double width)
         {
-            using GraphicsPath path = new GraphicsPath();
-            // FontFamily wraps an unmanaged GDI+ object: dispose it at the end of the block instead of
-            // leaving it to the finalizer (this code runs for every text on every repaint)
-            using FontFamily ff = Text.FontFamilyNames.Contains(fontName.ToUpper()) ? new FontFamily(fontName) : new FontFamily(System.Drawing.Text.GenericFontFamilies.SansSerif);
-            StringFormat sf = StringFormat.GenericTypographic.Clone() as StringFormat;
-            sf.LineAlignment = StringAlignment.Near;
-            sf.Alignment = StringAlignment.Near;
-            if (!ff.IsStyleAvailable((FontStyle)fontStyle))
+            lock (this)
             {
-                if (ff.IsStyleAvailable(FontStyle.Regular)) fontStyle = (int)FontStyle.Regular;
-                if (ff.IsStyleAvailable(FontStyle.Bold)) fontStyle = (int)FontStyle.Bold;
-                if (ff.IsStyleAvailable(FontStyle.Italic)) fontStyle = (int)FontStyle.Italic;
-                if (ff.IsStyleAvailable(FontStyle.Strikeout)) fontStyle = (int)FontStyle.Strikeout;
-                if (ff.IsStyleAvailable(FontStyle.Underline)) fontStyle = (int)FontStyle.Underline;
+                FontFace face = GetFace(fontName, fontStyle);
+                width = face.GetAdvanceWidth(c);
+                face.GetGlyphPath(c, (fontStyle & 4) != 0, (fontStyle & 8) != 0, out PointF[] points, out byte[] types);
+                if (points.Length == 0) return new Path2D[0];
+                return GlyphShapeBuilder.PathDataToPath2D(points, types, FontPrecision);
             }
-            int fs = fontStyle;
-            int em = ff.GetEmHeight((FontStyle)fs);
-            if (em == 0) em = 1000;
-            using Font font = new Font(ff, em, (FontStyle)fs, GraphicsUnit.Pixel);
-            IntPtr hfont = font.ToHfont();
-            IntPtr oldfont = Gdi.SelectObject(hDC, hfont);
-            Gdi.ABC[] abc = new Gdi.ABC[1];
-            Gdi.GetCharABCWidths(hDC, (uint)c, (uint)c, abc);
-            //int[] widths = new int[1]; // liefert das selbe wie GetCharABCWidths, nur die Summe halt.
-            //Gdi.GetCharWidth32(hDC, (uint)c, (uint)c, widths);
-            if (!kerning.ContainsKey(new KerningKey(fontName, fontStyle)))
-            {
-                KerningKey kk = new KerningKey(fontName, fontStyle);
-                Dictionary<(char Left, char Right), double> pairs = new Dictionary<(char Left, char Right), double>();
-                kerning[kk] = pairs;
-                int num = Gdi.GetKerningPairs(hDC, 0, null);
-                if (num > 0)
-                {
-                    Gdi.KERNINGPAIR[] kp = new Gdi.KERNINGPAIR[num];
-                    int ok = Gdi.GetKerningPairs(hDC, num, kp);
-                    for (int i = 0; i < kp.Length; ++i)
-                    {
-                        pairs[((char)kp[i].wFirst, (char)kp[i].wSecond)] = kp[i].iKernAmount / (double)em;
-                    }
-                }
-            }
-            Gdi.SelectObject(hDC, oldfont);
-            Gdi.DeleteObject(hfont);
-
-            width = (abc[0].abcA + abc[0].abcB + abc[0].abcC) / (double)em;
-
-            path.AddString(c.ToString(), ff, fs, 1.0f, new PointF(0.0f, 0.0f), sf);
-            if (path.PointCount == 0) return new Path2D[0];
-            return GlyphShapeBuilder.PathDataToPath2D(path.PathPoints, path.PathTypes, FontPrecision);
         }
         public CompoundShape Get(string font, int fontStyle, char c, out double width)
         {   // soll verschwinden!!
@@ -606,13 +556,10 @@ namespace CADability.GeoObject
         }
         public double GetKerning(string font, int fontStyle, char a, char b)
         {
-            Dictionary<(char Left, char Right), double> pairs;
-            double res = 0.0;
-            if (kerning.TryGetValue(new KerningKey(font, fontStyle), out pairs))
+            lock (this)
             {
-                pairs.TryGetValue((a, b), out res);
+                return GetFace(font, fontStyle).GetKerning(a, b);
             }
-            return res;
         }
         public IPaintTo3DList Get(string font, int fontStyle, char c, out double width, IPaintTo3D paintTo3D)
         {
@@ -792,11 +739,32 @@ namespace CADability.GeoObject
             }
             return painted;
         }
+        /// <summary>
+        /// Disposes the cached glyph display lists and empties all caches. The glyphs are recorded again with the
+        /// <see cref="IPaintTo3D"/> that paints them next.
+        /// </summary>
         public void Clear()
         {
-            cache.Clear();
+            lock (this)
+            {
+                foreach (DictVal val in cache.Values)
+                {
+                    val.list?.Dispose();
+                }
+                cache.Clear();
+                centerLineCache.Clear();
+                fontCharacteristicsCache.Clear();
+                lock (faces) faces.Clear();
+            }
         }
         public GeoObjectList GetCenterLines(string font, int fontStyle, char c, out double width)
+        {
+            lock (this)
+            {
+                return ReadCenterLines(font, fontStyle, c, out width);
+            }
+        }
+        private GeoObjectList ReadCenterLines(string font, int fontStyle, char c, out double width)
         {
             CenterLineVal found;
             if (!centerLineCache.TryGetValue(new DictKey(font, fontStyle, c), out found))
@@ -971,9 +939,16 @@ namespace CADability.GeoObject
         private LineAlignMode lineAlignment;
         // private IGeoObject[] cachedDisplayItems;
         private static HashSet<string> fontFamilyNames;
+        /// <summary>
+        /// The upper case names of the font families of <see cref="FontProvider.Current"/>.
+        /// </summary>
         internal static HashSet<string> FontFamilyNames =>
             LazyInitializer.EnsureInitialized(ref fontFamilyNames, () =>
-                new HashSet<string>(FontFamily.Families.Select(f => f.Name.ToUpper())));
+                new HashSet<string>(FontProvider.Current.GetFamilyNames().Select(f => f.ToUpper())));
+        internal static void ResetFontFamilyNames()
+        {
+            fontFamilyNames = null;
+        }
 
         #region polymorph construction
         /// <summary>
@@ -985,6 +960,19 @@ namespace CADability.GeoObject
         /// Provide a delegate here if you want your Text derived class to be created each time CADability creates a text.
         /// </summary>
         public static ConstructionDelegate Constructor;
+        /// <summary>
+        /// Releases the display lists of the text glyphs, which are shared by all texts and all views, and empties the
+        /// font cache. Call it when the <see cref="IPaintTo3D"/> that recorded the glyphs can no longer be used, i.e. when the
+        /// renderer is switched or its graphics device was lost. The glyph lists are disposed with
+        /// <see cref="IPaintTo3DList.Dispose"/>, so call it while the old renderer can still handle that (e.g. with its OpenGL
+        /// context current), or make its lists ignore a lost device.
+        /// The display lists of the models contain the glyph lists, so they must be rebuilt as well, see
+        /// <see cref="ProjectedModel.InvalidateDisplayLists"/>.
+        /// </summary>
+        public static void ClearFontCache()
+        {
+            FontCache.GlobalFontCache.Clear();
+        }
         /// <summary>
         /// The only way to create a text: there are no public constructors. Calls <see cref="Constructor"/> when one is
         /// registered, otherwise creates a <see cref="Text"/>. Set at least <see cref="Font"/>, <see cref="TextString"/>,
@@ -1019,37 +1007,28 @@ namespace CADability.GeoObject
             {
                 try
                 {
-                    // FontFamily wraps an unmanaged GDI+ object: dispose it at the end of the block instead of
-                    // leaving it to the finalizer (this code runs for every text on every repaint)
-                    using FontFamily ff = FontFamilyNames.Contains(fontName.ToUpper()) ? new FontFamily(fontName) : new FontFamily(System.Drawing.Text.GenericFontFamilies.SansSerif);
-                    FontStyle fs = fontStyle;
-                    if (!ff.IsStyleAvailable(fs))
-                    {
-                        if (ff.IsStyleAvailable(FontStyle.Regular)) fs = FontStyle.Regular;
-                        else if (ff.IsStyleAvailable(FontStyle.Bold)) fs = FontStyle.Bold;
-                        else if (ff.IsStyleAvailable(FontStyle.Italic)) fs = FontStyle.Italic;
-                        else if (ff.IsStyleAvailable(FontStyle.Strikeout)) fs = FontStyle.Strikeout;
-                        else if (ff.IsStyleAvailable(FontStyle.Underline)) fs = FontStyle.Underline; // irgend einen muss es ja wohl geben, oder?
-                    }
-                    int em = ff.GetEmHeight(fs);
-                    int asc = ff.GetCellAscent(fs);
-                    int desc = ff.GetCellDescent(fs);
-                    int lsp = ff.GetLineSpacing(fs);
-                    double dbg = (double)(asc + desc) / (double)lsp;
+                    int fs = (int)fontStyle;
+                    FontFace ff = FontCache.GlobalFontCache.GetFace(fontName, fs); // FontProvider.Current, see issue #412
+                    int em = ff.EmHeight;
+                    int asc = ff.CellAscent;
+                    int desc = ff.CellDescent;
+                    int lsp = ff.LineSpacing;
                     // asc+desc kann mehr als em sein. ich nehme jedoch an, dass em für die Größe ausschlaggebend ist
                     // wenn man em als 1 annimmt, dann muss man um desc/em nach unten verschieben um auf die Grundlinie zu kommen
                     emSizeFactor = (double)(asc + desc) / (double)em;
                     emAscDescFactor = (double)(desc) / (double)asc;
                     emDescDiff = (double)(em - asc) / (double)em;
                     this.desc = (double)(desc) / (double)em;
-                    // the bitmap only serves as a device for measuring; it must be disposed as well, otherwise
-                    // 400 KB of unmanaged GDI+ memory stay alive per measured text until the finalizer runs
-                    using (Bitmap measureBitmap = new Bitmap(1000, 100))
-                    using (Graphics graphics = Graphics.FromImage(measureBitmap))
-                    using (Font font = new Font(fontName, (float)(glyphDirection.Length), GraphicsUnit.Pixel))
+                    // the size of the text string with the font size glyphDirection.Length: the advance widths and the kerning
+                    // of the characters and the line spacing (this used to be Graphics.MeasureString of GDI+)
+                    double width = 0.0;
+                    for (int i = 0; i < textString.Length; ++i)
                     {
-                        sizeExtent = graphics.MeasureString(textString, font);
+                        width += ff.GetAdvanceWidth(textString[i]);
+                        if (i > 0) width += ff.GetKerning(textString[i - 1], textString[i]);
                     }
+                    double size = glyphDirection.Length;
+                    sizeExtent = new SizeF((float)(width * size), (float)(size * lsp / em));
                     isValidExtent = true;
                 }
                 catch (Exception e)
@@ -1268,22 +1247,12 @@ namespace CADability.GeoObject
             if (Bold) fs |= (int)FontStyle.Bold;
             if (Strikeout) fs |= (int)FontStyle.Strikeout;
             PlaneSurface pls = new PlaneSurface(location, lineDirection, glyphDirection, lineDirection ^ glyphDirection);
-            // FontFamily wraps an unmanaged GDI+ object: dispose it at the end of the block instead of
-            // leaving it to the finalizer (this code runs for every text on every repaint)
-            using FontFamily ff = FontFamilyNames.Contains(fontName.ToUpper()) ? new FontFamily(fontName) : new FontFamily(System.Drawing.Text.GenericFontFamilies.SansSerif);
-            if (!ff.IsStyleAvailable((FontStyle)fs))
-            {
-                if (ff.IsStyleAvailable(FontStyle.Regular)) fs = (int)FontStyle.Regular;
-                else if (ff.IsStyleAvailable(FontStyle.Bold)) fs = (int)FontStyle.Bold;
-                else if (ff.IsStyleAvailable(FontStyle.Italic)) fs = (int)FontStyle.Italic;
-                else if (ff.IsStyleAvailable(FontStyle.Strikeout)) fs = (int)FontStyle.Strikeout;
-                else if (ff.IsStyleAvailable(FontStyle.Underline)) fs = (int)FontStyle.Underline; // irgend einen muss es ja wohl geben, oder?
-            }
+            FontFace ff = FontCache.GlobalFontCache.GetFace(fontName, fs); // FontProvider.Current, see issue #412
             string txt = GetDisplayString(fs);
-            int em = ff.GetEmHeight((FontStyle)fs);
-            int ls = ff.GetLineSpacing((FontStyle)fs);
-            int dc = ff.GetCellDescent((FontStyle)fs);
-            int ac = ff.GetCellAscent((FontStyle)fs);
+            int em = ff.EmHeight;
+            int ls = ff.LineSpacing;
+            int dc = ff.CellDescent;
+            int ac = ff.CellAscent;
             double lsp = ls / em;
             if (lineSpacing > 0.0) lsp = lineSpacing; // explicit baseline distance as factor of the text size
             double dx = 0.0;
@@ -1425,22 +1394,12 @@ namespace CADability.GeoObject
             if (Bold) fs |= (int)FontStyle.Bold;
             if (Strikeout) fs |= (int)FontStyle.Strikeout;
             PlaneSurface pls = new PlaneSurface(location, lineDirection, glyphDirection, lineDirection ^ glyphDirection);
-            // FontFamily wraps an unmanaged GDI+ object: dispose it at the end of the block instead of
-            // leaving it to the finalizer (this code runs for every text on every repaint)
-            using FontFamily ff = FontFamilyNames.Contains(fontName.ToUpper()) ? new FontFamily(fontName) : new FontFamily(System.Drawing.Text.GenericFontFamilies.SansSerif);
-            if (!ff.IsStyleAvailable((FontStyle)fs))
-            {
-                if (ff.IsStyleAvailable(FontStyle.Regular)) fs = (int)FontStyle.Regular;
-                else if (ff.IsStyleAvailable(FontStyle.Bold)) fs = (int)FontStyle.Bold;
-                else if (ff.IsStyleAvailable(FontStyle.Italic)) fs = (int)FontStyle.Italic;
-                else if (ff.IsStyleAvailable(FontStyle.Strikeout)) fs = (int)FontStyle.Strikeout;
-                else if (ff.IsStyleAvailable(FontStyle.Underline)) fs = (int)FontStyle.Underline; // irgend einen muss es ja wohl geben, oder?
-            }
+            FontFace ff = FontCache.GlobalFontCache.GetFace(fontName, fs); // FontProvider.Current, see issue #412
             string txt = GetDisplayString(fs);
-            int em = ff.GetEmHeight((FontStyle)fs);
-            int ls = ff.GetLineSpacing((FontStyle)fs);
-            int dc = ff.GetCellDescent((FontStyle)fs);
-            int ac = ff.GetCellAscent((FontStyle)fs);
+            int em = ff.EmHeight;
+            int ls = ff.LineSpacing;
+            int dc = ff.CellDescent;
+            int ac = ff.CellAscent;
             double lsp = ls / em;
             if (lineSpacing > 0.0) lsp = lineSpacing; // explicit baseline distance as factor of the text size
             double dx = 0.0;
@@ -1568,22 +1527,12 @@ namespace CADability.GeoObject
             if (Bold) fs |= (int)FontStyle.Bold;
             if (Strikeout) fs |= (int)FontStyle.Strikeout;
             PlaneSurface pls = new PlaneSurface(location, lineDirection, glyphDirection, lineDirection ^ glyphDirection);
-            // FontFamily wraps an unmanaged GDI+ object: dispose it at the end of the block instead of
-            // leaving it to the finalizer (this code runs for every text on every repaint)
-            using FontFamily ff = FontFamilyNames.Contains(fontName.ToUpper()) ? new FontFamily(fontName) : new FontFamily(System.Drawing.Text.GenericFontFamilies.SansSerif);
-            if (!ff.IsStyleAvailable((FontStyle)fs))
-            {
-                if (ff.IsStyleAvailable(FontStyle.Regular)) fs = (int)FontStyle.Regular;
-                else if (ff.IsStyleAvailable(FontStyle.Bold)) fs = (int)FontStyle.Bold;
-                else if (ff.IsStyleAvailable(FontStyle.Italic)) fs = (int)FontStyle.Italic;
-                else if (ff.IsStyleAvailable(FontStyle.Strikeout)) fs = (int)FontStyle.Strikeout;
-                else if (ff.IsStyleAvailable(FontStyle.Underline)) fs = (int)FontStyle.Underline; // irgend einen muss es ja wohl geben, oder?
-            }
+            FontFace ff = FontCache.GlobalFontCache.GetFace(fontName, fs); // FontProvider.Current, see issue #412
             string txt = GetDisplayString(fs);
-            int em = ff.GetEmHeight((FontStyle)fs);
-            int ls = ff.GetLineSpacing((FontStyle)fs);
-            int dc = ff.GetCellDescent((FontStyle)fs);
-            int ac = ff.GetCellAscent((FontStyle)fs);
+            int em = ff.EmHeight;
+            int ls = ff.LineSpacing;
+            int dc = ff.CellDescent;
+            int ac = ff.CellAscent;
             double lsp = ls / em;
             if (lineSpacing > 0.0) lsp = lineSpacing; // explicit baseline distance as factor of the text size
             double dx = 0.0;
@@ -1972,22 +1921,13 @@ namespace CADability.GeoObject
                 {   // bei sehr kleinen lineDirection u.s.w. gibts hier ein Problem
                     pls = new PlaneSurface(location, GeoVector.XAxis, GeoVector.YAxis, GeoVector.ZAxis);
                 }
-                // FontFamily wraps an unmanaged GDI+ object: dispose it at the end of the block instead of
-                // leaving it to the finalizer (this code runs for every text on every repaint)
-                using FontFamily ff = FontFamilyNames.Contains(fontName.ToUpper()) ? new FontFamily(fontName) : new FontFamily(System.Drawing.Text.GenericFontFamilies.SansSerif);
-                if (!ff.IsStyleAvailable((FontStyle)fs))
-                {
-                    if (ff.IsStyleAvailable(FontStyle.Regular)) fs = (int)FontStyle.Regular;
-                    else if (ff.IsStyleAvailable(FontStyle.Bold)) fs = (int)FontStyle.Bold;
-                    else if (ff.IsStyleAvailable(FontStyle.Italic)) fs = (int)FontStyle.Italic;
-                    else if (ff.IsStyleAvailable(FontStyle.Strikeout)) fs = (int)FontStyle.Strikeout;
-                    else if (ff.IsStyleAvailable(FontStyle.Underline)) fs = (int)FontStyle.Underline; // irgend einen muss es ja wohl geben, oder?
-                }
+                FontFace ff = FontCache.GlobalFontCache.TryGetFace(fontName, fs); // FontProvider.Current, see issue #412
+                if (ff == null) return; // no font at all: nothing to paint or measure
                 string txt = GetDisplayString(fs);
-                int em = ff.GetEmHeight((FontStyle)fs);
-                int ls = ff.GetLineSpacing((FontStyle)fs);
-                int dc = ff.GetCellDescent((FontStyle)fs);
-                int ac = ff.GetCellAscent((FontStyle)fs);
+                int em = ff.EmHeight;
+                int ls = ff.LineSpacing;
+                int dc = ff.CellDescent;
+                int ac = ff.CellAscent;
                 double lsp;
                 if (em > 0) lsp = (double)ls / em;
                 else lsp = 1.0;
@@ -2612,21 +2552,12 @@ namespace CADability.GeoObject
                     if (Strikeout) fs |= (int)FontStyle.Strikeout;
                     List<IGeoObject> res = new List<IGeoObject>();
                     PlaneSurface pls = new PlaneSurface(location, lineDirection, glyphDirection, lineDirection ^ glyphDirection);
-                    // FontFamily wraps an unmanaged GDI+ object: dispose it at the end of the block instead of
-                    // leaving it to the finalizer (this code runs for every text on every repaint)
-                    using FontFamily ff = FontFamilyNames.Contains(fontName.ToUpper()) ? new FontFamily(fontName) : new FontFamily(System.Drawing.Text.GenericFontFamilies.SansSerif);
-                    if (!ff.IsStyleAvailable((FontStyle)fs))
-                    {
-                        if (ff.IsStyleAvailable(FontStyle.Regular)) fs = (int)FontStyle.Regular;
-                        else if (ff.IsStyleAvailable(FontStyle.Bold)) fs = (int)FontStyle.Bold;
-                        else if (ff.IsStyleAvailable(FontStyle.Italic)) fs = (int)FontStyle.Italic;
-                        else if (ff.IsStyleAvailable(FontStyle.Strikeout)) fs = (int)FontStyle.Strikeout;
-                        else if (ff.IsStyleAvailable(FontStyle.Underline)) fs = (int)FontStyle.Underline; // there must be one
-                    }
-                    int em = ff.GetEmHeight((FontStyle)fs);
-                    int ls = ff.GetLineSpacing((FontStyle)fs);
-                    int dc = ff.GetCellDescent((FontStyle)fs);
-                    int ac = ff.GetCellAscent((FontStyle)fs);
+                    FontFace ff = FontCache.GlobalFontCache.TryGetFace(fontName, fs); // FontProvider.Current, see issue #412
+                    if (ff == null) return; // no font at all: nothing to paint or measure
+                    int em = ff.EmHeight;
+                    int ls = ff.LineSpacing;
+                    int dc = ff.CellDescent;
+                    int ac = ff.CellAscent;
                     for (int i = 0; i < textString.Length; ++i)
                     {
                         double width;
@@ -2635,11 +2566,7 @@ namespace CADability.GeoObject
                 }
                 else
                 {
-#if WEBASSEMBLY
-                    paintTo3D.PrepareText(fontName, textString, CADability.WebDrawing.FontStyle.Regular);
-#else
                     paintTo3D.PrepareText(fontName, textString, fontStyle);
-#endif
                 }
             }
         }
@@ -2685,22 +2612,13 @@ namespace CADability.GeoObject
                 if (Strikeout) fs |= (int)FontStyle.Strikeout;
                 List<IGeoObject> res = new List<IGeoObject>();
                 PlaneSurface pls = new PlaneSurface(location, lineDirection, glyphDirection, lineDirection ^ glyphDirection);
-                // FontFamily wraps an unmanaged GDI+ object: dispose it at the end of the block instead of
-                // leaving it to the finalizer (this code runs for every text on every repaint)
-                using FontFamily ff = FontFamilyNames.Contains(fontName.ToUpper()) ? new FontFamily(fontName) : new FontFamily(System.Drawing.Text.GenericFontFamilies.SansSerif);
-                if (!ff.IsStyleAvailable((FontStyle)fs))
-                {
-                    if (ff.IsStyleAvailable(FontStyle.Regular)) fs = (int)FontStyle.Regular;
-                    else if (ff.IsStyleAvailable(FontStyle.Bold)) fs = (int)FontStyle.Bold;
-                    else if (ff.IsStyleAvailable(FontStyle.Italic)) fs = (int)FontStyle.Italic;
-                    else if (ff.IsStyleAvailable(FontStyle.Strikeout)) fs = (int)FontStyle.Strikeout;
-                    else if (ff.IsStyleAvailable(FontStyle.Underline)) fs = (int)FontStyle.Underline; // irgend einen muss es ja wohl geben, oder?
-                }
+                FontFace ff = FontCache.GlobalFontCache.TryGetFace(fontName, fs); // FontProvider.Current, see issue #412
+                if (ff == null) return; // no font at all: nothing to paint or measure
                 string txt = GetDisplayString(fs);
-                int em = ff.GetEmHeight((FontStyle)fs);
-                int ls = ff.GetLineSpacing((FontStyle)fs);
-                int dc = ff.GetCellDescent((FontStyle)fs);
-                int ac = ff.GetCellAscent((FontStyle)fs);
+                int em = ff.EmHeight;
+                int ls = ff.LineSpacing;
+                int dc = ff.CellDescent;
+                int ac = ff.CellAscent;
                 double lsp = ls / em;
                 if (lineSpacing > 0.0) lsp = lineSpacing; // explicit baseline distance as factor of the text size
             if (lineSpacing > 0.0) lsp = lineSpacing; // explicit baseline distance as factor of the text size
@@ -2828,11 +2746,7 @@ namespace CADability.GeoObject
             else
             {
                 string wrapped = GetDisplayString((int)fontStyle); // apply automatic line wrapping here as well
-#if WEBASSEMBLY
-                paintTo3D.Text(lineDirection, glyphDirection, location, fontName, wrapped, CADability.WebDrawing.FontStyle.Regular, alignment, lineAlignment);
-#else
                 paintTo3D.Text(lineDirection, glyphDirection, location, fontName, wrapped, fontStyle, alignment, lineAlignment);
-#endif
             }
         }
         /// <inheritdoc/>

@@ -14,13 +14,8 @@ using Keys = CADability.Substitutes.Keys;
 using PaintEventArgs = CADability.Substitutes.PaintEventArgs;
 using CheckState = CADability.Substitutes.CheckState;
 using static CADability.Projection;
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-using Point = CADability.WebDrawing.Point;
-#else
 using System.Drawing;
 using Point = System.Drawing.Point;
-#endif
 
 namespace CADability
 {
@@ -969,6 +964,7 @@ namespace CADability
 		/// <summary>
 		/// Marks the display lists of the <see cref="ProjectedModel"/> as dirty and recalculates them. Call it when the projection or the display mode
 		/// changed in a way that invalidates the cached display lists. The canvas is not invalidated, call <see cref="Invalidate"/> as well.
+		/// To only record the display lists again, e.g. after the graphics device was lost, <see cref="CADability.ProjectedModel.InvalidateDisplayLists"/> is enough.
 		/// </summary>
 		public void ForceInvalidateAll()
 		{
@@ -1091,8 +1087,15 @@ namespace CADability
 			if (!painting)
 			{
 				painting = true;
-				Paint(e);
-				painting = false;
+				try
+				{
+					Paint(e);
+				}
+				finally
+				{   // an exception in Paint (e.g. from the IPaintTo3D implementation) still goes to the caller,
+					// but must not leave the flag set: the view would never paint again
+					painting = false;
+				}
 			}
 		}
 		private void Paint(PaintEventArgs e)

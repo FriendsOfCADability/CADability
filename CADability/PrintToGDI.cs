@@ -1515,11 +1515,7 @@ namespace CADability
                         found = pr.GdiViews[i];
                     }
                 }
-                if (pd == null)
-                {
-                    pd = pr.printDocument;
-                    if (pd == null) pd = new PrintDocument();
-                }
+                if (pd == null) pd = pr.PrintDocument;
                 if (found != null)
                 {
                     PrintToGDI ptg = new PrintToGDI(found);

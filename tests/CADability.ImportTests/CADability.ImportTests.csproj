@@ -14,6 +14,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- the font of the text tests, see TestFonts.cs -->
+    <Content Include="..\CADability.Tests\Files\Fonts\LiberationSans-Regular.ttf" Link="Files\Fonts\LiberationSans-Regular.ttf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="Files\**\*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

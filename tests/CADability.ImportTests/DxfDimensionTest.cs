@@ -367,7 +367,6 @@ Dimensions
         [TestMethod]
         public void import_dxf_dimension_without_block_shows_its_measurement()
         {
-            RequireGdi();
             string dxf = Header + Tables + EntitiesStart + AlignedDimension(null) + Epilogue;
             Block block = AssertRegeneratedDimension(ImportDxf(dxf).GetActiveModel());
             Text text = block.Children.OfType<Text>().SingleOrDefault();
@@ -759,7 +758,6 @@ Dimensions
         [TestMethod]
         public void export_dimension_round_trips_as_a_dxf_dimension()
         {
-            RequireGdi();
             Project project = MakeProjectWithDimension(new GeoPoint(0, 0, 0), new GeoPoint(100, 0, 0));
             Model reimported = WithChoice("DxfDwg.ExportDimension", 1, () => ExportAndImport(project));
 
@@ -776,6 +774,12 @@ Dimensions
         // Header, the red layer "Dimensions" and a dimension style "LOGICAL" with values that are
         // nothing like CADability's defaults, so a translation is visible in the assertions:
         // DIMSCALE 2, DIMASZ 1.5, DIMEXO 0.5, DIMEXE 1.25, DIMTXT 3.5, DIMDEC 3.
+        /// <summary>
+        /// The fixtures are verbatim strings, so they have the line endings of the checkout: CRLF on Windows with
+        /// text=auto. A test that edits a fixture with Replace("...\n...") normalizes it to LF first.
+        /// </summary>
+        private static string Lf(string fixture) => fixture.Replace("\r\n", "\n");
+
         private const string StyledPrologue = @"  0
 SECTION
   2
@@ -993,8 +997,8 @@ AcDbRotatedDimension
         [TestMethod]
         public void import_dxf_dimension_uses_the_standard_style_of_the_file()
         {
-            string standard = LinearDimension.Replace("  3\nLOGICAL\n", "");
-            Assert.AreNotEqual(LinearDimension, standard, "the style reference should be removed");
+            string standard = Lf(LinearDimension).Replace("  3\nLOGICAL\n", "");
+            Assert.AreNotEqual(Lf(LinearDimension), standard, "the style reference should be removed");
             Project project = ImportProjectAsDimensions(StyledPrologue + standard + Epilogue);
             Dimension dim = SingleDimensionObject(project.GetActiveModel());
 
@@ -1211,11 +1215,11 @@ AcDb3PointAngularDimension
         {
             // drop the rotated subclass to make it an aligned dimension, and put the second
             // measured point straight above the first, along the normal
-            string degenerate = LinearDimension
+            string degenerate = Lf(LinearDimension)
                 .Replace("100\nAcDbRotatedDimension\n 50\n0.0\n", "")
                 .Replace(" 14\n100.0", " 14\n0.0")
                 .Replace(" 34\n0.0", " 34\n100.0");
-            Assert.AreNotEqual(LinearDimension, degenerate, "the fixture should have been changed");
+            Assert.AreNotEqual(Lf(LinearDimension), degenerate, "the fixture should have been changed");
             Model model = ImportAsDimensions(StyledPrologue + degenerate + Epilogue);
 
             Assert.AreEqual(1, model.Count, "it must not get lost");
@@ -1230,9 +1234,9 @@ AcDb3PointAngularDimension
         [TestMethod]
         public void import_dxf_dimension_text_override_keeps_the_measurement()
         {
-            string withText = LinearDimension.Replace("100\nAcDbAlignedDimension",
+            string withText = Lf(LinearDimension).Replace("100\nAcDbAlignedDimension",
                 "  1\nca. <> mm\n100\nAcDbAlignedDimension");
-            Assert.AreNotEqual(LinearDimension, withText, "the text override should be inserted");
+            Assert.AreNotEqual(Lf(LinearDimension), withText, "the text override should be inserted");
             Dimension dim = SingleDimensionObject(ImportAsDimensions(StyledPrologue + withText + Epilogue));
 
             dim.GetBoundingCube();
@@ -1389,8 +1393,8 @@ AcDbArcDimension
         public void import_dxf_dimension_translates_the_angle_format()
         {
             // DIMAUNIT (group code 275) 1 is degrees, minutes and seconds
-            string prologue = StyledPrologue.Replace("271\n3\n", "271\n3\n275\n1\n");
-            Assert.AreNotEqual(StyledPrologue, prologue, "DIMAUNIT should be set");
+            string prologue = Lf(StyledPrologue).Replace("271\n3\n", "271\n3\n275\n1\n");
+            Assert.AreNotEqual(Lf(StyledPrologue), prologue, "DIMAUNIT should be set");
             Dimension dim = SingleDimensionObject(ImportAsDimensions(prologue + LinearDimension + Epilogue));
 
             Assert.AreEqual(DimensionStyle.EAngleText.DegreeMinuteSecond, dim.DimensionStyle.AngleText);
@@ -1605,13 +1609,6 @@ AcDbArcDimension
             Block block = model[0] as Block;
             Assert.IsNotNull(block, "a DIMENSION imports as the block that holds its picture");
             return block;
-        }
-
-        // Adding a Text to a model computes its extent through GDI, which only exists on Windows.
-        private static void RequireGdi()
-        {
-            if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
-                Assert.Inconclusive("text needs GDI, which is only available on Windows");
         }
 
         private Project ImportDxf(string dxf)

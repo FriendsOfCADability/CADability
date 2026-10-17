@@ -1,11 +1,7 @@
 ﻿using CADability.GeoObject;
 using CADability.UserInterface;
 using System;
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-#else
 using System.Drawing;
-#endif
 using System.Globalization;
 using System.Runtime.Serialization;
 

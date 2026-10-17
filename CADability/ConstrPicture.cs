@@ -230,7 +230,6 @@ namespace CADability.Actions
         /// <param name="val">The new file name</param>
         void OnSetFileName(string val)
         {
-#if !WEBASSEMBLY
             fileName = val; // save the name
             System.Drawing.Bitmap bmp = new System.Drawing.Bitmap(fileName); // load the bitmap
             picture.Bitmap = bmp; // set the bitmap to the picture object
@@ -241,7 +240,6 @@ namespace CADability.Actions
             // action it will automatically be inserted into the model
             widthValue = picture.Bitmap.PhysicalDimension.Width;
             heightValue = picture.Bitmap.PhysicalDimension.Height;
-#endif
         }
         
         /// <summary>

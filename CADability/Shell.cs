@@ -14,13 +14,8 @@ using System.Collections;
 using System.Security.Cryptography;
 using static CADability.UserInterface.StateChangedArgs;
 
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-using Point = CADability.WebDrawing.Point;
-#else
 using System.Drawing;
 using Point = System.Drawing.Point;
-#endif
 
 namespace CADability.GeoObject
 {

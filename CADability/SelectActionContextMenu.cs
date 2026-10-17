@@ -13,13 +13,8 @@ using CADability.Curve2D;
 using CADability.Shapes;
 using MathNet.Numerics.LinearAlgebra.Factorization;
 
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-using Point = CADability.WebDrawing.Point;
-#else
 using System.Drawing;
 using Point = System.Drawing.Point;
-#endif
 
 namespace CADability
 {

@@ -14,7 +14,7 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 
     <BuildDocFx Condition=" '$(Configuration)'!='RelWithDoc' ">false</BuildDocFx>
-    <Configurations>Debug;Release;RelWithDoc;WebDebug</Configurations>
+    <Configurations>Debug;Release;RelWithDoc</Configurations>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>CADabilityKey.snk</AssemblyOriginatorKeyFile>
     <AssemblyName>CADability</AssemblyName>
@@ -54,11 +54,6 @@
     <DefineConstants>NET4X;TRACE;DEBUG;xTESTNEWCONTEXTMENU, xUSENONPRIODICSURFACES</DefineConstants>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)'=='WebDebug'">
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <DefineConstants>TRACE;xPARALLEL, xTESTNEWCONTEXTMENU, xUSENONPRIODICSURFACES, WEBASSEMBLY</DefineConstants>
-  </PropertyGroup>
-
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DefineConstants>NET4X;xTESTNEWCONTEXTMENU</DefineConstants>
@@ -92,7 +87,6 @@
     <RemoveFiles Include="Tangulation.cs" />
     <RemoveFiles Include="log.txt" />
     <RemoveFiles Include="_ToDo.txt" />
-    <RemoveFiles Include="WebDrawing.cs" Condition="'$(Configuration)'!='WebDebug'" />
 
     <EmbeddedResource Remove="@(RemoveFiles)" />
     <EmbeddedFiles Remove="@(RemoveFiles)" />

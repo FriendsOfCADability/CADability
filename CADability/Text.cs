@@ -525,7 +525,16 @@ namespace CADability.GeoObject
             // the constructor throws where there is no GDI (e.g. on Linux), and an exception in a finalizer ends the process
             if (hDC != IntPtr.Zero) Gdi.DeleteDC(hDC);
         }
+        // The caches and the device context are shared by all threads that measure or paint text, and Clear may empty the
+        // caches at any time: every access goes through lock (this). The lock is reentrant, Get and GetCenterLines call GetOutline2D.
         public Path2D[] GetOutline2D(string fontName, int fontStyle, char c, out double width)
+        {
+            lock (this)
+            {
+                return ReadOutline2D(fontName, fontStyle, c, out width);
+            }
+        }
+        private Path2D[] ReadOutline2D(string fontName, int fontStyle, char c, out double width)
         {
             using GraphicsPath path = new GraphicsPath();
             // FontFamily wraps an unmanaged GDI+ object: dispose it at the end of the block instead of
@@ -600,9 +609,12 @@ namespace CADability.GeoObject
         {
             Dictionary<(char Left, char Right), double> pairs;
             double res = 0.0;
-            if (kerning.TryGetValue(new KerningKey(font, fontStyle), out pairs))
+            lock (this)
             {
-                pairs.TryGetValue((a, b), out res);
+                if (kerning.TryGetValue(new KerningKey(font, fontStyle), out pairs))
+                {
+                    pairs.TryGetValue((a, b), out res);
+                }
             }
             return res;
         }
@@ -803,6 +815,13 @@ namespace CADability.GeoObject
             }
         }
         public GeoObjectList GetCenterLines(string font, int fontStyle, char c, out double width)
+        {
+            lock (this)
+            {
+                return ReadCenterLines(font, fontStyle, c, out width);
+            }
+        }
+        private GeoObjectList ReadCenterLines(string font, int fontStyle, char c, out double width)
         {
             CenterLineVal found;
             if (!centerLineCache.TryGetValue(new DictKey(font, fontStyle, c), out found))

@@ -128,6 +128,11 @@ namespace CADability
 		internal Dictionary<Layer, List<IGeoObject>> layerCurveObjects; // temporär alle Curves etc. geordnet nach Layern
 		internal bool showTransparentFaceEdges; // zeige die Kanten von transparenten Faces
 		internal double displayListPrecision;
+		/// <summary>
+		/// Counts the calls of <see cref="InvalidateDisplayLists"/>. Display lists made outside the model, like the one of the
+		/// selection, compare it to notice that they belong to a renderer or graphics device that is no longer valid.
+		/// </summary>
+		internal int displayListGeneration;
 		internal Layer nullLayer; // key für obige Listen, wenn kein Layer gegeben ist
 		private volatile bool displayListsDirty; // wird bei Zugriff nicht gelockt
 		internal OctTree<IGeoObject> octTree; // erstmal internal, mal sehen...
@@ -358,6 +363,7 @@ namespace CADability
 		internal void InvalidateDisplayLists()
 		{
 			displayListsDirty = true;
+			++displayListGeneration;
 			NewDisplaylistAvailableEvent?.Invoke(this);
 		}
 		internal void RecalcDisplayLists(IPaintTo3D paintTo3D)

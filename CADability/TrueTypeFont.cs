@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace CADability
@@ -38,6 +39,10 @@ namespace CADability
         private readonly bool longLoca;
         private int cmapOffset = -1, cmapFormat, symbolOffset;
         private Dictionary<int, int> kerningPairs; // (left glyph << 16 | right glyph) -> value in font units, created on demand
+        private readonly int fontOffset; // of the table directory, a font of a collection does not start at 0
+        private Dictionary<int, string> names; // name ID -> name, the preferred record per ID
+        private readonly FontVariations variations; // null for a font that is not variable
+        private double[] coords; // normalized variation coordinates, null for the default instance
 
         /// <summary>
         /// The family name, e.g. "Liberation Sans", as GDI knows it (name ID 1, Windows platform preferred).
@@ -82,12 +87,15 @@ namespace CADability
         /// </summary>
         public bool HasTrueTypeOutlines { get; }
         /// <summary>
-        /// True for an OpenType font with outlines in the "CFF " table (Compact Font Format, cubic curves).
+        /// True for an OpenType font with outlines in the "CFF " or "CFF2" table (Compact Font Format, cubic curves).
         /// </summary>
         public bool HasCffOutlines { get; }
         /// <summary>
-        /// True if the glyph outlines can be read: TrueType or CFF outlines. False for bitmap fonts and for CFF2 (variable
-        /// OpenType fonts).
+        /// True if the CFF outlines are in the "CFF2" table, the format of variable OpenType fonts.
+        /// </summary>
+        public bool IsCff2 { get; }
+        /// <summary>
+        /// True if the glyph outlines can be read: TrueType, CFF or CFF2 outlines. False for bitmap fonts.
         /// </summary>
         public bool HasOutlines => HasTrueTypeOutlines || HasCffOutlines;
         private CffOutlines cff; // created on demand
@@ -118,6 +126,7 @@ namespace CADability
         private TrueTypeFont(byte[] data, int offset)
         {
             this.data = data;
+            fontOffset = offset;
             uint version = U32(offset);
             bool trueType = version == 0x00010000 || version == 0x74727565; // 'true' (old Apple fonts)
             if (!trueType && version != 0x4F54544F) throw new InvalidDataException("not a TrueType or OpenType font"); // 'OTTO'
@@ -133,7 +142,8 @@ namespace CADability
             }
             // a TrueType font without outlines is a bitmap font (e.g. color emoji)
             HasTrueTypeOutlines = trueType && tables.ContainsKey("glyf") && tables.ContainsKey("loca");
-            HasCffOutlines = !trueType && tables.ContainsKey("CFF ");
+            HasCffOutlines = !trueType && (tables.ContainsKey("CFF ") || tables.ContainsKey("CFF2"));
+            IsCff2 = !trueType && !tables.ContainsKey("CFF ") && tables.ContainsKey("CFF2");
             int head = Table("head");
             UnitsPerEm = U16(head + 18);
             if (UnitsPerEm == 0) UnitsPerEm = 1000;
@@ -170,12 +180,52 @@ namespace CADability
             }
             IsBold = bold;
             IsItalic = italic;
-            ReadNames(out string family, out string subfamily, out string full, out string typographicFamily);
-            FamilyName = family ?? "";
-            SubfamilyName = subfamily ?? "";
-            FullName = full ?? FamilyName;
-            TypographicFamilyName = typographicFamily ?? FamilyName;
+            ReadNames();
+            FamilyName = NameOf(1) ?? "";
+            SubfamilyName = NameOf(2) ?? "";
+            FullName = NameOf(4) ?? FamilyName;
+            TypographicFamilyName = NameOf(16) ?? FamilyName;
             SelectCmap();
+            if (tables.ContainsKey("fvar") && (HasTrueTypeOutlines || HasCffOutlines)) variations = new FontVariations(data, tables, NameOf);
+        }
+
+        /// <summary>
+        /// The name with the name ID <paramref name="nameId"/> (Windows US English preferred), null if the font has none.
+        /// </summary>
+        public string NameOf(int nameId)
+        {
+            return names != null && names.TryGetValue(nameId, out string res) ? res : null;
+        }
+        /// <summary>
+        /// True for a variable font ("fvar"). <see cref="NamedInstances"/> are its predefined instances, <see cref="WithVariation"/>
+        /// makes an instance at any coordinates.
+        /// </summary>
+        public bool IsVariable => variations != null;
+        /// <summary>
+        /// The axes of a variable font, empty for other fonts.
+        /// </summary>
+        public VariationAxis[] Axes => variations?.Axes ?? new VariationAxis[0];
+        /// <summary>
+        /// The named instances of a variable font, e.g. "Light Condensed", empty for other fonts.
+        /// </summary>
+        public NamedInstance[] NamedInstances => variations?.Instances ?? new NamedInstance[0];
+        /// <summary>
+        /// The normalized coordinates of this instance, null for the default instance.
+        /// </summary>
+        public double[] NormalizedCoordinates => coords == null ? null : (double[])coords.Clone();
+        /// <summary>
+        /// Returns this variable font at the coordinates <paramref name="userCoordinates"/> (in the units of the axes, e.g. wght
+        /// 300, one value per axis of <see cref="Axes"/>): its glyph outlines and advance widths are varied. The metrics of the
+        /// whole font ("MVAR") stay those of the default instance.
+        /// </summary>
+        public TrueTypeFont WithVariation(double[] userCoordinates)
+        {
+            if (variations == null) throw new InvalidOperationException("The font \"" + FullName + "\" is not a variable font");
+            TrueTypeFont res = new TrueTypeFont(data, fontOffset);
+            res.IsHeaderOnly = IsHeaderOnly;
+            double[] normalized = res.variations.Normalize(userCoordinates);
+            res.coords = normalized.Any(c => c != 0.0) ? normalized : null;
+            return res;
         }
 
         /// <summary>
@@ -226,7 +276,7 @@ namespace CADability
             int numTables = (directory[4] << 8) | directory[5];
             if (numTables > 1000) throw new InvalidDataException("invalid table directory");
             byte[] records = ReadBytes(stream, offset + 12, 16 * numTables);
-            string[] needed = { "head", "hhea", "maxp", "OS/2", "post", "name" };
+            string[] needed = { "head", "hhea", "maxp", "OS/2", "post", "name", "fvar" };
             List<(byte[] record, byte[] content)> copied = new List<(byte[], byte[])>();
             for (int i = 0; i < numTables; ++i)
             {
@@ -239,7 +289,7 @@ namespace CADability
                     if (length > stream.Length) throw new InvalidDataException("table " + tag + " exceeds the file");
                     copied.Add((record, ReadBytes(stream, ReadU32(records, 16 * i + 8), (int)length)));
                 }
-                else if (tag == "glyf" || tag == "loca" || tag == "CFF ")
+                else if (tag == "glyf" || tag == "loca" || tag == "CFF " || tag == "CFF2")
                 {   // only their presence matters (HasTrueTypeOutlines, HasCffOutlines)
                     for (int k = 8; k < 16; ++k) record[k] = 0;
                     copied.Add((record, new byte[0]));
@@ -303,12 +353,46 @@ namespace CADability
         /// <summary>
         /// Returns the advance width of a glyph in font units.
         /// </summary>
-        public int GetAdvanceWidth(int glyph)
+        public double GetAdvanceWidth(int glyph)
         {
             int hmtx = Table("hmtx");
             if (numberOfHMetrics == 0) return 0;
             int i = Math.Min(glyph, numberOfHMetrics - 1);
-            return U16(hmtx + 4 * i);
+            double advance = U16(hmtx + 4 * i);
+            if (coords != null)
+            {
+                double delta = variations.GetAdvanceDelta(glyph, coords);
+                if (double.IsNaN(delta)) delta = PhantomAdvanceDelta(glyph); // no HVAR: the phantom points of gvar
+                advance += delta; // fractional: the exact value of the instance
+            }
+            return advance;
+        }
+        private int LeftSideBearing(int glyph)
+        {
+            int hmtx = Table("hmtx");
+            if (glyph < numberOfHMetrics) return S16(hmtx + 4 * glyph + 2);
+            return S16(hmtx + 4 * numberOfHMetrics + 2 * (glyph - numberOfHMetrics));
+        }
+        /// <summary>
+        /// The change of the advance width from the deltas of the two horizontal phantom points in "gvar".
+        /// </summary>
+        private double PhantomAdvanceDelta(int glyph)
+        {
+            if (!HasTrueTypeOutlines) return 0.0;
+            int g = GlyphOffset(glyph, out int length);
+            int pointCount = 0;
+            int xMin = 0;
+            if (length > 0)
+            {
+                int numberOfContours = S16(g);
+                xMin = S16(g + 2);
+                if (numberOfContours >= 0) pointCount = numberOfContours == 0 ? 0 : U16(g + 10 + 2 * (numberOfContours - 1)) + 1;
+                else pointCount = CompositeComponents(g).Count;
+            }
+            double[] x = new double[pointCount + 4], y = new double[pointCount + 4], dx = new double[pointCount + 4], dy = new double[pointCount + 4];
+            x[pointCount] = xMin - LeftSideBearing(glyph);
+            variations.AddGlyphDeltas(glyph, x, y, null, coords, dx, dy);
+            return dx[pointCount + 1] - dx[pointCount];
         }
         /// <summary>
         /// Returns the kerning between two glyphs in font units from the "kern" table, 0 if there is none. Kerning that only
@@ -464,10 +548,18 @@ namespace CADability
             if (!HasCffOutlines) throw new NotSupportedException("The font \"" + FullName + "\" has no CFF outlines");
             if (cff == null)
             {
-                var t = tables["CFF "];
-                cff = new CffOutlines(data, t.offset, t.length, UnitsPerEm);
+                if (IsCff2)
+                {
+                    var t = tables["CFF2"];
+                    cff = new CffOutlines(data, t.offset, t.length, UnitsPerEm, variations);
+                }
+                else
+                {
+                    var t = tables["CFF "];
+                    cff = new CffOutlines(data, t.offset, t.length, UnitsPerEm);
+                }
             }
-            cff.Draw(glyph, sink);
+            cff.Draw(glyph, sink, coords);
         }
         /// <summary>
         /// Collects an outline as GDI+ path data (see <see cref="GetPathData(int, out PointF[], out byte[])"/>).
@@ -527,9 +619,11 @@ namespace CADability
                 start = -1;
             }
         }
-        private void AddContours(int glyph, List<GlyphPoint[]> res, int depth)
+        /// <summary>
+        /// The position of a glyph in the "glyf" table and its length, 0 for an empty glyph.
+        /// </summary>
+        private int GlyphOffset(int glyph, out int length)
         {
-            if (glyph < 0 || glyph >= numGlyphs || depth > 8) return; // a deeper nesting is a broken (or malicious) font
             int loca = Table("loca");
             int start, end;
             if (longLoca)
@@ -542,15 +636,21 @@ namespace CADability
                 start = 2 * U16(loca + 2 * glyph);
                 end = 2 * U16(loca + 2 * glyph + 2);
             }
-            if (end <= start) return; // an empty glyph, e.g. the space
             var glyf = tables["glyf"];
             if (end > glyf.length) throw new InvalidDataException("glyph " + glyph + " exceeds the glyf table");
-            int g = glyf.offset + start;
-            int numberOfContours = S16(g);
-            if (numberOfContours >= 0) ReadSimpleGlyph(g, numberOfContours, res);
-            else ReadCompositeGlyph(g, res, depth);
+            length = Math.Max(0, end - start);
+            return glyf.offset + start;
         }
-        private void ReadSimpleGlyph(int g, int numberOfContours, List<GlyphPoint[]> res)
+        private void AddContours(int glyph, List<GlyphPoint[]> res, int depth)
+        {
+            if (glyph < 0 || glyph >= numGlyphs || depth > 8) return; // a deeper nesting is a broken (or malicious) font
+            int g = GlyphOffset(glyph, out int length);
+            if (length == 0) return; // an empty glyph, e.g. the space
+            int numberOfContours = S16(g);
+            if (numberOfContours >= 0) ReadSimpleGlyph(glyph, g, numberOfContours, res);
+            else ReadCompositeGlyph(glyph, g, res, depth);
+        }
+        private void ReadSimpleGlyph(int glyph, int g, int numberOfContours, List<GlyphPoint[]> res)
         {
             int pos = g + 10;
             int[] endPts = new int[numberOfContours];
@@ -570,7 +670,7 @@ namespace CADability
                     for (int r = 0; r < repeat && i < numPoints; ++r) flags[i++] = f;
                 }
             }
-            int[] xs = new int[numPoints], ys = new int[numPoints];
+            double[] xs = new double[numPoints], ys = new double[numPoints];
             int v = 0;
             for (int i = 0; i < numPoints; ++i)
             {
@@ -587,6 +687,20 @@ namespace CADability
                 else if ((f & 0x20) == 0) { v += S16(pos); pos += 2; }
                 ys[i] = v;
             }
+            if (coords != null)
+            {   // a variable font: add the deltas of "gvar", with four phantom points after the points of the glyph
+                double[] x = new double[numPoints + 4], y = new double[numPoints + 4], dx = new double[numPoints + 4], dy = new double[numPoints + 4];
+                Array.Copy(xs, x, numPoints);
+                Array.Copy(ys, y, numPoints);
+                x[numPoints] = S16(g + 2) - LeftSideBearing(glyph);
+                x[numPoints + 1] = x[numPoints] + U16(Table("hmtx") + 4 * Math.Min(glyph, numberOfHMetrics - 1));
+                variations.AddGlyphDeltas(glyph, x, y, endPts, coords, dx, dy);
+                for (int i = 0; i < numPoints; ++i)
+                {
+                    xs[i] += dx[i];
+                    ys[i] += dy[i];
+                }
+            }
             int startPoint = 0;
             for (int c = 0; c < numberOfContours; ++c)
             {
@@ -598,62 +712,99 @@ namespace CADability
                 startPoint = endPts[c] + 1;
             }
         }
-        private void ReadCompositeGlyph(int g, List<GlyphPoint[]> res, int depth)
+        private struct Component
         {
+            public int Flags, Glyph, Arg1, Arg2;
+            public double A, B, C, D;
+        }
+        private List<Component> CompositeComponents(int g)
+        {
+            List<Component> res = new List<Component>();
             int pos = g + 10;
             int flags;
             do
             {
-                flags = U16(pos);
-                int component = U16(pos + 2);
+                Component comp = new Component { A = 1, D = 1 };
+                flags = comp.Flags = U16(pos);
+                comp.Glyph = U16(pos + 2);
                 pos += 4;
-                int arg1, arg2;
                 if ((flags & 1) != 0) // ARG_1_AND_2_ARE_WORDS
                 {
-                    arg1 = S16(pos);
-                    arg2 = S16(pos + 2);
+                    comp.Arg1 = S16(pos);
+                    comp.Arg2 = S16(pos + 2);
                     pos += 4;
                 }
                 else if ((flags & 2) != 0)
                 {   // offsets are signed
-                    arg1 = (sbyte)data[pos];
-                    arg2 = (sbyte)data[pos + 1];
+                    comp.Arg1 = (sbyte)data[pos];
+                    comp.Arg2 = (sbyte)data[pos + 1];
                     pos += 2;
                 }
                 else
                 {   // point numbers are unsigned
-                    arg1 = data[pos];
-                    arg2 = data[pos + 1];
+                    comp.Arg1 = data[pos];
+                    comp.Arg2 = data[pos + 1];
                     pos += 2;
                 }
-                double a = 1, b = 0, c = 0, d = 1;
                 if ((flags & 0x8) != 0) // WE_HAVE_A_SCALE
                 {
-                    a = d = F2Dot14(pos);
+                    comp.A = comp.D = F2Dot14(pos);
                     pos += 2;
                 }
                 else if ((flags & 0x40) != 0) // WE_HAVE_AN_X_AND_Y_SCALE
                 {
-                    a = F2Dot14(pos);
-                    d = F2Dot14(pos + 2);
+                    comp.A = F2Dot14(pos);
+                    comp.D = F2Dot14(pos + 2);
                     pos += 4;
                 }
                 else if ((flags & 0x80) != 0) // WE_HAVE_A_TWO_BY_TWO
                 {
-                    a = F2Dot14(pos);
-                    b = F2Dot14(pos + 2);
-                    c = F2Dot14(pos + 4);
-                    d = F2Dot14(pos + 6);
+                    comp.A = F2Dot14(pos);
+                    comp.B = F2Dot14(pos + 2);
+                    comp.C = F2Dot14(pos + 4);
+                    comp.D = F2Dot14(pos + 6);
                     pos += 8;
                 }
-                List<GlyphPoint[]> parts = new List<GlyphPoint[]>();
-                AddContours(component, parts, depth + 1);
-                double dx = 0, dy = 0;
-                if ((flags & 2) != 0) // ARGS_ARE_XY_VALUES
+                res.Add(comp);
+            } while ((flags & 0x20) != 0); // MORE_COMPONENTS
+            return res;
+        }
+        private void ReadCompositeGlyph(int glyph, int g, List<GlyphPoint[]> res, int depth)
+        {
+            List<Component> components = CompositeComponents(g);
+            double[] offsetX = new double[components.Count], offsetY = new double[components.Count];
+            for (int i = 0; i < components.Count; ++i)
+            {
+                offsetX[i] = components[i].Arg1;
+                offsetY[i] = components[i].Arg2;
+            }
+            if (coords != null)
+            {   // a variable font: "gvar" has one delta per component (for its offset) and four for the phantom points
+                int n = components.Count;
+                double[] x = new double[n + 4], y = new double[n + 4], dx = new double[n + 4], dy = new double[n + 4];
+                Array.Copy(offsetX, x, n);
+                Array.Copy(offsetY, y, n);
+                x[n] = S16(g + 2) - LeftSideBearing(glyph);
+                variations.AddGlyphDeltas(glyph, x, y, null, coords, dx, dy);
+                for (int i = 0; i < n; ++i)
                 {
-                    dx = arg1;
-                    dy = arg2;
-                    if ((flags & 0x800) != 0) // SCALED_COMPONENT_OFFSET: the offset is transformed as well
+                    if ((components[i].Flags & 2) == 0) continue; // point matching has no offset to vary
+                    offsetX[i] += dx[i];
+                    offsetY[i] += dy[i];
+                }
+            }
+            for (int ci = 0; ci < components.Count; ++ci)
+            {
+                Component comp = components[ci];
+                double a = comp.A, b = comp.B, c = comp.C, d = comp.D;
+                List<GlyphPoint[]> parts = new List<GlyphPoint[]>();
+                AddContours(comp.Glyph, parts, depth + 1);
+                double dx = 0, dy = 0;
+                if ((comp.Flags & 2) != 0) // ARGS_ARE_XY_VALUES
+                {
+                    dx = offsetX[ci];
+                    dy = offsetY[ci];
+                    if ((comp.Flags & 0x800) != 0) // SCALED_COMPONENT_OFFSET: the offset is transformed as well
                     {
                         double tx = a * dx + c * dy, ty = b * dx + d * dy;
                         dx = tx;
@@ -662,7 +813,7 @@ namespace CADability
                 }
                 else
                 {   // the component is placed by matching a point of the glyph so far (arg1) with a point of the component (arg2)
-                    GlyphPoint? p1 = PointByIndex(res, arg1), p2 = PointByIndex(parts, arg2);
+                    GlyphPoint? p1 = PointByIndex(res, comp.Arg1), p2 = PointByIndex(parts, comp.Arg2);
                     if (p1.HasValue && p2.HasValue)
                     {
                         dx = p1.Value.X - (a * p2.Value.X + c * p2.Value.Y);
@@ -679,7 +830,7 @@ namespace CADability
                     }
                     res.Add(moved);
                 }
-            } while ((flags & 0x20) != 0); // MORE_COMPONENTS
+            }
         }
         private static GlyphPoint? PointByIndex(List<GlyphPoint[]> contours, int index)
         {
@@ -808,45 +959,30 @@ namespace CADability
             return res;
         }
 
-        private void ReadNames(out string family, out string subfamily, out string full, out string typographicFamily)
+        private void ReadNames()
         {
-            family = subfamily = full = typographicFamily = null;
+            names = new Dictionary<int, string>();
             if (!tables.TryGetValue("name", out var name)) return;
             int count = U16(name.offset + 2);
             int strings = name.offset + U16(name.offset + 4);
             // per name ID: the rank of the record found so far (Windows US English is best)
-            Dictionary<int, (int rank, string value)> found = new Dictionary<int, (int, string)>();
+            Dictionary<int, int> rankOf = new Dictionary<int, int>();
             for (int i = 0; i < count; ++i)
             {
                 int rec = name.offset + 6 + 12 * i;
                 int platform = U16(rec), encoding = U16(rec + 2), language = U16(rec + 4), nameId = U16(rec + 6);
-                if (nameId != 1 && nameId != 2 && nameId != 4 && nameId != 16) continue;
+                if (nameId == 0 || (nameId > 25 && nameId < 256)) continue; // only the names CADability uses (families, styles, instances)
                 int length = U16(rec + 8), offset = strings + U16(rec + 10);
                 if (offset + length > data.Length) continue;
                 int rank;
-                string value;
-                if (platform == 3 && (encoding == 1 || encoding == 0 || encoding == 10))
-                {
-                    rank = language == 0x409 ? 0 : 1;
-                    value = Encoding.BigEndianUnicode.GetString(data, offset, length);
-                }
-                else if (platform == 0)
-                {
-                    rank = 2;
-                    value = Encoding.BigEndianUnicode.GetString(data, offset, length);
-                }
-                else if (platform == 1 && encoding == 0)
-                {
-                    rank = 3;
-                    value = Encoding.ASCII.GetString(data, offset, length);
-                }
+                if (platform == 3 && (encoding == 1 || encoding == 0 || encoding == 10)) rank = language == 0x409 ? 0 : 1;
+                else if (platform == 0) rank = 2;
+                else if (platform == 1 && encoding == 0) rank = 3;
                 else continue;
-                if (!found.TryGetValue(nameId, out var old) || rank < old.rank) found[nameId] = (rank, value);
+                if (rankOf.TryGetValue(nameId, out int old) && old <= rank) continue;
+                rankOf[nameId] = rank;
+                names[nameId] = rank == 3 ? Encoding.ASCII.GetString(data, offset, length) : Encoding.BigEndianUnicode.GetString(data, offset, length);
             }
-            if (found.TryGetValue(1, out var f)) family = f.value;
-            if (found.TryGetValue(2, out var s)) subfamily = s.value;
-            if (found.TryGetValue(4, out var u)) full = u.value;
-            if (found.TryGetValue(16, out var t)) typographicFamily = t.value;
         }
 
         private int Table(string tag)

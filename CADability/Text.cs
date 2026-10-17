@@ -5,14 +5,6 @@ using CADability.Shapes;
 using CADability.UserInterface;
 using System;
 using System.Collections.Generic;
-// some work to do to implement text for webassembly
-//#if WEBASSEMBLY
-//using CADability.WebDrawing;
-//using Point = CADability.WebDrawing.Point;
-//#else
-//using System.Drawing;
-//using Point = System.Drawing.Point;
-//#endif
 using System.Drawing;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -529,13 +521,19 @@ namespace CADability.GeoObject
                 return null;
             }
         }
+        // The caches are shared by all threads that measure or paint text, and Clear may empty them at any time: every access
+        // goes through lock (this). The lock is reentrant, Get and GetCenterLines call GetOutline2D. The faces are locked
+        // separately and always after this, so the two locks are taken in the same order everywhere.
         public Path2D[] GetOutline2D(string fontName, int fontStyle, char c, out double width)
         {
-            FontFace face = GetFace(fontName, fontStyle);
-            width = face.GetAdvanceWidth(c);
-            face.GetGlyphPath(c, (fontStyle & 4) != 0, (fontStyle & 8) != 0, out PointF[] points, out byte[] types);
-            if (points.Length == 0) return new Path2D[0];
-            return GlyphShapeBuilder.PathDataToPath2D(points, types, FontPrecision);
+            lock (this)
+            {
+                FontFace face = GetFace(fontName, fontStyle);
+                width = face.GetAdvanceWidth(c);
+                face.GetGlyphPath(c, (fontStyle & 4) != 0, (fontStyle & 8) != 0, out PointF[] points, out byte[] types);
+                if (points.Length == 0) return new Path2D[0];
+                return GlyphShapeBuilder.PathDataToPath2D(points, types, FontPrecision);
+            }
         }
         public CompoundShape Get(string font, int fontStyle, char c, out double width)
         {   // soll verschwinden!!
@@ -558,7 +556,10 @@ namespace CADability.GeoObject
         }
         public double GetKerning(string font, int fontStyle, char a, char b)
         {
-            return GetFace(font, fontStyle).GetKerning(a, b);
+            lock (this)
+            {
+                return GetFace(font, fontStyle).GetKerning(a, b);
+            }
         }
         public IPaintTo3DList Get(string font, int fontStyle, char c, out double width, IPaintTo3D paintTo3D)
         {
@@ -738,17 +739,32 @@ namespace CADability.GeoObject
             }
             return painted;
         }
+        /// <summary>
+        /// Disposes the cached glyph display lists and empties all caches. The glyphs are recorded again with the
+        /// <see cref="IPaintTo3D"/> that paints them next.
+        /// </summary>
         public void Clear()
         {
             lock (this)
             {
+                foreach (DictVal val in cache.Values)
+                {
+                    val.list?.Dispose();
+                }
                 cache.Clear();
                 centerLineCache.Clear();
                 fontCharacteristicsCache.Clear();
+                lock (faces) faces.Clear();
             }
-            lock (faces) faces.Clear();
         }
         public GeoObjectList GetCenterLines(string font, int fontStyle, char c, out double width)
+        {
+            lock (this)
+            {
+                return ReadCenterLines(font, fontStyle, c, out width);
+            }
+        }
+        private GeoObjectList ReadCenterLines(string font, int fontStyle, char c, out double width)
         {
             CenterLineVal found;
             if (!centerLineCache.TryGetValue(new DictKey(font, fontStyle, c), out found))
@@ -944,6 +960,19 @@ namespace CADability.GeoObject
         /// Provide a delegate here if you want your Text derived class to be created each time CADability creates a text.
         /// </summary>
         public static ConstructionDelegate Constructor;
+        /// <summary>
+        /// Releases the display lists of the text glyphs, which are shared by all texts and all views, and empties the
+        /// font cache. Call it when the <see cref="IPaintTo3D"/> that recorded the glyphs can no longer be used, i.e. when the
+        /// renderer is switched or its graphics device was lost. The glyph lists are disposed with
+        /// <see cref="IPaintTo3DList.Dispose"/>, so call it while the old renderer can still handle that (e.g. with its OpenGL
+        /// context current), or make its lists ignore a lost device.
+        /// The display lists of the models contain the glyph lists, so they must be rebuilt as well, see
+        /// <see cref="ProjectedModel.InvalidateDisplayLists"/>.
+        /// </summary>
+        public static void ClearFontCache()
+        {
+            FontCache.GlobalFontCache.Clear();
+        }
         /// <summary>
         /// The only way to create a text: there are no public constructors. Calls <see cref="Constructor"/> when one is
         /// registered, otherwise creates a <see cref="Text"/>. Set at least <see cref="Font"/>, <see cref="TextString"/>,
@@ -2537,11 +2566,7 @@ namespace CADability.GeoObject
                 }
                 else
                 {
-#if WEBASSEMBLY
-                    paintTo3D.PrepareText(fontName, textString, CADability.WebDrawing.FontStyle.Regular);
-#else
                     paintTo3D.PrepareText(fontName, textString, fontStyle);
-#endif
                 }
             }
         }
@@ -2721,11 +2746,7 @@ namespace CADability.GeoObject
             else
             {
                 string wrapped = GetDisplayString((int)fontStyle); // apply automatic line wrapping here as well
-#if WEBASSEMBLY
-                paintTo3D.Text(lineDirection, glyphDirection, location, fontName, wrapped, CADability.WebDrawing.FontStyle.Regular, alignment, lineAlignment);
-#else
                 paintTo3D.Text(lineDirection, glyphDirection, location, fontName, wrapped, fontStyle, alignment, lineAlignment);
-#endif
             }
         }
         /// <inheritdoc/>

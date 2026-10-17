@@ -1,5 +1,4 @@
-﻿#if !WEBASSEMBLY
-using CADability.Attribute;
+﻿using CADability.Attribute;
 using CADability.GeoObject;
 using System;
 using System.Collections.Generic;
@@ -1281,4 +1280,3 @@ namespace CADability
         }
     }
 }
-#endif

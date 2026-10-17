@@ -21,7 +21,8 @@ namespace CADability
         private static FontProvider current;
         /// <summary>
         /// The font provider the kernel uses. Setting it clears the cached glyphs, so that texts are rebuilt with the new
-        /// provider.
+        /// provider, like <see cref="Text.ClearFontCache"/>: set it before texts are painted, or rebuild the display lists of
+        /// the views afterwards (<see cref="ProjectedModel.InvalidateDisplayLists"/>).
         /// </summary>
         public static FontProvider Current
         {

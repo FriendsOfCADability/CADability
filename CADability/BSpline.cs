@@ -3,13 +3,8 @@ using CADability.Curve2D;
 using CADability.UserInterface;
 using System;
 using System.Collections.Generic;
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-using Point = CADability.WebDrawing.Point;
-#else
 using System.Drawing;
 using Point = System.Drawing.Point;
-#endif
 using System.Runtime.Serialization;
 using System.Threading;
 using MathNet.Numerics.LinearAlgebra.Double;

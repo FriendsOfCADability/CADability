@@ -2808,42 +2808,51 @@ namespace CADability
             if (knots != null) dkn = (knots[knots.Length - 1] - knots[0]) * 1e-6;
             for (int ind = lower; ind < upper; ind++)
             {
-                Polynom diff;
-                if (pw != null && pw[ind] != null)
+                bool rational = pw != null && pw[ind] != null;
+                void candidate(double u)
                 {
-                    diff = px[ind] * px1[ind] - p.x * px1[ind] * pw[ind] + py[ind] * py1[ind] - p.y * py1[ind] * pw[ind];
+                    GeoPoint2D ev;
+                    if (rational)
+                    {
+                        double w = pw[ind].Eval(u);
+                        ev = new GeoPoint2D(px[ind].Eval(u) / w, py[ind].Eval(u) / w);
+                    }
+                    else
+                    {
+                        ev = new GeoPoint2D(px[ind].Eval(u), py[ind].Eval(u));
+                    }
+                    double d = ev | p;
+                    if (d < bestDist)
+                    {
+                        bestDist = d;
+                        res = u;
+                    }
+                }
+                Polynom diff;
+                if (rational)
+                {
+                    // the curve is (px/pw, py/pw), its derivative ((px1*pw - px*pw1)/pw², ...); the connection to p stands
+                    // perpendicular on it where this polynomial, multiplied by pw³, vanishes
+                    diff = (px[ind] - p.x * pw[ind]) * (px1[ind] * pw[ind] - px[ind] * pw1[ind]) + (py[ind] - p.y * pw[ind]) * (py1[ind] * pw[ind] - py[ind] * pw1[ind]);
                 }
                 else
                 {
                     diff = (px[ind] - p.x) * px1[ind] + (py[ind] - p.y) * py1[ind];
                 }
 
-
                 double[] roots = diff.Roots();
 
                 for (int i = 0; i < roots.Length; i++)
                 {
-                    if (knots == null || (roots[i] >= knots[ind] - dkn && roots[i] <= knots[ind + 1] + dkn))
-                    {
-                        GeoPoint2D ev;
-                        if (pw != null && pw[ind] != null)
-                        {
-                            double w = pw[ind].Eval(roots[i]);
-                            ev = new GeoPoint2D(px[ind].Eval(roots[i]) / w, py[ind].Eval(roots[i]) / w);
-
-                        }
-                        else
-                        {
-                            ev = new GeoPoint2D(px[ind].Eval(roots[i]), py[ind].Eval(roots[i]));
-                        }
-
-                        double d = ev | p;
-                        if (d < bestDist)
-                        {
-                            bestDist = d;
-                            res = roots[i];
-                        }
-                    }
+                    if (knots == null || (roots[i] >= knots[ind] - dkn && roots[i] <= knots[ind + 1] + dkn)) candidate(roots[i]);
+                }
+                // The closest point of a span may also be one of its ends, where the connection to p need not be
+                // perpendicular to the curve. And where the derivative vanishes at the end of a span (coinciding poles,
+                // issue 173), diff has a multiple root there, which Roots does not find reliably.
+                if (knots != null)
+                {
+                    candidate(knots[ind]);
+                    candidate(knots[ind + 1]);
                 }
             }
             dist = bestDist;

@@ -9,11 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using static CADability.BRepOperation;
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-#else
 using Color = System.Drawing.Color;
-#endif
 
 /* SO GEHTS WEITER:
  * Die Triangulierung der beteiligten Faces muss vermieden werden, dauert zu lange.
@@ -9744,6 +9740,38 @@ namespace CADability
             }
         }
         /// <summary>
+        /// The vertex for a point on the border of <paramref name="face1"/> or <paramref name="face2"/>, which the intersection of their
+        /// surfaces added to the intersection points, e.g. a point where two crossing cylinders of the same radius touch each other and
+        /// their intersection curves meet. When the point is a vertex of one of the faces, that vertex is returned. When it lies on an
+        /// edge of one of the faces, the edge is split there: the intersection curves end on that edge, although the edge did not
+        /// intersect the other face, because it only touches it within the precision, like the seam of the wider of two crossing
+        /// cylinders, whose radii differ by less than the precision (issue #458). Returns null, when the point is neither.
+        /// </summary>
+        private Vertex VertexOnBorder(Face face1, Face face2, GeoPoint p)
+        {
+            foreach (Face face in new[] { face1, face2 })
+            {
+                foreach (Vertex vtx in face.Vertices)
+                {
+                    if ((vtx.Position | p) < precision) return vtx;
+                }
+            }
+            foreach (Face face in new[] { face1, face2 })
+            {
+                foreach (Edge edge in face.AllEdges)
+                {
+                    if (edge.Curve3D == null || edge.Curve3D.DistanceTo(p) >= precision) continue;
+                    double pos = edge.Curve3D.PositionOf(p);
+                    double prec = precision / edge.Curve3D.Length * 2.0;
+                    if (pos <= prec || pos >= 1 - prec) continue;
+                    Vertex v = new Vertex(edge.Curve3D.PointAt(pos));
+                    edge.Split(new SortedList<double, Vertex> { { pos, v } }, precision);
+                    return v;
+                }
+            }
+            return null;
+        }
+        /// <summary>
         /// The surfaces of the two faces are tangential along the intersection curve <paramref name="curve"/>. Returns true, when they
         /// only touch there: the surface of <paramref name="face1"/> stays on one side of the surface of <paramref name="face2"/> on both
         /// sides of the curve, like a cylinder lying on a plane. Such a curve is no intersection edge: it would split the face of the plane
@@ -9940,7 +9968,17 @@ namespace CADability
                         // This happens e.g. when two cylinders with the same diameter intersect or in general there is a touching point, which was not in points
                         for (int i = usedVertices.Count; i < points.Count; i++)
                         {
-                            if (!item.Key.face1.Contains(ref paramsuvsurf1[i], false) || !item.Key.face2.Contains(ref paramsuvsurf2[i], false))
+                            Vertex v = null;
+                            bool valid = item.Key.face1.Contains(ref paramsuvsurf1[i], false) && item.Key.face2.Contains(ref paramsuvsurf2[i], false);
+                            if (!valid && item.Key.face1.Contains(ref paramsuvsurf1[i], true) && item.Key.face2.Contains(ref paramsuvsurf2[i], true))
+                            {   // on the border of a face: valid, where it is a vertex of the faces or lies on one of their edges, but not,
+                                // where one of the intersection points already is, which would make an edge of length 0
+                                bool known = false;
+                                for (int j = 0; j < i && !known; j++) known = (usedVertices[j].Position | points[i]) < precision;
+                                if (!known) v = VertexOnBorder(item.Key.face1, item.Key.face2, points[i]);
+                                valid = v != null;
+                            }
+                            if (!valid)
                             {
                                 for (int j = 0; j < c3ds.Length; j++)
                                 {
@@ -9948,8 +9986,7 @@ namespace CADability
                                                                       // but in order to keep points and usedVertices in sync, we still have to add a vertex to usedVertices
                                 }
                             }
-                            Vertex v = new Vertex(points[i]);
-                            usedVertices.Add(v);
+                            usedVertices.Add(v ?? new Vertex(points[i]));
                         }
                     }
                     for (int i = 0; i < c3ds.Length; i++) // meist nur eine Kurve

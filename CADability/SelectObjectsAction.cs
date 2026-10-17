@@ -307,6 +307,11 @@ namespace CADability.Actions
 		/// e.g. after zooming in, the selection must be made again, or it no longer lies on the curve.
 		/// </summary>
 		private double displayListModelPrecision;
+		/// <summary>
+		/// The <see cref="Model.displayListGeneration"/> of the model when <see cref="displayList"/> was made. It changes when
+		/// the host invalidates all display lists, e.g. after the graphics device was lost: the list must be made again then.
+		/// </summary>
+		private int displayListModelGeneration;
 
 		private GeoPoint2D fixPoint; // der Fixpunkt beim Ziehen an den Handles
 		private BoundingRect orgExtend; // Ausdehunug der original Objekte beim Ziehen
@@ -547,10 +552,12 @@ namespace CADability.Actions
 					// on every other repaint
 					Model selectionModel = (selectedObjects.Count > 0 ? GetGeoObjectModel(selectedObjects[0]) : null) ?? View.Model;
 					double modelPrecision = selectionModel != null ? selectionModel.displayListPrecision : 0.0;
-					if (modelPrecision != displayListModelPrecision) displayList = null;
+					int modelGeneration = selectionModel != null ? selectionModel.displayListGeneration : 0;
+					if (modelPrecision != displayListModelPrecision || modelGeneration != displayListModelGeneration) displayList = null;
 					if (displayList == null)
 					{
 						displayListModelPrecision = modelPrecision;
+						displayListModelGeneration = modelGeneration;
 						PaintToSelect.OpenList("selected");
 						foreach (IGeoObject go in selectedObjects)
 						{

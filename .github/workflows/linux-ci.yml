@@ -58,6 +58,15 @@ jobs:
           --logger "trx;LogFileName=CADability.ImportTests.trx"
           --results-directory TestResults
 
+      - name: Run the kernel as WebAssembly
+        # CADability.dll in the browser runtime of .NET, under Node.js (preinstalled on the runner): fonts from bytes,
+        # solids, text, pictures, painting through an IPaintTo3D of its own, old project files, import and export.
+        # The exit code is the number of failed checks.
+        if: success() || failure()
+        run: |
+          dotnet build tests/CADability.WasmSmoke/CADability.WasmSmoke.csproj -c Release
+          node tests/CADability.WasmSmoke/bin/Release/net10.0/wwwroot/main.mjs
+
       - name: Upload test results
         if: success() || failure()
         uses: actions/upload-artifact@v4

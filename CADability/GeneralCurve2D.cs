@@ -1038,20 +1038,25 @@ namespace CADability.Curve2D
 					}
 				}
 			}
+			// The polynomial form is evaluated with the knot values as parameters, which costs precision where they are
+			// large, and its roots miss the foot points on spans whose derivative vanishes at an end (coinciding poles,
+			// issue 173). The perpendicular foot on the curve itself may fail where the polynomial form succeeds. So both are computed and the
+			// closer one is taken.
+			double explicitRes = double.NaN;
+			double explicitDist = double.MaxValue;
 			if (this is IExplicitPCurve2D explicitP)
 			{
 				ExplicitPCurve2D explicitPCurve2D = explicitP.GetExplicitPCurve2D();
 				if (explicitPCurve2D != null)
 				{
-					if (ind >= 0)
+					double epos, dist;
+					if (ind >= 0) epos = explicitPCurve2D.PositionOf(p, out dist, interparam[ind], interparam[ind + 1]);
+					else epos = explicitPCurve2D.PositionOf(p, out dist);
+					if (dist < double.MaxValue)
 					{
-						double epos = explicitPCurve2D.PositionOf(p, out double dist, interparam[ind], interparam[ind + 1]);
-						if (dist < double.MaxValue) return explicitPCurve2D.NormaliseParameter(epos);
-					}
-					else
-					{
-						double epos = explicitPCurve2D.PositionOf(p, out double dist);
-						if (dist < double.MaxValue) return explicitPCurve2D.NormaliseParameter(epos);
+						explicitRes = explicitPCurve2D.NormaliseParameter(epos);
+						explicitDist = PointAt(explicitRes) | p;
+						if (explicitDist == 0.0) return explicitRes;
 					}
 				}
 			}
@@ -1065,6 +1070,7 @@ namespace CADability.Curve2D
 			{
 				found = FindPerpendicularFoot(p, 0.0, 1.0, StartPoint, EndPoint, StartDirection.ToRight(), EndDirection.ToRight(), out res);
 			}
+			if (!double.IsNaN(explicitRes) && (!found || explicitDist <= (PointAt(res) | p))) return explicitRes;
 			if (!found)
 			{
 				double ds = p | StartPoint;

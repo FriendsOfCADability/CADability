@@ -1,5 +1,4 @@
-﻿#if !WEBASSEMBLY
-using CADability.Attribute;
+﻿using CADability.Attribute;
 using CADability.Shapes;
 using System;
 using System.Collections;
@@ -365,4 +364,3 @@ namespace CADability
 #endregion
     }
 }
-#endif

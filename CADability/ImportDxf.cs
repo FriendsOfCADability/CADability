@@ -14,13 +14,8 @@ using CADability.Shapes;
 using CADability.Curve2D;
 using CADability.Attribute;
 using PlaneSurface = CADability.GeoObject.PlaneSurface;
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-using Point = CADability.WebDrawing.Point;
-#else
 using System.Drawing;
 using Color = System.Drawing.Color;
-#endif
 
 namespace CADability.DXF
 {

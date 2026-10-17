@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using CADability.GeoObject;
 using CADability.Substitutes;
 // with UseWindowsForms (the Windows build of the tests), System.Windows.Forms has a PaintEventArgs as well
@@ -74,9 +73,9 @@ namespace CADability.Tests
         [TestMethod]
         public void ClearingTheFontCacheDisposesTheGlyphLists()
         {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) Assert.Inconclusive("the font cache needs GDI, which is only available on Windows");
+            // the font cache gets its fonts from FontProvider.Current and no longer needs GDI (issue #412)
             FontCache fontCache = new FontCache();
-            string[] dictionaries = { "cache", "centerLineCache", "fontCharacteristicsCache", "kerning" };
+            string[] dictionaries = { "cache", "centerLineCache", "fontCharacteristicsCache", "faces" };
             IDictionary cache = Dictionary(fontCache, "cache");
             Type dictKey = typeof(FontCache).GetNestedType("DictKey", BindingFlags.NonPublic);
             Type dictVal = typeof(FontCache).GetNestedType("DictVal", BindingFlags.NonPublic);
@@ -88,8 +87,8 @@ namespace CADability.Tests
             object withoutList = Activator.CreateInstance(dictVal); // e.g. a space: the list is null
             dictVal.GetField("listCreated").SetValue(withoutList, true);
             cache[Activator.CreateInstance(dictKey, "Arial", 0, ' ')] = withoutList;
-            Type kerningKey = typeof(FontCache).GetNestedType("KerningKey", BindingFlags.NonPublic);
-            Dictionary(fontCache, "kerning")[Activator.CreateInstance(kerningKey, "Arial", 0)] = new Dictionary<(char Left, char Right), double>();
+            Type fontKey = typeof(FontCache).GetNestedType("FontKey", BindingFlags.NonPublic);
+            Dictionary(fontCache, "faces")[Activator.CreateInstance(fontKey, "Arial", 0)] = null;
 
             fontCache.Clear();
 

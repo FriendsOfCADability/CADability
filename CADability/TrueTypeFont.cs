@@ -66,18 +66,32 @@ namespace CADability
         public int Ascender { get; }
         public int Descender { get; }
         public int LineGap { get; }
-        public int WinAscent { get; }
-        public int WinDescent { get; }
+        public int WinAscent { get; private set; }
+        public int WinDescent { get; private set; }
         /// <summary>
-        /// The top of the underline above the baseline in font units (negative: below), from the "post" table.
+        /// The typographic ascender, descender (negative) and line gap of the "OS/2" table.
         /// </summary>
-        public int UnderlinePosition { get; }
-        public int UnderlineThickness { get; }
+        public int TypoAscender { get; private set; }
+        public int TypoDescender { get; private set; }
+        public int TypoLineGap { get; private set; }
         /// <summary>
-        /// The top of the strikeout line above the baseline in font units, from the "OS/2" table.
+        /// True if the font asks for its typographic metrics to be used for the line layout (USE_TYPO_METRICS, bit 7 of
+        /// fsSelection in "OS/2"), as GDI+ does: then they are the cell and the line spacing instead of usWinAscent and
+        /// usWinDescent. Bahnschrift, Cascadia, Sitka and Cambria Math are such fonts.
         /// </summary>
-        public int StrikeoutPosition { get; }
-        public int StrikeoutSize { get; }
+        public bool UseTypoMetrics { get; }
+        /// <summary>
+        /// The middle of the underline above the baseline in font units (negative: below), from the "post" table. GDI+ centers
+        /// the underline on it.
+        /// </summary>
+        public int UnderlinePosition { get; private set; }
+        public int UnderlineThickness { get; private set; }
+        /// <summary>
+        /// The middle of the strikeout line above the baseline in font units, from the "OS/2" table. GDI+ centers the
+        /// strikeout line on it.
+        /// </summary>
+        public int StrikeoutPosition { get; private set; }
+        public int StrikeoutSize { get; private set; }
         /// <summary>
         /// True for a font read by <see cref="ReadHeaders"/>: it knows its names, style and metrics, but has no glyphs.
         /// </summary>
@@ -102,21 +116,25 @@ namespace CADability
         public int GlyphCount => numGlyphs;
 
         /// <summary>
-        /// The ascent of the character cell in font units, as GDI and GDI+ use it for TrueType fonts (usWinAscent).
+        /// The ascent of the character cell in font units, as GDI+ uses it: usWinAscent, or the typographic ascender when
+        /// <see cref="UseTypoMetrics"/> is set.
         /// </summary>
-        public int CellAscent => WinAscent;
+        public int CellAscent => UseTypoMetrics ? TypoAscender : WinAscent;
         /// <summary>
-        /// The descent of the character cell in font units, positive downwards (usWinDescent).
+        /// The descent of the character cell in font units, positive downwards: usWinDescent, or the typographic descender
+        /// when <see cref="UseTypoMetrics"/> is set.
         /// </summary>
-        public int CellDescent => WinDescent;
+        public int CellDescent => UseTypoMetrics ? -TypoDescender : WinDescent;
         /// <summary>
-        /// The distance between two lines in font units, computed like GDI does: the cell height plus the external leading,
-        /// which is the part of the line gap of the "hhea" table that is not already part of the cell.
+        /// The distance between two lines in font units, computed like GDI+ does. With <see cref="UseTypoMetrics"/> it is the
+        /// typographic ascender, descender and line gap. Otherwise it is the cell height plus the external leading, which is
+        /// the part of the line gap of the "hhea" table that is not already part of the cell.
         /// </summary>
         public int LineSpacing
         {
             get
             {
+                if (UseTypoMetrics) return TypoAscender - TypoDescender + TypoLineGap;
                 int cell = WinAscent + WinDescent;
                 int external = Math.Max(0, LineGap - (cell - (Ascender - Descender)));
                 return cell + external;
@@ -170,6 +188,10 @@ namespace CADability
                 int fsSelection = U16(os2.offset + 62);
                 italic = (fsSelection & 1) != 0;
                 bold = (fsSelection & 0x20) != 0;
+                TypoAscender = S16(os2.offset + 68);
+                TypoDescender = S16(os2.offset + 70);
+                TypoLineGap = S16(os2.offset + 72);
+                UseTypoMetrics = (fsSelection & 0x80) != 0 && TypoAscender - TypoDescender > 0;
                 WinAscent = U16(os2.offset + 74);
                 WinDescent = U16(os2.offset + 76);
             }
@@ -210,6 +232,12 @@ namespace CADability
         /// </summary>
         public NamedInstance[] NamedInstances => variations?.Instances ?? new NamedInstance[0];
         /// <summary>
+        /// The name of a named instance as Windows makes it from the style attributes ("STAT"), e.g. "Display Light" for an
+        /// instance of Segoe UI Variable whose subfamily name in "fvar" is "Light Display". The subfamily name of "fvar" when
+        /// the font has no usable "STAT" table.
+        /// </summary>
+        public string InstanceName(NamedInstance instance) => variations?.StatInstanceName(instance.Coordinates) ?? instance.SubfamilyName;
+        /// <summary>
         /// The normalized coordinates of this instance, null for the default instance.
         /// </summary>
         public double[] NormalizedCoordinates => coords == null ? null : (double[])coords.Clone();
@@ -225,6 +253,19 @@ namespace CADability
             res.IsHeaderOnly = IsHeaderOnly;
             double[] normalized = res.variations.Normalize(userCoordinates);
             res.coords = normalized.Any(c => c != 0.0) ? normalized : null;
+            if (res.coords != null)
+            {   // the font wide metrics of the instance ("MVAR"), rounded like the values of the tables
+                int Varied(int value, string tag) => (int)Math.Floor(value + res.variations.GetMetricDelta(tag, res.coords) + 0.5);
+                res.TypoAscender = Varied(res.TypoAscender, "hasc");
+                res.TypoDescender = Varied(res.TypoDescender, "hdsc");
+                res.TypoLineGap = Varied(res.TypoLineGap, "hlgp");
+                res.WinAscent = Varied(res.WinAscent, "hcla");
+                res.WinDescent = Varied(res.WinDescent, "hcld");
+                res.UnderlinePosition = Varied(res.UnderlinePosition, "undo");
+                res.UnderlineThickness = Varied(res.UnderlineThickness, "unds");
+                res.StrikeoutPosition = Varied(res.StrikeoutPosition, "stro");
+                res.StrikeoutSize = Varied(res.StrikeoutSize, "strs");
+            }
             return res;
         }
 
@@ -276,7 +317,7 @@ namespace CADability
             int numTables = (directory[4] << 8) | directory[5];
             if (numTables > 1000) throw new InvalidDataException("invalid table directory");
             byte[] records = ReadBytes(stream, offset + 12, 16 * numTables);
-            string[] needed = { "head", "hhea", "maxp", "OS/2", "post", "name", "fvar" };
+            string[] needed = { "head", "hhea", "maxp", "OS/2", "post", "name", "fvar", "STAT" };
             List<(byte[] record, byte[] content)> copied = new List<(byte[], byte[])>();
             for (int i = 0; i < numTables; ++i)
             {
@@ -378,7 +419,16 @@ namespace CADability
         /// </summary>
         private double PhantomAdvanceDelta(int glyph)
         {
-            if (!HasTrueTypeOutlines) return 0.0;
+            PhantomDeltas(glyph, out double left, out double right);
+            return right - left;
+        }
+        /// <summary>
+        /// The deltas of "gvar" for the two horizontal phantom points (the origin and the advance) of a glyph.
+        /// </summary>
+        private void PhantomDeltas(int glyph, out double left, out double right)
+        {
+            left = right = 0.0;
+            if (!HasTrueTypeOutlines || coords == null) return;
             int g = GlyphOffset(glyph, out int length);
             int pointCount = 0;
             int xMin = 0;
@@ -392,7 +442,28 @@ namespace CADability
             double[] x = new double[pointCount + 4], y = new double[pointCount + 4], dx = new double[pointCount + 4], dy = new double[pointCount + 4];
             x[pointCount] = xMin - LeftSideBearing(glyph);
             variations.AddGlyphDeltas(glyph, x, y, null, coords, dx, dy);
-            return dx[pointCount + 1] - dx[pointCount];
+            left = dx[pointCount];
+            right = dx[pointCount + 1];
+        }
+        /// <summary>
+        /// The x coordinate of the origin of a glyph in the coordinates of "glyf": the first phantom point, xMin of the glyph
+        /// minus its left side bearing from "hmtx". It is 0 in almost every font. When it is not, the rasterizers of Windows
+        /// and FreeType (and fontTools) move the outline so that the origin is at 0, which puts the glyph at its left side
+        /// bearing. Times New Roman Italic and Symbol have such glyphs. A composite glyph with USE_MY_METRICS has the origin
+        /// of that component.
+        /// </summary>
+        private double HorizontalOrigin(int glyph, int depth = 0)
+        {
+            int g = GlyphOffset(glyph, out int length);
+            if (length == 0) return 0.0; // no outline to move
+            if (S16(g) < 0 && depth < 8)
+            {   // a composite glyph with USE_MY_METRICS takes the metrics, and so the origin, of that component (Times New
+                // Roman Bold 'Ü' has another left side bearing than its 'U', and Windows draws it like the 'U')
+                foreach (Component component in CompositeComponents(g))
+                    if ((component.Flags & 0x200) != 0) return HorizontalOrigin(component.Glyph, depth + 1);
+            }
+            PhantomDeltas(glyph, out double left, out _);
+            return S16(g + 2) - LeftSideBearing(glyph) + left;
         }
         /// <summary>
         /// Returns the kerning between two glyphs in font units from the "kern" table, 0 if there is none. Kerning that only
@@ -414,7 +485,8 @@ namespace CADability
         }
 
         /// <summary>
-        /// Returns the contours of a glyph in font units (y upwards), with the components of a composite glyph resolved.
+        /// Returns the contours of a glyph in font units (y upwards), with the components of a composite glyph resolved and the
+        /// origin of the glyph at x = 0 (see <see cref="HorizontalOrigin"/>).
         /// </summary>
         public List<GlyphPoint[]> GetContours(int glyph)
         {
@@ -422,6 +494,12 @@ namespace CADability
             if (IsHeaderOnly) throw new InvalidOperationException("The font \"" + FullName + "\" was read by ReadHeaders and has no glyphs, load it with Load");
             List<GlyphPoint[]> res = new List<GlyphPoint[]>();
             AddContours(glyph, res, 0);
+            double origin = glyph >= 0 && glyph < numGlyphs ? HorizontalOrigin(glyph) : 0.0;
+            if (origin != 0.0)
+            {
+                foreach (GlyphPoint[] contour in res)
+                    for (int i = 0; i < contour.Length; ++i) contour[i] = new GlyphPoint(contour[i].X - origin, contour[i].Y, contour[i].OnCurve);
+            }
             return res;
         }
 
@@ -524,10 +602,11 @@ namespace CADability
                 }
                 tps[tps.Count - 1] |= 0x80;
             }
-            void AddBar(int top, int thickness)
-            {
+            void AddBar(int middle, int thickness)
+            {   // centered on the position, as GDI+ does
                 if (thickness <= 0) return;
                 double width = GetAdvanceWidth(glyph);
+                double top = middle + thickness / 2.0;
                 pts.Add(Map(0, top)); tps.Add(0);
                 pts.Add(Map(width, top)); tps.Add(1);
                 pts.Add(Map(width, top - thickness)); tps.Add(1);

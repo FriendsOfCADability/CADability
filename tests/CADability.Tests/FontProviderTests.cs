@@ -118,10 +118,14 @@ namespace CADability.Tests
                 Assert.AreEqual(plain.Length + 1, underlined.Length);
                 Assert.AreEqual(plain.Length + 2, both.Length);
                 Assert.AreEqual(w1, w2);
-                // the underline is below the baseline (y = 1 - CellAscent/em after PathDataToPath2D)
+                // the underline is centered on the underline position of "post", as GDI+ does it (the baseline is at
+                // y = 1 - CellAscent/em after PathDataToPath2D)
                 FontFace face = FontCache.GlobalFontCache.GetFace("Liberation Sans", 0);
-                double baseline = 1.0 - face.CellAscent / (double)face.EmHeight;
-                Assert.IsTrue(underlined.Last().GetExtent().Top < baseline);
+                TrueTypeFont font = ((ManagedFontFace)face).Font;
+                double em = face.EmHeight, baseline = 1.0 - face.CellAscent / em;
+                BoundingRect bar = underlined.Last().GetExtent();
+                Assert.AreEqual(baseline + font.UnderlinePosition / em, (bar.Top + bar.Bottom) / 2.0, 1e-5);
+                Assert.AreEqual(font.UnderlineThickness / em, bar.Top - bar.Bottom, 1e-5);
             });
         }
 

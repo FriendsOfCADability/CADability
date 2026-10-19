@@ -40,8 +40,58 @@ static class Program
             }
         }
         Console.WriteLine();
-        foreach (string fam in noItalic.Take(8)) Measure(fam, false, true);
-        foreach (string fam in noBold.Take(8)) Measure(fam, true, false);
+        string[] plain = { "Microsoft Sans Serif", "Lucida Console", "Gabriola", "Ink Free", "Lucida Sans Unicode", "Impact", "Javanese Text", "Segoe UI Historic" };
+        foreach (string fam in plain) { if (noBold.Contains(fam)) Bold(fam); else Console.WriteLine($"{fam}: has bold or is missing"); }
+        Measure("Microsoft Sans Serif", false, true);
+    }
+
+    // what GDI+ AddString does for synthetic bold, at the em size 1 of the old kernel code and at the em size em
+    static void Bold(string family)
+    {
+        using FontFamily ff = new FontFamily(family);
+        int em = ff.GetEmHeight(FontStyle.Regular), asc = ff.GetCellAscent(FontStyle.Regular);
+        Console.WriteLine($"=== {family} bold, em {em} ascent {asc}");
+        foreach (float size in new[] { 1.0f, (float)em })
+        {
+            foreach (char c in "Il")
+            {
+                var r = GdiPlusAt(ff, FontStyle.Regular, c, size).Select(p => (p.x * em / size, p.y * em / size)).ToList();
+                var b = GdiPlusAt(ff, FontStyle.Bold, c, size).Select(p => (p.x * em / size, p.y * em / size)).ToList();
+                string pts(List<(double x, double y)> l) => string.Join(" ", l.Take(14).Select(p => $"({p.x:F1},{p.y:F1})"));
+                Console.WriteLine($"  size {size} '{c}' regular n {r.Count}: {pts(r)}");
+                Console.WriteLine($"  size {size} '{c}' bold    n {b.Count}: {pts(b)}");
+            }
+        }
+        // the advance width the old kernel took: GetCharABCWidths with the bold GDI+ font selected (em height as pixel size)
+        foreach (char c in "Ilo")
+        {
+            int wr = GdiAdvance(ff, FontStyle.Regular, em, c), wb = GdiAdvance(ff, FontStyle.Bold, em, c);
+            Console.WriteLine($"  advance '{c}' regular {wr} bold {wb}");
+        }
+        foreach (char c in "Ho")
+        {
+            var r = GdiOutline(family, em, 400, false, c, out GLYPHMETRICS gr);
+            var s = GdiOutline(family, em, 700, false, c, out GLYPHMETRICS gs);
+            Console.WriteLine($"  GDI '{c}' adv {gr.cx}->{gs.cx} box x {gr.ox}..{gr.ox + gr.bx} -> {gs.ox}..{gs.ox + gs.bx} y {gr.oy - (int)gr.by}..{gr.oy} -> {gs.oy - (int)gs.by}..{gs.oy} points {r.Count}/{s.Count}");
+        }
+    }
+    static List<(double x, double y)> GdiPlusAt(FontFamily ff, FontStyle style, char c, float size)
+    {
+        using GraphicsPath path = new GraphicsPath();
+        using StringFormat sf = (StringFormat)StringFormat.GenericTypographic.Clone();
+        path.AddString(c.ToString(), ff, (int)style, size, new PointF(0, 0), sf);
+        if (path.PointCount == 0) return new List<(double, double)>();
+        return path.PathPoints.Select(p => ((double)p.X, (double)p.Y)).ToList();
+    }
+    [StructLayout(LayoutKind.Sequential)] struct ABC { public int a; public uint b; public int c; }
+    [DllImport("gdi32.dll", EntryPoint = "GetCharABCWidthsW")] static extern bool GetCharABCWidths(IntPtr hdc, uint first, uint last, [Out] ABC[] abc);
+    static int GdiAdvance(FontFamily ff, FontStyle style, int em, char c)
+    {
+        IntPtr hdc = CreateCompatibleDC(IntPtr.Zero);
+        using Font font = new Font(ff, em, style, GraphicsUnit.Pixel);
+        IntPtr hf = font.ToHfont(), old = SelectObject(hdc, hf);
+        try { ABC[] abc = new ABC[1]; GetCharABCWidths(hdc, c, c, abc); return abc[0].a + (int)abc[0].b + abc[0].c; }
+        finally { SelectObject(hdc, old); DeleteObject(hf); DeleteDC(hdc); }
     }
 
     static void Measure(string family, bool bold, bool italic)

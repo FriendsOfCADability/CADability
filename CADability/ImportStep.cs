@@ -414,6 +414,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 		HashSet<Item> products = new HashSet<Item>();
 		HashSet<Item> mappedItems = new HashSet<Item>();
 		private Dictionary<int, string> importProblems;
+		private System.Collections.Concurrent.ConcurrentDictionary<int, Item> waitingFor = new System.Collections.Concurrent.ConcurrentDictionary<int, Item>(); // thread id -> item the thread waits for in CreateEntity
 		private List<Item> notImportedFaces;
 		private Dictionary<string, ColorDef> definedColors;
 		private System.Collections.Concurrent.ConcurrentDictionary<string, IGeoObject> namedGeoObjects = new System.Collections.Concurrent.ConcurrentDictionary<string, IGeoObject>();
@@ -694,6 +695,10 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 			public object val;
 			public Dictionary<string, Item> parameter;
 			public int definingIndex;
+			/// <summary>
+			/// Managed thread id of the thread that is creating this item in <see cref="CreateEntity"/>, 0 when none
+			/// </summary>
+			public volatile int creatingThread;
 #if DEBUG
 			public List<Item> usedBy;
 			public void SetUsedBy(Item item)
@@ -2322,12 +2327,22 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 #endif
 			if (!(item.val is List<Item>)) return item.val; // already created, maybe null
 			if (defind >= 0) item.definingIndex = defind;
-			lock (item) // no problem is not parallel
+			if (!EnterCreation(item)) return null; // cyclic reference, the threads would wait for each other
+			bool creating = false;
+			try
 			{
+				if (!(item.val is List<Item>)) return item.val; // already created, maybe null
+				if (item.creatingThread == Environment.CurrentManagedThreadId)
+				{   // cyclic reference: this item is already being created further up on this thread, creating it again
+					// would recurse until the stack overflows (#487)
+					ReportCyclicReference(item);
+					return null;
+				}
+				item.creatingThread = Environment.CurrentManagedThreadId;
+				creating = true;
 #if DEBUG
 				lock (definitionStack) definitionStack.Push(item.definingIndex);
 #endif
-				if (!(item.val is List<Item>)) return item.val; // already created, maybe null
 				if (item.type == Item.ItemType.advancedFace || item.type == Item.ItemType.faceSurface || item.type == Item.ItemType.curveBoundedSurface) CreatingFace();
 				switch (item.type)
 				{
@@ -4631,11 +4646,60 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 							break;
 						}
 				}
-#if DEBUG
-				lock (definitionStack) definitionStack.Pop();
-#endif
 				return item.val; // has now been created
-			} // end lock
+			}
+			finally
+			{
+				if (creating)
+				{
+					item.creatingThread = 0;
+#if DEBUG
+					lock (definitionStack) definitionStack.Pop();
+#endif
+				}
+				Monitor.Exit(item);
+			}
+		}
+
+		/// <summary>
+		/// Acquires the lock of <paramref name="item"/> for <see cref="CreateEntity"/>. Returns false, without the lock, when
+		/// the thread that holds it waits, directly or through other threads, for an item this thread is creating: in a
+		/// reference cycle that was entered from different ends by the parallel import, the threads would wait for each
+		/// other forever (#487).
+		/// </summary>
+		private bool EnterCreation(Item item)
+		{
+			if (Monitor.TryEnter(item)) return true;
+			int me = Environment.CurrentManagedThreadId;
+			waitingFor[me] = item;
+			try
+			{
+				while (!Monitor.TryEnter(item, 10))
+				{
+					Item waitedFor = item;
+					for (int i = 0; i <= waitingFor.Count; i++)
+					{
+						int owner = waitedFor.creatingThread;
+						if (owner == 0) break; // not known yet or already done, try again
+						if (owner == me)
+						{
+							ReportCyclicReference(item);
+							return false;
+						}
+						if (!waitingFor.TryGetValue(owner, out waitedFor)) break; // the owner is working, not waiting
+					}
+				}
+				return true;
+			}
+			finally
+			{
+				waitingFor.TryRemove(me, out _);
+			}
+		}
+
+		private void ReportCyclicReference(Item item)
+		{
+			lock (importProblems) importProblems[item.definingIndex] = "cyclic reference";
 		}
 
 		private void AvoidDuplicateColorNames(ColorDef cd)

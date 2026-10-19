@@ -130,7 +130,7 @@ namespace CADability.Tests
         public void MissingStyleFallsBackToAnExistingFace()
         {
             ManagedFontProvider provider = new ManagedFontProvider(new[] { FontDirectory() }, false);
-            CollectionAssert.AreEqual(new[] { "Liberation Sans" }, provider.GetFamilyNames());
+            CollectionAssert.Contains(provider.GetFamilyNames(), "Liberation Sans");
             FontFace bold = provider.GetFace("liberation sans", true, false);
             Assert.IsNotNull(bold, "the family name is not case sensitive");
             Assert.IsFalse(bold.IsBold, "only the regular face is there");

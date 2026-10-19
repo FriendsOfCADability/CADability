@@ -336,7 +336,53 @@ namespace CADability
         private AnimatedView[] ser_animatedViews;
         private Layout[] ser_layouts;
         private GDI2DView[] ser_gdiViews;
-        internal PrintDocument printDocument; // das PrintDocument zum Drucken, enthält die Druckereinstellungen
+        private PrintDocument printDocument; // das PrintDocument zum Drucken, enthält die Druckereinstellungen; created on demand (Windows)
+        private PageSetup defaultPageSetup; // the page settings as long as there is no printDocument
+        /// <summary>
+        /// The page settings of the project for printing, which are saved with the project. Null if none have been set: then
+        /// the printer's defaults are used. On Windows they are also changed by the page setup and printer dialogs.
+        /// </summary>
+        public PageSetup DefaultPageSetup
+        {
+            get
+            {
+                if (printDocument != null)
+                {
+                    try
+                    {
+                        return PageSetup.FromPageSettings(printDocument.DefaultPageSettings);
+                    }
+                    catch (InvalidPrinterException) { } // no printer installed: the settings that were read or set
+                }
+                return defaultPageSetup?.Clone();
+            }
+            set
+            {
+                defaultPageSetup = value?.Clone();
+                printDocument = null; // made again from the new settings when needed
+            }
+        }
+        /// <summary>
+        /// The print document with the page settings of the project, created from <see cref="DefaultPageSetup"/> when it is
+        /// first needed (Windows only).
+        /// </summary>
+        internal PrintDocument PrintDocument
+        {
+            get
+            {
+                if (printDocument == null)
+                {
+                    PrintDocument created = new PrintDocument();
+                    try
+                    {
+                        defaultPageSetup?.ApplyTo(created);
+                    }
+                    catch (InvalidPrinterException) { } // no printer installed: its defaults
+                    printDocument = created;
+                }
+                return printDocument;
+            }
+        }
         /// <summary>
         /// Creates an empty Project. The empty project contains clones of the globally defined
         /// attributes and attribute lists (like colors, layers etc.)
@@ -1477,24 +1523,32 @@ namespace CADability
         }
 
         /// <summary>
-        /// Reads the GDI+ bitmaps of pictures and icons in binary project files of CADability 1.x as
-        /// <see cref="LegacyImageData"/>, i.e. as their image file bytes, so that such files open without GDI+ (issue #412).
-        /// All other types are bound as usual.
+        /// Reads the GDI+ objects in binary project files of CADability 1.x without GDI+ (issue #412): the bitmaps of pictures
+        /// and icons as <see cref="LegacyImageData"/>, i.e. as their image file bytes, and the page settings with all their
+        /// parts as <see cref="LegacyPrintingData"/>, from which a <see cref="PageSetup"/> is made. All other types are bound
+        /// as usual.
         /// </summary>
-        private class LegacyImageBinder : SerializationBinder
+        private class LegacySystemDrawingBinder : SerializationBinder
         {
             public override Type BindToType(string assemblyName, string typeName)
             {
-                if (LegacyImageData.IsGdiImageType(typeName) && assemblyName.StartsWith("System.Drawing")) return typeof(LegacyImageData);
-                return null; // the formatter's own binding
+                return BindLegacySystemDrawing(assemblyName, typeName); // null: the formatter's own binding
             }
+        }
+        private static Type BindLegacySystemDrawing(string assemblyName, string typeName)
+        {
+            if (assemblyName == null || !assemblyName.StartsWith("System.Drawing")) return null;
+            if (LegacyImageData.IsGdiImageType(typeName)) return typeof(LegacyImageData);
+            if (LegacyPrintingData.IsPrintingType(typeName)) return typeof(LegacyPrintingData);
+            return null;
         }
         private class CondorSerializationBinder : SerializationBinder
         {
             public override Type BindToType(string assemblyName, string typeName)
             {
                 System.Diagnostics.Trace.WriteLine("BindToType: " + assemblyName + ", " + typeName);
-                if (LegacyImageData.IsGdiImageType(typeName) && assemblyName.StartsWith("System.Drawing")) return typeof(LegacyImageData);
+                Type legacy = BindLegacySystemDrawing(assemblyName, typeName);
+                if (legacy != null) return legacy;
                 // Diese Zeilen dienen dazu alte CONDOR Dateien lesbar zu machen.
                 // evtl. machen sie Schwierigkeiten, wenn Objekte von anderen Modulen
                 // deserialisiert werden sollen. Dann müsste man weiter unten es wieder 
@@ -1664,7 +1718,7 @@ namespace CADability
 #if FW2
             formatter.Binder = new CondorSerializationBinder(); // das soll hier gleich laufen, damit nicht versucht wird die CADability.dll zu laden
 #else
-            formatter.Binder = new LegacyImageBinder();
+            formatter.Binder = new LegacySystemDrawingBinder();
 #endif
             long startPosition = stream.Position;
             try
@@ -2599,17 +2653,10 @@ namespace CADability
             }
             if (info.MemberCount > 12) // to avoid exceptions
             {
-                try
+                foreach (SerializationEntry entry in info)
                 {
-                    PageSettings ps = (PageSettings)info.GetValue("DefaultPageSettings", typeof(PageSettings));
-                    if (printDocument == null) printDocument = new PrintDocument();
-                    printDocument.DefaultPageSettings = ps;
-                }
-                catch (SerializationException)
-                {
-                }
-                catch (Exception e) when (IsSystemDrawingUnavailable(e))
-                {
+                    if (entry.Name == "DefaultPageSetup") defaultPageSetup = entry.Value as PageSetup;
+                    else if (entry.Name == "DefaultPageSettings" && defaultPageSetup == null) defaultPageSetup = PageSetup.FromSerialized(entry.Value); // 1.x
                 }
             }
             base.resourceIdInternal = "ProjectSettings";
@@ -2669,10 +2716,9 @@ namespace CADability
             info.AddValue("FilterList", filterList);
             info.AddValue("AnimatedViews", animatedViews.ToArray());
             info.AddValue("ActiveViewName", activeViewName);
-            if (!Settings.GlobalSettings.GetBoolValue("DontSave.System.Drawing", false))
-            {
-                if (printDocument != null) info.AddValue("DefaultPageSettings", printDocument.DefaultPageSettings);
-            }
+            // the neutral page settings, not the GDI+ PageSettings, which cannot be serialized on .NET Core (issue #412)
+            PageSetup pageSetup = DefaultPageSetup;
+            if (pageSetup != null) info.AddValue("DefaultPageSetup", pageSetup);
         }
         /// <summary>
         /// Implements <see cref="IJsonSerialize.GetObjectData(IJsonWriteData)"/>: writes the models, the active model, the
@@ -2698,10 +2744,9 @@ namespace CADability
             data.AddProperty("FilterList", filterList);
             data.AddProperty("AnimatedViews", animatedViews);
             data.AddProperty("ActiveViewName", activeViewName);
-            if (!Settings.GlobalSettings.GetBoolValue("DontSave.System.Drawing", false))
-            {
-                if (printDocument != null) data.AddProperty("DefaultPageSettings", printDocument.DefaultPageSettings);
-            }
+            // the neutral page settings, not the GDI+ PageSettings, which cannot be serialized on .NET Core (issue #412)
+            PageSetup pageSetup = DefaultPageSetup;
+            if (pageSetup != null) data.AddProperty("DefaultPageSetup", pageSetup);
         }
 
         /// <summary>
@@ -2733,15 +2778,9 @@ namespace CADability
             filterList = data.GetPropertyOrDefault<FilterList>("FilterList");
             animatedViews = data.GetPropertyOrDefault<List<AnimatedView>>("AnimatedViews");
             activeViewName = data.GetPropertyOrDefault<string>("ActiveViewName");
-            try
-            {
-                if (!Settings.GlobalSettings.GetBoolValue("DontSave.System.Drawing", false))
-                {
-                    printDocument = new PrintDocument();
-                    printDocument.DefaultPageSettings = data.GetPropertyOrDefault<PageSettings>("DefaultPageSettings");
-                }
-            }
-            catch (Exception e) when (IsSystemDrawingUnavailable(e)) { }
+            defaultPageSetup = data.GetPropertyOrDefault<PageSetup>("DefaultPageSetup");
+            if (defaultPageSetup == null && data.HasProperty("DefaultPageSettings")) defaultPageSetup = PageSetup.FromSerialized(data.GetProperty<object>("DefaultPageSettings")); // 1.x
+            printDocument = null;
             data.RegisterForSerializationDoneCallback(this);
         }
         /// <summary>

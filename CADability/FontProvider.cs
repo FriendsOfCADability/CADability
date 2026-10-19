@@ -13,26 +13,61 @@ namespace CADability
     /// Provides the fonts for <see cref="Text"/> and dimensions: the names of the font families, their metrics and the outlines
     /// of the glyphs. The kernel gets all fonts from <see cref="Current"/>, which works without any user interface. The default
     /// is a <see cref="ManagedFontProvider"/>, which reads the TrueType font files of the system itself and therefore works on
-    /// every platform. CADability.Forms contains a provider based on GDI (GdiFontProvider) for applications that want the
-    /// fonts exactly as Windows renders them.
+    /// every platform. CADability.Forms contains a provider based on GDI (GdiFontProvider), which gives the fonts exactly as
+    /// CADability showed them on Windows before; as soon as CADability.Forms is used, it makes that provider the default,
+    /// unless the application has set <see cref="Current"/> itself.
     /// </summary>
     public abstract class FontProvider
     {
         private static FontProvider current;
+        private static bool chosenByApplication;
+        private static readonly object sync = new object();
         /// <summary>
         /// The font provider the kernel uses. Setting it clears the cached glyphs, so that texts are rebuilt with the new
         /// provider, like <see cref="Text.ClearFontCache"/>: set it before texts are painted, or rebuild the display lists of
-        /// the views afterwards (<see cref="ProjectedModel.InvalidateDisplayLists"/>).
+        /// the views afterwards (<see cref="ProjectedModel.InvalidateDisplayLists"/>). A provider set here is kept:
+        /// CADability.Forms only replaces the default with its GDI provider while the application has not set one.
         /// </summary>
         public static FontProvider Current
         {
-            get => LazyInitializer.EnsureInitialized(ref current, () => new ManagedFontProvider());
+            get
+            {
+                FontProvider res = Volatile.Read(ref current);
+                if (res != null) return res;
+                lock (sync)
+                {
+                    if (current == null) current = new ManagedFontProvider();
+                    return current;
+                }
+            }
             set
             {
-                current = value ?? throw new ArgumentNullException(nameof(value));
-                FontCache.GlobalFontCache.Clear();
-                Text.ResetFontFamilyNames();
+                if (value == null) throw new ArgumentNullException(nameof(value));
+                lock (sync)
+                {
+                    chosenByApplication = true;
+                    current = value;
+                }
+                ClearCaches();
             }
+        }
+        /// <summary>
+        /// Makes the provider made by <paramref name="create"/> the default, unless the application has set
+        /// <see cref="Current"/> itself. CADability.Forms calls this to use GDI for the fonts, as CADability did before issue #412.
+        /// </summary>
+        internal static void SetDefault(Func<FontProvider> create)
+        {
+            lock (sync)
+            {
+                if (chosenByApplication) return;
+                current = create();
+            }
+            ClearCaches();
+        }
+        private static void ClearCaches()
+        {   // outside the lock: the caches have locks of their own, and a thread holding one of them may ask for Current
+            FontCache.GlobalFontCache.Clear();
+            Text.ResetFontFamilyNames();
         }
         /// <summary>
         /// The names of all font families this provider knows, e.g. for a list to choose from.

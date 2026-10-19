@@ -31,6 +31,17 @@ path = [
 ]
 
 [[annotations]]
+path = [
+	"tests/CADability.Tests/Files/Fonts/LiberationSans-Regular.ttf",
+	"tests/CADability.Tests/Files/Fonts/LiberationSans-Regular.reference.json",
+]
+SPDX-FileCopyrightText = [
+	"2010 Google Corporation with Reserved Font Arimo, Tinos and Cousine",
+	"2012 Red Hat, Inc. with Reserved Font Name Liberation",
+]
+SPDX-License-Identifier = "OFL-1.1"
+
+[[annotations]]
 # Test drawings of R10 and R11/R12 from https://github.com/michal-josef-spacek/CAD-Format-DWG-AC1006
 # and https://github.com/michal-josef-spacek/CAD-Format-DWG-AC1009, renamed after their content.
 path = "tests/CADability.ImportTests/Files/Dwg/**"

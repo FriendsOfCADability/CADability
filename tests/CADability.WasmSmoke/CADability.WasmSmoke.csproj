@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+  <!-- Runs the kernel as WebAssembly under Node.js (issue #412): CADability.dll in the browser runtime of .NET, without
+       GDI+, with a renderer of its own that implements IPaintTo3D, as a browser front end would.
+       dotnet build -c Release, then node bin/Release/net10.0/wwwroot/main.mjs; the exit code is the number of failed checks.
+       No workload is needed. The project is not part of CADability.sln, so building the solution does not need the
+       WebAssembly SDK. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <!-- IPaintTo3D and the CADability API still name GDI+ types like Bitmap and FontStyle; using them in signatures is
+         fine, only creating GDI+ objects fails outside Windows -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\CADability\CADability.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\CADability.Tests\Files\Fonts\LiberationSans-Regular.ttf" LogicalName="LiberationSans-Regular.ttf" />
+    <EmbeddedResource Include="..\CADability.Tests\Files\CDB\pictures-1x.cdb.json" LogicalName="pictures-1x.cdb.json" />
+    <EmbeddedResource Include="..\CADability.Tests\Files\CDB\pagesettings-1x-net48.cdb.json" LogicalName="pagesettings-1x-net48.cdb.json" />
+    <EmbeddedResource Include="..\CADability.Tests\Files\CDB\Volumes.cdb.json" LogicalName="Volumes.cdb.json" />
+    <EmbeddedResource Include="..\CADability.ImportTests\Files\Step\issue101.stp" LogicalName="issue101.stp" />
+  </ItemGroup>
+  <!-- Node.js starts the program with main.mjs, which loads _framework/dotnet.js from the same folder -->
+  <Target Name="CopyNodeEntryPoint" AfterTargets="Build">
+    <Copy SourceFiles="main.mjs" DestinationFolder="$(OutDir)wwwroot" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

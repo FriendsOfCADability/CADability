@@ -28,6 +28,9 @@ namespace CADability.Forms
     /// </summary>
     public class PaintToOpenGL : IPaintTo3D, IPaintTo3DFlatText
     {
+        // texts get their fonts from GDI as before issue #412, unless the application has chosen a font provider
+        static PaintToOpenGL() { GdiFontProvider.MakeDefault(); }
+
         #region IPaintTo3D data
         public static int debugNumTriangles = 0;
         public static Thread MainThread = null;

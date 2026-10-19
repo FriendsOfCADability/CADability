@@ -530,12 +530,33 @@ namespace CADability
         /// </summary>
         public void GetPathData(int glyph, bool underline, bool strikeout, out PointF[] points, out byte[] types)
         {
+            GetPathData(glyph, underline, strikeout, 0.0, 0.0, out points, out types);
+        }
+        /// <summary>
+        /// Like <see cref="GetPathData(int, bool, bool, out PointF[], out byte[])"/>, with the strokes made wider by
+        /// <paramref name="boldX"/> and higher by <paramref name="boldY"/> font units for a synthetic bold face (see
+        /// <see cref="SyntheticFontFace.EmboldenContours"/>). The quadratic outline of TrueType is made wider, before its
+        /// segments become cubic ones, as GDI+ does it; a CFF outline is made wider after it was drawn. The underline and the
+        /// strikeout line are not made wider.
+        /// </summary>
+        internal void GetPathData(int glyph, bool underline, bool strikeout, double boldX, double boldY, out PointF[] points, out byte[] types)
+        {
             List<PointF> pts = new List<PointF>();
             List<byte> tps = new List<byte>();
             double scale = 1.0 / UnitsPerEm;
             PointF Map(double x, double y) => new PointF((float)(x * scale), (float)((CellAscent - y) * scale));
-            if (HasCffOutlines) DrawCff(glyph, new PathDataSink(pts, tps, Map));
-            else foreach (GlyphPoint[] contour in GetContours(glyph))
+            bool bold = boldX > 0 || boldY > 0;
+            if (HasCffOutlines)
+            {
+                DrawCff(glyph, new PathDataSink(pts, tps, Map));
+                if (bold && pts.Count > 0)
+                {
+                    PointF[] wider = SyntheticFontFace.Embolden(pts.ToArray(), tps.ToArray(), boldX * scale, boldY * scale);
+                    pts.Clear();
+                    pts.AddRange(wider);
+                }
+            }
+            else foreach (GlyphPoint[] contour in Emboldened(GetContours(glyph), boldX, boldY))
             {
                 if (contour.Length < 2) continue;
                 int n = contour.Length;
@@ -626,6 +647,18 @@ namespace CADability
             if (strikeout) AddBar(StrikeoutPosition, StrikeoutSize);
             points = pts.ToArray();
             types = tps.ToArray();
+        }
+
+        // the contours made wider for a synthetic bold face, keeping which points are on the curve
+        private static List<GlyphPoint[]> Emboldened(List<GlyphPoint[]> contours, double boldX, double boldY)
+        {
+            if (boldX <= 0 && boldY <= 0) return contours;
+            List<(double x, double y)[]> xy = contours.Select(c => c.Select(p => (p.X, p.Y)).ToArray()).ToList();
+            List<(double x, double y)[]> wider = SyntheticFontFace.EmboldenContours(xy, boldX, boldY);
+            List<GlyphPoint[]> res = new List<GlyphPoint[]>(contours.Count);
+            for (int c = 0; c < contours.Count; ++c)
+                res.Add(contours[c].Select((p, i) => new GlyphPoint(wider[c][i].x, wider[c][i].y, p.OnCurve)).ToArray());
+            return res;
         }
 
         /// <summary>

@@ -7,7 +7,8 @@ namespace CADability.Tests
 {
     /// <summary>
     /// Sends all printable ASCII characters of installed fonts through <see cref="FontCache.Get(string, int, char, out double, IPaintTo3D)"/>
-    /// and checks that every glyph with a closed outline is painted with triangles. Needs Windows (GDI) and the font.
+    /// and checks that every glyph with a closed outline is painted with triangles. Needs the font: Liberation Sans comes with
+    /// the tests (see <see cref="TestFonts"/>), the others are Windows fonts.
     /// </summary>
     [TestClass]
     public class FontCacheGlyphTests
@@ -105,7 +106,6 @@ namespace CADability.Tests
 
         private static string CheckFontAvailable(string fontName)
         {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return "glyph outlines need GDI, which is only available on Windows";
             if (!GeoObject.Text.FontFamilyNames.Contains(fontName.ToUpper()))
             {
                 // name the installed families that start with the same word, which shows a misspelled or a wrong instance name
@@ -145,6 +145,7 @@ namespace CADability.Tests
         }
 
         [DataTestMethod]
+        [DataRow("Liberation Sans")]
         [DataRow("Arial")]
         [DataRow("Calibri")]
         [DataRow("Bahnschrift")]
@@ -179,18 +180,17 @@ namespace CADability.Tests
         {
             if (!System.Diagnostics.Debugger.IsAttached && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CADABILITY_FONT_SURVEY")))
                 Assert.Inconclusive("survey over all installed fonts, takes a few minutes: start it with Debug Test or set CADABILITY_FONT_SURVEY=1");
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) Assert.Inconclusive("glyph outlines need GDI, which is only available on Windows");
             int fontsWithProblems = 0;
-            foreach (FontFamily ff in FontFamily.Families)
+            foreach (string family in FontProvider.Current.GetFamilyNames())
             {
                 try
                 {
-                    var (withoutTriangles, withoutList) = CheckFont(ff.Name, (int)FontStyle.Regular, TestContext);
+                    var (withoutTriangles, withoutList) = CheckFont(family, (int)FontStyle.Regular, TestContext);
                     if (withoutTriangles.Count + withoutList.Count > 0) ++fontsWithProblems;
                 }
                 catch (Exception ex)
                 {
-                    TestContext.WriteLine("{0}: exception {1}", ff.Name, ex.Message);
+                    TestContext.WriteLine("{0}: exception {1}", family, ex.Message);
                     ++fontsWithProblems;
                 }
             }

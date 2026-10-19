@@ -387,6 +387,15 @@ namespace CADability
                 return font.GetKerning(font.GetGlyphIndex(left), font.GetGlyphIndex(right)) / (double)font.UnitsPerEm;
             }
         }
+        /// <summary>
+        /// Like <see cref="GetGlyphPath(int, bool, bool, out PointF[], out byte[])"/>, with the strokes made wider by
+        /// <paramref name="boldX"/> and higher by <paramref name="boldY"/> (in units of the em height) for a synthetic bold
+        /// face, see <see cref="SyntheticFontFace"/>.
+        /// </summary>
+        internal void GetGlyphPath(int codePoint, bool underline, bool strikeout, double boldX, double boldY, out PointF[] points, out byte[] types)
+        {
+            font.GetPathData(font.GetGlyphIndex(codePoint), underline, strikeout, boldX * font.UnitsPerEm, boldY * font.UnitsPerEm, out points, out types);
+        }
         public override void GetGlyphPath(int codePoint, bool underline, bool strikeout, out PointF[] points, out byte[] types)
         {
             font.GetPathData(font.GetGlyphIndex(codePoint), underline, strikeout, out points, out types);

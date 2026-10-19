@@ -40,9 +40,37 @@ static class Program
             }
         }
         Console.WriteLine();
-        string[] plain = { "Microsoft Sans Serif", "Lucida Console", "Gabriola", "Ink Free", "Lucida Sans Unicode", "Impact", "Javanese Text", "Segoe UI Historic" };
-        foreach (string fam in plain) { if (noBold.Contains(fam)) Bold(fam); else Console.WriteLine($"{fam}: has bold or is missing"); }
-        Measure("Microsoft Sans Serif", false, true);
+        // the strength of the synthetic bold of GDI+ against the metrics of the font, for every family without a bold face
+        Console.WriteLine("family | em asc desc linespacing | upem(head) | dxRight dyTop dxLeft dyBottom (glyph I, in font units)");
+        foreach (string fam in noBold)
+        {
+            using FontFamily ff = new FontFamily(fam);
+            int em = ff.GetEmHeight(FontStyle.Regular);
+            foreach (char c in "I|l.")
+            {
+                var r = GdiPlusAt(ff, FontStyle.Regular, c, em);
+                var b = GdiPlusAt(ff, FontStyle.Bold, c, em);
+                if (r.Count == 0 || b.Count == 0) continue;
+                int upem = 0;
+                FontFace face = managed.GetFace(fam, false, false);
+                if (face != null) upem = face.EmHeight;
+                Console.WriteLine($"{fam} | {em} {ff.GetCellAscent(FontStyle.Regular)} {ff.GetCellDescent(FontStyle.Regular)} {ff.GetLineSpacing(FontStyle.Regular)} | {upem} | '{c}' {b.Max(p => p.x) - r.Max(p => p.x):F1} {r.Min(p => p.y) - b.Min(p => p.y):F1} {r.Min(p => p.x) - b.Min(p => p.x):F1} {b.Max(p => p.y) - r.Max(p => p.y):F1}");
+                break;
+            }
+        }
+        // does it depend on the em size requested from AddString, for a font with an em of 1000 and one of 4096
+        foreach (string fam in new[] { "Ink Free", "Gabriola", "Microsoft Sans Serif" })
+        {
+            if (!noBold.Contains(fam)) continue;
+            using FontFamily ff = new FontFamily(fam);
+            int em = ff.GetEmHeight(FontStyle.Regular);
+            foreach (float size in new[] { 1f, 10f, 100f, (float)em, 10000f })
+            {
+                var r = GdiPlusAt(ff, FontStyle.Regular, 'I', size);
+                var b = GdiPlusAt(ff, FontStyle.Bold, 'I', size);
+                Console.WriteLine($"  {fam} size {size}: dxRight {(b.Max(p => p.x) - r.Max(p => p.x)) * em / size:F2} dyTop {(r.Min(p => p.y) - b.Min(p => p.y)) * em / size:F2} (font units)");
+            }
+        }
     }
 
     // what GDI+ AddString does for synthetic bold, at the em size 1 of the old kernel code and at the em size em

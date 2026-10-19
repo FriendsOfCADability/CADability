@@ -61,6 +61,8 @@ namespace CADability.Forms
         private string currenToolTip;
         private string currentCursor;
         private Action<int> callbackCollapsed;
+        // texts get their fonts from GDI as before issue #412, unless the application has chosen a font provider
+        static CadCanvas() { GdiFontProvider.MakeDefault(); }
         public CadCanvas() : base()
         {
             toolTip = new ToolTip();

@@ -9,11 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using static CADability.BRepOperation;
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-#else
 using Color = System.Drawing.Color;
-#endif
 
 /* SO GEHTS WEITER:
  * Die Triangulierung der beteiligten Faces muss vermieden werden, dauert zu lange.
@@ -1535,6 +1531,9 @@ namespace CADability
                 dcfaces.Add(ef.face, ef.face.GetHashCode());
             }
 #endif
+            // First the intersection points of every edge with all faces of the other shell, then the vertices: a grazing contact of an
+            // edge with the other shell can only be recognized with the points on all its faces (#457), see DropGrazingIntersections
+            List<EdgeFaceIntersection> found = new List<EdgeFaceIntersection>();
             foreach (EdgeFaceKey ef in edgesToFaces.Keys)
             {
                 GeoPoint[] ip;
@@ -1550,6 +1549,7 @@ namespace CADability
                 if (ef.edge.PrimaryFace.Surface.SameGeometry(ef.edge.PrimaryFace.Domain, ef.face.Surface, ef.face.Domain, precision, out ModOp2D _)) continue;
                 if (ef.edge.SecondaryFace!=null && ef.edge.SecondaryFace.Surface.SameGeometry(ef.edge.SecondaryFace.Domain, ef.face.Surface, ef.face.Domain, precision, out ModOp2D _)) continue;
                 ef.face.IntersectAndPosition(ef.edge, out ip, out uvOnFace, out uOnCurve3D, out position, precision);
+                int firstOfPair = found.Count;
                 for (int i = 0; i < ip.Length; ++i)
                 {
                     if (uOnCurve3D[i] < -prec || uOnCurve3D[i] > 1.0 + prec || position[i] == Border.Position.Outside)
@@ -1559,92 +1559,350 @@ namespace CADability
                         continue;
                     }
                     SnapTangentialIntersection(ef.edge, ef.face, ref ip[i], ref uvOnFace[i], ref uOnCurve3D[i], ref position[i]);
-                    if (multipleFaces != null)
-                    {   // in multiple face mode we do not want the vertics of the edge to intersect a face, which is connected to this vertex
-                        // this would leed to many intersection points which are not required
-                        // there ist often a tangential intersection at the start or endvertex. In these cases we get imprecise intersection points
-                        // and should handle tangential intersections seperately
-                        bool tangential = Math.Abs(ef.edge.Curve3D.DirectionAt(uOnCurve3D[i]) * ef.face.Surface.GetNormal(uvOnFace[i])) < 0.01;
-                        double maxDist = tangential ? Precision.eps * 1000 : Precision.eps;
-                        //if ((ip[i] | ef.edge.Vertex1.Position) < maxDist && ef.edge.Vertex1.InvolvedFaces.Contains(ef.face)) continue;
-                        //if ((ip[i] | ef.edge.Vertex2.Position) < maxDist && ef.edge.Vertex2.InvolvedFaces.Contains(ef.face)) continue;
-                    }
-                    if (knownIntersections != null)
-                    {   // knownIntersections are often tangential intersections of round fillets. The precision of tangential intersections is often bad,
-                        // so we try to correct those intersection points with the vertices of known intersection edges, so that the connection of intersection edges is kept.
-                        if (Math.Abs(ef.edge.Curve3D.DirectionAt(uOnCurve3D[i]).Normalized * ef.face.Surface.GetNormal(uvOnFace[i]).Normalized) < 1e-3)
-                        {   // a (rather) tangential intersection, maybe we are close to a known intersection. Tangential intersections have a bad precision.
-                            foreach (KeyValuePair<Edge, Tuple<Face, Face>> item in knownIntersections)
+                    found.Add(new EdgeFaceIntersection(ef.edge, ef.face, ip[i], uvOnFace[i], uOnCurve3D[i], position[i]));
+                }
+                if (operation != Operation.testonly) AddGrazingContacts(ef.edge, ef.face, found, firstOfPair);
+                if (operation == Operation.testonly && found.Count > 0) break; // one intersection point is enough
+            }
+            if (operation != Operation.testonly) DropGrazingIntersections(found);
+            foreach (EdgeFaceIntersection efi in found)
+            {
+                Edge edge = efi.Edge;
+                Face face = efi.Face;
+                GeoPoint ip = efi.Point;
+                GeoPoint2D uvOnFace = efi.UV;
+                double uOnCurve3D = efi.U;
+                Border.Position position = efi.Position;
+                double prec = precision / edge.Curve3D.Length;
+                if (multipleFaces != null)
+                {   // in multiple face mode we do not want the vertics of the edge to intersect a face, which is connected to this vertex
+                    // this would leed to many intersection points which are not required
+                    // there ist often a tangential intersection at the start or endvertex. In these cases we get imprecise intersection points
+                    // and should handle tangential intersections seperately
+                    bool tangential = Math.Abs(edge.Curve3D.DirectionAt(uOnCurve3D) * face.Surface.GetNormal(uvOnFace)) < 0.01;
+                    double maxDist = tangential ? Precision.eps * 1000 : Precision.eps;
+                    //if ((ip | edge.Vertex1.Position) < maxDist && edge.Vertex1.InvolvedFaces.Contains(face)) continue;
+                    //if ((ip | edge.Vertex2.Position) < maxDist && edge.Vertex2.InvolvedFaces.Contains(face)) continue;
+                }
+                if (knownIntersections != null)
+                {   // knownIntersections are often tangential intersections of round fillets. The precision of tangential intersections is often bad,
+                    // so we try to correct those intersection points with the vertices of known intersection edges, so that the connection of intersection edges is kept.
+                    if (Math.Abs(edge.Curve3D.DirectionAt(uOnCurve3D).Normalized * face.Surface.GetNormal(uvOnFace).Normalized) < 1e-3)
+                    {   // a (rather) tangential intersection, maybe we are close to a known intersection. Tangential intersections have a bad precision.
+                        foreach (KeyValuePair<Edge, Tuple<Face, Face>> item in knownIntersections)
+                        {
+                            if ((face == item.Value.Item1 && (edge.PrimaryFace == item.Value.Item2 || edge.SecondaryFace == item.Value.Item2)) ||
+                                (face == item.Value.Item2 && (edge.PrimaryFace == item.Value.Item1 || edge.SecondaryFace == item.Value.Item1)))
                             {
-                                if ((ef.face == item.Value.Item1 && (ef.edge.PrimaryFace == item.Value.Item2 || ef.edge.SecondaryFace == item.Value.Item2)) ||
-                                    (ef.face == item.Value.Item2 && (ef.edge.PrimaryFace == item.Value.Item1 || ef.edge.SecondaryFace == item.Value.Item1)))
+                                if ((item.Key.Vertex1.Position | ip) < (item.Key.Vertex2.Position | ip))
                                 {
-                                    if ((item.Key.Vertex1.Position | ip[i]) < (item.Key.Vertex2.Position | ip[i]))
+                                    if ((item.Key.Vertex1.Position | ip) < prec * 100)
                                     {
-                                        if ((item.Key.Vertex1.Position | ip[i]) < prec * 100)
-                                        {
-                                            ip[i] = item.Key.Vertex1.Position;
-                                            uvOnFace[i] = ef.face.PositionOf(ip[i]);
-                                            uOnCurve3D[i] = ef.edge.Curve3D.PositionOf(ip[i]);
-                                        }
+                                        ip = item.Key.Vertex1.Position;
+                                        uvOnFace = face.PositionOf(ip);
+                                        uOnCurve3D = edge.Curve3D.PositionOf(ip);
                                     }
-                                    else
+                                }
+                                else
+                                {
+                                    if ((item.Key.Vertex2.Position | ip) < prec * 100)
                                     {
-                                        if ((item.Key.Vertex2.Position | ip[i]) < prec * 100)
-                                        {
-                                            ip[i] = item.Key.Vertex2.Position;
-                                            uvOnFace[i] = ef.face.PositionOf(ip[i]);
-                                            uOnCurve3D[i] = ef.edge.Curve3D.PositionOf(ip[i]);
-                                        }
+                                        ip = item.Key.Vertex2.Position;
+                                        uvOnFace = face.PositionOf(ip);
+                                        uOnCurve3D = edge.Curve3D.PositionOf(ip);
                                     }
                                 }
                             }
                         }
                     }
-                    Vertex v = new Vertex(ip[i]);
-                    v.AddPositionOnFace(ef.face, uvOnFace[i]);
-                    double deviation = DeviationOfEdge(ef.edge, ip[i]);
-                    if (deviation * MaxToleranceFactor > precision) vertexTolerance[v] = deviation;
-                    IntersectionVertex iv = new IntersectionVertex();
-                    iv.v = v;
-                    iv.edge = ef.edge;
-                    iv.face = ef.face;
-                    iv.uOnEdge = uOnCurve3D[i];
-                    iv.isOnFaceBorder = (position[i] == Border.Position.OnCurve); // das ist für später: Verbindung zweier Schnittpunkte, die beide auf dem Rand liegen, ist nicht sicher innerhalb
-                    if (ef.edge.PrimaryFace.Owner == shell1)
-                    {
-                        iv.edgeIsOn1 = true;
-                        AddFacesToIntersectionVertices(ef.edge.PrimaryFace, ef.face, iv);
-                        AddFacesToIntersectionVertices(ef.edge.SecondaryFace, ef.face, iv);
-                    }
-                    else
-                    {
-                        iv.edgeIsOn1 = false;
-                        AddFacesToIntersectionVertices(ef.face, ef.edge.PrimaryFace, iv);
-                        AddFacesToIntersectionVertices(ef.face, ef.edge.SecondaryFace, iv);
-                    }
-                    intersectionVertices.Add(iv);
-                    if (!edgesToSplit.ContainsKey(ef.edge)) edgesToSplit[ef.edge] = new List<Vertex>();
-                    edgesToSplit[ef.edge].Add(v);
-                    if (position[i] == Border.Position.OnCurve)
-                    {
-                        List<Edge> touchedEdges = ef.face.FindEdges(uvOnFace[i]);
-                        for (int j = 0; j < touchedEdges.Count; j++)
-                        {
-                            if (touchedEdges[j].Curve3D == null) continue; // no poles here
-                            double cprec = prec / touchedEdges[j].Curve3D.Length; // darf natürlich nicht 0 sein!
-                            double pos = touchedEdges[j].Curve3D.PositionOf(v.Position);
-                            if (pos > cprec && pos < 1 - cprec)
-                            {
-                                if (!edgesToSplit.ContainsKey(touchedEdges[j])) edgesToSplit[touchedEdges[j]] = new List<Vertex>();
-                                edgesToSplit[touchedEdges[j]].Add(v);
-                            }
-                        }
-                    }
-                    if (operation == Operation.testonly) return; // ein Schnittpunkt reicht hier
                 }
+                Vertex v = new Vertex(ip);
+                v.AddPositionOnFace(face, uvOnFace);
+                double deviation = DeviationOfEdge(edge, ip);
+                if (deviation * MaxToleranceFactor > precision) vertexTolerance[v] = deviation;
+                IntersectionVertex iv = new IntersectionVertex();
+                iv.v = v;
+                iv.edge = edge;
+                iv.face = face;
+                iv.uOnEdge = uOnCurve3D;
+                iv.isOnFaceBorder = (position == Border.Position.OnCurve); // das ist für später: Verbindung zweier Schnittpunkte, die beide auf dem Rand liegen, ist nicht sicher innerhalb
+                if (edge.PrimaryFace.Owner == shell1)
+                {
+                    iv.edgeIsOn1 = true;
+                    AddFacesToIntersectionVertices(edge.PrimaryFace, face, iv);
+                    AddFacesToIntersectionVertices(edge.SecondaryFace, face, iv);
+                }
+                else
+                {
+                    iv.edgeIsOn1 = false;
+                    AddFacesToIntersectionVertices(face, edge.PrimaryFace, iv);
+                    AddFacesToIntersectionVertices(face, edge.SecondaryFace, iv);
+                }
+                intersectionVertices.Add(iv);
+                if (!edgesToSplit.ContainsKey(edge)) edgesToSplit[edge] = new List<Vertex>();
+                edgesToSplit[edge].Add(v);
+                if (position == Border.Position.OnCurve)
+                {
+                    List<Edge> touchedEdges = face.FindEdges(uvOnFace);
+                    for (int j = 0; j < touchedEdges.Count; j++)
+                    {
+                        if (touchedEdges[j].Curve3D == null) continue; // no poles here
+                        double cprec = prec / touchedEdges[j].Curve3D.Length; // darf natürlich nicht 0 sein!
+                        double pos = touchedEdges[j].Curve3D.PositionOf(v.Position);
+                        if (pos > cprec && pos < 1 - cprec)
+                        {
+                            if (!edgesToSplit.ContainsKey(touchedEdges[j])) edgesToSplit[touchedEdges[j]] = new List<Vertex>();
+                            edgesToSplit[touchedEdges[j]].Add(v);
+                        }
+                        AddToNeighbourOfOverlappingFace(edge, touchedEdges[j].OtherFace(face), iv);
+                    }
+                }
+                if (operation == Operation.testonly) return; // ein Schnittpunkt reicht hier
             }
         }
+        /// <summary>
+        /// An intersection point of an edge of one shell with a face of the other shell, found by <see cref="createEdgeFaceIntersections"/>.
+        /// </summary>
+        private class EdgeFaceIntersection
+        {
+            public readonly Edge Edge;
+            public readonly Face Face;
+            public readonly GeoPoint Point;
+            public readonly GeoPoint2D UV;
+            public readonly double U;
+            public readonly Border.Position Position;
+            public EdgeFaceIntersection(Edge edge, Face face, GeoPoint point, GeoPoint2D uv, double u, Border.Position position)
+            {
+                Edge = edge; Face = face; Point = point; UV = uv; U = u; Position = position;
+            }
+        }
+        /// <summary>
+        /// An edge, which reaches into the other shell by much less than the precision near a tangential contact, cuts its faces twice
+        /// in grazing intersection points, which are far apart along the edge: a box edge 1e-7 deep in a cylinder of radius 5 enters it
+        /// 1e-3 before the line where they touch and leaves it 1e-3 behind it. The intersection of the two surfaces is that contact line
+        /// (they are tangent within the precision), it passes through neither point, and no intersection edge can be made of them. When the
+        /// seam of the cylinder lies on the contact line, the two points even lie on two different faces (issue #457).
+        /// <para>
+        /// Within the precision, the edge only touches the other shell. Two grazing points of an edge, which follow each other along the
+        /// edge, between which the edge stays well within the precision of the surfaces of their faces (<see cref="MaxGrazingDepth"/>), and
+        /// which do not lie on the intersection of these surfaces with a surface of the edge (<see cref="MissesSurfaceIntersection"/>), are
+        /// dropped: the edge is taken as staying just outside of the other shell. Replacing them by the point of contact made the contact
+        /// line an intersection edge, and the union of a cylinder lying on a box lost the box.
+        /// </para>
+        /// </summary>
+        private void DropGrazingIntersections(List<EdgeFaceIntersection> found)
+        {
+            // only the grazing points are candidates; they are looked up by edge and by vertex, so this is linear in the number of
+            // intersection points, which may be thousands for a big model
+            List<EdgeFaceIntersection> grazing = found.Where(f => IsGrazing(f.Edge.Curve3D, f)).ToList();
+            if (grazing.Count < 2) return;
+            HashSet<EdgeFaceIntersection> dropped = new HashSet<EdgeFaceIntersection>();
+            foreach (IGrouping<Edge, EdgeFaceIntersection> onEdge in found.GroupBy(f => f.Edge))
+            {
+                if (onEdge.Count() < 2) continue;
+                Edge edge = onEdge.Key;
+                ICurve curve = edge.Curve3D;
+                List<EdgeFaceIntersection> sorted = onEdge.OrderBy(f => f.U).ToList();
+                for (int i = 0; i < sorted.Count - 1; i++)
+                {
+                    EdgeFaceIntersection a = sorted[i], b = sorted[i + 1];
+                    if (!IsGrazing(curve, a) || !IsGrazing(curve, b)) continue;
+                    if ((a.Point | b.Point) < precision) continue; // these are merged with the vertices anyway
+                    double Distance(double u)
+                    {
+                        GeoPoint p = curve.PointAt(u);
+                        return Math.Min(Math.Abs(a.Face.Surface.GetDistance(p)), Math.Abs(b.Face.Surface.GetDistance(p)));
+                    }
+                    bool within = true;
+                    for (int k = 1; k < 8 && within; k++) within = Distance(a.U + (b.U - a.U) * k / 8.0) < MaxGrazingDepth * precision;
+                    if (!within) continue;
+                    // where the surfaces really intersect in curves through the points (two cylinders of almost the same radius crossing
+                    // each other), the points are needed
+                    if (!MissesSurfaceIntersection(edge, a) && !MissesSurfaceIntersection(edge, b)) continue;
+                    dropped.Add(a);
+                    dropped.Add(b);
+                    ++i; // b is used up
+                }
+            }
+            // A grazing contact across a vertex: the edge is split where it is closest to the other shell, e.g. the circle at the end of a
+            // cylinder at its seam, so each of the two edges has one of the two grazing points.
+            Dictionary<Vertex, List<EdgeFaceIntersection>> atVertex = new Dictionary<Vertex, List<EdgeFaceIntersection>>();
+            foreach (EdgeFaceIntersection g in grazing)
+            {
+                foreach (Vertex vertex in new[] { g.Edge.Vertex1, g.Edge.Vertex2 })
+                {
+                    if (!atVertex.TryGetValue(vertex, out List<EdgeFaceIntersection> list)) atVertex[vertex] = list = new List<EdgeFaceIntersection>();
+                    if (!list.Contains(g)) list.Add(g); // a closed edge has the same vertex twice
+                }
+            }
+            foreach (EdgeFaceIntersection a in grazing)
+            {
+                if (dropped.Contains(a)) continue;
+                foreach (Vertex vertex in new[] { a.Edge.Vertex1, a.Edge.Vertex2 })
+                {
+                    EdgeFaceIntersection partner = null;
+                    foreach (EdgeFaceIntersection b in atVertex[vertex])
+                    {
+                        if (b == a || b.Edge == a.Edge || dropped.Contains(b)) continue;
+                        if ((a.Point | b.Point) < precision) continue;
+                        if (StaysOnSurfaces(a, vertex, a.Face, b.Face) && StaysOnSurfaces(b, vertex, a.Face, b.Face) &&
+                            (MissesSurfaceIntersection(a.Edge, a) || MissesSurfaceIntersection(b.Edge, b)))
+                        {
+                            partner = b;
+                            break;
+                        }
+                    }
+                    if (partner != null)
+                    {
+                        dropped.Add(a);
+                        dropped.Add(partner);
+                        break;
+                    }
+                }
+            }
+            if (dropped.Count > 0) found.RemoveAll(dropped.Contains);
+        }
+        /// <summary>
+        /// Points where <paramref name="edge"/> touches <paramref name="face"/> within a small fraction of the precision
+        /// (<see cref="MaxGrazingDepth"/>) without cutting it, which are found when it touches exactly (issue #457):
+        /// <list type="bullet">
+        /// <item>an end of the edge, where it runs tangentially into the surface and ends in a vertex of a face overlapping the face,
+        /// e.g. the quarter circle at the end of a rounded edge ending on the bottom of a box, which lies 1e-6 below the plane the
+        /// rounding is tangent to and overlaps the bottom of the bar;</item>
+        /// <item>where the edge passes a border of the face, whose other face overlaps a face of the edge, e.g. an edge of the bottom of
+        /// that box passing the tangent edge of the rounding, while the bottom of the box overlaps the bottom of the rounded bar.</item>
+        /// </list>
+        /// Only tangential contacts are added: taking every end of an edge within the precision of a face as an intersection point
+        /// broke other cases. The points of this pair of edge and face are the last ones in <paramref name="found"/>, from
+        /// <paramref name="firstOfPair"/> on.
+        /// </summary>
+        private void AddGrazingContacts(Edge edge, Face face, List<EdgeFaceIntersection> found, int firstOfPair)
+        {
+            ICurve curve = edge.Curve3D;
+            if (curve == null) return;
+            double depth = MaxGrazingDepth * precision;
+            bool Known(GeoPoint p)
+            {   // the points of this pair of edge and face are the last ones in the list, from firstOfPair on
+                for (int i = firstOfPair; i < found.Count; i++) if ((found[i].Point | p) < precision) return true;
+                return false;
+            }
+            void AddIfGrazing(GeoPoint p, double u, bool onBorder)
+            {
+                GeoPoint2D uv = face.Surface.PositionOf(p);
+                SurfaceHelper.AdjustPeriodic(face.Surface, face.Domain, ref uv);
+                Border.Position position = onBorder ? Border.Position.OnCurve : face.Area.GetPosition(uv, precision);
+                if (position == Border.Position.Outside) return;
+                EdgeFaceIntersection efi = new EdgeFaceIntersection(edge, face, p, uv, u, position);
+                if (IsGrazing(curve, efi)) found.Add(efi);
+            }
+            if (faceToOverlappingFaces.TryGetValue(face, out HashSet<Face> overlappingFace))
+            {
+                foreach (double u in new[] { 0.0, 1.0 })
+                {   // only where the edge ends in a vertex of a face overlapping the face, as in SnapTangentialIntersection: the pole of a
+                    // sphere 1e-6 above the bottom of a box it lies in is not a contact
+                    GeoPoint p = curve.PointAt(u);
+                    Vertex vertex = (edge.Vertex1.Position | p) < (edge.Vertex2.Position | p) ? edge.Vertex1 : edge.Vertex2;
+                    if (!vertex.InvolvedFaces.Overlaps(overlappingFace)) continue;
+                    if (Math.Abs(face.Surface.GetDistance(p)) < depth && !Known(p)) AddIfGrazing(p, u, false);
+                }
+            }
+            HashSet<Face> overlappingEdge = new HashSet<Face>();
+            if (faceToOverlappingFaces.TryGetValue(edge.PrimaryFace, out HashSet<Face> ovl)) overlappingEdge.UnionWith(ovl);
+            if (edge.SecondaryFace != null && faceToOverlappingFaces.TryGetValue(edge.SecondaryFace, out ovl)) overlappingEdge.UnionWith(ovl);
+            if (overlappingEdge.Count == 0) return;
+            foreach (Edge border in face.AllEdges)
+            {
+                if (border.Curve3D == null || !overlappingEdge.Contains(border.OtherFace(face))) continue;
+                if (!ClosestPoints(curve, border.Curve3D, out double s, out double t)) continue;
+                GeoPoint p = curve.PointAt(s);
+                if ((p | border.Curve3D.PointAt(t)) < depth && Math.Abs(face.Surface.GetDistance(p)) < depth && !Known(p)) AddIfGrazing(p, s, true);
+            }
+        }
+        /// <summary>
+        /// The positions <paramref name="s"/> on <paramref name="c1"/> and <paramref name="t"/> on <paramref name="c2"/> of the closest
+        /// points of the two curves, both inside the curves, by alternating projection from the closest of some points on c1.
+        /// </summary>
+        private static bool ClosestPoints(ICurve c1, ICurve c2, out double s, out double t)
+        {
+            s = t = 0.0;
+            double best = double.MaxValue;
+            for (int i = 0; i <= 16; i++)
+            {
+                double d = c2.DistanceTo(c1.PointAt(i / 16.0));
+                if (d < best) { best = d; s = i / 16.0; }
+            }
+            for (int i = 0; i < 32; i++)
+            {
+                t = Math.Max(0.0, Math.Min(1.0, c2.PositionOf(c1.PointAt(s))));
+                double sn = Math.Max(0.0, Math.Min(1.0, c1.PositionOf(c2.PointAt(t))));
+                bool done = Math.Abs(sn - s) < 1e-12;
+                s = sn;
+                if (done) break;
+            }
+            return s > 0.0 && s < 1.0 && t > 0.0 && t < 1.0;
+        }
+        /// <summary>
+        /// Whether the edge of <paramref name="efi"/> stays well within the precision of the surface of <paramref name="face1"/> or
+        /// <paramref name="face2"/> from the intersection point to its end in <paramref name="vertex"/>, see <see cref="DropGrazingIntersections"/>.
+        /// </summary>
+        private bool StaysOnSurfaces(EdgeFaceIntersection efi, Vertex vertex, Face face1, Face face2)
+        {
+            ICurve curve = efi.Edge.Curve3D;
+            double end = (curve.StartPoint | vertex.Position) < (curve.EndPoint | vertex.Position) ? 0.0 : 1.0;
+            for (int k = 1; k <= 8; k++)
+            {
+                GeoPoint p = curve.PointAt(efi.U + (end - efi.U) * k / 8.0);
+                if (Math.Min(Math.Abs(face1.Surface.GetDistance(p)), Math.Abs(face2.Surface.GetDistance(p))) >= MaxGrazingDepth * precision) return false;
+            }
+            return true;
+        }
+        /// <summary>
+        /// Whether the intersection of the surface of a face of <paramref name="edge"/> with the surface of the face of <paramref name="efi"/>
+        /// does not pass through the intersection point: the surfaces are tangent within the precision, and their intersection is the
+        /// line where they touch, e.g. the top of a box and a cylinder lying on it.
+        /// </summary>
+        private bool MissesSurfaceIntersection(Edge edge, EdgeFaceIntersection efi)
+        {
+            foreach (Face edgeFace in new[] { edge.PrimaryFace, edge.SecondaryFace })
+            {
+                if (edgeFace == null) continue;
+                List<GeoPoint> points = new List<GeoPoint> { efi.Point };
+                bool intersects;
+                double[,] params3d;
+                try
+                {
+                    intersects = Surfaces.Intersect(edgeFace.Surface, edgeFace.Area.GetExtent(), efi.Face.Surface, efi.Face.Area.GetExtent(), points,
+                        out _, out _, out _, out params3d, out _, out _, out _, out _, precision);
+                }
+                catch (Exception) { continue; }
+                bool onCurve = false;
+                if (intersects && params3d != null)
+                    for (int i = 0; i < params3d.GetLength(0); i++) onCurve |= params3d[i, 0] != double.MinValue;
+                if (!onCurve) return true;
+            }
+            return false;
+        }
+        /// <summary>
+        /// Whether the edge runs almost tangential to the surface of the face at the intersection point <paramref name="efi"/>.
+        /// </summary>
+        private static bool IsGrazing(ICurve curve, EdgeFaceIntersection efi)
+        {
+            GeoVector dir = curve.DirectionAt(efi.U);
+            GeoVector n = efi.Face.Surface.GetNormal(efi.UV);
+            if (Precision.IsNullVector(dir) || Precision.IsNullVector(n)) return false;
+            return Math.Abs(dir.Normalized * n.Normalized) < GrazingCosine;
+        }
+        /// <summary>
+        /// The cosine of the angle between an edge and the normal of a surface below which an intersection point of the edge is grazing.
+        /// An edge which reaches d into a cylinder of radius r near a line of contact meets it with sqrt(2 d / r), 2e-3 for d = 1e-5, r = 5.
+        /// </summary>
+        private const double GrazingCosine = 0.05;
+        /// <summary>
+        /// How deep, relative to the precision, an edge may reach into the other shell between two grazing intersection points, which are
+        /// then taken as a contact, see <see cref="DropGrazingIntersections"/>. Up to about half the precision the surface intersection
+        /// still separates the two intersection curves, as for a box 1e-5 deep in a cylinder with a precision of 1.7e-5.
+        /// </summary>
+        private const double MaxGrazingDepth = 0.25;
         /// <summary>
         /// How far <paramref name="p"/>, a point on the curve of <paramref name="edge"/>, is from the surfaces of the faces of the edge and from
         /// the curves of the edge on these faces, where the edge is split at this point.
@@ -1662,6 +1920,114 @@ namespace CADability
                 if (pos >= 0.0 && pos <= 1.0) res = Math.Max(res, face.Surface.PointAt(c2d.PointAt(pos)) | p);
             }
             return res;
+        }
+        /// <summary>
+        /// <paramref name="iv"/> is an intersection point of <paramref name="edge"/> with a face on its border, which it shares with
+        /// <paramref name="neighbour"/>, so the point also lies on <paramref name="neighbour"/>. The edge is not intersected with
+        /// <paramref name="neighbour"/>, when one of the faces of the edge overlaps it (the edge lies in it); then the point is added
+        /// here for the other face of the edge. E.g. where the tangent edge of a rounding leaves the side of a box whose bottom lies
+        /// within the precision in the plane the rounding is tangent to: the point on the border between the side and the bottom of
+        /// the box is needed on the bottom too, to intersect the bottom with the rounding along the tangent edge and split it there.
+        /// </summary>
+        private void AddToNeighbourOfOverlappingFace(Edge edge, Face neighbour, IntersectionVertex iv)
+        {
+            if (neighbour == null || !faceToOverlappingFaces.TryGetValue(neighbour, out HashSet<Face> overlapping)) return;
+            if (!overlapping.Contains(edge.PrimaryFace) && (edge.SecondaryFace == null || !overlapping.Contains(edge.SecondaryFace))) return;
+            foreach (Face face in new Face[] { edge.PrimaryFace, edge.SecondaryFace })
+            {
+                if (face == null || overlapping.Contains(face)) continue;
+                iv.v.AddPositionOnFace(neighbour, neighbour.Surface.PositionOf(iv.v.Position));
+                IntersectionVertex onNeighbour = new IntersectionVertex
+                {
+                    v = iv.v, edge = edge, face = neighbour, uOnEdge = iv.uOnEdge, edgeIsOn1 = iv.edgeIsOn1, isOnFaceBorder = true,
+                };
+                if (iv.edgeIsOn1) AddFacesToIntersectionVertices(face, neighbour, onNeighbour);
+                else AddFacesToIntersectionVertices(neighbour, face, onNeighbour);
+                intersectionVertices.Add(onNeighbour);
+            }
+        }
+        private static bool HasCurveThroughTwoPoints(double[,] params3d)
+        {
+            if (params3d == null) return false;
+            for (int i = 0; i < params3d.GetLength(0); i++)
+            {
+                int n = 0;
+                for (int j = 0; j < params3d.GetLength(1); j++) if (params3d[i, j] != double.MinValue) ++n;
+                if (n >= 2) return true;
+            }
+            return false;
+        }
+        /// <summary>
+        /// The surfaces of <paramref name="face1"/> and <paramref name="face2"/> have no intersection curve through the intersection
+        /// <paramref name="points"/>, but one of the faces is tangent to the other one along one of its edges, where it meets a face
+        /// that overlaps the other one: e.g. a rounding is tangent along its edge to the bottom of a box, which lies 1e-5 above the
+        /// plane of the rounding. 1e-7 above it would cut the rounding close to the edge, and the intersection points would be moved
+        /// onto the edge (<see cref="SnapTangentialIntersection"/>); further away the surfaces do not meet, but the face of the box
+        /// still has to be split along that edge. Returns the curve of the edge as the intersection curve, in the form
+        /// Surfaces.Intersect returns it.
+        /// </summary>
+        private bool TangentialContactAlongEdge(Face face1, Face face2, List<GeoPoint> points, out ICurve[] c3ds, out ICurve2D[] crvsOnSurface1, out ICurve2D[] crvsOnSurface2,
+            out double[,] params3d, out double[,] params2dFace1, out double[,] params2dFace2, out GeoPoint2D[] paramsuvsurf1, out GeoPoint2D[] paramsuvsurf2)
+        {
+            c3ds = null; crvsOnSurface1 = null; crvsOnSurface2 = null; params3d = null; params2dFace1 = null; params2dFace2 = null; paramsuvsurf1 = null; paramsuvsurf2 = null;
+            if (points.Count < 2) return false;
+            foreach ((Face onFace, Face other) in new[] { (face1, face2), (face2, face1) })
+            {
+                if (!faceToOverlappingFaces.TryGetValue(other, out HashSet<Face> overlappingOther)) continue;
+                foreach (Edge edge in onFace.AllEdges)
+                {
+                    ICurve curve = edge.Curve3D;
+                    if (curve == null || !overlappingOther.Contains(edge.OtherFace(onFace))) continue; // only an edge to a face overlapping the other face
+                    double[] u = new double[points.Count];
+                    int onCurve = 0;
+                    for (int j = 0; j < points.Count; j++)
+                    {
+                        u[j] = double.MinValue;
+                        if (curve.DistanceTo(points[j]) < precision)
+                        {
+                            u[j] = curve.PositionOf(points[j]);
+                            ++onCurve;
+                        }
+                    }
+                    if (onCurve < 2) continue;
+                    double umin = u.Where(x => x != double.MinValue).Min(), umax = u.Where(x => x != double.MinValue).Max();
+                    // the part of the edge between the points lies on the other surface, which is tangent there
+                    bool tangent = true;
+                    for (int k = 0; k <= 4 && tangent; k++)
+                    {
+                        GeoPoint p = curve.PointAt(umin + k * (umax - umin) / 4);
+                        tangent = Math.Abs(other.Surface.GetDistance(p)) < precision &&
+                            Precision.SameDirection(face1.Surface.GetNormal(face1.Surface.PositionOf(p)), face2.Surface.GetNormal(face2.Surface.PositionOf(p)), false);
+                    }
+                    if (!tangent) continue;
+                    ICurve c3d = curve.Clone();
+                    ICurve2D c1 = face1.Surface.GetProjectedCurve(c3d, 0.0);
+                    ICurve2D c2 = face2.Surface.GetProjectedCurve(c3d, 0.0);
+                    if (c1 == null || c2 == null) continue;
+                    SurfaceHelper.AdjustPeriodic(face1.Surface, face1.Domain, c1);
+                    SurfaceHelper.AdjustPeriodic(face2.Surface, face2.Domain, c2);
+                    c3ds = new ICurve[] { c3d };
+                    crvsOnSurface1 = new ICurve2D[] { c1 };
+                    crvsOnSurface2 = new ICurve2D[] { c2 };
+                    params3d = new double[1, points.Count];
+                    params2dFace1 = new double[1, points.Count];
+                    params2dFace2 = new double[1, points.Count];
+                    paramsuvsurf1 = new GeoPoint2D[points.Count];
+                    paramsuvsurf2 = new GeoPoint2D[points.Count];
+                    for (int j = 0; j < points.Count; j++)
+                    {
+                        paramsuvsurf1[j] = face1.Surface.PositionOf(points[j]);
+                        paramsuvsurf2[j] = face2.Surface.PositionOf(points[j]);
+                        SurfaceHelper.AdjustPeriodic(face1.Surface, face1.Domain, ref paramsuvsurf1[j]);
+                        SurfaceHelper.AdjustPeriodic(face2.Surface, face2.Domain, ref paramsuvsurf2[j]);
+                        params3d[0, j] = u[j];
+                        params2dFace1[0, j] = u[j] == double.MinValue ? double.MinValue : c1.PositionOf(paramsuvsurf1[j]);
+                        params2dFace2[0, j] = u[j] == double.MinValue ? double.MinValue : c2.PositionOf(paramsuvsurf2[j]);
+                    }
+                    return true;
+                }
+            }
+            return false;
         }
         /// <summary>
         /// How far the intersection curve of the surfaces of <paramref name="face1"/> and <paramref name="face2"/> may be from <paramref name="p"/>,
@@ -3827,10 +4193,11 @@ namespace CADability
             BoundingCube otherExtent = other.GetExtent(precision);
             bool IsOnOther(GeoPoint p)
             {
-                if (!otherExtent.Contains(p)) return false;
+                // the extent of a planar face has no thickness, a point within precision beside it is outside of it
+                if (!otherExtent.Contains(p, precision)) return false;
                 foreach (Face face in other.Faces)
                 {
-                    if (face.GetExtent(precision).Contains(p) && Math.Abs(face.Distance(p)) < precision) return true;
+                    if (face.GetExtent(precision).Contains(p, precision) && Math.Abs(face.Distance(p)) < precision) return true;
                 }
                 return false;
             }
@@ -6148,7 +6515,8 @@ namespace CADability
         }
 
         internal void ConnectOpenEdges(HashSet<Edge> openEdges)
-        {
+        {   // Two open edges between the same vertices are the same edge within the precision of this operation, as in the other overload:
+            // with Precision.eps, a box whose face is 1e-5 from the face of a long bar (precision 1.4e-4) left a sliver of open edges (#457)
             foreach (Edge openEdge in openEdges)
             {
                 if (openEdge.PrimaryFace == null) continue; // has already been merged
@@ -6164,13 +6532,13 @@ namespace CADability
                 {
                     if (edg == openEdge) continue;
                     if (!openEdges.Contains(edg)) continue;
-                    if ((edg.PrimaryFace == openEdge.PrimaryFace || edg.SecondaryFace == openEdge.PrimaryFace) && BRepOperation.SameEdge(edg, openEdge, Precision.eps))
+                    if ((edg.PrimaryFace == openEdge.PrimaryFace || edg.SecondaryFace == openEdge.PrimaryFace) && BRepOperation.SameEdge(edg, openEdge, precision))
                     {
                         edg.RemoveFace(openEdge.PrimaryFace);
                         openEdge.PrimaryFace.ReplaceEdge(openEdge, edg);
                         break;
                     }
-                    else if (edg.SecondaryFace == null && openEdge.SecondaryFace == null && BRepOperation.SameEdge(edg, openEdge, Precision.eps))
+                    else if (edg.SecondaryFace == null && openEdge.SecondaryFace == null && BRepOperation.SameEdge(edg, openEdge, precision))
                     {
                         if (openEdge.StartVertex(openEdge.PrimaryFace) != edg.StartVertex(edg.PrimaryFace))
                         {   // only correct oriented connections
@@ -9265,18 +9633,26 @@ namespace CADability
         /// <returns>the faces connected to <paramref name="startWith"/>, including it; they are removed from <paramref name="allFaces"/></returns>
         internal static HashSet<Face> extractConnectedFaces(HashSet<Face> allFaces, Face startWith)
         {
+            // depth first search with an explicit stack: the recursion was as deep as the number of connected faces
+            // and overflowed the stack for shells of some ten thousand faces (#486). The faces are visited in the
+            // same order as by the recursion.
             HashSet<Face> result = new HashSet<Face>();
             result.Add(startWith);
             allFaces.Remove(startWith);
-            foreach (Edge edge in startWith.Edges)
+            Stack<(Edge[] edges, int next)> stack = new Stack<(Edge[] edges, int next)>();
+            stack.Push((startWith.Edges.ToArray(), 0));
+            while (stack.Count > 0)
             {
-                if (allFaces.Contains(edge.SecondaryFace) && edge.IsOrientedConnection)
+                (Edge[] edges, int next) = stack.Pop();
+                if (next >= 2 * edges.Length) continue;
+                stack.Push((edges, next + 1));
+                Edge edge = edges[next / 2];
+                Face face = (next % 2 == 0) ? edge.SecondaryFace : edge.PrimaryFace;
+                if (allFaces.Contains(face) && edge.IsOrientedConnection)
                 {
-                    result.UnionWith(extractConnectedFaces(allFaces, edge.SecondaryFace));
-                }
-                if (allFaces.Contains(edge.PrimaryFace) && edge.IsOrientedConnection)
-                {
-                    result.UnionWith(extractConnectedFaces(allFaces, edge.PrimaryFace));
+                    result.Add(face);
+                    allFaces.Remove(face);
+                    stack.Push((face.Edges.ToArray(), 0));
                 }
             }
             return result;
@@ -9370,6 +9746,38 @@ namespace CADability
                     edge.Vertex2.RemoveEdge(edge);
                 }
             }
+        }
+        /// <summary>
+        /// The vertex for a point on the border of <paramref name="face1"/> or <paramref name="face2"/>, which the intersection of their
+        /// surfaces added to the intersection points, e.g. a point where two crossing cylinders of the same radius touch each other and
+        /// their intersection curves meet. When the point is a vertex of one of the faces, that vertex is returned. When it lies on an
+        /// edge of one of the faces, the edge is split there: the intersection curves end on that edge, although the edge did not
+        /// intersect the other face, because it only touches it within the precision, like the seam of the wider of two crossing
+        /// cylinders, whose radii differ by less than the precision (issue #458). Returns null, when the point is neither.
+        /// </summary>
+        private Vertex VertexOnBorder(Face face1, Face face2, GeoPoint p)
+        {
+            foreach (Face face in new[] { face1, face2 })
+            {
+                foreach (Vertex vtx in face.Vertices)
+                {
+                    if ((vtx.Position | p) < precision) return vtx;
+                }
+            }
+            foreach (Face face in new[] { face1, face2 })
+            {
+                foreach (Edge edge in face.AllEdges)
+                {
+                    if (edge.Curve3D == null || edge.Curve3D.DistanceTo(p) >= precision) continue;
+                    double pos = edge.Curve3D.PositionOf(p);
+                    double prec = precision / edge.Curve3D.Length * 2.0;
+                    if (pos <= prec || pos >= 1 - prec) continue;
+                    Vertex v = new Vertex(edge.Curve3D.PointAt(pos));
+                    edge.Split(new SortedList<double, Vertex> { { pos, v } }, precision);
+                    return v;
+                }
+            }
+            return null;
         }
         /// <summary>
         /// The surfaces of the two faces are tangential along the intersection curve <paramref name="curve"/>. Returns true, when they
@@ -9553,7 +9961,14 @@ namespace CADability
                 double[,] params2dFace2;
                 GeoPoint2D[] paramsuvsurf1;
                 GeoPoint2D[] paramsuvsurf2;
-                if (Surfaces.Intersect(item.Key.face1.Surface, item.Key.face1.Area.GetExtent(), item.Key.face2.Surface, item.Key.face2.Area.GetExtent(), points, out c3ds, out crvsOnSurface1, out crvsOnSurface2, out params3d, out params2dFace1, out params2dFace2, out paramsuvsurf1, out paramsuvsurf2, precision, pointPrecision))
+                bool intersects = Surfaces.Intersect(item.Key.face1.Surface, item.Key.face1.Area.GetExtent(), item.Key.face2.Surface, item.Key.face2.Area.GetExtent(), points, out c3ds, out crvsOnSurface1, out crvsOnSurface2, out params3d, out params2dFace1, out params2dFace2, out paramsuvsurf1, out paramsuvsurf2, precision, pointPrecision);
+                if ((!intersects || !HasCurveThroughTwoPoints(params3d)) &&
+                    TangentialContactAlongEdge(item.Key.face1, item.Key.face2, points, out ICurve[] tc3ds, out ICurve2D[] tcrvs1, out ICurve2D[] tcrvs2, out double[,] tparams3d, out double[,] tparams2d1, out double[,] tparams2d2, out GeoPoint2D[] tuv1, out GeoPoint2D[] tuv2))
+                {
+                    intersects = true;
+                    c3ds = tc3ds; crvsOnSurface1 = tcrvs1; crvsOnSurface2 = tcrvs2; params3d = tparams3d; params2dFace1 = tparams2d1; params2dFace2 = tparams2d2; paramsuvsurf1 = tuv1; paramsuvsurf2 = tuv2;
+                }
+                if (intersects)
                 {
                     if (usedVertices.Count < points.Count)
                     {
@@ -9561,7 +9976,17 @@ namespace CADability
                         // This happens e.g. when two cylinders with the same diameter intersect or in general there is a touching point, which was not in points
                         for (int i = usedVertices.Count; i < points.Count; i++)
                         {
-                            if (!item.Key.face1.Contains(ref paramsuvsurf1[i], false) || !item.Key.face2.Contains(ref paramsuvsurf2[i], false))
+                            Vertex v = null;
+                            bool valid = item.Key.face1.Contains(ref paramsuvsurf1[i], false) && item.Key.face2.Contains(ref paramsuvsurf2[i], false);
+                            if (!valid && item.Key.face1.Contains(ref paramsuvsurf1[i], true) && item.Key.face2.Contains(ref paramsuvsurf2[i], true))
+                            {   // on the border of a face: valid, where it is a vertex of the faces or lies on one of their edges, but not,
+                                // where one of the intersection points already is, which would make an edge of length 0
+                                bool known = false;
+                                for (int j = 0; j < i && !known; j++) known = (usedVertices[j].Position | points[i]) < precision;
+                                if (!known) v = VertexOnBorder(item.Key.face1, item.Key.face2, points[i]);
+                                valid = v != null;
+                            }
+                            if (!valid)
                             {
                                 for (int j = 0; j < c3ds.Length; j++)
                                 {
@@ -9569,8 +9994,7 @@ namespace CADability
                                                                       // but in order to keep points and usedVertices in sync, we still have to add a vertex to usedVertices
                                 }
                             }
-                            Vertex v = new Vertex(points[i]);
-                            usedVertices.Add(v);
+                            usedVertices.Add(v ?? new Vertex(points[i]));
                         }
                     }
                     for (int i = 0; i < c3ds.Length; i++) // meist nur eine Kurve
@@ -10909,12 +11333,24 @@ namespace CADability
 
         private void collectFaces(Face startWith, HashSet<Face> unusedfaces, HashSet<Face> connected)
         {
+            // iterative like extractConnectedFaces, to not overflow the stack with many faces (#486)
             unusedfaces.Remove(startWith);
             connected.Add(startWith);
-            foreach (Edge edg in startWith.Edges)
+            Stack<(Edge[] edges, int next)> stack = new Stack<(Edge[] edges, int next)>();
+            stack.Push((startWith.Edges.ToArray(), 0));
+            while (stack.Count > 0)
             {
-                if (edg.PrimaryFace != null && unusedfaces.Contains(edg.PrimaryFace)) collectFaces(edg.PrimaryFace, unusedfaces, connected);
-                if (edg.SecondaryFace != null && unusedfaces.Contains(edg.SecondaryFace)) collectFaces(edg.SecondaryFace, unusedfaces, connected);
+                (Edge[] edges, int next) = stack.Pop();
+                if (next >= 2 * edges.Length) continue;
+                stack.Push((edges, next + 1));
+                Edge edg = edges[next / 2];
+                Face face = (next % 2 == 0) ? edg.PrimaryFace : edg.SecondaryFace;
+                if (face != null && unusedfaces.Contains(face))
+                {
+                    unusedfaces.Remove(face);
+                    connected.Add(face);
+                    stack.Push((face.Edges.ToArray(), 0));
+                }
             }
         }
 

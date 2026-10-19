@@ -4,13 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-using Point = CADability.WebDrawing.Point;
-#else
 using System.Drawing;
 using Point = System.Drawing.Point;
-#endif
 
 namespace CADability
 {

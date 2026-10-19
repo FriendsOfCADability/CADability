@@ -58,30 +58,21 @@ namespace CADability.GeoObject
         {   // serialisierbar machen!
             ICurve fixedCurve;
             bool fixedU;
-            OffsetSurface offsetSurface;
+            // the offset surface, or the surface it became by a modification (see Modify)
+            ISurface offsetSurface;
             double param, pmin, pmax;
             public FixedCurve(OffsetSurface offsetSurface, double param, double pmin, double pmax, bool fixedU)
+                : this(offsetSurface, fixedU ? offsetSurface.baseSurface.FixedU(param, pmin, pmax) : offsetSurface.baseSurface.FixedV(param, pmin, pmax), param, pmin, pmax, fixedU)
+            {
+            }
+            private FixedCurve(ISurface offsetSurface, ICurve fixedCurve, double param, double pmin, double pmax, bool fixedU)
             {
                 this.fixedU = fixedU;
                 this.offsetSurface = offsetSurface;
+                this.fixedCurve = fixedCurve;
                 this.param = param;
                 this.pmin = pmin;
                 this.pmax = pmax;
-                if (fixedU)
-                {
-                    fixedCurve = offsetSurface.baseSurface.FixedU(param, pmin, pmax);
-                }
-                else
-                {
-                    fixedCurve = offsetSurface.baseSurface.FixedV(param, pmin, pmax);
-                }
-                if (fixedCurve is BSpline)
-                {
-                    GeoPoint dbg = (fixedCurve as BSpline).GetPole(0);
-                    if (double.IsNaN(dbg.x))
-                    {
-                    }
-                }
             }
             protected override double[] GetBasePoints()
             {
@@ -128,15 +119,17 @@ namespace CADability.GeoObject
 
             /// <inheritdoc/>
             public override void Modify(ModOp m)
-            {   // this curve cannot be modified, because it is defined by the underlying offset surface.
-                // this is only called when a Face or Surface has been modified.
+            {   // The curve is defined by the surface. A face modifies its surface with GetModified, which returns a new surface,
+                // so the curve must modify its own reference to the surface in the same way, or it stays where it was.
+                offsetSurface = offsetSurface.GetModified(m);
+                fixedCurve.Modify(m); // only used for directions and positions
                 InvalidateSecondaryData();
             }
 
             /// <inheritdoc/>
             public override IGeoObject Clone()
             {
-                return new FixedCurve(offsetSurface, param, pmin, pmax, fixedU);
+                return new FixedCurve(offsetSurface, fixedCurve.Clone() as ICurve, param, pmin, pmax, fixedU);
             }
 
             /// <inheritdoc/>
@@ -179,7 +172,7 @@ namespace CADability.GeoObject
             {
                 fixedCurve = info.GetValue("FixedCurve", typeof(ICurve)) as ICurve;
                 fixedU = info.GetBoolean("FixedU");
-                offsetSurface = info.GetValue("OffsetSurface", typeof(OffsetSurface)) as OffsetSurface;
+                offsetSurface = info.GetValue("OffsetSurface", typeof(ISurface)) as ISurface;
                 param = info.GetDouble("Param");
                 pmin = info.GetDouble("Pmin");
                 pmax = info.GetDouble("Pmax");
@@ -333,18 +326,128 @@ namespace CADability.GeoObject
             }
             else throw new NotImplementedException("Modify OffsetSurface with non ortogonal Matrix");
         }
-        /// <inheritdoc/>
+        /// <summary>
+        /// Returns the modified surface. Under a rotation, reflection or translation, optionally with a uniform scaling, this is
+        /// again an offset surface. Under any other modification, e.g. a scaling with different factors along the axes, the image
+        /// of an offset surface is no offset surface: its distance to the modified base surface depends on the direction of the
+        /// normal. Then the part of the parameter space in which the surface is used (the domain of its face) is approximated by a
+        /// <see cref="NurbsSurface"/> in the same (u, v) parametrisation (see <see cref="Approximate"/>), and the modified
+        /// approximation is returned, so the 2d curves of the face stay valid.
+        /// </summary>
+        /// <param name="m">the modification</param>
+        /// <returns>the modified surface</returns>
         public override ISurface GetModified(ModOp m)
         {
-            // Only correct for an isogonal m. A scaling with different factors along perpendicular axes was treated as
-            // isogonal before ModOp.IsIsogonal checked the lengths, and is still accepted here with the same approximate
-            // result rather than throwing, until such a surface is approximated by a NURBS surface (issue #415).
-            if (m.IsIsogonal || HasPerpendicularAxes(m))
-            {
-                OffsetSurface res = new OffsetSurface(baseSurface.GetModified(m), offset * m.Factor, usedArea);
-                return res;
+            if (m.IsIsogonal) return new OffsetSurface(baseSurface.GetModified(m), offset * m.Factor, usedArea);
+            if (UsedBounds(out BoundingRect bounds))
+            {   // the approximation is modified, so its deviation is scaled by up to the largest stretch of m
+                double[,] a = m.Matrix;
+                double stretch = 0.0;
+                for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) stretch += a[i, j] * a[i, j];
+                stretch = Math.Sqrt(stretch); // the Frobenius norm is at least the largest stretch
+                NurbsSurface approximation = Approximate(bounds.Left, bounds.Right, bounds.Bottom, bounds.Top, Precision.eps / Math.Max(stretch, 1.0));
+                return approximation.GetModified(m);
             }
-            else throw new NotImplementedException("Modify OffsetSurface with non ortogonal Matrix");
+            // without a finite part of the parameter space there is nothing to approximate: keep the result of the versions
+            // before #415 for a scaling along perpendicular axes, which has the right shape only for a uniform scaling
+            if (HasPerpendicularAxes(m)) return new OffsetSurface(baseSurface.GetModified(m), offset * m.Factor, usedArea);
+            throw new NotImplementedException("Modify OffsetSurface without bounds with a non orthogonal matrix");
+        }
+        /// <summary>
+        /// The part of the parameter space in which this surface is used: <see cref="ISurfaceImpl.usedArea"/> or the natural
+        /// bounds, if they are finite.
+        /// </summary>
+        private bool UsedBounds(out BoundingRect bounds)
+        {
+            bounds = usedArea;
+            if (IsFinite(bounds)) return true;
+            GetNaturalBounds(out double umin, out double umax, out double vmin, out double vmax);
+            bounds = new BoundingRect(umin, vmin, umax, vmax);
+            return IsFinite(bounds);
+        }
+        private static bool IsFinite(BoundingRect r)
+        {
+            return !r.IsEmpty() && !r.IsInfinite && r.Width > 0.0 && r.Height > 0.0 &&
+                r.Left > double.MinValue && r.Right < double.MaxValue && r.Bottom > double.MinValue && r.Top < double.MaxValue;
+        }
+        /// <summary>
+        /// Approximates this surface in the given part of its parameter space by a non rational <see cref="NurbsSurface"/> with
+        /// the same parametrisation: the point at (u, v) of the result is (within <paramref name="precision"/>) the point at (u, v)
+        /// of this surface. The surface is interpolated by a cubic spline surface through a grid of points, which is refined in
+        /// each direction until the points between the grid points are within <paramref name="precision"/>, or up to 256 segments.
+        /// </summary>
+        /// <param name="umin">the lower bound of u</param>
+        /// <param name="umax">the upper bound of u</param>
+        /// <param name="vmin">the lower bound of v</param>
+        /// <param name="vmax">the upper bound of v</param>
+        /// <param name="precision">the maximum distance of the approximation from this surface</param>
+        /// <returns>the approximation</returns>
+        public override NurbsSurface Approximate(double umin, double umax, double vmin, double vmax, double precision)
+        {
+            const int maxSegments = 256;
+            int nu = 8, nv = 8;
+            while (true)
+            {
+                NurbsSurface res = Interpolate(umin, umax, vmin, vmax, nu, nv);
+                // the deviation half way between the grid points: along u, along v and in the middle of the cells
+                double du = 0.0, dv = 0.0, dc = 0.0;
+                for (int i = 0; i <= 2 * nu; i++)
+                {
+                    double u = umin + i * (umax - umin) / (2 * nu);
+                    for (int j = 0; j <= 2 * nv; j++)
+                    {
+                        if (i % 2 == 0 && j % 2 == 0) continue; // a grid point, interpolated exactly
+                        GeoPoint2D uv = new GeoPoint2D(u, vmin + j * (vmax - vmin) / (2 * nv));
+                        double d = res.PointAt(uv) | PointAt(uv);
+                        if (j % 2 == 0) du = Math.Max(du, d);
+                        else if (i % 2 == 0) dv = Math.Max(dv, d);
+                        else dc = Math.Max(dc, d);
+                    }
+                }
+                bool refineU = du > precision || (dc > precision && dv <= precision);
+                bool refineV = dv > precision || (dc > precision && du <= precision);
+                if (refineU && nu < maxSegments) nu *= 2;
+                else refineU = false;
+                if (refineV && nv < maxSegments) nv *= 2;
+                else refineV = false;
+                if (!refineU && !refineV) return res;
+            }
+        }
+        /// <summary>
+        /// The cubic spline surface through the points of a grid of <paramref name="nu"/> x <paramref name="nv"/> segments, with
+        /// the parameters of the grid points as its parameters (NURBS book A9.4: the rows are interpolated in u, then the poles of
+        /// the rows in v).
+        /// </summary>
+        private NurbsSurface Interpolate(double umin, double umax, double vmin, double vmax, int nu, int nv)
+        {
+            double[] up = new double[nu + 1];
+            for (int i = 0; i <= nu; i++) up[i] = umin + i * (umax - umin) / nu;
+            double[] vp = new double[nv + 1];
+            for (int j = 0; j <= nv; j++) vp[j] = vmin + j * (vmax - vmin) / nv;
+            int udegree = Math.Min(3, nu), vdegree = Math.Min(3, nv);
+            GeoPoint[,] rowPoles = null;
+            double[] uKnots = null;
+            for (int j = 0; j <= nv; j++)
+            {
+                GeoPoint[] row = new GeoPoint[nu + 1];
+                for (int i = 0; i <= nu; i++) row[i] = PointAt(new GeoPoint2D(up[i], vp[j]));
+                Nurbs<GeoPoint, GeoPointPole> rowCurve = new Nurbs<GeoPoint, GeoPointPole>(row, up, udegree);
+                if (rowPoles == null) rowPoles = new GeoPoint[rowCurve.Poles.Length, nv + 1];
+                for (int i = 0; i < rowCurve.Poles.Length; i++) rowPoles[i, j] = rowCurve.Poles[i];
+                uKnots = rowCurve.UKnots;
+            }
+            GeoPoint[,] poles = null;
+            double[] vKnots = null;
+            for (int i = 0; i < rowPoles.GetLength(0); i++)
+            {
+                GeoPoint[] column = new GeoPoint[nv + 1];
+                for (int j = 0; j <= nv; j++) column[j] = rowPoles[i, j];
+                Nurbs<GeoPoint, GeoPointPole> columnCurve = new Nurbs<GeoPoint, GeoPointPole>(column, vp, vdegree);
+                if (poles == null) poles = new GeoPoint[rowPoles.GetLength(0), columnCurve.Poles.Length];
+                for (int j = 0; j < columnCurve.Poles.Length; j++) poles[i, j] = columnCurve.Poles[j];
+                vKnots = columnCurve.UKnots;
+            }
+            return new NurbsSurface(poles, null, uKnots, vKnots, udegree, vdegree, false, false);
         }
         private static bool HasPerpendicularAxes(ModOp m)
         {

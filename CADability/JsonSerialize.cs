@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace CADability
@@ -193,6 +194,12 @@ namespace CADability
 
         Tokenizer tk;
         /// <summary>
+        /// The property in the header of a file whose strings escape backslashes (as \\). Files without it were written
+        /// before, unescaped, and are read as before: only \", \n and \r are resolved, so that e.g. \\server stays.
+        /// </summary>
+        private const string StringEscapingProperty = "StringEscaping";
+        private bool escapedBackslashes; // the file being read escapes backslashes
+        /// <summary>
         /// Read JSON files token by token
         /// </summary>
         class Tokenizer : IDisposable
@@ -212,6 +219,15 @@ namespace CADability
                 actind = 0;
             }
 
+            /// <summary>
+            /// True if the quote at <paramref name="quote"/> is escaped, i.e. preceded by an odd number of backslashes.
+            /// </summary>
+            private static bool IsEscaped(string line, int quote)
+            {
+                int backslashes = 0;
+                for (int i = quote - 1; i >= 0 && line[i] == '\\'; --i) ++backslashes;
+                return backslashes % 2 == 1;
+            }
             private bool EqualsAt(string value, StringComparison cmp = StringComparison.Ordinal)
             {
                 if ((uint)actind > (uint)currentline.Length) return false;
@@ -240,7 +256,7 @@ namespace CADability
                     case '"':
                         {   // return string in quotes
                             int ind = currentline.IndexOf('"', actind + 1);
-                            while (ind >= 0 && ind < currentline.Length - 1 && currentline[ind - 1] == '\\') ind = currentline.IndexOf('"', ind + 1); // skip \" in a string
+                            while (ind >= 0 && ind < currentline.Length - 1 && IsEscaped(currentline, ind)) ind = currentline.IndexOf('"', ind + 1); // skip \" in a string
                             if (ind < 0) return etoken.eof; // the file ends inside the string
                             start = actind + 1;
                             length = ind - start + 1 - 1;
@@ -582,6 +598,11 @@ namespace CADability
         Dictionary<string, int> typeVersions;
         Dictionary<int, int> typeIndexToVersion;
         Queue<Tuple<IJsonSerialize, JsonDict>> deferred;
+        /// <summary>
+        /// The entities of the last <see cref="FromStream(Stream, IJsonProgress)"/> that could not be created and were read
+        /// as null. Each entry names the entity and its type and carries the original exception as its inner exception.
+        /// </summary>
+        internal List<SerializationException> ReadErrors { get; } = new List<SerializationException>();
         private bool verbose;
         private string fileVersion;
 
@@ -691,7 +712,7 @@ namespace CADability
         }
         private object unescape(string line, int start, int length, bool propName)
         {
-            string res = line.Substring(start, length).Replace("\\\"", "\"").Replace("\\n", "\n").Replace("\\r", "\r");
+            string res = escapedBackslashes ? Unescape(line.Substring(start, length)) : line.Substring(start, length).Replace("\\\"", "\"").Replace("\\n", "\n").Replace("\\r", "\r");
             if (!propName)
             {
                 if (res.StartsWith("##")) return res.Substring(1);
@@ -699,6 +720,32 @@ namespace CADability
                 if (res.StartsWith("$$")) return res.Substring(1);
             }
             return res;
+        }
+        /// <summary>
+        /// Resolves the escape sequences of a string in a file that escapes backslashes ("StringEscaping" in the header):
+        /// \\, \", \n and \r. Any other backslash is kept as it is.
+        /// </summary>
+        internal static string Unescape(string escaped)
+        {
+            if (escaped.IndexOf('\\') < 0) return escaped;
+            StringBuilder res = new StringBuilder(escaped.Length);
+            for (int i = 0; i < escaped.Length; ++i)
+            {
+                char c = escaped[i];
+                if (c == '\\' && i + 1 < escaped.Length)
+                {
+                    char next = escaped[i + 1];
+                    switch (next)
+                    {
+                        case '\\': res.Append('\\'); ++i; continue;
+                        case '"': res.Append('"'); ++i; continue;
+                        case 'n': res.Append('\n'); ++i; continue;
+                        case 'r': res.Append('\r'); ++i; continue;
+                    }
+                }
+                res.Append(c);
+            }
+            return res.ToString();
         }
         private string propName(string line, int start, int length)
         {
@@ -738,6 +785,8 @@ namespace CADability
                 if (name == "$Type") typename = res[name] as string;
                 if (name == "$TypeVersion") typeversion = Convert.ToInt32(res[name]);
                 if (name == "$Assembly") assemblyName = res[name] as string;
+                // in the header: the file escapes backslashes, so they are unescaped from here on (the header comes first)
+                if (name == StringEscapingProperty && res[name] is double escaping && escaping >= 1) escapedBackslashes = true;
                 token = tk.NextToken(out line, out start, out length);
                 if (token == Tokenizer.etoken.comma) token = tk.NextToken(out line, out start, out length);
                 else if (token == Tokenizer.etoken.endObject) break;
@@ -766,6 +815,8 @@ namespace CADability
         public object FromStream(Stream stream, IJsonProgress progress)
         {
             this.progress = progress;
+            ReadErrors.Clear();
+            escapedBackslashes = false; // files written before the escaping of backslashes
             tk = new Tokenizer(stream, progress);
             string line;
             int start, length;
@@ -1128,11 +1179,26 @@ namespace CADability
                             {
                                 return ci.Invoke(new object[] { si, new StreamingContext() });
                             }
-                            catch { return null; }
+                            catch (Exception e)
+                            {
+                                // The entity is read as null, as before, so that the rest of the file can still be read. But the cause is
+                                // kept and reported, otherwise the only symptom is a NullReferenceException in the object that refers to it.
+                                ReportReadError(index, tp, ci == null ? new MissingMethodException(tp.FullName, ".ctor(SerializationInfo, StreamingContext)") : e);
+                                return null;
+                            }
                         };
                     }
                 }
             }
+        }
+        private void ReportReadError(ulong index, Type type, Exception error)
+        {
+            if (error is TargetInvocationException tie && tie.InnerException != null) error = tie.InnerException;
+            SerializationException readError = new SerializationException("Entity " + index.ToString() + " of type " + type.FullName + " could not be read: "
+                + error.GetType().FullName + ": " + error.Message, error);
+            ReadErrors.Add(readError);
+            // Debugger.Log is not removed in Release builds, unlike Trace and Debug, and costs nothing without an attached debugger
+            if (System.Diagnostics.Debugger.IsLogging()) System.Diagnostics.Debugger.Log(0, nameof(JsonSerialize), readError.Message + Environment.NewLine);
         }
         private void CreateDeferred(IJsonSerialize obj, JsonDict data, List<object> entities, HashSet<ulong> underConstruction)
         {
@@ -1226,6 +1292,8 @@ namespace CADability
             WriteString(an.Version.ToString());
             WriteProperty("Assembly");
             WriteString(ass.GetName().Name);
+            WriteProperty(StringEscapingProperty); // strings escape backslashes, see WriteString
+            outStream.Write("1");
             EndObject();
             queue = new Queue<object>();
             serializedTypes = new Dictionary<Type, int>();
@@ -1302,7 +1370,8 @@ namespace CADability
             }
             else
             {
-                string escaped = val.Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r"); // escape delimiters and \n
+                // escape backslashes (marked by StringEscapingProperty in the header), delimiters, \n and \r
+                string escaped = val.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r");
                 if (escapePound && escaped.StartsWith("#")) escaped = "#" + escaped; // escape starting #
                 if (escapePound && escaped.StartsWith("$")) escaped = "$" + escaped; // escape starting $
                 outStream.Write("\"" + escaped + "\"");

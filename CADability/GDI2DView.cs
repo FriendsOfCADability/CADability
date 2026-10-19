@@ -1,5 +1,4 @@
-﻿#if !WEBASSEMBLY
-using CADability.Actions;
+﻿using CADability.Actions;
 using CADability.Attribute;
 using CADability.GeoObject;
 using CADability.UserInterface;
@@ -1754,4 +1753,3 @@ namespace CADability
         #endregion
     }
 }
-#endif

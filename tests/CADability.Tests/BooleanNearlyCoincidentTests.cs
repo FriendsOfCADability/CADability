@@ -61,11 +61,16 @@ namespace CADability.Tests
         [DataTestMethod]
         [DataRow(2.5e-3)]
         [DataRow(1e-3)]
+        // within the precision (1.4e-4): the faces between the two parallel faces left a sliver of open edges, which were only
+        // connected within Precision.eps, and bar - box was empty (issue #457)
+        [DataRow(1e-5)]
+        [DataRow(-1e-5)]
         public void a_face_close_to_a_face_of_a_long_bar_is_kept(double gap)
         {
             Solid bar = Box(0, 0, 0, 40, 3000, 80);
             Solid box = Box(-gap, -50, 10, 20 + gap, 80, 40); // its face at x == -gap is parallel to the bar's face at x == 0
-            AssertBooleans(box, bar, 20 * 30 * 40, 0.01);
+            // within the precision, the box may also be taken as touching the bar: a slab of the contact area (30 x 40) and gap thick
+            AssertBooleans(box, bar, 20 * 30 * 40, 0.01 + 1200 * Math.Abs(gap));
         }
 
         /// <summary>
@@ -83,6 +88,18 @@ namespace CADability.Tests
         [DataRow(3e-8, 3e-7)]
         [DataRow(3e-8, -3e-7)]
         [DataRow(3e-8, 1e-6)]
+        // below the tangent plane the box does not cut the rounding, and 1e-5 above it, the cut is too far from the tangent edge to
+        // be moved onto it: the bottom of the box was not split along the tangent edge, box - bar was empty (issue #400)
+        [DataRow(0.0, -1e-7)]
+        [DataRow(0.0, -3e-7)]
+        [DataRow(0.0, 1e-5)]
+        [DataRow(3e-8, 1e-5)]
+        // 1e-6 and 1e-5 below the plane: the quarter circle at the end of the rounding ends tangentially 1e-6 above the bottom of the
+        // box, and the bottom edges of the box pass the tangent edge 1e-6 below it, neither cuts the other face, and box - bar was
+        // empty (issue #457)
+        [DataRow(0.0, -1e-6)]
+        [DataRow(0.0, -1e-5)]
+        [DataRow(3e-8, -1e-5)]
         public void a_box_nearly_on_the_tangent_plane_of_a_rounded_edge(double tilt, double dz)
         {
             Solid bar = FilletBar(100);
@@ -90,7 +107,166 @@ namespace CADability.Tests
             if (tilt != 0.0) box.Modify(ModOp.Rotate(new GeoPoint(0, -10, dz), GeoVector.XAxis, new SweepAngle(tilt)));
             // the common part is 20 x 10 of the profile, without the corner outside the rounding, and 30 long
             double common = 30 * (200 - (9 - 9 * Math.PI / 4));
-            AssertBooleans(box, bar, common, 1e-3);
+            // within the precision of the operation (1.1e-4), the box may also be taken as lying on the plane: a slab of the
+            // contact area (20 x 30) and dz thick
+            AssertBooleans(box, bar, common, Math.Max(1e-3, 600 * Math.Abs(dz)));
+        }
+
+        private static double VolumeOf(Solid[] result, string what)
+        {
+            Assert.IsNotNull(result, what);
+            foreach (Solid solid in result) Assert.AreEqual(0, solid.Shells[0].OpenEdges.Length, what + ": open edges");
+            return result.Sum(s => s.Volume(1e-4));
+        }
+
+        /// <summary>
+        /// A cylinder of radius 5 lying on a cube of 10, reaching into it by less than the precision (about 1.7e-5). The top edges of the
+        /// cube cut the cylinder twice, sqrt(2 * 5 * depth) on both sides of the line where they touch, and on two different faces,
+        /// because the seam of the cylinder lies on that line. The surfaces of the top face and the cylinder are tangent within the
+        /// precision, their intersection is that line, and the points could not be connected: both differences were empty
+        /// (issue #457). The grazing points are dropped now, the cylinder is taken as lying on the cube.
+        /// </summary>
+        [DataTestMethod]
+        [DataRow(1e-7)]
+        [DataRow(3e-7)]
+        [DataRow(1e-6)]
+        public void a_cylinder_reaching_into_a_face_by_less_than_the_precision_lies_on_it(double depth)
+        {
+            Solid cube = Box(0, 0, 0, 10, 10, 10);
+            Solid cylinder = Make3D.MakeCylinder(new GeoPoint(-5, 5, 15 - depth), 5 * GeoVector.ZAxis, 20 * GeoVector.XAxis);
+            double segment = 10 * Math.Sqrt(2 * 5 * depth) * depth * 4.0 / 3.0; // the common part, at most
+            Assert.AreEqual(1000.0, VolumeOf(Solid.Subtract(cube, cylinder), "cube - cylinder"), segment + 1e-6, "cube - cylinder");
+            Assert.AreEqual(500 * Math.PI, VolumeOf(Solid.Subtract(cylinder, cube), "cylinder - cube"), segment + 1e-6, "cylinder - cube");
+            Assert.AreEqual(0.0, VolumeOf(Solid.Intersect(cube, cylinder), "cube * cylinder"), segment + 1e-6, "cube * cylinder");
+        }
+
+        /// <summary>
+        /// A cylinder of radius 3 inside a cube of 10, on its bottom, reaching through it by 1e-6. The circles at the ends of the
+        /// cylinder graze the bottom twice, each of the two points on one half of the circle, which is split at the seam on the bottom
+        /// (issue #457).
+        /// </summary>
+        [TestMethod]
+        public void a_cylinder_inside_a_cube_reaching_through_its_bottom_by_less_than_the_precision()
+        {
+            Solid cube = Box(0, 0, 0, 10, 10, 10);
+            Solid cylinder = Make3D.MakeCylinder(new GeoPoint(2, 5, 3 - 1e-6), 3 * GeoVector.ZAxis, 6 * GeoVector.XAxis);
+            Assert.AreEqual(54 * Math.PI, VolumeOf(Solid.Intersect(cube, cylinder), "cube * cylinder"), 1e-4, "cube * cylinder");
+        }
+
+        /// <summary>
+        /// A box reaching into the top face of a cube by less than the precision of the operation (about 1.7e-5 here) touches it.
+        /// No face of either solid was left over, and the test, whether one solid contains the other, took a vertex of the box
+        /// 1e-7 below the top face for a point not on the cube, because the extent of the planar face had no thickness: the
+        /// intersection was the whole box (issue #400, found by tests/CADability.BooleanSweep).
+        /// </summary>
+        [DataTestMethod]
+        [DataRow(1e-7)]
+        [DataRow(1e-6)]
+        [DataRow(1e-5)]
+        public void a_box_reaching_into_a_face_by_less_than_the_precision_touches_it(double depth)
+        {
+            Solid cube = Box(0, 0, 0, 10, 10, 10);
+            Solid box = Box(2, 2, 10 - depth, 6, 6, 5);
+            Assert.AreEqual(0.0, VolumeOf(Solid.Intersect(cube, box), "cube * box"), 36 * depth + 1e-6, "cube * box");
+            Assert.AreEqual(1000.0, Single(Solid.Subtract(cube, box), "cube - box").Volume(1e-4), 36 * depth + 1e-6, "cube - box");
+            Assert.AreEqual(180.0, Single(Solid.Subtract(box, cube), "box - cube").Volume(1e-4), 36 * depth + 1e-6, "box - cube");
+        }
+
+        /// <summary>
+        /// A box 1e-5 above the top face of a cube, within the precision of the operation (1.7e-5). The faces were taken as
+        /// overlapping, but the vertical edges of the box, which end 1e-5 above the face, did not intersect it: the tolerance of
+        /// their parameter was fixed at 1e-6, i.e. 5e-6 for an edge of 5. Without the intersection points the top face of the
+        /// cube was not split, cube - box gave the reversed box, a negative volume, and the union was null (issue #400).
+        /// </summary>
+        [TestMethod]
+        public void a_box_at_the_precision_above_a_face_touches_it()
+        {
+            Solid cube = Box(0, 0, 0, 10, 10, 10);
+            Solid box = Box(2, 2, 10 + 1e-5, 6, 6, 5);
+            Assert.AreEqual(1000.0, Single(Solid.Subtract(cube, box), "cube - box").Volume(1e-4), 1e-3, "cube - box");
+            Assert.AreEqual(180.0, Single(Solid.Subtract(box, cube), "box - cube").Volume(1e-4), 1e-3, "box - cube");
+            Solid union = Solid.Unite(cube, box);
+            Assert.IsNotNull(union, "cube + box");
+            Assert.AreEqual(1180.0, Single(new[] { union }, "cube + box").Volume(1e-4), 1e-3, "cube + box");
+        }
+
+        /// <summary>
+        /// A blind hole whose top is 1e-5 below the top face of the box, within the precision of the operation (1.4e-5): the
+        /// difference was the unchanged box and the union the cylinder alone, for the same reason as in
+        /// <see cref="a_box_at_the_precision_above_a_face_touches_it"/>.
+        /// </summary>
+        [TestMethod]
+        public void a_blind_hole_ending_at_the_precision_below_a_face()
+        {
+            Solid cube = Box(0, 0, 0, 10, 10, 10);
+            Solid cylinder = Make3D.MakeCylinder(new GeoPoint(5, 5, 4), 2 * GeoVector.XAxis, (6 - 1e-5) * GeoVector.ZAxis);
+            double hole = 4 * Math.PI * 6;
+            Assert.AreEqual(1000.0 - hole, VolumeOf(Solid.Subtract(cube, cylinder), "cube - cylinder"), 1e-3, "cube - cylinder");
+            Solid union = Solid.Unite(cube, cylinder);
+            Assert.IsNotNull(union, "cube + cylinder");
+            Assert.AreEqual(1000.0, Single(new[] { union }, "cube + cylinder").Volume(1e-4), 1e-3, "cube + cylinder");
+        }
+
+        /// <summary>
+        /// Two cylinders of radius 5 and 5 + <paramref name="dr"/> on the same axis, the longer one around the shorter one (or inside
+        /// it): within the precision of the operation (3e-5 here) the mantles coincide. CylindricalSurface.SameGeometry compared the
+        /// radii with Precision.eps instead of the precision passed in, so for 1e-6 and 1e-5 the mantles were neither overlapping nor
+        /// intersecting, and the intersection was empty (issue #400).
+        /// </summary>
+        [DataTestMethod]
+        [DataRow(1e-6)]
+        [DataRow(-1e-6)]
+        [DataRow(1e-5)]
+        [DataRow(-1e-5)]
+        public void coaxial_cylinders_whose_radii_differ_by_less_than_the_precision(double dr)
+        {
+            Solid shorter = Make3D.MakeCylinder(GeoPoint.Origin, 5 * GeoVector.XAxis, 10 * GeoVector.ZAxis);
+            Solid longer = Make3D.MakeCylinder(new GeoPoint(0, 0, -5), (5 + dr) * GeoVector.XAxis, 20 * GeoVector.ZAxis);
+            double common = 10 * Math.PI * Math.Pow(Math.Min(5, 5 + dr), 2);
+            double tolerance = 1e-3 + 2 * Math.PI * 5 * 20 * Math.Abs(dr); // the mantle dr thick
+            Assert.AreEqual(common, Single(Solid.Intersect(shorter, longer), "shorter * longer").Volume(1e-4), tolerance, "shorter * longer");
+            Assert.AreEqual(longer.Volume(1e-4) - common, VolumeOf(Solid.Subtract(longer, shorter), "longer - shorter"), tolerance, "longer - shorter");
+        }
+
+        /// <summary>
+        /// Two cylinders crossing at right angles with axes that meet, A with radius 5 along z, B with radius 5 + <paramref name="d"/>
+        /// along x, both 20 long. Within the precision of the operation (2.5e-5 here) the radii are the same, and the cylinders intersect
+        /// in four half ellipses, which meet where the cylinders touch. The exact intersection curves turn too sharply there to be
+        /// followed, and the edges of B at these points only touch A within the precision, so no vertex was made there: the results were
+        /// empty, a whole cylinder or wrong (issue #458).
+        /// </summary>
+        [DataTestMethod]
+        [DataRow(1e-7)]
+        [DataRow(-1e-7)]
+        [DataRow(3e-7)]
+        [DataRow(-3e-7)]
+        [DataRow(1e-6)]
+        [DataRow(-1e-6)]
+        [DataRow(1e-5)]
+        [DataRow(-1e-5)]
+        public void crossing_cylinders_whose_radii_differ_by_less_than_the_precision(double d)
+        {
+            Solid A() => Make3D.MakeCylinder(new GeoPoint(0, 0, -10), 5 * GeoVector.XAxis, 20 * GeoVector.ZAxis);
+            Solid B() => Make3D.MakeCylinder(new GeoPoint(-10, 0, 0), (5 + d) * GeoVector.YAxis, 20 * GeoVector.XAxis);
+            double va = 500 * Math.PI, vb = 20 * Math.PI * (5 + d) * (5 + d);
+            double common = IntersectionCurveVolumeTests.Common(5, 5 + d);
+            double tolerance = 1e-3 + 2 * Math.PI * 5 * 20 * Math.Abs(d); // a mantle d thick
+            Assert.AreEqual(common, VolumeOf(Solid.Intersect(A(), B()), "a * b"), tolerance, "a * b");
+            Assert.AreEqual(va - common, VolumeOf(Solid.Subtract(A(), B()), "a - b"), tolerance, "a - b");
+            Assert.AreEqual(vb - common, VolumeOf(Solid.Subtract(B(), A()), "b - a"), tolerance, "b - a");
+            Solid union = Solid.Unite(A(), B());
+            Assert.IsNotNull(union, "a + b");
+            Assert.AreEqual(va + vb - common, union.Volume(1e-4), tolerance, "a + b");
+        }
+
+        [TestMethod]
+        public void cylinders_are_the_same_geometry_within_the_precision()
+        {
+            CylindricalSurface a = new CylindricalSurface(GeoPoint.Origin, 5 * GeoVector.XAxis, 5 * GeoVector.YAxis, GeoVector.ZAxis);
+            CylindricalSurface b = new CylindricalSurface(new GeoPoint(1e-6, 0, 0), (5 + 1e-6) * GeoVector.XAxis, (5 + 1e-6) * GeoVector.YAxis, GeoVector.ZAxis);
+            BoundingRect bounds = new BoundingRect(0, 0, Math.PI, 10);
+            Assert.IsTrue(a.SameGeometry(bounds, b, bounds, 1e-5, out _), "within 1e-5");
+            Assert.IsFalse(a.SameGeometry(bounds, b, bounds, 1e-7, out _), "not within 1e-7");
         }
     }
 }

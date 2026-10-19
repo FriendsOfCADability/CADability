@@ -60,11 +60,14 @@ csproj is the single source of truth for what gets published.
    create the GitHub release themselves, so they prepare the text as a
    Markdown file for the person doing the release.
 
-## Known limitation: tags cannot be pushed from Claude Code cloud sessions
+## Known limitation: tags cannot be pushed and branches cannot be deleted from Claude Code cloud sessions
 
 Pushing to `refs/tags/*` from a Claude Code cloud session fails, while pushing
 branches to the same repository with the same credentials works. Both annotated
-and lightweight tags are affected. The symptom is:
+and lightweight tags are affected. Deleting a remote branch
+(`git push origin --delete <branch>`) fails the same way, while creating and
+updating branches, including `git push --force-with-lease` on a branch of the
+session, works. The symptom is:
 
 ```
 error: RPC failed; HTTP 403 curl 22 The requested URL returned error: 403
@@ -75,19 +78,25 @@ Everything up-to-date
 
 Two things make this easy to misread:
 
-- git prints `Everything up-to-date` **after** the error and **exits with
-  status 0**, so a script or agent that only checks the exit code concludes the
-  tag was pushed. Always verify with `git ls-remote --tags origin`.
+- git prints `Everything up-to-date` **after** the error. For a tag it **exits
+  with status 0**, so a script or agent that only checks the exit code
+  concludes the tag was pushed. Always verify with `git ls-remote --tags origin`.
+  A branch deletion exited with status 1, but the output reads like success
+  all the same; verify with `git ls-remote --heads origin <branch>`.
 - The `unexpected disconnect` line looks like a transient network problem and
   invites retrying. It is not transient — the `HTTP 403` on the line above is
   the real cause, and retrying with backoff never succeeds.
 
 This is not the outbound HTTPS proxy: its status endpoint records no denial for
 `github.com` when the push fails. It is the git credentials the session is
-given, which cover branch refs but not tag refs.
+given, which cover creating and updating branch refs, but not tag refs and not
+deleting refs. The GitHub tools of the session have no way to delete a branch
+either.
 
 **Workaround:** release via the `workflow_dispatch` trigger described above,
-and push the tag later from a normal clone.
+and push the tag later from a normal clone. Merged branches are deleted by a
+person, with *Delete branch* on the page of the merged pull request or on the
+*Branches* page of the repository.
 
 Note that `git ls-remote --tags origin | tail -n 5` is misleading here, because
 the output is sorted lexically rather than by version: pipe it through

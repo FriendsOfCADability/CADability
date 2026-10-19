@@ -1,0 +1,66 @@
+name: Linux CI
+
+# Builds the kernel and runs both test projects on Linux, where GDI+ (System.Drawing.Common)
+# is not available. Every step of #412 (removing GDI+ from CADability.dll) is checked here.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # ACadSharp is built from source (external/ACadSharp submodule, which
+          # itself pulls in CSUtilities as a submodule)
+          submodules: recursive
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          # ACadSharp's TargetFrameworks include net10.0, so restore needs the .NET 10 SDK.
+          # The test projects target net8.0, so its runtime is installed as well.
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Build the kernel
+        run: dotnet build CADability/CADability.csproj -c Release
+
+      - name: Build CADability.Forms
+        # Targets net8.0-windows and compiles on Linux with EnableWindowsTargeting (set in its csproj).
+        # Built here because the GDI+ code that leaves the kernel moves into this project.
+        run: dotnet build CADability.Forms/CADability.Forms.csproj -c Release
+
+      - name: Run CADability.Tests
+        run: >
+          dotnet test tests/CADability.Tests/CADability.Tests.csproj -c Release
+          --logger "trx;LogFileName=CADability.Tests.trx"
+          --results-directory TestResults
+
+      - name: Run CADability.ImportTests
+        if: success() || failure()
+        run: >
+          dotnet test tests/CADability.ImportTests/CADability.ImportTests.csproj -c Release
+          --logger "trx;LogFileName=CADability.ImportTests.trx"
+          --results-directory TestResults
+
+      - name: Upload test results
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-linux
+          path: TestResults/*.trx

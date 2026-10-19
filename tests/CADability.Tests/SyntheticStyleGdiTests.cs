@@ -19,6 +19,23 @@ namespace CADability.Tests
         private static readonly GdiFontProvider gdi = new GdiFontProvider();
         private static readonly ManagedFontProvider managed = new ManagedFontProvider();
 
+        /// <summary>
+        /// The point of the GDI+ outline for every point of the managed one: GDI+ may start a contour at another point (e.g.
+        /// for MS Gothic), so the points are matched by their position. Null, if a point has no counterpart.
+        /// </summary>
+        private static int[] Match(PointF[] managedPoints, PointF[] gdiPoints, double em)
+        {
+            int[] res = new int[managedPoints.Length];
+            for (int i = 0; i < managedPoints.Length; ++i)
+            {
+                bool Same(int j) => Math.Abs(managedPoints[i].X - gdiPoints[j].X) * em < 0.5 && Math.Abs(managedPoints[i].Y - gdiPoints[j].Y) * em < 0.5;
+                if (Same(i)) { res[i] = i; continue; }
+                res[i] = Enumerable.Range(0, gdiPoints.Length).Where(Same).DefaultIfEmpty(-1).First();
+                if (res[i] < 0) return null;
+            }
+            return res;
+        }
+
         [TestMethod]
         [DataRow("Microsoft Sans Serif")]
         [DataRow("Lucida Console")]
@@ -47,17 +64,19 @@ namespace CADability.Tests
                     g.GetGlyphPath(c, false, false, out PointF[] gs, out _);
                     string what = $"{family}{(bold ? " bold" : "")}{(italic ? " italic" : "")} '{c}'";
                     double worst = 0.0;
-                    if (mr.Length == ms.Length && gr.Length == gs.Length && mr.Length == gr.Length)
+                    int[] match = mr.Length == ms.Length && gr.Length == gs.Length && mr.Length == gr.Length ? Match(mr, gr, em) : null;
+                    if (match != null)
                     {
                         for (int i = 0; i < mr.Length; ++i)
                         {
                             // the change of every point in font units
-                            double dx = ((ms[i].X - mr[i].X) - (gs[i].X - gr[i].X)) * em, dy = ((ms[i].Y - mr[i].Y) - (gs[i].Y - gr[i].Y)) * em;
+                            int j = match[i];
+                            double dx = ((ms[i].X - mr[i].X) - (gs[j].X - gr[j].X)) * em, dy = ((ms[i].Y - mr[i].Y) - (gs[j].Y - gr[j].Y)) * em;
                             worst = Math.Max(worst, Math.Max(Math.Abs(dx), Math.Abs(dy)));
                         }
                     }
                     else
-                    {   // GDI+ splits the curves differently: compare the change of the bounding box
+                    {   // GDI+ splits the curves differently or has other points: compare the change of the bounding box
                         double[] Box(PointF[] p) => new double[] { p.Min(q => q.X), p.Min(q => q.Y), p.Max(q => q.X), p.Max(q => q.Y) };
                         double[] a = Box(mr), b = Box(ms), c2 = Box(gr), d = Box(gs);
                         for (int k = 0; k < 4; ++k) worst = Math.Max(worst, Math.Abs((b[k] - a[k]) - (d[k] - c2[k])) * em);

@@ -408,8 +408,8 @@ namespace CADability.GeoObject
         {
             public readonly string fontName;
             public readonly int fontStyle;
-            public readonly char c;
-            public DictKey(string fontName, int fontStyle, char c)
+            public readonly int c; // a Unicode code point
+            public DictKey(string fontName, int fontStyle, int c)
             {
                 this.fontName = fontName;
                 this.fontStyle = fontStyle;
@@ -417,7 +417,7 @@ namespace CADability.GeoObject
             }
             public override int GetHashCode()
             {
-                return fontName.GetHashCode() ^ fontStyle ^ (int)c;
+                return fontName.GetHashCode() ^ fontStyle ^ c;
             }
             public override bool Equals(object obj)
             {
@@ -524,7 +524,7 @@ namespace CADability.GeoObject
         // The caches are shared by all threads that measure or paint text, and Clear may empty them at any time: every access
         // goes through lock (this). The lock is reentrant, Get and GetCenterLines call GetOutline2D. The faces are locked
         // separately and always after this, so the two locks are taken in the same order everywhere.
-        public Path2D[] GetOutline2D(string fontName, int fontStyle, char c, out double width)
+        public Path2D[] GetOutline2D(string fontName, int fontStyle, int c, out double width)
         {
             lock (this)
             {
@@ -535,7 +535,7 @@ namespace CADability.GeoObject
                 return GlyphShapeBuilder.PathDataToPath2D(points, types, FontPrecision);
             }
         }
-        public CompoundShape Get(string font, int fontStyle, char c, out double width)
+        public CompoundShape Get(string font, int fontStyle, int c, out double width)
         {   // soll verschwinden!!
             DictVal found;
             lock (this)
@@ -554,14 +554,14 @@ namespace CADability.GeoObject
             width = found.width;
             return found.shape;
         }
-        public double GetKerning(string font, int fontStyle, char a, char b)
+        public double GetKerning(string font, int fontStyle, int a, int b)
         {
             lock (this)
             {
                 return GetFace(font, fontStyle).GetKerning(a, b);
             }
         }
-        public IPaintTo3DList Get(string font, int fontStyle, char c, out double width, IPaintTo3D paintTo3D)
+        public IPaintTo3DList Get(string font, int fontStyle, int c, out double width, IPaintTo3D paintTo3D)
         {
             bool useLists = true;
             if (paintTo3D != null) useLists = !paintTo3D.IsBitmap;
@@ -757,14 +757,14 @@ namespace CADability.GeoObject
                 lock (faces) faces.Clear();
             }
         }
-        public GeoObjectList GetCenterLines(string font, int fontStyle, char c, out double width)
+        public GeoObjectList GetCenterLines(string font, int fontStyle, int c, out double width)
         {
             lock (this)
             {
                 return ReadCenterLines(font, fontStyle, c, out width);
             }
         }
-        private GeoObjectList ReadCenterLines(string font, int fontStyle, char c, out double width)
+        private GeoObjectList ReadCenterLines(string font, int fontStyle, int c, out double width)
         {
             CenterLineVal found;
             if (!centerLineCache.TryGetValue(new DictKey(font, fontStyle, c), out found))
@@ -1022,10 +1022,11 @@ namespace CADability.GeoObject
                     // the size of the text string with the font size glyphDirection.Length: the advance widths and the kerning
                     // of the characters and the line spacing (this used to be Graphics.MeasureString of GDI+)
                     double width = 0.0;
-                    for (int i = 0; i < textString.Length; ++i)
+                    int[] chars = CodePoints(textString);
+                    for (int i = 0; i < chars.Length; ++i)
                     {
-                        width += ff.GetAdvanceWidth(textString[i]);
-                        if (i > 0) width += ff.GetKerning(textString[i - 1], textString[i]);
+                        width += ff.GetAdvanceWidth(chars[i]);
+                        if (i > 0) width += ff.GetKerning(chars[i - 1], chars[i]);
                     }
                     double size = glyphDirection.Length;
                     sizeExtent = new SizeF((float)(width * size), (float)(size * lsp / em));
@@ -1164,6 +1165,24 @@ namespace CADability.GeoObject
             }
             points.RemoveRange(0, points.Count - 1); // den letzten als ersten drinlassen
         }
+        /// <summary>
+        /// The characters of <paramref name="s"/> as Unicode code points: a surrogate pair (e.g. an emoji) is one character.
+        /// A lone surrogate is kept as the char it is.
+        /// </summary>
+        internal static int[] CodePoints(string s)
+        {
+            List<int> res = new List<int>(s.Length);
+            for (int i = 0; i < s.Length; ++i)
+            {
+                if (char.IsHighSurrogate(s[i]) && i + 1 < s.Length && char.IsLowSurrogate(s[i + 1]))
+                {
+                    res.Add(char.ConvertToUtf32(s[i], s[i + 1]));
+                    ++i;
+                }
+                else res.Add(s[i]);
+            }
+            return res.ToArray();
+        }
         // Returns the string to display: textString, with additional line breaks inserted at word
         // boundaries when ColumnWidth demands wrapping. Character widths are measured with the same
         // FontCache the layout loops use, so the wrapped lines fit the column exactly.
@@ -1196,9 +1215,10 @@ namespace CADability.GeoObject
         }
         private void AppendWrappedParagraph(System.Text.StringBuilder result, string paragraph, double normalizedWidth, int fs)
         {
-            double MeasureWord(string w)
+            double MeasureWord(string word)
             {
                 double total = 0.0;
+                int[] w = CodePoints(word);
                 for (int i = 0; i < w.Length; i++)
                 {
                     FontCache.GlobalFontCache.Get(fontName, fs, w[i], out double cw, null);
@@ -1248,7 +1268,7 @@ namespace CADability.GeoObject
             if (Strikeout) fs |= (int)FontStyle.Strikeout;
             PlaneSurface pls = new PlaneSurface(location, lineDirection, glyphDirection, lineDirection ^ glyphDirection);
             FontFace ff = FontCache.GlobalFontCache.GetFace(fontName, fs); // FontProvider.Current, see issue #412
-            string txt = GetDisplayString(fs);
+            int[] txt = CodePoints(GetDisplayString(fs));
             int em = ff.EmHeight;
             int ls = ff.LineSpacing;
             int dc = ff.CellDescent;
@@ -1395,7 +1415,7 @@ namespace CADability.GeoObject
             if (Strikeout) fs |= (int)FontStyle.Strikeout;
             PlaneSurface pls = new PlaneSurface(location, lineDirection, glyphDirection, lineDirection ^ glyphDirection);
             FontFace ff = FontCache.GlobalFontCache.GetFace(fontName, fs); // FontProvider.Current, see issue #412
-            string txt = GetDisplayString(fs);
+            int[] txt = CodePoints(GetDisplayString(fs));
             int em = ff.EmHeight;
             int ls = ff.LineSpacing;
             int dc = ff.CellDescent;
@@ -1528,7 +1548,7 @@ namespace CADability.GeoObject
             if (Strikeout) fs |= (int)FontStyle.Strikeout;
             PlaneSurface pls = new PlaneSurface(location, lineDirection, glyphDirection, lineDirection ^ glyphDirection);
             FontFace ff = FontCache.GlobalFontCache.GetFace(fontName, fs); // FontProvider.Current, see issue #412
-            string txt = GetDisplayString(fs);
+            int[] txt = CodePoints(GetDisplayString(fs));
             int em = ff.EmHeight;
             int ls = ff.LineSpacing;
             int dc = ff.CellDescent;
@@ -1923,7 +1943,7 @@ namespace CADability.GeoObject
                 }
                 FontFace ff = FontCache.GlobalFontCache.TryGetFace(fontName, fs); // FontProvider.Current, see issue #412
                 if (ff == null) return; // no font at all: nothing to paint or measure
-                string txt = GetDisplayString(fs);
+                int[] txt = CodePoints(GetDisplayString(fs));
                 int em = ff.EmHeight;
                 int ls = ff.LineSpacing;
                 int dc = ff.CellDescent;
@@ -2558,10 +2578,9 @@ namespace CADability.GeoObject
                     int ls = ff.LineSpacing;
                     int dc = ff.CellDescent;
                     int ac = ff.CellAscent;
-                    for (int i = 0; i < textString.Length; ++i)
+                    foreach (int c in CodePoints(textString))
                     {
-                        double width;
-                        FontCache.GlobalFontCache.Get(fontName, fs, textString[i], out width, paintTo3D);
+                        FontCache.GlobalFontCache.Get(fontName, fs, c, out double width, paintTo3D);
                     }
                 }
                 else
@@ -2614,7 +2633,7 @@ namespace CADability.GeoObject
                 PlaneSurface pls = new PlaneSurface(location, lineDirection, glyphDirection, lineDirection ^ glyphDirection);
                 FontFace ff = FontCache.GlobalFontCache.TryGetFace(fontName, fs); // FontProvider.Current, see issue #412
                 if (ff == null) return; // no font at all: nothing to paint or measure
-                string txt = GetDisplayString(fs);
+                int[] txt = CodePoints(GetDisplayString(fs));
                 int em = ff.EmHeight;
                 int ls = ff.LineSpacing;
                 int dc = ff.CellDescent;

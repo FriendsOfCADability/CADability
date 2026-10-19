@@ -98,21 +98,24 @@ namespace CADability
         /// </summary>
         public abstract int LineSpacing { get; }
         /// <summary>
-        /// The advance width of the character <paramref name="c"/> in units of the em height.
+        /// The advance width of the character <paramref name="codePoint"/> in units of the em height. Characters are Unicode
+        /// code points, so that characters outside the Basic Multilingual Plane (e.g. most emoji), which take two UTF-16
+        /// chars (a surrogate pair) in a string, are one character here.
         /// </summary>
-        public abstract double GetAdvanceWidth(char c);
+        public abstract double GetAdvanceWidth(int codePoint);
         /// <summary>
-        /// The kerning between two characters in units of the em height, usually negative; 0 if there is none.
+        /// The kerning between two characters (Unicode code points) in units of the em height, usually negative; 0 if there
+        /// is none.
         /// </summary>
-        public abstract double GetKerning(char left, char right);
+        public abstract double GetKerning(int left, int right);
         /// <summary>
-        /// Returns the outline of the character <paramref name="c"/> in the layout of a GDI+ GraphicsPath after
+        /// Returns the outline of the character (Unicode code point) <paramref name="codePoint"/> in the layout of a GDI+ GraphicsPath after
         /// <c>AddString</c> with an em size of 1 and <c>StringFormat.GenericTypographic</c>: in units of the em height, y
         /// downwards, the top of the character cell at 0 and the baseline at <see cref="CellAscent"/>/<see cref="EmHeight"/>.
         /// The point types are those of GDI+ (0 start, 1 line, 3 cubic Bezier, 0x80 closes the figure). Curves must be returned
         /// as Bezier segments and not be flattened. Underline and strikeout are added as rectangles when requested.
         /// </summary>
-        public abstract void GetGlyphPath(char c, bool underline, bool strikeout, out PointF[] points, out byte[] types);
+        public abstract void GetGlyphPath(int codePoint, bool underline, bool strikeout, out PointF[] points, out byte[] types);
     }
 
     /// <summary>
@@ -298,20 +301,20 @@ namespace CADability
         public override int CellAscent => font.CellAscent;
         public override int CellDescent => font.CellDescent;
         public override int LineSpacing => font.LineSpacing;
-        public override double GetAdvanceWidth(char c)
+        public override double GetAdvanceWidth(int codePoint)
         {
-            return font.GetAdvanceWidth(font.GetGlyphIndex(c)) / (double)font.UnitsPerEm;
+            return font.GetAdvanceWidth(font.GetGlyphIndex(codePoint)) / (double)font.UnitsPerEm;
         }
-        public override double GetKerning(char left, char right)
+        public override double GetKerning(int left, int right)
         {
             lock (locker)
             {   // the kerning pairs are read on the first call
                 return font.GetKerning(font.GetGlyphIndex(left), font.GetGlyphIndex(right)) / (double)font.UnitsPerEm;
             }
         }
-        public override void GetGlyphPath(char c, bool underline, bool strikeout, out PointF[] points, out byte[] types)
+        public override void GetGlyphPath(int codePoint, bool underline, bool strikeout, out PointF[] points, out byte[] types)
         {
-            font.GetPathData(font.GetGlyphIndex(c), underline, strikeout, out points, out types);
+            font.GetPathData(font.GetGlyphIndex(codePoint), underline, strikeout, out points, out types);
         }
     }
 }

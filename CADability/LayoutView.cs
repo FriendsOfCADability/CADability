@@ -84,21 +84,15 @@ namespace CADability
             this.layout = layout;
             screenToLayout = layoutToScreen = ModOp2D.Null;
             base.resourceIdInternal = "LayoutView";
-            // printDocument = project.printDocument;
             printDocument = new PrintDocument();
-
-            if (printDocument != null)
+            // the page settings of the layout, else those of the project, else the orientation of the layout's paper
+            PageSetup pageSetup = layout.PageSetup ?? project.DefaultPageSetup;
+            try
             {
-                if (layout.pageSettings != null)
-                {
-                    printDocument.DefaultPageSettings = layout.pageSettings;
-                }
-                else
-                {
-                    if (project.printDocument != null) printDocument.DefaultPageSettings = (PageSettings)project.printDocument.DefaultPageSettings.Clone();
-                    else printDocument.DefaultPageSettings.Landscape = layout.PaperWidth > layout.PaperHeight;
-                }
+                if (pageSetup != null) pageSetup.ApplyTo(printDocument);
+                else printDocument.DefaultPageSettings.Landscape = layout.PaperWidth > layout.PaperHeight;
             }
+            catch (InvalidPrinterException) { } // no printer installed
         }
 
         event ScrollPositionChanged IView.ScrollPositionChangedEvent
@@ -1047,27 +1041,19 @@ namespace CADability
 
         private void OnPrint()
         {
-            if (printDocument == null) printDocument = project.printDocument;
-            if (printDocument == null)
-                printDocument = new PrintDocument();
+            if (printDocument == null) printDocument = project.PrintDocument;
             Print(printDocument);
         }
         private void OnPrintSetup()
         {
             //psd.AllowPrinter = true;
             //psd.EnableMetric = true;
-            if (printDocument == null)
+            if (printDocument == null) printDocument = project.PrintDocument;
+            if (layout.PageSetup != null) layout.PageSetup.ApplyTo(printDocument);
+
+            if (Frame.UIService.ShowPageSetupDlg(ref printDocument, printDocument.DefaultPageSettings, out int width, out int height, out bool landscape) == DialogResult.OK)
             {
-                if (project.printDocument == null) project.printDocument = new PrintDocument();
-                printDocument = project.printDocument;
-            }
-            if (layout.pageSettings != null)
-            {
-                printDocument.DefaultPageSettings = layout.pageSettings;
-            }
-            
-            if (Frame.UIService.ShowPageSetupDlg(ref printDocument, layout.pageSettings, out int width, out int height, out bool landscape) == DialogResult.OK)
-            {
+                layout.PageSetup = PageSetup.FromPageSettings(printDocument.DefaultPageSettings); // saved with the layout
                 //psd.Document.OriginAtMargins = false;
 
                 if (landscape)
@@ -1088,11 +1074,7 @@ namespace CADability
         }
         private void OnSelectPrinter()
         {
-            if (printDocument == null)
-            {
-                if (project.printDocument == null) project.printDocument = new PrintDocument();
-                printDocument = project.printDocument;
-            }
+            if (printDocument == null) printDocument = project.PrintDocument;
             //PrintDialog printDialog = new PrintDialog();
             //printDialog.Document = printDocument;
             //printDialog.AllowSomePages = false;
@@ -1102,6 +1084,7 @@ namespace CADability
             if (Frame.UIService.ShowPrintDlg(ref printDocument) == DialogResult.OK)
             {
                 // printDocument = printDialog.Document; update in ShowPrintDlg
+                layout.PageSetup = PageSetup.FromPageSettings(printDocument.DefaultPageSettings); // the printer is saved with the layout
             }
         }
         

@@ -133,5 +133,36 @@ namespace CADability.Tests
             Assert.AreEqual(1, paintFake.Count("OpenList"), "the selection is made once");
             Assert.AreEqual(3, paintFake.Count("SelectedList"), "and shown in the three repaints of the view of its model");
         }
+
+        /// <summary>
+        /// #496: after <see cref="ProjectedModel.InvalidateDisplayLists"/>, e.g. because the graphics device was lost, the
+        /// display list of the selection belongs to the old device and must be made again, although the precision of the
+        /// model display lists did not change.
+        /// </summary>
+        [TestMethod]
+        public void the_selection_is_made_again_when_the_display_lists_are_invalidated()
+        {
+            Project project = Project.CreateSimpleProject();
+            Model model = project.GetActiveModel();
+            Line line = Line.TwoPoints(new GeoPoint(0, 0, 0), new GeoPoint(10, 5, 0));
+            model.Add(line);
+            model.displayListPrecision = 0.5;
+            ProjectedModel projectedModel = new ProjectedModel(model, new Projection(Projection.StandardProjection.FromTop));
+
+            (IFrame frame, Fake _) = Create<IFrame>();
+            SelectObjectsAction action = new SelectObjectsAction(frame);
+            typeof(SelectObjectsAction).GetField("selectedObjects", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(action, new GeoObjectList(line));
+            (IView view, Fake viewFake) = Create<IView>();
+            viewFake.Model = model;
+            (IPaintTo3D paintTo3D, Fake paintFake) = Create<IPaintTo3D>();
+            paintFake.Capabilities = PaintCapabilities.ZoomIndependentDisplayList;
+
+            onRepaintSelect.Invoke(action, new object[] { System.Drawing.Rectangle.Empty, view, paintTo3D });
+            onRepaintSelect.Invoke(action, new object[] { System.Drawing.Rectangle.Empty, view, paintTo3D });
+            Assert.AreEqual(1, paintFake.Count("OpenList"), "an unchanged selection is painted from its display list");
+            projectedModel.InvalidateDisplayLists();
+            onRepaintSelect.Invoke(action, new object[] { System.Drawing.Rectangle.Empty, view, paintTo3D });
+            Assert.AreEqual(2, paintFake.Count("OpenList"), "the selection must be made again for the new device");
+        }
     }
 }

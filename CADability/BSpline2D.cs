@@ -1668,10 +1668,9 @@ namespace CADability.Curve2D
             // Notfalls Darstellung als Polyline
             int l = poles.Length * 4 + 2;
             PointF[] ppf = new PointF[l];
-            double du = (endParam - startParam) / (l - 1);
             for (int i = 0; i < l; ++i)
             {
-                ppf[i] = PointAt(startParam + i * du).PointF;
+                ppf[i] = PointAt((double)i / (l - 1)).PointF; // PointAt expects 0..1, not the knot parameter
             }
             if (!forward) Array.Reverse(ppf);
             path.AddLines(ppf);

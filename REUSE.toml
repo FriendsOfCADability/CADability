@@ -59,3 +59,10 @@ path = [
 ]
 SPDX-FileCopyrightText = "2023 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'"
 SPDX-License-Identifier = "OFL-1.1"
+
+[[annotations]]
+# Test drawings of R10 and R11/R12 from https://github.com/michal-josef-spacek/CAD-Format-DWG-AC1006
+# and https://github.com/michal-josef-spacek/CAD-Format-DWG-AC1009, renamed after their content.
+path = "tests/CADability.ImportTests/Files/Dwg/**"
+SPDX-FileCopyrightText = "2021-2023 Michal Josef Špaček"
+SPDX-License-Identifier = "BSD-2-Clause"

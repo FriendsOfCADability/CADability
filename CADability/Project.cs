@@ -1476,11 +1476,25 @@ namespace CADability
             wgl.WriteToFile(fileName);
         }
 
+        /// <summary>
+        /// Reads the GDI+ bitmaps of pictures and icons in binary project files of CADability 1.x as
+        /// <see cref="LegacyImageData"/>, i.e. as their image file bytes, so that such files open without GDI+ (issue #412).
+        /// All other types are bound as usual.
+        /// </summary>
+        private class LegacyImageBinder : SerializationBinder
+        {
+            public override Type BindToType(string assemblyName, string typeName)
+            {
+                if (LegacyImageData.IsGdiImageType(typeName) && assemblyName.StartsWith("System.Drawing")) return typeof(LegacyImageData);
+                return null; // the formatter's own binding
+            }
+        }
         private class CondorSerializationBinder : SerializationBinder
         {
             public override Type BindToType(string assemblyName, string typeName)
             {
                 System.Diagnostics.Trace.WriteLine("BindToType: " + assemblyName + ", " + typeName);
+                if (LegacyImageData.IsGdiImageType(typeName) && assemblyName.StartsWith("System.Drawing")) return typeof(LegacyImageData);
                 // Diese Zeilen dienen dazu alte CONDOR Dateien lesbar zu machen.
                 // evtl. machen sie Schwierigkeiten, wenn Objekte von anderen Modulen
                 // deserialisiert werden sollen. Dann müsste man weiter unten es wieder 
@@ -1649,6 +1663,8 @@ namespace CADability
 
 #if FW2
             formatter.Binder = new CondorSerializationBinder(); // das soll hier gleich laufen, damit nicht versucht wird die CADability.dll zu laden
+#else
+            formatter.Binder = new LegacyImageBinder();
 #endif
             long startPosition = stream.Position;
             try

@@ -65,6 +65,8 @@ namespace CADability.Forms
             LazyInitializer.EnsureInitialized(ref fontFamilyNames, () =>
                 new HashSet<string>(FontFamily.Families.Select(f => f.Name.ToUpper())));
 
+        // texts get their fonts from GDI as before issue #412, unless the application has chosen a font provider
+        static PaintToGDI() { GdiFontProvider.MakeDefault(); }
         public PaintToGDI(Projection projection, Graphics graphics)
             : this()
         {

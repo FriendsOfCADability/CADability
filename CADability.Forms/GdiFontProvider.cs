@@ -4,18 +4,32 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace CADability.Forms
 {
     /// <summary>
     /// A <see cref="FontProvider"/> that gets the fonts from GDI and GDI+, as CADability did before issue #412: the glyph
-    /// outlines from <see cref="GraphicsPath.AddString(string, FontFamily, int, float, PointF, StringFormat)"/>, the widths and
-    /// the kerning from gdi32. It knows every font Windows knows (also OpenType fonts with CFF outlines) and synthesizes bold
-    /// and italic faces a family does not have. Set <see cref="FontProvider.Current"/> to an instance of this class to use it;
-    /// the default is the <see cref="ManagedFontProvider"/>.
+    /// outlines from <see cref="GraphicsPath.AddString(string, FontFamily, int, float, PointF, StringFormat)"/>, the widths
+    /// and the kerning from gdi32. It knows every font Windows knows (also OpenType fonts with CFF outlines) and
+    /// synthesizes bold and italic faces a family does not have. As soon as one of the main classes of CADability.Forms is
+    /// used (<see cref="CadControl"/>, <see cref="CadCanvas"/>, <see cref="CadFrame"/>, <see cref="PaintToOpenGL"/> or
+    /// <see cref="PaintToGDI"/>), this provider becomes the default, so that Windows Forms applications show their texts
+    /// as before. An application that sets <see cref="FontProvider.Current"/> itself keeps its choice, e.g.
+    /// <c>FontProvider.Current = new ManagedFontProvider();</c> for the same fonts as on the other platforms.
     /// </summary>
     public class GdiFontProvider : FontProvider
     {
+        private static int madeDefault;
+        /// <summary>
+        /// Makes a <see cref="GdiFontProvider"/> the default font provider, unless the application has chosen one. Called by the
+        /// static constructors of the main classes of CADability.Forms; only the first call does something.
+        /// </summary>
+        internal static void MakeDefault()
+        {
+            if (Interlocked.Exchange(ref madeDefault, 1) == 0) SetDefault(() => new GdiFontProvider());
+        }
+
         private readonly Dictionary<(string family, bool bold, bool italic), GdiFontFace> faces = new Dictionary<(string, bool, bool), GdiFontFace>();
         private HashSet<string> familyNames; // upper case
 

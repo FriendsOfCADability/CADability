@@ -62,6 +62,11 @@ namespace CADability
         public string FullName { get; }
         public bool IsBold { get; }
         public bool IsItalic { get; }
+        /// <summary>
+        /// The weight of the face, usWeightClass of the "OS/2" table (400 regular, 700 bold); for an instance of a variable font
+        /// the value of its "wght" axis. Without an "OS/2" table 700 for a bold face and 400 otherwise.
+        /// </summary>
+        public int WeightClass { get; private set; }
         public int UnitsPerEm { get; }
         public int Ascender { get; }
         public int Descender { get; }
@@ -183,6 +188,7 @@ namespace CADability
             StrikeoutPosition = UnitsPerEm / 4;
             if (tables.TryGetValue("OS/2", out var os2) && os2.length >= 78)
             {
+                WeightClass = U16(os2.offset + 4);
                 StrikeoutSize = S16(os2.offset + 26);
                 StrikeoutPosition = S16(os2.offset + 28);
                 int fsSelection = U16(os2.offset + 62);
@@ -202,6 +208,7 @@ namespace CADability
             }
             IsBold = bold;
             IsItalic = italic;
+            if (WeightClass == 0) WeightClass = bold ? 700 : 400;
             ReadNames();
             FamilyName = NameOf(1) ?? "";
             SubfamilyName = NameOf(2) ?? "";
@@ -253,6 +260,9 @@ namespace CADability
             res.IsHeaderOnly = IsHeaderOnly;
             double[] normalized = res.variations.Normalize(userCoordinates);
             res.coords = normalized.Any(c => c != 0.0) ? normalized : null;
+            VariationAxis[] axes = res.variations.Axes;
+            for (int i = 0; i < axes.Length && i < userCoordinates.Length; ++i)
+                if (axes[i].Tag == "wght") res.WeightClass = (int)Math.Round(userCoordinates[i]);
             if (res.coords != null)
             {   // the font wide metrics of the instance ("MVAR"), rounded like the values of the tables
                 int Varied(int value, string tag) => (int)Math.Floor(value + res.variations.GetMetricDelta(tag, res.coords) + 0.5);
@@ -520,12 +530,33 @@ namespace CADability
         /// </summary>
         public void GetPathData(int glyph, bool underline, bool strikeout, out PointF[] points, out byte[] types)
         {
+            GetPathData(glyph, underline, strikeout, 0.0, 0.0, out points, out types);
+        }
+        /// <summary>
+        /// Like <see cref="GetPathData(int, bool, bool, out PointF[], out byte[])"/>, with the strokes made wider by
+        /// <paramref name="boldX"/> and higher by <paramref name="boldY"/> font units for a synthetic bold face (see
+        /// <see cref="SyntheticFontFace.EmboldenContours"/>). The quadratic outline of TrueType is made wider, before its
+        /// segments become cubic ones, as GDI+ does it; a CFF outline is made wider after it was drawn. The underline and the
+        /// strikeout line are not made wider.
+        /// </summary>
+        internal void GetPathData(int glyph, bool underline, bool strikeout, double boldX, double boldY, out PointF[] points, out byte[] types)
+        {
             List<PointF> pts = new List<PointF>();
             List<byte> tps = new List<byte>();
             double scale = 1.0 / UnitsPerEm;
             PointF Map(double x, double y) => new PointF((float)(x * scale), (float)((CellAscent - y) * scale));
-            if (HasCffOutlines) DrawCff(glyph, new PathDataSink(pts, tps, Map));
-            else foreach (GlyphPoint[] contour in GetContours(glyph))
+            bool bold = boldX > 0 || boldY > 0;
+            if (HasCffOutlines)
+            {
+                DrawCff(glyph, new PathDataSink(pts, tps, Map));
+                if (bold && pts.Count > 0)
+                {
+                    PointF[] wider = SyntheticFontFace.Embolden(pts.ToArray(), tps.ToArray(), boldX * scale, boldY * scale);
+                    pts.Clear();
+                    pts.AddRange(wider);
+                }
+            }
+            else foreach (GlyphPoint[] contour in Emboldened(GetContours(glyph), boldX, boldY))
             {
                 if (contour.Length < 2) continue;
                 int n = contour.Length;
@@ -616,6 +647,18 @@ namespace CADability
             if (strikeout) AddBar(StrikeoutPosition, StrikeoutSize);
             points = pts.ToArray();
             types = tps.ToArray();
+        }
+
+        // the contours made wider for a synthetic bold face, keeping which points are on the curve
+        private static List<GlyphPoint[]> Emboldened(List<GlyphPoint[]> contours, double boldX, double boldY)
+        {
+            if (boldX <= 0 && boldY <= 0) return contours;
+            List<(double x, double y)[]> xy = contours.Select(c => c.Select(p => (p.X, p.Y)).ToArray()).ToList();
+            List<(double x, double y)[]> wider = SyntheticFontFace.EmboldenContours(xy, boldX, boldY);
+            List<GlyphPoint[]> res = new List<GlyphPoint[]>(contours.Count);
+            for (int c = 0; c < contours.Count; ++c)
+                res.Add(contours[c].Select((p, i) => new GlyphPoint(wider[c][i].x, wider[c][i].y, p.OnCurve)).ToArray());
+            return res;
         }
 
         /// <summary>

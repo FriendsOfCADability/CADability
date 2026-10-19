@@ -124,7 +124,7 @@ namespace CADability
     /// default it uses the font directories of the system; more files or directories can be added. The named instances of a
     /// variable font (TrueType with "gvar" or OpenType with "CFF2") are faces of their own, with family names as GDI makes
     /// them, e.g. "Bahnschrift Light Condensed". Bitmap fonts are left out. A bold or italic face that a family does not have
-    /// is not synthesized: the closest face is used.
+    /// is synthesized from the closest face, as GDI+ does it (see <see cref="SyntheticFontFace"/>).
     /// </summary>
     public class ManagedFontProvider : FontProvider
     {
@@ -137,6 +137,7 @@ namespace CADability
             public bool Bold, Italic;
             public double[] Coordinates; // the named instance of a variable font, null for a font that is not variable
             public ManagedFontFace Face; // loaded on demand
+            public readonly FontFace[] Synthetic = new FontFace[4]; // with synthetic bold (1) and/or italic (2), made on demand
         }
         private readonly object locker = new object();
         private readonly List<string> directories = new List<string>();
@@ -231,8 +232,12 @@ namespace CADability
                     if (best.Coordinates != null) font = font.WithVariation(best.Coordinates);
                     best.Face = new ManagedFontFace(font, best.Family, best.Bold, best.Italic);
                 }
+                // a style the family does not have is synthesized from the closest face, as GDI+ does it
+                int synthetic = (bold && !best.Bold ? 1 : 0) | (italic && !best.Italic ? 2 : 0);
+                if (synthetic == 0) return best.Face;
+                if (best.Synthetic[synthetic] == null) best.Synthetic[synthetic] = new SyntheticFontFace(best.Face, (synthetic & 1) != 0, (synthetic & 2) != 0);
+                return best.Synthetic[synthetic];
             }
-            return best.Face;
         }
 
         private static void AddEntry(Entry entry, TrueTypeFont font, List<Entry> list)
@@ -381,6 +386,15 @@ namespace CADability
             {   // the kerning pairs are read on the first call
                 return font.GetKerning(font.GetGlyphIndex(left), font.GetGlyphIndex(right)) / (double)font.UnitsPerEm;
             }
+        }
+        /// <summary>
+        /// Like <see cref="GetGlyphPath(int, bool, bool, out PointF[], out byte[])"/>, with the strokes made wider by
+        /// <paramref name="boldX"/> and higher by <paramref name="boldY"/> (in units of the em height) for a synthetic bold
+        /// face, see <see cref="SyntheticFontFace"/>.
+        /// </summary>
+        internal void GetGlyphPath(int codePoint, bool underline, bool strikeout, double boldX, double boldY, out PointF[] points, out byte[] types)
+        {
+            font.GetPathData(font.GetGlyphIndex(codePoint), underline, strikeout, boldX * font.UnitsPerEm, boldY * font.UnitsPerEm, out points, out types);
         }
         public override void GetGlyphPath(int codePoint, bool underline, bool strikeout, out PointF[] points, out byte[] types)
         {

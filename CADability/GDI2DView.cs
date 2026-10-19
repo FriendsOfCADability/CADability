@@ -552,8 +552,7 @@ namespace CADability
                     }
                     return true;
                 case "MenuId.GDI2DView.Print":
-                    if (project.printDocument == null) project.printDocument = new PrintDocument();
-                    PrintSinglePage(project.printDocument);
+                    PrintSinglePage(project.PrintDocument);
                     return true;
                 case "MenuId.Zoom.Total":
                     ZoomToModelExtent(1.1);

@@ -2,6 +2,8 @@ using System.Collections;
 using System.Reflection;
 using CADability.GeoObject;
 using CADability.Substitutes;
+// with UseWindowsForms (the Windows build of the tests), System.Windows.Forms has a PaintEventArgs as well
+using PaintEventArgs = CADability.Substitutes.PaintEventArgs;
 
 namespace CADability.Tests
 {
@@ -81,10 +83,10 @@ namespace CADability.Tests
             object withList = Activator.CreateInstance(dictVal);
             dictVal.GetField("list").SetValue(withList, list);
             dictVal.GetField("listCreated").SetValue(withList, true);
-            cache[Activator.CreateInstance(dictKey, "Arial", 0, 'A')] = withList;
+            cache[Activator.CreateInstance(dictKey, "Arial", 0, (int)'A')] = withList;
             object withoutList = Activator.CreateInstance(dictVal); // e.g. a space: the list is null
             dictVal.GetField("listCreated").SetValue(withoutList, true);
-            cache[Activator.CreateInstance(dictKey, "Arial", 0, ' ')] = withoutList;
+            cache[Activator.CreateInstance(dictKey, "Arial", 0, (int)' ')] = withoutList;
             Type fontKey = typeof(FontCache).GetNestedType("FontKey", BindingFlags.NonPublic);
             Dictionary(fontCache, "faces")[Activator.CreateInstance(fontKey, "Arial", 0)] = null;
 

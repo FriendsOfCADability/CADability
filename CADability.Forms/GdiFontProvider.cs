@@ -60,8 +60,8 @@ namespace CADability.Forms
         private readonly FontFamily family;
         private readonly FontStyle style; // bold and italic only
         private readonly int em;
-        private readonly Dictionary<char, double> widths = new Dictionary<char, double>();
-        private Dictionary<(char, char), double> kerning;
+        private readonly Dictionary<int, double> widths = new Dictionary<int, double>();
+        private Dictionary<(int, int), double> kerning;
 
         public GdiFontFace(FontFamily family, bool bold, bool italic)
         {
@@ -85,28 +85,37 @@ namespace CADability.Forms
         public override int CellDescent => family.GetCellDescent(style);
         public override int LineSpacing => family.GetLineSpacing(style);
 
-        public override double GetAdvanceWidth(char c)
+        public override double GetAdvanceWidth(int codePoint)
         {
             lock (widths)
             {
-                if (widths.TryGetValue(c, out double width)) return width;
+                if (widths.TryGetValue(codePoint, out double width)) return width;
                 WithSelectedFont(hdc =>
                 {
-                    ABC[] abc = new ABC[1];
-                    GetCharABCWidths(hdc, c, c, abc);
-                    width = (abc[0].abcA + abc[0].abcB + abc[0].abcC) / (double)em;
+                    if (codePoint <= 0xFFFF)
+                    {
+                        ABC[] abc = new ABC[1];
+                        GetCharABCWidths(hdc, (uint)codePoint, (uint)codePoint, abc);
+                        width = (abc[0].abcA + abc[0].abcB + abc[0].abcC) / (double)em;
+                    }
+                    else
+                    {   // GetCharABCWidths only takes UTF-16 chars: measure the surrogate pair as a string
+                        string s = char.ConvertFromUtf32(codePoint);
+                        GetTextExtentPoint32(hdc, s, s.Length, out SIZE size);
+                        width = size.cx / (double)em;
+                    }
                 });
-                widths[c] = width;
+                widths[codePoint] = width;
                 return width;
             }
         }
-        public override double GetKerning(char left, char right)
+        public override double GetKerning(int left, int right)
         {
             lock (widths)
             {
                 if (kerning == null)
                 {
-                    Dictionary<(char, char), double> pairs = new Dictionary<(char, char), double>();
+                    Dictionary<(int, int), double> pairs = new Dictionary<(int, int), double>();
                     WithSelectedFont(hdc =>
                     {
                         int num = GetKerningPairs(hdc, 0, null);
@@ -114,7 +123,7 @@ namespace CADability.Forms
                         {
                             KERNINGPAIR[] kp = new KERNINGPAIR[num];
                             GetKerningPairs(hdc, num, kp);
-                            for (int i = 0; i < kp.Length; ++i) pairs[((char)kp[i].wFirst, (char)kp[i].wSecond)] = kp[i].iKernAmount / (double)em;
+                            for (int i = 0; i < kp.Length; ++i) pairs[((ushort)kp[i].wFirst, (ushort)kp[i].wSecond)] = kp[i].iKernAmount / (double)em;
                         }
                     });
                     kerning = pairs;
@@ -123,7 +132,7 @@ namespace CADability.Forms
                 return res;
             }
         }
-        public override void GetGlyphPath(char c, bool underline, bool strikeout, out PointF[] points, out byte[] types)
+        public override void GetGlyphPath(int codePoint, bool underline, bool strikeout, out PointF[] points, out byte[] types)
         {
             FontStyle fs = style | (underline ? FontStyle.Underline : FontStyle.Regular) | (strikeout ? FontStyle.Strikeout : FontStyle.Regular);
             using (GraphicsPath path = new GraphicsPath())
@@ -131,7 +140,7 @@ namespace CADability.Forms
             {
                 sf.LineAlignment = StringAlignment.Near;
                 sf.Alignment = StringAlignment.Near;
-                path.AddString(c.ToString(), family, (int)fs, 1.0f, new PointF(0.0f, 0.0f), sf);
+                path.AddString(AsString(codePoint), family, (int)fs, 1.0f, new PointF(0.0f, 0.0f), sf);
                 if (path.PointCount == 0)
                 {
                     points = new PointF[0];
@@ -144,6 +153,9 @@ namespace CADability.Forms
                 }
             }
         }
+
+        // a lone surrogate (not a valid code point) is passed on as the char it is
+        private static string AsString(int codePoint) => codePoint >= 0xD800 && codePoint <= 0xDFFF ? ((char)codePoint).ToString() : char.ConvertFromUtf32(codePoint);
 
         /// <summary>
         /// Selects this face with the em height as pixel size into a device context for the duration of <paramref name="action"/>.
@@ -191,6 +203,14 @@ namespace CADability.Forms
         }
         [DllImport("gdi32.dll", EntryPoint = "GetCharABCWidthsW")]
         private static extern bool GetCharABCWidths(IntPtr hdc, uint uFirstChar, uint uLastChar, [Out] ABC[] lpabc);
+        [StructLayout(LayoutKind.Sequential)]
+        private struct SIZE
+        {
+            public int cx;
+            public int cy;
+        }
+        [DllImport("gdi32.dll", EntryPoint = "GetTextExtentPoint32W", CharSet = CharSet.Unicode)]
+        private static extern bool GetTextExtentPoint32(IntPtr hdc, string lpString, int c, out SIZE psizl);
         [DllImport("gdi32.dll", EntryPoint = "GetKerningPairsW")]
         private static extern int GetKerningPairs(IntPtr hdc, int cPairs, [Out] KERNINGPAIR[] lpkrnpair);
         [DllImport("gdi32.dll")]

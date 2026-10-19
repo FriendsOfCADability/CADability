@@ -25,7 +25,7 @@ static class Program
     static void Main()
     {
         CADability.Forms.GdiFontProvider gdi = new CADability.Forms.GdiFontProvider();
-        foreach ((string fam, char c, bool bold, bool italic) in new[] { ("Microsoft Sans Serif", '8', true, false), ("Sylfaen", 'I', true, false), ("MS Gothic", 'o', false, true), ("Gabriola", 'I', true, false) })
+        foreach ((string fam, char c, bool bold, bool italic) in new[] { ("Sylfaen", '8', true, false), ("Gabriola", 'H', true, false), ("Gabriola", 'l', true, false), ("Gabriola", '8', true, false) })
         {
             FontFace mr = managed.GetFace(fam, false, false), ms = managed.GetFace(fam, bold, italic);
             FontFace gr = gdi.GetFace(fam, false, false), gs = gdi.GetFace(fam, bold, italic);

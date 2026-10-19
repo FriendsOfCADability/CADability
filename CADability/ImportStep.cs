@@ -4076,7 +4076,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 								child.parameter["_transformation"] = new Item(Item.ItemType.created, transformation);
 								child.parameter["_referred"] = relatedProduct;
 								relatingProduct.parameter["_children"].lval.Add(child);
-								products.Add(relatingProduct);
+								lock (products) products.Add(relatingProduct); // the parallel import adds products on several threads
 							}
 #if DEBUG
 							//System.Diagnostics.Trace.WriteLine(SubTree(item.definingIndex, 5));
@@ -4590,7 +4590,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 							//    System.Diagnostics.Trace.WriteLine(up[i]);
 							//}
 #endif
-							mappedItems.Add(item);
+							lock (mappedItems) mappedItems.Add(item); // the parallel import creates mapped items on several threads
 							string name = item.parameter["name"].sval;
 							object mo = CreateEntity(item.parameter["mapping_source"].parameter["mapping_origin"]);
 							object mr = CreateEntity(item.parameter["mapping_source"].parameter["mapped_representation"]);

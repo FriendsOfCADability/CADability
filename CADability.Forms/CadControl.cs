@@ -23,6 +23,8 @@ namespace CADability.Forms
 
         #endregion PRIVATE FIELDS
 
+        // texts get their fonts from GDI as before issue #412, unless the application has chosen a font provider
+        static CadControl() { GdiFontProvider.MakeDefault(); }
         /// <summary>
         /// Default constructor
         /// </summary>

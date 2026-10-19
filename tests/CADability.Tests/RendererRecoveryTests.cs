@@ -2,6 +2,8 @@ using System.Collections;
 using System.Reflection;
 using CADability.GeoObject;
 using CADability.Substitutes;
+// with UseWindowsForms (the Windows build of the tests), System.Windows.Forms has a PaintEventArgs as well
+using PaintEventArgs = CADability.Substitutes.PaintEventArgs;
 
 namespace CADability.Tests
 {

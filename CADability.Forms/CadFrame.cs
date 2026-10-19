@@ -20,6 +20,9 @@ namespace CADability.Forms
     /// </summary>
     public class CadFrame : FrameImpl, IUIService
     {
+        // texts get their fonts from GDI as before issue #412, unless the application has chosen a font provider
+        static CadFrame() { GdiFontProvider.MakeDefault(); }
+
         #region PRIVATE FIELDS
 
         private ICommandHandler commandHandler;

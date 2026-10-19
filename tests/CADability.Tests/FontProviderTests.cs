@@ -131,15 +131,16 @@ namespace CADability.Tests
 
         [TestMethod]
         [DoNotParallelize]
-        public void MissingStyleFallsBackToAnExistingFace()
+        public void MissingStyleIsMadeFromAnExistingFace()
         {
             ManagedFontProvider provider = new ManagedFontProvider(new[] { FontDirectory() }, false);
             CollectionAssert.Contains(provider.GetFamilyNames(), "Liberation Sans");
             FontFace bold = provider.GetFace("liberation sans", true, false);
             Assert.IsNotNull(bold, "the family name is not case sensitive");
-            Assert.IsFalse(bold.IsBold, "only the regular face is there");
+            // only the regular face is there: the bold face is synthesized from it (see SyntheticFontFaceTests)
+            Assert.IsTrue(bold.IsBold);
+            Assert.AreSame(provider.GetFace("Liberation Sans", false, false), ((SyntheticFontFace)bold).BaseFace, "faces are loaded once");
             Assert.IsNull(provider.GetFace("Arial", false, false));
-            Assert.AreSame(bold, provider.GetFace("Liberation Sans", false, false), "faces are loaded once");
         }
 
         [TestMethod]

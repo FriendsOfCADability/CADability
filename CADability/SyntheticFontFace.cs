@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 
 namespace CADability
@@ -63,13 +64,17 @@ namespace CADability
 
         public override void GetGlyphPath(int codePoint, bool underline, bool strikeout, out PointF[] points, out byte[] types)
         {
-            face.GetGlyphPath(codePoint, underline, strikeout, out points, out types);
-            if (points.Length == 0) return;
-            if (bold)
-            {
-                (double x, double y) = BoldStrengthOf(face);
-                if (x > 0) points = Embolden(points, types, x, y);
+            (double x, double y) = bold ? BoldStrengthOf(face) : (0.0, 0.0);
+            if (x > 0 && face is ManagedFontFace managed)
+            {   // made wider on the outline of the font, before the quadratic segments of TrueType become cubic ones
+                managed.GetGlyphPath(codePoint, underline, strikeout, x, y, out points, out types);
             }
+            else
+            {
+                face.GetGlyphPath(codePoint, underline, strikeout, out points, out types);
+                if (x > 0 && points.Length > 0) points = Embolden(points, types, x, y);
+            }
+            if (points.Length == 0) return;
             if (italic)
             {
                 // the path is in units of the em height with y downwards and the baseline at CellAscent/EmHeight
@@ -80,64 +85,74 @@ namespace CADability
 
         /// <summary>
         /// Makes the strokes of a path (in the layout of <see cref="FontFace.GetGlyphPath"/>, y downwards) wider by
-        /// <paramref name="strengthX"/> and higher by <paramref name="strengthY"/>: FT_Outline_EmboldenXY of FreeType moves every
-        /// point of a contour outwards by half the strength along the bisector of its two edges, then the path is moved by half
-        /// the strength to the right and up. For a polygon this moves every edge that faces right by the strength to the right
-        /// and every edge that faces up by the strength up, and leaves the others where they are, which is what GDI+ does. The
-        /// control points of the Bezier segments are moved the same way.
+        /// <paramref name="strengthX"/> and higher by <paramref name="strengthY"/>, see <see cref="EmboldenContours"/>. The
+        /// control points of the Bezier segments are moved like the other points. For the glyphs of a TrueType font this is
+        /// done on the quadratic outline instead, as GDI+ does it (see <see cref="TrueTypeFont.GetPathData(int, bool, bool, double, double, out PointF[], out byte[])"/>).
         /// </summary>
         internal static PointF[] Embolden(PointF[] points, byte[] types, double strengthX, double strengthY)
         {
-            PointF[] res = (PointF[])points.Clone();
-            double halfX = strengthX / 2.0, halfY = strengthY / 2.0;
-            // the orientation of the whole outline, as FreeType determines it: the holes run the other way than the outer
-            // contours, so that "outwards" means away from the ink for both, and the holes get smaller
-            double area = 0.0;
-            ForEachContour(types, (first, last) =>
-            {
-                for (int i = first; i <= last; ++i)
-                {
-                    int j = i == last ? first : i + 1;
-                    area += points[i].X * -points[j].Y - points[j].X * -points[i].Y; // y upwards
-                }
-            });
-            if (area == 0.0) return res;
-            bool clockwise = area < 0; // the TrueType orientation (outer contours clockwise with y upwards)
-            ForEachContour(types, (first, last) => EmboldenContour(points, res, first, last, halfX, halfY, clockwise));
-            for (int i = 0; i < res.Length; ++i)
-            {
-                res[i].X = (float)(res[i].X + halfX);
-                res[i].Y = (float)(res[i].Y - halfY);
-            }
-            return res;
-        }
-
-        private static void ForEachContour(byte[] types, Action<int, int> action)
-        {
+            List<(double x, double y)[]> contours = new List<(double x, double y)[]>();
+            List<int> starts = new List<int>();
             int first = 0;
             while (first < types.Length)
             {
                 int last = first;
                 while (last + 1 < types.Length && (types[last + 1] & 0x07) != 0) ++last; // a figure ends before the next start point
-                action(first, last);
+                (double x, double y)[] contour = new (double x, double y)[last - first + 1];
+                for (int i = first; i <= last; ++i) contour[i - first] = (points[i].X, -points[i].Y); // y upwards
+                contours.Add(contour);
+                starts.Add(first);
                 first = last + 1;
             }
+            List<(double x, double y)[]> bold = EmboldenContours(contours, strengthX, strengthY);
+            PointF[] res = new PointF[points.Length];
+            for (int c = 0; c < bold.Count; ++c)
+                for (int i = 0; i < bold[c].Length; ++i) res[starts[c] + i] = new PointF((float)bold[c][i].x, (float)-bold[c][i].y);
+            return res;
         }
 
-        private static void EmboldenContour(PointF[] points, PointF[] res, int first, int last, double halfX, double halfY, bool clockwise)
+        /// <summary>
+        /// Makes the strokes of an outline (closed contours, y upwards) wider by <paramref name="strengthX"/> and higher by
+        /// <paramref name="strengthY"/>: FT_Outline_EmboldenXY of FreeType moves every point of a contour outwards by half
+        /// the strength along the bisector of its two edges, then the outline is moved by half the strength to the right
+        /// and up. Unlike FreeType, which limits the shift at an inner corner by the length of the shorter edge, the shift
+        /// is kept within half the strength on each axis, as GDI+ does it: a short edge at a rounded corner still moves by
+        /// the whole strength, and a sharp corner does not shoot out further than its edges. For a polygon this moves every
+        /// edge that faces right by the strength to the right and every edge that faces up by the strength up, and leaves
+        /// the others where they are, which is what GDI+ does. The orientation is that of the whole outline, as FreeType
+        /// determines it: the holes run the other way than the outer contours, so that "outwards" means away from the ink
+        /// for both, and the holes get smaller.
+        /// </summary>
+        internal static List<(double x, double y)[]> EmboldenContours(IList<(double x, double y)[]> contours, double strengthX, double strengthY)
         {
-            int n = last - first + 1;
-            if (n < 3) return;
-            // FreeType works with y upwards: flip y
-            double X(int i) => points[first + (i % n + n) % n].X;
-            double Y(int i) => -points[first + (i % n + n) % n].Y;
+            List<(double x, double y)[]> res = new List<(double x, double y)[]>(contours.Count);
+            foreach ((double x, double y)[] contour in contours) res.Add(((double x, double y)[])contour.Clone());
+            double area = 0.0;
+            foreach ((double x, double y)[] contour in contours)
+                for (int i = 0; i < contour.Length; ++i)
+                {
+                    var p = contour[i]; var q = contour[(i + 1) % contour.Length];
+                    area += p.x * q.y - q.x * p.y;
+                }
+            if (area == 0.0) return res;
+            bool clockwise = area < 0; // the TrueType orientation (outer contours clockwise with y upwards)
+            double halfX = strengthX / 2.0, halfY = strengthY / 2.0;
+            for (int c = 0; c < contours.Count; ++c) EmboldenContour(contours[c], res[c], halfX, halfY, clockwise);
+            foreach ((double x, double y)[] contour in res)
+                for (int i = 0; i < contour.Length; ++i) contour[i] = (contour[i].x + halfX, contour[i].y + halfY);
+            return res;
+        }
 
+        private static void EmboldenContour((double x, double y)[] points, (double x, double y)[] res, double halfX, double halfY, bool clockwise)
+        {
+            int n = points.Length;
+            if (n < 3) return;
+            (double x, double y) P(int i) => points[(i % n + n) % n];
             // the incoming edge of the first point: the last edge with a length
-            int prev = n - 1;
             double inX = 0, inY = 0, lIn = 0;
-            for (int k = 0; k < n; ++k, --prev)
+            for (int k = 1; k <= n; ++k)
             {
-                inX = X(0) - X(prev); inY = Y(0) - Y(prev);
+                inX = P(0).x - P(-k).x; inY = P(0).y - P(-k).y;
                 lIn = Math.Sqrt(inX * inX + inY * inY);
                 if (lIn > 0) break;
             }
@@ -145,16 +160,15 @@ namespace CADability
             inX /= lIn; inY /= lIn;
             for (int i = 0; i < n; ++i)
             {
-                if (i > 0 && X(i) == X(i - 1) && Y(i) == Y(i - 1))
+                if (i > 0 && P(i) == P(i - 1))
                 {   // a point on top of the previous one moves with it
-                    res[first + i] = res[first + i - 1];
+                    res[i] = res[i - 1];
                     continue;
                 }
-                int next = i + 1;
                 double outX = 0, outY = 0, lOut = 0;
-                for (int k = 0; k < n; ++k, ++next)
+                for (int k = 1; k <= n; ++k)
                 {
-                    outX = X(next) - X(i); outY = Y(next) - Y(i);
+                    outX = P(i + k).x - P(i).x; outY = P(i + k).y - P(i).y;
                     lOut = Math.Sqrt(outX * outX + outY * outY);
                     if (lOut > 0) break;
                 }
@@ -168,16 +182,14 @@ namespace CADability
                     shiftX = inY + outY;
                     shiftY = inX + outX;
                     if (clockwise) shiftX = -shiftX; else shiftY = -shiftY;
-                    double q = outX * inY - outY * inX; // sine of the turn
-                    if (clockwise) q = -q;
-                    double l = Math.Min(lIn, lOut);
-                    // the shift along the bisector, limited by the length of the shorter edge
-                    shiftX = halfX * q <= l * d ? shiftX * halfX / d : shiftX * l / q;
-                    shiftY = halfY * q <= l * d ? shiftY * halfY / d : shiftY * l / q;
+                    // the shift along the bisector; GDI+ does not limit it at an inner corner by the length of the shorter
+                    // edge as FreeType does, but keeps it within half the strength on each axis, so that a sharp corner moves
+                    // no further than an edge
+                    shiftX = Math.Max(-halfX, Math.Min(halfX, shiftX * halfX / d));
+                    shiftY = Math.Max(-halfY, Math.Min(halfY, shiftY * halfY / d));
                 }
-                res[first + i].X = (float)(points[first + i].X + shiftX);
-                res[first + i].Y = (float)(points[first + i].Y - shiftY); // back to y downwards
-                inX = outX; inY = outY; lIn = lOut;
+                res[i] = (points[i].x + shiftX, points[i].y + shiftY);
+                inX = outX; inY = outY;
             }
         }
     }

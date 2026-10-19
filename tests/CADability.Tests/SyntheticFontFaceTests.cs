@@ -67,6 +67,28 @@ namespace CADability.Tests
             Assert.AreEqual(40, Height(4), 1e-3, "the hole gets lower");
         }
 
+        [TestMethod]
+        public void BoldMovesShortEdgesAndSharpCornersNoFurtherThanTheStrength()
+        {
+            // an L (y downwards) whose inner corner is cut by an edge of 1.4: GDI+ moves the ends of the short edge by the
+            // whole strength like the long edges (FreeType would limit the shift at an inner corner by the length of the edge)
+            PointF[] points = Em(1000, 0, 100, 100, 100, 100, 60, 41, 60, 40, 59, 40, 0, 0, 0);
+            PointF[] bold = SyntheticFontFace.Embolden(points, Polygon(points.Length), 10.0 / 1000, 10.0 / 1000);
+            Assert.AreEqual(50, bold[3].Y * 1000, 1e-3, "the end of the upper edge of the foot");
+            Assert.AreEqual(50, bold[4].X * 1000, 1e-3, "the end of the right edge of the stem");
+            Assert.AreEqual(50, bold[2].Y * 1000, 1e-3);
+            Assert.AreEqual(50, bold[5].X * 1000, 1e-3);
+
+            // a thin spike to the right: its tip moves no further than the strength on either axis
+            points = Em(1000, 0, 100, 0, 0, 500, 45, 500, 55);
+            bold = SyntheticFontFace.Embolden(points, Polygon(points.Length), 10.0 / 1000, 10.0 / 1000);
+            for (int i = 0; i < points.Length; ++i)
+            {
+                Assert.IsTrue((double)(bold[i].X - points[i].X) * 1000 is >= -1e-3 and <= 10 + 1e-3, "x of point " + i);
+                Assert.IsTrue((double)(points[i].Y - bold[i].Y) * 1000 is >= -1e-3 and <= 10 + 1e-3, "y of point " + i);
+            }
+        }
+
         /// <summary>
         /// A face that only answers its metrics, for <see cref="SyntheticFontFace.BoldStrengthOf"/>.
         /// </summary>

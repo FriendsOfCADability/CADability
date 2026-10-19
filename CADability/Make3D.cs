@@ -2128,17 +2128,25 @@ namespace CADability.GeoObject
         }
         private static void extractConnectedFaces(HashSet<Face> allFaces, Face startWith, HashSet<Face> result)
         {
+            // depth first search with an explicit stack: the recursion was as deep as the number of connected faces
+            // and overflowed the stack for meshes of a few thousand triangles (#486). The faces are visited in the
+            // same order as by the recursion.
             result.Add(startWith);
             allFaces.Remove(startWith);
-            foreach (Edge edge in startWith.Edges)
+            Stack<(Edge[] edges, int next)> stack = new Stack<(Edge[] edges, int next)>();
+            stack.Push((startWith.Edges.ToArray(), 0));
+            while (stack.Count > 0)
             {
-                if (allFaces.Contains(edge.PrimaryFace))
+                (Edge[] edges, int next) = stack.Pop();
+                if (next >= 2 * edges.Length) continue;
+                stack.Push((edges, next + 1));
+                Edge edge = edges[next / 2];
+                Face face = (next % 2 == 0) ? edge.PrimaryFace : edge.SecondaryFace;
+                if (allFaces.Contains(face))
                 {
-                    extractConnectedFaces(allFaces, edge.PrimaryFace, result);
-                }
-                if (allFaces.Contains(edge.SecondaryFace))
-                {
-                    extractConnectedFaces(allFaces, edge.SecondaryFace, result);
+                    result.Add(face);
+                    allFaces.Remove(face);
+                    stack.Push((face.Edges.ToArray(), 0));
                 }
             }
         }

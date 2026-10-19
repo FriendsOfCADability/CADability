@@ -292,6 +292,18 @@ namespace CADability
             RecalcAll(false);
         }
         /// <summary>
+        /// Makes this projected model and all other projected models of the same <see cref="Model"/> record their display
+        /// lists again with the next paint, and requests a repaint. Use it when the display lists are no longer valid, e.g.
+        /// after the graphics device was lost or the renderer was switched (together with <see cref="Text.ClearFontCache"/>).
+        /// Unlike <see cref="ForceRecalc"/> it keeps the extent and does not rebuild the display data of the objects.
+        /// </summary>
+        public void InvalidateDisplayLists()
+        {
+            dirty = true;
+            recalcVisibility = true;
+            model.InvalidateDisplayLists(); // raises NewDisplaylistAvailableEvent: OnNewDisplaylistAvailable requests the repaint
+        }
+        /// <summary>
         /// Obsolete, does nothing. It remains from the former GDI based display via a <see cref="PaintBuffer"/>; the
         /// current display is connected with <see cref="Connect(IPaintTo3D)"/>.
         /// </summary>

@@ -17,7 +17,20 @@ namespace CADability
 
     public class PaintTo3DOutOfMemory : ApplicationException
     {
-        internal PaintTo3DOutOfMemory()
+        /// <summary>
+        /// Creates the exception. An <see cref="IPaintTo3D"/> implementation throws it when it runs out of (graphics) memory
+        /// while recording or painting a display list; CADability then frees display lists and retries with less detail.
+        /// </summary>
+        public PaintTo3DOutOfMemory()
+        {
+        }
+        /// <summary>
+        /// Creates the exception with a message and the exception that caused it, e.g. the native allocation error of the
+        /// renderer, so that it can be logged.
+        /// </summary>
+        /// <param name="message">Description of the failure</param>
+        /// <param name="innerException">The exception that caused this one, may be null</param>
+        public PaintTo3DOutOfMemory(string message, Exception innerException) : base(message, innerException)
         {
         }
     }

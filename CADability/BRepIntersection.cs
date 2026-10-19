@@ -9633,18 +9633,26 @@ namespace CADability
         /// <returns>the faces connected to <paramref name="startWith"/>, including it; they are removed from <paramref name="allFaces"/></returns>
         internal static HashSet<Face> extractConnectedFaces(HashSet<Face> allFaces, Face startWith)
         {
+            // depth first search with an explicit stack: the recursion was as deep as the number of connected faces
+            // and overflowed the stack for shells of some ten thousand faces (#486). The faces are visited in the
+            // same order as by the recursion.
             HashSet<Face> result = new HashSet<Face>();
             result.Add(startWith);
             allFaces.Remove(startWith);
-            foreach (Edge edge in startWith.Edges)
+            Stack<(Edge[] edges, int next)> stack = new Stack<(Edge[] edges, int next)>();
+            stack.Push((startWith.Edges.ToArray(), 0));
+            while (stack.Count > 0)
             {
-                if (allFaces.Contains(edge.SecondaryFace) && edge.IsOrientedConnection)
+                (Edge[] edges, int next) = stack.Pop();
+                if (next >= 2 * edges.Length) continue;
+                stack.Push((edges, next + 1));
+                Edge edge = edges[next / 2];
+                Face face = (next % 2 == 0) ? edge.SecondaryFace : edge.PrimaryFace;
+                if (allFaces.Contains(face) && edge.IsOrientedConnection)
                 {
-                    result.UnionWith(extractConnectedFaces(allFaces, edge.SecondaryFace));
-                }
-                if (allFaces.Contains(edge.PrimaryFace) && edge.IsOrientedConnection)
-                {
-                    result.UnionWith(extractConnectedFaces(allFaces, edge.PrimaryFace));
+                    result.Add(face);
+                    allFaces.Remove(face);
+                    stack.Push((face.Edges.ToArray(), 0));
                 }
             }
             return result;
@@ -11325,12 +11333,24 @@ namespace CADability
 
         private void collectFaces(Face startWith, HashSet<Face> unusedfaces, HashSet<Face> connected)
         {
+            // iterative like extractConnectedFaces, to not overflow the stack with many faces (#486)
             unusedfaces.Remove(startWith);
             connected.Add(startWith);
-            foreach (Edge edg in startWith.Edges)
+            Stack<(Edge[] edges, int next)> stack = new Stack<(Edge[] edges, int next)>();
+            stack.Push((startWith.Edges.ToArray(), 0));
+            while (stack.Count > 0)
             {
-                if (edg.PrimaryFace != null && unusedfaces.Contains(edg.PrimaryFace)) collectFaces(edg.PrimaryFace, unusedfaces, connected);
-                if (edg.SecondaryFace != null && unusedfaces.Contains(edg.SecondaryFace)) collectFaces(edg.SecondaryFace, unusedfaces, connected);
+                (Edge[] edges, int next) = stack.Pop();
+                if (next >= 2 * edges.Length) continue;
+                stack.Push((edges, next + 1));
+                Edge edg = edges[next / 2];
+                Face face = (next % 2 == 0) ? edg.PrimaryFace : edg.SecondaryFace;
+                if (face != null && unusedfaces.Contains(face))
+                {
+                    unusedfaces.Remove(face);
+                    connected.Add(face);
+                    stack.Push((face.Edges.ToArray(), 0));
+                }
             }
         }
 

@@ -24,104 +24,28 @@ static class Program
 
     static void Main()
     {
-        List<string> noBold = new List<string>(), noItalic = new List<string>();
-        using (InstalledFontCollection fonts = new InstalledFontCollection())
+        CADability.Forms.GdiFontProvider gdi = new CADability.Forms.GdiFontProvider();
+        foreach ((string fam, char c, bool bold, bool italic) in new[] { ("Microsoft Sans Serif", '8', true, false), ("Sylfaen", 'I', true, false), ("MS Gothic", 'o', false, true), ("Gabriola", 'I', true, false) })
         {
-            foreach (FontFamily ff in fonts.Families)
+            FontFace mr = managed.GetFace(fam, false, false), ms = managed.GetFace(fam, bold, italic);
+            FontFace gr = gdi.GetFace(fam, false, false), gs = gdi.GetFace(fam, bold, italic);
+            if (mr == null || gr == null) { Console.WriteLine(fam + " missing"); continue; }
+            double em = mr.EmHeight;
+            Console.WriteLine($"=== {fam} '{c}' bold {bold} italic {italic}: managed {ms.GetType().Name} em {mr.EmHeight} asc {mr.CellAscent}; GDI+ em {gr.EmHeight} asc {gr.CellAscent} adv m {mr.GetAdvanceWidth(c) * em:F1} g {gr.GetAdvanceWidth(c) * em:F1}");
+            mr.GetGlyphPath(c, false, false, out PointF[] a, out byte[] at);
+            ms.GetGlyphPath(c, false, false, out PointF[] b, out byte[] bt);
+            gr.GetGlyphPath(c, false, false, out PointF[] d, out byte[] dt);
+            gs.GetGlyphPath(c, false, false, out PointF[] e, out byte[] et);
+            Console.WriteLine($"   counts managed {a.Length}/{b.Length} GDI+ {d.Length}/{e.Length}");
+            int n = Math.Max(Math.Max(a.Length, b.Length), Math.Max(d.Length, e.Length));
+            for (int i = 0; i < n; ++i)
             {
-                FontFace regular = managed.GetFace(ff.Name, false, false);
-                if (regular == null) continue;
-                FontFace bold = managed.GetFace(ff.Name, true, false), italic = managed.GetFace(ff.Name, false, true);
-                bool mb = bold != null && bold.IsBold, mi = italic != null && italic.IsItalic;
-                if (mb && mi) continue;
-                Console.WriteLine($"{ff.Name}: managed bold {mb} italic {mi}; GDI+ IsStyleAvailable regular {ff.IsStyleAvailable(FontStyle.Regular)} bold {ff.IsStyleAvailable(FontStyle.Bold)} italic {ff.IsStyleAvailable(FontStyle.Italic)} bolditalic {ff.IsStyleAvailable(FontStyle.Bold | FontStyle.Italic)}");
-                if (!mb && ff.IsStyleAvailable(FontStyle.Regular) && !regular.IsBold) noBold.Add(ff.Name);
-                if (!mi && ff.IsStyleAvailable(FontStyle.Regular) && !regular.IsItalic) noItalic.Add(ff.Name);
-            }
-        }
-        Console.WriteLine();
-        // the strength of the synthetic bold of GDI+ against the metrics of the font, for every family without a bold face
-        Console.WriteLine("family | em asc desc linespacing | upem(head) | dxRight dyTop dxLeft dyBottom (glyph I, in font units)");
-        foreach (string fam in noBold)
-        {
-            using FontFamily ff = new FontFamily(fam);
-            int em = ff.GetEmHeight(FontStyle.Regular);
-            foreach (char c in "I|l.")
-            {
-                var r = GdiPlusAt(ff, FontStyle.Regular, c, em);
-                var b = GdiPlusAt(ff, FontStyle.Bold, c, em);
-                if (r.Count == 0 || b.Count == 0) continue;
-                int upem = 0;
-                FontFace face = managed.GetFace(fam, false, false);
-                if (face != null) upem = face.EmHeight;
-                Console.WriteLine($"{fam} | {em} {ff.GetCellAscent(FontStyle.Regular)} {ff.GetCellDescent(FontStyle.Regular)} {ff.GetLineSpacing(FontStyle.Regular)} | {upem} | '{c}' {b.Max(p => p.x) - r.Max(p => p.x):F1} {r.Min(p => p.y) - b.Min(p => p.y):F1} {r.Min(p => p.x) - b.Min(p => p.x):F1} {b.Max(p => p.y) - r.Max(p => p.y):F1}");
-                break;
-            }
-        }
-        // does it depend on the em size requested from AddString, for a font with an em of 1000 and one of 4096
-        foreach (string fam in new[] { "Ink Free", "Gabriola", "Microsoft Sans Serif" })
-        {
-            if (!noBold.Contains(fam)) continue;
-            using FontFamily ff = new FontFamily(fam);
-            int em = ff.GetEmHeight(FontStyle.Regular);
-            foreach (float size in new[] { 1f, 10f, 100f, (float)em, 10000f })
-            {
-                var r = GdiPlusAt(ff, FontStyle.Regular, 'I', size);
-                var b = GdiPlusAt(ff, FontStyle.Bold, 'I', size);
-                Console.WriteLine($"  {fam} size {size}: dxRight {(b.Max(p => p.x) - r.Max(p => p.x)) * em / size:F2} dyTop {(r.Min(p => p.y) - b.Min(p => p.y)) * em / size:F2} (font units)");
+                string P(PointF[] p, byte[] t) => i < p.Length ? $"({p[i].X * em,7:F1},{p[i].Y * em,7:F1}){t[i],3}" : "                     ";
+                string D(PointF[] p, PointF[] q) => i < p.Length && i < q.Length ? $"({(q[i].X - p[i].X) * em,6:F1},{(q[i].Y - p[i].Y) * em,6:F1})" : "";
+                Console.WriteLine($"   {i,3} m {P(a, at)} -> {P(b, bt)} d{D(a, b),-16} | g {P(d, dt)} -> {P(e, et)} d{D(d, e)}");
             }
         }
     }
-
-    // what GDI+ AddString does for synthetic bold, at the em size 1 of the old kernel code and at the em size em
-    static void Bold(string family)
-    {
-        using FontFamily ff = new FontFamily(family);
-        int em = ff.GetEmHeight(FontStyle.Regular), asc = ff.GetCellAscent(FontStyle.Regular);
-        Console.WriteLine($"=== {family} bold, em {em} ascent {asc}");
-        foreach (float size in new[] { 1.0f, (float)em })
-        {
-            foreach (char c in "Il")
-            {
-                var r = GdiPlusAt(ff, FontStyle.Regular, c, size).Select(p => (p.x * em / size, p.y * em / size)).ToList();
-                var b = GdiPlusAt(ff, FontStyle.Bold, c, size).Select(p => (p.x * em / size, p.y * em / size)).ToList();
-                string pts(List<(double x, double y)> l) => string.Join(" ", l.Take(14).Select(p => $"({p.x:F1},{p.y:F1})"));
-                Console.WriteLine($"  size {size} '{c}' regular n {r.Count}: {pts(r)}");
-                Console.WriteLine($"  size {size} '{c}' bold    n {b.Count}: {pts(b)}");
-            }
-        }
-        // the advance width the old kernel took: GetCharABCWidths with the bold GDI+ font selected (em height as pixel size)
-        foreach (char c in "Ilo")
-        {
-            int wr = GdiAdvance(ff, FontStyle.Regular, em, c), wb = GdiAdvance(ff, FontStyle.Bold, em, c);
-            Console.WriteLine($"  advance '{c}' regular {wr} bold {wb}");
-        }
-        foreach (char c in "Ho")
-        {
-            var r = GdiOutline(family, em, 400, false, c, out GLYPHMETRICS gr);
-            var s = GdiOutline(family, em, 700, false, c, out GLYPHMETRICS gs);
-            Console.WriteLine($"  GDI '{c}' adv {gr.cx}->{gs.cx} box x {gr.ox}..{gr.ox + gr.bx} -> {gs.ox}..{gs.ox + gs.bx} y {gr.oy - (int)gr.by}..{gr.oy} -> {gs.oy - (int)gs.by}..{gs.oy} points {r.Count}/{s.Count}");
-        }
-    }
-    static List<(double x, double y)> GdiPlusAt(FontFamily ff, FontStyle style, char c, float size)
-    {
-        using GraphicsPath path = new GraphicsPath();
-        using StringFormat sf = (StringFormat)StringFormat.GenericTypographic.Clone();
-        path.AddString(c.ToString(), ff, (int)style, size, new PointF(0, 0), sf);
-        if (path.PointCount == 0) return new List<(double, double)>();
-        return path.PathPoints.Select(p => ((double)p.X, (double)p.Y)).ToList();
-    }
-    [StructLayout(LayoutKind.Sequential)] struct ABC { public int a; public uint b; public int c; }
-    [DllImport("gdi32.dll", EntryPoint = "GetCharABCWidthsW")] static extern bool GetCharABCWidths(IntPtr hdc, uint first, uint last, [Out] ABC[] abc);
-    static int GdiAdvance(FontFamily ff, FontStyle style, int em, char c)
-    {
-        IntPtr hdc = CreateCompatibleDC(IntPtr.Zero);
-        using Font font = new Font(ff, em, style, GraphicsUnit.Pixel);
-        IntPtr hf = font.ToHfont(), old = SelectObject(hdc, hf);
-        try { ABC[] abc = new ABC[1]; GetCharABCWidths(hdc, c, c, abc); return abc[0].a + (int)abc[0].b + abc[0].c; }
-        finally { SelectObject(hdc, old); DeleteObject(hf); DeleteDC(hdc); }
-    }
-
     static void Measure(string family, bool bold, bool italic)
     {
         Console.WriteLine($"=== {family} synthetic {(bold ? "bold" : "")}{(italic ? "italic" : "")}");

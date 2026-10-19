@@ -59,9 +59,9 @@ namespace CADability.Tests
                 {
                     FontFace g = gdi.GetFace(family, bold, italic), m = managed.GetFace(family, bold, italic);
                     Assert.IsNotNull(m, family + " is not known to the managed provider");
-                    // only real faces: GDI synthesizes a missing bold or italic face, the managed provider takes the closest
-                    if (g.IsBold != bold || g.IsItalic != italic || m.IsBold != bold || m.IsItalic != italic) continue;
-                    Compare(g, (ManagedFontFace)m, Characters, true, report);
+                    // only real faces: a missing bold or italic face is synthesized by both, see SyntheticStylesMatchGdiPlus
+                    if (g.IsBold != bold || g.IsItalic != italic || !(m is ManagedFontFace real) || real.IsBold != bold || real.IsItalic != italic) continue;
+                    Compare(g, real, Characters, true, report);
                     ++compared;
                 }
             }

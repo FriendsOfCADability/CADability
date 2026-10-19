@@ -62,6 +62,11 @@ namespace CADability
         public string FullName { get; }
         public bool IsBold { get; }
         public bool IsItalic { get; }
+        /// <summary>
+        /// The weight of the face, usWeightClass of the "OS/2" table (400 regular, 700 bold); for an instance of a variable font
+        /// the value of its "wght" axis. Without an "OS/2" table 700 for a bold face and 400 otherwise.
+        /// </summary>
+        public int WeightClass { get; private set; }
         public int UnitsPerEm { get; }
         public int Ascender { get; }
         public int Descender { get; }
@@ -183,6 +188,7 @@ namespace CADability
             StrikeoutPosition = UnitsPerEm / 4;
             if (tables.TryGetValue("OS/2", out var os2) && os2.length >= 78)
             {
+                WeightClass = U16(os2.offset + 4);
                 StrikeoutSize = S16(os2.offset + 26);
                 StrikeoutPosition = S16(os2.offset + 28);
                 int fsSelection = U16(os2.offset + 62);
@@ -202,6 +208,7 @@ namespace CADability
             }
             IsBold = bold;
             IsItalic = italic;
+            if (WeightClass == 0) WeightClass = bold ? 700 : 400;
             ReadNames();
             FamilyName = NameOf(1) ?? "";
             SubfamilyName = NameOf(2) ?? "";
@@ -253,6 +260,9 @@ namespace CADability
             res.IsHeaderOnly = IsHeaderOnly;
             double[] normalized = res.variations.Normalize(userCoordinates);
             res.coords = normalized.Any(c => c != 0.0) ? normalized : null;
+            VariationAxis[] axes = res.variations.Axes;
+            for (int i = 0; i < axes.Length && i < userCoordinates.Length; ++i)
+                if (axes[i].Tag == "wght") res.WeightClass = (int)Math.Round(userCoordinates[i]);
             if (res.coords != null)
             {   // the font wide metrics of the instance ("MVAR"), rounded like the values of the tables
                 int Varied(int value, string tag) => (int)Math.Floor(value + res.variations.GetMetricDelta(tag, res.coords) + 0.5);

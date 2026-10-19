@@ -113,12 +113,15 @@ namespace CADability
 
         /// <summary>
         /// Makes the strokes of an outline (closed contours, y upwards) wider by <paramref name="strengthX"/> and higher by
-        /// <paramref name="strengthY"/>: FT_Outline_EmboldenXY of FreeType moves every point of a contour outwards by half the
-        /// strength along the bisector of its two edges, then the outline is moved by half the strength to the right and up.
-        /// For a polygon this moves every edge that faces right by the strength to the right and every edge that faces up by
-        /// the strength up, and leaves the others where they are, which is what GDI+ does. The orientation is that of the
-        /// whole outline, as FreeType determines it: the holes run the other way than the outer contours, so that "outwards"
-        /// means away from the ink for both, and the holes get smaller.
+        /// <paramref name="strengthY"/>: FT_Outline_EmboldenXY of FreeType moves every point of a contour outwards by half
+        /// the strength along the bisector of its two edges, then the outline is moved by half the strength to the right
+        /// and up. Unlike FreeType, which limits the shift at an inner corner by the length of the shorter edge, the shift
+        /// is kept within half the strength on each axis, as GDI+ does it: a short edge at a rounded corner still moves by
+        /// the whole strength, and a sharp corner does not shoot out further than its edges. For a polygon this moves every
+        /// edge that faces right by the strength to the right and every edge that faces up by the strength up, and leaves
+        /// the others where they are, which is what GDI+ does. The orientation is that of the whole outline, as FreeType
+        /// determines it: the holes run the other way than the outer contours, so that "outwards" means away from the ink
+        /// for both, and the holes get smaller.
         /// </summary>
         internal static List<(double x, double y)[]> EmboldenContours(IList<(double x, double y)[]> contours, double strengthX, double strengthY)
         {
@@ -179,15 +182,14 @@ namespace CADability
                     shiftX = inY + outY;
                     shiftY = inX + outX;
                     if (clockwise) shiftX = -shiftX; else shiftY = -shiftY;
-                    double q = outX * inY - outY * inX; // sine of the turn
-                    if (clockwise) q = -q;
-                    double l = Math.Min(lIn, lOut);
-                    // the shift along the bisector, limited by the length of the shorter edge
-                    shiftX = halfX * q <= l * d ? shiftX * halfX / d : shiftX * l / q;
-                    shiftY = halfY * q <= l * d ? shiftY * halfY / d : shiftY * l / q;
+                    // the shift along the bisector; GDI+ does not limit it at an inner corner by the length of the shorter
+                    // edge as FreeType does, but keeps it within half the strength on each axis, so that a sharp corner moves
+                    // no further than an edge
+                    shiftX = Math.Max(-halfX, Math.Min(halfX, shiftX * halfX / d));
+                    shiftY = Math.Max(-halfY, Math.Min(halfY, shiftY * halfY / d));
                 }
                 res[i] = (points[i].x + shiftX, points[i].y + shiftY);
-                inX = outX; inY = outY; lIn = lOut;
+                inX = outX; inY = outY;
             }
         }
     }

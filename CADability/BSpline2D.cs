@@ -1668,10 +1668,9 @@ namespace CADability.Curve2D
             // Notfalls Darstellung als Polyline
             int l = poles.Length * 4 + 2;
             PointF[] ppf = new PointF[l];
-            double du = (endParam - startParam) / (l - 1);
             for (int i = 0; i < l; ++i)
             {
-                ppf[i] = PointAt(startParam + i * du).PointF;
+                ppf[i] = PointAt((double)i / (l - 1)).PointF; // PointAt expects 0..1, not the knot parameter
             }
             if (!forward) Array.Reverse(ppf);
             path.AddLines(ppf);
@@ -3996,51 +3995,52 @@ namespace CADability.Curve2D
         }
         ExplicitPCurve2D IExplicitPCurve2D.GetExplicitPCurve2D()
         {
-            if (explicitPCurve2D == null || !explicitPCurve2D.TryGetTarget(out ExplicitPCurve2D res))
+            // The cached curve has to be returned as well: returning null for it made PositionOf and GetArea take another
+            // way than on the first call, so their results depended on whether the garbage collector had freed it.
+            if (explicitPCurve2D != null && explicitPCurve2D.TryGetTarget(out ExplicitPCurve2D cached)) return cached;
+            ExplicitPCurve2D res;
+            if (nurbs != null)
             {
-                if (nurbs != null)
+                Polynom[] px = new Polynom[knots.Length - 1];
+                Polynom[] py = new Polynom[knots.Length - 1];
+                Polynom[] pz = new Polynom[knots.Length - 1];
+                Polynom[] pw = new Polynom[knots.Length - 1];
+                for (int i = 0; i < knots.Length - 1; i++)
                 {
-                    Polynom[] px = new Polynom[knots.Length - 1];
-                    Polynom[] py = new Polynom[knots.Length - 1];
-                    Polynom[] pz = new Polynom[knots.Length - 1];
-                    Polynom[] pw = new Polynom[knots.Length - 1];
-                    for (int i = 0; i < knots.Length - 1; i++)
-                    {
-                        Polynom[] pn = nurbs.CurvePointPolynom((knots[i] + knots[i + 1]) / 2.0);
-                        // das sind 4 Polynome, px,py,pz,pw
-                        px[i] = pn[0];
-                        py[i] = pn[1];
-                        pw[i] = pn[2];
-                    }
-                    bool isRational = false;
-                    for (int i = 0; i < weights.Length; i++)
-                    {
-                        if (weights[i] != 1.0)
-                        {
-                            isRational = true;
-                            break;
-                        }
-                    }
-                    if (isRational) res = new ExplicitPCurve2D(px, py, pw, knots);
-                    else res = new ExplicitPCurve2D(px, py, null, knots);
-                    explicitPCurve2D = new WeakReference<ExplicitPCurve2D>(res);
-                    return res;
+                    Polynom[] pn = nurbs.CurvePointPolynom((knots[i] + knots[i + 1]) / 2.0);
+                    // das sind 4 Polynome, px,py,pz,pw
+                    px[i] = pn[0];
+                    py[i] = pn[1];
+                    pw[i] = pn[2];
                 }
-                if (nubs != null)
+                bool isRational = false;
+                for (int i = 0; i < weights.Length; i++)
                 {
-                    Polynom[] px = new Polynom[knots.Length - 1];
-                    Polynom[] py = new Polynom[knots.Length - 1];
-                    for (int i = 0; i < knots.Length - 1; i++)
+                    if (weights[i] != 1.0)
                     {
-                        Polynom[] pn = nubs.CurvePointPolynom((knots[i] + knots[i + 1]) / 2.0);
-                        // das sind 4 Polynome, px,py,pz,pw
-                        px[i] = pn[0];
-                        py[i] = pn[1];
+                        isRational = true;
+                        break;
                     }
-                    res = new ExplicitPCurve2D(px, py, null, knots);
-                    explicitPCurve2D = new WeakReference<ExplicitPCurve2D>(res);
-                    return res;
                 }
+                if (isRational) res = new ExplicitPCurve2D(px, py, pw, knots);
+                else res = new ExplicitPCurve2D(px, py, null, knots);
+                explicitPCurve2D = new WeakReference<ExplicitPCurve2D>(res);
+                return res;
+            }
+            if (nubs != null)
+            {
+                Polynom[] px = new Polynom[knots.Length - 1];
+                Polynom[] py = new Polynom[knots.Length - 1];
+                for (int i = 0; i < knots.Length - 1; i++)
+                {
+                    Polynom[] pn = nubs.CurvePointPolynom((knots[i] + knots[i + 1]) / 2.0);
+                    // das sind 4 Polynome, px,py,pz,pw
+                    px[i] = pn[0];
+                    py[i] = pn[1];
+                }
+                res = new ExplicitPCurve2D(px, py, null, knots);
+                explicitPCurve2D = new WeakReference<ExplicitPCurve2D>(res);
+                return res;
             }
             return null;
         }

@@ -221,27 +221,51 @@ namespace CADability.Forms
         {
             this.ProgressAction?.Invoke(show, percent, title);
         }
+        // Bitmaps handed out by IUIService.GetBitmap, keyed by "filename:index". Hotspot icons are requested on every repaint,
+        // and PaintToOpenGL.PrepareIcon caches its display lists per Bitmap instance, so the same name must always yield the same instance.
+        private static readonly Dictionary<string, Bitmap> stripBitmapCache = new Dictionary<string, Bitmap>();
         /// <summary>
-        /// Returns a bitmap from the specified embeded resource. the name is in the form filename:index
+        /// Returns a bitmap from the specified embeded resource. the name is in the form filename:index.
+        /// The bitmap is cached and shared between all callers, so it must not be disposed or modified.
         /// </summary>
         /// <param name="name"></param>
         /// <returns></returns>
         Bitmap IUIService.GetBitmap(string name)
         {
+            lock (stripBitmapCache)
+            {
+                if (stripBitmapCache.TryGetValue(name, out Bitmap cached)) return cached;
+            }
             string[] parts = name.Split(':');
             if (parts.Length == 2)
             {
-                ImageList il = BitmapTable.GetImageList(parts[0], 15, 15);
-                if (il != null)
+                using (ImageList il = BitmapTable.GetImageList(parts[0], 15, 15))
                 {
-                    try
+                    if (il != null)
                     {
-                        int ind = int.Parse(parts[1]);
-                        return il.Images[ind] as Bitmap;
+                        try
+                        {
+                            int ind = int.Parse(parts[1]);
+                            // ImageList.Images[ind] creates a new Bitmap that does not depend on the ImageList, so it survives disposing the list
+                            Bitmap res = il.Images[ind] as Bitmap;
+                            if (res != null)
+                            {
+                                lock (stripBitmapCache)
+                                {
+                                    if (stripBitmapCache.TryGetValue(name, out Bitmap other))
+                                    {
+                                        res.Dispose();
+                                        return other;
+                                    }
+                                    stripBitmapCache[name] = res;
+                                }
+                            }
+                            return res;
+                        }
+                        catch (FormatException) { }
+                        catch (OverflowException) { }
+                        catch (ArgumentOutOfRangeException) { }
                     }
-                    catch (FormatException) { }
-                    catch (OverflowException) { }
-                    catch (ArgumentOutOfRangeException) { }
                 }
             }
             return null;

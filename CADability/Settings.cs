@@ -4,11 +4,7 @@ using System;
 using System.Collections;
 using System.IO;
 using System.Runtime.Serialization;
-#if WEBASSEMBLY
-using CADability.WebDrawing;
-#else
 using System.Drawing;
-#endif
 
 
 namespace CADability

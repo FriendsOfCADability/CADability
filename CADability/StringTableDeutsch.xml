@@ -760,7 +760,7 @@
 		<label>|Standard|Hintergrund|2D|3D|Text|Bemaßung</label>
 	</data>
 	<data name="StyleList.Default">
-		<label>|2D:2D,rot,dünn,durchgezogen|3D:3D,blau,dünn,durchgezogen|Text:Text,blau,-,-|Bemaßung:Bemaßung,blau,-,-</label>
+		<label>|2D:2D,Rot,Dünn,Durchgezogen|3D:3D,Blau,Dünn,Durchgezogen|Text:Text,Blau,-,-|Bemaßung:Bemaßung,Blau,-,-</label>
 	</data>
 	<data name="LayerName">
 		<label>Ebene</label>
@@ -6070,5 +6070,25 @@
 	<data name="Construct.Plane.DircetionY">
 		<label>Y-Achse der Ebene</label>
 		<info>Y-Achse der Ebene</info>
+	</data>
+	<data name="Constr.Parametrics.Angle">
+		<label>Winkel zwischen Flächen</label>
+		<info>Den Winkel zwischen Flächen eines Körpers ändern</info>
+	</data>
+	<data name="Parametrics.Angle.FaceToRotate">
+		<label>Zu drehende Fläche</label>
+		<info>Die Fläche wählen, die gedreht wird</info>
+	</data>
+	<data name="Parametrics.Angle.MoreFacesToRotate">
+		<label>Weitere zu drehende Flächen</label>
+		<info>Weitere Flächen wählen, die mit der ersten Fläche gedreht werden</info>
+	</data>
+	<data name="Parametrics.Angle.Reference">
+		<label>Bezugsfläche für den Winkel</label>
+		<info>Die Bezugsfläche für den Winkel wählen</info>
+	</data>
+	<data name="Parametrics.Angle.Angle">
+		<label>Drehwinkel</label>
+		<info>Der Winkel, um den die Flächen gedreht werden</info>
 	</data>
 </root>

@@ -15,11 +15,11 @@
 	</data>
 	<data name="Line.StartPoint">
 		<label>Starting point</label>
-		<info>Edit field for the starting point, separate x, y an z components by spaces.</info>
+		<info>Edit field for the starting point, separate x, y and z components by spaces.</info>
 	</data>
 	<data name="Line.EndPoint">
 		<label>Ending point</label>
-		<info>Edit field for the ending point, separate x, y an z components by spaces.</info>
+		<info>Edit field for the ending point, separate x, y and z components by spaces.</info>
 	</data>
 	<data name="GeoPoint.XValue">
 		<label>X-value</label>
@@ -50,8 +50,8 @@
 		<info>Angle in the X/Y plane, corresponds to the longitude in the polar coordinate system</info>
 	</data>
 	<data name="GeoVector.Latitude">
-		<label>Angle (in the X/Y plane)</label>
-		<info>Angle in the X/Y plane, corresponds to the latitude in the polar coordinate system</info>
+		<label>Angle (to the X/Y plane)</label>
+		<info>Angle to the X/Y plane, corresponds to the latitude in the polar coordinate system</info>
 	</data>
 	<data name="GeoVector.Length">
 		<label>Length</label>
@@ -98,16 +98,16 @@
 		<info>Most recently used projects, last used project</info>
 	</data>
 	<data name="MenuId.File.Mru.File2">
-		<label>2. last used project</label>
-		<info>Most recently used projects, 2. last used project</info>
+		<label>Second most recent project</label>
+		<info>Most recently used projects, second most recent project</info>
 	</data>
 	<data name="MenuId.File.Mru.File3">
-		<label>3. last used project</label>
-		<info>Most recently used projects, 3. last used project</info>
+		<label>Third most recent project</label>
+		<info>Most recently used projects, third most recent project</info>
 	</data>
 	<data name="MenuId.File.Mru.File4">
-		<label>4. last used project</label>
-		<info>Most recently used projects, 4. last used project</info>
+		<label>Fourth most recent project</label>
+		<info>Most recently used projects, fourth most recent project</info>
 	</data>
 	<data name="MenuId.App.Exit">
 		<label>Exit</label>
@@ -151,7 +151,7 @@
 	</data>
 	<data name="MenuId.Align.Hcenter">
 		<label>Align horizontal center</label>
-		<info>The selected objects are aligned horizontal at the center of the last selected object</info>
+		<info>The selected objects are aligned horizontally at the center of the last selected object</info>
 	</data>
 	<data name="MenuId.Align.Right">
 		<label>Align right</label>
@@ -175,11 +175,11 @@
 	</data>
 	<data name="MenuId.Space.Down">
 		<label>Space down</label>
-		<info> The selected objects receive vertically the same distance from each other (gaps are identical)      </info>
+		<info>The selected objects get the same vertical distance from each other (gaps are identical)</info>
 	</data>
 	<data name="MenuId.Space.Across">
 		<label>Space across</label>
-		<info>The selected objects receive horizontal the same distance from each other (gaps are identical)      </info>
+		<info>The selected objects get the same horizontal distance from each other (gaps are identical)</info>
 	</data>
 	<data name="MenuId.Same.Width">
 		<label>Same width</label>
@@ -206,8 +206,8 @@
 		<info>Reflect the selected objects at a given axis or plane</info>
 	</data>
 	<data name="MenuId.Object.Snap">
-		<label>Snap</label>
-		<info>Snap the selected objects by up to 3 pairs of points</info>
+		<label>Fit</label>
+		<info>Fit the selected objects by up to 3 pairs of points</info>
 	</data>
 	<data name="MenuId.Object.Hatch">
 		<label>Hatch</label>
@@ -227,7 +227,7 @@
 	</data>
 	<data name="MenuId.Import">
 		<label>Import</label>
-		<info>Import different kind of 3d data files</info>
+		<info>Import various kinds of 3D data files</info>
 	</data>
 	<data name="MenuId.Import.Edges">
 		<label>Import Edges</label>
@@ -247,23 +247,23 @@
 	</data>
 	<data name="MenuId.Split.DoubleHor">
 		<label>Two views (horizontal)</label>
-		<info>Two views split window horizontally</info>
+		<info>Two views, window split horizontally</info>
 	</data>
 	<data name="MenuId.Split.DoubleVer">
 		<label>Two views (vertical)</label>
-		<info>Two views split window vertically</info>
+		<info>Two views, window split vertically</info>
 	</data>
 	<data name="MenuId.Split.TripleHor">
 		<label>Three views (horizontal)</label>
-		<info>Three views split window horizontally</info>
+		<info>Three views, window split horizontally</info>
 	</data>
 	<data name="MenuId.Split.TripleVer">
 		<label>Three views (vertical)</label>
-		<info>Three views split window vertically</info>
+		<info>Three views, window split vertically</info>
 	</data>
 	<data name="MenuId.Split.Quadruple">
 		<label>Four views</label>
-		<info>Split window in four views</info>
+		<info>Split window into four views</info>
 	</data>
 	<data name="MenuId.Show.Ruler">
 		<label>Ruler</label>
@@ -311,7 +311,7 @@
 	</data>
 	<data name="MenuId.Constr.Line.PointTangent">
 		<label>Tangent from a point</label>
-		<info>Line: specify a starting point and an tangential object</info>
+		<info>Line: specify a starting point and a tangential object</info>
 	</data>
 	<data name="MenuId.Constr.Line.TwoTangents">
 		<label>Tangent to two curves</label>
@@ -319,7 +319,7 @@
 	</data>
 	<data name="MenuId.Constr.Line.TangentAngle">
 		<label>Tangent with direction</label>
-		<info>Line: specify a direction and an tangential object</info>
+		<info>Line: specify a direction and a tangential object</info>
 	</data>
 	<data name="MenuId.Constr.Line.MiddlePerp">
 		<label>Perpendicular bisector</label>
@@ -375,7 +375,7 @@
 	</data>
 	<data name="MenuId.Constr.Circle.TwoTangentsPoint">
 		<label>Tangential to 2 objects, point</label>
-		<info>Circle: Tangential to 2 objects with a given circlepoint</info>
+		<info>Circle: Tangential to 2 objects with a given circle point</info>
 	</data>
 	<data name="MenuId.Constr.Circle.TangentPointRadius">
 		<label>Tangential to one object, point and radius</label>
@@ -411,7 +411,7 @@
 	</data>
 	<data name="MenuId.Constr.Arc.TwoTangentsPoint">
 		<label>Tangential to 2 objects, point</label>
-		<info>Circular arc: Tangential to 2 objects, circlepoint, starting at the first object, ending at the last</info>
+		<info>Circular arc: Tangential to 2 objects, circle point, starting at the first object, ending at the last</info>
 	</data>
 	<data name="MenuId.Constr.Arc.TangentPointRadius">
 		<label>Tangential to an object, point and radius</label>
@@ -446,11 +446,11 @@
 		<info>Minor radius of the ellipse</info>
 	</data>
 	<data name="Constr.Ellipse.CenterRadius.Point">
-		<label>1. vertex</label>
+		<label>1st vertex</label>
 		<info>Please define the major axis vertex of the ellipse</info>
 	</data>
 	<data name="Constr.Ellipse.CenterRadius.Point2">
-		<label>2. vertex</label>
+		<label>2nd vertex</label>
 		<info>Please define the minor axis vertex of the ellipse</info>
 	</data>
 	<data name="Constr.Ellipse.CenterRadius.Angle">
@@ -479,7 +479,7 @@
 	</data>
 	<data name="MenuId.Constr.Ellipsearc.FivePoints">
 		<label>By 5 points</label>
-		<info>elliptical arc: 5 points on the arc</info>
+		<info>Elliptical arc: 5 points on the arc</info>
 	</data>
 	<data name="MenuId.Constr.Text">
 		<label>Text</label>
@@ -498,12 +498,12 @@
 		<info>Add and position a bitmap</info>
 	</data>
 	<data name="MenuId.Constr.Picture.RefPoint2Directions">
-		<label>Fixpoint, 2 directions</label>
-		<info>Construct a bitmap by fixpoint, width direction, height direction</info>
+		<label>Reference point, 2 directions</label>
+		<info>Construct a bitmap by reference point, width direction, height direction</info>
 	</data>
 	<data name="MenuId.Constr.Picture.RefPointWidthHeight">
-		<label>Fixpoint, width, height</label>
-		<info>Construct a bitmap by fixpoint, width, height</info>
+		<label>Reference point, width, height</label>
+		<info>Construct a bitmap by reference point, width, height</info>
 	</data>
 	<data name="MenuId.Constr.Dimension">
 		<label>Dimension</label>
@@ -590,8 +590,8 @@
 		<info>Split objects at intersection points</info>
 	</data>
 	<data name="MenuId.Expand">
-		<label>Expand</label>
-		<info>Expand or extend objects</info>
+		<label>Extend</label>
+		<info>Extend objects</info>
 	</data>
 	<data name="MenuId.Connect">
 		<label>Connect</label>
@@ -623,7 +623,7 @@
 	</data>
 	<data name="MenuId.Measure">
 		<label>Measure</label>
-		<info>Measure positions, lengths, angles</info>
+		<info>Measure positions, lengths, angles and areas</info>
 	</data>
 	<data name="MenuId.Extras">
 		<label>Customize</label>
@@ -671,7 +671,7 @@
 	</data>
 	<data name="MenuId.Activate.Snap">
 		<label>Snap</label>
-		<info>Various snapping modes</info>
+		<info>Activate/Inactivate the snap mode</info>
 	</data>
 	<data name="MenuId.Help">
 		<label>?</label>
@@ -745,19 +745,19 @@
 		<info>Modify the layer table</info>
 	</data>
 	<data name="LayerList.DontRemoveLastItem">
-		<label>The last item cannot be removed</label>
+		<label>The last layer cannot be removed</label>
 	</data>
 	<data name="LayerList.ItemIsUsed">
-		<label>The item is being used, remove anyway?</label>
+		<label>The layer is in use, remove anyway?</label>
 	</data>
 	<data name="LayerList.InfoText">
-		<label>List of the items</label>
+		<label>List of the layers</label>
 	</data>
 	<data name="LayerList.Default">
 		<label>|Standard|Background|2D|3D|Text|Dimension</label>
 	</data>
 	<data name="StyleList.Default">
-		<label>|2D:2D,red,thin,continous|3D:3D,blue,thin,continous|Text:Text,blue,-,-|Dimension:Dimension,blue,-,-</label>
+		<label>|2D:2D,Red,Thin,Continuous|3D:3D,Blue,Thin,Continuous|Text:Text,Blue,-,-|Dimension:Dimension,Blue,-,-</label>
 	</data>
 	<data name="LayerName">
 		<label>Layer</label>
@@ -784,8 +784,8 @@
 		<label>|Use|Do not use</label>
 	</data>
 	<data name="Select.UseFixPoint">
-		<label>Fixpoint</label>
-		<info>Use fixpoint when modifying selected objects?</info>
+		<label>Fixed point</label>
+		<info>Use fixed point when modifying selected objects?</info>
 	</data>
 	<data name="Select.UseFixPoint.Values">
 		<label>|Use|Do not use</label>
@@ -830,31 +830,31 @@
 	</data>
 	<data name="MenuId.Snap.ObjectSnapPoint">
 		<label>Snap point</label>
-		<info>Snap on primary points of the object</info>
+		<info>Snap to primary points of the object</info>
 	</data>
 	<data name="MenuId.Snap.Intersections">
 		<label>Intersection points</label>
-		<info>Snap on intersection points of objects</info>
+		<info>Snap to intersection points of objects</info>
 	</data>
 	<data name="MenuId.Snap.ObjectPoint">
 		<label>Object point</label>
-		<info>Snap on arbitrary points of the object</info>
+		<info>Snap to arbitrary points of the object</info>
 	</data>
 	<data name="MenuId.Snap.DropPoint">
-		<label>Drop point</label>
-		<info>Snap on perpendicular base point on the objects</info>
+		<label>Perpendicular</label>
+		<info>Snap to the perpendicular foot point on the object</info>
 	</data>
 	<data name="MenuId.Snap.ObjectCenter">
 		<label>Center</label>
-		<info>Snap on center of object</info>
+		<info>Snap to the center of the object</info>
 	</data>
 	<data name="MenuId.Snap.TangentPoint">
 		<label>Tangential point</label>
-		<info>Snap on tangential point of object</info>
+		<info>Snap to the tangent point of the object</info>
 	</data>
 	<data name="MenuId.Snap.Surface">
 		<label>Surface</label>
-		<info>Snap on point on a surface</info>
+		<info>Snap to a point on a surface</info>
 	</data>
 	<data name="DxfDwg.ReadingFile">
 		<label>Reading dxf/dwg file</label>
@@ -905,7 +905,7 @@
 	</data>
 	<data name="MenuId.DrawingPlane.Point.Direction">
 		<label>Point and normal</label>
-		<info>Define the drawing plane through a points and with a normal vector</info>
+		<info>Define the drawing plane through a point and with a normal vector</info>
 	</data>
 	<data name="Block.Object">
 		<label>Block</label>
@@ -977,27 +977,27 @@
 	</data>
 	<data name="MenuId.Constr.Circle.3Points">
 		<label>Three points</label>
-		<info>Circle: three points on the circumference of circle</info>
+		<info>Circle: three points on the circumference of the circle</info>
 	</data>
 	<data name="Constr.Circle.3Points">
 		<label>Circle: three points</label>
-		<info>Circle: three points on the circumference of circle</info>
+		<info>Circle: three points on the circumference of the circle</info>
 	</data>
 	<data name="Constr.Circle.Point">
 		<label>Point of circle</label>
-		<info>Point on the circumference of circle</info>
+		<info>Point on the circumference of the circle</info>
 	</data>
 	<data name="Constr.Circle.Point1">
 		<label>1st Point of circle</label>
-		<info>1st Point on the circumference of circle</info>
+		<info>1st point on the circumference of the circle</info>
 	</data>
 	<data name="Constr.Circle.Point2">
 		<label>2nd Point of circle</label>
-		<info>2nd Point on the circumference of circle</info>
+		<info>2nd point on the circumference of the circle</info>
 	</data>
 	<data name="Constr.Circle.3Points.Point3">
 		<label>3rd Point of circle</label>
-		<info>3rd Point on the circumference of circle</info>
+		<info>3rd point on the circumference of the circle</info>
 	</data>
 	<data name="MenuId.Constr.Circle.CenterRadius">
 		<label>Center and radius</label>
@@ -1032,15 +1032,15 @@
 		<info>Circular arc: tangential to three objects</info>
 	</data>
 	<data name="Constr.Arc.TwoTangentsRadius">
-		<label>Circular arc: At 2 tangents and radius</label>
+		<label>Circular arc: 2 tangents and radius</label>
 		<info>Circular arc: tangential to two objects and radius</info>
 	</data>
 	<data name="Constr.Arc.TwoTangentsPoint">
-		<label>Circular arc: At 2 tangents and point</label>
-		<info>Circular arc: tangential to two objects and circlepoint</info>
+		<label>Circular arc: 2 tangents and point</label>
+		<info>Circular arc: tangential to two objects and circle point</info>
 	</data>
 	<data name="Constr.Arc.TangentPointRadius">
-		<label>Circular arc: At a tangent, point and radius</label>
+		<label>Circular arc: tangent, point and radius</label>
 		<info>Circular arc: Tangential to an object, circle point and radius</info>
 	</data>
 	<data name="Constr.Circle.ThreeTangents">
@@ -1053,10 +1053,10 @@
 	</data>
 	<data name="Constr.Circle.TwoTangentsPoint">
 		<label>Circle: 2 tangents and point</label>
-		<info>Circle: tangential to two objects and circlepoint</info>
+		<info>Circle: tangential to two objects and circle point</info>
 	</data>
 	<data name="Constr.Circle.TangentPointRadius">
-		<label>Circle: At a tangent, point and radius</label>
+		<label>Circle: tangent, point and radius</label>
 		<info>Circle: Tangential to an object, circle point and radius</info>
 	</data>
 	<data name="Constr.Arc.Radius">
@@ -1092,19 +1092,19 @@
 	</data>
 	<data name="Constr.Arc.Point">
 		<label>Point on circle</label>
-		<info>Circumference point of circle</info>
+		<info>Point on the circular arc</info>
 	</data>
 	<data name="Constr.Arc.Point1">
 		<label>1st Point on circle</label>
-		<info>1st circumference point of circle</info>
+		<info>1st point on the circular arc</info>
 	</data>
 	<data name="Constr.Arc.Point2">
 		<label>2nd Point on circle</label>
-		<info>2nd circumference point of circle</info>
+		<info>2nd point on the circular arc</info>
 	</data>
 	<data name="Constr.Arc.3Points.Point3">
 		<label>3rd Point on circle</label>
-		<info>3rd circumference point of circle</info>
+		<info>3rd point on the circular arc</info>
 	</data>
 	<data name="Constr.Arc.CenterStartEnd">
 		<label>Circular arc: center, starting and ending point</label>
@@ -1230,8 +1230,8 @@
 		<info>Rectangle: 2 diagonal points (always horizontal)</info>
 	</data>
 	<data name="Constr.Rect.Parallelogram">
-		<label>Parallelogram: Punkt/2 directions</label>
-		<info>Parallelogram: fixpoint and two directions</info>
+		<label>Parallelogram: Point/2 directions</label>
+		<info>Parallelogram: base point and two directions</info>
 	</data>
 	<data name="Rect.StartPoint">
 		<label>Starting point</label>
@@ -1271,11 +1271,11 @@
 	</data>
 	<data name="Constr.Text.1Point">
 		<label>Text: position</label>
-		<info>Text: first point</info>
+		<info>Horizontal text at a reference point</info>
 	</data>
 	<data name="Constr.Text.2Points">
-		<label>Text: 2 point</label>
-		<info>Text: second point</info>
+		<label>Text: 2 points</label>
+		<info>Text with direction and width defined by two points</info>
 	</data>
 	<data name="Text.StartPoint">
 		<label>Reference point</label>
@@ -1318,7 +1318,7 @@
 		<info>Mode of linear dimension</info>
 	</data>
 	<data name="Constr.Dimension.Points.Method.Values">
-		<label>|Simple|Continue|Series</label>
+		<label>|Simple|Chain|Baseline</label>
 	</data>
 	<data name="Constr.Dimension.Distance">
 		<label>Dimension: Distance</label>
@@ -1350,7 +1350,7 @@
 	</data>
 	<data name="Constr.Dimension.Direction.4Points">
 		<label>Angular dimension (4 points)</label>
-		<info>Angle dimension of an angle given by four points</info>
+		<info>Angular dimension of an angle given by four points</info>
 	</data>
 	<data name="Constr.Dimension.Direction.4Points.Point1">
 		<label>1st point </label>
@@ -1394,7 +1394,7 @@
 	</data>
 	<data name="Constr.Dimension.Point.Object">
 		<label>Object</label>
-		<info>Object to be labeled or annotated</info>
+		<info>Object to which the point dimension is perpendicular</info>
 	</data>
 	<data name="Constr.Dimension.Labeling">
 		<label>Annotation</label>
@@ -1406,7 +1406,7 @@
 	</data>
 	<data name="Constr.Dimension.Labeling.Object">
 		<label>Object</label>
-		<info>Object to be annotated or labeled</info>
+		<info>Object to which the label is perpendicular</info>
 	</data>
 	<data name="Constr.Dimension.Labeling.Point.Text">
 		<label>Text</label>
@@ -1517,7 +1517,7 @@
 	</data>
 	<data name="MenuId.LayerListEntry.Current">
 		<label>Default layer</label>
-		<info>This color becomes the default layer for new objects</info>
+		<info>This layer becomes the default layer for new objects</info>
 	</data>
 	<data name="MenuId.LayerListEntry.Edit">
 		<label>Rename</label>
@@ -1537,7 +1537,7 @@
 	</data>
 	<data name="MenuId.HatchStyleList.RemoveUnused">
 		<label>Remove unused</label>
-		<info>Remove unused hatchstyles from the table</info>
+		<info>Remove unused hatch styles from the table</info>
 	</data>
 	<data name="MenuId.HatchStyleList.UpdateFromProject">
 		<label>Update from project</label>
@@ -1545,7 +1545,7 @@
 	</data>
 	<data name="MenuId.HatchStyleList.AddFromGlobal">
 		<label>Update from global</label>
-		<info>Update the hatch style table from all hatch styles define in the global settings</info>
+		<info>Update the hatch style table from all hatch styles defined in the global settings</info>
 	</data>
 	<data name="MenuId.HatchStyleList.MakeGlobal">
 		<label>Make global</label>
@@ -1599,11 +1599,11 @@
 	</data>
 	<data name="MenuId.SelectedObjects.ComposeAll">
 		<label>Combine</label>
-		<info>Combine the selected objects to a block</info>
+		<info>Combine the selected objects into a block</info>
 	</data>
 	<data name="MenuId.SelectedObjects.Decompose">
 		<label>Explode</label>
-		<info>Disintegrate the block into single objects</info>
+		<info>Explode the decomposable selected objects into their parts (one level)</info>
 	</data>
 	<data name="FileName.NewFile">
 		<label>New file</label>
@@ -1633,7 +1633,7 @@
 	</data>
 	<data name="BSpline.ThroughPoints.Point">
 		<label>Point {0}</label>
-		<info>The spline is passing through these point</info>
+		<info>The spline passes through this point</info>
 	</data>
 	<data name="GeoObject.Attributes">
 		<label>Attributes</label>
@@ -1656,7 +1656,7 @@
 		<info>Construct a polyline by specifying the vertices</info>
 	</data>
 	<data name="Constr.Polyline.Points">
-		<label>Polyline</label>
+		<label>Polyline vertices</label>
 		<info>Construct a polyline by specifying the vertices</info>
 	</data>
 	<data name="Constr.Polyline.Points.Point">
@@ -1799,16 +1799,16 @@
 		<info>Select object at which the following objects will be trimmed. Select none to trim immediately</info>
 	</data>
 	<data name="ToolsExpand">
-		<label>Expand object</label>
-		<info>Expand the object until it hits another object</info>
+		<label>Extend object</label>
+		<info>Extend the object until it hits another object</info>
 	</data>
 	<data name="ToolsExpand.Object">
-		<label>Object to expand</label>
-		<info>Select object to expand</info>
+		<label>Object to extend</label>
+		<info>Select object to extend</info>
 	</data>
 	<data name="ToolsExpand.SourceObject">
-		<label>Expand to</label>
-		<info>Select object up to which the object is to be expanded</info>
+		<label>Extend to</label>
+		<info>Select object up to which the object is to be extended</info>
 	</data>
 	<data name="ToolsConnect">
 		<label>Connect objects</label>
@@ -1823,24 +1823,24 @@
 		<info>2nd object to be connected</info>
 	</data>
 	<data name="ToolsRoundOff">
-		<label>Round</label>
-		<info>Round objects at a common vertex</info>
+		<label>Fillet objects</label>
+		<info>Fillet objects at a common vertex</info>
 	</data>
 	<data name="ToolsRoundMultiple">
-		<label>Round multiple</label>
-		<info>Round objects at all common vertices</info>
+		<label>Fillet multiple</label>
+		<info>Fillet objects at all common vertices</info>
 	</data>
 	<data name="ToolsRound.Object">
 		<label>Position</label>
-		<info>Position where objects are rounded (if possible, approach from inside)</info>
+		<info>Position where objects are filleted (if possible, approach from inside)</info>
 	</data>
 	<data name="ToolsRound.Object2">
 		<label>2nd object</label>
-		<info>2nd object for rounding</info>
+		<info>2nd object to fillet</info>
 	</data>
 	<data name="ToolsRound.Radius">
 		<label>Radius</label>
-		<info>Radius for rounding</info>
+		<info>Fillet radius</info>
 	</data>
 	<data name="ToolsRoundIn">
 		<label>Channel</label>
@@ -1919,7 +1919,7 @@
 	</data>
 	<data name="CopyMatrixObjects.Direction">
 		<label>Angle</label>
-		<info>Angles of the grid</info>
+		<info>Angle of the grid to the horizontal</info>
 	</data>
 	<data name="CopyCircularObjects">
 		<label>Copy circular</label>
@@ -1942,14 +1942,14 @@
 	</data>
 	<data name="CopyCircularObjects.CopiesAngle">
 		<label>Angle</label>
-		<info>Angle distance of the copies</info>
+		<info>Angular spacing of the copies</info>
 	</data>
 	<data name="CopyCircularObjects.ObjectsRotation">
 		<label>Orientation mode</label>
 		<info>Orientation mode for the copies</info>
 	</data>
 	<data name="CopyCircularObjects.ObjectsRotation.Values">
-		<label>|Invariable|Rotated</label>
+		<label>|Unchanged|Rotated</label>
 	</data>
 	<data name="Hatch.Object">
 		<label>Hatching</label>
@@ -2051,34 +2051,34 @@
 	</data>
 	<data name="MenuId.PointSymbol.Dot">
 		<label>Point (pixel)</label>
-		<info>The point is represented as tiny colored point with a pixel</info>
+		<info>The point is represented as a tiny colored dot of one pixel</info>
 	</data>
 	<data name="MenuId.PointSymbol.Plus">
 		<label>Cross (+)</label>
-		<info>The point is represented as horizontal cross (+)</info>
+		<info>The point is represented as a horizontal cross (+)</info>
 	</data>
 	<data name="MenuId.PointSymbol.Cross">
 		<label>Cross (X)</label>
-		<info>The point is represented as diagonal cross (X)</info>
+		<info>The point is represented as a diagonal cross (X)</info>
 	</data>
 	<data name="MenuId.PointSymbol.Line">
 		<label>Line</label>
-		<info>The point is represented as small line</info>
+		<info>The point is represented as a small line</info>
 	</data>
 	<data name="MenuId.PointSymbol.Square">
 		<label>Square</label>
-		<info>The point is represented as small square with the point at its center</info>
+		<info>The point is represented as a small square with the point at its center</info>
 	</data>
 	<data name="MenuId.PointSymbol.Circle">
 		<label>Circle</label>
-		<info>The point is represented as small circle with the point at its center</info>
+		<info>The point is represented as a small circle with the point at its center</info>
 	</data>
 	<data name="Text.Bold">
 		<label>Bold</label>
 		<info>Bold typeface</info>
 	</data>
 	<data name="Text.Bold.Values">
-		<label>|Fat|Normal</label>
+		<label>|Bold|Normal</label>
 	</data>
 	<data name="Text.Italic">
 		<label>Italic</label>
@@ -2179,7 +2179,7 @@
 	</data>
 	<data name="Constr.AngleTwoPoints">
 		<label>Angle: 2 points</label>
-		<info>Define an angle  by two points relative to the x-axis of the drawing plane</info>
+		<info>Define an angle by two points relative to the x-axis of the drawing plane</info>
 	</data>
 	<data name="Constr.AngleTwoPoints.FirstPoint">
 		<label>1st point</label>
@@ -2195,7 +2195,7 @@
 	</data>
 	<data name="Construct.MidPoint.FirstPoint">
 		<label>1st point</label>
-		<info>1st Point for the intermediate point</info>
+		<info>1st point for the intermediate point</info>
 	</data>
 	<data name="Construct.MidPoint.SecondPoint">
 		<label>2nd point</label>
@@ -2203,19 +2203,19 @@
 	</data>
 	<data name="Construct.MidPoint.Ratio">
 		<label>Ratio</label>
-		<info>Position of the intermediate point (0.0 is the at first point, 0.5 is in the center, 1.0 at the second point)</info>
+		<info>Position of the intermediate point (0.0 is at the first point, 0.5 is in the center, 1.0 at the second point)</info>
 	</data>
 	<data name="Construct.IntersectPoint">
 		<label>Intersection point</label>
 		<info>Intersection point of two objects</info>
 	</data>
 	<data name="Construct.IntersectPoint.FirstCurve">
-		<label>1st Object</label>
-		<info>1st Object for intersection</info>
+		<label>1st object</label>
+		<info>1st object for intersection</info>
 	</data>
 	<data name="Construct.IntersectPoint.SecondCurve">
-		<label>2nd Object</label>
-		<info>2nd Object for intersection</info>
+		<label>2nd object</label>
+		<info>2nd object for intersection</info>
 	</data>
 	<data name="Construct.ObjectPoint">
 		<label>Point on object</label>
@@ -2223,7 +2223,7 @@
 	</data>
 	<data name="Construct.ObjectPoint.Curve">
 		<label>Object</label>
-		<info>The object, on which the point is to be</info>
+		<info>The object on which the point is to lie</info>
 	</data>
 	<data name="Construct.ObjectPoint.Ratio">
 		<label>Ratio</label>
@@ -2238,12 +2238,12 @@
 		<info>Define the length as the distance between two points</info>
 	</data>
 	<data name="Construct.DistanceTwoPoints.FirstPoint">
-		<label>1st Point</label>
-		<info>1st Point for distance</info>
+		<label>1st point</label>
+		<info>1st point for distance</info>
 	</data>
 	<data name="Construct.DistanceTwoPoints.SecondPoint">
-		<label>2nd Point</label>
-		<info>2nd Point for distance</info>
+		<label>2nd point</label>
+		<info>2nd point for distance</info>
 	</data>
 	<data name="Construct.DistancePointCurve">
 		<label>Distance point to curve</label>
@@ -2287,14 +2287,14 @@
 	</data>
 	<data name="Construct.DirectionOfCurve.Object">
 		<label>Curve</label>
-		<info>the direction of this curve will be used</info>
+		<info>The direction of this curve will be used</info>
 	</data>
 	<data name="Construct.DirectionOfCurve.DirPoint">
 		<label>Position</label>
 		<info>Position on the curve where the direction is measured</info>
 	</data>
 	<data name="Construct.DirectionOfCurve.DirPoint.Values">
-		<label>|Starting point|Automatically|Ending point|Center|Interactive</label>
+		<label>|Starting point|Automatic|Ending point|Center|Interactive</label>
 	</data>
 	<data name="Construct.DirectionOfCurve.DirOffset">
 		<label>Offset</label>
@@ -2372,11 +2372,11 @@
 		<info>The length of the selected object</info>
 	</data>
 	<data name="MenuId.Length.DistanceTwoPoints">
-		<label>Distance two points</label>
+		<label>Distance between two points</label>
 		<info>The resulting length is the distance between two points</info>
 	</data>
 	<data name="MenuId.Measure.Length.DistanceTwoPoints">
-		<label>Distance two points</label>
+		<label>Distance between two points</label>
 		<info>The resulting length is the distance between two points</info>
 	</data>
 	<data name="MenuId.Length.DistancePointCurve">
@@ -2389,18 +2389,18 @@
 	</data>
 	<data name="MenuId.Length.DistanceTwoCurves">
 		<label>Distance of two curves</label>
-		<info>The resulting length is the distance from a point to a curve</info>
+		<info>The resulting length is the minimum distance between two curves</info>
 	</data>
 	<data name="MenuId.Measure.Length.DistanceTwoCurves">
 		<label>Distance of two curves</label>
-		<info>The resulting length is the distance from a point to a curve</info>
+		<info>The resulting length is the minimum distance between two curves</info>
 	</data>
 	<data name="MenuId.Length.DoubleValue">
 		<label>Double</label>
 		<info>Double the current length</info>
 	</data>
 	<data name="MenuId.Length.HalfValue">
-		<label>Bisect</label>
+		<label>Halve</label>
 		<info>Halve the current length</info>
 	</data>
 	<data name="MenuId.Length.NameVariable">
@@ -2472,18 +2472,18 @@
 		<info>Type of display of the direction or vector values</info>
 	</data>
 	<data name="Setting.Formatting.Vector.Mode.Values">
-		<label>|Angle|Polar|X/Y/Z-values|X/Y values</label>
+		<label>|Angle|Polar|X/Y/Z values|X/Y values</label>
 	</data>
 	<data name="Setting.Formatting.Angle">
 		<label>Angle</label>
 		<info>How to format angular values</info>
 	</data>
 	<data name="Setting.Formatting.Angle.Mode">
-		<label>Degree system</label>
-		<info>Scaling system for angles</info>
+		<label>Angle unit</label>
+		<info>Unit for displaying angles</info>
 	</data>
 	<data name="Setting.Formatting.Angle.Mode.Values">
-		<label>|Degree (decimal)|Degree (minutes)|Degree (minutes, seconds)|Radian measure</label>
+		<label>|Degrees (decimal)|Degrees, minutes|Degrees, minutes, seconds|Radians</label>
 	</data>
 	<data name="Setting.Formatting.Angle.Digits">
 		<label>Precision</label>
@@ -2527,11 +2527,11 @@
 	</data>
 	<data name="MenuId.Vector.DirectionOfSurface">
 		<label>Direction of a surface</label>
-		<info>The direction of the selected surface in the cursor point</info>
+		<info>The direction of the selected surface at the cursor point</info>
 	</data>
 	<data name="MenuId.Measure.Vector.DirectionOfSurface">
 		<label>Direction of a surface</label>
-		<info>The direction of the selected surface in the cursor point</info>
+		<info>The direction of the selected surface at the cursor point</info>
 	</data>
 	<data name="MenuId.Vector.DirectionTwoPoints">
 		<label>Direction between two points</label>
@@ -2613,7 +2613,7 @@
 	</data>
 	<data name="Ellipse.Center">
 		<label>Center</label>
-		<info>Ellipses center</info>
+		<info>Center of the ellipse</info>
 	</data>
 	<data name="Ellipse.MajorRadius">
 		<label>Major radius</label>
@@ -2648,7 +2648,7 @@
 		<info>Direction of the arc</info>
 	</data>
 	<data name="Arc.Direction.Values">
-		<label>|Counter clockwise|Clockwise</label>
+		<label>|Counterclockwise|Clockwise</label>
 	</data>
 	<data name="Rectangle.Location">
 		<label>Location</label>
@@ -2700,7 +2700,7 @@
 	</data>
 	<data name="Path.Length">
 		<label>Length</label>
-		<info>length of the path</info>
+		<info>Length of the path</info>
 	</data>
 	<data name="CircleArc.Object">
 		<label>Circular arc</label>
@@ -2723,8 +2723,8 @@
 		<info>Text of the dimension object</info>
 	</data>
 	<data name="DimensionStyle.SecondText">
-		<label>2nd Text</label>
-		<info>2nd Text of the dimension object</info>
+		<label>2nd text</label>
+		<info>2nd text of the dimension object</info>
 	</data>
 	<data name="DimensionStyle.Tolerance">
 		<label>Tolerance</label>
@@ -2735,7 +2735,7 @@
 		<info>Valid dimension types of this dimension style</info>
 	</data>
 	<data name="DimensionStyle.Colors">
-		<label>Colors</label>
+		<label>Colors/line widths</label>
 		<info>The colors and line width of the dimension object</info>
 	</data>
 	<data name="DimensionStyle.Options">
@@ -2764,14 +2764,14 @@
 		<label>Standard</label>
 	</data>
 	<data name="DimensionStyle.DimNoExtLine">
-		<label>Subsidiary lines</label>
-		<info>Display of subsidiary lines</info>
+		<label>Extension lines</label>
+		<info>Display of extension lines</info>
 	</data>
 	<data name="DimensionStyle.DimNoExtLine.Values">
 		<label>|Suppress|Display</label>
 	</data>
 	<data name="DimensionStyle.DimNoDimLine">
-		<label>Dimension Line display</label>
+		<label>Dimension line display</label>
 		<info>Display of dimension lines</info>
 	</data>
 	<data name="DimensionStyle.DimNoDimLine.Values">
@@ -2779,7 +2779,7 @@
 	</data>
 	<data name="DimensionStyle.DimBreakDimLine">
 		<label>Dimension line with text</label>
-		<info>Display dimension line</info>
+		<info>Display of the dimension line under the dimension text</info>
 	</data>
 	<data name="DimensionStyle.DimBreakDimLine.Values">
 		<label>|Break if necessary|Continuous</label>
@@ -2796,20 +2796,20 @@
 		<info>Use multi line dimensioning for reference dimension objects</info>
 	</data>
 	<data name="DimensionStyle.DimTextOutsideForceDimensionLine">
-		<label>extend dim line to text</label>
-		<info>extend dimension line when text is outside</info>
+		<label>Extend dimension line to text</label>
+		<info>Extend the dimension line when the text is outside</info>
 	</data>
 	<data name="DimensionStyle.DimLineExtension">
 		<label>Dimension line extension</label>
 		<info>Extend the dimension line of the dimension object</info>
 	</data>
 	<data name="DimensionStyle.ExtLineExtension">
-		<label>Subsidiary lines extension</label>
-		<info>Extend the subsidiary lines of the dimension object</info>
+		<label>Extension line overshoot</label>
+		<info>Overshoot of the extension lines beyond the dimension line</info>
 	</data>
 	<data name="DimensionStyle.ExtLineOffset">
-		<label>Subsidiary lines distance</label>
-		<info>Distance of subsidiary lines from the point of dimensioning</info>
+		<label>Extension line offset</label>
+		<info>Distance of the extension lines from the dimensioned point</info>
 	</data>
 	<data name="DimensionStyle.LineIncrement">
 		<label>Dimension line distance</label>
@@ -2865,27 +2865,27 @@
 		<info>Scaling factor for the dimension text</info>
 	</data>
 	<data name="DimensionStyle.DimTxtDialog">
-		<label>Text input manually</label>
-		<info>Always display a input dialog for the dimension text</info>
+		<label>Manual text input</label>
+		<info>Always display an input dialog for the dimension text</info>
 	</data>
 	<data name="DimensionStyle.DimTxtOutside">
 		<label>Text outside</label>
 		<info>Place dimension text outside of the dimensioning</info>
 	</data>
 	<data name="DimensionStyle.DimTxtAutomatic">
-		<label>Text automatic placement</label>
+		<label>Automatic text placement</label>
 		<info>Place text automatically</info>
 	</data>
 	<data name="DimensionStyle.DimTxtRotate90">
-		<label>Text rotate 90°</label>
-		<info>Rotate text about 90° to the dimension line</info>
+		<label>Rotate text 90°</label>
+		<info>Rotate text by 90° to the dimension line</info>
 	</data>
 	<data name="DimensionStyle.DimTxtRotate60">
-		<label>Text rotate 60°</label>
-		<info>Rotate text about 60° to the dimension line</info>
+		<label>Rotate text 60°</label>
+		<info>Rotate text by 60° to the dimension line</info>
 	</data>
 	<data name="DimensionStyle.DimTxtRotateAutomatic">
-		<label>Text rotate automatic</label>
+		<label>Rotate text automatically</label>
 		<info>Rotate text automatically if it doesn't fit inside</info>
 	</data>
 	<data name="DimensionStyle.DimTxtInsideHor">
@@ -2905,8 +2905,8 @@
 		<info>Use 2nd text for dimension text</info>
 	</data>
 	<data name="DimensionStyle.TextPostfixAlt">
-		<label>Alternate postfix</label>
-		<info>Postfix for the alternate text</info>
+		<label>Alternate suffix</label>
+		<info>Suffix for the alternate text</info>
 	</data>
 	<data name="DimensionStyle.ScaleAlt">
 		<label>Alternate scaling factor</label>
@@ -2917,7 +2917,7 @@
 		<info>Kind of tolerance</info>
 	</data>
 	<data name="DimensionStyle.ToleranceMode.Values">
-		<label>|No tolerances|Plus/minus|Boundary</label>
+		<label>|No tolerances|Plus/minus|Limits</label>
 	</data>
 	<data name="DimensionStyle.PlusTolerance">
 		<label>Plus tolerance</label>
@@ -2960,35 +2960,35 @@
 		<info>Color of the dimension line</info>
 	</data>
 	<data name="DimensionStyle.ExtLineColor">
-		<label>Subsidiary line</label>
-		<info>Color of the subsidiary line</info>
+		<label>Extension line</label>
+		<info>Color of the extension line</info>
 	</data>
 	<data name="DimensionStyle.FillColor">
-		<label>Solid</label>
-		<info>Color of the solid arrows</info>
+		<label>Fill</label>
+		<info>Color of the filled arrows</info>
 	</data>
 	<data name="DimensionStyle.DimLineWidth">
-		<label>Dimension line weight</label>
-		<info>The line strength of the dimension line</info>
+		<label>Dimension line width</label>
+		<info>Line width of the dimension line</info>
 	</data>
 	<data name="DimensionStyle.ExtLineWidth">
-		<label>Subsidiary line weight</label>
-		<info>Line width of the subsidiary lines</info>
+		<label>Extension line width</label>
+		<info>Line width of the extension lines</info>
 	</data>
 	<data name="DimensionStyle.DimTxtAngle">
 		<label>Angular dimensioning</label>
 		<info>Formatting of the angular values</info>
 	</data>
 	<data name="DimensionStyle.DimTxtAngle.Values">
-		<label>|Degree|Degree, minutes, seconds|Grade|Radian|Length of curve</label>
+		<label>|Degree|Degree, minutes, seconds|Gradian|Radian|Arc length</label>
 	</data>
 	<data name="DimensionStyle.DimAngleBisection">
 		<label>Bisector</label>
-		<info>Dimensioning of halve angles</info>
+		<info>Dimension only the half angle (bisector)</info>
 	</data>
 	<data name="DimensionStyle.DimRadiusBend">
-		<label>Bending radius dimension</label>
-		<info>Bend the subsidiary line of a radius dimension</info>
+		<label>Bent radius dimension</label>
+		<info>Radius dimension with a bend and horizontal dimension text</info>
 	</data>
 	<data name="DimensionStyle.TextFont">
 		<label>Text font</label>
@@ -3187,10 +3187,10 @@
 		<info>Ending angle of the angular dimensioning</info>
 	</data>
 	<data name="LineWidthList.Default">
-		<label>|Thin:0.0D|0.7 mm:0.7L|0,3 mm:0.3W</label>
+		<label>|Thin:0.0D|Thick (0.7 mm):0.7L|0.3 mm:0.3W</label>
 	</data>
 	<data name="LinePatternList.Default">
-		<label>|Continous|Dashed: 2.0 2.0|Dash-dotted: 4.0 2 0 0 0 2.0|Dotted: 0.0 2.0</label>
+		<label>|Continuous|Dashed: 2.0 2.0|Dash-dotted: 4.0 2.0 0.0 2.0|Dotted: 0.0 2.0</label>
 	</data>
 	<data name="LineWidthList">
 		<label>Line widths</label>
@@ -3219,7 +3219,7 @@
 	</data>
 	<data name="MenuId.LineWidthList.RemoveUnused">
 		<label>Remove unused</label>
-		<info>Remove unused line width</info>
+		<info>Remove unused line widths</info>
 	</data>
 	<data name="MenuId.LineWidthList.UpdateFromProject">
 		<label>Update from project</label>
@@ -3274,12 +3274,12 @@
 		<info>The scaling system of the line pattern</info>
 	</data>
 	<data name="MenuId.LinePatternList.New">
-		<label>New line width</label>
+		<label>New line pattern</label>
 		<info>Add a new line pattern to the line pattern table</info>
 	</data>
 	<data name="MenuId.LinePatternList.RemoveUnused">
 		<label>Remove unused</label>
-		<info>In this project unused bar patterns are removed</info>
+		<info>Remove line patterns not used in this project</info>
 	</data>
 	<data name="MenuId.LinePatternList.UpdateFromProject">
 		<label>Update from project</label>
@@ -3395,28 +3395,28 @@
 		<info>Line pattern of the selected objects. Changing the line pattern affects all selected objects</info>
 	</data>
 	<data name="Select.MultipleLinePattern">
-		<label>Arbitrary</label>
+		<label>Various</label>
 	</data>
 	<data name="Select.LineWidth">
 		<label>Line width</label>
 		<info>Line width of the selected objects. Changing the line width affects all selected objects</info>
 	</data>
 	<data name="Select.MultipleLineWidth">
-		<label>Arbitrary</label>
+		<label>Various</label>
 	</data>
 	<data name="Select.Layer">
 		<label>Layer</label>
 		<info>Layer of the selected objects. Changing the layer affects all selected objects</info>
 	</data>
 	<data name="Select.MultipleLayer">
-		<label>Arbitrary</label>
+		<label>Various</label>
 	</data>
 	<data name="Select.ColorDef">
 		<label>Color</label>
 		<info>Color of the selected objects. Changing the color affects all selected objects</info>
 	</data>
 	<data name="Select.MultipleColorDef">
-		<label>Arbitrary</label>
+		<label>Various</label>
 	</data>
 	<data name="Select.NumObjects">
 		<label>Count</label>
@@ -3434,8 +3434,8 @@
 		<info>Automatically shows the input fields of the current action (construction/selection)</info>
 	</data>
 	<data name="Setting.Action.KeepStyle">
-		<label>Keep style</label>
-		<info>Keep style of attributes</info>
+		<label>Keep attributes</label>
+		<info>Keep changed attributes such as color and layer</info>
 	</data>
 	<data name="Action.Settings">
 		<label>Actions</label>
@@ -3460,8 +3460,8 @@
 		<info>Default scale of this model</info>
 	</data>
 	<data name="Model.LineStyleScale">
-		<label>Scaling line pattern</label>
-		<info>Scaling line pattern in this model</info>
+		<label>Line pattern scaling</label>
+		<info>Scaling of the line patterns in this model</info>
 	</data>
 	<data name="Project.Models">
 		<label>Models</label>
@@ -3514,7 +3514,7 @@
 	</data>
 	<data name="MenuId.Layout.Scale.1To5">
 		<label>1:5</label>
-		<info>Scale 1:5 for this patch</info>
+		<info>Set scale 1:5 for this patch</info>
 	</data>
 	<data name="MenuId.Layout.Scale.1To10">
 		<label>1:10</label>
@@ -3594,7 +3594,7 @@
 	</data>
 	<data name="SelectObjects.Settings">
 		<label>Select</label>
-		<info>Various setting for the selection of objects</info>
+		<info>Various settings for the selection of objects</info>
 	</data>
 	<data name="ImportedColor.Name">
 		<label>Import Color</label>
@@ -3650,7 +3650,7 @@
 	</data>
 	<data name="Setting.Colors.Layout">
 		<label>Layout color</label>
-		<info>Color for the background of the layout select</info>
+		<info>Color for the background of the layout</info>
 	</data>
 	<data name="DrawingPlane.Constr.Offset">
 		<label>Drawing plane</label>
@@ -3684,7 +3684,7 @@
 	</data>
 	<data name="MenuId.Projection.Direction.Vertical.FromBottom">
 		<label>From bottom</label>
-		<info>Projection direction (view) from down</info>
+		<info>View the model from below</info>
 	</data>
 	<data name="MenuId.Projection.Direction.Horizontal.FromFront">
 		<label>From front</label>
@@ -3729,7 +3729,7 @@
 	</data>
 	<data name="MenuId.Approximate">
 		<label>Approximate</label>
-		<info>Approximate this curve by line/circular arcs (Precision see global settings)</info>
+		<info>Approximate this curve by lines/circular arcs (set the precision in the global settings)</info>
 	</data>
 	<data name="Layout.HorizontalPosition">
 		<label>Left (model)</label>
@@ -3826,10 +3826,10 @@
 	</data>
 	<data name="Approximate.Precision">
 		<label>Precision</label>
-		<info>Precision, maximum derivation from the exact curve</info>
+		<info>Precision, maximum deviation from the exact curve</info>
 	</data>
 	<data name="Approximate">
-		<label>Approximate</label>
+		<label>Approximation</label>
 		<info>Mode and precision for approximation</info>
 	</data>
 	<data name="MenuId.Symbols.FileOpen">
@@ -3900,7 +3900,7 @@
 	</data>
 	<data name="Measure">
 		<label>Measure</label>
-		<info>Various method for measuring positions (coordinates), lengths, angles and areas</info>
+		<info>Various methods for measuring positions (coordinates), lengths, angles and areas</info>
 	</data>
 	<data name="MeasurePoint">
 		<label>Coordinate</label>
@@ -3908,11 +3908,11 @@
 	</data>
 	<data name="MeasureLength">
 		<label>Length</label>
-		<info>Measure length</info>
+		<info>Measured length</info>
 	</data>
 	<data name="MeasureDirection">
 		<label>Direction</label>
-		<info>Measure direction</info>
+		<info>Measured direction</info>
 	</data>
 	<data name="HatchStyleSolid.Color">
 		<label>Color</label>
@@ -3931,10 +3931,10 @@
 		<info>Handling of holes</info>
 	</data>
 	<data name="HatchStyleContour.ExcludeHoles.Values">
-		<label>|Circumscribe|Skip|Both </label>
+		<label>|Circumscribe|Skip|Both</label>
 	</data>
 	<data name="HatchStyleContour.SpiralMode">
-		<label>Spiral</label>
+		<label>Contour course</label>
 		<info>Handling of equidistant lines</info>
 	</data>
 	<data name="HatchStyleContour.SpiralMode.Values">
@@ -3946,7 +3946,7 @@
 	</data>
 	<data name="NamedValues">
 		<label>Values</label>
-		<info>Defined values for use in input field or formulas</info>
+		<info>Defined values for use in input fields or formulas</info>
 	</data>
 	<data name="NamedValues.NewGeoPoint.Prefix">
 		<label>p</label>
@@ -3983,7 +3983,7 @@
 	</data>
 	<data name="FilterName">
 		<label>Filter</label>
-		<info>A filter for selection objects</info>
+		<info>A filter for selecting objects</info>
 	</data>
 	<data name="CheckedAttribute.Entry">
 		<label>Activate entry</label>
@@ -4026,7 +4026,7 @@
 	</data>
 	<data name="MenuId.Filter.Active">
 		<label>Is active</label>
-		<info>this filter is active or inactive. Only active filters affect the selection</info>
+		<info>This filter is active or inactive. Only active filters affect the selection</info>
 	</data>
 	<data name="MenuId.Filter.OnlyThis">
 		<label>Only this filter</label>
@@ -4053,20 +4053,20 @@
 		<info>Create a new filter that accepts all selected objects</info>
 	</data>
 	<data name="MenuId.HatchStyleList.UpdateAllHatchs">
-		<label>Update hatch</label>
+		<label>Update hatches</label>
 		<info>Update all hatch objects to reflect modifications of the hatch styles</info>
 	</data>
 	<data name="LineWidth.Undefined">
-		<label>-Arbitrary-</label>
+		<label>- Any -</label>
 	</data>
 	<data name="LinePattern.Undefined">
-		<label>-Arbitrary-</label>
+		<label>- Any -</label>
 	</data>
 	<data name="HatchStyle.Undefined">
-		<label>-Arbitrary-</label>
+		<label>- Any -</label>
 	</data>
 	<data name="DimensionStyle.Undefined">
-		<label>-Arbitrary-</label>
+		<label>- Any -</label>
 	</data>
 	<data name="StyleSelection">
 		<label>Style</label>
@@ -4090,7 +4090,7 @@
 	</data>
 	<data name="MenuId.StyleEntry.DefaultForSolids">
 		<label>3D default</label>
-		<info>Default style for 2D curves (solid, shell, face)</info>
+		<info>Default style for 3D objects (solid, shell, face)</info>
 	</data>
 	<data name="MenuId.StyleEntry.DefaultForText">
 		<label>Text default</label>
@@ -4105,8 +4105,8 @@
 		<info>Default for hidden 3D objects</info>
 	</data>
 	<data name="MenuId.StyleEntry.DefaultForAxis">
-		<label>Default for Axis</label>
-		<info>Default for Axis</info>
+		<label>Axis default</label>
+		<info>Default style for axes</info>
 	</data>
 	<data name="MenuId.VisibleLayer.SelectAll">
 		<label>Select all</label>
@@ -4114,10 +4114,10 @@
 	</data>
 	<data name="MenuId.VisibleLayer.SelectNone">
 		<label>Select none</label>
-		<info>Select no layer as visible layers</info>
+		<info>Make all layers invisible in this view</info>
 	</data>
 	<data name="ModelView.VisibleLayers">
-		<label>Visible layer</label>
+		<label>Visible layers</label>
 		<info>Select visible layers for this model view</info>
 	</data>
 	<data name="VisibleLayer.Entry">
@@ -4220,11 +4220,11 @@
 	</data>
 	<data name="MenuId.SelectedObjects.Approximate">
 		<label>Approximate all</label>
-		<info>Approximate all selected objects by line/circular arcs; Details like precision are adjustable in the global settings</info>
+		<info>Approximate all selected objects by lines/circular arcs; details like precision can be set in the global settings</info>
 	</data>
 	<data name="MenuId.SelectedObjects.SewFaces">
 		<label>Connect faces</label>
-		<info>Connect all selected faces or shells. Faces are connected to shells or solids</info>
+		<info>Connect all selected faces or shells. The result may be shells or solids</info>
 	</data>
 	<data name="Progress.ImportDWG">
 		<label>Reading file "{0}"</label>
@@ -4259,7 +4259,7 @@
 		<info>Select display mode</info>
 	</data>
 	<data name="ModelView.ShowHiddenLines.Values">
-		<label>|Shading|Wires</label>
+		<label>|Shaded|Wireframe</label>
 	</data>
 	<data name="SphericalSurface">
 		<label>Spherical Surface</label>
@@ -4405,11 +4405,11 @@
 	</data>
 	<data name="MenuId.Constr.Ellipse.2PointsDirections">
 		<label>Two points two directions</label>
-		<info>Ellipse: to points on the circumference and the tangential direction at these two points</info>
+		<info>Ellipse: two points on the circumference and the tangential direction at these two points</info>
 	</data>
 	<data name="Constr.Ellipse.2PointsDirections">
 		<label>Ellipse: Two points two directions</label>
-		<info>Ellipse: to points on the circumference and the tangential direction at these two points</info>
+		<info>Ellipse: two points on the circumference and the tangential direction at these two points</info>
 	</data>
 	<data name="Constr.Ellipse.2PointsDirections.Point1">
 		<label>1st point</label>
@@ -4421,7 +4421,7 @@
 	</data>
 	<data name="Constr.Ellipse.2PointsDirections.Point2">
 		<label>2nd point</label>
-		<info>1st point on the circumference of the ellipse</info>
+		<info>2nd point on the circumference of the ellipse</info>
 	</data>
 	<data name="Constr.Ellipse.2PointsDirections.Direction2">
 		<label>2nd direction</label>
@@ -4429,11 +4429,11 @@
 	</data>
 	<data name="MenuId.Constr.Ellipsearc.2PointsDirections">
 		<label>Two points two directions</label>
-		<info>Elliptical arc: to points on the circumference and the tangential direction at these two points</info>
+		<info>Elliptical arc: two points on the circumference and the tangential direction at these two points</info>
 	</data>
 	<data name="Constr.Ellipsearc.2PointsDirections">
 		<label>Elliptical arc: Two points two directions</label>
-		<info>Elliptical arc: to points on the circumference and the tangential direction at these two points</info>
+		<info>Elliptical arc: two points on the circumference and the tangential direction at these two points</info>
 	</data>
 	<data name="MenuId.View.Toolbars">
 		<label>Toolbars</label>
@@ -4461,7 +4461,7 @@
 	</data>
 	<data name="Constr.Solid.FaceExtrude.Path">
 		<label>Object</label>
-		<info>Face or closed curve to be extruded. Alternative use " Inner point" to define a face (with holes).</info>
+		<info>Face or closed curve to be extruded. Alternatively, use "Inner point" to define a face (with holes).</info>
 	</data>
 	<data name="Constr.Solid.FaceExtrude.InnerPoint">
 		<label>Inner point</label>
@@ -4481,11 +4481,7 @@
 	</data>
 	<data name="Constr.Solid.FaceRotate.Path">
 		<label>Object</label>
-		<info>Face or closed curve to be rotated. Alternative use " Inner point" to define a face (with holes).</info>
-	</data>
-	<data name="Constr.Solid.FaceExtrude.InnerPoint">
-		<label>Inner point</label>
-		<info>Inner point defines a face to be rotated. Similar to hatch, face can have holes.</info>
+		<info>Face or closed curve to be rotated. Alternatively, use "Inner point" to define a face (with holes).</info>
 	</data>
 	<data name="MenuId.Export">
 		<label>Export</label>
@@ -4508,20 +4504,20 @@
 	</data>
 	<data name="DxfDwg.ImportDimension">
 		<label>Import Dimension</label>
-		<info>Way of import of DXF/DWG Dimension</info>
+		<info>How DXF/DWG dimensions are imported</info>
 	</data>
 	<data name="DxfDwg.ImportDimension.Values">
 		<label>|As Block|As Dimension</label>
 	</data>
 	<data name="DxfDwg.ExportDimension">
 		<label>Export Dimension</label>
-		<info>Way of export of DXF/DWG Dimension</info>
+		<info>How dimensions are exported to DXF/DWG</info>
 	</data>
 	<data name="DxfDwg.ExportDimension.Values">
 		<label>|As Block|As Dimension</label>
 	</data>
 	<data name="MenuId.Export.Settings">
-		<label>Settings export formats</label>
+		<label>Export format settings</label>
 		<info>Select export format versions</info>
 	</data>
 	<data name="Face.Edge">
@@ -4542,11 +4538,11 @@
 	</data>
 	<data name="Constr.Solid.RuledSolid.Path1">
 		<label>1st path</label>
-		<info>Objects for the first path. may be a circle, an ellipse, a closed path or a face</info>
+		<info>Object for the first path; may be a circle, an ellipse, a closed path or a face</info>
 	</data>
 	<data name="Constr.Solid.RuledSolid.Path2">
 		<label>2nd path</label>
-		<info>Objects for the second path. may be a circle, an ellipse, a closed path or a face</info>
+		<info>Object for the second path; may be a circle, an ellipse, a closed path or a face</info>
 	</data>
 	<data name="Constr.Solid.SolidInsertMode">
 		<label>Insertion mode</label>
@@ -4669,7 +4665,7 @@
 	</data>
 	<data name="Constr.Rotate.AxisLine">
 		<label>Axis of rotation</label>
-		<info>Specify the axis of rotation for 3dimensional rotation</info>
+		<info>Specify the axis of rotation for three-dimensional rotation</info>
 	</data>
 	<data name="MenuId.Constr.Face.FromObject">
 		<label>Face from object</label>
@@ -4677,7 +4673,7 @@
 	</data>
 	<data name="MenuId.Constr.Face.FromSelectedObject">
 		<label>Face from object</label>
-		<info>Selected curves or a paths will be converted to a planar face</info>
+		<info>Selected curves or paths will be converted to a planar face</info>
 	</data>
 	<data name="Constr.Face.FromObject">
 		<label>Face from object</label>
@@ -4709,7 +4705,7 @@
 	</data>
 	<data name="ConstructAequidist.SharpCornerMinAngle">
 		<label>Sharp corners from</label>
-		<info>All connection angles greater then this generate sharp corners (0°: only sharp corners, 180°: no sharp corners)</info>
+		<info>All connection angles greater than this generate sharp corners (0°: only sharp corners, 180°: no sharp corners)</info>
 	</data>
 	<data name="Constr.SplitCurve.Mode.Values">
 		<label>|Percentage|Length</label>
@@ -4735,7 +4731,7 @@
 		<info>Length of the segments</info>
 	</data>
 	<data name="Constr.SplitCurve.Distance">
-		<label>{0:##}. segment</label>
+		<label>Segment {0:##}</label>
 		<info>Length of the segment</info>
 	</data>
 	<data name="Constr.SplitCurve">
@@ -4803,7 +4799,7 @@
 	</data>
 	<data name="Select.SelectColor">
 		<label>Select color</label>
-		<info>Color of the surrounding of the selected objects</info>
+		<info>Color of the border around the selected objects</info>
 	</data>
 	<data name="Select.FocusColor">
 		<label>Focus color</label>
@@ -4811,7 +4807,7 @@
 	</data>
 	<data name="Select.SelectWidth">
 		<label>Selection width</label>
-		<info>Width of the surrounding of the selected objects, 0: fast selection without rim</info>
+		<info>Width of the border around the selected objects, 0: fast selection without border</info>
 	</data>
 	<data name="Select.SelectTransparency">
 		<label>Transparency</label>
@@ -4819,10 +4815,10 @@
 	</data>
 	<data name="Select.DragWidth">
 		<label>Drag distance</label>
-		<info>Mouse moving distance in pixel to start "Drag And Drop" action (to prevent unintended movements)</info>
+		<info>Mouse movement distance in pixels to start a "Drag And Drop" action (to prevent unintended movements)</info>
 	</data>
 	<data name="Select.PickRadius">
-		<label>Pickradius</label>
+		<label>Pick radius</label>
 		<info>Maximum allowed distance for an object from the cursor to be selected.</info>
 	</data>
 	<data name="Constr.Line.Tangent.Position">
@@ -4851,10 +4847,6 @@
 	<data name="Constr.Fillet.Faces">
 		<label>Face-Edges</label>
 		<info>Click a face for all its touched edges to be replaced by a fillet</info>
-	</data>
-	<data name="Constr.Fillet.Faces">
-		<label>Solid-Edges</label>
-		<info>Click a shell or solid for all its edges with common faces to be replaced by a fillet</info>
 	</data>
 	<data name="Constr.Fillet.Radius">
 		<label>Radius</label>
@@ -4905,7 +4897,7 @@
 	</data>
 	<data name="MenuId.Projection.Direction">
 		<label>Orthogonal view direction</label>
-		<info>Choose a orthogonal view direction</info>
+		<info>Choose an orthogonal view direction</info>
 	</data>
 	<data name="MenuId.Projection.Direction.FromTop">
 		<label>From top</label>
@@ -4932,7 +4924,7 @@
 		<info>View from bottom</info>
 	</data>
 	<data name="MenuId.Projection.Direction.Orthogonal">
-		<label>Orthogonal (Drawingplane)</label>
+		<label>Orthogonal (drawing plane)</label>
 		<info>Perpendicular to the drawing plane</info>
 	</data>
 	<data name="MenuId.Construct.Finish">
@@ -4947,7 +4939,7 @@
 		<label>Solution {0}</label>
 	</data>
 	<data name="Projection.Default">
-		<label>|Top|Right|Front|Perspective</label>
+		<label>|Top|Right|Front|Isometric</label>
 	</data>
 	<data name="Language.ChangeMessage">
 		<label>Not all items will change their language immediately. Restart the program for correct display.</label>
@@ -4999,11 +4991,11 @@
 	</data>
 	<data name="MenuId.Vector">
 		<label>Vector Input</label>
-		<info>Various methods to define multiple vectors or directions</info>
+		<info>Various methods to define vectors or directions</info>
 	</data>
 	<data name="MenuId.Length">
 		<label>Length Input</label>
-		<info>Various methods to define multiple lengths or distances</info>
+		<info>Various methods to define lengths or distances</info>
 	</data>
 	<data name="MenuId.SelectedObject">
 		<label>Selected Object</label>
@@ -5066,11 +5058,11 @@
 	</data>
 	<data name="Constr.Face.RuledFace.Path1">
 		<label>1st path</label>
-		<info>Objects for the first path. may be a circle, an ellipse, a path</info>
+		<info>Objects for the first path: a circle, an ellipse, a path or a polyline</info>
 	</data>
 	<data name="Constr.Face.RuledFace.Path2">
 		<label>2nd path</label>
-		<info>Objects for the second path. may be a circle, an ellipse, a path</info>
+		<info>Objects for the second path (in a different plane than the first): a circle, an ellipse, a path or a polyline</info>
 	</data>
 	<data name="ToroidalSurface">
 		<label>Toroidal Surface</label>
@@ -5201,19 +5193,19 @@
 	</data>
 	<data name="Constr.Cone.StartPoint">
 		<label>Center point</label>
-		<info>Construction of the center point of the cone. Axis direction, 1. radius and height refer to this point.</info>
+		<info>Construction of the center point of the cone. Axis direction, first radius and height refer to this point.</info>
 	</data>
 	<data name="Constr.Cone.EndPoint">
 		<label>Axis point</label>
-		<info>Construction of the axis point for direction and height of the cone. Alternative: Construct a radius for cylinder upright on drawing plane. Optional: Please define differing height.</info>
+		<info>Construction of the axis point for direction and height of the cone. Alternative: Construct a radius for a cone upright on the drawing plane. Optional: Please define differing height.</info>
 	</data>
 	<data name="Constr.Cone.Radius1">
-		<label>1. radius</label>
-		<info>Construction of the first cylinder-radius (referring to the cylinder-axis).</info>
+		<label>1st radius</label>
+		<info>Construction of the first cone radius (referring to the cone axis).</info>
 	</data>
 	<data name="Constr.Cone.Radius2">
-		<label>2. radius</label>
-		<info>Construction of the second cylinder-radius (referring to the cylinder-axis). May be zero</info>
+		<label>2nd radius</label>
+		<info>Construction of the second cone radius (referring to the cone axis). May be zero</info>
 	</data>
 	<data name="Constr.Cone.Height">
 		<label>Height</label>
@@ -5368,7 +5360,7 @@
 	</data>
 	<data name="Drive.MovedObjects">
 		<label>Moved Objects</label>
-		<info>List of the moved objects. Drag any object to be move onto this area</info>
+		<info>List of the moved objects. Drag any object to be moved onto this area</info>
 	</data>
 	<data name="CurveDrive.Independent">
 		<label>- Not moved -</label>
@@ -5382,8 +5374,8 @@
 		<info>For this drive</info>
 	</data>
 	<data name="Drive.Time">
-		<label>Point of Time</label>
-		<info>Point of Time of this entry</info>
+		<label>Point in time</label>
+		<info>Point in time of this entry</info>
 	</data>
 	<data name="Drive.Position">
 		<label>Position</label>
@@ -5410,7 +5402,7 @@
 	</data>
 	<data name="Schedule.List">
 		<label>Programs</label>
-		<info>All programs or schedules of this model, chose an active program</info>
+		<info>All programs or schedules of this model, choose an active program</info>
 	</data>
 	<data name="ScheduleList.NewScheduleName">
 		<label>Program</label>
@@ -5456,7 +5448,7 @@
 		<info>Choose precision</info>
 	</data>
 	<data name="Font.Precision.Values">
-		<label>|Raw|Medium|Smooth</label>
+		<label>|Coarse|Medium|Fine</label>
 	</data>
 	<data name="Font">
 		<label>Font Display</label>
@@ -5580,15 +5572,15 @@
 	</data>
 	<data name="MeasureLengthx">
 		<label>Length, x-axis:</label>
-		<info>Measure length in x-axis direction</info>
+		<info>Measured length in x-axis direction</info>
 	</data>
 	<data name="MeasureLengthy">
 		<label>Length, y-axis:</label>
-		<info>Measure length in y-axis direction</info>
+		<info>Measured length in y-axis direction</info>
 	</data>
 	<data name="MeasureLengthz">
 		<label>Length, z-axis:</label>
-		<info>Measure length in z-axis direction</info>
+		<info>Measured length in z-axis direction</info>
 	</data>
 	<data name="Constr.Picture">
 		<label>Bitmap</label>
@@ -5666,19 +5658,19 @@
 		<info>Unscaled object</info>
 	</data>
 	<data name="Arc.StartPoint">
-		<label>Starting point</label>
+		<label>Start point</label>
 		<info>Starting point of the arc</info>
 	</data>
 	<data name="Arc.EndPoint">
-		<label>Ending point</label>
+		<label>End point</label>
 		<info>Ending point of the arc</info>
 	</data>
 	<data name="Ellipse.StartPoint">
-		<label>Starting point</label>
+		<label>Start point</label>
 		<info>Starting point of the elliptical arc</info>
 	</data>
 	<data name="Ellipse.EndPoint">
-		<label>Ending point</label>
+		<label>End point</label>
 		<info>Ending point of the elliptical arc</info>
 	</data>
 	<data name="MenuId.OpenFileDialog.Show">
@@ -5722,22 +5714,22 @@
 		<info>Use shading when printing on GDI</info>
 	</data>
 	<data name="Printing.GDIBitmap">
-		<label>GDI Bitmapprinting</label>
-		<info>GDI-Printing via bitmap, slowly, but maybe better areas</info>
+		<label>GDI bitmap printing</label>
+		<info>GDI printing via bitmap, slower, but possibly better for areas</info>
 	</data>
 	<data name="Printing.GDICoverage">
 		<label>GDI Coverage</label>
-		<info>GDI-Printing with respecting coverage(slower)</info>
+		<info>GDI printing respecting coverage (slower)</info>
 	</data>
 	<data name="Printing.UseZOrder">
 		<label>Display Order</label>
-		<info>GDI-Printing with respecting of layer display order</info>
+		<info>GDI printing respecting the layer display order (slower)</info>
 	</data>
 	<data name="GDI2DView.Default.Name">
 		<label>GDI View {0:##}</label>
 	</data>
 	<data name="AnimatedView.Default.Name">
-		<label>AnimatedView {0:##}</label>
+		<label>Animated view {0:##}</label>
 	</data>
 	<data name="MenuId.CurveDriveCurve.Show">
 		<label>Show</label>
@@ -5779,15 +5771,15 @@
 	</data>
 	<data name="DualCurveDrive">
 		<label>Coupled Curve Drive</label>
-		<info>Drive simultaneous along two coupled curves</info>
+		<info>Drive simultaneously along two coupled curves</info>
 	</data>
 	<data name="DualCurveDrive.Curve1">
-		<label>1. coupled curve</label>
-		<info>Define 1. coupled curve for movement base</info>
+		<label>1st coupled curve</label>
+		<info>Define the 1st coupled curve as the base of movement</info>
 	</data>
 	<data name="DualCurveDrive.Curve2">
-		<label>2. coupled curve</label>
-		<info>Define 1. coupled curve for base of orientation in space</info>
+		<label>2nd coupled curve</label>
+		<info>Define the 2nd coupled curve as the base of the spatial orientation</info>
 	</data>
 	<data name="DualCurveDrive.Stretch">
 		<label>Coupled curves: Adjust</label>
@@ -5805,8 +5797,8 @@
 		<info>Length of the arc</info>
 	</data>
 	<data name="MenuId.Path.Vertex.StartWithMe">
-		<label>start here</label>
-		<info>Makes the path to start with this vertex</info>
+		<label>Start here</label>
+		<info>Makes the path start with this vertex</info>
 	</data>
 	<data name="Select.FastFeedback">
 		<label>Fast Feedback</label>
@@ -5821,7 +5813,7 @@
 	</data>
 	<data name="ToolsExpand.Distance">
 		<label>distance</label>
-		<info>additional distance: positiv: longer, negativ: shorter</info>
+		<info>additional distance: positive: longer, negative: shorter</info>
 	</data>
 	<data name="MenuId.XAxis">
 		<label>X-Axis</label>
@@ -5849,7 +5841,7 @@
 	</data>
 	<data name="Constr.Rotate.Offset">
 		<label>offset</label>
-		<info>additional offset by 0°, 90°, 180° or 270°(-90°)</info>
+		<info>additional rotation by 0°, 90°, 180° or 270°(-90°)</info>
 	</data>
 	<data name="Constr.Rotate.Offset.Values">
 		<label>|0°|90°|180°|270°(-90°)</label>
@@ -5891,7 +5883,7 @@
 	</data>
 	<data name="DistanceTo.AssociateParametric">
 		<label>Associate parameter with solid</label>
-		<info>Associate this parameter with the solid by th eprovided name</info>
+		<info>Associate this parameter with the solid by the provided name</info>
 	</data>
 	<data name="DistanceTo.ParametricsName">
 		<label>Parameter name</label>
@@ -5945,11 +5937,6 @@
 		<label>Show axis</label>
 		<info>Show axis of holes or round items</info>
 	</data>
-	<data name="MenuId.Fillet">
-		<label>Fillet</label>
-		<info>
-		</info>
-	</data>
 	<data name="MenuId.Fillet.ChangeRadius">
 		<label>Change radius</label>
 		<info>Change radius of fillet</info>
@@ -5968,7 +5955,7 @@
 	</data>
 	<data name="MenuId.MakeTransparent">
 		<label>Make transparent</label>
-		<info>Display this object tranparent</info>
+		<info>Display this object transparent</info>
 	</data>
 	<data name="MenuId.Solid.Hide">
 		<label>Hide</label>
@@ -6010,7 +5997,7 @@
 	</data>
 	<data name="MenuId.MakeOpaque">
 		<label>Make Opaque</label>
-		<info>Display this object opaque (non-tranparent)</info>
+		<info>Display this object opaque (non-transparent)</info>
 	</data>
 	<data name="TextToValue.Failed">
 		<label>Invalid input</label>
@@ -6029,24 +6016,81 @@
 	</data>
 	<data name="Constr.Parametrics.Angle">
 		<label>Angle between Faces</label>
-		<info>???</info>
+		<info>Change the angle between faces of a solid</info>
 	</data>
 	<data name="Parametrics.Angle.FaceToRotate">
 		<label>Face to rotate</label>
-		<info>???</info>
+		<info>Select the face to be rotated</info>
 	</data>
 	<data name="Parametrics.Angle.MoreFacesToRotate">
 		<label>More faces to rotate</label>
-		<info>???</info>
+		<info>Select more faces to be rotated together with the first face</info>
 	</data>
 	<data name="Parametrics.Angle.Reference">
 		<label>Reference Face for Angle</label>
-		<info>???</info>
+		<info>Select the reference face for the angle</info>
 	</data>
 	<data name="Parametrics.Angle.Angle">
 		<label>Rotation Angle</label>
-		<info>???</info>
+		<info>Angle by which the faces are rotated</info>
 	</data>	
 	<!--
 	-->
+	<data name="Language.Selected.Values">
+		<label>english</label>
+	</data>
+	<data name="ToolsConnect.Object1">
+		<label>1st object</label>
+		<info>Specify the 1st object, to be connected at the side where it is clicked</info>
+	</data>
+	<data name="ToolsConnect.Object2">
+		<label>2nd object</label>
+		<info>Specify the 2nd object, to be connected at the side where it is clicked</info>
+	</data>
+	<data name="Constr.Solid.FaceRotate.InnerPoint">
+		<label>Inner point</label>
+		<info>Inner point defines the face (with holes) to rotate, similar to hatch.</info>
+	</data>
+	<data name="Constr.Fillet.Face">
+		<label>Face edges</label>
+		<info>Select a face whose edges with adjacent faces are to be filleted</info>
+	</data>
+	<data name="Constr.Fillet.Shell">
+		<label>Solid edges</label>
+		<info>Select the shell or solid whose edges between faces are to be filleted</info>
+	</data>
+	<data name="MenuId.Drive.MovedObjects.Set">
+		<label>Set</label>
+		<info>Set the moved objects</info>
+	</data>
+	<data name="MenuId.Drive.MovedObjects.Show">
+		<label>Show</label>
+		<info>Show the moved objects</info>
+	</data>
+	<data name="Constr.Face.ScrewPath.Orientation">
+		<label>Orientation</label>
+		<info>Left-hand or right-hand thread</info>
+	</data>
+	<data name="Constr.Face.ScrewPath.Orientation.Values">
+		<label>|Right-hand thread|Left-hand thread</label>
+	</data>
+	<data name="Debug.Hashcode">
+		<label>Debug:HashCode</label>
+		<info>Debug version only</info>
+	</data>
+	<data name="MenuId.Constr.Solid.ScrewPath">
+		<label>Screw path</label>
+	</data>
+	<data name="MenuId.DrawingPlane.OfCurve">
+		<label>Plane of a curve</label>
+		<info>Plane of a curve, e.g. a circular arc</info>
+	</data>
+	<data name="Construct.Plane.DircetionX">
+		<label>X-axis of the plane</label>
+		<info>X-axis of the plane</info>
+	</data>
+	<data name="Construct.Plane.DircetionY">
+		<label>Y-axis of the plane</label>
+		<info>Y-axis of the plane</info>
+	</data>
 </root>

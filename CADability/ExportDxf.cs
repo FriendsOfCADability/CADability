@@ -1128,7 +1128,10 @@ namespace CADability.DXF
                 found = new ACadSharp.Tables.DimensionStyle(candidate);
                 doc.DimensionStyles.Add(found);
             }
-            if (style.TextSize > 0.0) found.TextHeight = style.TextSize;
+            // DIMTXT is the height of the capital letters like the height of a TEXT, while
+            // CADability draws the dimension text with TextSize as the em height (issue #506).
+            if (style.TextSize > 0.0)
+                found.TextHeight = style.TextSize * GeoObject.Text.GetCapHeightFactor(style.TextFont, false, false);
             found.ArrowSize = Math.Max(0.0, style.SymbolSize);
             found.ExtensionLineOffset = style.ExtLineOffset;
             found.ExtensionLineExtension = style.ExtLineExtension;

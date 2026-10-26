@@ -2276,8 +2276,6 @@ namespace CADability.DXF
         {
             double scale = acad.ScaleFactor > 0.0 ? acad.ScaleFactor : 1.0;
             style.Types = Attribute.DimensionStyle.ETypeFlag.DimAllTypes;
-            style.TextSize = acad.TextHeight * scale;
-            style.TextSizeTol = acad.TextHeight * acad.ToleranceScaleFactor * scale;
             style.SymbolSize = acad.ArrowSize * scale;
             style.ExtLineOffset = acad.ExtensionLineOffset * scale;
             style.ExtLineExtension = acad.ExtensionLineExtension * scale;
@@ -2302,12 +2300,17 @@ namespace CADability.DXF
             style.TextPrefix = arcSymbol + (acad.Prefix ?? "");
             style.TextPostfix = acad.Suffix ?? "";
             style.TextFont = FontNameFromStyle(acad.Style);
+            // DIMTXT is the height of the capital letters like the height of a TEXT, while
+            // CADability draws the dimension text with TextSize as the em height (issue #506).
+            double emHeight = acad.TextHeight * scale / GeoObject.Text.GetCapHeightFactor(style.TextFont, false, false);
+            style.TextSize = emHeight;
+            style.TextSizeTol = emHeight * acad.ToleranceScaleFactor;
             // DIMTAD says whether the text sits on the dimension line or above it, DIMGAP how
-            // far; CADability measures that distance in text heights.
+            // far; CADability measures that distance in multiples of TextSize.
             style.TextDist = acad.TextVerticalAlignment == DimensionTextVerticalAlignment.Centered
-                || acad.TextHeight <= 0.0
+                || emHeight <= 0.0
                 ? 0.0
-                : Math.Abs(acad.DimensionLineGap) / acad.TextHeight;
+                : Math.Abs(acad.DimensionLineGap) * scale / emHeight;
             style.Symbol = MapArrowSymbol(acad);
             style.DimNoExtLine1 = acad.SuppressFirstExtensionLine;
             style.DimNoExtLine2 = acad.SuppressSecondExtensionLine;

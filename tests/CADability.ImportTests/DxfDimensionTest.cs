@@ -565,7 +565,9 @@ Dimensions
                     "the measurement text");
             }
             Assert.AreEqual(project.DimensionStyleList.Current.Name, linear.Style.Name);
-            Assert.AreEqual(project.DimensionStyleList.Current.TextSize, linear.Style.TextHeight, 1e-12);
+            CADability.Attribute.DimensionStyle current = project.DimensionStyleList.Current;
+            Assert.AreEqual(CapitalHeight(current.TextFont, current.TextSize), linear.Style.TextHeight, 1e-8,
+                "DIMTXT is the height of the capital letters CADability draws (issue #506)");
         }
 
         /// <summary>
@@ -981,7 +983,8 @@ AcDbRotatedDimension
             Assert.IsNotNull(style, "a rebuilt dimension needs a style to draw with");
             Assert.AreEqual("LOGICAL", style.Name, "the style should keep the name from the file");
             Assert.AreSame(style, project.DimensionStyleList.Find("LOGICAL"), "the style is part of the project");
-            Assert.AreEqual(7.0, style.TextSize, 1e-8, "DIMTXT 3.5 times DIMSCALE 2");
+            Assert.AreEqual(7.0, CapitalHeight(style.TextFont, style.TextSize), 1e-8,
+                "capital letters as high as DIMTXT 3.5 times DIMSCALE 2 (issue #506)");
             Assert.AreEqual(3.0, style.SymbolSize, 1e-8, "DIMASZ 1.5 times DIMSCALE 2");
             Assert.AreEqual(1.0, style.ExtLineOffset, 1e-8, "DIMEXO 0.5 times DIMSCALE 2");
             Assert.AreEqual(2.5, style.ExtLineExtension, 1e-8, "DIMEXE 1.25 times DIMSCALE 2");
@@ -1002,7 +1005,8 @@ AcDbRotatedDimension
             Project project = ImportProjectAsDimensions(StyledPrologue + standard + Epilogue);
             Dimension dim = SingleDimensionObject(project.GetActiveModel());
 
-            Assert.AreEqual(0.18, dim.DimensionStyle.TextSize, 1e-8, "DIMTXT of AutoCAD's Standard style");
+            Assert.AreEqual(0.18, CapitalHeight(dim.DimensionStyle.TextFont, dim.DimensionStyle.TextSize), 1e-8,
+                "capital letters as high as DIMTXT of AutoCAD's Standard style");
             Assert.AreEqual(0.18, dim.DimensionStyle.SymbolSize, 1e-8, "DIMASZ of AutoCAD's Standard style");
         }
 
@@ -1047,7 +1051,8 @@ DSTYLE
             Dimension[] dims = model.AllObjects.OfType<Dimension>().ToArray();
             Assert.AreEqual(2, dims.Length, "both dimensions should be rebuilt");
 
-            double[] sizes = dims.Select(d => d.DimensionStyle.TextSize).OrderBy(t => t).ToArray();
+            double[] sizes = dims.Select(d => CapitalHeight(d.DimensionStyle.TextFont, d.DimensionStyle.TextSize))
+                .OrderBy(t => t).ToArray();
             Assert.AreEqual(7.0, sizes[0], 1e-8, "the plain dimension keeps DIMTXT 3.5 times DIMSCALE 2");
             Assert.AreEqual(18.0, sizes[1], 1e-8, "the overridden one gets 9.0 times DIMSCALE 2");
             Assert.AreNotSame(dims[0].DimensionStyle, dims[1].DimensionStyle,
@@ -1602,6 +1607,23 @@ AcDbArcDimension
         }
 
         private static double Distance(CSMath.XYZ p, GeoPoint q) => new GeoPoint(p.X, p.Y, p.Z) | q;
+
+        /// <summary>
+        /// The height of an "H" that CADability draws in <paramref name="font"/> with the text size
+        /// <paramref name="textSize"/>, which is the em height. DIMTXT is this height (issue #506).
+        /// </summary>
+        private static double CapitalHeight(string font, double textSize)
+        {
+            Text text = Text.Construct();
+            text.Font = font;
+            text.TextString = "H";
+            text.LineDirection = GeoVector.XAxis;
+            text.GlyphDirection = GeoVector.YAxis;
+            text.TextSize = textSize;
+            BoundingCube ext = BoundingCube.EmptyBoundingCube;
+            foreach (IGeoObject go in text.GetOutline()) ext.MinMax(go.GetBoundingCube());
+            return ext.Ymax - ext.Ymin;
+        }
 
         private static Block SingleDimensionBlock(Model model)
         {

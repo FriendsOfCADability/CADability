@@ -2398,15 +2398,17 @@ namespace CADability.GeoObject
         /// em height. DXF and DWG give the height of a text as the height of its capital letters, so import and export
         /// convert with this factor (issue #506).
         /// </summary>
-        internal double CapHeightFactor
+        internal double CapHeightFactor => GetCapHeightFactor(fontName, Bold, Italic);
+        /// <summary>
+        /// The height of the capital letters of the font <paramref name="fontName"/> as a fraction of its em height, see
+        /// <see cref="CapHeightFactor"/>. Dimensions use it for the text size of their style.
+        /// </summary>
+        internal static double GetCapHeightFactor(string fontName, bool bold, bool italic)
         {
-            get
-            {
-                int fs = 0;
-                if (Bold) fs |= (int)FontStyle.Bold;
-                if (Italic) fs |= (int)FontStyle.Italic;
-                return FontCache.GlobalFontCache.GetCapHeight(fontName, fs);
-            }
+            int fs = 0;
+            if (bold) fs |= (int)FontStyle.Bold;
+            if (italic) fs |= (int)FontStyle.Italic;
+            return FontCache.GlobalFontCache.GetCapHeight(fontName, fs);
         }
         /// <summary>
         /// Width of the text column for automatic word wrapping (in world units, e.g. from a DXF MTEXT).

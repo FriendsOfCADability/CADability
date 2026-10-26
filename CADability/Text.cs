@@ -477,6 +477,7 @@ namespace CADability.GeoObject
         readonly Dictionary<DictKey, CenterLineVal> centerLineCache; // Cache für die CenterLines, Größe 1
         readonly Dictionary<FontKey, FontCharacteristics> fontCharacteristicsCache; // Cache für die FontCharacteristics
         readonly Dictionary<FontKey, FontFace> faces; // the faces of FontProvider.Current, per font name and bold/italic
+        readonly Dictionary<FontKey, double> capHeights; // see GetCapHeight
         public FontCache()
         {
             FontPrecision = Settings.GlobalSettings.GetIntValue("Font.Precision", 1); // |grob|mittel|fein
@@ -485,6 +486,7 @@ namespace CADability.GeoObject
             centerLineCache = new Dictionary<DictKey, CenterLineVal>();
             fontCharacteristicsCache = new Dictionary<FontKey, FontCharacteristics>();
             faces = new Dictionary<FontKey, FontFace>();
+            capHeights = new Dictionary<FontKey, double>();
         }
         /// <summary>
         /// Returns the face of <see cref="FontProvider.Current"/> for a font name and a font style (the flags of
@@ -519,6 +521,39 @@ namespace CADability.GeoObject
             catch (InvalidOperationException)
             {
                 return null;
+            }
+        }
+        /// <summary>
+        /// The height of the capital letters of a font in units of the em height, measured at the outline of "H". A DXF or
+        /// DWG text height (group 40) is this height, while <see cref="Text.TextSize"/> is the em height (issue #506).
+        /// Returns 1.0 when there is no font at all or the font has no "H", then both heights are taken to be the same.
+        /// </summary>
+        internal double GetCapHeight(string fontName, int fontStyle)
+        {
+            FontKey key = new FontKey(fontName ?? "", fontStyle & 3);
+            lock (this)
+            {
+                if (capHeights.TryGetValue(key, out double res)) return res;
+                res = 1.0;
+                FontFace face = TryGetFace(fontName, fontStyle & 3);
+                if (face != null && face.EmHeight > 0)
+                {
+                    try
+                    {   // the outline is y downwards with the baseline at CellAscent/EmHeight, see FontFace.GetGlyphPath
+                        face.GetGlyphPath('H', false, false, out PointF[] points, out byte[] _);
+                        if (points.Length > 0)
+                        {
+                            double top = points.Min(p => p.Y);
+                            double height = (double)face.CellAscent / face.EmHeight - top;
+                            if (height > 0.0 && height <= 2.0) res = height;
+                        }
+                    }
+                    catch (Exception ex) when (!(ex is ThreadAbortException))
+                    {   // a glyph that cannot be read leaves the heights the same
+                    }
+                }
+                capHeights[key] = res;
+                return res;
             }
         }
         // The caches are shared by all threads that measure or paint text, and Clear may empty them at any time: every access
@@ -754,6 +789,7 @@ namespace CADability.GeoObject
                 cache.Clear();
                 centerLineCache.Clear();
                 fontCharacteristicsCache.Clear();
+                capHeights.Clear();
                 lock (faces) faces.Clear();
             }
         }
@@ -2355,6 +2391,21 @@ namespace CADability.GeoObject
                         isValidExtent = false;
                     }
                 }
+            }
+        }
+        /// <summary>
+        /// The height of the capital letters of the font of this text as a fraction of <see cref="TextSize"/>, which is the
+        /// em height. DXF and DWG give the height of a text as the height of its capital letters, so import and export
+        /// convert with this factor (issue #506).
+        /// </summary>
+        internal double CapHeightFactor
+        {
+            get
+            {
+                int fs = 0;
+                if (Bold) fs |= (int)FontStyle.Bold;
+                if (Italic) fs |= (int)FontStyle.Italic;
+                return FontCache.GlobalFontCache.GetCapHeight(fontName, fs);
             }
         }
         /// <summary>

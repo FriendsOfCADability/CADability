@@ -1907,6 +1907,9 @@ namespace CADability.DXF
             text.Location = pointsInWcs ? GeoPoint(anchor) : OcsToWcs(anchor, txt.Normal);
             text.LineDirection = linedir;
             text.GlyphDirection = glyphdir;
+            // The DXF height is the height of the capital letters, TextSize the em height of
+            // the font (issue #506). The export multiplies by the same factor.
+            h /= text.CapHeightFactor;
             text.TextSize = h;
             linedir.Length = h * txt.WidthFactor;
             if (!linedir.IsNullVector()) text.LineDirection = linedir;
@@ -2559,9 +2562,10 @@ namespace CADability.DXF
                 // Automatic word wrap at the MTEXT column width (DXF group code 41)
                 if (mText.RectangleWidth > 0) text.ColumnWidth = mText.RectangleWidth;
                 // AutoCAD spaces MTEXT baselines 5/3 of the text height apart, scaled by the
-                // file's line spacing factor (DXF group code 44, default 1.0)
+                // file's line spacing factor (DXF group code 44, default 1.0). The text height
+                // is that of the capital letters, LineSpacing a factor of the em height.
                 double factor = mText.LineSpacing > 0 ? mText.LineSpacing : 1.0;
-                text.LineSpacing = 5.0 / 3.0 * factor;
+                text.LineSpacing = 5.0 / 3.0 * factor * text.CapHeightFactor;
             }
             return geo;
         }

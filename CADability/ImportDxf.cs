@@ -1907,6 +1907,9 @@ namespace CADability.DXF
             text.Location = pointsInWcs ? GeoPoint(anchor) : OcsToWcs(anchor, txt.Normal);
             text.LineDirection = linedir;
             text.GlyphDirection = glyphdir;
+            // The DXF height is the height of the capital letters, TextSize the em height of
+            // the font (issue #506). The export multiplies by the same factor.
+            h /= text.CapHeightFactor;
             text.TextSize = h;
             linedir.Length = h * txt.WidthFactor;
             if (!linedir.IsNullVector()) text.LineDirection = linedir;
@@ -2273,8 +2276,6 @@ namespace CADability.DXF
         {
             double scale = acad.ScaleFactor > 0.0 ? acad.ScaleFactor : 1.0;
             style.Types = Attribute.DimensionStyle.ETypeFlag.DimAllTypes;
-            style.TextSize = acad.TextHeight * scale;
-            style.TextSizeTol = acad.TextHeight * acad.ToleranceScaleFactor * scale;
             style.SymbolSize = acad.ArrowSize * scale;
             style.ExtLineOffset = acad.ExtensionLineOffset * scale;
             style.ExtLineExtension = acad.ExtensionLineExtension * scale;
@@ -2299,12 +2300,17 @@ namespace CADability.DXF
             style.TextPrefix = arcSymbol + (acad.Prefix ?? "");
             style.TextPostfix = acad.Suffix ?? "";
             style.TextFont = FontNameFromStyle(acad.Style);
+            // DIMTXT is the height of the capital letters like the height of a TEXT, while
+            // CADability draws the dimension text with TextSize as the em height (issue #506).
+            double emHeight = acad.TextHeight * scale / GeoObject.Text.GetCapHeightFactor(style.TextFont, false, false);
+            style.TextSize = emHeight;
+            style.TextSizeTol = emHeight * acad.ToleranceScaleFactor;
             // DIMTAD says whether the text sits on the dimension line or above it, DIMGAP how
-            // far; CADability measures that distance in text heights.
+            // far; CADability measures that distance in multiples of TextSize.
             style.TextDist = acad.TextVerticalAlignment == DimensionTextVerticalAlignment.Centered
-                || acad.TextHeight <= 0.0
+                || emHeight <= 0.0
                 ? 0.0
-                : Math.Abs(acad.DimensionLineGap) / acad.TextHeight;
+                : Math.Abs(acad.DimensionLineGap) * scale / emHeight;
             style.Symbol = MapArrowSymbol(acad);
             style.DimNoExtLine1 = acad.SuppressFirstExtensionLine;
             style.DimNoExtLine2 = acad.SuppressSecondExtensionLine;
@@ -2559,9 +2565,10 @@ namespace CADability.DXF
                 // Automatic word wrap at the MTEXT column width (DXF group code 41)
                 if (mText.RectangleWidth > 0) text.ColumnWidth = mText.RectangleWidth;
                 // AutoCAD spaces MTEXT baselines 5/3 of the text height apart, scaled by the
-                // file's line spacing factor (DXF group code 44, default 1.0)
+                // file's line spacing factor (DXF group code 44, default 1.0). The text height
+                // is that of the capital letters, LineSpacing a factor of the em height.
                 double factor = mText.LineSpacing > 0 ? mText.LineSpacing : 1.0;
-                text.LineSpacing = 5.0 / 3.0 * factor;
+                text.LineSpacing = 5.0 / 3.0 * factor * text.CapHeightFactor;
             }
             return geo;
         }

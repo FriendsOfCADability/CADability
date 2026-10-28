@@ -1,4 +1,4 @@
-using CADability.Attribute;
+﻿using CADability.Attribute;
 using CADability.GeoObject;
 using CADability.Shapes;
 using CADability.Substitutes;

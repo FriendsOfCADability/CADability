@@ -21,7 +21,7 @@ namespace CADability.Forms
             label = new Label();
             this.Controls.Add(label);
         }
-        public void Init(string title)
+        private void Init(string title)
         {
             this.ControlBox = false;
             this.MaximizeBox = false;
@@ -47,56 +47,38 @@ namespace CADability.Forms
         }
         public void ShowProgressBar(bool show, double percent, string title)
         {
-            if (Owner == null) return; // has been killed
-            if (show && !Visible)
+            if (Owner == null || Owner.IsDisposed) return; // has been killed
+            if (Owner.InvokeRequired)
             {
-                // show it
-                Init(title);
-                this.Show();
-                Cursor.Current = Cursors.WaitCursor;
-                //Application.DoEvents();
+                Owner.BeginInvoke(new Action<bool, double, string>(ShowProgressBar), show, percent, title);
             }
-            else if (!show && Visible)
+            else
             {
-                this.Hide();
-                Cursor.Current = Cursors.Default;
-                //Application.DoEvents();
-            }
-            if (show)
-            {
-                if (title != null)
+                if (show && !Visible)
                 {
-                    if (this.InvokeRequired)
-                    {
-                        this.BeginInvoke((Action)delegate ()
-                        {
-                            label.Text = title;
-                            Update();
-                        });
-                    }
-                    else
+                    // show it
+                    Init(title);
+                    this.Show();
+                    Cursor.Current = Cursors.WaitCursor;
+                }
+                else if (!show && Visible)
+                {
+                    this.Hide();
+                    Cursor.Current = Cursors.Default;
+                }
+                if (show)
+                {
+                    if (title != null)
                     {
                         label.Text = title;
                         Update();
                     }
-                }
-                int val = Math.Max(0, Math.Min(1000, (int)(percent * 10))); // minimum, maximum = 0, 1000
-                if (val != progressBar.Value)
-                {
-                    if (this.InvokeRequired)
-                    {
-                        this.BeginInvoke((Action)delegate ()
-                        {
-                            progressBar.Value = val;
-                            Update();
-                        });
-                    }
-                    else
+                    int val = Math.Max(0, Math.Min(1000, (int)(percent * 10))); // minimum, maximum = 0, 1000
+                    if (val != progressBar.Value)
                     {
                         progressBar.Value = val;
                         Update();
                     }
-                    // Application.DoEvents();
                 }
             }
         }

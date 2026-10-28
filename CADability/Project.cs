@@ -1,4 +1,4 @@
-﻿using CADability.Attribute;
+using CADability.Attribute;
 using CADability.GeoObject;
 using CADability.Shapes;
 using CADability.Substitutes;
@@ -1265,6 +1265,10 @@ namespace CADability
         /// <returns>true, if successful, false if the user pressed escape in the SaveFileDialog</returns>
         public virtual bool WriteToFile(string FileName)
         {
+            return WriteToFile(FileName, true);
+        }
+        public virtual bool WriteToFile(string FileName, bool useProgress)
+        {
             // the json format is the only format we write, no more writing in binary ISerializable format
             if (FileName == null || FileName.Length == 0)
             {
@@ -1274,11 +1278,11 @@ namespace CADability
             }
             if (FileName != null && FileName.Length > 0)
             {
-                UIProgressBar progress = new UIProgressBar("saving cdb file");
+                UIProgressBar progress = useProgress ? new UIProgressBar("saving cdb file") : null;
                 try
                 {
                     // JsonSerialize.ToStream does a step for every IGeoObject it writes
-                    progress.SetStepIncrement(100.0 / Math.Max(1, CountSerializedGeoObjects()));
+                    if (progress != null) progress.SetStepIncrement(100.0 / Math.Max(1, CountSerializedGeoObjects()));
                     fileName = FileName;
                     using (Stream stream = File.Open(FileName, FileMode.Create))
                     {
@@ -1289,7 +1293,7 @@ namespace CADability
                 }
                 finally
                 {
-                    progress.SetCompleted();
+                    if (progress != null) progress.SetCompleted();
                 }
             }
             return true;

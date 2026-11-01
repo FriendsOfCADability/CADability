@@ -697,9 +697,11 @@ namespace CADability.DXF
             if (text.Bold) fs |= System.Drawing.FontStyle.Bold;
             if (text.Italic) fs |= System.Drawing.FontStyle.Italic;
 
-            // TextSize is the raw DXF cap-height (group 40) stored unchanged during import.
-            // Do not apply any font-metric scaling here — it would corrupt the value.
-            double height = text.TextSize;
+            // TextSize is the em height of the font, while the DXF height (group 40) is the
+            // height of the capital letters, which AutoCAD and other viewers scale the font to.
+            // Writing TextSize unchanged makes the text 1.4 (Arial) to 1.6 (Consolas) times too
+            // large in every other program (issue #506). The import divides by the same factor.
+            double height = text.TextSize * text.CapHeightFactor;
 
             string fontName = text.Font ?? "Standard";
             if (!createdTextStyles.TryGetValue(fontName, out ACadSharp.Tables.TextStyle textStyle))
@@ -765,6 +767,10 @@ namespace CADability.DXF
                 Normal = ToXYZ(normal),
                 Rotation = rotation,
             };
+            // Group 41: CADability stretches or compresses a text by the length of its line
+            // direction relative to its glyph direction.
+            double widthFactor = text.LineDirection.Length / text.GlyphDirection.Length;
+            if (widthFactor > 0.0 && Math.Abs(widthFactor - 1.0) > 1e-9) res.WidthFactor = widthFactor;
             // Set group 11 whenever it is meaningful. Leaving it at its (0,0,0) default while
             // groups 72/73 say it is authoritative would place the text at the origin.
             if (!defaultAlign)
@@ -814,9 +820,10 @@ namespace CADability.DXF
             if (text.ColumnWidth > 0) res.RectangleWidth = text.ColumnWidth;
             if (text.LineSpacing > 0)
             {
-                // Import stores the DXF spacing factor as 5/3 * factor (AutoCAD's MTEXT
-                // baseline distance); invert that here and keep it inside the DXF range.
-                double factor = text.LineSpacing * 3.0 / 5.0;
+                // AutoCAD spaces MTEXT baselines 5/3 * factor of the DXF height apart, and the
+                // import converts that into a factor of TextSize; invert that here and keep it
+                // inside the DXF range.
+                double factor = text.LineSpacing * 3.0 / 5.0 / text.CapHeightFactor;
                 res.LineSpacing = Math.Max(0.25, Math.Min(4.0, factor));
                 // Group 73 must name a real spacing style, otherwise the factor in group 44
                 // is ignored; the default (None/0) is not one the DXF reference allows here.
@@ -1121,7 +1128,10 @@ namespace CADability.DXF
                 found = new ACadSharp.Tables.DimensionStyle(candidate);
                 doc.DimensionStyles.Add(found);
             }
-            if (style.TextSize > 0.0) found.TextHeight = style.TextSize;
+            // DIMTXT is the height of the capital letters like the height of a TEXT, while
+            // CADability draws the dimension text with TextSize as the em height (issue #506).
+            if (style.TextSize > 0.0)
+                found.TextHeight = style.TextSize * GeoObject.Text.GetCapHeightFactor(style.TextFont, false, false);
             found.ArrowSize = Math.Max(0.0, style.SymbolSize);
             found.ExtensionLineOffset = style.ExtLineOffset;
             found.ExtensionLineExtension = style.ExtLineExtension;

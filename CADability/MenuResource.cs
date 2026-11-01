@@ -304,14 +304,16 @@ namespace CADability.UserInterface
         /// <param name="MenuName">Name of the menu to load: the "Name" attribute of a "MainMenu" node or the "MenuId" attribute of a "Popup" node</param>
         /// <param name="main">true to load a main menu, false to load a popup (context) menu</param>
         /// <param name="handler">Command handler which handles the menu commands</param>
-        /// <returns>The menu entries</returns>
+        /// <returns>The menu entries, an empty array if there is no menu with this name (e.g. for a null name)</returns>
         static public MenuWithHandler[] LoadMenuDefinition(string MenuName, bool main, ICommandHandler handler)
         {
             List<MenuWithHandler> result = new List<MenuWithHandler>();
             ICommandHandler Handler = handler;
+            if (MenuName == null) return result.ToArray(); // e.g. an object without a context menu of its own, like a picture
             XmlNode MenuNode;
             if (main) MenuNode = mMenuDocument.SelectSingleNode("Menus/MainMenu[@Name='" + MenuName + "']");
             else MenuNode = mMenuDocument.SelectSingleNode("Menus//Popup[@MenuId='" + MenuName + "']");
+            if (MenuNode == null) return result.ToArray();
             for (XmlNode nd = MenuNode.FirstChild; nd != null; nd = nd.NextSibling)
             {
                 LoadMenu(nd, result, Handler);

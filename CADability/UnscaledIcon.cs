@@ -338,7 +338,7 @@ namespace CADability.GeoObject
 
         string IGeoObjectShowProperty.GetContextMenuId()
         {
-            throw new Exception("The method or operation is not implemented.");
+            return null; // no context menu of its own
         }
 
         #endregion

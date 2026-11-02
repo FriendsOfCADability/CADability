@@ -103,6 +103,12 @@ namespace CADability.Tests
             // the outer corner at (0, y, 100), the inner one at (40, y, 60)
             Assert.IsTrue(verticalCut.Any(p => Precision.IsEqual(p, new GeoPoint(0, 0, 100))));
             Assert.IsTrue(verticalCut.Any(p => Precision.IsEqual(p, new GeoPoint(40, 30, 60))));
+            // the two bars touch on the cut and unite to one solid
+            Solid corner = Solid.Unite(vertical, horizontal);
+            Assert.IsNotNull(corner);
+            Assert.IsTrue(corner.Shells[0].CheckConsistency());
+            double expected = vertical.Volume(0.001) + horizontal.Volume(0.001);
+            Assert.AreEqual(expected, corner.Volume(0.001), expected * 1e-5);
         }
     }
 }

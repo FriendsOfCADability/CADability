@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using CADability.GeoObject;
 
 namespace CADability.Tests
@@ -140,6 +141,36 @@ namespace CADability.Tests
             Solid prism = PrismSolid(profile, length * GeoVector.ZAxis);
             double expected = (1200 - Math.PI * 25 / 2) * 20;
             Assert.AreEqual(expected, prism.Volume(0.001), expected * 1e-5);
+        }
+
+        /// <summary>
+        /// The side face of a concave arc lies on a left handed cylinder (its normal points towards the axis). A box across the
+        /// notch splits the prism into the part outside and the part inside the box, which add up to the prism again.
+        /// </summary>
+        [TestMethod]
+        public void prism_with_a_concave_arc_in_a_boolean_operation()
+        {
+            Ellipse notch = Ellipse.Construct();
+            notch.SetArcPlaneCenterRadiusAngles(Plane.XYPlane, new GeoPoint(20, 0, 0), 5, Math.PI, -Math.PI);
+            Solid prism = PrismSolid(Profile(
+                Line.TwoPoints(new GeoPoint(0, 0, 0), new GeoPoint(15, 0, 0)),
+                notch,
+                Line.TwoPoints(new GeoPoint(25, 0, 0), new GeoPoint(40, 0, 0)),
+                Line.TwoPoints(new GeoPoint(40, 0, 0), new GeoPoint(40, 30, 0)),
+                Line.TwoPoints(new GeoPoint(40, 30, 0), new GeoPoint(0, 30, 0)),
+                Line.TwoPoints(new GeoPoint(0, 30, 0), new GeoPoint(0, 0, 0))), 20 * GeoVector.ZAxis);
+            Solid box = Make3D.MakeBox(new GeoPoint(10, -10, 5), 20 * GeoVector.XAxis, 13 * GeoVector.YAxis, 10 * GeoVector.ZAxis);
+            // inside the box, the prism is the strip 10 <= x <= 30, 0 <= y <= 3 without the part of the notch below y = 3
+            double inside = (20 * 3 - (3 * 4 + 25 * Math.Asin(3.0 / 5))) * 10;
+            Solid[] outside = Solid.Subtract(prism, box);
+            Assert.AreEqual(1, outside.Length);
+            Assert.IsTrue(outside[0].Shells[0].CheckConsistency());
+            double expected = prism.Volume(0.001) - inside;
+            Assert.AreEqual(expected, outside[0].Volume(0.001), expected * 1e-5);
+            // the notch separates the part inside the box into a piece left and a piece right of it
+            Solid[] common = Solid.Intersect(prism, box);
+            Assert.AreEqual(2, common.Length);
+            Assert.AreEqual(inside, common.Sum(s => s.Volume(0.001)), inside * 1e-5);
         }
 
         /// <summary>Issue #511: subtracting the prism extruded against the normal of its profile used to throw</summary>

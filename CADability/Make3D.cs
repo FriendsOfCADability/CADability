@@ -154,36 +154,26 @@ namespace CADability.GeoObject
         /// <param name="location">Starting point of the resulting profile, corresponds to the 2d origin</param>
         /// <param name="topDirection">The "up" direction for the resulting profile, corresponds to the y-axis of the 2d shape</param>
         /// <param name="mainDirection">Direction of the prism, the length of this vector defines the length of the prism</param>
-        /// <param name="startMiter">Direction of the connecting profile at the starting point</param>
-        /// <param name="endMiter">Direction of the connecting profile at the ending point</param>
+        /// <param name="startMiter">Direction of the connecting profile at the starting point, must not be parallel to mainDirection</param>
+        /// <param name="endMiter">Direction of the connecting profile at the ending point, must not be parallel to mainDirection</param>
         /// <returns>The resulting solid</returns>
         public static Solid MakePrismMiter(SimpleShape shape, GeoPoint location, GeoVector topDirection, GeoVector mainDirection, GeoVector startMiter, GeoVector endMiter)
         {
             GeoVector xdir = topDirection ^ mainDirection;
             GeoVector ydir = mainDirection ^ xdir;
+            // the normal of mainPlane points along mainDirection: the outline runs counterclockwise around mainDirection,
+            // the holes are reversed and run clockwise
             Plane mainPlane = new Plane(location, xdir, ydir);
-            Path p3d = shape.Outline.MakePath(mainPlane);
-            // SplitArcs(p3d);
-            ICurve[] curves = p3d.Curves;
-            Edge[] extruded = new Edge[curves.Length]; // die Kanten parallel zu mainDirection
-            Edge[] startEdges = new Edge[curves.Length]; // die Kanten auf der Startebene
-            Edge[] endEdges = new Edge[curves.Length]; // die Kanten auf der Endebene
-            ICurve[][] holes = new ICurve[shape.NumHoles][];
-            Edge[][] startHolesEdges = new Edge[shape.NumHoles][];
-            Edge[][] endHolesEdges = new Edge[shape.NumHoles][];
+            List<ICurve[]> loops = new List<ICurve[]>();
+            loops.Add(MiterLoop(shape.Outline.MakePath(mainPlane), false));
             for (int i = 0; i < shape.NumHoles; i++)
             {
-                p3d = shape.Hole(i).MakePath(mainPlane);
-                // SplitArcs(p3d);
-                (p3d as ICurve).Reverse(); // Löcher umdrehen
-                startHolesEdges[i] = new Edge[p3d.CurveCount];
-                endHolesEdges[i] = new Edge[p3d.CurveCount];
-                holes[i] = p3d.Curves;
+                loops.Add(MiterLoop(shape.Hole(i).MakePath(mainPlane), true));
             }
             Plane startMiterPlane = new Plane(location, startMiter ^ mainDirection, GeoVector.Bisector(mainDirection, startMiter));
-            startMiterPlane.Reverse();
+            startMiterPlane.Reverse(); // the bottom face points against mainDirection
             Plane endMiterPlane = new Plane(location + mainDirection, endMiter ^ mainDirection, GeoVector.Bisector(-mainDirection, endMiter));
-            Face[] sides = new Face[curves.Length];
+            // the profile is moved along mainDirection onto the miter planes
             GeoPoint[] src = new GeoPoint[] { mainPlane.Location, mainPlane.ToGlobal(new GeoPoint(1, 0, 0)), mainPlane.ToGlobal(new GeoPoint(0, 1, 0)) };
             GeoPoint[] dst = new GeoPoint[] { startMiterPlane.Intersect(src[0], mainDirection), startMiterPlane.Intersect(src[1], mainDirection), startMiterPlane.Intersect(src[2], mainDirection) };
             ModOp toStartMiter = ModOp.Fit(src, dst, true);
@@ -191,122 +181,80 @@ namespace CADability.GeoObject
             ModOp toEndMiter = ModOp.Fit(src, dst, true);
             Face lower = Face.Construct();
             Face upper = Face.Construct();
+            PlaneSurface lowerSurface = new PlaneSurface(startMiterPlane);
+            PlaneSurface upperSurface = new PlaneSurface(endMiterPlane);
             List<Face> allFaces = new List<Face>();
-#if DEBUG
-            DebuggerContainer dc = new DebuggerContainer();
-#endif
-            for (int i = 0; i < curves.Length; i++)
+            Edge[][] startEdges = new Edge[loops.Count][]; // the edges on the start plane, one array per loop
+            Edge[][] endEdges = new Edge[loops.Count][]; // the edges on the end plane
+            for (int j = 0; j < loops.Count; j++)
             {
-                sides[i] = Face.Construct();
-                Line line = Line.Construct();
-                line.SetTwoPoints(toStartMiter * curves[i].StartPoint, toEndMiter * curves[i].StartPoint);
-                extruded[i] = new Edge(sides[i], line);
-                startEdges[i] = new Edge(lower, curves[i].CloneModified(toStartMiter));
-                endEdges[i] = new Edge(upper, curves[i].CloneModified(toEndMiter));
-                allFaces.Add(sides[i]);
-#if DEBUG
-                dc.Add(startEdges[i].Curve3D);
-                dc.Add(endEdges[i].Curve3D);
-#endif
-            }
-            for (int i = 0; i < curves.Length; i++)
-            {
-                int i1 = i + 1;
-                if (i1 >= curves.Length) i1 = 0;
-                ISurface surface = ExtrudedSurface(curves[i], mainDirection);
-                if (surface is CylindricalSurface)
-                {
-                    // um eine NonPeriodicCylindricalSurface zu machen brauchen wir ein vmin
-                    // Eine Ebene durch mainDirection und die Senkrechte zu mainDirection und Ellipsenebene
-                    // in die wird die Ellipse projiziert. 
-                    if (startEdges[i].Curve3D is Ellipse)
-                    {   // muss ja wohl so sein
-                        Plane pln = new Plane((startEdges[i].Curve3D as Ellipse).Center, mainDirection, (startEdges[i].Curve3D as Ellipse).Normal);
-                        ICurve2D c2d = startEdges[i].Curve3D.GetProjectedCurve(pln);
-                        BoundingRect ext = c2d.GetExtent();
-                        double vmin = ext.Left; // die Ebene geht mit ihrer x-Achse in mainDirection
-                        double vmax = mainDirection.Length; // stimmt zwar nicht, ist aber egal
-                        surface = new NonPeriodicCylindricalSurface(surface as CylindricalSurface, vmin, vmax);
-                    }
-                }
-                sides[i].Set(surface, new Edge[] { extruded[i], startEdges[i], extruded[i1], endEdges[i] }, null);
-                extruded[i].SetFace(sides[i], false);
-                extruded[i1].SetFace(sides[i], true);
-                endEdges[i].SetFace(sides[i], false);
-                startEdges[i].SetFace(sides[i], true);
-                if (surface.IsUPeriodic || surface.IsVPeriodic) sides[i].CheckPeriodic();
-            }
-            for (int j = 0; j < shape.NumHoles; j++)
-            {
-                extruded = new Edge[holes[j].Length];
-                sides = new Face[holes[j].Length];
-                for (int i = 0; i < holes[j].Length; i++)
+                ICurve[] curves = loops[j];
+                Face[] sides = new Face[curves.Length];
+                Edge[] extruded = new Edge[curves.Length]; // the edges parallel to mainDirection, extruded[i] at the start of curves[i]
+                startEdges[j] = new Edge[curves.Length];
+                endEdges[j] = new Edge[curves.Length];
+                for (int i = 0; i < curves.Length; i++)
                 {
                     sides[i] = Face.Construct();
-                    Line line = Line.Construct();
-                    line.SetTwoPoints(toStartMiter * holes[j][i].StartPoint, toEndMiter * holes[j][i].StartPoint);
-                    extruded[i] = new Edge(sides[i], line);
-
-                    startHolesEdges[j][i] = new Edge(lower, holes[j][i].CloneModified(toStartMiter));
-                    endHolesEdges[j][i] = new Edge(upper, holes[j][i].CloneModified(toEndMiter));
-#if DEBUG
-                    dc.Add(startHolesEdges[j][i].Curve3D);
-                    dc.Add(endHolesEdges[j][i].Curve3D);
-#endif
-                    allFaces.Add(sides[i]);
+                    extruded[i] = new Edge(sides[i], Line.TwoPoints(toStartMiter * curves[i].StartPoint, toEndMiter * curves[i].StartPoint));
+                    startEdges[j][i] = new Edge(lower, curves[i].CloneModified(toStartMiter));
+                    endEdges[j][i] = new Edge(upper, curves[i].CloneModified(toEndMiter));
                 }
-                for (int i = 0; i < holes[j].Length; i++)
+                for (int i = 0; i < curves.Length; i++)
                 {
                     int i1 = i + 1;
-                    if (i1 >= holes[j].Length) i1 = 0;
-                    ISurface surface = ExtrudedSurface(holes[j][i], mainDirection);
-                    if (surface is CylindricalSurface)
-                    {
-                        // um eine NonPeriodicCylindricalSurface zu machen brauchen wir ein vmin
-                        // Eine Ebene durch mainDirection und die Senkrechte zu mainDirection und Ellipsenebene
-                        // in die wird die Ellipse projiziert. 
-                        if (startHolesEdges[j][i].Curve3D is Ellipse)
-                        {   // muss ja wohl so sein
-                            Plane pln = new Plane((startHolesEdges[j][i].Curve3D as Ellipse).Center, mainDirection, mainDirection ^ (startHolesEdges[j][i].Curve3D as Ellipse).Normal);
-                            ICurve2D c2d = startHolesEdges[j][i].Curve3D.GetProjectedCurve(pln);
-                            BoundingRect ext = c2d.GetExtent();
-                            double vmin = ext.Left; // die Ebene geht mit ihrer x-Achse in mainDirection
-                            double vmax = mainDirection.Length; // stimmt zwar nicht, ist aber egal
-                            surface = new NonPeriodicCylindricalSurface(surface as CylindricalSurface, vmin, vmax);
-                        }
-                    }
-                    sides[i].Set(surface, new Edge[] { extruded[i], startHolesEdges[j][i], extruded[i1], endHolesEdges[j][i] }, null);
-                    extruded[i].SetFace(sides[i], false);
-                    extruded[i1].SetFace(sides[i], true);
-                    endHolesEdges[j][i].SetFace(sides[i], false);
-                    startHolesEdges[j][i].SetFace(sides[i], true);
-                    if (surface.IsUPeriodic || surface.IsVPeriodic) sides[i].CheckPeriodic();
+                    if (i1 >= curves.Length) i1 = 0;
+                    // The side face runs along curves[i], its loop is: down extruded[i], along the start edge, up extruded[i1],
+                    // back along the end edge. All edges need their 2d curves before Face.Set, because Face.Set computes the
+                    // domain of the face from them. The 2d curves are given in the direction of the 3d curves, SetFace
+                    // reverses them if necessary.
+                    ISurface surface = ExtrudedSurface(curves[i], mainDirection);
+                    ICurve2D start2d = surface.GetProjectedCurve(startEdges[j][i].Curve3D, 0.0);
+                    ICurve2D end2d = surface.GetProjectedCurve(endEdges[j][i].Curve3D, 0.0);
+                    // the extruded lines connect the ends of these 2d curves (on a cylinder, this keeps them on the same side of the seam)
+                    extruded[i].SetFace(sides[i], new Line2D(start2d.StartPoint, end2d.StartPoint), false);
+                    extruded[i1].SetFace(sides[i], new Line2D(start2d.EndPoint, end2d.EndPoint), true);
+                    startEdges[j][i].SetFace(sides[i], start2d, true);
+                    endEdges[j][i].SetFace(sides[i], end2d, false);
+                    sides[i].Set(surface, new Edge[] { extruded[i], startEdges[j][i], extruded[i1], endEdges[j][i] }, null);
                 }
-            }
-            lower.Set(new PlaneSurface(startMiterPlane), startEdges, startHolesEdges);
-            upper.Set(new PlaneSurface(endMiterPlane), endEdges, endHolesEdges);
-            for (int i = 0; i < startEdges.Length; i++)
-            {
-                startEdges[i].SetFace(lower, false);
-                endEdges[i].SetFace(upper, true);
-            }
-            for (int i = 0; i < startHolesEdges.Length; i++)
-            {
-                for (int j = 0; j < startHolesEdges[i].Length; j++)
+                for (int i = 0; i < curves.Length; i++)
                 {
-                    startHolesEdges[i][j].SetFace(lower, false);
-                    endHolesEdges[i][j].SetFace(upper, true);
+                    // seen from outside, the bottom face runs against the curves, the top face along them
+                    startEdges[j][i].SetFace(lower, lowerSurface.GetProjectedCurve(startEdges[j][i].Curve3D, 0.0), false);
+                    endEdges[j][i].SetFace(upper, upperSurface.GetProjectedCurve(endEdges[j][i].Curve3D, 0.0), true);
                 }
+                allFaces.AddRange(sides);
             }
+            // a loop of a face lists its edges in the order they are traversed: the bottom face runs backwards
+            Edge[][] startLoops = startEdges.Select(loop => Enumerable.Reverse(loop).ToArray()).ToArray();
+            lower.Set(lowerSurface, startLoops[0], startLoops.Skip(1).ToArray());
+            upper.Set(upperSurface, endEdges[0], endEdges.Skip(1).ToArray());
             allFaces.Add(lower);
             allFaces.Add(upper);
             Shell sh = Shell.Construct();
             sh.SetFaces(allFaces.ToArray());
-            sh.AssertOutwardOrientation(); // das könnte men sich sparen, wenn man gleich auf die Orientierung achten würde
+            sh.RecalcVertices(); // each loop of edges was created with its own vertices, which must be merged
             Solid sld = Solid.Construct();
             sld.SetShell(sh);
-
             return sld;
+        }
+
+        /// <summary>
+        /// The curves of one loop of the profile of <see cref="MakePrismMiter(SimpleShape, GeoPoint, GeoVector, GeoVector, GeoVector, GeoVector)"/>,
+        /// reversed for a hole. A loop needs at least two curves, so a single closed curve like a circle is split into two halves.
+        /// </summary>
+        private static ICurve[] MiterLoop(Path path, bool hole)
+        {
+            if (hole) (path as ICurve).Reverse();
+            List<ICurve> curves = new List<ICurve>();
+            foreach (ICurve curve in path.Curves)
+            {
+                if (curve.IsClosed) curves.AddRange(curve.Split(0.5));
+                else curves.Add(curve);
+            }
+            if (curves.Count == 1) curves = new List<ICurve>(curves[0].Split(0.5));
+            return curves.ToArray();
         }
 
         private static void SplitArcs(Path p3d)

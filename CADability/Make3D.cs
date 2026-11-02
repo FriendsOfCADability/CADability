@@ -673,8 +673,14 @@ namespace CADability.GeoObject
                 if (Precision.SameDirection((iCurve as Ellipse).Plane.Normal, vect, false))
                 {
                     Ellipse elli = (iCurve as Ellipse);
-                    // Problem: die Kurve kann über die Naht des Cylinders gehen, bitte berücksichtigen
-                    return new CylindricalSurface(elli.Center, elli.MajorAxis, elli.MinorAxis, vect.Normalized);
+                    // The outward normal of the side face points away from the axis where the arc turns counterclockwise
+                    // around vect and towards it where it turns clockwise. MajorAxis ^ MinorAxis is the plane normal, so the
+                    // cylinder (MajorAxis, MinorAxis, vect) points away from the axis when normal * vect > 0, and the arc turns
+                    // counterclockwise when sweepParameter * (normal * vect) > 0. Both agree for a positive sweep; for a
+                    // negative sweep the reversed minor axis flips the cylinder (issue #511).
+                    // Note: the curve may cross the seam of the cylinder
+                    GeoVector minorAxis = elli.SweepParameter < 0.0 ? -elli.MinorAxis : elli.MinorAxis;
+                    return new CylindricalSurface(elli.Center, elli.MajorAxis, minorAxis, vect.Normalized);
                     // dummerweise ist hier nichts über den v-Bereich bekannt, so dass 
                     // return new NonPeriodicCylindricalSurface(cs, -vect.Length, vect.Length);
                 }

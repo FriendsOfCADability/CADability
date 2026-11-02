@@ -92,5 +92,66 @@ namespace CADability.Tests
             Assert.AreEqual(5, shell.Faces.Length);
             Assert.AreEqual(10, shell.OpenEdgesExceptPoles.Length, "the bottom and top outline should be open");
         }
+
+        /// <summary>a half disc of radius 10 in the plane spanned by dirX and dirY, the half circle followed by its chord</summary>
+        private static GeoObject.Path HalfDisc(GeoVector dirX, GeoVector dirY)
+        {
+            Plane plane = new Plane(GeoPoint.Origin, dirX, dirY);
+            Ellipse arc = Ellipse.Construct();
+            arc.SetArcPlaneCenterRadiusAngles(plane, GeoPoint.Origin, 10, 0, Math.PI);
+            return Profile(arc, Line.TwoPoints(arc.EndPoint, arc.StartPoint));
+        }
+
+        /// <summary>
+        /// Issue #511: the plane of the profile is reversed when its normal points against the extrusion. The arc used to
+        /// keep its sweep direction in the reversed plane, so the bottom face got a wrong outline and the volume was negative.
+        /// </summary>
+        [DataTestMethod]
+        [DataRow(false, 30.0, DisplayName = "normal -Y, extruded +Y")]
+        [DataRow(false, -30.0, DisplayName = "normal -Y, extruded -Y")]
+        [DataRow(true, 30.0, DisplayName = "normal +Y, extruded +Y")]
+        [DataRow(true, -30.0, DisplayName = "normal +Y, extruded -Y")]
+        public void prism_of_a_half_disc_in_both_directions(bool normalAlongY, double length)
+        {
+            GeoObject.Path profile = normalAlongY ? HalfDisc(GeoVector.ZAxis, GeoVector.XAxis) : HalfDisc(GeoVector.XAxis, GeoVector.ZAxis);
+            Solid prism = PrismSolid(profile, length * GeoVector.YAxis);
+            double expected = Math.PI * 50 * 30;
+            Assert.AreEqual(expected, prism.Volume(0.001), expected * 1e-5);
+        }
+
+        /// <summary>
+        /// Issue #511: a concave arc, which turns clockwise, needs a side face whose normal points towards the axis of its
+        /// cylinder. Extruded along the normal of its plane, the rectangle with a semicircular notch used to be inconsistent.
+        /// </summary>
+        [DataTestMethod]
+        [DataRow(20.0)]
+        [DataRow(-20.0)]
+        public void prism_of_a_profile_with_a_concave_arc(double length)
+        {
+            Ellipse notch = Ellipse.Construct();
+            notch.SetArcPlaneCenterRadiusAngles(Plane.XYPlane, new GeoPoint(20, 0, 0), 5, Math.PI, -Math.PI);
+            GeoObject.Path profile = Profile(
+                Line.TwoPoints(new GeoPoint(0, 0, 0), new GeoPoint(15, 0, 0)),
+                notch,
+                Line.TwoPoints(new GeoPoint(25, 0, 0), new GeoPoint(40, 0, 0)),
+                Line.TwoPoints(new GeoPoint(40, 0, 0), new GeoPoint(40, 30, 0)),
+                Line.TwoPoints(new GeoPoint(40, 30, 0), new GeoPoint(0, 30, 0)),
+                Line.TwoPoints(new GeoPoint(0, 30, 0), new GeoPoint(0, 0, 0)));
+            Solid prism = PrismSolid(profile, length * GeoVector.ZAxis);
+            double expected = (1200 - Math.PI * 25 / 2) * 20;
+            Assert.AreEqual(expected, prism.Volume(0.001), expected * 1e-5);
+        }
+
+        /// <summary>Issue #511: subtracting the prism extruded against the normal of its profile used to throw</summary>
+        [TestMethod]
+        public void prism_extruded_against_the_normal_can_be_subtracted()
+        {
+            Solid prism = PrismSolid(HalfDisc(GeoVector.XAxis, GeoVector.ZAxis), 30 * GeoVector.YAxis);
+            Solid box = Make3D.MakeBox(new GeoPoint(-20, 10, -20), 40 * GeoVector.XAxis, 10 * GeoVector.YAxis, 40 * GeoVector.ZAxis);
+            Solid[] result = Solid.Subtract(box, prism);
+            Assert.AreEqual(1, result.Length);
+            double expected = 40 * 10 * 40 - Math.PI * 50 * 10;
+            Assert.AreEqual(expected, result[0].Volume(0.001), expected * 1e-5);
+        }
     }
 }

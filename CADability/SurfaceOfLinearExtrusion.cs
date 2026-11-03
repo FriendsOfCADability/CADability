@@ -432,7 +432,7 @@ namespace CADability.GeoObject
                     {
                         ICurve c3d = FixedU(pos, vmin, vmax);
                         Line2D l2d = new Line2D(new GeoPoint2D(pos, vmin), new GeoPoint2D(pos, vmax));
-                        DualSurfaceCurve dsc = new DualSurfaceCurve(c3d, this, l2d, pl, c3d.GetProjectedCurve(pl.Plane));
+                        DualSurfaceCurve dsc = new DualSurfaceCurve(c3d, this, l2d, pl, pl.GetProjectedCurve(c3d, 0.0)); // the uv system of the PlaneSurface may differ from that of its Plane
                         res.Add(dsc);
                     }
                 }
@@ -451,7 +451,9 @@ namespace CADability.GeoObject
                     }
                     double v = cp.Distance(pl.Plane.Location) / direction.Length;
                     Line2D l2d = new Line2D(new GeoPoint2D(curveStartParameter, v), new GeoPoint2D(curveEndParameter, v));
-                    DualSurfaceCurve dsc = new DualSurfaceCurve(basisCurve.CloneModified(ModOp.Translate(v * direction)), this, l2d, pl, basisCurve.GetProjectedCurve(pl.Plane));
+                    ICurve c3d = basisCurve.CloneModified(ModOp.Translate(v * direction));
+                    // the uv system of the PlaneSurface may differ from that of its Plane (e.g. the faces of Make3D.MakeBox are scaled), so project with the surface
+                    DualSurfaceCurve dsc = new DualSurfaceCurve(c3d, this, l2d, pl, pl.GetProjectedCurve(c3d, 0.0));
                     return new IDualSurfaceCurve[] { dsc };
                 }
             }

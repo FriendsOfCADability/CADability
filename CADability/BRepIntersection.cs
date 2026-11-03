@@ -9764,20 +9764,22 @@ namespace CADability
                     if ((vtx.Position | p) < precision) return vtx;
                 }
             }
-            foreach (Face face in new[] { face1, face2 })
+            // The point is split into every edge of both faces, which passes through it, with the same vertex. The faces come from
+            // different shells and may touch along an edge of each, e.g. where two crossing cylinders of the same radius meet on a
+            // miter cut (#512). When only the edge of one of them were split, the coinciding edges of the two shells would end in
+            // different vertices and could not be connected when the faces are collected to the resulting shell.
+            Vertex v = null;
+            HashSet<Edge> edges = new HashSet<Edge>(face1.AllEdges.Concat(face2.AllEdges));
+            foreach (Edge edge in edges)
             {
-                foreach (Edge edge in face.AllEdges)
-                {
-                    if (edge.Curve3D == null || edge.Curve3D.DistanceTo(p) >= precision) continue;
-                    double pos = edge.Curve3D.PositionOf(p);
-                    double prec = precision / edge.Curve3D.Length * 2.0;
-                    if (pos <= prec || pos >= 1 - prec) continue;
-                    Vertex v = new Vertex(edge.Curve3D.PointAt(pos));
-                    edge.Split(new SortedList<double, Vertex> { { pos, v } }, precision);
-                    return v;
-                }
+                if (edge.Curve3D == null || edge.Curve3D.DistanceTo(p) >= precision) continue;
+                double pos = edge.Curve3D.PositionOf(p);
+                double prec = precision / edge.Curve3D.Length * 2.0;
+                if (pos <= prec || pos >= 1 - prec) continue;
+                if (v == null) v = new Vertex(edge.Curve3D.PointAt(pos));
+                edge.Split(new SortedList<double, Vertex> { { pos, v } }, precision);
             }
-            return null;
+            return v;
         }
         /// <summary>
         /// The surfaces of the two faces are tangential along the intersection curve <paramref name="curve"/>. Returns true, when they
@@ -10086,6 +10088,11 @@ namespace CADability
 
                             ICurve tr = c3ds[i].Clone(); // InterpolatedDualSurfaceCurve muss die Surfaces erahlten
                             tr.Trim(u1, u2);
+                            // the faces may already touch along this part of the intersection curve: then it is an existing edge on both faces
+                            // and must not become a new edge. The check for the whole curve above only applies when there are exactly two
+                            // intersection points; where the curve is split, e.g. at the singular points of two crossing cylinders of the same
+                            // radius, whose common edge on a miter cut is one of their intersection ellipses (#512), each part must be checked.
+                            if (LiesOnEdgesOfBothFaces(item.Key.face1, item.Key.face2, tr)) continue;
                             ICurve2D con1 = crvsOnSurface1[i].Trim(params2dFace1[i, j1], params2dFace1[i, j2]);
                             ICurve2D con2 = crvsOnSurface2[i].Trim(params2dFace2[i, j1], params2dFace2[i, j2]);
                             // hier am Besten aus InterpolatedDualSurfaceCurve BSplines machen, sowohl in 2d, als auch in 3d und ganz am Ende
@@ -10401,6 +10408,24 @@ namespace CADability
             }
         }
 
+        /// <summary>
+        /// Returns true, when <paramref name="curve"/>, a part of the intersection curve of <paramref name="face1"/> and
+        /// <paramref name="face2"/>, runs along the border of each of the two faces: the faces touch along existing edges there.
+        /// The curve may run along a part of an edge or along several consecutive edges, e.g. where an edge has already been split
+        /// at an intersection vertex.
+        /// </summary>
+        private bool LiesOnEdgesOfBothFaces(Face face1, Face face2, ICurve curve)
+        {
+            const int n = 8;
+            GeoPoint[] samples = new GeoPoint[n + 1];
+            for (int i = 0; i <= n; i++) samples[i] = curve.PointAt(i / (double)n);
+            bool LiesOnBorderOf(Face face)
+            {
+                Edge[] edges = face.AllEdges.Where(e => e.Curve3D != null).ToArray();
+                return samples.All(p => edges.Any(e => e.Curve3D.DistanceTo(p) < precision));
+            }
+            return LiesOnBorderOf(face1) && LiesOnBorderOf(face2);
+        }
         private static bool EdgesContainConnection(IEnumerable<Edge> edges, Vertex v1, Vertex v2)
         {
             foreach (Edge edg in edges)

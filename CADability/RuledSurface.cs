@@ -404,7 +404,7 @@ namespace CADability
                             e3.SetArc3Points(pl.PointAt(ip1[0]), pl.PointAt(ipm[0]), pl.PointAt(ip2[0]), pl.Plane);
                             double v = Geometry.LinePar(sp1, ep1, pl.PointAt(ip1[0]));
                             DualSurfaceCurve dsc = new DualSurfaceCurve(e3, this, new Line2D(new GeoPoint2D(umin, v), new GeoPoint2D(umax, v)),
-                                pl, e3.GetProjectedCurve(pl.Plane));
+                                pl, pl.GetProjectedCurve(e3, 0.0)); // the uv system of the PlaneSurface may differ from that of its Plane
                             return new IDualSurfaceCurve[] { dsc };
                         }
                     }
@@ -420,7 +420,7 @@ namespace CADability
                     double v = Geometry.LinePar(firstCurve.StartPoint, secondCurve.StartPoint, ip);
                     ICurve cv = FixedV(v, umin, umax);
                     DualSurfaceCurve dsc = new DualSurfaceCurve(cv, this, new Line2D(new GeoPoint2D(umin, v), new GeoPoint2D(umax, v)),
-                        pl, cv.GetProjectedCurve(pl.Plane));
+                        pl, pl.GetProjectedCurve(cv, 0.0)); // the uv system of the PlaneSurface may differ from that of its Plane
                     return new IDualSurfaceCurve[] { dsc };
                 }
             }

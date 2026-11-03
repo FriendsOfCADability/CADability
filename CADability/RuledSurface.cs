@@ -355,11 +355,33 @@ namespace CADability
         /// <inheritdoc/>
         public override IDualSurfaceCurve[] GetPlaneIntersection(PlaneSurface pl, double umin, double umax, double vmin, double vmax, double precision)
         {
+            return ElementaryPlaneIntersection(pl, umin, umax) ?? ConstantVPlaneIntersection(pl, umin, umax) ?? base.GetPlaneIntersection(pl, umin, umax, vmin, vmax, precision);
+        }
+        /// <inheritdoc/>
+        public override IDualSurfaceCurve[] GetDualSurfaceCurves(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, List<GeoPoint> seeds, List<Tuple<double, double, double, double>> extremePositions)
+        {
+            // The general intersection with a plane is an interpolated curve, which may stop short of the end of the face (#515).
+            // Where the intersection with the plane is a line or a circular arc, use it. The curve of constant v between other
+            // curves (ConstantVPlaneIntersection) is not used here: as an IntermediateCurve it gave less precise results.
+            if (other is PlaneSurface pl)
+            {
+                IDualSurfaceCurve[] exact = ElementaryPlaneIntersection(pl, thisBounds.Left, thisBounds.Right);
+                if (exact != null) return exact;
+            }
+            return base.GetDualSurfaceCurves(thisBounds, other, otherBounds, seeds, extremePositions);
+        }
+        /// <summary>
+        /// The intersection with <paramref name="pl"/> for <paramref name="umin"/> &lt;= u &lt;= <paramref name="umax"/> where it is a
+        /// line or a circular arc: two lines parallel to the plane give a line, two circular arcs in planes parallel to it, which turn
+        /// alike, give a circular arc. Returns null in all other cases.
+        /// </summary>
+        private IDualSurfaceCurve[] ElementaryPlaneIntersection(PlaneSurface pl, double umin, double umax)
+        {
             if (firstCurve is Line && secondCurve is Line)
             {
                 if (Precision.IsPerpendicular(firstCurve.StartDirection, pl.Normal, false) &&
                     Precision.IsPerpendicular(secondCurve.StartDirection, pl.Normal, false))
-                {   // eine Ebene, die zu beiden Linien parallel ist
+                {   // a plane parallel to both lines
                     GeoPoint sp1, ep1, sp2, ep2;
                     sp1 = firstCurve.PointAt(umin);
                     ep1 = secondCurve.PointAt(umin);
@@ -380,43 +402,50 @@ namespace CADability
                     }
                 }
             }
-            if (firstCurve is Ellipse && secondCurve is Ellipse)
+            if (firstCurve is Ellipse e1 && secondCurve is Ellipse e2 && e1.IsCircle && e2.IsCircle &&
+                Precision.SameDirection(pl.Normal, e1.Plane.Normal, false) && Precision.SameDirection(pl.Normal, e2.Plane.Normal, false))
             {
-                Ellipse e1 = firstCurve as Ellipse;
-                Ellipse e2 = secondCurve as Ellipse;
-                if (Precision.SameDirection(pl.Normal, e1.Plane.Normal, false) && Precision.SameDirection(pl.Normal, e2.Plane.Normal, false))
+                // the points of constant v are (1 - v)·(c1 + r1·e(a1 + s1·u)) + v·(c2 + r2·e(a2 + s2·u)). This is a circle, when both
+                // arcs turn with the same angular speed around the normal of the plane, otherwise ConstantVPlaneIntersection gives the curve
+                double turn1 = e1.SweepParameter * Math.Sign(e1.Plane.Normal * pl.Normal);
+                double turn2 = e2.SweepParameter * Math.Sign(e2.Plane.Normal * pl.Normal);
+                if (Math.Abs(turn1 - turn2) < 1e-10)
                 {
-                    if (e1.IsCircle && e2.IsCircle)
+                    GeoPoint sp1, ep1, sp2, ep2, spm, epm;
+                    sp1 = firstCurve.PointAt(umin);
+                    ep1 = secondCurve.PointAt(umin);
+                    sp2 = firstCurve.PointAt(umax);
+                    ep2 = secondCurve.PointAt(umax);
+                    spm = firstCurve.PointAt((umin + umax) / 2.0);
+                    epm = secondCurve.PointAt((umin + umax) / 2.0);
+                    GeoPoint2D[] ip1 = pl.GetLineIntersection(sp1, ep1 - sp1);
+                    GeoPoint2D[] ip2 = pl.GetLineIntersection(sp2, ep2 - sp2);
+                    GeoPoint2D[] ipm = pl.GetLineIntersection(spm, epm - spm);
+                    if (ip1.Length == 1 && ip2.Length == 1 && ipm.Length == 1)
                     {
-                        GeoPoint sp1, ep1, sp2, ep2, spm, epm;
-                        sp1 = firstCurve.PointAt(umin);
-                        ep1 = secondCurve.PointAt(umin);
-                        sp2 = firstCurve.PointAt(umax);
-                        ep2 = secondCurve.PointAt(umax);
-                        spm = firstCurve.PointAt((umin + umax) / 2.0);
-                        epm = secondCurve.PointAt((umin + umax) / 2.0);
-                        GeoPoint2D[] ip1 = pl.GetLineIntersection(sp1, ep1 - sp1);
-                        GeoPoint2D[] ip2 = pl.GetLineIntersection(sp2, ep2 - sp2);
-                        GeoPoint2D[] ipm = pl.GetLineIntersection(spm, epm - spm);
-                        if (ip1.Length == 1 && ip2.Length == 1 && ipm.Length == 1)
-                        {
-                            Ellipse e3 = Ellipse.Construct();
-                            e3.SetArc3Points(pl.PointAt(ip1[0]), pl.PointAt(ipm[0]), pl.PointAt(ip2[0]), pl.Plane);
-                            double v = Geometry.LinePar(sp1, ep1, pl.PointAt(ip1[0]));
-                            DualSurfaceCurve dsc = new DualSurfaceCurve(e3, this, new Line2D(new GeoPoint2D(umin, v), new GeoPoint2D(umax, v)),
-                                pl, pl.GetProjectedCurve(e3, 0.0)); // the uv system of the PlaneSurface may differ from that of its Plane
-                            return new IDualSurfaceCurve[] { dsc };
-                        }
+                        Ellipse e3 = Ellipse.Construct();
+                        e3.SetArc3Points(pl.PointAt(ip1[0]), pl.PointAt(ipm[0]), pl.PointAt(ip2[0]), pl.Plane);
+                        double v = Geometry.LinePar(sp1, ep1, pl.PointAt(ip1[0]));
+                        DualSurfaceCurve dsc = new DualSurfaceCurve(e3, this, new Line2D(new GeoPoint2D(umin, v), new GeoPoint2D(umax, v)),
+                            pl, pl.GetProjectedCurve(e3, 0.0)); // the uv system of the PlaneSurface may differ from that of its Plane
+                        return new IDualSurfaceCurve[] { dsc };
                     }
                 }
             }
-            PlanarState ps1 = firstCurve.GetPlanarState();
-            PlanarState ps2 = secondCurve.GetPlanarState();
-            if ((ps1 == PlanarState.UnderDetermined || ps1 == PlanarState.Planar) && (ps2 == PlanarState.UnderDetermined || ps2 == PlanarState.Planar))
-            {
-                if (Precision.IsPerpendicular(firstCurve.StartDirection, pl.Normal, false) && Precision.IsPerpendicular(secondCurve.StartDirection, pl.Normal, false))
-                {   // beide Kurven sind eben und parallel zur Schnittebene, wir haben also ein festes v und somit eine Zwischenkurve
-                    GeoPoint ip = pl.Plane.Intersect(firstCurve.StartPoint, secondCurve.StartPoint - firstCurve.StartPoint);
+            return null;
+        }
+        /// <summary>
+        /// The intersection with <paramref name="pl"/> for <paramref name="umin"/> &lt;= u &lt;= <paramref name="umax"/>, when both
+        /// curves lie in planes parallel to it: the curve of constant v between them. Returns null in all other cases.
+        /// </summary>
+        private IDualSurfaceCurve[] ConstantVPlaneIntersection(PlaneSurface pl, double umin, double umax)
+        {
+            if (LiesInPlaneParallelTo(firstCurve, pl.Normal) && LiesInPlaneParallelTo(secondCurve, pl.Normal))
+            {   // both curves lie in planes parallel to the plane: the intersection has a constant v and is a curve between them
+                GeoVector between = secondCurve.StartPoint - firstCurve.StartPoint;
+                if (!Precision.IsPerpendicular(between, pl.Normal, false))
+                {
+                    GeoPoint ip = pl.Plane.Intersect(firstCurve.StartPoint, between);
                     double v = Geometry.LinePar(firstCurve.StartPoint, secondCurve.StartPoint, ip);
                     ICurve cv = FixedV(v, umin, umax);
                     DualSurfaceCurve dsc = new DualSurfaceCurve(cv, this, new Line2D(new GeoPoint2D(umin, v), new GeoPoint2D(umax, v)),
@@ -424,7 +453,20 @@ namespace CADability
                     return new IDualSurfaceCurve[] { dsc };
                 }
             }
-            return base.GetPlaneIntersection(pl, umin, umax, vmin, vmax, precision);
+            return null;
+        }
+        /// <summary>
+        /// True, when <paramref name="curve"/> lies in a plane perpendicular to <paramref name="normal"/>: a planar curve whose plane
+        /// has this normal, or a line perpendicular to it.
+        /// </summary>
+        private static bool LiesInPlaneParallelTo(ICurve curve, GeoVector normal)
+        {
+            switch (curve.GetPlanarState())
+            {
+                case PlanarState.Planar: return Precision.SameDirection(curve.GetPlane().Normal, normal, false);
+                case PlanarState.UnderDetermined: return Precision.IsPerpendicular(curve.StartDirection, normal, false);
+                default: return false;
+            }
         }
         /// <inheritdoc/>
         public override ICurve Make3dCurve(ICurve2D curve2d)

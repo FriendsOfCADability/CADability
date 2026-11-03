@@ -190,6 +190,41 @@ namespace CADability.Tests
         }
 
         /// <summary>
+        /// A prism twisted by 30 degrees: the ruled faces between the edges of the square at the bottom and of the rotated one at the
+        /// top are no planes, and a plane parallel to both of their lines cuts them in a line.
+        /// </summary>
+        [TestMethod]
+        public void the_parts_of_a_twisted_prism_add_up()
+        {
+            GeoObject.Path Square(double z, double angle)
+            {
+                ICurve[] sides = new ICurve[4];
+                for (int i = 0; i < 4; i++)
+                {
+                    double a0 = angle + i * Math.PI / 2, a1 = angle + (i + 1) * Math.PI / 2;
+                    sides[i] = Line.TwoPoints(new GeoPoint(10 * Math.Cos(a0), 10 * Math.Sin(a0), z), new GeoPoint(10 * Math.Cos(a1), 10 * Math.Sin(a1), z));
+                }
+                GeoObject.Path path = GeoObject.Path.Construct();
+                Assert.IsTrue(path.Set(sides));
+                return path;
+            }
+            Solid twisted = Make3D.MakeRuledSolid(Square(0, 0), Square(10, Math.PI / 6), null);
+            Assert.IsNotNull(twisted);
+            AssertClosedAndConsistent(twisted);
+            Assert.AreEqual(4, twisted.Shells[0].Faces.Count(f => f.Surface is RuledSurface));
+            double total = twisted.Volume(1e-4);
+            Solid slab = Slab(4, 6);
+            double common = Sum(Solid.Intersect(twisted, slab));
+            Assert.IsTrue(common > 100, "the slab cuts the prism");
+            Assert.AreEqual(total, Sum(Solid.Subtract(twisted, slab)) + common, 1e-3);
+            Assert.AreEqual(SlabVolume(4, 6), Sum(Solid.Subtract(slab, twisted)) + common, 1e-3);
+            Solid union = Solid.Unite(twisted, slab);
+            Assert.IsNotNull(union);
+            AssertClosedAndConsistent(union);
+            Assert.AreEqual(total + SlabVolume(4, 6) - common, union.Volume(1e-4), 1e-3);
+        }
+
+        /// <summary>
         /// The curve of constant v between a circle and an ellipse in parallel planes, which <see cref="RuledSurface.GetPlaneIntersection"/>
         /// returns, lies on both surfaces.
         /// </summary>

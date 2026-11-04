@@ -1267,6 +1267,15 @@ namespace CADability
         {
             return WriteToFile(FileName, true);
         }
+        /// <summary>
+        /// Saves the project in a file with the given FileName, in JSON format, like <see cref="WriteToFile(string)"/>,
+        /// and lets the caller decide whether a progress bar is shown while saving.
+        /// If FileName is null, a SaveFileDialog is presented, which needs the UI thread.
+        /// </summary>
+        /// <param name="FileName">The file name</param>
+        /// <param name="useProgress">true: show the progress bar while saving, false: save without any progress display,
+        /// e.g. for a save in the background</param>
+        /// <returns>true, if successful, false if the user pressed escape in the SaveFileDialog</returns>
         public virtual bool WriteToFile(string FileName, bool useProgress)
         {
             // the json format is the only format we write, no more writing in binary ISerializable format

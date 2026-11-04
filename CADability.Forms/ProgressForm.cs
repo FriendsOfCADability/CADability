@@ -47,10 +47,19 @@ namespace CADability.Forms
         }
         public void ShowProgressBar(bool show, double percent, string title)
         {
-            if (Owner == null || Owner.IsDisposed) return; // has been killed
-            if (Owner.InvokeRequired)
+            Form owner = Owner;
+            if (owner == null || owner.IsDisposed) return; // has been killed
+            if (owner.InvokeRequired)
             {
-                Owner.BeginInvoke(new Action<bool, double, string>(ShowProgressBar), show, percent, title);
+                try
+                {
+                    owner.BeginInvoke(new Action<bool, double, string>(ShowProgressBar), show, percent, title);
+                }
+                catch (InvalidOperationException)
+                {
+                    // the owner was closed after the check above: there is nothing left to show the progress on,
+                    // and the caller (e.g. saving the project) must not fail because of the progress display
+                }
             }
             else
             {

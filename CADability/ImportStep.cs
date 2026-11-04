@@ -1450,19 +1450,20 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 					//Settings.GlobalSettings.SetValue("StepImport.Parallel", false);
 					if (Settings.GlobalSettings.GetBoolValue("StepImport.Parallel", true))
 					{
+						// Only the geometry of the parts is made in parallel, each part by one thread, the faces of a shell one after
+						// the other (see closedShell). The products, their associations and the assembly structure are collected in
+						// the loop below in the order of the file: in the order the threads finish, they would be different each time,
+						// and so would the order of the objects in the model.
 						Parallel.For(0, roots[Item.ItemType.shapeDefinitionRepresentation].Count, i =>
 						{
 							Item item = definitions[roots[Item.ItemType.shapeDefinitionRepresentation][i]];
-							object so = CreateEntity(item);
+							if (item.parameter.TryGetValue("used_representation", out Item usedRepresentation)) CreateEntity(usedRepresentation);
 						});
 					}
-					else
+					for (int i = 0; i < roots[Item.ItemType.shapeDefinitionRepresentation].Count; i++)
 					{
-						for (int i = 0; i < roots[Item.ItemType.shapeDefinitionRepresentation].Count; i++)
-						{
-							Item item = definitions[roots[Item.ItemType.shapeDefinitionRepresentation][i]];
-							object so = CreateEntity(item);
-						}
+						Item item = definitions[roots[Item.ItemType.shapeDefinitionRepresentation][i]];
+						object so = CreateEntity(item);
 					}
 					for (int i = 0; i < roots[Item.ItemType.representationRelationship].Count; i++)
 					{
@@ -1675,10 +1676,12 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 					// there is the concept of "mappedItem", which is not respected with the "products" concept.
 					// I am not sure how to handle this, so I am doing this as exclusive patterns. If we have mappedItems, we do not use the products.
 					// The mappedItems seem also to appear in the products.
-					HashSet<Item> rootMappedItems = new HashSet<Item>(mappedItems);
+					// the parallel import adds the mapped items in the order the threads reach them: use the order of the file
+					List<Item> mappedItemsInFileOrder = mappedItems.OrderBy(mi => mi.definingIndex).ToList();
+					HashSet<Item> rootMappedItems = new HashSet<Item>(mappedItemsInFileOrder);
 					if (mappedItems.Count > 0)
 					{
-						foreach (Item mpItem in mappedItems)
+						foreach (Item mpItem in mappedItemsInFileOrder)
 						{
 							foreach (Item subitem in mpItem["mapping_source"]["mapped_representation"]["items"].lval)
 							{
@@ -1689,7 +1692,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 					GeoObjectList rmiList = new GeoObjectList();
 					if (rootMappedItems.Count > 0)
 					{
-						foreach (Item mi in rootMappedItems)
+						foreach (Item mi in mappedItemsInFileOrder.Where(rootMappedItems.Contains))
 						{
 							object l = CreateEntity(mi);
 							if (l is GeoObjectList) rmiList.AddRange(l as GeoObjectList);
@@ -2351,26 +2354,12 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 							GetContext(item.parameter["context_of_items"]);
 							List<Item> lst = item.SubList(1);
 							GeoObjectList gl = new GeoObjectList();
-							if (Settings.GlobalSettings.GetBoolValue("StepImport.Parallel", true))
+							// one after the other, also with StepImport.Parallel: the order of the objects must not depend on the threads
+							for (int i = 0; i < lst.Count; i++)
 							{
-								Parallel.For(0, lst.Count, i =>
-								{
-									object o = CreateEntity(lst[i]);
-									lock (gl)
-									{
-										if (o is IGeoObject) gl.Add(o as IGeoObject);
-										else if (o is IGeoObject[]) gl.AddRange(o as IGeoObject[]);
-									}
-								});
-							}
-							else
-							{
-								for (int i = 0; i < lst.Count; i++)
-								{
-									object o = CreateEntity(lst[i]);
-									if (o is IGeoObject) gl.Add(o as IGeoObject);
-									else if (o is IGeoObject[]) gl.AddRange(o as IGeoObject[]);
-								}
+								object o = CreateEntity(lst[i]);
+								if (o is IGeoObject) gl.Add(o as IGeoObject);
+								else if (o is IGeoObject[]) gl.AddRange(o as IGeoObject[]);
 							}
 							item.val = gl;
 						}
@@ -2691,26 +2680,16 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 								break;
 							}
 							List<Face> faces = new List<Face>();
-							if (Settings.GlobalSettings.GetBoolValue("StepImport.Parallel", true))
+							// The faces of a shell are made one after the other, also with StepImport.Parallel. In parallel, the face
+							// whose thread comes first makes the edges and vertices it shares with its neighbours: which face becomes
+							// the primary face of an edge, the order of the faces and the order of the hash codes of faces, edges and
+							// vertices then changed from one import to the next, and with them the results of boolean operations.
+							// Making the faces in parallel saved only a few percent of the import time.
+							for (int i = 0; i < lst.Count; i++)
 							{
-								Parallel.For(0, lst.Count, i =>
-								{
-									object o = CreateEntity(lst[i]);
-									lock (faces)
-									{
-										if (o is Face) faces.Add(o as Face);
-										if (o is Face[]) faces.AddRange(o as Face[]);
-									}
-								});
-							}
-							else
-							{
-								for (int i = 0; i < lst.Count; i++)
-								{
-									object o = CreateEntity(lst[i]);
-									if (o is Face) faces.Add(o as Face);
-									if (o is Face[]) faces.AddRange(o as Face[]);
-								}
+								object o = CreateEntity(lst[i]);
+								if (o is Face) faces.Add(o as Face);
+								if (o is Face[]) faces.AddRange(o as Face[]);
 							}
 							if (faces.Count == 0)
 							{
@@ -2806,26 +2785,16 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 						{
 							List<Item> lst = item.SubList(1);
 							List<Face> faces = new List<Face>();
-							if (Settings.GlobalSettings.GetBoolValue("StepImport.Parallel", true))
+							// The faces of a shell are made one after the other, also with StepImport.Parallel. In parallel, the face
+							// whose thread comes first makes the edges and vertices it shares with its neighbours: which face becomes
+							// the primary face of an edge, the order of the faces and the order of the hash codes of faces, edges and
+							// vertices then changed from one import to the next, and with them the results of boolean operations.
+							// Making the faces in parallel saved only a few percent of the import time.
+							for (int i = 0; i < lst.Count; i++)
 							{
-								Parallel.For(0, lst.Count, i =>
-								{
-									object o = CreateEntity(lst[i]);
-									lock (faces)
-									{
-										if (o is Face) faces.Add(o as Face);
-										if (o is Face[]) faces.AddRange(o as Face[]);
-									}
-								});
-							}
-							else
-							{
-								for (int i = 0; i < lst.Count; i++)
-								{
-									object o = CreateEntity(lst[i]);
-									if (o is Face) faces.Add(o as Face);
-									if (o is Face[]) faces.AddRange(o as Face[]);
-								}
+								object o = CreateEntity(lst[i]);
+								if (o is Face) faces.Add(o as Face);
+								if (o is Face[]) faces.AddRange(o as Face[]);
 							}
 							Shell.ConnectFaces(faces.ToArray(), Precision.eps);
 							Shell shell = Shell.MakeShell(faces.ToArray());
@@ -4075,7 +4044,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
 								}
 								child.parameter["_transformation"] = new Item(Item.ItemType.created, transformation);
 								child.parameter["_referred"] = relatedProduct;
-								relatingProduct.parameter["_children"].lval.Add(child);
+								lock (relatingProduct.parameter["_children"]) relatingProduct.parameter["_children"].lval.Add(child);
 								lock (products) products.Add(relatingProduct); // the parallel import adds products on several threads
 							}
 #if DEBUG

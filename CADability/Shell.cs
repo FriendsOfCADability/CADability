@@ -6316,14 +6316,20 @@ namespace CADability.GeoObject
                         edg.Orient();
                     }
 
-                    if ((edg.Curve3D.StartPoint | edg.Vertex1.Position) > Precision.eps)
+                    // a GeneralCurve (e.g. RuledSurface.IntermediateCurve) cannot move its end points: leave it as it is,
+                    // a small gap to the vertex is better than failing the whole operation
+                    try
                     {
-                        edg.Curve3D.StartPoint = edg.Vertex1.Position;
+                        if ((edg.Curve3D.StartPoint | edg.Vertex1.Position) > Precision.eps)
+                        {
+                            edg.Curve3D.StartPoint = edg.Vertex1.Position;
+                        }
+                        if ((edg.Curve3D.EndPoint | edg.Vertex2.Position) > Precision.eps)
+                        {
+                            edg.Curve3D.EndPoint = edg.Vertex2.Position;
+                        }
                     }
-                    if ((edg.Curve3D.EndPoint | edg.Vertex2.Position) > Precision.eps)
-                    {
-                        edg.Curve3D.EndPoint = edg.Vertex2.Position;
-                    }
+                    catch (GeneralCurveException) { }
                     if (edg.Curve3D is InterpolatedDualSurfaceCurve)
                     {
                         (edg.Curve3D as InterpolatedDualSurfaceCurve).Repair(edg.PrimaryFace.Area.GetExtent(), edg.SecondaryFace.Area.GetExtent());

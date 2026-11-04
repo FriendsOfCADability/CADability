@@ -9267,9 +9267,18 @@ namespace CADability.GeoObject
             // cylinders of equal radius 0.05 % too large (#458). Such a curve is approximated again below from its 3d curve, much
             // finer. Not for a seam, whose two 2d curves on this face are told apart by the order they are modified in.
             HashSet<Edge> projected = new HashSet<Edge>();
+            // points of the projected curves before the reversal: ModifyCurve2D approximates them with arcs, and close to the
+            // pole of a sphere this approximation is far off, so the exact curve is compared with these points instead
+            Dictionary<Edge, GeoPoint2D[]> projectedSamples = new Dictionary<Edge, GeoPoint2D[]>();
             foreach (Edge edg in AllEdges)
             {
-                if (edg.PrimaryFace != edg.SecondaryFace && edg.Curve3D != null && edg.Curve2D(this) is ProjectedCurve) projected.Add(edg);
+                if (edg.PrimaryFace != edg.SecondaryFace && edg.Curve3D != null && edg.Curve2D(this) is ProjectedCurve pc)
+                {
+                    projected.Add(edg);
+                    GeoPoint2D[] samples = new GeoPoint2D[7];
+                    for (int k = 0; k < samples.Length; k++) samples[k] = pc.PointAt((k + 1) / 8.0);
+                    projectedSamples[edg] = samples;
+                }
             }
             ModOp2D m = surface.ReverseOrientation();
             modifiedBounds.Modify(m);
@@ -9356,10 +9365,16 @@ namespace CADability.GeoObject
                         // the same ends, and the same way between them, not the other way around a periodic surface
                         bool same = (exact.StartPoint | approximated.StartPoint) < tolerance && (exact.EndPoint | approximated.EndPoint) < tolerance &&
                             (exact.StartPoint | exact.EndPoint) > tolerance; // a closed curve could go either way
-                        for (int k = 1; k < 8 && same; k++)
+                        // the exact curve must pass the points of the curve before the reversal, mapped by m. Comparing it with the
+                        // arc approximation instead failed close to the pole of a sphere, where the arcs were more than 1 % of the
+                        // length off, and the coarse approximation was kept: the face lost a part (a box united with a sphere)
+                        GeoPoint2D[] samples = projectedSamples[edg];
+                        double sampleTolerance = 1e-3 * Math.Max(exact.Length, 1e-6);
+                        for (int k = 0; k < samples.Length && same; k++)
                         {
-                            same = approximated.MinDistance(exact.PointAt(k / 8.0)) < 1e-2 * Math.Max(approximated.Length, 1e-6) &&
-                                exact.MinDistance(approximated.PointAt(k / 8.0)) < 1e-2 * Math.Max(approximated.Length, 1e-6);
+                            GeoPoint2D sample = m * samples[k];
+                            SurfaceHelper.AdjustPeriodic(surface, modifiedBounds, ref sample);
+                            same = exact.MinDistance(sample) < sampleTolerance;
                         }
                         if (same)
                         {   // A spline within 1e-6 of the domain, with the ends of the coarse approximation, so that the curve still

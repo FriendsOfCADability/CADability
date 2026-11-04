@@ -22,6 +22,9 @@ namespace CADability.Tests
     /// <item>The difference of the cube and a sphere on the middle of an edge, tilted by 1.2 about x, was 0.08 % too small:
     /// <c>Shell.CombineConnectedFaces</c> merged the two parts of the sphere across its seam, and the pole edge of one part,
     /// which spans its u range at the pole, shrank to a point. Faces with a pole edge are no longer combined.</item>
+    /// <item>The union with a sphere on a corner rotated by 0.7 about (1, 2, 3) was 1e-4 too large: <c>Face.ReverseOrientation</c>
+    /// kept the arc approximation of a 2d curve close to the pole, which was 0.16 off the edge, because it compared the exact
+    /// curve with that approximation, not with the curve before the reversal.</item>
     /// </list>
     /// </summary>
     [TestClass]
@@ -96,6 +99,34 @@ namespace CADability.Tests
             {   // the pole edge must not have shrunk to a point and become a hole
                 Assert.AreEqual(0, face.HoleCount, "a face of the difference has a hole");
             }
+        }
+
+        [TestMethod]
+        [DataRow(3.0)]
+        [DataRow(4.0)]
+        public void SphereOnACornerRotatedInSpace(double radius)
+        {
+            GeoPoint centre = new GeoPoint(10, 10, 10);
+            Solid sphere = Make3D.MakeSphere(centre, radius);
+            sphere.Modify(ModOp.Rotate(centre, new GeoVector(1, 2, 3), new Angle(0.7)));
+            Solid union = Solid.Unite(Cube(), sphere);
+            Assert.IsNotNull(union);
+            foreach (Face face in union.Shells[0].Faces)
+            {   // the 2d curves of the faces must follow their edges; one of them was a coarse arc approximation close to the pole
+                foreach (Edge edge in face.AllEdges)
+                {
+                    if (edge.Curve3D == null) continue;
+                    ICurve2D c2d = edge.Curve2D(face);
+                    for (int i = 0; i <= 32; i++)
+                    {
+                        double d = edge.Curve3D.DistanceTo(face.Surface.PointAt(c2d.PointAt(i / 32.0)));
+                        Assert.IsTrue(d < 1e-4, $"the 2d curve of an edge of a {face.Surface.GetType().Name} is {d} off the edge");
+                    }
+                }
+            }
+            double sphereVolume = 4.0 / 3.0 * Math.PI * radius * radius * radius;
+            double expected = 1000 + sphereVolume * 7.0 / 8.0;
+            Assert.AreEqual(expected, union.Volume(1e-6), 3e-5 * expected, "volume of the union");
         }
 
         /// <summary>

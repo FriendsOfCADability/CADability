@@ -13702,27 +13702,21 @@ namespace CADability.GeoObject
                             if (current.next2 != null && surf1ips[current.enterOnSurf1].Contains(current.next2))
                             {
                                 current.next = current.next2;
-                                currentOn2 = current.next2;
                             }
                             else if (current.next1 != null && surf2ips[current.enterOnSurf2].Contains(current.next1))
                             {
                                 current.next = current.next1;
-                                currentOn1 = current.next1;
                             }
                             else
                             {   // should not happen, only when next on both grids is again on both grids
-                                if (current.next2 != null)
-                                {
-                                    current.next = current.next2;
-                                    currentOn2 = current.next2;
-                                }
-                                else if (current.next1 != null)
-                                {
-                                    current.next = current.next1;
-                                    currentOn1 = current.next1;
-                                }
+                                if (current.next2 != null) current.next = current.next2;
+                                else if (current.next1 != null) current.next = current.next1;
                             }
-
+                            // this point is on the grids of both surfaces, so the walk has passed it on both: advance both. Advancing only
+                            // the one that was followed left the other one behind, and the curve ended early, after the next point on
+                            // the grid of only that surface found no successor (#515)
+                            currentOn1 = current.next1;
+                            currentOn2 = current.next2;
                         }
                         else if (current.mode.HasFlag(LinkedIntersectionPoint.emode.in1))
                         {

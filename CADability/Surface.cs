@@ -5651,6 +5651,34 @@ namespace CADability.GeoObject
             }
             //return null;
         }
+        /// <summary>
+        /// At a singularity of <paramref name="surface"/>, e.g. a pole of a sphere, one parameter of <paramref name="uv"/> is
+        /// arbitrary: PositionOf returns whatever the rounding errors of the point give. Such a value must not widen the bounds
+        /// of a face, which <see cref="Intersect(ISurface, BoundingRect, ISurface, BoundingRect, List{GeoPoint}, out ICurve[], out ICurve2D[], out ICurve2D[], out double[,], out double[,], out double[,], out GeoPoint2D[], out GeoPoint2D[], double, IList{double})"/>
+        /// does for every point: a half sphere with the bounds u = pi..2pi, whose pole came out at u = pi/2, got the
+        /// intersection curve of the other half as well. When <paramref name="p"/> is at a singularity (within
+        /// <paramref name="precision"/>), the arbitrary parameter is moved into <paramref name="bounds"/>.
+        /// </summary>
+        private static void ClampAtSingularity(ISurface surface, BoundingRect bounds, GeoPoint p, double precision, ref GeoPoint2D uv)
+        {
+            if (bounds.IsEmpty() || bounds.IsInfinite) return;
+            foreach (double vs in surface.GetVSingularities())
+            {   // along v = vs, u does not change the point
+                if ((surface.PointAt(new GeoPoint2D(uv.x, vs)) | p) < precision)
+                {
+                    uv.x = Math.Max(bounds.Left, Math.Min(bounds.Right, uv.x));
+                    break;
+                }
+            }
+            foreach (double us in surface.GetUSingularities())
+            {
+                if ((surface.PointAt(new GeoPoint2D(us, uv.y)) | p) < precision)
+                {
+                    uv.y = Math.Max(bounds.Bottom, Math.Min(bounds.Top, uv.y));
+                    break;
+                }
+            }
+        }
         internal static bool Intersect(ISurface surface1, BoundingRect bounds1, ISurface surface2, BoundingRect bounds2, List<GeoPoint> points,
             out ICurve[] crvs3d, out ICurve2D[] crvsOnSurface1, out ICurve2D[] crvsOnSurface2, out double[,] params3d, out double[,] params2dsurf1, out double[,] params2dsurf2,
             out GeoPoint2D[] paramsuvsurf1, out GeoPoint2D[] paramsuvsurf2, double precision, IList<double> pointPrecision = null)
@@ -5675,6 +5703,8 @@ namespace CADability.GeoObject
                 paramsuvsurf2[j] = surface2.PositionOf(points[j]);
                 SurfaceHelper.AdjustPeriodic(surface1, bounds1, ref paramsuvsurf1[j]);
                 SurfaceHelper.AdjustPeriodic(surface2, bounds2, ref paramsuvsurf2[j]);
+                ClampAtSingularity(surface1, bounds1, points[j], PrecisionOf(j), ref paramsuvsurf1[j]);
+                ClampAtSingularity(surface2, bounds2, points[j], PrecisionOf(j), ref paramsuvsurf2[j]);
                 bounds1.MinMax(paramsuvsurf1[j]);
                 bounds2.MinMax(paramsuvsurf2[j]);
             }
@@ -5693,6 +5723,8 @@ namespace CADability.GeoObject
                     paramsuvsurf2[j] = surface2.PositionOf(points[j]);
                     SurfaceHelper.AdjustPeriodic(surface1, bounds1, ref paramsuvsurf1[j]);
                     SurfaceHelper.AdjustPeriodic(surface2, bounds2, ref paramsuvsurf2[j]);
+                    ClampAtSingularity(surface1, bounds1, points[j], PrecisionOf(j), ref paramsuvsurf1[j]);
+                    ClampAtSingularity(surface2, bounds2, points[j], PrecisionOf(j), ref paramsuvsurf2[j]);
                 }
             }
             // if there are closed curves in the result we try to split them

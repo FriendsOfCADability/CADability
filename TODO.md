@@ -178,15 +178,29 @@ None left: all of them have been fixed.
   large, while both differences are exact. In the union, the hole edges of the merged faces
   have `Path2D` curves, and these faces triangulate to a slightly smaller area
   than the same faces in the differences; not yet investigated further.
-- [ ] A cube of 10 and a sphere whose axis lies in a face of the cube have
-  neither a union nor a difference (`Solid.Unite` returns null,
-  `Solid.Subtract` an empty array): the sphere of radius 3 centred on the
+- [x] A cube of 10 and a sphere whose axis lies in a face of the cube had
+  neither a union nor a difference: the sphere of radius 3 centred on the
   middle of an edge, (10, 5, 10), and the sphere of radius 4 centred on a
-  corner, (10, 10, 10), also when it is moved off the corner to
-  (10, 10.5, 10.3). The plane of the face goes through the poles of the
-  sphere. A sphere of radius 3 on the corner and spheres centred on a face
-  work. The kernel of the ShapeIt fork (develop, 3319b34) gives the exact
-  volumes in all these cases.
+  corner, (10, 10, 10). Fixed by the exact `HitTest(BoundingCube)` of #521:
+  the old one of `SphericalSurface` missed slabs through the sphere and lost
+  faces in the octtree. With the axis tilted in the face, the sphere on the
+  middle of the face still failed (a pole widened the bounds of a half sphere
+  in `Surfaces.Intersect`), fixed in `claude/sphere-boolean-axis-in-face`.
+- [x] The union of the cube with a sphere centred on a corner, whose axis is
+  tilted in the face x = 10, gave only the sphere: the edge of the cube along
+  x crosses the seam of the sphere exactly, at (10 - r, 10, 10), and the
+  intersection curves on one half sphere form a loop that touches its outline
+  there. Fixed in `claude/boolean-edge-crosses-seam` (`MergeTouchingHole`).
+- [x] The difference of the cube and a sphere centred on the middle of an
+  edge, tilted by 1.2 about x, was 0.08 % too small: `CombineConnectedFaces`
+  merged the two parts of the sphere across its seam, and the pole edge of
+  one part shrank to a point. Faces with a pole edge are no longer combined.
+- [ ] `Solid.Volume` is unstable for the union of the cube with a sphere of
+  radius 3 or 4 on a corner, rotated by 0.7 about (1, 2, 3): 1099.073 at a
+  precision of 1e-6, 1098.999 at 1e-7, 1097.375 at 1e-8, exact 1098.960. The
+  shell is closed (only the pole edges are open) and the difference is
+  exact, so the geometry seems right and the volume integration of these
+  sphere faces is the problem.
 
 - [ ] `Face.MakeRegularSurface` no longer simplifies exact rational NURBS
   cylinders, cones, spheres and tori, because it maps the edges with the

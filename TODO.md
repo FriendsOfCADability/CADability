@@ -199,16 +199,17 @@ None left: all of them have been fixed.
   (1, 2, 3), was 1e-4 too large: `Face.ReverseOrientation` kept the arc
   approximation of a 2d curve close to the pole of the sphere, 0.16 off its
   edge, because it compared the exact curve with that approximation.
-- [ ] `ShellMetrics.IntegratedVolume` is wrong for sphere faces whose border
-  is a `ProjectedCurve` that passes close to a pole: by 2.8 for the
-  difference of the cube and a sphere of radius 3 on an edge, rotated by 1.2
-  about x, while the tessellated volume of the same faces is right. Only the
-  tests and the boolean sweep use it.
-- [ ] A face triangulation stops refining at 100000 triangles, in the middle
+- [x] `ShellMetrics.IntegratedVolume` was wrong for sphere faces bounded at
+  a pole: by 2.8 for the difference of the cube and a sphere of radius 3 on
+  an edge, rotated by 1.2 about x. `Face.Area` joined the 2d curves at the
+  pole by a line across the face; fixed in #528 (`ConnectAtSingularities`).
+- [x] A face triangulation stops refining at 100000 triangles, in the middle
   of a round of edge splits. A precision that needs more (1e-6 on a sphere of
-  radius 3) then gives a worse mesh than a coarser one, with triangles across
-  half the sphere, and since a face keeps its finest triangulation,
-  `Solid.Volume` afterwards depends on which precision was asked before.
+  radius 3) gave a worse mesh than a coarser one, and since a face kept its
+  finest triangulation, `Solid.Volume` depended on which precision was asked
+  before. Fixed in #527: an incomplete triangulation is no longer reused for a
+  coarser precision, and `Shell.Volume` retriangulates coarser while a face is
+  incomplete. The cap itself stays.
 
 - [ ] `Face.MakeRegularSurface` no longer simplifies exact rational NURBS
   cylinders, cones, spheres and tori, because it maps the edges with the

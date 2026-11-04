@@ -2165,57 +2165,117 @@ namespace CADability.GeoObject
         {
             throw new NotImplementedException("HitTest must be implemented");
         }
-        /// <inheritdoc/>
-        public override bool HitTest(BoundingCube bc, out GeoPoint2D uv)
+        /// <summary>
+        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.HitTest (BoundingCube, out GeoPoint2D)"/>: true, when the
+        /// unbounded cylinder passes through <paramref name="bc"/>. <paramref name="uv"/> is then the position of a point of the
+        /// cylinder inside <paramref name="bc"/>.
+        /// <para>
+        /// In the system of the unit cylinder (toUnit) the box is a parallelepiped K and the cylinder is r == 1, where r is the
+        /// distance from the z-axis. K is convex and connected, so the cylinder passes through K exactly when the smallest r in K
+        /// is at most 1 and the largest is at least 1. The largest r is at a corner, because r is a convex function. The smallest r
+        /// is 0, when the axis passes through the box, otherwise it is on an edge of K: the outline of the projection of K onto
+        /// the xy-plane consists of projected edges. An edge may enter and leave the cylinder while both of its ends are outside,
+        /// which the former implementation missed: it only looked at edges with their ends on different sides.
+        /// </para>
+        /// <para>
+        /// This is called for many boxes when the faces are sorted into an octtree (Face.HitBoundingCube), so the cheap cases
+        /// come first and nothing is allocated.
+        /// </para>
+        /// </summary>
+        public override unsafe bool HitTest(BoundingCube bc, out GeoPoint2D uv)
         {
-            // any vertex of the cube on the cylinder?
             uv = GeoPoint2D.Origin;
-            GeoPoint[] cube = bc.Points;
-            bool[] pos = new bool[8];
+            // the edges of the box in the unit system
+            double wx = bc.Xmax - bc.Xmin, wy = bc.Ymax - bc.Ymin, wz = bc.Zmax - bc.Zmin;
+            GeoVector ux = toUnit * GeoVector.XAxis, uy = toUnit * GeoVector.YAxis, uz = toUnit * GeoVector.ZAxis;
+            // f bounds how much a distance in the world grows in the xy-plane of the unit system (the Frobenius norm of the rows
+            // of toUnit which give x and y)
+            double f = Math.Sqrt(ux.x * ux.x + ux.y * ux.y + uy.x * uy.x + uy.y * uy.y + uz.x * uz.x + uz.y * uz.y);
+            // Precision.eps in the unit system. A box which only touches the cylinder counts as a hit: a wrong hit only costs a
+            // little time in the octtree, a missed one loses a face
+            double tol = Precision.eps * f;
+            double rMin = 1.0 - tol, rMax = 1.0 + tol;
+
+            // 0. a sphere around the box: most boxes of an octtree are far away from the cylinder or deep inside
+            GeoPoint center = toUnit * new GeoPoint((bc.Xmin + bc.Xmax) / 2.0, (bc.Ymin + bc.Ymax) / 2.0, (bc.Zmin + bc.Zmax) / 2.0);
+            double centerR = Math.Sqrt(center.x * center.x + center.y * center.y);
+            double radius = f * Math.Sqrt(wx * wx + wy * wy + wz * wz) / 2.0;
+            if (centerR - radius > rMax || centerR + radius < rMin) return false;
+
+            // the corners in the unit system: corner i is at the maximum in x, y or z, when bit 0, 1 or 2 of i is set
+            GeoPoint c0 = toUnit * new GeoPoint(bc.Xmin, bc.Ymin, bc.Zmin);
+            GeoVector ex = wx * ux;
+            GeoVector ey = wy * uy;
+            GeoVector ez = wz * uz;
+            double* x = stackalloc double[8];
+            double* y = stackalloc double[8];
+            double* z = stackalloc double[8];
+            double maxR2 = -1.0;
+            int farthest = 0;
             for (int i = 0; i < 8; ++i)
             {
-                GeoPoint p = cube[i];
-                GeoPoint q = toUnit * p;
-                if (Math.Abs(q.x * q.x + q.y * q.y - 1) < Precision.eps)
+                x[i] = c0.x; y[i] = c0.y; z[i] = c0.z;
+                if ((i & 1) != 0) { x[i] += ex.x; y[i] += ex.y; z[i] += ex.z; }
+                if ((i & 2) != 0) { x[i] += ey.x; y[i] += ey.y; z[i] += ey.z; }
+                if ((i & 4) != 0) { x[i] += ez.x; y[i] += ez.y; z[i] += ez.z; }
+                double r2 = x[i] * x[i] + y[i] * y[i];
+                if (r2 > maxR2)
                 {
-                    uv = PositionOf(p);
-                    return true;
+                    maxR2 = r2;
+                    farthest = i;
                 }
-                pos[i] = Orientation(p) < 0;
             }
+            // 1. the whole box is inside the cylinder
+            if (maxR2 < rMin * rMin) return false;
 
-            // any line of the cube interfering the cylinder?
-            for (int i = 0; i < 7; ++i)
+            // 2. the point of the box closest to the axis: on the axis, when the axis passes through the box, otherwise on an edge
+            double ax, ay, az; // this point in the unit system
+            if (UnitBox.LinePassesThrough(Location, Axis, bc, Precision.eps, out double s))
             {
-                for (int j = i + 1; j < 8; ++j)
+                ax = 0.0; ay = 0.0; az = s; // s is the z coordinate in the unit system
+            }
+            else
+            {
+                double minR2 = double.MaxValue;
+                ax = ay = az = 0.0;
+                for (int i = 0; i < 8; ++i)
                 {
-                    if (pos[i] != pos[j])
+                    for (int bit = 1; bit < 8; bit <<= 1)
                     {
-                        GeoPoint2D[] erg = GetLineIntersection(cube[i], cube[j] - cube[i]);
-                        for (int k = 0; k < erg.Length; ++k)
+                        if ((i & bit) != 0) continue; // each edge once: from the corner without the bit to the one with it
+                        int j = i | bit;
+                        double dx = x[j] - x[i], dy = y[j] - y[i];
+                        double len2 = dx * dx + dy * dy;
+                        // the closest point to the origin on the projected edge
+                        double t = len2 > 0.0 ? -(x[i] * dx + y[i] * dy) / len2 : 0.0;
+                        if (t < 0.0) t = 0.0;
+                        else if (t > 1.0) t = 1.0;
+                        double px = x[i] + t * dx, py = y[i] + t * dy;
+                        double r2 = px * px + py * py;
+                        if (r2 < minR2)
                         {
-                            GeoPoint gp = PointAt(erg[k]);
-                            if (bc.Contains(gp) || bc.IsOnBounds(gp, bc.Size * 1e-8))
-                            {
-                                uv = erg[k];
-                                return true;
-                            }
+                            minR2 = r2;
+                            ax = px; ay = py; az = z[i] + t * (z[j] - z[i]);
                         }
-                        throw new ApplicationException("internal error: CylindricalSurface.HitTest");
                     }
                 }
+                // 3. the whole box is outside of the cylinder, also when the axis is close
+                if (minR2 > rMax * rMax) return false;
             }
 
-            // cube´s vertices within the surface?
-            if (pos[0] && pos[1] && pos[2] && pos[3] && pos[4] && pos[5] && pos[6] && pos[7])
-                return false;  //convexity of the inner points
-
-            // complete cylinder is outside of the cube?
-            if (!bc.Interferes(Location, Axis, 0, false))
-                return false;  //all vertices of the cube are out of the cylinder
-
-            // now every mantleline goes through the complete cube
-            uv = PositionOf(toCylinder * (new GeoPoint(1, 0, (toUnit * bc.GetCenter()).z)));
+            // 4. a hit: the segment from the closest point to the farthest corner lies in the box and crosses r == 1. Solve
+            // |a + t*(f - a)|^2 == 1 in the xy-plane: A*t^2 + 2*B*t + C == 0 with C <= 0 (within the tolerance)
+            double fx = x[farthest] - ax, fy = y[farthest] - ay, fz = z[farthest] - az;
+            double A = fx * fx + fy * fy;
+            double B = ax * fx + ay * fy;
+            double C = ax * ax + ay * ay - 1.0;
+            double tHit;
+            double discriminant = B * B - A * C;
+            if (A > 0.0 && discriminant >= 0.0) tHit = (-B + Math.Sqrt(discriminant)) / A;
+            else tHit = Math.Abs(C) <= Math.Abs(maxR2 - 1.0) ? 0.0 : 1.0; // only touching, within the tolerance
+            if (tHit < 0.0) tHit = 0.0;
+            else if (tHit > 1.0) tHit = 1.0;
+            uv = PositionOf(toCylinder * new GeoPoint(ax + tHit * fx, ay + tHit * fy, az + tHit * fz));
             return true;
         }
         /// <inheritdoc/>

@@ -1003,62 +1003,92 @@ namespace CADability.GeoObject
             GeoPoint q = toUnit * p;
             return q.x * q.x + q.y * q.y - q.z * q.z;
         }
-        /// <inheritdoc/>
+        /// <summary>
+        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.HitTest (BoundingCube, out GeoPoint2D)"/>: true, when the (double)
+        /// cone passes through <paramref name="bc"/>. <paramref name="uv"/> is then the position of a point of the cone inside the box.
+        /// <para>
+        /// In the system of the unit cone the box is a parallelepiped K and the cone is x^2 + y^2 == z^2. K is connected, so the cone
+        /// passes through K exactly when K has a point inside (x^2 + y^2 &lt;= z^2) and a point outside. A point inside exists, when a
+        /// corner is inside, when an edge dips into the cone, or when the axis passes through the box: a part of the cone which is
+        /// only inside a face of K is an ellipse, which surrounds the point where the axis passes through this face. A point outside
+        /// exists, when a corner is outside, or when there are corners in both halves of the cone: the segment between them passes
+        /// z == 0. The hit point is on the segment between such two points. The former implementation took a point of the cone which
+        /// is not always inside the box, when the axis passes through it.
+        /// </para>
+        /// </summary>
         public override bool HitTest(BoundingCube bc, out GeoPoint2D uv)
         {
-            // any vertex of the cube on the cone?
             uv = GeoPoint2D.Origin;
-            if (bc.Contains(this.Location))
-            {
-                // the center of the cube is inside the box. (0.0) is a valid point
-                return true;
-            }
-            GeoPoint[] cube = bc.Points;
-            bool[] pos = new bool[8];
+            UnitBox box = new UnitBox(toUnit, bc);
+            double tol = box.Tolerance;
+            const double sqrt2 = 1.4142135623730951;
+            // 0. a sphere around the box which doesn't reach the surface: (rho - |z|) / sqrt(2) is the signed distance from the cone
+            double rc = Math.Sqrt(box.Center.x * box.Center.x + box.Center.y * box.Center.y);
+            if (Math.Abs(rc - Math.Abs(box.Center.z)) / sqrt2 > box.Radius + tol) return false;
+            // 1. the corners: inside, outside, and the halves of the cone of the inside corners
+            int inside = -1, outside = -1, upper = -1, lower = -1;
             for (int i = 0; i < 8; ++i)
             {
-                GeoPoint p = cube[i];
-                GeoPoint q = toUnit * p;
-                if (Math.Abs(q.x * q.x + q.y * q.y - q.z * q.z) < Precision.eps)
+                GeoPoint p = box.Corner(i);
+                double sd = (Math.Sqrt(p.x * p.x + p.y * p.y) - Math.Abs(p.z)) / sqrt2;
+                if (sd <= tol)
                 {
-                    uv = PositionOf(p);
-                    return true;
+                    if (inside < 0) inside = i;
+                    if (p.z > 0) upper = i;
+                    else lower = i;
                 }
-                pos[i] = Orientation(p) < 0;
+                if (sd >= -tol && outside < 0) outside = i;
             }
-
-            // any line of the cube interfering the cone?
-            int[,] l = bc.LineNumbers;
-            for (int k = 0; k < 12; ++k)
+            // 2. a point inside
+            GeoPoint a = GeoPoint.Origin;
+            bool found = false;
+            if (inside >= 0)
             {
-                int i = l[k, 0];
-                int j = l[k, 1];
-                GeoPoint2D[] erg = GetLineIntersection(cube[i], cube[j] - cube[i]);
-                for (int m = 0; m < erg.Length; ++m)
+                a = box.Corner(inside);
+                found = true;
+            }
+            else
+            {   // an edge which dips into the cone: along the edge x^2 + y^2 - z^2 is A*t^2 + 2*B*t + C, with a minimum inside the edge
+                for (int i = 0; i < 8 && !found; ++i)
                 {
-                    GeoPoint gp = PointAt(erg[m]);
-                    if (bc.Contains(gp) || bc.IsOnBounds(gp, bc.Size * 1e-8))
+                    for (int bit = 1; bit < 8; bit <<= 1)
                     {
-                        uv = erg[m];
-                        return true;
+                        if ((i & bit) != 0) continue;
+                        GeoPoint p = box.Corner(i);
+                        GeoVector e = box.Edge(bit);
+                        double A = e.x * e.x + e.y * e.y - e.z * e.z;
+                        if (A <= 0.0) continue; // the minimum is at an end of the edge, the corners are outside
+                        double B = p.x * e.x + p.y * e.y - p.z * e.z;
+                        double t = -B / A;
+                        if (t <= 0.0 || t >= 1.0) continue;
+                        if (p.x * p.x + p.y * p.y - p.z * p.z - B * B / A <= 0.0)
+                        {
+                            a = p + t * e;
+                            found = true;
+                            break;
+                        }
                     }
                 }
-                //if (pos[i] != pos[j])
-                //    throw new ApplicationException("internal error: ConicalSurface.HitTest");
+                if (!found && UnitBox.LinePassesThrough(toCone * GeoPoint.Origin, toCone * GeoVector.ZAxis, bc, Precision.eps, out double s))
+                {
+                    a = new GeoPoint(0.0, 0.0, s); // the axis is inside the cone
+                    found = true;
+                }
             }
-
-            // cube´s vertices within the surface?
-            if (pos[0] && pos[1] && pos[2] && pos[3] && pos[4] && pos[5] && pos[6] && pos[7])
-                return false;   //convexity of the inner points in both single cones
-            //if the cube´s vertices within both cones, there would be a lineintersection 
-
-            // complete cone is outside of the cube?
-            if (!bc.Interferes(Location, Axis, 0, false))
-                return false;   //all vertices of the cube are out of the cone
-
-            // now every mantleline goes through the complete cube
-            double d = (toUnit * bc.GetCenter()).z;
-            uv = PositionOf(toCone * (new GeoPoint(d, 0, d)));
+            if (!found) return false; // the whole box outside of the cone
+            // 3. a point outside
+            GeoPoint b;
+            if (outside >= 0) b = box.Corner(outside);
+            else if (upper >= 0 && lower >= 0)
+            {   // all corners inside, in both halves: the segment between them passes z == 0, where x^2 + y^2 >= z^2
+                GeoPoint pu = box.Corner(upper), pl = box.Corner(lower);
+                b = pu + (pu.z / (pu.z - pl.z)) * (pl - pu);
+            }
+            else return false; // the whole box inside one half of the cone
+            // 4. a hit: the segment from a to b crosses the cone
+            GeoVector d = b - a;
+            double tHit = UnitBox.Crossing(d.x * d.x + d.y * d.y - d.z * d.z, a.x * d.x + a.y * d.y - a.z * d.z, a.x * a.x + a.y * a.y - a.z * a.z);
+            uv = PositionOf(toCone * (a + tHit * d));
             return true;
         }
         /// <inheritdoc/>

@@ -186,14 +186,21 @@ None left: all of them have been fixed.
   faces in the octtree. With the axis tilted in the face, the sphere on the
   middle of the face still failed (a pole widened the bounds of a half sphere
   in `Surfaces.Intersect`), fixed in `claude/sphere-boolean-axis-in-face`.
-- [ ] Still wrong: the union of the cube with a sphere centred on a corner,
-  e.g. (10, 10, 10) with radius 2, 3 or 4, whose axis is tilted in the face
-  x = 10 (rotated about the x axis), gives only the sphere. The edge of the
-  cube along x through the corner then crosses the seam of the sphere
-  exactly, at (10 - r, 10, 10); a further rotation of 0.001 about y makes it
-  work. The difference is right. Also a few results are off by 0.01 to
-  0.08 %: the union with a corner sphere rotated by 0.7 about (1, 2, 3), the
-  difference with an edge sphere rotated by 1.2 about x.
+- [x] The union of the cube with a sphere centred on a corner, whose axis is
+  tilted in the face x = 10, gave only the sphere: the edge of the cube along
+  x crosses the seam of the sphere exactly, at (10 - r, 10, 10), and the
+  intersection curves on one half sphere form a loop that touches its outline
+  there. Fixed in `claude/boolean-edge-crosses-seam` (`MergeTouchingHole`).
+- [x] The difference of the cube and a sphere centred on the middle of an
+  edge, tilted by 1.2 about x, was 0.08 % too small: `CombineConnectedFaces`
+  merged the two parts of the sphere across its seam, and the pole edge of
+  one part shrank to a point. Faces with a pole edge are no longer combined.
+- [ ] `Solid.Volume` is unstable for the union of the cube with a sphere of
+  radius 3 or 4 on a corner, rotated by 0.7 about (1, 2, 3): 1099.073 at a
+  precision of 1e-6, 1098.999 at 1e-7, 1097.375 at 1e-8, exact 1098.960. The
+  shell is closed (only the pole edges are open) and the difference is
+  exact, so the geometry seems right and the volume integration of these
+  sphere faces is the problem.
 
 - [ ] `Face.MakeRegularSurface` no longer simplifies exact rational NURBS
   cylinders, cones, spheres and tori, because it maps the edges with the

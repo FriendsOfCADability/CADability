@@ -1011,6 +1011,38 @@ namespace CADability
                 surface = pc.surface;
             }
         }
+        /// <summary>
+        /// The position of <paramref name="p"/> on this curve. For a point of the curve it follows exactly from the 3d curve;
+        /// the base implementation interpolates the 2d points of the curve, which was up to a few 1e-6 off, more than
+        /// <see cref="Precision.eps"/>. The boolean operations trim the 2d curves of the intersection edges at the positions
+        /// of their vertices, so a 2d curve ended beside its vertex and the loop of edges on a face did not close (a sphere
+        /// whose axis lies in a face of a box, but not parallel to an edge of it, gave no union). Points that are not on the
+        /// curve still use the base implementation.
+        /// </summary>
+        public override double PositionOf(GeoPoint2D p)
+        {
+            GeoPoint p3d = surface.PointAt(p);
+            double par3d = curve3D.PositionOf(p3d);
+            if (!double.IsNaN(par3d) && !double.IsInfinity(par3d) && (curve3D.PointAt(par3d) | p3d) < Precision.eps)
+            {
+                double res = Get2dParameter(par3d);
+                if (curve3D.IsClosed)
+                {   // the start point of a closed 3d curve is also its end point: take the parameter which is closest to this part
+                    foreach (double other in new[] { Get2dParameter(par3d - 1.0), Get2dParameter(par3d + 1.0) })
+                    {
+                        if (DistanceToUnitInterval(other) < DistanceToUnitInterval(res)) res = other;
+                    }
+                }
+                return res;
+            }
+            return base.PositionOf(p);
+        }
+        private static double DistanceToUnitInterval(double t)
+        {
+            if (t < 0.0) return -t;
+            if (t > 1.0) return t - 1.0;
+            return 0.0;
+        }
         /// <inheritdoc/>
         public override ICurve2D Trim(double StartPos, double EndPos)
         {

@@ -19,6 +19,9 @@ namespace CADability.Tests
     /// of the cube along x crosses the seam of the sphere exactly, at (10 - r, 10, 10), and the intersection curves on one half
     /// sphere form a loop that touches its outline there. The test whether this hole lies in the outline used its start
     /// point, the touching vertex, and failed; the hole is now tested with an inner point and inserted into the outline.</item>
+    /// <item>The difference of the cube and a sphere on the middle of an edge, tilted by 1.2 about x, was 0.08 % too small:
+    /// <c>Shell.CombineConnectedFaces</c> merged the two parts of the sphere across its seam, and the pole edge of one part,
+    /// which spans its u range at the pole, shrank to a point. Faces with a pole edge are no longer combined.</item>
     /// </list>
     /// </summary>
     [TestClass]
@@ -79,6 +82,20 @@ namespace CADability.Tests
             Solid sphere = Make3D.MakeSphere(centre, radius);
             sphere.Modify(ModOp.Rotate(centre, GeoVector.XAxis, new Angle(angle))); // the seam stays at (10 - r, 10, 10), on an edge of the cube
             AssertVolumes(sphere, radius, 0.125, $"sphere of radius {radius} on a corner, tilted by {angle}");
+        }
+
+        [TestMethod]
+        public void SphereOnAnEdgeWithItsPoleOnTheIntersection()
+        {
+            GeoPoint centre = new GeoPoint(10, 5, 10);
+            Solid sphere = Make3D.MakeSphere(centre, 3);
+            sphere.Modify(ModOp.Rotate(centre, GeoVector.XAxis, new Angle(1.2))); // a pole at (10, 7.8, 8.9), on the face x = 10
+            AssertVolumes(sphere, 3, 0.25, "sphere on an edge, tilted by 1.2");
+            Solid[] d = Solid.Subtract(Cube(), sphere);
+            foreach (Face face in d[0].Shells[0].Faces)
+            {   // the pole edge must not have shrunk to a point and become a hole
+                Assert.AreEqual(0, face.HoleCount, "a face of the difference has a hole");
+            }
         }
 
         /// <summary>

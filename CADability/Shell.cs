@@ -6338,6 +6338,18 @@ namespace CADability.GeoObject
             }
         }
         /// <summary>
+        /// Whether <paramref name="face"/> has an edge without a 3d curve, i.e. an edge along a singularity of its surface,
+        /// e.g. the pole of a sphere.
+        /// </summary>
+        private static bool HasPoleEdge(Face face)
+        {
+            foreach (Edge e in face.AllEdges)
+            {
+                if (e.Curve3D == null) return true;
+            }
+            return false;
+        }
+        /// <summary>
         /// Adjacent faces that share a common surface are replaced by a single face
         /// </summary>
         /// <returns>Number of faces that have been combined</returns>
@@ -6396,6 +6408,14 @@ namespace CADability.GeoObject
                                 }
                             }
 #endif
+                            if ((edge.PrimaryFace.Surface.GetUSingularities().Length > 0 || edge.PrimaryFace.Surface.GetVSingularities().Length > 0) &&
+                                (HasPoleEdge(edge.PrimaryFace) || HasPoleEdge(edge.SecondaryFace)))
+                            {   // CombineWith does not adapt a pole edge, which spans the u (or v) range of one face at a singularity, to the
+                                // combined range: it shrank to a point, the combined face was missing a part (a sphere cut by a box whose
+                                // seam passes through the box). Combining is only for fewer faces, the result is right without it
+                                notSameSurface.Add(edge);
+                                continue;
+                            }
                             if (edge.PrimaryFace.Surface.IsUPeriodic || edge.PrimaryFace.Surface.IsVPeriodic)
                             {   // do not combine two faces, which are periodic and in the combination fill the whole period
                                 // these faces are explicitly kept separate

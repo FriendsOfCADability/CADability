@@ -191,9 +191,16 @@ None left: all of them have been fixed.
   x crosses the seam of the sphere exactly, at (10 - r, 10, 10), and the
   intersection curves on one half sphere form a loop that touches its outline
   there. Fixed in `claude/boolean-edge-crosses-seam` (`MergeTouchingHole`).
-- [ ] A few results of the cube/sphere sweep are off by 0.01 to 0.08 %: the
-  union with a corner sphere rotated by 0.7 about (1, 2, 3) (radius 3 and 4),
-  the difference with an edge sphere of radius 3 rotated by 1.2 about x.
+- [x] The difference of the cube and a sphere centred on the middle of an
+  edge, tilted by 1.2 about x, was 0.08 % too small: `CombineConnectedFaces`
+  merged the two parts of the sphere across its seam, and the pole edge of
+  one part shrank to a point. Faces with a pole edge are no longer combined.
+- [ ] `Solid.Volume` is unstable for the union of the cube with a sphere of
+  radius 3 or 4 on a corner, rotated by 0.7 about (1, 2, 3): 1099.073 at a
+  precision of 1e-6, 1098.999 at 1e-7, 1097.375 at 1e-8, exact 1098.960. The
+  shell is closed (only the pole edges are open) and the difference is
+  exact, so the geometry seems right and the volume integration of these
+  sphere faces is the problem.
 
 - [ ] `Face.MakeRegularSurface` no longer simplifies exact rational NURBS
   cylinders, cones, spheres and tori, because it maps the edges with the

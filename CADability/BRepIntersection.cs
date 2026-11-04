@@ -4229,6 +4229,35 @@ namespace CADability
             }
             return null;
         }
+        /// <summary>
+        /// When <paramref name="hole"/> touches <paramref name="outline"/> of <paramref name="face"/> in exactly one vertex, the
+        /// outline with the hole inserted at that vertex, a single loop that passes this vertex twice; otherwise null. Such a
+        /// hole occurs e.g. where an edge of the other shell crosses the seam of a sphere and the intersection curves close
+        /// there. A face whose hole touches its outline is degenerate: its triangulation is slower and less precise (the union
+        /// of a box and a sphere took six times as long, its volume was off by 2e-5). Touching in more vertices would cut the
+        /// face into several parts and is left as it is.
+        /// </summary>
+        internal static Edge[] MergeTouchingHole(Face face, Edge[] outline, Edge[] hole)
+        {
+            HashSet<Vertex> outlineVertices = new HashSet<Vertex>(outline.Select(e => e.StartVertex(face)));
+            int touching = -1;
+            for (int k = 0; k < hole.Length; k++)
+            {
+                if (outlineVertices.Contains(hole[k].StartVertex(face)))
+                {
+                    if (touching >= 0) return null; // touches in more than one vertex
+                    touching = k;
+                }
+            }
+            if (touching < 0) return null;
+            Vertex v = hole[touching].StartVertex(face);
+            int m = Array.FindIndex(outline, e => e.StartVertex(face) == v);
+            List<Edge> res = new List<Edge>(outline.Length + hole.Length);
+            for (int k = 0; k < m; k++) res.Add(outline[k]);
+            for (int k = 0; k < hole.Length; k++) res.Add(hole[(touching + k) % hole.Length]);
+            for (int k = m; k < outline.Length; k++) res.Add(outline[k]);
+            return res.ToArray();
+        }
         public Shell[] Result()
         {
             // whether the shells meet: Result consumes the overlapping faces, so this is taken before
@@ -4710,12 +4739,28 @@ namespace CADability
                 }
                 for (int i = numOutlines; i < areas.Length; i++) // for all holes, begin with the smallest
                 {
+                    // test with the middle of an edge of the hole: a vertex of the hole may lie on the outline (see MergeTouchingHole)
+                    GeoPoint2D testPoint = loops2D[i][0].PointAt(0.5);
                     for (int j = numOutlines - 1; j >= 0; --j) // for all outlines, begin with the smallest outline
                     {
-                        if (Border.IsInside(loops2D[j], loops2D[i][0].StartPoint))
+                        if (Border.IsInside(loops2D[j], testPoint))
                         {
                             outlineToHoles[j].Add(i); // this hole (i) has found its outline (j)
                             break;
+                        }
+                    }
+                }
+                // A hole that touches its outline in one vertex, e.g. where an edge of the other shell crosses the seam of a sphere
+                // and the intersection curves close there, is no proper hole: insert it into the outline at that vertex
+                for (int i = 0; i < numOutlines; i++)
+                {
+                    for (int k = outlineToHoles[i].Count - 1; k >= 0; --k)
+                    {
+                        Edge[] merged = MergeTouchingHole(faceToSplit, edgeLoop[i], edgeLoop[outlineToHoles[i][k]]);
+                        if (merged != null)
+                        {
+                            edgeLoop[i] = merged;
+                            outlineToHoles[i].RemoveAt(k);
                         }
                     }
                 }

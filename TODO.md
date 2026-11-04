@@ -186,14 +186,14 @@ None left: all of them have been fixed.
   faces in the octtree. With the axis tilted in the face, the sphere on the
   middle of the face still failed (a pole widened the bounds of a half sphere
   in `Surfaces.Intersect`), fixed in `claude/sphere-boolean-axis-in-face`.
-- [ ] Still wrong: the union of the cube with a sphere centred on a corner,
-  e.g. (10, 10, 10) with radius 2, 3 or 4, whose axis is tilted in the face
-  x = 10 (rotated about the x axis), gives only the sphere. The edge of the
-  cube along x through the corner then crosses the seam of the sphere
-  exactly, at (10 - r, 10, 10); a further rotation of 0.001 about y makes it
-  work. The difference is right. Also a few results are off by 0.01 to
-  0.08 %: the union with a corner sphere rotated by 0.7 about (1, 2, 3), the
-  difference with an edge sphere rotated by 1.2 about x.
+- [x] The union of the cube with a sphere centred on a corner, whose axis is
+  tilted in the face x = 10, gave only the sphere: the edge of the cube along
+  x crosses the seam of the sphere exactly, at (10 - r, 10, 10), and the
+  intersection curves on one half sphere form a loop that touches its outline
+  there. Fixed in `claude/boolean-edge-crosses-seam` (`MergeTouchingHole`).
+- [ ] A few results of the cube/sphere sweep are off by 0.01 to 0.08 %: the
+  union with a corner sphere rotated by 0.7 about (1, 2, 3) (radius 3 and 4),
+  the difference with an edge sphere of radius 3 rotated by 1.2 about x.
 
 - [ ] `Face.MakeRegularSurface` no longer simplifies exact rational NURBS
   cylinders, cones, spheres and tori, because it maps the edges with the

@@ -200,6 +200,10 @@ namespace CADability.GeoObject
                     AddDecomposed(blk.Child(j), decomposeHatch, decomposePath, decomposePolyLine);
                 }
             }
+            else if (ObjectToAdd is BlockRef blockRef)
+            {   // e.g. a reference inside a block: its contents at the place of the reference
+                AddDecomposed(blockRef.Flattened, decomposeHatch, decomposePath, decomposePolyLine);
+            }
             else if (ObjectToAdd is Path)
             {
                 Path path = (ObjectToAdd as Path);
@@ -346,25 +350,21 @@ namespace CADability.GeoObject
         {
             for (int i = list.Count - 1; i >= 0; --i)
             {
-                if (this[i] is Block && !(!decomposeHatch && this[i] is Hatch))
+                // read the object once: after Remove(i), this[i] is the next object or does not exist at all (#518)
+                IGeoObject go = this[i];
+                if (go is Block blk && !(!decomposeHatch && go is Hatch))
                 {
-                    if (this[i] is Hatch)
-                    {
-                        Hatch hatch = (this[i] as Hatch);
-                        hatch.ConditionalRecalc();
-                    }
-                    Block blk = this[i] as Block;
+                    if (go is Hatch hatch) hatch.ConditionalRecalc();
                     Remove(i);
                     for (int j = 0; j < blk.Count; ++j)
                     {
                         AddDecomposed(blk.Child(j), decomposeHatch, false, false);
                     }
                 }
-                if (this[i] is BlockRef)
+                else if (go is BlockRef blockRef)
                 {
-                    BlockRef blk = this[i] as BlockRef;
                     Remove(i);
-                    AddDecomposed(blk.Flattened, decomposeHatch, false, false);
+                    AddDecomposed(blockRef.Flattened, decomposeHatch, false, false);
                 }
             }
         }
@@ -403,27 +403,13 @@ namespace CADability.GeoObject
         {
             for (int i = list.Count - 1; i >= 0; --i)
             {
-                if (this[i] is Block)
+                // read the object once: after Remove(i), this[i] is the next object, which has already been handled, or does not
+                // exist at all, when the object was the last one and decomposed into nothing, like an empty block (#518)
+                IGeoObject go = this[i];
+                if (go is Block || go is BlockRef || go is Path || go is Polyline)
                 {
-                    Block blk = this[i] as Block;
                     Remove(i);
-                    for (int j = 0; j < blk.Count; ++j)
-                    {
-                        blk.Child(j).PropagateAttributes(blk.Layer, blk.ColorDef);
-                        AddDecomposed(blk.Child(j), true, true, true);
-                    }
-                }
-                if (this[i] is BlockRef)
-                {
-                    BlockRef blk = this[i] as BlockRef;
-                    Remove(i);
-                    AddDecomposed(blk.Flattened, true, true, true);
-                }
-                if (this[i] is Path || this[i] is Polyline)
-                {
-                    IGeoObject go = this[i];
-                    Remove(i);
-                    AddDecomposed(go, true, true, true);
+                    AddDecomposed(go, true, true, true); // recalculates a hatch and decomposes the contents recursively
                 }
             }
         }

@@ -3637,84 +3637,77 @@ namespace CADability
             }
         }
         /// <summary>
-        /// Fits a line through the given 2d points: the location is their centroid, the direction is the principal direction
-        /// of the points found by a singular value decomposition. Throws an <see cref="ApplicationException"/> when fewer
-        /// than three points are given. The fit is not always optimal; it is mainly used to test whether points are collinear.
+        /// Fits a line to the given 2d points by orthogonal least squares: the sum of the squared perpendicular distances
+        /// is minimal. The line passes through the centroid of the points, its direction is the principal axis of the
+        /// centered second moments, which in 2d has the closed form angle = atan2(2*sxy, sxx - syy) / 2.
+        /// Throws an <see cref="ApplicationException"/> when fewer than two points are given.
         /// </summary>
-        /// <param name="points">the points to fit, at least three</param>
+        /// <param name="points">the points to fit, at least two</param>
         /// <param name="location">a point on the fitted line (the centroid of the points)</param>
         /// <param name="direction">direction of the fitted line (normalized)</param>
         /// <returns>the maximum distance of a point from the fitted line, 0.0 when the points are exactly collinear</returns>
         public static double LineFit(GeoPoint2D[] points, out GeoPoint2D location, out GeoVector2D direction)
-        {   // nach http://stackoverflow.com/questions/2352256/fit-a-3d-line-to-3d-point-data-in-java
-            if (points.Length < 3) throw new ApplicationException("Invalid parameter at LineFit: points must contain more than two points");
-            Matrix P = new DenseMatrix(points.Length, 2);
+        {
+            if (points.Length < 2) throw new ApplicationException("Invalid parameter at LineFit: points must contain at least two points");
+            location = new GeoPoint2D(points);
+            double sxx = 0.0, syy = 0.0, sxy = 0.0;
             for (int i = 0; i < points.Length; i++)
             {
-                P[i, 0] = points[i].x;
-                P[i, 1] = points[i].y;
+                double dx = points[i].x - location.x;
+                double dy = points[i].y - location.y;
+                sxx += dx * dx;
+                syy += dy * dy;
+                sxy += dx * dy;
             }
-            Svd<double> svd = (P.Transpose() * P).Svd();
-            int maxind = 0;
-            for (int i = 1; i < 2; i++)
-            {
-                if (svd.S[i] > svd.S[maxind]) maxind = i;
-            }
-            direction = new GeoVector2D(svd.VT[0, maxind], svd.VT[1, maxind]);
-            location = new GeoPoint2D(points);
+            double angle = 0.5 * Math.Atan2(2.0 * sxy, sxx - syy);
+            direction = new GeoVector2D(Math.Cos(angle), Math.Sin(angle));
             double d = 0.0;
-            double dl = direction.Length;
-            if (dl > 0.0)
+            for (int i = 0; i < points.Length; i++)
             {
-                for (int i = 0; i < points.Length; i++)
-                {
-                    d = Math.Max(((new GeoVector(points[i] - location)) ^ new GeoVector(direction)).Length / dl, d);
-                }
-                return d;
+                d = Math.Max(d, Math.Abs((points[i].x - location.x) * direction.y - (points[i].y - location.y) * direction.x));
             }
-            return double.MaxValue;
+            return d;
         }
         /// <summary>
-        /// Fits a line through the given 3d points: the location is their centroid, the direction is the principal direction
-        /// of the points found by a singular value decomposition. Throws an <see cref="ApplicationException"/> when fewer
-        /// than three points are given. The fit is not always optimal; it is mainly used to test whether points are collinear,
-        /// for a better fit see <see cref="GaussNewtonMinimizer.LineFit(IArray{GeoPoint}, double, out GeoPoint, out GeoVector)"/>.
+        /// Fits a line to the given 3d points by orthogonal least squares: the sum of the squared perpendicular distances
+        /// is minimal. The line passes through the centroid of the points, its direction is the eigenvector of the largest
+        /// eigenvalue of the covariance matrix of the centered points. Throws an <see cref="ApplicationException"/> when
+        /// fewer than two points are given.
         /// </summary>
-        /// <param name="points">the points to fit, at least three</param>
+        /// <param name="points">the points to fit, at least two</param>
         /// <param name="location">a point on the fitted line (the centroid of the points)</param>
         /// <param name="direction">direction of the fitted line (normalized)</param>
         /// <returns>the maximum distance of a point from the fitted line, 0.0 when the points are exactly collinear</returns>
         public static double LineFit(GeoPoint[] points, out GeoPoint location, out GeoVector direction)
-        {   // nach http://stackoverflow.com/questions/2352256/fit-a-3d-line-to-3d-point-data-in-java
-            // better use GaussNewtonMinimizer.LineFit
-            if (points.Length < 3) throw new ApplicationException("Invalid parameter at LineFit: points must contain more than two points");
-            Matrix P = new DenseMatrix(points.Length, 3);
+        {
+            if (points.Length < 2) throw new ApplicationException("Invalid parameter at LineFit: points must contain at least two points");
+            location = new GeoPoint(points);
+            Matrix cov = new DenseMatrix(3, 3);
             for (int i = 0; i < points.Length; i++)
             {
-                P[i, 0] = points[i].x;
-                P[i, 1] = points[i].y;
-                P[i, 2] = points[i].z;
+                GeoVector v = points[i] - location;
+                double[] c = { v.x, v.y, v.z };
+                for (int j = 0; j < 3; j++)
+                {
+                    for (int k = 0; k < 3; k++) cov[j, k] += c[j] * c[k];
+                }
             }
-            Svd<double> svd = (P.Transpose() * P).Svd();
-            int maxind = 0;
+            Evd<double> evd = cov.Evd(Symmetricity.Symmetric);
+            int maxind = 0; // don't rely on the order of the eigenvalues
             for (int i = 1; i < 3; i++)
             {
-                if (svd.S[i] > svd.S[maxind]) maxind = i;
+                if (evd.EigenValues[i].Real > evd.EigenValues[maxind].Real) maxind = i;
             }
-            direction = new GeoVector(svd.VT[0, maxind], svd.VT[1, maxind], svd.VT[2, maxind]);
-            location = new GeoPoint(points);
-            double d = 0.0;
+            direction = new GeoVector(evd.EigenVectors[0, maxind], evd.EigenVectors[1, maxind], evd.EigenVectors[2, maxind]);
             double dl = direction.Length;
-            if (dl > 0.0)
+            if (!(dl > 0.0)) return double.MaxValue;
+            direction = (1.0 / dl) * direction;
+            double d = 0.0;
+            for (int i = 0; i < points.Length; i++)
             {
-                for (int i = 0; i < points.Length; i++)
-                {
-                    d = Math.Max(((points[i] - location) ^ direction).Length / dl, d);
-                    double dd = Geometry.DistPL(points[i], location, direction);
-                }
-                return d;
+                d = Math.Max(d, ((points[i] - location) ^ direction).Length);
             }
-            return double.MaxValue;
+            return d;
         }
         /// <summary>
         /// Expresses the point <paramref name="p"/> in the 2d coordinate system given by its origin <paramref name="sysLoc"/>

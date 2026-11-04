@@ -35,9 +35,6 @@ namespace CADability.GeoObject
         private ISurface simpleSurface = null;
         private ModOp2D toSimpleSurface;
         private bool simpleSurfaceChecked = false;
-        // Kurven  mit festem u bzw. v, die schon mal berechnet wurden
-        private WeakReference fixedUCurves;
-        private WeakReference fixedVCurves;
         private WeakReference cubeHull;
         private WeakReference uSingularities, vSingularities;
         private new BoxedSurface boxedSurface
@@ -73,8 +70,6 @@ namespace CADability.GeoObject
         private new void InvalidateSecondaryData()
         {
             knotSpanExtent = null;
-            fixedUCurves = null;
-            fixedVCurves = null;
             cubeHull = null;
             nubs = null;
             nurbs = null;
@@ -1696,6 +1691,7 @@ namespace CADability.GeoObject
         /// <returns>The trimmed surface, or null when this surface is not initialized</returns>
         public NurbsSurface TrimmU(double u0, double u1)
         {
+            if (nubs == null && nurbs == null) Init(); // made on demand, see FixedU
             if (nubs != null)
             {
                 Nurbs<GeoPoint, GeoPointPole> trimmed = nubs.TrimU(u0, u1);
@@ -3067,28 +3063,19 @@ namespace CADability.GeoObject
             }
             return FixedV(v).TrimParam(umin, umax);
         }
+        /// <summary>
+        /// The curve on this surface with the fixed u parameter, over the whole v range of the knots.
+        /// <para>
+        /// These curves used to be cached in a dictionary behind a WeakReference. Measured over the regression tests, two thirds of
+        /// the calls were hits, but the time was the same without the cache: the curve is cheap to make. The cache was not thread
+        /// safe, and since it also kept a null result, a single call before nubs or nurbs existed made the curve null for good.
+        /// </para>
+        /// </summary>
         private BSpline FixedU(double u)
-        {   // liefert einen BSpline mit festem U-Wert. Die Kurven werden in einem Dictionary gespeichert
-            // können aber wg. Weakreference verloren gehen
-            Dictionary<double, BSpline> dict = null;
-            if (fixedUCurves == null) fixedUCurves = new WeakReference(null);
-            try
-            {
-                if (fixedUCurves.Target != null)
-                {
-                    dict = fixedUCurves.Target as Dictionary<double, BSpline>;
-                }
-            }
-            catch (InvalidOperationException) { }
+        {
             BSpline res = null;
-            if (dict != null)
-            {
-                if (dict.TryGetValue(u, out res)) return res;
-            }
-            else
-            {
-                dict = new Dictionary<double, BSpline>();
-            }
+            // nubs and nurbs are made on demand, e.g. they don't exist yet after the surface has been read from a file
+            if (nubs == null && nurbs == null) Init();
             if (nurbs != null)
             {
                 res = BSpline.Construct();
@@ -3101,32 +3088,16 @@ namespace CADability.GeoObject
                 Nurbs<GeoPoint, GeoPointPole> tmp = nubs.FixedU(u);
                 res.FromNurbs(tmp, vKnots[0], vKnots[vKnots.Length - 1]);
             }
-            dict[u] = res;
-            fixedUCurves.Target = dict;
             return res;
         }
+        /// <summary>
+        /// The curve on this surface with the fixed v parameter, over the whole u range of the knots, see <see cref="FixedU(double)"/>.
+        /// </summary>
         private BSpline FixedV(double v)
-        {   // liefert einen BSpline mit festem U-Wert. Die Kurven werden in einem Dictionary gespeichert
-            // können aber wg. Weakreference verloren gehen
-            Dictionary<double, BSpline> dict = null;
-            if (fixedVCurves == null) fixedVCurves = new WeakReference(null);
-            try
-            {
-                if (fixedVCurves.Target != null)
-                {
-                    dict = fixedVCurves.Target as Dictionary<double, BSpline>;
-                }
-            }
-            catch (InvalidOperationException) { }
+        {
             BSpline res = null;
-            if (dict != null)
-            {
-                if (dict.TryGetValue(v, out res)) return res;
-            }
-            else
-            {
-                dict = new Dictionary<double, BSpline>();
-            }
+            // nubs and nurbs are made on demand, e.g. they don't exist yet after the surface has been read from a file
+            if (nubs == null && nurbs == null) Init();
             if (nurbs != null)
             {
                 res = BSpline.Construct();
@@ -3139,8 +3110,6 @@ namespace CADability.GeoObject
                 Nurbs<GeoPoint, GeoPointPole> tmp = nubs.FixedV(v);
                 res.FromNurbs(tmp, uKnots[0], uKnots[uKnots.Length - 1]);
             }
-            dict[v] = res;
-            fixedVCurves.Target = dict;
             return res;
         }
         internal BoundingCube GetPatchExtent(BoundingRect uvPatch)
@@ -3241,6 +3210,7 @@ namespace CADability.GeoObject
         /// </summary>
         private GeoPointH[] GetBezierNetH(double u0, double u1, double v0, double v1, out bool weightsOk)
         {
+            if (nubs == null && nurbs == null) Init(); // made on demand, see FixedU
             weightsOk = true;
             if (nubs != null)
             {
@@ -4247,6 +4217,7 @@ namespace CADability.GeoObject
         /// <inheritdoc/>
         public override ICurve Make3dCurve(CADability.Curve2D.ICurve2D curve2d)
         {
+            if (nubs == null && nurbs == null) Init(); // made on demand, see FixedU
             if (curve2d is Curve2DAspect)
             {
                 ICurve res = (curve2d as Curve2DAspect).Get3DCurve(this);

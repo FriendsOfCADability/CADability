@@ -520,80 +520,47 @@ namespace CADability.GeoObject
 			//double d = Math.Min(Location | PointAt(g[0]), Location | PointAt(g[1]));
 			//return ((p|Location) - d);
 		}
-		/// <inheritdoc/>
+		/// <summary>
+		/// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.HitTest (BoundingCube, out GeoPoint2D)"/>: true, when the sphere
+		/// passes through <paramref name="bc"/>. <paramref name="uv"/> is then the position of a point of the sphere inside the box.
+		/// <para>
+		/// In the system of the unit sphere the box is a parallelepiped K and the sphere is |p| == 1. K is convex and connected, so
+		/// the sphere passes through K exactly when the smallest |p| in K is at most 1 and the largest is at least 1. The largest
+		/// is at a corner, the smallest is the distance of K from the center (<see cref="UnitBox.ClosestToOrigin"/>). The former
+		/// implementation missed a slab through the sphere, where neither a corner nor an edge nor an extreme point of the sphere is
+		/// in the box. It runs very often (Face.HitBoundingCube), so the cheap cases come first and nothing is allocated.
+		/// </para>
+		/// </summary>
 		public override bool HitTest(BoundingCube bc, out GeoPoint2D uv)
 		{
-			// any vertex of the cube on the sphere?
-			uv = GeoPoint2D.Origin;
-			GeoPoint[] cube = bc.Points;
-			bool[] pos = new bool[8];
-			for (int i = 0; i < 8; ++i)
-			{
-				GeoPoint p = cube[i];
-				GeoPoint q = toUnit * p;
-				if (Math.Abs(q.x * q.x + q.y * q.y + q.z * q.z - 1) < Precision.eps)
-				{
-					uv = PositionOf(p);
-					return true;
-				}
-				pos[i] = Orientation(p) <= 0;
-			}
-
-			// any line of the cube interfering the sphere?
-			int[,] l = bc.LineNumbers;
-			for (int k = 0; k < 12; ++k)
-			{
-				int i = l[k, 0];
-				int j = l[k, 1];
-				GeoPoint2D[] erg = GetLineIntersection(cube[i], cube[j] - cube[i]);
-				for (int m = 0; m < erg.Length; ++m)
-				{
-					GeoPoint gp = PointAt(erg[m]);
-					if (bc.Contains(gp, bc.Size * 1e-8))
-					{
-						uv = erg[m];
-						return true;
-					}
-				}
-				if (pos[i] != pos[j])
-					throw new ApplicationException("internal error: SphericalSurface.HitTest");
-			}
-
-			// cube´s vertices within the surface?
-			if (pos[0] && pos[1] && pos[2] && pos[3] && pos[4] && pos[5] && pos[6] && pos[7])
-				return false;   //convexity of the inner points 
-
-			// complete sphere outside of the cube?
-			for (int i = 0; i < 8; ++i)
-			{
-				cube[i] = toUnit * cube[i];
-			}
-			Plane[] planes = new Plane[6];
-			planes[0] = new Plane(cube[0], cube[1], cube[2]);
-			planes[1] = new Plane(cube[0], cube[2], cube[4]);
-			planes[2] = new Plane(cube[0], cube[4], cube[1]);
-			planes[3] = new Plane(cube[7], cube[5], cube[3]);
-			planes[4] = new Plane(cube[7], cube[3], cube[6]);
-			planes[5] = new Plane(cube[7], cube[6], cube[5]);
-			for (int i = 0; i < 6; ++i)
-			{
-				GeoPoint p = PointAt(planes[i].Project(GeoPoint.Origin));
-				GeoPoint gp = planes[i].ToGlobal(p);
-				if ((bc.Contains(gp, Precision.eps)) && (gp - Location).Length <= 1)
-				{
-					GeoPoint2D[] s = GetLineIntersection(Location, gp - Location);
-					for (int j = 0; j < s.Length; ++j)
-					{
-						GeoPoint g = PointAt(s[j]);
-						if (bc.Contains(g, Precision.eps))
-						{
-							uv = s[j];
-							return true;
-						}
-					}
-				}
-			}
-			return false;
+		    uv = GeoPoint2D.Origin;
+		    UnitBox box = new UnitBox(toUnit, bc);
+		    double tol = box.Tolerance;
+		    // 0. a sphere around the box which doesn't reach the surface: most boxes of an octtree are far away
+		    double centerDist = Math.Sqrt(box.Center.x * box.Center.x + box.Center.y * box.Center.y + box.Center.z * box.Center.z);
+		    if (Math.Abs(centerDist - 1.0) > box.Radius + tol) return false;
+		    // 1. the whole box inside the sphere
+		    double maxR2 = -1.0;
+		    int farthest = 0;
+		    for (int i = 0; i < 8; ++i)
+		    {
+		        double r2 = box.Corner(i).x * box.Corner(i).x + box.Corner(i).y * box.Corner(i).y + box.Corner(i).z * box.Corner(i).z;
+		        if (r2 > maxR2)
+		        {
+		            maxR2 = r2;
+		            farthest = i;
+		        }
+		    }
+		    if (maxR2 < (1.0 - tol) * (1.0 - tol)) return false;
+		    // 2. the whole box outside of the sphere
+		    GeoPoint a = box.ClosestToOrigin();
+		    double c = a.x * a.x + a.y * a.y + a.z * a.z - 1.0;
+		    if (c > (1.0 + tol) * (1.0 + tol) - 1.0) return false;
+		    // 3. a hit: the segment from the closest point to the farthest corner lies in the box and crosses the sphere
+		    GeoVector d = box.Corner(farthest) - a;
+		    double t = UnitBox.Crossing(d * d, a.x * d.x + a.y * d.y + a.z * d.z, c);
+		    uv = PositionOf(toSphere * (a + t * d));
+		    return true;
 		}
 		/// <inheritdoc/>
 		protected override double[] GetSaveUSteps()

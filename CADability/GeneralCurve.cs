@@ -97,7 +97,8 @@ namespace CADability.GeoObject
             private Plane plane;
             public ProjectedCurve(ICurve curve, Plane plane)
             {
-                this.curve = curve;
+                // keep a copy of its own: Reverse reverses this curve, which must not reverse the curve that was projected
+                this.curve = curve.Clone();
                 this.plane = plane;
             }
             protected override void GetTriangulationBasis(out GeoPoint2D[] points, out GeoVector2D[] directions, out double[] parameters)
@@ -139,8 +140,9 @@ namespace CADability.GeoObject
                 ProjectedCurve pc = toCopyFrom as ProjectedCurve;
                 if (pc != null)
                 {
-                    this.curve = pc.curve;
+                    this.curve = pc.curve.Clone();
                     this.plane = pc.plane;
+                    base.ClearTriangulation();
                 }
             }
             #region ISerializable Members
@@ -723,13 +725,14 @@ namespace CADability.GeoObject
                 return pCurve | p;
             }
             else
-            {
-                if (pos <= 1e-6)
+            {   // only positions on the curve count: a point beyond an end has the distance to that end, not to the extended
+                // curve, as for a Line (positions outside [0,1] and NaN end up in the last branch)
+                if (pos <= 1e-6 && pos > 0)
                 {
                     GeoPoint pCurve = PointAt(pos);
                     return Math.Min(p | StartPoint, pCurve | p);
                 }
-                else if (pos >= 1.0 - 1e-6)
+                else if (pos >= 1.0 - 1e-6 && pos < 1)
                 {
                     GeoPoint pCurve = PointAt(pos);
                     return Math.Min(p | EndPoint, pCurve | p);

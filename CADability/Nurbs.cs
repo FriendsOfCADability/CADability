@@ -1681,31 +1681,38 @@ namespace CADability
         unsafe void BasisFunsU(int span, double u, int deg, out double[] N)
         {
             N = new double[deg + 1];
-            fixed (double* pN = N)
+            fixed (double* pN = N) BasisFunsU(span, u, deg, pN);
+        }
+        /// <summary>
+        /// <see cref="BasisFunsU(int, double, int, out double[])"/> into <paramref name="pN"/>, which must have room for deg+1
+        /// values: the evaluation of points and derivatives, which runs very often, passes a buffer on the stack instead of
+        /// allocating an array each time.
+        /// </summary>
+        unsafe void BasisFunsU(int span, double u, int deg, double* pN)
+        {
+            if (deg < 0) throw new IndexOutOfRangeException(); // as the array version, which would write N[0] of an empty array
+            double* left = stackalloc double[deg + 1];
+            double* right = stackalloc double[deg + 1];
+            pN[0] = 1.0;
+            for (int j = 1; j <= deg; ++j)
             {
-                double* left = stackalloc double[deg + 1];
-                double* right = stackalloc double[deg + 1];
-                pN[0] = 1.0;
-                for (int j = 1; j <= deg; ++j)
+                left[j] = u - uknots[span + 1 - j];
+                right[j] = uknots[span + j] - u;
+                double saved = 0.0;
+                for (int r = 0; r < j; ++r)
                 {
-                    left[j] = u - uknots[span + 1 - j];
-                    right[j] = uknots[span + j] - u;
-                    double saved = 0.0;
-                    for (int r = 0; r < j; ++r)
+                    double temp = pN[r] / (right[r + 1] + left[j - r]);
+                    if (!double.IsNaN(temp) && !double.IsInfinity(temp))
                     {
-                        double temp = pN[r] / (right[r + 1] + left[j - r]);
-                        if (!double.IsNaN(temp) && !double.IsInfinity(temp))
-                        {
-                            pN[r] = saved + right[r + 1] * temp;
-                            saved = left[j - r] * temp;
-                        }
-                        else
-                        {
-                            pN[r] = saved;
-                        }
+                        pN[r] = saved + right[r + 1] * temp;
+                        saved = left[j - r] * temp;
                     }
-                    pN[j] = saved;
+                    else
+                    {
+                        pN[r] = saved;
+                    }
                 }
+                pN[j] = saved;
             }
         }
         void BasisFunsU(int span, int deg, out Polynom[] N, bool dim2)
@@ -1786,31 +1793,38 @@ namespace CADability
         unsafe void BasisFunsV(int span, double v, int deg, out double[] N)
         {
             N = new double[deg + 1];
-            fixed (double* pN = N)
+            fixed (double* pN = N) BasisFunsV(span, v, deg, pN);
+        }
+        /// <summary>
+        /// <see cref="BasisFunsV(int, double, int, out double[])"/> into <paramref name="pN"/>, which must have room for deg+1
+        /// values: the evaluation of points and derivatives, which runs very often, passes a buffer on the stack instead of
+        /// allocating an array each time.
+        /// </summary>
+        unsafe void BasisFunsV(int span, double v, int deg, double* pN)
+        {
+            if (deg < 0) throw new IndexOutOfRangeException(); // as the array version, which would write N[0] of an empty array
+            double* left = stackalloc double[deg + 1];
+            double* right = stackalloc double[deg + 1];
+            pN[0] = 1.0;
+            for (int j = 1; j <= deg; ++j)
             {
-                double* left = stackalloc double[deg + 1];
-                double* right = stackalloc double[deg + 1];
-                pN[0] = 1.0;
-                for (int j = 1; j <= deg; ++j)
+                left[j] = v - vknots[span + 1 - j];
+                right[j] = vknots[span + j] - v;
+                double saved = 0.0;
+                for (int r = 0; r < j; ++r)
                 {
-                    left[j] = v - vknots[span + 1 - j];
-                    right[j] = vknots[span + j] - v;
-                    double saved = 0.0;
-                    for (int r = 0; r < j; ++r)
+                    double temp = pN[r] / (right[r + 1] + left[j - r]);
+                    if (!double.IsNaN(temp) && !double.IsInfinity(temp))
                     {
-                        double temp = pN[r] / (right[r + 1] + left[j - r]);
-                        if (!double.IsNaN(temp) && !double.IsInfinity(temp))
-                        {
-                            pN[r] = saved + right[r + 1] * temp;
-                            saved = left[j - r] * temp;
-                        }
-                        else
-                        {
-                            pN[r] = saved;
-                        }
+                        pN[r] = saved + right[r + 1] * temp;
+                        saved = left[j - r] * temp;
                     }
-                    pN[j] = saved;
+                    else
+                    {
+                        pN[r] = saved;
+                    }
                 }
+                pN[j] = saved;
             }
         }
         void AllBasisFunsU(int span, double u, out double[][] AN)
@@ -1995,7 +2009,30 @@ namespace CADability
             }
             return PK;
         }
+        // Derivative control points per maxderiv. They only depend on poles and knots, which are never changed
+        // after construction (the same assumption InitDerivS makes for derivs), so they are computed once.
+        // Without the cache every SurfaceDeriv call rebuilt them for the whole pole net, which dominated
+        // NurbsSurface.DerivativeAt/Derivative2At. The arrays are only read after being filled, so sharing them
+        // between threads is fine; a race merely computes the same values twice.
+        private DerivsKL[] surfaceDerivCptsCache;
         private DerivsKL SurfaceDeriveCpts(int maxderiv)
+        {
+            DerivsKL[] cache = surfaceDerivCptsCache;
+            if (cache == null || cache.Length <= maxderiv)
+            {
+                DerivsKL[] larger = new DerivsKL[maxderiv + 1];
+                if (cache != null) Array.Copy(cache, larger, cache.Length);
+                cache = larger;
+            }
+            DerivsKL res = cache[maxderiv];
+            if (res == null)
+            {
+                res = cache[maxderiv] = ComputeSurfaceDeriveCpts(maxderiv);
+                surfaceDerivCptsCache = cache;
+            }
+            return res;
+        }
+        private DerivsKL ComputeSurfaceDeriveCpts(int maxderiv)
         {   // Buch S. 114: n,m: Anzahl der Poles, p,q: u/vdegree, U,V: knots, P: poles, d: maxderiv, r1,s1: 0, r2,s2: n,m
             DerivsKL PKL = new Nurbs<T, C>.DerivsKL(this, maxderiv);
             int du = Math.Min(maxderiv, udegree);
@@ -2112,13 +2149,13 @@ namespace CADability
             deriv2 = null;
         }
 
-        public T CurvePoint(double u)
+        public unsafe T CurvePoint(double u)
         {
             int span;
             int n = uknots.Length - udegree - 1;
             span = FindSpanU(n, u);
-            double[] N; // N sollte mit stackalloc alokiert werden, da es nur lokal gebraucht wird
-            BasisFunsU(span, u, udegree, out N);
+            double* N = stackalloc double[udegree + 1];
+            BasisFunsU(span, u, udegree, N);
             T res = new T();
             for (int j = 0; j <= udegree; ++j)
             {
@@ -2204,16 +2241,16 @@ namespace CADability
             }
             return res;
         }
-        public T SurfacePoint(double u, double v)
+        public unsafe T SurfacePoint(double u, double v)
         {
             int n = uknots.Length - udegree - 1;
             int uspan = FindSpanU(n, u);
             int m = vknots.Length - vdegree - 1;
             int vspan = FindSpanV(m, v);
-            double[] Nu; // n sollte mit stackalloc alokiert werden, da es nur lokal gebraucht wird
-            BasisFunsU(uspan, u, udegree, out Nu);
-            double[] Nv; // n sollte mit stackalloc alokiert werden, da es nur lokal gebraucht wird
-            BasisFunsV(vspan, v, vdegree, out Nv);
+            double* Nu = stackalloc double[udegree + 1];
+            BasisFunsU(uspan, u, udegree, Nu);
+            double* Nv = stackalloc double[vdegree + 1];
+            BasisFunsV(vspan, v, vdegree, Nv);
             int uind = uspan - udegree;
             T res = new T();
             for (int l = 0; l <= vdegree; ++l)
@@ -2338,7 +2375,7 @@ namespace CADability
             double[][] Nu, Nv;
             AllBasisFunsU(uspan, u, out Nu);
             AllBasisFunsV(vspan, v, out Nv);
-            DerivsKL PKL = SurfaceDeriveCpts(maxderiv); // muss natürlich in einen cache
+            DerivsKL PKL = SurfaceDeriveCpts(maxderiv); // cached, see SurfaceDeriveCpts
 
             int uind = uspan - udegree;
             int vind = vspan - vdegree;
@@ -2417,20 +2454,20 @@ namespace CADability
             return res;
         }
 
-        public void SurfaceDeriv1(double u, double v, out T pointAtUV, out T derivU, out T derivV)
+        public unsafe void SurfaceDeriv1(double u, double v, out T pointAtUV, out T derivU, out T derivV)
         {   // Seite 137 bin sind alle 1
             int n = uknots.Length - udegree - 1;
             int uspan = FindSpanU(n, u);
             int m = vknots.Length - vdegree - 1;
             int vspan = FindSpanV(m, v);
-            double[] Nu; // n sollte mit stackalloc alokiert werden, da es nur lokal gebraucht wird
-            BasisFunsU(uspan, u, udegree, out Nu);
-            double[] Nv; // n sollte mit stackalloc alokiert werden, da es nur lokal gebraucht wird
-            BasisFunsV(vspan, v, vdegree, out Nv);
-            double[] Nuu;
-            BasisFunsU(uspan, u, udegree - 1, out Nuu);
-            double[] Nvv;
-            BasisFunsV(vspan, v, vdegree - 1, out Nvv);
+            double* Nu = stackalloc double[udegree + 1];
+            BasisFunsU(uspan, u, udegree, Nu);
+            double* Nv = stackalloc double[vdegree + 1];
+            BasisFunsV(vspan, v, vdegree, Nv);
+            double* Nuu = stackalloc double[udegree];
+            BasisFunsU(uspan, u, udegree - 1, Nuu);
+            double* Nvv = stackalloc double[vdegree];
+            BasisFunsV(vspan, v, vdegree - 1, Nvv);
             derivU = new T();
             derivV = new T();
             pointAtUV = new T();
@@ -2473,7 +2510,7 @@ namespace CADability
                 derivV = RatCurveDerivs1(derivV, pointAtUV);
             }
         }
-        public void CurveDeriv1(double u, out T pointAtU, out T derivAtU)
+        public unsafe void CurveDeriv1(double u, out T pointAtU, out T derivAtU)
         {
             // implementiert im Buch S. 99 für d==1, also nur 1. Ableitung
             // die unveränderlichen PK1 müssen natürlich zum BSpline objekt, damit sie nicht immer neu berechnet werden müssen
@@ -2481,15 +2518,15 @@ namespace CADability
             if (deriv1 == null) InitDeriv1();
             int n = uknots.Length - udegree - 1;
             int span = FindSpanU(n, u);
-            double[] N;
-            BasisFunsU(span, u, udegree, out N);
+            double* N = stackalloc double[udegree + 1];
+            BasisFunsU(span, u, udegree, N);
             pointAtU = new T();
             for (int j = 0; j <= udegree; ++j)
             {
                 pointAtU = calc.Add(pointAtU, calc.Mul(N[j], poles[span - udegree + j]));
             }
 
-            BasisFunsU(span, u, udegree - 1, out N);
+            BasisFunsU(span, u, udegree - 1, N); // fewer values, the buffer is large enough
             derivAtU = new T();
             for (int j = 0; j <= udegree - 1; ++j)
             {

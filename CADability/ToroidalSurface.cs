@@ -2326,99 +2326,110 @@ namespace CADability.GeoObject
             return new ModOp2D(-1, 0, 2.0 * Math.PI, 0, 1, 0);
         }
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Overrides <see cref="CADability.GeoObject.ISurfaceImpl.HitTest (BoundingCube, out GeoPoint2D)"/>: true, when the torus
+        /// passes through <paramref name="bc"/>. <paramref name="uv"/> is then the position of a point of the torus inside the box.
+        /// <para>
+        /// In the system of the unit torus the signed distance from the surface is |p - core circle| - minorRadius. A sphere around
+        /// the box which doesn't reach the surface rejects most boxes of an octtree without further work. For the others: corners
+        /// on both sides, an edge which passes through the torus (the exact intersection of a line with the torus) or a point of
+        /// the torus inside the box (a torus which is completely inside). What these miss is a part of the torus which is only inside
+        /// a face of the box, like a slab through the tube or across the hole, which the former implementation missed. Such a box is
+        /// divided (twice at most): the new edges cross the faces and find it.
+        /// </para>
+        /// </summary>
         public override bool HitTest(BoundingCube bc, out GeoPoint2D uv)
         {
-            // any vertex of the cube on the torus?
+            return HitTest(bc, 2, out uv);
+        }
+        private bool HitTest(BoundingCube bc, int divisions, out GeoPoint2D uv)
+        {
             uv = GeoPoint2D.Origin;
-            GeoPoint[] cube = bc.Points;
-            GeoPoint[] points = new GeoPoint[8];
+            UnitBox box = new UnitBox(toUnit, bc);
+            double tol = box.Tolerance;
+            // 0. a sphere around the box which doesn't reach the surface
+            if (Math.Abs(SignedDistanceInUnit(box.Center)) > box.Radius + tol) return false;
+            // 1. corners on both sides: there is an edge from one side to the other, find the crossing by bisection
+            int inside = -1, outside = -1;
             for (int i = 0; i < 8; ++i)
             {
-                points[i] = toUnit * cube[i];
-            }
-            bool[] pos = new bool[8];
-            for (int i = 0; i < 8; ++i)
-            {
-                GeoPoint p = cube[i];
-                if ((PointAt(PositionOf(p)) - p).Length < Precision.eps)
+                double sd = SignedDistanceInUnit(box.Corner(i));
+                if (Math.Abs(sd) <= tol)
                 {
-                    uv = PositionOf(p);
+                    uv = PositionOfInUnit(box.Corner(i));
                     return true;
                 }
-                pos[i] = Orientation(p) < 0;
+                if (sd < 0.0) inside = i;
+                else outside = i;
             }
-
-            // any line of the cube interfering the torus?
-            int[,] l = bc.LineNumbers;
+            if (inside >= 0 && outside >= 0)
+            {
+                for (int i = 0; i < 8; ++i)
+                {
+                    for (int bit = 1; bit < 8; bit <<= 1)
+                    {
+                        if ((i & bit) != 0) continue;
+                        GeoPoint p0 = box.Corner(i), p1 = box.Corner(i | bit);
+                        double s0 = SignedDistanceInUnit(p0), s1 = SignedDistanceInUnit(p1);
+                        if ((s0 < 0.0) == (s1 < 0.0)) continue;
+                        double t0 = 0.0, t1 = 1.0; // s(t0) and s(t1) have different signs
+                        for (int k = 0; k < 60 && (t1 - t0) > 1e-15; ++k)
+                        {
+                            double tm = (t0 + t1) / 2.0;
+                            if ((SignedDistanceInUnit(p0 + tm * (p1 - p0)) < 0.0) == (s0 < 0.0)) t0 = tm;
+                            else t1 = tm;
+                        }
+                        uv = PositionOfInUnit(p0 + ((t0 + t1) / 2.0) * (p1 - p0));
+                        return true;
+                    }
+                }
+            }
+            // 2. an edge which passes through the torus while both of its ends are on the same side
+            GeoPoint[] corners = bc.Points;
+            int[,] lines = bc.LineNumbers;
             for (int k = 0; k < 12; ++k)
             {
-                int i = l[k, 0];
-                int j = l[k, 1];
-                GeoPoint[] erg = GetLineIntersection3D(cube[i], cube[j] - cube[i]);
-                for (int m = 0; m < erg.Length; ++m)
+                GeoPoint ws = corners[lines[k, 0]];
+                GeoVector wd = corners[lines[k, 1]] - ws;
+                GeoPoint us = toUnit * ws;
+                GeoVector ud = toUnit * wd;
+                double len2 = ud * ud;
+                if (len2 == 0.0) continue;
+                GeoPoint[] ips = GetLineIntersection3D(ws, wd); // in the unit system
+                for (int m = 0; m < ips.Length; ++m)
                 {
-                    GeoPoint gp = toTorus * erg[m];
-                    if (bc.Contains(gp, bc.Size * 1e-8))
+                    double t = ((ips[m] - us) * ud) / len2;
+                    if (t >= -1e-9 && t <= 1.0 + 1e-9)
                     {
-                        uv = PositionOfInUnit(erg[m]);
-                        return true;
-                    }
-                }
-                if (pos[i] != pos[j])
-                {
-                    GeoPoint2D[] isp2d = base.GetLineIntersection(cube[i], cube[j] - cube[i]);
-                    if (isp2d.Length > 0)
-                    {
-                        uv = isp2d[0];
-                        return true;
-                    }
-                }
-                //throw new ApplicationException("internal error: ToroidalSurface.HitTest");
-            }
-
-            //  any of the cube's faces hitting the torus?
-            GeoVector[] nv = new GeoVector[3];
-            nv[0] = (points[0] - points[1]) ^ (points[0] - points[2]);
-            nv[1] = (points[0] - points[1]) ^ (points[0] - points[4]);
-            nv[2] = (points[0] - points[2]) ^ (points[0] - points[4]);
-            for (int i = 0; i < 3; ++i)
-            {
-                //GeoPoint pu = toUnit * p;
-                ////double u = Math.Atan2(pu.y, pu.x);
-                //double d = Math.Sqrt(pu.x * pu.x + pu.y * pu.y);
-                ////double v = Math.Atan2(pu.z, d);
-                //return new GeoPoint2D(Math.Atan2(pu.y, pu.x), Math.Atan2(pu.z, d));
-
-                double d = Math.Sqrt(nv[i].x * nv[i].x + nv[i].y * nv[i].y);
-                double u = Math.Atan2(nv[i].y, nv[i].x);
-                double v = Math.Atan2(nv[i].z, d);
-                GeoPoint2D[] gp = new GeoPoint2D[4];
-                gp[0] = new GeoPoint2D(u, v);
-                gp[1] = new GeoPoint2D(u, Math.PI + v);
-                gp[2] = new GeoPoint2D(Math.PI - u, v);
-                gp[3] = new GeoPoint2D(Math.PI - u, Math.PI + v);
-                for (int j = 0; j < gp.Length; ++j)
-                {
-                    GeoPoint x = PointAt(gp[j]);
-                    if (bc.Contains(x, bc.Size * 1e-8))
-                    {
-                        uv = new GeoPoint2D(u, v);
+                        uv = PositionOfInUnit(ips[m]);
                         return true;
                     }
                 }
             }
-
-            //  is the complete torus in the cube?
-            GeoPoint g = toTorus * (new GeoPoint(1 - minorRadius, 0, 0));
-            if (bc.Contains(g))
+            // 3. a torus which is completely inside the box
+            GeoPoint onTorus = new GeoPoint(1.0 + minorRadius, 0.0, 0.0);
+            if (bc.Contains(toTorus * onTorus))
             {
-                uv = PositionOf(g);
+                uv = PositionOfInUnit(onTorus);
                 return true;
             }
-
-            //  now the cube is completely inside or outside of the torus
+            // 4. a part of the torus only inside the faces: divide the box, the new edges cross the faces of the box
+            if (divisions == 0) return false;
+            double xm = (bc.Xmin + bc.Xmax) / 2.0, ym = (bc.Ymin + bc.Ymax) / 2.0, zm = (bc.Zmin + bc.Zmax) / 2.0;
+            for (int i = 0; i < 8; ++i)
+            {
+                BoundingCube part = new BoundingCube((i & 1) == 0 ? bc.Xmin : xm, (i & 1) == 0 ? xm : bc.Xmax,
+                    (i & 2) == 0 ? bc.Ymin : ym, (i & 2) == 0 ? ym : bc.Ymax, (i & 4) == 0 ? bc.Zmin : zm, (i & 4) == 0 ? zm : bc.Zmax);
+                if (HitTest(part, divisions - 1, out uv)) return true;
+            }
+            uv = GeoPoint2D.Origin;
             return false;
+        }
+        /// <summary>The signed distance of <paramref name="p"/> (in the unit system) from the torus, negative inside the tube.</summary>
+        private double SignedDistanceInUnit(GeoPoint p)
+        {
+            double rho = Math.Sqrt(p.x * p.x + p.y * p.y) - 1.0;
+            return Math.Sqrt(rho * rho + p.z * p.z) - minorRadius;
         }
 
         /// <inheritdoc/>

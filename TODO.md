@@ -178,6 +178,15 @@ None left: all of them have been fixed.
   large, while both differences are exact. In the union, the hole edges of the merged faces
   have `Path2D` curves, and these faces triangulate to a slightly smaller area
   than the same faces in the differences; not yet investigated further.
+- [ ] A cube of 10 and a sphere whose axis lies in a face of the cube have
+  neither a union nor a difference (`Solid.Unite` returns null,
+  `Solid.Subtract` an empty array): the sphere of radius 3 centred on the
+  middle of an edge, (10, 5, 10), and the sphere of radius 4 centred on a
+  corner, (10, 10, 10), also when it is moved off the corner to
+  (10, 10.5, 10.3). The plane of the face goes through the poles of the
+  sphere. A sphere of radius 3 on the corner and spheres centred on a face
+  work. The kernel of the ShapeIt fork (develop, 3319b34) gives the exact
+  volumes in all these cases.
 
 - [ ] `Face.MakeRegularSurface` no longer simplifies exact rational NURBS
   cylinders, cones, spheres and tori, because it maps the edges with the
@@ -210,6 +219,32 @@ None left: all of them have been fixed.
   as a name (#373 left this as it is). A database handle (1005) refers to
   the document the XData came from; ACadSharp writes 0 when no object of the
   exported document has it.
+
+## ShapeIt fork: changes not yet ported
+
+The kernel in the ShapeIt repository (FriendsOfCADability/ShapeIt, branch
+`develop`) was compared with master on 2026-11-04 (ShapeIt 3319b34, master
+ad7062c4). The small fixes up to then are ported in
+`claude/shapeit-port-geometry-fixes`. Left for later:
+
+- [ ] Worth porting with some adaptation: typed lists and arrays when reading
+  JSON (a4adab2), inflection points of `BSpline2D` as polynomial roots
+  (9d8fcd0, keep the exclusion of corner knots), touching points in
+  `GeneralCurve2D.Intersect` (8a54652) and snapping imprecise curve/surface
+  intersections to the curve ends (fbdad96); the last two change where
+  intersection points are made and need the boolean sweep. ShapeIt keeps the
+  feature names of faces (`Shell.AddFeature`) when a shell is cloned or
+  saved; whether master loses them was not checked yet.
+- [ ] Larger self-contained parts: `Shell.PushPull` (with its tests), the
+  formula evaluator of `FormulaInput.cs` for length, angle and point
+  properties, `BVH`, `StlSurfaceReconstruction` (analytic surfaces from STL).
+- [ ] Not portable on their own: fillets and chamfers of solid edges
+  (`BlendEdges`, `RoundEdges`, `ChamferEdges`, `PipeContactCurve`,
+  `SweptCircleSurface`; master's `BRepOperation.ChamferEdges` always returns
+  null), `MakeHollow`, the parallel edge/face intersections of the boolean
+  operation and `CDTriangulation`. They depend on ShapeIt's rewritten
+  `BooleanOperation`, `ISurface.Domain` and `ParallelepipedHull`, about 18,000
+  lines; this needs a decision whether the kernels are merged.
 
 ## Documentation
 

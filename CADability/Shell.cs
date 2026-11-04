@@ -347,11 +347,22 @@ namespace CADability.GeoObject
         /// orientation: positive for an outward oriented shell, negative for an inward oriented one (a cavity).
         /// </summary>
         /// <param name="precision">precision of the triangulation, which limits the precision of the result: the edges deviate
-        /// by up to this value, the triangles inside the faces by about five times this value (see <see cref="Face.GetTriangulation"/>)</param>
+        /// by up to this value, the triangles inside the faces by about five times this value (see <see cref="Face.GetTriangulation"/>).
+        /// When a face cannot be triangulated that finely (a triangulation stops at a maximum number of triangles, and when it
+        /// stopped half way, the volume was far worse than with a coarser precision: a sphere of radius 3 was off by 1e-8 at 1e-4,
+        /// by 9e-4 at 1e-7), all faces are triangulated again with a ten times coarser precision, until each face is complete.</param>
         /// <returns>the signed volume</returns>
         public double Volume(double precision)
         {
-            return SignedVolume(Faces, precision);
+            Face[] shellFaces = Faces;
+            double volume = SignedVolume(shellFaces, precision);
+            for (int attempt = 0; attempt < 6 && shellFaces.Any(f => f.TriangulationIncomplete); attempt++)
+            {   // all faces with the same precision, so that their meshes fit along the edges
+                precision *= 10.0;
+                foreach (Face face in shellFaces) face.Retriangulate(precision);
+                volume = SignedVolume(shellFaces, precision);
+            }
+            return volume;
         }
         /// <summary>
         /// Computes the signed volume enclosed by the provided faces. The faces must form a closed shell, otherwise the

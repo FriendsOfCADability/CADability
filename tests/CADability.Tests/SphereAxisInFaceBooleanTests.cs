@@ -40,10 +40,10 @@ namespace CADability.Tests
             double difference = 1000 - sphereVolume * fractionInside;
             Solid u = Solid.Unite(Cube(), sphere.Clone() as Solid);
             Assert.IsNotNull(u, what + ": no union");
-            Assert.AreEqual(union, u.Volume(1e-6), 1e-5 * union, what + ": volume of the union");
+            Assert.AreEqual(union, u.Volume(1e-4), 1e-5 * union, what + ": volume of the union");
             Solid[] d = Solid.Subtract(Cube(), sphere.Clone() as Solid);
             Assert.AreEqual(1, d.Length, what + ": number of solids of the difference");
-            Assert.AreEqual(difference, d[0].Volume(1e-6), 1e-5 * difference, what + ": volume of the difference");
+            Assert.AreEqual(difference, d[0].Volume(1e-4), 1e-5 * difference, what + ": volume of the difference");
         }
 
         [TestMethod]

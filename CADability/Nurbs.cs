@@ -2009,28 +2009,56 @@ namespace CADability
             }
             return PK;
         }
-        // Derivative control points per maxderiv. They only depend on poles and knots, which are never changed
-        // after construction (the same assumption InitDerivS makes for derivs), so they are computed once.
-        // Without the cache every SurfaceDeriv call rebuilt them for the whole pole net, which dominated
-        // NurbsSurface.DerivativeAt/Derivative2At. The arrays are only read after being filled, so sharing them
-        // between threads is fine; a race merely computes the same values twice.
-        private DerivsKL[] surfaceDerivCptsCache;
+        /// <summary>
+        /// The derivative control points of the whole pole net up to <paramref name="maxderiv"/> (NURBS book A3.7). Only
+        /// <see cref="BoundsSurfaceDeriv2"/> needs all of them; the evaluation uses <see cref="LocalSurfaceDerivCpts"/>.
+        /// </summary>
         private DerivsKL SurfaceDeriveCpts(int maxderiv)
         {
-            DerivsKL[] cache = surfaceDerivCptsCache;
-            if (cache == null || cache.Length <= maxderiv)
+            return ComputeSurfaceDeriveCpts(maxderiv);
+        }
+        /// <summary>
+        /// The derivative control points PKL[k, l, i, j] that the evaluation at a point in the knot span
+        /// (<paramref name="uspan"/>, <paramref name="vspan"/>) needs: A3.7 of the NURBS book restricted to the poles
+        /// uspan-udegree..uspan and vspan-vdegree..vspan (r1 = uspan-p, r2 = uspan, s1 = vspan-q, s2 = vspan in the book).
+        /// i and j are relative to uspan-udegree and vspan-vdegree. Each value is computed from the same poles and knots in the
+        /// same order as in <see cref="ComputeSurfaceDeriveCpts"/>, so it is bit-identical to the value there; computing the
+        /// whole net on every call dominated <see cref="SurfaceDeriv"/>, keeping it would cost about 250 bytes per pole.
+        /// </summary>
+        private T[,,,] LocalSurfaceDerivCpts(int uspan, int vspan, int du, int dv)
+        {
+            int uind = uspan - udegree;
+            int vind = vspan - vdegree;
+            T[,,,] PKL = new T[du + 1, dv + 1, udegree + 1, vdegree + 1];
+            // the derivatives in u of each row of poles (A3.3 with r1 = uind), written directly into PKL[k, 0, i, j]
+            for (int j = 0; j <= vdegree; j++)
             {
-                DerivsKL[] larger = new DerivsKL[maxderiv + 1];
-                if (cache != null) Array.Copy(cache, larger, cache.Length);
-                cache = larger;
+                for (int i = 0; i <= udegree; i++) PKL[0, 0, i, j] = poles[ind(uind + i, vind + j)];
+                for (int k = 1; k <= du; k++)
+                {
+                    int tmp = Math.Max(0, udegree - k + 1);
+                    for (int i = 0; i <= udegree - k; i++)
+                    {
+                        PKL[k, 0, i, j] = calc.Mul(tmp / (uknots[uind + i + udegree + 1] - uknots[uind + i + k]), calc.Sub(PKL[k - 1, 0, i + 1, j], PKL[k - 1, 0, i, j]));
+                    }
+                }
             }
-            DerivsKL res = cache[maxderiv];
-            if (res == null)
+            // the derivatives in v of each column of these (A3.3 with r1 = vind)
+            for (int k = 0; k <= du; k++)
             {
-                res = cache[maxderiv] = ComputeSurfaceDeriveCpts(maxderiv);
-                surfaceDerivCptsCache = cache;
+                for (int i = 0; i <= udegree - k; i++)
+                {
+                    for (int l = 1; l <= dv; l++)
+                    {
+                        int tmp = Math.Max(0, vdegree - l + 1);
+                        for (int j = 0; j <= vdegree - l; j++)
+                        {
+                            PKL[k, l, i, j] = calc.Mul(tmp / (vknots[vind + j + vdegree + 1] - vknots[vind + j + l]), calc.Sub(PKL[k, l - 1, i, j + 1], PKL[k, l - 1, i, j]));
+                        }
+                    }
+                }
             }
-            return res;
+            return PKL;
         }
         private DerivsKL ComputeSurfaceDeriveCpts(int maxderiv)
         {   // Buch S. 114: n,m: Anzahl der Poles, p,q: u/vdegree, U,V: knots, P: poles, d: maxderiv, r1,s1: 0, r2,s2: n,m
@@ -2375,10 +2403,7 @@ namespace CADability
             double[][] Nu, Nv;
             AllBasisFunsU(uspan, u, out Nu);
             AllBasisFunsV(vspan, v, out Nv);
-            DerivsKL PKL = SurfaceDeriveCpts(maxderiv); // cached, see SurfaceDeriveCpts
-
-            int uind = uspan - udegree;
-            int vind = vspan - vdegree;
+            T[,,,] PKL = LocalSurfaceDerivCpts(uspan, vspan, du, dv); // only the poles of this knot span
 
             for (int k = 0; k <= du; k++)
             {
@@ -2390,7 +2415,7 @@ namespace CADability
                         T tmp = new T();
                         for (int j = 0; j <= udegree - k; j++)
                         {
-                            tmp = calc.Add(tmp, calc.Mul(Nu[udegree - k][j], PKL[k, l, uind + j, vind + i]));
+                            tmp = calc.Add(tmp, calc.Mul(Nu[udegree - k][j], PKL[k, l, j, i]));
                         }
                         SKL[k, l] = calc.Add(SKL[k, l], calc.Mul(Nv[vdegree - l][i], tmp));
                     }

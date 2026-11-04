@@ -195,12 +195,20 @@ None left: all of them have been fixed.
   edge, tilted by 1.2 about x, was 0.08 % too small: `CombineConnectedFaces`
   merged the two parts of the sphere across its seam, and the pole edge of
   one part shrank to a point. Faces with a pole edge are no longer combined.
-- [ ] `Solid.Volume` is unstable for the union of the cube with a sphere of
-  radius 3 or 4 on a corner, rotated by 0.7 about (1, 2, 3): 1099.073 at a
-  precision of 1e-6, 1098.999 at 1e-7, 1097.375 at 1e-8, exact 1098.960. The
-  shell is closed (only the pole edges are open) and the difference is
-  exact, so the geometry seems right and the volume integration of these
-  sphere faces is the problem.
+- [x] The union of the cube with a sphere on a corner, rotated by 0.7 about
+  (1, 2, 3), was 1e-4 too large: `Face.ReverseOrientation` kept the arc
+  approximation of a 2d curve close to the pole of the sphere, 0.16 off its
+  edge, because it compared the exact curve with that approximation.
+- [ ] `ShellMetrics.IntegratedVolume` is wrong for sphere faces whose border
+  is a `ProjectedCurve` that passes close to a pole: by 2.8 for the
+  difference of the cube and a sphere of radius 3 on an edge, rotated by 1.2
+  about x, while the tessellated volume of the same faces is right. Only the
+  tests and the boolean sweep use it.
+- [ ] A face triangulation stops refining at 100000 triangles, in the middle
+  of a round of edge splits. A precision that needs more (1e-6 on a sphere of
+  radius 3) then gives a worse mesh than a coarser one, with triangles across
+  half the sphere, and since a face keeps its finest triangulation,
+  `Solid.Volume` afterwards depends on which precision was asked before.
 
 - [ ] `Face.MakeRegularSurface` no longer simplifies exact rational NURBS
   cylinders, cones, spheres and tori, because it maps the edges with the

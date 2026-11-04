@@ -97,7 +97,8 @@ namespace CADability.GeoObject
             private Plane plane;
             public ProjectedCurve(ICurve curve, Plane plane)
             {
-                this.curve = curve;
+                // keep a copy of its own: Reverse reverses this curve, which must not reverse the curve that was projected
+                this.curve = curve.Clone();
                 this.plane = plane;
             }
             protected override void GetTriangulationBasis(out GeoPoint2D[] points, out GeoVector2D[] directions, out double[] parameters)
@@ -139,8 +140,9 @@ namespace CADability.GeoObject
                 ProjectedCurve pc = toCopyFrom as ProjectedCurve;
                 if (pc != null)
                 {
-                    this.curve = pc.curve;
+                    this.curve = pc.curve.Clone();
                     this.plane = pc.plane;
+                    base.ClearTriangulation();
                 }
             }
             #region ISerializable Members

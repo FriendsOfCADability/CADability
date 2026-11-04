@@ -1948,6 +1948,16 @@ namespace CADability
                 InsertLengthEdge(sortededges, toAdd.ToArray());
             }
         }
+        /// <summary>
+        /// The number of triangles at which <see cref="Approximate(bool)"/> stops refining, also when the precision is not reached.
+        /// </summary>
+        private const int MaxTriangles = 100000;
+        /// <summary>
+        /// True, when the refinement stopped at <see cref="MaxTriangles"/> with inner edges still more than ten times the
+        /// deflection from the surface. The refinement goes in rounds over the whole face, so the mesh is then fine in some
+        /// parts and still very coarse in others, much worse than a complete mesh of a coarser precision.
+        /// </summary>
+        public bool ReachedMaxTriangles { get; private set; }
         void Approximate(bool noFlip)
         {
             // wenn eine Fläche periodisch ist, dann darf eine Kante höchstens ein Drittel
@@ -1968,7 +1978,7 @@ namespace CADability
             }
             if (!noFlip) MakeDelaunay(sortededges);
 
-            while (sortededges.Count > 0 && triangle.Count < 100000)
+            while (sortededges.Count > 0 && triangle.Count < MaxTriangles)
             {
                 foreach (Edge edge in sortededges)
                 {
@@ -2026,6 +2036,19 @@ namespace CADability
                 // nur noch die neu entstandenen überprüfen, die anderen sind schon überprüft
                 sortededges.Clear();
                 sortededges.AddRange(toAdd);
+            }
+            if (triangle.Count >= MaxTriangles)
+            {   // stopped before all edges are close enough to the surface? Only far off edges count: a refinement that stopped
+                // in its last rounds is fine, it is the one that stopped half way which leaves triangles across the face
+                foreach (Edge edge in sortededges)
+                {
+                    if (edge.t1 == null || edge.t2 == null) continue;
+                    if (surface.MaxDist(vertex[edge.v1].p2d, vertex[edge.v2].p2d, out GeoPoint2D _) > 10.0 * maxDeflection)
+                    {
+                        ReachedMaxTriangles = true;
+                        break;
+                    }
+                }
             }
             if (!noFlip)
             {

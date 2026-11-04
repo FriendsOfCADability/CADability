@@ -6118,8 +6118,14 @@ namespace CADability.GeoObject
             return polylines.ToArray();
         }
 
+        /// <summary>
+        /// Set by <see cref="Triangulate(double)"/>, when a triangulation stopped at its maximum number of triangles before the
+        /// precision was reached (<see cref="Triangulation.ReachedMaxTriangles"/>).
+        /// </summary>
+        private bool triangulationIncomplete;
         private void Triangulate(double precision)
         {
+            triangulationIncomplete = false;
             SimpleShape ss = Area; // damit es sicher bestimmt ist
                                    // wenn die Fläche Knicke hat, dann entlang der Knicke aufteilen
 
@@ -6383,6 +6389,7 @@ namespace CADability.GeoObject
                     GeoPoint[] tmpTriPoint;
                     int[] tmpTriInd;
                     t.GetSimpleTriangles(out tmpTriUv, out tmpTriPoint, out tmpTriInd, true);
+                    triangulationIncomplete |= t.ReachedMaxTriangles;
                     int tc1 = System.Environment.TickCount - tc0;
                     if (Surface is IRestrictedDomain rd)
                     {   // in this case, where we have self intersecting polygons, the polygon intersection points may be outside the defined area of the surface.
@@ -6479,6 +6486,7 @@ namespace CADability.GeoObject
                         if (!t.innerIntersection)
                         {
                             t.GetSimpleTriangles(out tmpTriUv, out tmpTriPoint, out tmpTriInd, true);
+                            triangulationIncomplete |= t.ReachedMaxTriangles;
                             for (int j = 0; j < tmpTriInd.Length; ++j)
                             {
                                 tmpTriInd[j] += sumTriPoint.Count;
@@ -7017,6 +7025,31 @@ namespace CADability.GeoObject
         /// needs about the same deviation inside the face passes the precision divided by this factor.
         /// </summary>
         internal const double InteriorPrecisionFactor = 5.0;
+        /// <summary>
+        /// True, when the current triangulation stopped at the maximum number of triangles before its precision was reached,
+        /// see <see cref="Triangulation.ReachedMaxTriangles"/>.
+        /// </summary>
+        internal bool TriangulationIncomplete
+        {
+            get
+            {
+                lock (lockTriangulationRecalc) return trianglePoint != null && triangulationIncomplete;
+            }
+        }
+        /// <summary>
+        /// Triangulates this face with <paramref name="precision"/>, also when it has a finer triangulation: the faces of a shell
+        /// must be triangulated with the same precision, so that the meshes fit along their edges (see <see cref="Shell.Volume"/>).
+        /// </summary>
+        internal void Retriangulate(double precision)
+        {
+            lock (lockTriangulationRecalc)
+            {
+                if (surface == null) return;
+                if (trianglePoint != null && trianglePrecision == precision) return;
+                Triangulate(precision);
+                trianglePrecision = precision;
+            }
+        }
         internal void AssureTriangles(double precision)
         {
             lock (lockTriangulationRecalc)
@@ -7031,7 +7064,9 @@ namespace CADability.GeoObject
                                                                   // throw new ApplicationException("internal error"); // darf nicht vorkommen
                 }
                 if (surface == null) return;
-                if (trianglePoint != null && precision >= trianglePrecision / 2.0) return;
+                // a finer triangulation is good for a coarser precision too, unless it stopped at the maximum number of triangles
+                // half way (see Triangulation.ReachedMaxTriangles): then it is worse than one made for the coarser precision
+                if (trianglePoint != null && precision >= trianglePrecision / 2.0 && !(triangulationIncomplete && precision > trianglePrecision * 2.0)) return;
                 Triangulate(precision);
                 trianglePrecision = precision;
                 // triangleOctTree is implemented but not used. Could maybe used in Face.HitTest

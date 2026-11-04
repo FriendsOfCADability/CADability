@@ -431,7 +431,8 @@ namespace CADability.GeoObject
         /// <summary>
         /// Returns the volume of this solid. The calculation is based on a triangulation of the faces with the provided
         /// <paramref name="precision"/> (see <see cref="Face.GetTriangulation"/>: the edges deviate by up to that value, the
-        /// triangles inside the faces by about five times that value).
+        /// triangles inside the faces by about five times that value). When a face cannot be triangulated that finely, a coarser
+        /// precision is used, see <see cref="Shell.Volume(double)"/>.
         /// </summary>
         /// <param name="precision">The precision of the triangulation</param>
         public double Volume(double precision)

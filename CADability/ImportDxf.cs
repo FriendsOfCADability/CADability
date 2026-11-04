@@ -1444,6 +1444,10 @@ namespace CADability.DXF
 
         private IGeoObject CreateInsert(ACadSharp.Entities.Insert insert)
         {
+            // A scale factor of 0 collapses the block and makes the transformation singular.
+            // ACadSharp rejected such inserts while reading up to 3.8.35, so they never arrived here;
+            // since 3.8.36 it keeps them. Skip them as before.
+            if (insert.XScale == 0.0 || insert.YScale == 0.0 || insert.ZScale == 0.0) return null;
             GeoObject.Block block = FindBlock(insert.Block);
             if (block != null && block.Count > 0)
             {

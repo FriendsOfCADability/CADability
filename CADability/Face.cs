@@ -1,4 +1,4 @@
-using CADability.Actions;
+﻿using CADability.Actions;
 using CADability.Attribute;
 using CADability.Curve2D;
 using MathNet.Numerics.LinearAlgebra.Double;
@@ -4187,6 +4187,48 @@ namespace CADability.GeoObject
             area = new SimpleShape(boutline, bholes);
         }
         /// <summary>
+        /// The 2d curves of a loop of this face, connected where they meet at a singularity of the surface, e.g. at the pole of
+        /// a sphere, where every u gives the same point. <see cref="Border"/> connects two curves that do not meet by moving the
+        /// end of the first one to the start of the second one; along a pole that made a straight line from the meridian to some
+        /// u on the pole, across the face, and the domain of the face was wrong (the integrated volume of a sphere cut by a box
+        /// was 2.8 off). This happened with a pole edge whose 2d curve still spanned the u range of the face before it was
+        /// split, and with two meridians that meet at the pole without a pole edge between them. Here a pole edge is moved to
+        /// its neighbours, and a missing piece of the pole is inserted as a line.
+        /// </summary>
+        private ICurve2D[] ConnectAtSingularities(ICurve2D[] curves, Edge[] edges)
+        {
+            double[] us = surface.GetUSingularities(), vs = surface.GetVSingularities();
+            if (curves.Length < 2 || (us.Length == 0 && vs.Length == 0)) return curves;
+            BoundingRect ext = BoundingRect.EmptyBoundingRect;
+            foreach (ICurve2D c in curves) ext.MinMax(c.GetExtent());
+            double tolerance = 1e-9 * Math.Max(1.0, ext.Size);
+            (bool isV, double value) SingularLine(GeoPoint2D a, GeoPoint2D b)
+            {
+                foreach (double v in vs) if (Math.Abs(a.y - v) < tolerance && Math.Abs(b.y - v) < tolerance) return (true, v);
+                foreach (double u in us) if (Math.Abs(a.x - u) < tolerance && Math.Abs(b.x - u) < tolerance) return (false, u);
+                return (false, double.NaN);
+            }
+            int n = curves.Length;
+            for (int i = 0; i < n; i++)
+            {   // a pole edge lies on a singular line: move its ends to the ends of its neighbours, if they lie on that line too
+                if (edges[i].Curve3D != null) continue;
+                GeoPoint2D prev = curves[(i + n - 1) % n].EndPoint, next = curves[(i + 1) % n].StartPoint;
+                if (!double.IsNaN(SingularLine(curves[i].StartPoint, prev).value)) curves[i].StartPoint = prev;
+                if (!double.IsNaN(SingularLine(curves[i].EndPoint, next).value)) curves[i].EndPoint = next;
+            }
+            List<ICurve2D> res = new List<ICurve2D>(n + 2);
+            for (int i = 0; i < n; i++)
+            {
+                res.Add(curves[i]);
+                GeoPoint2D end = curves[i].EndPoint, start = curves[(i + 1) % n].StartPoint;
+                if ((end | start) > tolerance && !double.IsNaN(SingularLine(end, start).value))
+                {   // the curves meet in 3d at the singularity, but at different parameters: the piece of the pole between them
+                    res.Add(new Line2D(end, start));
+                }
+            }
+            return res.ToArray();
+        }
+        /// <summary>
         /// Returns the two dimensional shape of the outline of this face in the parametric (u/v) space of the surface.
         /// </summary>
         public SimpleShape Area
@@ -4204,6 +4246,7 @@ namespace CADability.GeoObject
                     {
                         clonedOutline[i] = outline[i].Curve2D(this).Clone();
                     }
+                    clonedOutline = ConnectAtSingularities(clonedOutline, outline);
                     Border soutline = new Border(out bool reversed, clonedOutline);
                     bool ok = !reversed;
                     int hl = 0;
@@ -4212,10 +4255,13 @@ namespace CADability.GeoObject
                     for (int i = 0; i < hl; i++)
                     {
                         ICurve2D[] clondeHole = new ICurve2D[holes[i].Length];
+                        Edge[] holeEdges = new Edge[holes[i].Length];
                         for (int j = 0; j < holes[i].Length; j++)
                         {
                             clondeHole[holes[i].Length - j - 1] = holes[i][j].Curve2D(this).CloneReverse(true);
+                            holeEdges[holes[i].Length - j - 1] = holes[i][j];
                         }
+                        clondeHole = ConnectAtSingularities(clondeHole, holeEdges);
                         sholes[i] = new Border(out reversed, clondeHole);
                         if (reversed) ok = false;
                     }

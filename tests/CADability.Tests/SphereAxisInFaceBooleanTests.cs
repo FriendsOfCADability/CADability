@@ -1,4 +1,4 @@
-using CADability.Curve2D;
+﻿using CADability.Curve2D;
 using CADability.GeoObject;
 using System.Collections.Generic;
 using System.Linq;
@@ -95,6 +95,40 @@ namespace CADability.Tests
             foreach (Face face in d[0].Shells[0].Faces)
             {   // the pole edge must not have shrunk to a point and become a hole
                 Assert.AreEqual(0, face.HoleCount, "a face of the difference has a hole");
+            }
+        }
+
+        /// <summary>
+        /// The volume integrated over the faces (<see cref="ShellMetrics.IntegratedVolume(Shell)"/>) must be exact, too. It
+        /// uses the 2d domain of each face (<see cref="Face.Area"/>), which ran across the face along a pole: the pole edge of a
+        /// split half sphere still spanned the old u range, or two meridians met at the pole without a pole edge, and
+        /// <see cref="Border"/> joined them with a diagonal line. The difference on an edge, tilted by 1.2, was 2.8 off.
+        /// </summary>
+        [TestMethod]
+        [DataRow(10.0, 5.0, 10.0, 3.0, 1.2, 0.25)]
+        [DataRow(10.0, 5.0, 10.0, 3.0, 0.3, 0.25)]
+        [DataRow(10.0, 5.0, 5.0, 3.0, 0.7, 0.5)]
+        [DataRow(10.0, 10.0, 10.0, 4.0, 1.2, 0.125)]
+        public void IntegratedVolumeAtThePoles(double x, double y, double z, double radius, double angle, double fractionInside)
+        {
+            GeoPoint centre = new GeoPoint(x, y, z);
+            Solid sphere = Make3D.MakeSphere(centre, radius);
+            sphere.Modify(ModOp.Rotate(centre, GeoVector.XAxis, new Angle(angle)));
+            double sphereVolume = 4.0 / 3.0 * Math.PI * radius * radius * radius;
+            double union = 1000 + sphereVolume * (1 - fractionInside);
+            double difference = 1000 - sphereVolume * fractionInside;
+            Solid u = Solid.Unite(Cube(), sphere.Clone() as Solid);
+            Assert.IsNotNull(u);
+            Assert.AreEqual(union, ShellMetrics.IntegratedVolume(u.Shells[0]), 1e-6 * union, "integrated volume of the union");
+            Solid[] d = Solid.Subtract(Cube(), sphere.Clone() as Solid);
+            Assert.AreEqual(1, d.Length);
+            Assert.AreEqual(difference, ShellMetrics.IntegratedVolume(d[0].Shells[0]), 1e-6 * difference, "integrated volume of the difference");
+            foreach (Face face in u.Shells[0].Faces.Concat(d[0].Shells[0].Faces))
+            {   // the 2d domain of a face stays within the half sphere it was cut from
+                if (!(face.Surface is SphericalSurface)) continue;
+                double area = face.Area.Area;
+                Assert.IsTrue(area > 0, "the domain of a face on the sphere is empty");
+                Assert.IsTrue(face.Area.GetExtent().Width <= Math.PI + 1e-9, "the domain of a face is wider than a half sphere");
             }
         }
 

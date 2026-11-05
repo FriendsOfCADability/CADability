@@ -162,12 +162,19 @@ None left: all of them have been fixed.
 
 ## Found while fixing (not yet addressed)
 
-- [ ] Boolean operations still fail in some near-coincident configurations
-  (a sweep of 267 box/cylinder/sphere/fillet configurations for #168: 71
-  remain wrong, 2 crash with a stack overflow or a timeout, all unchanged by
-  the fix). Examples: a box bottom 3e-7 below the tangent plane of a rounded
-  edge, gaps of about 1e-5 (between `Precision.eps` and the BRep precision),
-  and tools 1e6 times smaller than the other solid. Solids touching only in
+- [ ] Boolean operations in near-coincident configurations. The sweep of 267
+  configurations made for #168, with 71 wrong results and 2 crashes, was
+  never part of the repository; `tests/CADability.BooleanSweep` (#453)
+  replaced it and has had no crash or timeout since, now 713 OK and 35
+  documented limitations of 748. Tools much smaller than the other solid: a
+  box of 10000 or 100000 with a box, cylinder or sphere of 1 down to 1e-5
+  on its top face gives the exact result in all four operations, after
+  `PlaneSurface.GetPlaneIntersection` no longer inverts a combined ModOp
+  (it threw for 10000 against 0.0001) and `Shell.Volume` spans its
+  tetrahedra from the middle of a shell far from the origin. The meshes of
+  neighbouring faces do not always meet exactly, so the volume of a closed
+  shell depends slightly on the reference point (up to 2e-8 relative in the
+  sweep). Solids touching only in
   an edge, a line or a point have no union (`Solid.Unite` returns null, the
   result would not be a manifold), and a solid touching the inside of another
   one, where the shells do not cross, cannot be subtracted (the result would

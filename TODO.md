@@ -242,6 +242,11 @@ None left: all of them have been fixed.
   `Triangulation.FlipToDelaunay` leaves them, because a ruling is exact and the
   other diagonal is not. A criterion for how well the triangles cover the
   surface, rather than how far their edges are from it, would catch them.
+- [ ] The DXF writer of ACadSharp needs gigabytes for nested blocks: a
+  document with one line in block L7 and 10 INSERTs of the next level in
+  each of L1 to L6 (10^6 lines when expanded) took 5.7 GB to write a file
+  of 21 KB. Not investigated yet; it probably evaluates the nested inserts
+  recursively. The DXF export of CADability uses this writer.
 - [ ] The DXF writer of ACadSharp writes every handle reference of XData,
   a layer reference (1003) included, as a database handle (1005), see
   `DxfSectionWriterBase.writeExtendedData`. The export therefore writes a

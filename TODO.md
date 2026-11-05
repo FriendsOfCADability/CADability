@@ -216,6 +216,18 @@ None left: all of them have been fixed.
   reparametrisation of `NurbsSurface.GetSimpleSurface`, which cannot follow a
   rational parametrisation. It could recompute the edges from their 3D curves,
   as `Shell.MakeRegularSurfaces` does.
+- [ ] The meshes of neighbouring faces do not always meet exactly after a
+  boolean operation with near-coincident faces, so the volume of the result
+  depends slightly on the point the tetrahedra are spanned from (up to 2e-8
+  relative in the boolean sweep). The cause is the geometry, not the
+  triangulation: when two faces are taken as coincident within the
+  precision (a box 1e-5 beside a face of a long bar), the merged face keeps
+  vertices 1e-5 off its plane, and the 2d curves of a neighbouring face
+  still end where the vertex was before. Moving the mesh points onto the
+  vertices closes the gaps, but tilts the long triangles of the big face:
+  the volume of bar - box became 0.11 off instead of 0.0085. Projecting the
+  merged vertices onto the coincident faces in `BRepOperation` would be the
+  fix.
 - [ ] CADability has no "floating" layer 0 in blocks. The DXF import
   resolves block contents on layer 0 to the layer of the INSERT (#293), so
   they are displayed and hidden like in AutoCAD, but the information is lost:

@@ -6428,7 +6428,7 @@ namespace CADability.GeoObject
                 }
                 // double dbga = this.area.Area;
 #endif
-                Triangulation t = new Triangulation(polylines.ToArray(), surface, precision * InteriorPrecisionFactor, 0.17);
+                CDTriangulation t = new CDTriangulation(polylines.ToArray(), surface, precision * InteriorPrecisionFactor, 0.17);
                 if (!t.innerIntersection)
                 {
                     GeoPoint2D[] tmpTriUv;
@@ -6528,7 +6528,7 @@ namespace CADability.GeoObject
                         GeoPoint2D[] tmpTriUv;
                         GeoPoint[] tmpTriPoint;
                         int[] tmpTriInd;
-                        t = new Triangulation(multiPolyLines[i], surface, precision * InteriorPrecisionFactor, 0.17);
+                        t = new CDTriangulation(multiPolyLines[i], surface, precision * InteriorPrecisionFactor, 0.17);
                         if (!t.innerIntersection)
                         {
                             t.GetSimpleTriangles(out tmpTriUv, out tmpTriPoint, out tmpTriInd, true);
@@ -6860,7 +6860,7 @@ namespace CADability.GeoObject
                     esum += polylines[j].Length;
                     edgeIndizes[j] = esum;
                 }
-                Triangulation t = new Triangulation(polylines.ToArray(), surface, precision * InteriorPrecisionFactor, 0.17);
+                CDTriangulation t = new CDTriangulation(polylines.ToArray(), surface, precision * InteriorPrecisionFactor, 0.17);
                 // Genauigkeit für innere Punkte nur halbsoviel wie für den Rand, dort fallen die Knicke nicht so auf
                 GeoPoint2D[] innerPoints = null;
                 if (surface is NurbsSurface)
@@ -6922,7 +6922,7 @@ namespace CADability.GeoObject
                             GeoPoint2D[] tmpTriUv;
                             GeoPoint[] tmpTriPoint;
                             int[] tmpTriInd;
-                            Triangulation t = new Triangulation(multiPolyLines[i], surface, precision * InteriorPrecisionFactor, 0.17);
+                            CDTriangulation t = new CDTriangulation(multiPolyLines[i], surface, precision * InteriorPrecisionFactor, 0.17);
                             GeoPoint2D[] innerPoints = null;
                             if (surface is NurbsSurface)
                             {

@@ -246,8 +246,20 @@ None left: all of them have been fixed.
   precision of a thousandth of its size: long thin triangles along the rulings
   overlap their neighbours while their edges stay within the deflection.
   `Triangulation.FlipToDelaunay` leaves them, because a ruling is exact and the
-  other diagonal is not. A criterion for how well the triangles cover the
-  surface, rather than how far their edges are from it, would catch them.
+  other diagonal is not. Measured again against the integrated area: 2.9 %
+  too large at 1e-3 for an ellipse ruled to a turned circle, and 14 to 71 %
+  at 1e-2 to 1e-3 for a flat band (height 5, radius 50) twisted by 1.2 rad,
+  whose height is within the inner deflection (5 times the precision), so
+  any triangle passes. Comparing the area of each triangle with the area of
+  the surface over its parameter triangle catches them, but does not help:
+  the triangles at the border cannot get better than their border edge,
+  which is never split, so splitting their other edges only made slivers
+  (up to 214000 triangles instead of 1000), and without them nothing
+  changed at coarse precisions. The cause is the border: the points on the
+  spline edges follow the curvature of the curves, not the twist of the
+  rulings between them. A fix needs the edges of ruled faces sampled by the
+  twist (the same points for both faces of an edge) or a structured
+  triangulation along the rulings.
 - [ ] The DXF writer of ACadSharp writes every handle reference of XData,
   a layer reference (1003) included, as a database handle (1005), see
   `DxfSectionWriterBase.writeExtendedData`. The export therefore writes a

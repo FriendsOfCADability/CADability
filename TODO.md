@@ -171,20 +171,20 @@ None left: all of them have been fixed.
   on its top face gives the exact result in all four operations, after
   `PlaneSurface.GetPlaneIntersection` no longer inverts a combined ModOp
   (it threw for 10000 against 0.0001) and `Shell.Volume` spans its
-  tetrahedra from the middle of a shell far from the origin. The meshes of
-  neighbouring faces do not always meet exactly, so the volume of a closed
-  shell depends slightly on the reference point (up to 2e-8 relative in the
-  sweep). Solids touching only in
+  tetrahedra from the middle of a shell far from the origin (why the volume
+  of the results still depends slightly on that point, see the entry on the
+  meshes of neighbouring faces below). Solids touching only in
   an edge, a line or a point have no union (`Solid.Unite` returns null, the
   result would not be a manifold), and a solid touching the inside of another
   one, where the shells do not cross, cannot be subtracted (the result would
   have a cavity touching the hull; the other solid is returned unchanged). A
   solid inside another one without touching it becomes a cavity (#416), but
   the boolean operations take only the outer shell of a solid into account.
-  Unions of spheres with offset axes measure 0.03 to 0.05 % too small or too
-  large, while both differences are exact. In the union, the hole edges of the merged faces
-  have `Path2D` curves, and these faces triangulate to a slightly smaller area
-  than the same faces in the differences; not yet investigated further.
+  The unions of spheres with offset axes, which measured 0.03 to 0.05 % off,
+  are exact since the sphere fixes of #525 to #528 (3.7e-6 for the
+  triangulation at 1e-4, below 1e-6 integrated); `SphereBooleanTests` checks
+  them to 1e-4 (triangulated at 1e-3) and 2e-6 (integrated) now instead of
+  2e-3.
 - [x] A cube of 10 and a sphere whose axis lies in a face of the cube had
   neither a union nor a difference: the sphere of radius 3 centred on the
   middle of an edge, (10, 5, 10), and the sphere of radius 4 centred on a
@@ -218,11 +218,24 @@ None left: all of them have been fixed.
   coarser precision, and `Shell.Volume` retriangulates coarser while a face is
   incomplete. The cap itself stays.
 
-- [ ] `Face.MakeRegularSurface` no longer simplifies exact rational NURBS
+- [x] `Face.MakeRegularSurface` did not simplify exact rational NURBS
   cylinders, cones, spheres and tori, because it maps the edges with the
   reparametrisation of `NurbsSurface.GetSimpleSurface`, which cannot follow a
-  rational parametrisation. It could recompute the edges from their 3D curves,
-  as `Shell.MakeRegularSurfaces` does.
+  rational parametrisation. It now recomputes the 2d curves from the 3D
+  curves of the edges, as `Shell.MakeRegularSurfaces` does, and puts a pole
+  edge on the singular line; faces with a seam are still left as they are.
+- [ ] The meshes of neighbouring faces do not always meet exactly after a
+  boolean operation with near-coincident faces, so the volume of the result
+  depends slightly on the point the tetrahedra are spanned from (up to 2e-8
+  relative in the boolean sweep). The cause is the geometry, not the
+  triangulation: when two faces are taken as coincident within the
+  precision (a box 1e-5 beside a face of a long bar), the merged face keeps
+  vertices 1e-5 off its plane, and the 2d curves of a neighbouring face
+  still end where the vertex was before. Moving the mesh points onto the
+  vertices closes the gaps, but tilts the long triangles of the big face:
+  the volume of bar - box became 0.11 off instead of 0.0085. Projecting the
+  merged vertices onto the coincident faces in `BRepOperation` would be the
+  fix.
 - [ ] CADability has no "floating" layer 0 in blocks. The DXF import
   resolves block contents on layer 0 to the layer of the INSERT (#293), so
   they are displayed and hidden like in AutoCAD, but the information is lost:
@@ -240,8 +253,31 @@ None left: all of them have been fixed.
   precision of a thousandth of its size: long thin triangles along the rulings
   overlap their neighbours while their edges stay within the deflection.
   `Triangulation.FlipToDelaunay` leaves them, because a ruling is exact and the
-  other diagonal is not. A criterion for how well the triangles cover the
-  surface, rather than how far their edges are from it, would catch them.
+  other diagonal is not. Measured again against the integrated area: 2.9 %
+  too large at 1e-3 for an ellipse ruled to a turned circle, and 14 to 71 %
+  at 1e-2 to 1e-3 for a flat band (height 5, radius 50) twisted by 1.2 rad,
+  whose height is within the inner deflection (5 times the precision), so
+  any triangle passes. Comparing the area of each triangle with the area of
+  the surface over its parameter triangle catches them, but does not help:
+  the triangles at the border cannot get better than their border edge,
+  which is never split, so splitting their other edges only made slivers
+  (up to 214000 triangles instead of 1000), and without them nothing
+  changed at coarse precisions. The cause is the border: the points on the
+  spline edges follow the curvature of the curves, not the twist of the
+  rulings between them. A fix needs the edges of ruled faces sampled by the
+  twist (the same points for both faces of an edge) or a structured
+  triangulation along the rulings.
+  The same geometry as a NURBS of degree (3, 1), the form in which STEP files
+  bring ruled faces, triangulates with exactly the same errors, so the
+  problem is not limited to `Make3D.MakeRuledShell`. Developable faces, the
+  only ones a sheet metal part can have, are hardly affected (0.1 to 0.3 %
+  for a transition with little twist, cones are fine), and an unfolding would
+  be computed from the exact surfaces anyway, not from the triangulation.
+  ShapeIt's `CDTriangulation` fixes the ruled faces (0.06 to 0.3 % at 1e-3),
+  but as a drop-in replacement in master (branch
+  `claude/cdtriangulation-trial`) a sphere became 9.2 % too large at 1e-3,
+  13 kernel tests failed and one hung. Deferred until it is decided whether
+  the kernels of CADability and ShapeIt are merged.
 - [ ] The DXF writer of ACadSharp needs gigabytes for nested blocks: a
   document with one line in block L7 and 10 INSERTs of the next level in
   each of L1 to L6 (10^6 lines when expanded) took 5.7 GB to write a file
@@ -281,8 +317,10 @@ ad7062c4). The small fixes up to then are ported in
 - [ ] Not portable on their own: fillets and chamfers of solid edges
   (`BlendEdges`, `RoundEdges`, `ChamferEdges`, `PipeContactCurve`,
   `SweptCircleSurface`; master's `BRepOperation.ChamferEdges` always returns
-  null), `MakeHollow`, the parallel edge/face intersections of the boolean
-  operation and `CDTriangulation`. They depend on ShapeIt's rewritten
+  null), `MakeHollow` and the parallel edge/face intersections of the boolean
+  operation. (`CDTriangulation` has the interface of `Triangulation` and only
+  uses `ISurface`, but it needs more than the class itself, see the ruled
+  faces above.) They depend on ShapeIt's rewritten
   `BooleanOperation`, `ISurface.Domain` and `ParallelepipedHull`, about 18,000
   lines; this needs a decision whether the kernels are merged.
 

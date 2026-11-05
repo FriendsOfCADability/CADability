@@ -8955,6 +8955,52 @@ namespace CADability.GeoObject
                     SimpleShape forceArea = Area;
                     return true;
                 }
+                // An exact rational NURBS cylinder, cone, sphere or torus does not run linearly with the angle, so no ModOp2D maps
+                // its parameters to those of the simple surface: the 2d curves are recomputed from the 3d curves of the edges, as
+                // Shell.MakeRegularSurfaces does. An edge without a 3d curve (a pole) becomes the line on the singular line of the
+                // new surface between its neighbours. Not for seams, which have two 2d curves on this face.
+                if (AllEdges.All(e => e.PrimaryFace != e.SecondaryFace)
+                    && (surface as NurbsSurface).GetSimpleSurface(maxError, out simpleSurface, out modify, true))
+                {
+                    ISurface original = surface;
+                    // the 2d curves as they are stored, to restore them when the projection fails
+                    List<(Edge edge, bool primary, ICurve2D curve)> previous = new List<(Edge, bool, ICurve2D)>();
+                    foreach (Edge edge in AllEdges) previous.Add((edge, edge.PrimaryFace == this, edge.PrimaryFace == this ? edge.PrimaryCurve2D : edge.SecondaryCurve2D));
+                    try
+                    {
+                        this.surface = simpleSurface;
+                        foreach (Edge edge in AllEdges) edge.RecalcCurve2D(this); // does nothing for a pole
+                        foreach (Edge[] loop in new[] { outline }.Concat(holes ?? new Edge[0][]))
+                        {
+                            for (int i = 0; i < loop.Length; i++)
+                            {
+                                if (loop[i].Curve3D != null) continue;
+                                Edge before = loop[(i + loop.Length - 1) % loop.Length], after = loop[(i + 1) % loop.Length];
+                                if (before.Curve3D == null || after.Curve3D == null) throw new ApplicationException("two poles in a row");
+                                // the stored 2d curves run in the direction of the loop
+                                Line2D pole = new Line2D(before.Curve2D(this).EndPoint, after.Curve2D(this).StartPoint);
+                                if (loop[i].PrimaryFace == this) loop[i].PrimaryCurve2D = pole;
+                                else loop[i].SecondaryCurve2D = pole;
+                            }
+                        }
+                        CheckPeriodic();
+                        this.area = null;
+                        SimpleShape forceArea = Area;
+                        if (forceArea != null) return true;
+                    }
+                    catch (Exception ex) when (!(ex is System.Threading.ThreadAbortException))
+                    {
+                        System.Diagnostics.Trace.WriteLine("MakeRegularSurface: the edges could not be projected onto the " + simpleSurface.GetType().Name + ": " + ex.Message);
+                    }
+                    // keep the face as it was
+                    this.surface = original;
+                    foreach ((Edge edge, bool primary, ICurve2D curve) in previous)
+                    {
+                        if (primary) edge.PrimaryCurve2D = curve;
+                        else edge.SecondaryCurve2D = curve;
+                    }
+                    this.area = null;
+                }
             }
             return false;
         }

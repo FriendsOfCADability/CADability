@@ -174,10 +174,10 @@ None left: all of them have been fixed.
   have a cavity touching the hull; the other solid is returned unchanged). A
   solid inside another one without touching it becomes a cavity (#416), but
   the boolean operations take only the outer shell of a solid into account.
-  Unions of spheres with offset axes measure 0.03 to 0.05 % too small or too
-  large, while both differences are exact. In the union, the hole edges of the merged faces
-  have `Path2D` curves, and these faces triangulate to a slightly smaller area
-  than the same faces in the differences; not yet investigated further.
+  The unions of spheres with offset axes, which measured 0.03 to 0.05 % off,
+  are exact since the sphere fixes of #525 to #528 (3.7e-6 for the
+  triangulation at 1e-4, below 1e-6 integrated); `SphereBooleanTests` checks
+  them to 1e-5 now instead of 2e-3.
 - [x] A cube of 10 and a sphere whose axis lies in a face of the cube had
   neither a union nor a difference: the sphere of radius 3 centred on the
   middle of an edge, (10, 5, 10), and the sphere of radius 4 centred on a

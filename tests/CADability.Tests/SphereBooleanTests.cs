@@ -1,4 +1,5 @@
 using CADability.GeoObject;
+using System.Linq;
 
 namespace CADability.Tests
 {
@@ -29,11 +30,16 @@ namespace CADability.Tests
             return task.Result;
         }
 
+        /// <summary>
+        /// The volume of the triangulation at 1e-3 must be right to 1e-4, the integrated volume to 2e-6. The unions of spheres
+        /// with offset axes were 0.03 to 0.05 % off, which the old tolerance of 2e-3 did not notice.
+        /// </summary>
         private static void AssertSolid(Solid solid, double volume, string what)
         {
             Assert.IsNotNull(solid, what);
             Assert.AreEqual(0, solid.Shells[0].OpenEdgesExceptPoles.Length, what + ": open edges");
-            Assert.AreEqual(volume, solid.Volume(1e-2), volume * 2e-3, what);
+            Assert.AreEqual(volume, solid.Volume(1e-3), volume * 1e-4, what + ": volume");
+            Assert.AreEqual(volume, solid.Shells.Sum(sh => ShellMetrics.IntegratedVolume(sh)), volume * 2e-6, what + ": integrated volume");
         }
 
         [DataTestMethod]

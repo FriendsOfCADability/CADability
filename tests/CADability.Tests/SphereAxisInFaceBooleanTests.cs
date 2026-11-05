@@ -126,7 +126,7 @@ namespace CADability.Tests
             }
             double sphereVolume = 4.0 / 3.0 * Math.PI * radius * radius * radius;
             double expected = 1000 + sphereVolume * 7.0 / 8.0;
-            Assert.AreEqual(expected, union.Volume(1e-6), 3e-5 * expected, "volume of the union");
+            Assert.AreEqual(expected, union.Volume(1e-4), 3e-5 * expected, "volume of the union");
         }
 
         /// <summary>

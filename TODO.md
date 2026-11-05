@@ -260,6 +260,17 @@ None left: all of them have been fixed.
   rulings between them. A fix needs the edges of ruled faces sampled by the
   twist (the same points for both faces of an edge) or a structured
   triangulation along the rulings.
+  The same geometry as a NURBS of degree (3, 1), the form in which STEP files
+  bring ruled faces, triangulates with exactly the same errors, so the
+  problem is not limited to `Make3D.MakeRuledShell`. Developable faces, the
+  only ones a sheet metal part can have, are hardly affected (0.1 to 0.3 %
+  for a transition with little twist, cones are fine), and an unfolding would
+  be computed from the exact surfaces anyway, not from the triangulation.
+  ShapeIt's `CDTriangulation` fixes the ruled faces (0.06 to 0.3 % at 1e-3),
+  but as a drop-in replacement in master (branch
+  `claude/cdtriangulation-trial`) a sphere became 9.2 % too large at 1e-3,
+  13 kernel tests failed and one hung. Deferred until it is decided whether
+  the kernels of CADability and ShapeIt are merged.
 - [ ] The DXF writer of ACadSharp writes every handle reference of XData,
   a layer reference (1003) included, as a database handle (1005), see
   `DxfSectionWriterBase.writeExtendedData`. The export therefore writes a
@@ -289,8 +300,10 @@ ad7062c4). The small fixes up to then are ported in
 - [ ] Not portable on their own: fillets and chamfers of solid edges
   (`BlendEdges`, `RoundEdges`, `ChamferEdges`, `PipeContactCurve`,
   `SweptCircleSurface`; master's `BRepOperation.ChamferEdges` always returns
-  null), `MakeHollow`, the parallel edge/face intersections of the boolean
-  operation and `CDTriangulation`. They depend on ShapeIt's rewritten
+  null), `MakeHollow` and the parallel edge/face intersections of the boolean
+  operation. (`CDTriangulation` has the interface of `Triangulation` and only
+  uses `ISurface`, but it needs more than the class itself, see the ruled
+  faces above.) They depend on ShapeIt's rewritten
   `BooleanOperation`, `ISurface.Domain` and `ParallelepipedHull`, about 18,000
   lines; this needs a decision whether the kernels are merged.
 

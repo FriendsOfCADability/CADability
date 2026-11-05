@@ -64,6 +64,27 @@ namespace CADability.DXF
         /// <see cref="Attribute.DimensionStyle.SameData"/> compares as well.
         /// </summary>
         private List<(Attribute.DimensionStyle pristine, Attribute.DimensionStyle used)> importedDimensionStyles;
+        /// <summary>
+        /// The default of the setting "DxfDwg.MaxImportObjects", see <see cref="maxImportObjects"/>. An imported object takes
+        /// about 650 bytes, and up to 1.6 KB while the blocks are copied, so this allows about 1.6 GB.
+        /// </summary>
+        internal const int DefaultMaxImportObjects = 1000000;
+        /// <summary>
+        /// The most objects the INSERTs of a drawing may create, from the setting "DxfDwg.MaxImportObjects". Every INSERT gets
+        /// its own copy of the block, so nested blocks multiply: a file of a few KB with 10 INSERTs per level over 8 levels
+        /// expands to 10^8 objects and exhausted the memory. When the copies exceed this number, the import stops with a
+        /// <see cref="DxfImportLimitException"/>.
+        /// </summary>
+        private long maxImportObjects;
+        /// <summary>
+        /// The number of objects all INSERTs and DIMENSIONs have created so far, see <see cref="maxImportObjects"/>.
+        /// </summary>
+        private long expandedObjects;
+        /// <summary>
+        /// The number of objects in each copy of a block made by <see cref="CopyBlock"/>, so that a block containing such
+        /// copies is counted without visiting all their contents again.
+        /// </summary>
+        private Dictionary<IGeoObject, long> copiedBlockSizes;
 
         /// <summary>
         /// Reads the DXF file <paramref name="fileName"/> with ACadSharp. The file is read into memory first; when its OBJECTS
@@ -380,7 +401,7 @@ namespace CADability.DXF
                     empty++;
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!IsFatal(ex))
             {
                 System.Diagnostics.Trace.WriteLine("dxf: failed to import " + item.GetType().Name + " (handle " + item.Handle.ToString("X") + "): " + ex.Message);
                 failed++;
@@ -464,6 +485,10 @@ namespace CADability.DXF
             layerTable = new Dictionary<string, Attribute.Layer>();
             importedDimensionStyles = new List<(Attribute.DimensionStyle, Attribute.DimensionStyle)>();
             dimensionsAsDimension = Settings.GlobalSettings.GetIntValue("DxfDwg.ImportDimension", 0) == 1;
+            maxImportObjects = Settings.GlobalSettings.GetIntValue("DxfDwg.MaxImportObjects", DefaultMaxImportObjects);
+            if (maxImportObjects <= 0) maxImportObjects = DefaultMaxImportObjects;
+            expandedObjects = 0;
+            copiedBlockSizes = new Dictionary<IGeoObject, long>(new ReferenceComparer());
             foreach (var item in doc.Layers)
             {
                 Attribute.Layer layer = project.LayerList.CreateOrFind(item.Name);
@@ -863,7 +888,7 @@ namespace CADability.DXF
                             IGeoObject go = GeoObjectFromEntity(ent);
                             if (go != null) found.Add(go);
                         }
-                        catch (Exception ex)
+                        catch (Exception ex) when (!IsFatal(ex))
                         {
                             // One unreadable entity must not cost the whole block, the same choice
                             // ConvertAndAdd makes for the model space. Letting the exception through
@@ -1451,7 +1476,7 @@ namespace CADability.DXF
             GeoObject.Block block = FindBlock(insert.Block);
             if (block != null && block.Count > 0)
             {
-                IGeoObject res = block.Clone();
+                IGeoObject res = CopyBlock(block);
                 ModOp transform = ModOp.Translate(GeoVector(insert.InsertPoint)) *
                     ModOp.Rotate(CADability.GeoVector.ZAxis, new SweepAngle(insert.Rotation)) *
                     ModOp.Scale(insert.XScale, insert.YScale, insert.ZScale) *
@@ -1461,6 +1486,44 @@ namespace CADability.DXF
                 return res;
             }
             return null;
+        }
+
+        /// <summary>
+        /// A copy of the block definition <paramref name="block"/> for one INSERT or DIMENSION, counted against
+        /// <see cref="maxImportObjects"/> before it is made.
+        /// </summary>
+        private GeoObject.Block CopyBlock(GeoObject.Block block)
+        {
+            long size = ObjectCount(block);
+            expandedObjects += size;
+            if (expandedObjects > maxImportObjects) throw new DxfImportLimitException(maxImportObjects);
+            GeoObject.Block res = (GeoObject.Block)block.Clone();
+            copiedBlockSizes[res] = size;
+            return res;
+        }
+
+        /// <summary>
+        /// The number of objects <paramref name="go"/> consists of: 1 for a simple object, a block counts itself and its
+        /// contents. Copies made by <see cref="CopyBlock"/> are looked up instead of counted again.
+        /// </summary>
+        private long ObjectCount(IGeoObject go)
+        {
+            if (copiedBlockSizes.TryGetValue(go, out long known)) return known;
+            if (!(go is GeoObject.Block blk)) return 1;
+            long res = 1;
+            for (int i = 0; i < blk.Count; i++) res += ObjectCount(blk.Child(i));
+            return res;
+        }
+
+        /// <summary>
+        /// Exceptions that must stop the whole import, which the handlers for a single entity let through.
+        /// </summary>
+        private static bool IsFatal(Exception ex) => ex is DxfImportLimitException || ex is OutOfMemoryException;
+
+        private sealed class ReferenceComparer : IEqualityComparer<IGeoObject>
+        {
+            public bool Equals(IGeoObject x, IGeoObject y) => ReferenceEquals(x, y);
+            public int GetHashCode(IGeoObject obj) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj);
         }
 
         private static string DescribeColor(ACadSharp.Color color)
@@ -1978,7 +2041,7 @@ namespace CADability.DXF
             }
             GeoObject.Block block = FindBlock(blockRec, true);
             if (block == null || block.Count == 0) return null;
-            GeoObject.Block res = (GeoObject.Block)block.Clone();
+            GeoObject.Block res = CopyBlock(block);
             ResolveLayerZero(res, dimension);
             SetDimensionUserData(res, dimension);
             return res;
@@ -2788,5 +2851,18 @@ namespace CADability.DXF
         /// The import is finished or has failed; a progress display can be hidden.
         /// </summary>
         void SetCompleted();
+    }
+
+    /// <summary>
+    /// Thrown by the DXF/DWG import when the INSERTs of the drawing would create more objects than the setting
+    /// "DxfDwg.MaxImportObjects" allows (1,000,000 by default). Every INSERT gets its own copy of its block, so nested blocks
+    /// multiply, and a small or crafted file could exhaust the memory.
+    /// </summary>
+    internal class DxfImportLimitException : ApplicationException
+    {
+        public DxfImportLimitException(long limit)
+            : base("The drawing expands to more than " + limit.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                  + " objects through its nested blocks and is not imported (setting DxfDwg.MaxImportObjects).")
+        { }
     }
 }

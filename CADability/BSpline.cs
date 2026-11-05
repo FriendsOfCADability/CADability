@@ -1,4 +1,4 @@
-using CADability.Attribute;
+﻿using CADability.Attribute;
 using CADability.Curve2D;
 using CADability.UserInterface;
 using System;
@@ -3794,7 +3794,7 @@ namespace CADability.GeoObject
             }
         }
 
-        internal BSpline SetCyclicalStartPoint(double pos)
+        public BSpline SetCyclicalStartPoint(double pos)
         {
             double par = startParam + pos * (endParam - startParam);
             BSpline[] parts = SplitParam(par);

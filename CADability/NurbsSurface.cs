@@ -840,7 +840,7 @@ namespace CADability.GeoObject
         {
             return nurbs;
         }
-        internal void SetPeriodic(bool uperiodic, bool vperiodic)
+        public void SetPeriodic(bool uperiodic, bool vperiodic)
         {   // es scheint so, als sollte man so mit den NURBS umgehen: sie sind immer "clamped", periodic zeigt nur, dass der Parameter
             // ggf. um die Periode versetzt werden muss, um den richtigen Wert zu liefern.
             // diese Methode wird nur nach dem Konstruktor aufgerufen

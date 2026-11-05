@@ -66,7 +66,7 @@ namespace CADability
     /// Describes an edge as imported from a step file. The edge may be decomposed into multiple edges for CADability faces
     /// in case of periodic faces.
     /// </summary>
-    internal class StepEdgeDescriptor
+    public class StepEdgeDescriptor
     {
 #if DEBUG
         public int stepDefiningIndex;
@@ -2173,7 +2173,7 @@ namespace CADability
             //}
         }
 
-        internal void SetSecondary(Face secondaryFace, ICurve2D curveOnSecondaryFace, bool forwardOnSecondaryFace)
+        public void SetSecondary(Face secondaryFace, ICurve2D curveOnSecondaryFace, bool forwardOnSecondaryFace)
         {
 #if DEBUG
             if (hashCode == 1469 || hashCode == 1468)
@@ -3695,7 +3695,7 @@ namespace CADability
             }
         }
 
-        internal void SetVertices(Vertex vertex1, Vertex vertex2)
+        public void SetVertices(Vertex vertex1, Vertex vertex2)
         {
             if (v1 != null) v1.RemoveEdge(this);
             v1 = vertex1;

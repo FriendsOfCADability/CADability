@@ -308,7 +308,7 @@ namespace CADability.GeoObject
         /// <param name="precision">precision for comparing the geometry of the edge curves, used to detect and remove duplicate
         /// or opposite edges in a loop</param>
         /// <returns></returns>
-        internal static Face[] MakeFacesFromStepAdvancedFace(ISurface surface, List<List<StepEdgeDescriptor>> loops, bool sameSense, double precision)
+        public static Face[] MakeFacesFromStepAdvancedFace(ISurface surface, List<List<StepEdgeDescriptor>> loops, bool sameSense, double precision)
         {
             List<object> toLock = new List<object>();
             if (Settings.GlobalSettings.GetBoolValue("StepImport.Parallel", false))

@@ -1,4 +1,4 @@
-using CADability.GeoObject;
+﻿using CADability.GeoObject;
 using System;
 using System.Collections.Generic;
 
@@ -268,6 +268,49 @@ namespace CADability.Tests
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Face.MakeRegularSurface did not simplify an exact rational NURBS, because no ModOp2D maps its parameters to those of
+        /// the simple surface. It now recomputes the 2d curves from the 3d curves of the edges: the face gets the cylinder, cone,
+        /// sphere or torus, its edges lie on it, and its area stays the same.
+        /// </summary>
+        [TestMethod]
+        public void MakeRegularSurface_RationalNurbsFace_GetsTheSimpleSurface()
+        {
+            List<string> tested = new List<string>();
+            foreach ((string name, NurbsSurface ns, Type shape) in RationalSurfaces())
+            {
+                ns.GetNaturalBounds(out double umin, out double umax, out double vmin, out double vmax);
+                Face face = Face.MakeFace(ns, new CADability.Shapes.SimpleShape(CADability.Shapes.Border.MakeRectangle(umin, umax, vmin, vmax)));
+                double size = SizeOf(ns);
+                double areaBefore = TriangulatedArea(face, size * 1e-4);
+                Assert.IsTrue(face.MakeRegularSurface(size * 1e-6), name + ": not simplified");
+                Assert.IsInstanceOfType(face.Surface, shape, name);
+                foreach (Edge edge in face.AllEdges.Where(e => e.Curve3D != null))
+                {
+                    CADability.Curve2D.ICurve2D c2d = edge.Curve2D(face);
+                    for (int i = 0; i <= 10; i++)
+                    {
+                        GeoPoint p = face.Surface.PointAt(c2d.PointAt(i / 10.0));
+                        Assert.IsTrue(edge.Curve3D.DistanceTo(p) < size * 1e-6, $"{name}: an edge is {edge.Curve3D.DistanceTo(p)} off its 2d curve");
+                    }
+                }
+                Assert.AreEqual(areaBefore, TriangulatedArea(face, size * 1e-4), areaBefore * 1e-4, name + ": area");
+                tested.Add(name);
+            }
+            Assert.AreEqual(6, tested.Count, "tested: " + string.Join(", ", tested));
+        }
+
+        private static double TriangulatedArea(Face face, double precision)
+        {
+            face.GetTriangulation(precision, out GeoPoint[] points, out GeoPoint2D[] _, out int[] triangles, out BoundingCube _);
+            double area = 0.0;
+            for (int i = 0; i < triangles.Length; i += 3)
+            {
+                area += ((points[triangles[i + 1]] - points[triangles[i]]) ^ (points[triangles[i + 2]] - points[triangles[i]])).Length / 2.0;
+            }
+            return area;
         }
 
         /// <summary>

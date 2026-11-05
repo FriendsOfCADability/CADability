@@ -211,11 +211,12 @@ None left: all of them have been fixed.
   coarser precision, and `Shell.Volume` retriangulates coarser while a face is
   incomplete. The cap itself stays.
 
-- [ ] `Face.MakeRegularSurface` no longer simplifies exact rational NURBS
+- [x] `Face.MakeRegularSurface` did not simplify exact rational NURBS
   cylinders, cones, spheres and tori, because it maps the edges with the
   reparametrisation of `NurbsSurface.GetSimpleSurface`, which cannot follow a
-  rational parametrisation. It could recompute the edges from their 3D curves,
-  as `Shell.MakeRegularSurfaces` does.
+  rational parametrisation. It now recomputes the 2d curves from the 3D
+  curves of the edges, as `Shell.MakeRegularSurfaces` does, and puts a pole
+  edge on the singular line; faces with a seam are still left as they are.
 - [ ] The meshes of neighbouring faces do not always meet exactly after a
   boolean operation with near-coincident faces, so the volume of the result
   depends slightly on the point the tetrahedra are spanned from (up to 2e-8

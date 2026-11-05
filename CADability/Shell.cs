@@ -355,14 +355,31 @@ namespace CADability.GeoObject
         public double Volume(double precision)
         {
             Face[] shellFaces = Faces;
-            double volume = SignedVolume(shellFaces, precision);
+            // For a shell far from the origin the tetrahedra are spanned from a point in its middle: from the origin, a box of
+            // 0.0001 at 5000 summed terms of about 1e11 to 1e-12, far below what a double can resolve, and the volume came out
+            // as 1.5e-5. Otherwise the origin is kept: the meshes of neighbouring faces do not always meet exactly, and the
+            // small gaps make the volume depend slightly on the reference point (up to 2e-8 relative in the boolean sweep).
+            GeoPoint reference = VolumeReference();
+            double volume = SignedVolume(shellFaces, precision, reference);
             for (int attempt = 0; attempt < 6 && shellFaces.Any(f => f.TriangulationIncomplete); attempt++)
             {   // all faces with the same precision, so that their meshes fit along the edges
                 precision *= 10.0;
                 foreach (Face face in shellFaces) face.Retriangulate(precision);
-                volume = SignedVolume(shellFaces, precision);
+                volume = SignedVolume(shellFaces, precision, reference);
             }
             return volume;
+        }
+        /// <summary>
+        /// The point the volume tetrahedra are spanned from: the centre of the box around the vertices of this shell when it is
+        /// more than a hundred times its size away from the origin, otherwise the origin.
+        /// </summary>
+        private GeoPoint VolumeReference()
+        {
+            BoundingCube ext = BoundingCube.EmptyBoundingCube;
+            foreach (Vertex vertex in Vertices) ext.MinMax(vertex.Position);
+            if (ext.IsEmpty) return GeoPoint.Origin;
+            GeoPoint center = ext.GetCenter();
+            return (center | GeoPoint.Origin) > 100.0 * ext.Size ? center : GeoPoint.Origin;
         }
         /// <summary>
         /// Computes the signed volume enclosed by the provided faces. The faces must form a closed shell, otherwise the

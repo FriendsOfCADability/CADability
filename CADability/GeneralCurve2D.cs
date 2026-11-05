@@ -1934,6 +1934,8 @@ namespace CADability.Curve2D
 				dc.Add(l2d, System.Drawing.Color.Blue, i);
 			}
 #endif
+			// segment pairs which produced a crossing; the search for touching points skips them
+			HashSet<(int, int)> crossingPairs = new HashSet<(int, int)>();
 			for (int i = 0; i < pts1.Length - 1; ++i)
 			{
 				for (int j = 0; j < pts2.Length - 1; ++j)
@@ -1945,13 +1947,216 @@ namespace CADability.Curve2D
 						if (curve1.IsValidParameter(gpwp[k].par1) && curve2.IsValidParameter(gpwp[k].par2))
 						{
 							res.Add(gpwp[k]);
+							crossingPairs.Add((i, j));
 						}
 					}
 				}
 			}
-			// ggf noch nachbessern wie in GeneralCurve2D
+			MergeMultipleContacts(curve1, curve2, Precision.eps, res);
+			AddTouchingPoints(curve1, curve2, crossingPairs, Precision.eps, res);
 
 			return res.ToArray();
+		}
+
+		/// <summary>
+		/// Adds the points where <paramref name="curve1"/> and <paramref name="curve2"/> touch each other, i.e. come
+		/// closer than <paramref name="tolerance"/> without crossing.
+		/// <para>
+		/// The triangle intersection in <see cref="CheckTriangleIntersect"/> only finds crossings: it relies on the
+		/// two chords intersecting once the triangles are small enough. At a tangential contact the curves stay on
+		/// the same side of each other, so the chords never intersect and the subdivision ends without a result -
+		/// also when a short curve ends on the other one and lies completely inside one of its hull triangles.
+		/// Here the closest approach of each pair of segments whose hulls come close enough is computed instead,
+		/// which is the same for a crossing and for a contact. Pairs which already produced a crossing are skipped.
+		/// </para>
+		/// </summary>
+		private static void AddTouchingPoints(GeneralCurve2D curve1, GeneralCurve2D curve2, HashSet<(int, int)> crossingPairs, double tolerance, List<GeoPoint2DWithParameter> res)
+		{
+			BoundingRect[] hulls1 = curve1.SegmentHulls(tolerance);
+			BoundingRect[] hulls2 = curve2.SegmentHulls(tolerance);
+			for (int i = 0; i < hulls1.Length; ++i)
+			{
+				for (int j = 0; j < hulls2.Length; ++j)
+				{
+					if (crossingPairs.Contains((i, j))) continue;
+					if (BoundingRect.Disjoint(hulls1[i], hulls2[j])) continue;
+					double ua = curve1.interparam[i], ub = curve1.interparam[i + 1];
+					double va = curve2.interparam[j], vb = curve2.interparam[j + 1];
+					double u = ClosestApproach(curve1, ua, ub, curve2, va, vb, out double v, out double dist);
+					if (dist > tolerance) continue;
+					if (!curve1.IsValidParameter(u) || !curve2.IsValidParameter(v)) continue;
+					// when both ends of the segment are close to the other curve, the curves overlap here: that is
+					// not a contact point, and the triangle intersection is responsible for this case
+					if (u > ua && u < ub && DistanceToSegment(curve1.PointAt(ua), curve2, va, vb, out _) <= tolerance
+						&& DistanceToSegment(curve1.PointAt(ub), curve2, va, vb, out _) <= tolerance) continue;
+					// the same contact is typically found by neighbouring segment pairs, or it is a crossing which
+					// has already been found: it is the same, when the curve stays close to the other curve in between
+					bool known = false;
+					for (int k = 0; k < res.Count; ++k)
+					{
+						if (IsSameContact(curve1, u, res[k].par1, curve2, tolerance))
+						{
+							known = true;
+							break;
+						}
+					}
+					if (!known) res.Add(new GeoPoint2DWithParameter(new GeoPoint2D(curve1.PointAt(u), curve2.PointAt(v)), u, v));
+				}
+			}
+		}
+
+		/// <summary>
+		/// At a tangential contact the subdivision in <see cref="CheckTriangleIntersect"/> does not converge to a
+		/// single point: the triangles keep overlapping until they are too small to be divided, and then each
+		/// remaining pair reports the middle of its triangles. So one contact comes as several close points with
+		/// a poor position. Such groups of points are replaced by the single point of closest approach.
+		/// </summary>
+		private static void MergeMultipleContacts(GeneralCurve2D curve1, GeneralCurve2D curve2, double tolerance, List<GeoPoint2DWithParameter> res)
+		{
+			if (res.Count < 2) return;
+			res.Sort((a, b) => a.par1.CompareTo(b.par1));
+			List<GeoPoint2DWithParameter> merged = new List<GeoPoint2DWithParameter>(res.Count);
+			int start = 0;
+			while (start < res.Count)
+			{
+				int end = start + 1;
+				while (end < res.Count && IsSameContact(curve1, res[end - 1].par1, res[end].par1, curve2, tolerance)) ++end;
+				if (end - start == 1) merged.Add(res[start]);
+				else
+				{
+					double umin = res[start].par1, umax = res[end - 1].par1;
+					double vmin = double.MaxValue, vmax = double.MinValue;
+					for (int k = start; k < end; ++k)
+					{
+						vmin = Math.Min(vmin, res[k].par2);
+						vmax = Math.Max(vmax, res[k].par2);
+					}
+					// the points are only approximations, so search a little beyond them, but not beyond the curves
+					double du = Math.Max(umax - umin, 1e-6), dv = Math.Max(vmax - vmin, 1e-6);
+					double u = ClosestApproach(curve1, Math.Max(0.0, umin - du), Math.Min(1.0, umax + du),
+						curve2, Math.Max(0.0, vmin - dv), Math.Min(1.0, vmax + dv), out double v, out double dist);
+					if (dist <= tolerance) merged.Add(new GeoPoint2DWithParameter(new GeoPoint2D(curve1.PointAt(u), curve2.PointAt(v)), u, v));
+					else merged.Add(res[start]); // should not happen, keep one of the original points
+				}
+				start = end;
+			}
+			res.Clear();
+			res.AddRange(merged);
+		}
+
+		/// <summary>
+		/// The bounding rectangles of the hull triangles of the segments of the triangulation, inflated by
+		/// <paramref name="inflate"/>.
+		/// </summary>
+		private BoundingRect[] SegmentHulls(double inflate)
+		{
+			if (interpol == null) MakeTriangulation();
+			BoundingRect[] res = new BoundingRect[interpol.Length - 1];
+			for (int i = 0; i < res.Length; ++i)
+			{
+				res[i] = new BoundingRect(interpol[i], interpol[i + 1], tringulation[i]);
+				res[i].Inflate(inflate);
+			}
+			return res;
+		}
+
+		/// <summary>
+		/// Two points at <paramref name="u1"/> and <paramref name="u2"/> on <paramref name="curve1"/> belong to the
+		/// same contact with <paramref name="curve2"/>, when the curve is still close to it halfway in between.
+		/// </summary>
+		private static bool IsSameContact(GeneralCurve2D curve1, double u1, double u2, GeneralCurve2D curve2, double tolerance)
+		{
+			if (Math.Abs(u1 - u2) < 1e-10) return true;
+			return curve2.MinDistance(curve1.PointAt((u1 + u2) / 2.0)) <= tolerance;
+		}
+
+		/// <summary>
+		/// Finds the parameter on [<paramref name="ua"/>, <paramref name="ub"/>] of <paramref name="curve1"/>, where
+		/// it comes closest to the part [<paramref name="va"/>, <paramref name="vb"/>] of <paramref name="curve2"/>.
+		/// The segments of the triangulation have no inflection point, so the distance is assumed to have a single
+		/// minimum there. Golden section search is used, because it needs neither the second derivative nor
+		/// correctly scaled first derivatives, and because the minimum of a tangential contact is too flat for
+		/// a method based on the derivative of the distance.
+		/// </summary>
+		private static double ClosestApproach(ICurve2D curve1, double ua, double ub, ICurve2D curve2, double va, double vb, out double v, out double dist)
+		{
+			const double invPhi = 0.6180339887498949;
+			double a = ua, b = ub;
+			double c = b - invPhi * (b - a);
+			double d = a + invPhi * (b - a);
+			double fc = DistanceToSegment(curve1.PointAt(c), curve2, va, vb, out double vc);
+			double fd = DistanceToSegment(curve1.PointAt(d), curve2, va, vb, out double vd);
+			while (b - a > 1e-14 * Math.Max(1.0, Math.Abs(a)))
+			{
+				if (fc <= fd)
+				{
+					b = d; d = c; fd = fc;
+					c = b - invPhi * (b - a);
+					fc = DistanceToSegment(curve1.PointAt(c), curve2, va, vb, out vc);
+				}
+				else
+				{
+					a = c; c = d; fc = fd;
+					d = a + invPhi * (b - a);
+					fd = DistanceToSegment(curve1.PointAt(d), curve2, va, vb, out vd);
+				}
+			}
+			double u = (a + b) / 2.0;
+			dist = DistanceToSegment(curve1.PointAt(u), curve2, va, vb, out v);
+			// the minimum may be at an end of the interval, which golden section only approaches
+			double distA = DistanceToSegment(curve1.PointAt(ua), curve2, va, vb, out double vA);
+			if (distA < dist)
+			{
+				u = ua; v = vA; dist = distA;
+			}
+			double distB = DistanceToSegment(curve1.PointAt(ub), curve2, va, vb, out double vB);
+			if (distB < dist)
+			{
+				u = ub; v = vB; dist = distB;
+			}
+			return u;
+		}
+
+		/// <summary>
+		/// The distance of <paramref name="p"/> to the part [<paramref name="va"/>, <paramref name="vb"/>] of
+		/// <paramref name="curve"/>, which must not contain an inflection point. The foot point is the root of
+		/// (p - curve(v)) * curve'(v), which does not depend on the length of the derivative. It is found by the
+		/// Illinois variant of regula falsi; without a sign change the closest point is one of the two ends.
+		/// </summary>
+		private static double DistanceToSegment(GeoPoint2D p, ICurve2D curve, double va, double vb, out double v)
+		{
+			double ga = (p - curve.PointAt(va)) * curve.DirectionAt(va);
+			double gb = (p - curve.PointAt(vb)) * curve.DirectionAt(vb);
+			if (ga <= 0.0 || gb >= 0.0)
+			{   // no foot point inside: the closest point is one of the ends
+				double da = p | curve.PointAt(va);
+				double db = p | curve.PointAt(vb);
+				v = da <= db ? va : vb;
+				return Math.Min(da, db);
+			}
+			double a = va, b = vb;
+			int side = 0;
+			v = (a + b) / 2.0;
+			for (int i = 0; i < 100; ++i)
+			{
+				v = (a * gb - b * ga) / (gb - ga);
+				if (b - a < 1e-15 * Math.Max(1.0, Math.Abs(a))) break;
+				double gv = (p - curve.PointAt(v)) * curve.DirectionAt(v);
+				if (gv == 0.0) break;
+				if (gv > 0.0)
+				{
+					a = v; ga = gv;
+					if (side == 1) gb /= 2.0;
+					side = 1;
+				}
+				else
+				{
+					b = v; gb = gv;
+					if (side == -1) ga /= 2.0;
+					side = -1;
+				}
+			}
+			return p | curve.PointAt(v);
 		}
 
 		/// <inheritdoc/>

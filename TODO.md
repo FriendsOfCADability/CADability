@@ -162,12 +162,18 @@ None left: all of them have been fixed.
 
 ## Found while fixing (not yet addressed)
 
-- [ ] Boolean operations still fail in some near-coincident configurations
-  (a sweep of 267 box/cylinder/sphere/fillet configurations for #168: 71
-  remain wrong, 2 crash with a stack overflow or a timeout, all unchanged by
-  the fix). Examples: a box bottom 3e-7 below the tangent plane of a rounded
-  edge, gaps of about 1e-5 (between `Precision.eps` and the BRep precision),
-  and tools 1e6 times smaller than the other solid. Solids touching only in
+- [ ] Boolean operations in near-coincident configurations. The sweep of 267
+  configurations made for #168, with 71 wrong results and 2 crashes, was
+  never part of the repository; `tests/CADability.BooleanSweep` (#453)
+  replaced it and has had no crash or timeout since, now 713 OK and 35
+  documented limitations of 748. Tools much smaller than the other solid: a
+  box of 10000 or 100000 with a box, cylinder or sphere of 1 down to 1e-5
+  on its top face gives the exact result in all four operations, after
+  `PlaneSurface.GetPlaneIntersection` no longer inverts a combined ModOp
+  (it threw for 10000 against 0.0001) and `Shell.Volume` spans its
+  tetrahedra from the middle of a shell far from the origin (why the volume
+  of the results still depends slightly on that point, see the entry on the
+  meshes of neighbouring faces below). Solids touching only in
   an edge, a line or a point have no union (`Solid.Unite` returns null, the
   result would not be a manifold), and a solid touching the inside of another
   one, where the shells do not cross, cannot be subtracted (the result would
@@ -177,7 +183,8 @@ None left: all of them have been fixed.
   The unions of spheres with offset axes, which measured 0.03 to 0.05 % off,
   are exact since the sphere fixes of #525 to #528 (3.7e-6 for the
   triangulation at 1e-4, below 1e-6 integrated); `SphereBooleanTests` checks
-  them to 1e-5 now instead of 2e-3.
+  them to 1e-4 (triangulated at 1e-3) and 2e-6 (integrated) now instead of
+  2e-3.
 - [x] A cube of 10 and a sphere whose axis lies in a face of the cube had
   neither a union nor a difference: the sphere of radius 3 centred on the
   middle of an edge, (10, 5, 10), and the sphere of radius 4 centred on a
@@ -271,6 +278,11 @@ None left: all of them have been fixed.
   `claude/cdtriangulation-trial`) a sphere became 9.2 % too large at 1e-3,
   13 kernel tests failed and one hung. Deferred until it is decided whether
   the kernels of CADability and ShapeIt are merged.
+- [ ] The DXF writer of ACadSharp needs gigabytes for nested blocks: a
+  document with one line in block L7 and 10 INSERTs of the next level in
+  each of L1 to L6 (10^6 lines when expanded) took 5.7 GB to write a file
+  of 21 KB. Not investigated yet; it probably evaluates the nested inserts
+  recursively. The DXF export of CADability uses this writer.
 - [ ] The DXF writer of ACadSharp writes every handle reference of XData,
   a layer reference (1003) included, as a database handle (1005), see
   `DxfSectionWriterBase.writeExtendedData`. The export therefore writes a
@@ -286,14 +298,19 @@ The kernel in the ShapeIt repository (FriendsOfCADability/ShapeIt, branch
 ad7062c4). The small fixes up to then are ported in
 `claude/shapeit-port-geometry-fixes`. Left for later:
 
-- [ ] Worth porting with some adaptation: typed lists and arrays when reading
-  JSON (a4adab2), inflection points of `BSpline2D` as polynomial roots
-  (9d8fcd0, keep the exclusion of corner knots), touching points in
-  `GeneralCurve2D.Intersect` (8a54652) and snapping imprecise curve/surface
-  intersections to the curve ends (fbdad96); the last two change where
-  intersection points are made and need the boolean sweep. ShapeIt keeps the
-  feature names of faces (`Shell.AddFeature`) when a shell is cloned or
-  saved; whether master loses them was not checked yet.
+- [x] Worth porting with some adaptation, done in
+  `claude/shapeit-port-curves`: typed lists and arrays when reading JSON
+  (a4adab2), and the touching points of `GeneralCurve2D.Intersect`
+  (8a54652). Of 8a54652 only the 2d part: the end points of an edge added
+  in `Face.IntersectAndPosition` broke two cases of the boolean sweep (a
+  sphere touching the bottom of a box from inside). The inflection points
+  of `BSpline2D` as polynomial roots (9d8fcd0) are not needed: master's
+  scan passes all tests of ShapeIt and takes 17 to 106 us per curve; the
+  tests are taken over. Snapping curve/surface intersections to the curve
+  ends (fbdad96) does not apply: it makes a snapping safer that only
+  ShapeIt's rewritten `Surface.Intersect` does. The feature names of faces
+  survive cloning and saving, but a clone shared the sets with the original
+  (fixed).
 - [ ] Larger self-contained parts: `Shell.PushPull` (with its tests), the
   formula evaluator of `FormulaInput.cs` for length, angle and point
   properties, `BVH`, `StlSurfaceReconstruction` (analytic surfaces from STL).

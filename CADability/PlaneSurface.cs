@@ -252,16 +252,24 @@ namespace CADability.GeoObject
         /// <inheritdoc/>
         public override IDualSurfaceCurve[] GetPlaneIntersection(PlaneSurface pl, double umin, double umax, double vmin, double vmax, double precision)
         {
-            PlaneSurface plm = pl.GetModified(toUnitPlane) as PlaneSurface;
-            GeoVector dir = GeoVector.ZAxis ^ plm.Normal.Normalized; // Richtung der Linie
-            dir = toUnitPlane * (Normal.Normalized ^ pl.Normal.Normalized);
+            // the direction of the intersection line in the unit system of this plane
+            GeoVector dir = toUnitPlane * (Normal.Normalized ^ pl.Normal.Normalized);
             GeoVector2D dir2d = new GeoVector2D(dir.x, dir.y);
             if (dir.Length > 0.0)
             {
-                GeoPoint2D[] ip = plm.GetLineIntersection(GeoPoint.Origin, new GeoVector(dir.y, -dir.x, dir.z)); // dir.z müsste ohnehin 0 sein
-                if (ip.Length > 0)
+                // A point of the intersection line: where the line from the origin of the unit system perpendicular to dir (in the
+                // unit system) meets the other plane. It is computed in world coordinates with the location and normal of the other
+                // plane. Mapping the other plane into the unit system of this one (pl.GetModified(toUnitPlane)) needed the inverse of
+                // the combined ModOp, whose determinant is the product of the scales of both uv systems: for the faces of a box of
+                // 10000 and of a box of 0.0001 (MakeBox scales u and v by the edge lengths) it fell below the limit of GetInverse,
+                // and the boolean operation threw a ModOpException.
+                Plane other = pl.Plane;
+                GeoPoint lineOrigin = fromUnitPlane * GeoPoint.Origin;
+                GeoVector lineDir = fromUnitPlane * new GeoVector(dir.y, -dir.x, dir.z); // dir.z should be 0 anyway
+                double dn = lineDir * other.Normal;
+                if (dn != 0.0)
                 {
-                    GeoPoint org = plm.PointAt(ip[0]);
+                    GeoPoint org = toUnitPlane * (lineOrigin + (((other.Location - lineOrigin) * other.Normal) / dn) * lineDir);
                     GeoPoint2D org2d = new GeoPoint2D(org.x, org.y);
                     double lmin, lmax;
                     if (Math.Abs(dir.x) > Math.Abs(dir.y))

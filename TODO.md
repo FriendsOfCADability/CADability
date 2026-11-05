@@ -250,14 +250,19 @@ The kernel in the ShapeIt repository (FriendsOfCADability/ShapeIt, branch
 ad7062c4). The small fixes up to then are ported in
 `claude/shapeit-port-geometry-fixes`. Left for later:
 
-- [ ] Worth porting with some adaptation: typed lists and arrays when reading
-  JSON (a4adab2), inflection points of `BSpline2D` as polynomial roots
-  (9d8fcd0, keep the exclusion of corner knots), touching points in
-  `GeneralCurve2D.Intersect` (8a54652) and snapping imprecise curve/surface
-  intersections to the curve ends (fbdad96); the last two change where
-  intersection points are made and need the boolean sweep. ShapeIt keeps the
-  feature names of faces (`Shell.AddFeature`) when a shell is cloned or
-  saved; whether master loses them was not checked yet.
+- [x] Worth porting with some adaptation, done in
+  `claude/shapeit-port-curves`: typed lists and arrays when reading JSON
+  (a4adab2), and the touching points of `GeneralCurve2D.Intersect`
+  (8a54652). Of 8a54652 only the 2d part: the end points of an edge added
+  in `Face.IntersectAndPosition` broke two cases of the boolean sweep (a
+  sphere touching the bottom of a box from inside). The inflection points
+  of `BSpline2D` as polynomial roots (9d8fcd0) are not needed: master's
+  scan passes all tests of ShapeIt and takes 17 to 106 us per curve; the
+  tests are taken over. Snapping curve/surface intersections to the curve
+  ends (fbdad96) does not apply: it makes a snapping safer that only
+  ShapeIt's rewritten `Surface.Intersect` does. The feature names of faces
+  survive cloning and saving, but a clone shared the sets with the original
+  (fixed).
 - [ ] Larger self-contained parts: `Shell.PushPull` (with its tests), the
   formula evaluator of `FormulaInput.cs` for length, angle and point
   properties, `BVH`, `StlSurfaceReconstruction` (analytic surfaces from STL).

@@ -24,14 +24,14 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # ACadSharp is built from source (external/ACadSharp submodule, which
           # itself pulls in CSUtilities as a submodule)
           submodules: recursive
 
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           # ACadSharp's TargetFrameworks include net10.0, so restore needs the .NET 10 SDK.
           # The test projects target net8.0 (net8.0-windows), so its runtimes are installed as well.
@@ -60,7 +60,7 @@ jobs:
 
       - name: Upload test results
         if: success() || failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-windows
           path: TestResults/*.trx

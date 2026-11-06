@@ -117,7 +117,9 @@
   <ItemGroup>
     <PackageReference Include="MathNet.Numerics.Signed" Version="5.0.0" />
     <PackageReference Include="System.Drawing.Common" Version="6.0.0" />
-    <!-- System.Memory is a runtime dependency of the embedded ACadSharp.dll (netstandard2.0) -->
+    <!-- System.Memory and System.Text.Encoding.CodePages are runtime dependencies of the embedded
+         ACadSharp.dll (netstandard2.0). CADability itself does not use CodePages; the reference is
+         what puts the package into the dependencies of the CADability package. -->
     <PackageReference Include="System.Memory" Version="4.6.3" />
     <PackageReference Include="System.Text.Encoding.CodePages" Version="9.0.6" />
   </ItemGroup>

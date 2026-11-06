@@ -1,4 +1,4 @@
-﻿using CADability.Actions;
+using CADability.Actions;
 using CADability.GeoObject;
 using System;
 using System.Collections;
@@ -157,6 +157,12 @@ namespace CADability
         /// disk, e.g. for tests or when running from a read-only location. Default is false.
         /// </summary>
         static public bool neverSaveGlobalSettings = false;
+        /// <summary>
+        /// When true, the global settings are not read from the global settings file when <see cref="Settings"/> is first
+        /// used; it starts with default settings instead. Set it before the first access to <see cref="Settings"/>,
+        /// because that access loads the settings. Default is false.
+        /// </summary>
+        static public bool neverLoadGlobalSettings = false;
         internal static string GetName()
         {
             if (GetGlobalSettingsFileName != null) return GetGlobalSettingsFileName();
@@ -324,7 +330,7 @@ namespace CADability
         {
             try
             {
-                if (!SettingsGlobalFileName.neverSaveGlobalSettings)
+                if (!SettingsGlobalFileName.neverLoadGlobalSettings)
                 {
                     InitGlobalSettingsFileName();
                     LoadGlobalSettings(GlobalSettingsFileName);

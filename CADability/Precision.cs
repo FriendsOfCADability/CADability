@@ -151,14 +151,14 @@ namespace CADability
             return Math.Abs(d1 - d2) < eps;
         }
         /// <summary>
-		/// Determins, whether the directions of the given vectors are almost identical, i.e.
-		/// the angular difference is less than epsa. This is also true for opposite directions.
-		/// </summary>
-		/// <param name="v1">first vector</param>
-		/// <param name="v2">second vector</param>
-		/// <param name="VectorsAreNormalized">true, if the vectors are already normalized, false if not or unknown</param>
-		/// <returns>true: almost same direction, false: different directions</returns>
-		public static bool SameDirection(GeoVector v1, GeoVector v2, bool VectorsAreNormalized)
+        /// Determins, whether the directions of the given vectors are almost identical, i.e.
+        /// the angular difference is less than epsa. This is also true for opposite directions.
+        /// </summary>
+        /// <param name="v1">first vector</param>
+        /// <param name="v2">second vector</param>
+        /// <param name="VectorsAreNormalized">true, if the vectors are already normalized, false if not or unknown</param>
+        /// <returns>true: almost same direction, false: different directions</returns>
+        public static bool SameDirection(GeoVector v1, GeoVector v2, bool VectorsAreNormalized)
         {
             GeoVector cross = v1 ^ v2;
             double cl = cross.Length;
@@ -298,12 +298,12 @@ namespace CADability
             return Math.Abs(v1 * v2) / (v1.Length * v2.Length) < epsa;
         }
         /// <summary>
-		/// Determins, whether the length of the given vector is almost 0, i.e.
-		/// the length is less than eps
-		/// </summary>
-		/// <param name="v">the vector to test</param>
-		/// <returns>true if null-vector, false otherwise</returns>
-		public static bool IsNullVector(GeoVector v)
+        /// Determins, whether the length of the given vector is almost 0, i.e.
+        /// the length is less than eps
+        /// </summary>
+        /// <param name="v">the vector to test</param>
+        /// <returns>true if null-vector, false otherwise</returns>
+        public static bool IsNullVector(GeoVector v)
         {
             return v.Length < eps;
         }

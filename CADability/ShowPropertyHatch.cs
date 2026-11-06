@@ -86,7 +86,7 @@ namespace CADability.UserInterface
                             GeoObjectList toSelect = hatch.Decompose();
                             addTo.Remove(hatch);
                             foreach (var t in toSelect)
-	                            addTo.Add(t);
+                                addTo.Add(t);
                             
                             SelectObjectsAction soa = Frame.ActiveAction as SelectObjectsAction;
                             soa.SetSelectedObjects(toSelect); // alle Teilobjekte markieren

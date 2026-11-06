@@ -377,13 +377,13 @@ namespace CADability.UserInterface
         /// <param name="Check">Ignored</param>
         [Obsolete("method has no functionality, remove this call")]
         public void CheckMouseButton(bool Check) { }
-		/// <summary>
-		/// Obsolete handler signature of <see cref="LabelChangedEvent"/>; hides <see cref="EditableProperty{T}.LabelChangedDelegate"/>.
-		/// </summary>
-		/// <param name="sender">The property entry whose label changed</param>
-		/// <param name="newLabel">The new label text</param>
+        /// <summary>
+        /// Obsolete handler signature of <see cref="LabelChangedEvent"/>; hides <see cref="EditableProperty{T}.LabelChangedDelegate"/>.
+        /// </summary>
+        /// <param name="sender">The property entry whose label changed</param>
+        /// <param name="newLabel">The new label text</param>
         [Obsolete("use delegate DoubleProperty.LabelTextChanged instead")]
-		public new delegate void LabelChangedDelegate(DoubleProperty sender, string newLabel);
+        public new delegate void LabelChangedDelegate(DoubleProperty sender, string newLabel);
         /// <summary>
         /// Obsolete and never raised; use <see cref="EditableProperty{T}.LabelTextChanged"/> instead.
         /// </summary>

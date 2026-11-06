@@ -136,7 +136,7 @@ namespace CADability.Actions
         }
 
         /// <inheritdoc/>
-		public override void OnSetAction()
+        public override void OnSetAction()
         {
             base.TitleId = "Construct.DirectionOfCurve";
 
@@ -174,13 +174,13 @@ namespace CADability.Actions
         }
 
         /// <inheritdoc/>
-		public override string GetID()
+        public override string GetID()
         {
             return "Construct.DirectionOfCurve";
         }
 
         /// <inheritdoc/>
-		public override void OnDone()
+        public override void OnDone()
         {
             succeeded = true;
             if (vectorProperty != null) vectorProperty.ModifiedByAction(this);

@@ -88,10 +88,10 @@ namespace CADability
             patches = (LayoutPatch[])al.ToArray(typeof(LayoutPatch));
         }
         /// <summary>
-		/// Removes the patch with the given index
-		/// </summary>
-		/// <param name="index"></param>
-		public void RemovePatch(int index)
+        /// Removes the patch with the given index
+        /// </summary>
+        /// <param name="index"></param>
+        public void RemovePatch(int index)
         {
             ArrayList al = new ArrayList(patches);
             al.RemoveAt(index);
@@ -104,9 +104,9 @@ namespace CADability
             patches = (LayoutPatch[])al.ToArray(typeof(LayoutPatch));
         }
         /// <summary>
-		/// Returns the number of the patches
-		/// </summary>
-		public int PatchCount
+        /// Returns the number of the patches
+        /// </summary>
+        public int PatchCount
         {
             get { return patches.Length; }
         }

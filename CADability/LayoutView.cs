@@ -275,10 +275,10 @@ namespace CADability
                     subEntries = new IShowProperty[2 + layout.PatchCount];
                     paperWidth = new DoubleProperty(base.Frame, "Layout.PaperWidth");
                     paperWidth.OnGetValue = () => layout.PaperWidth;
-					paperWidth.OnSetValue = val => layout.PaperWidth = val;
+                    paperWidth.OnSetValue = val => layout.PaperWidth = val;
                     paperHeight = new DoubleProperty(base.Frame, "Layout.PaperHeight");
-					paperHeight.OnGetValue = () => layout.PaperHeight;
-					paperHeight.OnSetValue = val => layout.PaperHeight = val;
+                    paperHeight.OnGetValue = () => layout.PaperHeight;
+                    paperHeight.OnSetValue = val => layout.PaperHeight = val;
                     paperWidth.Refresh();
                     paperHeight.Refresh();
                     subEntries[0] = paperWidth;

@@ -214,38 +214,38 @@ namespace CADability.Attribute
             set { owner = value; }
         }
         /*
-		/// <summary>
-		/// Gets the LayerList in sync with the ColorList.
-		/// The layer in the layer list may refer to a color. There is a color list in the same
-		/// context. (The context is given by an object that implements <see cref="IAttributeListContainer"/>,
-		/// currently there are <see cref="Project"/> and <see cref="Settings"/> that implement IAttributeListContainer)
-		/// This Update method redirects all references of layers in this list to colors in the related
-		/// color list. If a color is not in the colorlist, it will be added. 
-		/// </summary>
-		public void Update()
-		{
-			ColorList cl = ColorList;
-			for (int i=0; i<entries.Count; ++i)
-			{
-				Layer l = entries.GetByIndex(i) as Layer;
-				ColorDef cd = l.ColorDef;
-				if (cd!=null)
-				{
-					if (cd.Source==ColorDef.ColorSource.fromName)
-					{
-						ColorDef found = cl.GetColorDef(cd.Name);
-						if (found!=null)
-						{	// im Layer die Farbe ersetzen
-							if (cd!=found) l.ColorDef = found;
-						} 
-						else
-						{	// die Farbe gibt es in der ColorList nicht, also erzeugen
-							cl.AddColorDef(cd);
-						}
-					}
-				}
-			}
-		}
+        /// <summary>
+        /// Gets the LayerList in sync with the ColorList.
+        /// The layer in the layer list may refer to a color. There is a color list in the same
+        /// context. (The context is given by an object that implements <see cref="IAttributeListContainer"/>,
+        /// currently there are <see cref="Project"/> and <see cref="Settings"/> that implement IAttributeListContainer)
+        /// This Update method redirects all references of layers in this list to colors in the related
+        /// color list. If a color is not in the colorlist, it will be added. 
+        /// </summary>
+        public void Update()
+        {
+            ColorList cl = ColorList;
+            for (int i=0; i<entries.Count; ++i)
+            {
+                Layer l = entries.GetByIndex(i) as Layer;
+                ColorDef cd = l.ColorDef;
+                if (cd!=null)
+                {
+                    if (cd.Source==ColorDef.ColorSource.fromName)
+                    {
+                        ColorDef found = cl.GetColorDef(cd.Name);
+                        if (found!=null)
+                        {	// im Layer die Farbe ersetzen
+                            if (cd!=found) l.ColorDef = found;
+                        } 
+                        else
+                        {	// die Farbe gibt es in der ColorList nicht, also erzeugen
+                            cl.AddColorDef(cd);
+                        }
+                    }
+                }
+            }
+        }
 */
         /// <summary>
         /// Creates a layer list with the layer names taken from the string resource "LayerList.Default".

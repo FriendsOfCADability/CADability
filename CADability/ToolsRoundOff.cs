@@ -707,7 +707,7 @@ namespace CADability.Actions
 
 
         /// <inheritdoc/>
-		public override void OnSetAction()
+        public override void OnSetAction()
         { // normales runden!!
             base.ActiveObject = null;
             arc = Ellipse.Construct();
@@ -738,19 +738,19 @@ namespace CADability.Actions
             base.ShowActiveObject = false;
         }
         /// <inheritdoc/>
-		public override void OnRemoveAction()
+        public override void OnRemoveAction()
         {
             base.OnRemoveAction();
         }
 
         /// <inheritdoc/>
-		public override string GetID()
+        public override string GetID()
         {
             return "ToolsRoundOff";
         }
 
         /// <inheritdoc/>
-		public override void OnDone()
+        public override void OnDone()
         {
             if (base.ActiveObject != null)
             {

@@ -93,14 +93,14 @@ namespace CADability.Attribute
             return null;
         }
         /// <summary>
-		/// Generates the lines or other GeoObjects that fill out the given shape
-		/// in the given plane. Derived classes must override this method.
-		/// Default implementation returns null.
-		/// </summary>
-		/// <param name="shape">The shape to be filled</param>
-		/// <param name="plane">The plane of the shape</param>
-		/// <returns>The resulting GeoObjects or null</returns>
-		public virtual GeoObjectList GenerateContent(CompoundShape shape, Plane plane)
+        /// Generates the lines or other GeoObjects that fill out the given shape
+        /// in the given plane. Derived classes must override this method.
+        /// Default implementation returns null.
+        /// </summary>
+        /// <param name="shape">The shape to be filled</param>
+        /// <param name="plane">The plane of the shape</param>
+        /// <returns>The resulting GeoObjects or null</returns>
+        public virtual GeoObjectList GenerateContent(CompoundShape shape, Plane plane)
         {
             return null;
         }

@@ -68,7 +68,7 @@ namespace CADability.Actions
         {
         }
         /// <inheritdoc/>
-		public override string GetID()
+        public override string GetID()
         {
             return "Construct.Plane.OriginNormalPoint";
         }
@@ -78,7 +78,7 @@ namespace CADability.Actions
             return false;
         }
         /// <inheritdoc/>
-		public override void OnSetAction()
+        public override void OnSetAction()
         {
 
             plane = base.ActiveDrawingPlane;

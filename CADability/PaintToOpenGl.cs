@@ -449,8 +449,8 @@ namespace CADability
             //paintTo3D.Point2D((int)pf.X - width, (int)pf.Y - width);
         }
 
-		//Not implemented?
-		internal static List<Bitmap> BitmapList => null;
+        //Not implemented?
+        internal static List<Bitmap> BitmapList => null;
 
         public static void PointSymbol(IPaintTo3D paintTo3D, GeoPoint location, double size, GeoObject.PointSymbol symbol)
         {

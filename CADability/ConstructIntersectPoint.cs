@@ -159,7 +159,7 @@ namespace CADability.Actions
         }
 
         /// <inheritdoc/>
-		public override void OnSetAction()
+        public override void OnSetAction()
         {
             base.TitleId = "Construct.IntersectPoint";
 
@@ -192,12 +192,12 @@ namespace CADability.Actions
             Frame.Project.Undo.ClearContext();
         }
         /// <inheritdoc/>
-		public override string GetID()
+        public override string GetID()
         {
             return "Construct.IntersectPoint";
         }
         /// <inheritdoc/>
-		public override void OnDone()
+        public override void OnDone()
         {
             succeeded = true;
             if (geoPointProperty != null) geoPointProperty.ModifiedByAction(this);

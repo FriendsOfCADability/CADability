@@ -168,8 +168,8 @@ namespace CADability.Actions
         {
             base.OnRemoveAction();
             Frame.Project.Undo.ClearContext();
-			if (lengthProperty != null)
-				lengthProperty.Select();
+            if (lengthProperty != null)
+                lengthProperty.Select();
         }
 
         /// <inheritdoc/>

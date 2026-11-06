@@ -104,12 +104,12 @@ namespace CADability.Curve2D
             }
         }
         /// <inheritdoc/>
-		public override GeoVector2D DirectionAt(double Position)
+        public override GeoVector2D DirectionAt(double Position)
         {
             return StartDirection;
         }
         /// <inheritdoc/>
-		public override GeoPoint2D PointAt(double Position)
+        public override GeoPoint2D PointAt(double Position)
         {
             double dx = endPoint.x - startPoint.x;
             double dy = endPoint.y - startPoint.y;
@@ -124,7 +124,7 @@ namespace CADability.Curve2D
             return true;
         }
         /// <inheritdoc/>
-		public override double PositionOf(GeoPoint2D p)
+        public override double PositionOf(GeoPoint2D p)
         {
             double dx = endPoint.x - startPoint.x;
             double dy = endPoint.y - startPoint.y;
@@ -140,7 +140,7 @@ namespace CADability.Curve2D
             }
         }
         /// <inheritdoc/>
-		public override double GetAreaFromPoint(GeoPoint2D p)
+        public override double GetAreaFromPoint(GeoPoint2D p)
         {   // gesucht ist die vom Punkt p durch die Linie aufgespannte Fläche
             // mit Vorzeichen (gegen Uhrzeigersinn ist positiv)
             return ((startPoint.x - p.x) * (endPoint.y - p.y) - (startPoint.y - p.y) * (endPoint.x - p.x)) / 2.0;
@@ -148,7 +148,7 @@ namespace CADability.Curve2D
         /// <inheritdoc/>
         public override double Sweep { get { return 0.0; } }
         /// <inheritdoc/>
-		public override ICurve2D[] Split(double Position)
+        public override ICurve2D[] Split(double Position)
         {
             if (Position <= 0.0 || Position >= 1.0)
             {
@@ -165,7 +165,7 @@ namespace CADability.Curve2D
             }
         }
         /// <inheritdoc/>
-		public override BoundingRect GetExtent()
+        public override BoundingRect GetExtent()
         {
             BoundingRect res = BoundingRect.EmptyBoundingRect;
             res.MinMax(startPoint);
@@ -173,13 +173,13 @@ namespace CADability.Curve2D
             return res;
         }
         /// <inheritdoc/>
-		public override bool HitTest(ref BoundingRect Rect, bool IncludeControlPoints)
+        public override bool HitTest(ref BoundingRect Rect, bool IncludeControlPoints)
         {
             ClipRect clr = new ClipRect(Rect);
             return clr.LineHitTest(startPoint, endPoint);
         }
         /// <inheritdoc/>
-		public override double Distance(GeoPoint2D p)
+        public override double Distance(GeoPoint2D p)
         {   // welcher Abstand ist hier gefragt? Die Parallelenkonstruktion erwartet den
             // Abstand von der unendlichen Linie. Braucht jemand was anderes?
             // Nachtrag: jedenfalls braucht die Tangentenkonstruktion auch diesen idealen Abstand
@@ -196,7 +196,7 @@ namespace CADability.Curve2D
             //			}
         }
         /// <inheritdoc/>
-		public override double MinDistance(ICurve2D Other)
+        public override double MinDistance(ICurve2D Other)
         {
             if (Other is Line2D)
             {
@@ -289,14 +289,14 @@ namespace CADability.Curve2D
             }
         }
         /// <inheritdoc/>
-		public override ICurve2D Trim(double StartPos, double EndPos)
+        public override ICurve2D Trim(double StartPos, double EndPos)
         {
             GeoPoint2D newStartPoint = PointAt(StartPos);
             GeoPoint2D newEndPoint = PointAt(EndPos);
             return new Line2D(newStartPoint, newEndPoint);
         }
         /// <inheritdoc/>
-		public override ICurve2D Parallel(double Dist, bool approxSpline, double precision, double roundAngle)
+        public override ICurve2D Parallel(double Dist, bool approxSpline, double precision, double roundAngle)
         {
             ICurve2D res = Clone();
 
@@ -318,7 +318,7 @@ namespace CADability.Curve2D
             return res;
         }
         /// <inheritdoc/>
-		public override GeoPoint2DWithParameter[] Intersect(ICurve2D IntersectWith)
+        public override GeoPoint2DWithParameter[] Intersect(ICurve2D IntersectWith)
         {   // gesucht sind alle Schnittpunkte, also auch in der Verlängerung!
             Line2D l2d = IntersectWith as Line2D;
             if (l2d != null)
@@ -402,29 +402,29 @@ namespace CADability.Curve2D
             return base.Intersect(IntersectWith);
         }
         /// <inheritdoc/>
-		public override GeoPoint2D[] PerpendicularFoot(GeoPoint2D FromHere)
+        public override GeoPoint2D[] PerpendicularFoot(GeoPoint2D FromHere)
         {
             GeoPoint2D f = Geometry.DropPL(FromHere, startPoint, endPoint);
             return new GeoPoint2D[] { f };
         }
         /// <inheritdoc/>
-		public override GeoPoint2D[] TangentPoints(GeoPoint2D FromHere, GeoPoint2D CloseTo)
+        public override GeoPoint2D[] TangentPoints(GeoPoint2D FromHere, GeoPoint2D CloseTo)
         {
             return new GeoPoint2D[0];
         }
         /// <inheritdoc/>
-		public override GeoPoint2D[] TangentPointsToAngle(Angle ang, GeoPoint2D CloseTo)
+        public override GeoPoint2D[] TangentPointsToAngle(Angle ang, GeoPoint2D CloseTo)
         {
             return new GeoPoint2D[0];
         }
         /// <inheritdoc/>
-		public override GeoPoint2DWithParameter[] Intersect(GeoPoint2D StartPoint, GeoPoint2D EndPoint)
+        public override GeoPoint2DWithParameter[] Intersect(GeoPoint2D StartPoint, GeoPoint2D EndPoint)
         {
             Line2D lp = new Line2D(StartPoint, EndPoint);
             return Intersect(lp);
         }
         /// <inheritdoc/>
-		public override void Reverse()
+        public override void Reverse()
         {
             GeoPoint2D p = startPoint;
             startPoint = endPoint;
@@ -454,7 +454,7 @@ namespace CADability.Curve2D
             return res;
         }
         /// <inheritdoc/>
-		public override ICurve2D CloneReverse(bool reverse)
+        public override ICurve2D CloneReverse(bool reverse)
         {
             ICurve2D res = this.Clone();
             if (reverse) res.Reverse();
@@ -470,7 +470,7 @@ namespace CADability.Curve2D
             UserData.CloneFrom(c.UserData);
         }
         /// <inheritdoc/>
-		public override IGeoObject MakeGeoObject(Plane p)
+        public override IGeoObject MakeGeoObject(Plane p)
         {
             Line l = Line.Construct();
             l.StartPoint = p.ToGlobal(startPoint);
@@ -478,14 +478,14 @@ namespace CADability.Curve2D
             return l;
         }
         /// <inheritdoc/>
-		public override ICurve2D Project(Plane fromPlane, Plane toPlane)
+        public override ICurve2D Project(Plane fromPlane, Plane toPlane)
         {
             Line2D l = new Line2D(toPlane.Project(fromPlane.ToGlobal(startPoint)), toPlane.Project(fromPlane.ToGlobal(endPoint)));
             if (l.Length > Precision.eps) return l;
             else return null;
         }
         /// <inheritdoc/>
-		public override void AddToGraphicsPath(System.Drawing.Drawing2D.GraphicsPath path, bool forward)
+        public override void AddToGraphicsPath(System.Drawing.Drawing2D.GraphicsPath path, bool forward)
         {
             if (forward)
             {
@@ -497,12 +497,12 @@ namespace CADability.Curve2D
             }
         }
         /// <inheritdoc/>
-		public override IQuadTreeInsertable GetExtendedHitTest()
+        public override IQuadTreeInsertable GetExtendedHitTest()
         {
             return new InfiniteLine2D(startPoint, endPoint);
         }
         /// <inheritdoc/>
-		public override ICurve2D Approximate(bool linesOnly, double maxError)
+        public override ICurve2D Approximate(bool linesOnly, double maxError)
         {
             return Clone();
         }
@@ -651,7 +651,7 @@ namespace CADability.Curve2D
         }
 
         /// <inheritdoc/>
-		public bool HitTest(ref BoundingRect Rect, bool IncludeControlPoints)
+        public bool HitTest(ref BoundingRect Rect, bool IncludeControlPoints)
         {   // die 4 Eckpunkte des Rechtecks werden in das System gebracht, in dem die Linie
             // die X-Achse ist. Wenn alle positiv oder alle negativ sind, dann nicht getroffen.
             GeoPoint2D ll = toXAxis * new GeoPoint2D(Rect.Left, Rect.Bottom);

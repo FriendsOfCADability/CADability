@@ -68,7 +68,7 @@ namespace CADability.Actions
             base.OnSetAction();
         }
         /// <inheritdoc/>
-		public override void OnRemoveAction()
+        public override void OnRemoveAction()
         {
             Mode = -1;
         }
@@ -100,7 +100,7 @@ namespace CADability.Actions
             }
         }
         /// <inheritdoc/>
-		public override void OnMouseUp(MouseEventArgs e, IView vw)
+        public override void OnMouseUp(MouseEventArgs e, IView vw)
         {
             OnMouseMove(e, vw); // damit wird Invalidate... aufgerufen
             switch (Mode)
@@ -178,7 +178,7 @@ namespace CADability.Actions
             }
         }
         /// <inheritdoc/>
-		public override bool OnEscape()
+        public override bool OnEscape()
         {
             base.RemoveThisAction();
             return true;

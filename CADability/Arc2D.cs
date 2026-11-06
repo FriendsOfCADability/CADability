@@ -494,9 +494,9 @@ namespace CADability.Curve2D
         /// <inheritdoc/>
         public override ICurve2D Trim(double startPos, double endPos)
         {
-	        //If both parameters are 0.0d, this would produce an invalid arc
-			if (startPos == 0.0d && endPos == 0.0d)
-		        return null;
+            //If both parameters are 0.0d, this would produce an invalid arc
+            if (startPos == 0.0d && endPos == 0.0d)
+                return null;
 
             Arc2D res = new Arc2D(Center, Radius, start, sweep);
             Angle st = start + startPos * sweep;

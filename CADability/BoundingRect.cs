@@ -125,8 +125,8 @@ namespace CADability
         }
         /// <summary>
         /// Returns an empty BoundingRect which is convenient as a start for the <see cref="MinMax(GeoPoint2D)"/> method.
-		/// </summary>
-		static public BoundingRect EmptyBoundingRect = new BoundingRect(System.Double.MaxValue, System.Double.MaxValue, System.Double.MinValue, System.Double.MinValue);
+        /// </summary>
+        static public BoundingRect EmptyBoundingRect = new BoundingRect(System.Double.MaxValue, System.Double.MaxValue, System.Double.MinValue, System.Double.MinValue);
         /// <summary>
         /// A rectangle that contains everything: its limits are <see cref="double.MinValue"/> and <see cref="double.MaxValue"/>.
         /// <see cref="Width"/> and <see cref="Height"/> overflow to infinity, so use it only as a "no restriction" marker,
@@ -156,9 +156,9 @@ namespace CADability
             }
         }
         /// <summary>
-		/// Makes this BoundingRect an empty BoundingRect
-		/// </summary>
-		public void MakeEmpty()
+        /// Makes this BoundingRect an empty BoundingRect
+        /// </summary>
+        public void MakeEmpty()
         {
             Left = System.Double.MaxValue;
             Right = System.Double.MinValue;
@@ -263,7 +263,7 @@ namespace CADability
         /// <param name="frameWidth">The precision: if the distance to a bounding line is smaller 
         /// than this value, the point is considered as <see cref="Position.onframe"/></param>
         /// <returns>The position of the point</returns>
-		public Position GetPosition(GeoPoint2D p, double frameWidth)
+        public Position GetPosition(GeoPoint2D p, double frameWidth)
         {
             if (p.x < Left - frameWidth) return Position.outside;
             if (p.x > Right + frameWidth) return Position.outside;
@@ -489,7 +489,7 @@ namespace CADability
         /// <param name="p">The point to test</param>
         /// <param name="r">The rectangle to test with</param>
         /// <returns>true if contained</returns>
-		public static bool operator <(GeoPoint2D p, BoundingRect r)
+        public static bool operator <(GeoPoint2D p, BoundingRect r)
         {
             if (p.x > r.Left && p.x < r.Right && p.y > r.Bottom && p.y < r.Top) return true;
             return false;
@@ -646,11 +646,11 @@ namespace CADability
             return res;
         }
         /// <summary>
-		/// Returns an inflated or deflated rectangle
-		/// </summary>
-		/// <param name="rect">The initial rectangle</param>
-		/// <param name="offset">The offset for the inflation (may be negaitve)</param>
-		/// <returns>The inflated rectangle</returns>
+        /// Returns an inflated or deflated rectangle
+        /// </summary>
+        /// <param name="rect">The initial rectangle</param>
+        /// <param name="offset">The offset for the inflation (may be negaitve)</param>
+        /// <returns>The inflated rectangle</returns>
         public static BoundingRect operator +(BoundingRect rect, double offset)
         {
             return new BoundingRect(rect.Left - offset, rect.Bottom - offset, rect.Right + offset, rect.Top + offset);
@@ -669,10 +669,10 @@ namespace CADability
             return res;
         }
         /// <summary>
-		/// Typecast to a System.Drawing.Rectangle
-		/// </summary>
-		/// <param name="r">The initial rectangle</param>
-		/// <returns>The casted rectangle</returns>
+        /// Typecast to a System.Drawing.Rectangle
+        /// </summary>
+        /// <param name="r">The initial rectangle</param>
+        /// <returns>The casted rectangle</returns>
         public static explicit operator Rectangle(BoundingRect r)
         {   // BoundingRect ist immer Top>Bottom, Rectangle umgekehrt
             // zumindest für den Zweck, wie es hier gebraucht wird.

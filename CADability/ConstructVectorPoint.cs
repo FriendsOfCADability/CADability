@@ -120,7 +120,7 @@ namespace CADability.Actions
         }
 
         /// <inheritdoc/>
-		public override void OnSetAction()
+        public override void OnSetAction()
         {
             base.TitleId = "Construct.VectorPoint";
             feedBackLine = Line.Construct();
@@ -160,13 +160,13 @@ namespace CADability.Actions
         }
 
         /// <inheritdoc/>
-		public override string GetID()
+        public override string GetID()
         {
             return "Construct.VectorPoint";
         }
 
         /// <inheritdoc/>
-		public override void OnDone()
+        public override void OnDone()
         {
             succeeded = true;
             if (geoPointProperty != null) geoPointProperty.ModifiedByAction(this);

@@ -30,7 +30,7 @@ namespace CADability.Actions
             succeeded = false;
         }
         /// <inheritdoc/>
-		public override void OnSetAction()
+        public override void OnSetAction()
         {
             base.TitleId = "Constr.AngleTwoPoints";
 
@@ -81,7 +81,7 @@ namespace CADability.Actions
         }
 
         /// <inheritdoc/>
-		public override string GetID()
+        public override string GetID()
         {
             return "Constr.AngleTwoPoints";
         }

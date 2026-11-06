@@ -152,7 +152,7 @@ namespace CADability.Actions
         }
 
         /// <inheritdoc/>
-		public override void OnSetAction()
+        public override void OnSetAction()
         {
             base.TitleId = "CopyCircularObjects";
 
@@ -207,7 +207,7 @@ namespace CADability.Actions
         }
 
         /// <inheritdoc/>
-		public override void OnDone()
+        public override void OnDone()
         {
             using (base.Frame.Project.Undo.UndoFrame)
             {

@@ -224,34 +224,34 @@ namespace CADability.UserInterface
         {
             get
             {
-	            if (subEntries != null) 
-		            return subEntries;
+                if (subEntries != null) 
+                    return subEntries;
 
-	            subEntries = new IPropertyEntry[controlledObject.GetGeoPointCount()];
+                subEntries = new IPropertyEntry[controlledObject.GetGeoPointCount()];
                 for (int i = 0; i < subEntries.Length; ++i)
                 {
-	                int currentIndex = i;
-	                GeoPointProperty gpp = new GeoPointProperty(this.Frame, resourceIdInternal + ".Point");
-					//TODO: Remove this line and update ModifyWithMouse
-					gpp.UserData["Index"] = i;
+                    int currentIndex = i;
+                    GeoPointProperty gpp = new GeoPointProperty(this.Frame, resourceIdInternal + ".Point");
+                    //TODO: Remove this line and update ModifyWithMouse
+                    gpp.UserData["Index"] = i;
                     gpp.OnGetValue = () => OnGetGeoPoint(currentIndex);
                     gpp.OnSetValue = p => controlledObject.SetGeoPoint(currentIndex, p);
-	                gpp.ModifyWithMouse += ModifyWithMouse;
-	                gpp.SelectionChangedEvent += OnPointSelectionChanged;
-	                gpp.FilterCommandEvent += OnFilterSinglePointCommand;
-	                gpp.ContextMenuId = "MenuId.IndexedPoint";
-	                gpp.PrependContextMenu = prependContextMenue; // zusätzliches Menue
-	                gpp.DisplayZComponent = displayZComponent;
-	                string lt = StringTable.GetString(resourceIdInternal + ".Point.Label");
-	                if (lt.IndexOf("{0") >= 0)
-	                {
-		                try
-		                {
-			                gpp.LabelText = string.Format(lt, i + 1);
-		                }
-		                catch (FormatException) { } // geht halt nicht, Original bleibt
-	                }
-	                subEntries[i] = gpp;
+                    gpp.ModifyWithMouse += ModifyWithMouse;
+                    gpp.SelectionChangedEvent += OnPointSelectionChanged;
+                    gpp.FilterCommandEvent += OnFilterSinglePointCommand;
+                    gpp.ContextMenuId = "MenuId.IndexedPoint";
+                    gpp.PrependContextMenu = prependContextMenue; // zusätzliches Menue
+                    gpp.DisplayZComponent = displayZComponent;
+                    string lt = StringTable.GetString(resourceIdInternal + ".Point.Label");
+                    if (lt.IndexOf("{0") >= 0)
+                    {
+                        try
+                        {
+                            gpp.LabelText = string.Format(lt, i + 1);
+                        }
+                        catch (FormatException) { } // geht halt nicht, Original bleibt
+                    }
+                    subEntries[i] = gpp;
                 }
                 return subEntries;
 

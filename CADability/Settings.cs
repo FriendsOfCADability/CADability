@@ -1044,9 +1044,9 @@ namespace CADability
         {
             object o = GetValue(name);
             if (o is double d) 
-	            return d;
+                return d;
             if (o is DoubleProperty property) 
-	            return property.GetDouble();
+                return property.GetDouble();
 
             return defaultValue;
         }
@@ -1062,16 +1062,16 @@ namespace CADability
             object o = GetValue(name);
             switch (o)
             {
-	            case int i:
-		            return i;
-	            case double d:
-		            return (int)d;
-	            case IntegerProperty property:
-		            return (int)property;
-	            case MultipleChoiceSetting setting:
-		            return setting.CurrentSelection;
-	            default:
-		            return defaultValue;
+                case int i:
+                    return i;
+                case double d:
+                    return (int)d;
+                case IntegerProperty property:
+                    return (int)property;
+                case MultipleChoiceSetting setting:
+                    return setting.CurrentSelection;
+                default:
+                    return defaultValue;
             }
         }
         /// <summary>
@@ -1086,12 +1086,12 @@ namespace CADability
             object o = GetValue(name);
             switch (o)
             {
-	            case bool b:
-		            return b;
-	            case BooleanProperty property:
-		            return property.BooleanValue;
-	            default:
-		            return defaultValue;
+                case bool b:
+                    return b;
+                case BooleanProperty property:
+                    return property.BooleanValue;
+                default:
+                    return defaultValue;
             }
         }
         /// <summary>
@@ -1105,9 +1105,9 @@ namespace CADability
         {
             object o = GetValue(name);
             if (o is StringProperty property) 
-	            return property.GetString();
+                return property.GetString();
             if (o != null) 
-	            return o.ToString();
+                return o.ToString();
             return defaultValue;
         }
         /// <summary>
@@ -1270,9 +1270,9 @@ namespace CADability
         public static double GetDoubleValue(object theValue)
         {
             if (theValue is double value) 
-	            return value;
+                return value;
             if (theValue is DoubleProperty property) 
-	            return property.GetDouble();
+                return property.GetDouble();
             return (double)theValue;
         }
         /// <summary>

@@ -58,13 +58,13 @@ namespace CADability.Actions
         {
         }
         /// <inheritdoc/>
-		public override string GetID()
+        public override string GetID()
         {
             return "Construct.Plane.2PointsDrawingPlane";
         }
 
         /// <inheritdoc/>
-		public override void OnSetAction()
+        public override void OnSetAction()
         {
 
             plane = base.ActiveDrawingPlane;

@@ -14,7 +14,7 @@ namespace CADability.GeoObject
         /// <summary>
         /// Enumeration of different causes for this exception
         /// </summary>
-		public enum Mode
+        public enum Mode
         {
             /// <summary>
             /// Internal error
@@ -32,7 +32,7 @@ namespace CADability.GeoObject
         /// <summary>
         /// Cause of this exception
         /// </summary>
-		public Mode ExeptionMode;
+        public Mode ExeptionMode;
         internal CurveException(string msg, Mode m) : base(msg)
         {
             ExeptionMode = m;
@@ -46,7 +46,7 @@ namespace CADability.GeoObject
     /// <summary>
     /// Enumeration for the classification of the planar state of a curve
     /// </summary>
-	public enum PlanarState
+    public enum PlanarState
     {
         /// <summary>
         /// The curve resides in a certain plane
@@ -237,11 +237,11 @@ namespace CADability.GeoObject
         /// <summary>
         /// Returns true, if the curve is composed of other curves. <see cref="Path"/>s and <see cref="Polyline"/>s are composed curves.
         /// </summary>
-		bool IsComposed { get; }
+        bool IsComposed { get; }
         /// <summary>
         /// Returns subcurves of composed curves. <see cref="Path"/>s and <see cref="Polyline"/>s are composed curves.
         /// </summary>
-		ICurve[] SubCurves { get; }
+        ICurve[] SubCurves { get; }
         /// <summary>
         /// Returns a <see cref="Path"/> or a <see cref="Polyline"/> that approximates the curve with lines
         /// or lines and arcs.
@@ -249,7 +249,7 @@ namespace CADability.GeoObject
         /// <param name="linesOnly">true: no arcs, only lines</param>
         /// <param name="maxError">Maximum derivation from the exact curve</param>
         /// <returns>The Approximation</returns>
-		ICurve Approximate(bool linesOnly, double maxError);
+        ICurve Approximate(bool linesOnly, double maxError);
         /// <summary>
         /// Returns a list of positions where the curve has the same or opposite direction as the given direction.
         /// Mainly used for visualisation purposes. If there are no such points (which is true in most cases)

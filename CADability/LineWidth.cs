@@ -370,22 +370,22 @@ namespace CADability.Attribute
     }
     /* Default Implementierung
 #region ILineWidth Members
-	private LineWidth lineWidth;
-	public LineWidth LineWidth
-	{
-		get
-		{
-			return lineWidth;
-		}
-		set
-		{
-			using (new ChangingAttribute(this,"LineWidth",lineWidth))
-			{
-				lineWidth = value;
-			}
-		}
-	}
+    private LineWidth lineWidth;
+    public LineWidth LineWidth
+    {
+        get
+        {
+            return lineWidth;
+        }
+        set
+        {
+            using (new ChangingAttribute(this,"LineWidth",lineWidth))
+            {
+                lineWidth = value;
+            }
+        }
+    }
 #endregion
-	*/
+    */
 
 }

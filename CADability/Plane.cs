@@ -130,10 +130,10 @@ namespace CADability
         /// <summary>
         /// Creates a new plane with the given parameters. Throws a <see cref="PlaneException"/>, if <paramref name="DirectionX"/>
         /// and <paramref name="DirectionY"/> have the same direction.
-		/// </summary>
-		/// <param name="Location">location of the plane</param>
-		/// <param name="DirectionX">direction of the x-axis</param>
-		/// <param name="DirectionY">direction of the y-axis, will be adapted if not perpendicular to the x-axis</param>
+        /// </summary>
+        /// <param name="Location">location of the plane</param>
+        /// <param name="DirectionX">direction of the x-axis</param>
+        /// <param name="DirectionY">direction of the y-axis, will be adapted if not perpendicular to the x-axis</param>
         public Plane(GeoPoint Location, GeoVector DirectionX, GeoVector DirectionY)
         {
             try
@@ -152,7 +152,7 @@ namespace CADability
         /// <param name="location">location of the plane</param>
         /// <param name="p1">specifies the direction of the x-axis</param>
         /// <param name="p2">specifies the direction of the y-axis, wich will be perpendicular to the x-axis</param>
-		public Plane(GeoPoint location, GeoPoint p1, GeoPoint p2)
+        public Plane(GeoPoint location, GeoPoint p1, GeoPoint p2)
         {
             try
             {
@@ -169,7 +169,7 @@ namespace CADability
         /// </summary>
         /// <param name="location">location of the plane</param>
         /// <param name="normal">normal vector of the plane</param>
-		public Plane(GeoPoint location, GeoVector normal)
+        public Plane(GeoPoint location, GeoVector normal)
         {   // this is arbitrary
             if (normal.IsNullVector()) throw new PlaneException(PlaneException.tExceptionType.ConstructorFailed);
             try
@@ -513,7 +513,7 @@ namespace CADability
         /// <summary>
         /// Enumeration of the standard planes
         /// </summary>
-		public enum StandardPlane
+        public enum StandardPlane
         {
             /// <summary>
             /// X/Y-Plane
@@ -552,7 +552,7 @@ namespace CADability
         /// <summary>
         /// Returns the X/Y plane.
         /// </summary>
-		public static readonly Plane XYPlane = new Plane(StandardPlane.XYPlane, 0.0);
+        public static readonly Plane XYPlane = new Plane(StandardPlane.XYPlane, 0.0);
         /// <summary>
         /// Returns the X/Z plane.
         /// </summary>
@@ -733,7 +733,7 @@ namespace CADability
         /// Gets or sets the normal vector of this plane. Setting the normal vector results in a 
         /// recalculation of the x-axis and y-axis of this plane
         /// </summary>
-		public GeoVector Normal
+        public GeoVector Normal
         {
             get { return coordSys.Normal; }
             set
@@ -764,7 +764,7 @@ namespace CADability
         /// Gets or sets the direction of the x-axis of this plane. Setting the x-axis results in a 
         /// reculculation of the y-axis to make the axis perpendicular.
         /// </summary>
-		public GeoVector DirectionX
+        public GeoVector DirectionX
         {
             get
             {
@@ -985,7 +985,7 @@ namespace CADability
         /// </summary>
         /// <param name="v">2d vector in the coordinate system of the plane</param>
         /// <returns>3d vector in the global coordinate system</returns>
-		public GeoVector ToGlobal(GeoVector2D v)
+        public GeoVector ToGlobal(GeoVector2D v)
         {
             return v.x * DirectionX + v.y * DirectionY;
         }

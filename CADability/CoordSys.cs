@@ -25,7 +25,7 @@ namespace CADability
         /// <summary>
         /// Cause of this exception
         /// </summary>
-		public tExceptionType ExceptionType;
+        public tExceptionType ExceptionType;
         internal CoordSysException(tExceptionType ExceptionType)
         {
             this.ExceptionType = ExceptionType;

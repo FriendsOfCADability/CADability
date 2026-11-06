@@ -16,170 +16,170 @@ namespace CADability.Attribute
         /// <summary>
         /// Gets or sets the layer.
         /// </summary>
-		Layer Layer { get; set; }
+        Layer Layer { get; set; }
     }
     /*
-	public class LayerListEntry :IShowPropertyImpl,ICommandHandler
-	{
-		private Layer layer;
-		private LayerList layerList;
-		private IShowProperty[] showProperties;
-		private DisplayLayerCtrl control;
-		public LayerListEntry(Layer l, LayerList ll)
-		{
-			layer = l;
-			layerList = ll;
-		}
-		#region IShowProperty Members
-		
-		public override string LabelText
-		{
-			get
-			{
-				return layer.Name;
-			}
-		}
+    public class LayerListEntry :IShowPropertyImpl,ICommandHandler
+    {
+        private Layer layer;
+        private LayerList layerList;
+        private IShowProperty[] showProperties;
+        private DisplayLayerCtrl control;
+        public LayerListEntry(Layer l, LayerList ll)
+        {
+            layer = l;
+            layerList = ll;
+        }
+        #region IShowProperty Members
+        
+        public override string LabelText
+        {
+            get
+            {
+                return layer.Name;
+            }
+        }
 
-		public override ShowPropertyLabelFlags LabelType
-		{
-			get
-			{
-				ShowPropertyLabelFlags flags = ShowPropertyLabelFlags.Editable|ShowPropertyLabelFlags.Selectable|ShowPropertyLabelFlags.ContextMenu|ShowPropertyLabelFlags.ContextMenu ;
-				if( layerList.Current==layer )
-					flags |= ShowPropertyLabelFlags.Bold;
-				return flags;
-			}
-		}
+        public override ShowPropertyLabelFlags LabelType
+        {
+            get
+            {
+                ShowPropertyLabelFlags flags = ShowPropertyLabelFlags.Editable|ShowPropertyLabelFlags.Selectable|ShowPropertyLabelFlags.ContextMenu|ShowPropertyLabelFlags.ContextMenu ;
+                if( layerList.Current==layer )
+                    flags |= ShowPropertyLabelFlags.Bold;
+                return flags;
+            }
+        }
         /// <inheritdoc/>
         public override int SubEntriesCount
-		{
-			get
-			{
-				
-				return 4;
-			}
-		}
+        {
+            get
+            {
+                
+                return 4;
+            }
+        }
         /// <inheritdoc/>
         public override IShowProperty[] SubEntries
-		{
-			get
-			{
-				if (showProperties==null)
-				{
-					ImageList LayerImageList = BitmapTable.GetImageList("Layer.png",16,16);
-					showProperties = new IShowProperty[4];
-					BooleanProperty prop0 = new BooleanProperty(layer,"Visible",
-						"Layer.Visibility",
-						"Layer.Visibility.Values");
-					prop0.SetImages(LayerImageList,0,1);
-					showProperties[0] = prop0;
-					BooleanProperty prop1 = new BooleanProperty(layer,"Printable",
-						"Layer.Printability",
-						"Layer.Printability.Values");
-					prop1.SetImages(LayerImageList,4,5);
-					showProperties[1] = prop1;
-					BooleanProperty prop2 = new BooleanProperty(layer,"Pickable",
-						"Layer.Pickability",
-						"Layer.Pickability.Values");
-					prop2.SetImages(LayerImageList,2,3);
-					showProperties[2] = prop2;
-					ColorList ct = layerList.ColorList ;
-					if(ct != null)
-					{
-						ct.DidModifyEvent +=new DidModifyDelegate(ct_DidModify);
-						showProperties[3] = new ColorSelectionProperty(layer,"ColorDef","Layer.Color",ct,0);
-					}
-				}
-				return showProperties;
-			}
-		}
+        {
+            get
+            {
+                if (showProperties==null)
+                {
+                    ImageList LayerImageList = BitmapTable.GetImageList("Layer.png",16,16);
+                    showProperties = new IShowProperty[4];
+                    BooleanProperty prop0 = new BooleanProperty(layer,"Visible",
+                        "Layer.Visibility",
+                        "Layer.Visibility.Values");
+                    prop0.SetImages(LayerImageList,0,1);
+                    showProperties[0] = prop0;
+                    BooleanProperty prop1 = new BooleanProperty(layer,"Printable",
+                        "Layer.Printability",
+                        "Layer.Printability.Values");
+                    prop1.SetImages(LayerImageList,4,5);
+                    showProperties[1] = prop1;
+                    BooleanProperty prop2 = new BooleanProperty(layer,"Pickable",
+                        "Layer.Pickability",
+                        "Layer.Pickability.Values");
+                    prop2.SetImages(LayerImageList,2,3);
+                    showProperties[2] = prop2;
+                    ColorList ct = layerList.ColorList ;
+                    if(ct != null)
+                    {
+                        ct.DidModifyEvent +=new DidModifyDelegate(ct_DidModify);
+                        showProperties[3] = new ColorSelectionProperty(layer,"ColorDef","Layer.Color",ct,0);
+                    }
+                }
+                return showProperties;
+            }
+        }
 
-		public override Control GetValueControl(int Width, int Height)
-		{
-			if (control==null)
-			{	// erstmaliges Erzeugen des Controls
-				control = new DisplayLayerCtrl(layer);
-			}
-			return control;
-		}
+        public override Control GetValueControl(int Width, int Height)
+        {
+            if (control==null)
+            {	// erstmaliges Erzeugen des Controls
+                control = new DisplayLayerCtrl(layer);
+            }
+            return control;
+        }
         /// <summary>
         /// Overrides <see cref="IShowPropertyImpl.GetContextMenu"/>, 
         /// returns the context menu with the id "MenuId.LayerListEntry".
         /// (see <see cref="MenuResource.LoadContextMenu"/>)
         /// </summary>
         public override ContextMenu GetContextMenu()
-		{
-			ContextMenu res = MenuResource.LoadContextMenu("MenuId.LayerListEntry",this);
-			foreach( MenuItem mi in res.MenuItems)
-			{
-				MenuItemWithID miWid = mi as MenuItemWithID;
-				switch( miWid.ID)
-				{
-					case "MenuId.LayerListEntry.Delete":
-						if(layerList.Current == layer )
-							miWid.Enabled=false;
-						break;
-					case "MenuId.LayerListEntry.Current":
-						if(layerList.Current == layer )
-						{
-							miWid.Checked =true;
-							miWid.Enabled=false;
-						}
-						else
-						{
-							miWid.Checked =false;
-							miWid.Enabled=true;
-						}break;
-				}
-			}
-			return  res;
-		}
+        {
+            ContextMenu res = MenuResource.LoadContextMenu("MenuId.LayerListEntry",this);
+            foreach( MenuItem mi in res.MenuItems)
+            {
+                MenuItemWithID miWid = mi as MenuItemWithID;
+                switch( miWid.ID)
+                {
+                    case "MenuId.LayerListEntry.Delete":
+                        if(layerList.Current == layer )
+                            miWid.Enabled=false;
+                        break;
+                    case "MenuId.LayerListEntry.Current":
+                        if(layerList.Current == layer )
+                        {
+                            miWid.Checked =true;
+                            miWid.Enabled=false;
+                        }
+                        else
+                        {
+                            miWid.Checked =false;
+                            miWid.Enabled=true;
+                        }break;
+                }
+            }
+            return  res;
+        }
 
-		public override void LabelChanged(string NewText)
-		{
-			layer.Name = NewText;
-		}
+        public override void LabelChanged(string NewText)
+        {
+            layer.Name = NewText;
+        }
 
-	
-		public override void SetFocus(){control.Focus();}
-		public override Control[] FocusableControls()
-		{
-			Control[] ctrls = new Control[1];
-			ctrls[0] = control;
-			return ctrls;
-		}
-		#endregion
+    
+        public override void SetFocus(){control.Focus();}
+        public override Control[] FocusableControls()
+        {
+            Control[] ctrls = new Control[1];
+            ctrls[0] = control;
+            return ctrls;
+        }
+        #endregion
 
-		private void ct_DidModify(object sender, EventArgs args)
-		{
-			if (propertyPage!=null) propertyPage.Refresh(showProperties[3]);
-		}
-		#region ICommandHandler Members
+        private void ct_DidModify(object sender, EventArgs args)
+        {
+            if (propertyPage!=null) propertyPage.Refresh(showProperties[3]);
+        }
+        #region ICommandHandler Members
         bool ICommandHandler.OnCommand(string MenuId)
-		{
-			switch( MenuId )
-			{
-				case "MenuId.LayerListEntry.Edit":
-					if (propertyPage!=null) propertyPage.StartEditLabel(this);
-					return true;
-				case "MenuId.LayerListEntry.Delete":
-					layerList.Remove(layer);
-					if (propertyPage!=null) propertyPage.Refresh(layerList);
-					return true;
-				case "MenuId.LayerListEntry.Current":
-					layerList.Current = layer;
-					if (propertyPage!=null) propertyPage.Refresh(layerList);
-					return true;
-			}
-			return false;
-		}
+        {
+            switch( MenuId )
+            {
+                case "MenuId.LayerListEntry.Edit":
+                    if (propertyPage!=null) propertyPage.StartEditLabel(this);
+                    return true;
+                case "MenuId.LayerListEntry.Delete":
+                    layerList.Remove(layer);
+                    if (propertyPage!=null) propertyPage.Refresh(layerList);
+                    return true;
+                case "MenuId.LayerListEntry.Current":
+                    layerList.Current = layer;
+                    if (propertyPage!=null) propertyPage.Refresh(layerList);
+                    return true;
+            }
+            return false;
+        }
         bool ICommandHandler.OnUpdateCommand(string MenuId, CommandState CommandState)
-		{
-			// TODO: betreffende MenueIds behandeln
-			return false;
-		}
-		#endregion
-	}
+        {
+            // TODO: betreffende MenueIds behandeln
+            return false;
+        }
+        #endregion
+    }
 */
     /// <summary>
     /// Selects which layers an operation takes into account: all layers of a <see cref="LayerList"/>, only the layers

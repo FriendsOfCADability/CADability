@@ -64,10 +64,10 @@ namespace CADability.Attribute
             this.name = name;
         }
         /// <summary>
-		/// Returns a clone of this LinePattern
-		/// </summary>
-		/// <returns></returns>
-		public LinePattern Clone()
+        /// Returns a clone of this LinePattern
+        /// </summary>
+        /// <returns></returns>
+        public LinePattern Clone()
         {
             LinePattern res = new LinePattern();
             res.name = name;
@@ -254,10 +254,10 @@ namespace CADability.Attribute
                     subEntries[0] = mcp;
                     for (int i = 0; i < pattern.Length; ++i)
                     {
-	                    int currentIndex = i;
-	                    string rid = i % 2 == 0 ? "LinePattern.Stroke" : "LinePattern.Gap";
+                        int currentIndex = i;
+                        string rid = i % 2 == 0 ? "LinePattern.Stroke" : "LinePattern.Gap";
                         DoubleProperty dp = new DoubleProperty(propertyPage.ActiveView.Canvas.Frame, rid);
-						dp.OnGetValue = () => pattern[currentIndex];
+                        dp.OnGetValue = () => pattern[currentIndex];
                         dp.OnSetValue = (d) => OnSetPattern(currentIndex, d);
                         dp.DoubleChanged();
                         subEntries[i + 1] = dp;

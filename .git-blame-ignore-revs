@@ -1,0 +1,7 @@
+# Commits that only reformat code. git blame skips them when it is run with
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# and GitHub's blame view skips them on its own.
+# Each entry must be the hash of the commit as it is on master.
+
+# Indent with spaces instead of tabs, as .editorconfig requires
+dedcaef822722613fe6198c85d130e557b38d636

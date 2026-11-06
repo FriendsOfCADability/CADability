@@ -33,7 +33,7 @@ namespace CADability.UserInterface
                 if (geoObjects.Length > 0) propertyTreeView.OpenSubEntries(this, true);
                 SimpleNameProperty subEntry = GetObjectNameSubEntry(brepObject);
                 if (subEntry != null) propertyTreeView.SelectEntry(subEntry);
-			}
+            }
         }
         public void SetSelectedBRepObject(object brepObject)
         {	// funktioniert so nicht, selbst Refresh nutzt nichts.
@@ -114,23 +114,23 @@ namespace CADability.UserInterface
 
         private SimpleNameProperty GetObjectNameSubEntry(object selectedGeoObject)
         {
-	        SimpleNameProperty subEntry = null;
+            SimpleNameProperty subEntry = null;
 
-	        foreach (IShowProperty sp in SubEntries)
-	        {
-		        if (sp is SimpleNameProperty snp)
-		        {
-			        if (snp.AssociatedObject == selectedGeoObject)
-			        {
-				        subEntry = snp;
-				        break;
-			        }
-		        }
-	        }
+            foreach (IShowProperty sp in SubEntries)
+            {
+                if (sp is SimpleNameProperty snp)
+                {
+                    if (snp.AssociatedObject == selectedGeoObject)
+                    {
+                        subEntry = snp;
+                        break;
+                    }
+                }
+            }
 
-	        return subEntry;
+            return subEntry;
         }
-	}
+    }
     /// <summary>
     /// Darstellung eines GeoObjectInputs im ControlCenter
     /// </summary>
@@ -151,19 +151,19 @@ namespace CADability.UserInterface
         }
         public void SetGeoObjects(IGeoObject[] geoObjects, IGeoObject selectedGeoObject)
         {
-	        this.geoObjects = geoObjects;
-	        this.selectedGeoObject = selectedGeoObject;
-	        subEntries = null; // weg damit, damit es neu gemacht wird
-	        if (propertyTreeView != null)
-	        {
-		        this.Select();
-		        propertyTreeView.Refresh(this);
-		        if (geoObjects.Length > 0) propertyTreeView.OpenSubEntries(this, true);
-		        SimpleNameProperty subEntry = GetGeoObjectNameSubEntry(selectedGeoObject);
-		        if (subEntry != null) propertyTreeView.SelectEntry(subEntry);
-	        }
+            this.geoObjects = geoObjects;
+            this.selectedGeoObject = selectedGeoObject;
+            subEntries = null; // weg damit, damit es neu gemacht wird
+            if (propertyTreeView != null)
+            {
+                this.Select();
+                propertyTreeView.Refresh(this);
+                if (geoObjects.Length > 0) propertyTreeView.OpenSubEntries(this, true);
+                SimpleNameProperty subEntry = GetGeoObjectNameSubEntry(selectedGeoObject);
+                if (subEntry != null) propertyTreeView.SelectEntry(subEntry);
+            }
         }
-		public void SetSelectedGeoObject(IGeoObject geoObject)
+        public void SetSelectedGeoObject(IGeoObject geoObject)
         {	// funktioniert so nicht, selbst Refresh nutzt nichts.
             if (subEntries != null)
             {

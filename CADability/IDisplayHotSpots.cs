@@ -3,18 +3,18 @@
 namespace CADability
 {
     /*
-	 * So geht das mit den HotSpots:
-	 * Die SelectObjectAction oder besser gesagt, das dazugehörige IShowProperty, also SelectedObjectsProperty
-	 * bekommt die IShowProperties von allen markierten Objekten. Wenn diese auch noch das Interface
-	 * IDisplayHotSpots implementieren, dann hängt sich die SelectedObjectsProperty bei deren OnHotspotChanged
-	 * event ein, bekommt also mit, wenn HotSpots angezeigt werden sollen oder wieder verschwinden sollen.
-	 * Der Hotspot selbst muss IHotSpot implementieren. Das ist entweder eine GeoPointProperty
-	 * oder Stellvertreterobjekte wie LengthHotSpot, die sich auf eine Property beziehen aber selbst
-	 * die Lage des HotSpots verwalten.
-	 * Wenn der user auf den Hotspot klickt, dann wird IHotSpot.IsSelected gesetzt, wenn er daran
-	 * zieht, wird IHotSpot.StartDrag aufgerufen. Einfache Aktionen wie GeneralGeoVectorAction
-	 * verändern dann die entsprechende Einstellung.
-	 * */
+     * So geht das mit den HotSpots:
+     * Die SelectObjectAction oder besser gesagt, das dazugehörige IShowProperty, also SelectedObjectsProperty
+     * bekommt die IShowProperties von allen markierten Objekten. Wenn diese auch noch das Interface
+     * IDisplayHotSpots implementieren, dann hängt sich die SelectedObjectsProperty bei deren OnHotspotChanged
+     * event ein, bekommt also mit, wenn HotSpots angezeigt werden sollen oder wieder verschwinden sollen.
+     * Der Hotspot selbst muss IHotSpot implementieren. Das ist entweder eine GeoPointProperty
+     * oder Stellvertreterobjekte wie LengthHotSpot, die sich auf eine Property beziehen aber selbst
+     * die Lage des HotSpots verwalten.
+     * Wenn der user auf den Hotspot klickt, dann wird IHotSpot.IsSelected gesetzt, wenn er daran
+     * zieht, wird IHotSpot.StartDrag aufgerufen. Einfache Aktionen wie GeneralGeoVectorAction
+     * verändern dann die entsprechende Einstellung.
+     * */
 
     /// <summary>
     /// What happened to a hotspot, as reported by <see cref="HotspotChangedDelegate"/>: Visible and Invisible when the hotspot is to

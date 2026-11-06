@@ -85,7 +85,7 @@ namespace CADability
         /// </summary>
         /// <param name="context">any kind of object</param>
         /// <returns>the IDisposable interface for the using schema</returns>
-		public IDisposable ContextFrame(object context)
+        public IDisposable ContextFrame(object context)
         {
             return new contextFrame(this, context);
         }
@@ -273,8 +273,8 @@ namespace CADability
         }
         /// <summary>
         /// Executes the undo of the last step. Ususlly called by the project when handling the "MenuId.Edit.Undo" command.
-		/// </summary>
-		/// <returns>success: true, failure: false</returns>
+        /// </summary>
+        /// <returns>success: true, failure: false</returns>
         public bool UndoLastStep()
         {
             if (undoSteps.Count > 0)
@@ -414,9 +414,9 @@ namespace CADability
             return redoFrameStack.Peek();
         }
         /// <summary>
-		/// Closes the previously opened undo frame. See <see cref="OpenUndoFrame"/>.
-		/// </summary>
-		/// <param name="UndoFrame">the result from OpenUndoFrame</param>
+        /// Closes the previously opened undo frame. See <see cref="OpenUndoFrame"/>.
+        /// </summary>
+        /// <param name="UndoFrame">the result from OpenUndoFrame</param>
         public void CloseUndoFrame(object UndoFrame)
         {
             // System.Diagnostics.Debug.WriteLine("<--- Frame");

@@ -408,19 +408,19 @@ namespace CADability.Actions
             base.OnSetAction();
         }
         /// <inheritdoc/>
-		public override void OnRemoveAction()
+        public override void OnRemoveAction()
         {
             base.OnRemoveAction();
         }
 
         /// <inheritdoc/>
-		public override string GetID()
+        public override string GetID()
         {
             return "ToolsRoundMultiple";
         }
 
         /// <inheritdoc/>
-		public override void OnDone()
+        public override void OnDone()
         {
             if (base.ActiveObject != null)
             {   // es soll ein Pfad eingefügt werden

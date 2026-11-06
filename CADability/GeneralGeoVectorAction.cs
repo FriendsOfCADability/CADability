@@ -18,7 +18,7 @@ namespace CADability.Actions
         /// <summary>
         /// UserData to differentiate between multiple GeneralGeoVectorActions.
         /// </summary>
-		public UserData UserData;
+        public UserData UserData;
         /// <summary>
         /// Constructs a GeneralGeoVectorAction to modify the provided <see cref="GeoVectorProperty"/>
         /// </summary>

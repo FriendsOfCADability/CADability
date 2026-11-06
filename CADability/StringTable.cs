@@ -306,11 +306,11 @@ namespace CADability.UserInterface
         /// Returns the string with the given ID in the <see cref="ActiveLanguage"/>. If the there is no 
         /// appropriate entry in the ActiveLanguage then the default language is searched. If there is still no 
         /// entry
-		/// "missing string: "+Name is returned. 
-		/// </summary>
-		/// <param name="Name">Name or ID of the string</param>
-		/// <returns>the value of the string entry</returns>
-		public static string GetString(string Name)
+        /// "missing string: "+Name is returned. 
+        /// </summary>
+        /// <param name="Name">Name or ID of the string</param>
+        /// <returns>the value of the string entry</returns>
+        public static string GetString(string Name)
         {
             if (Name.EndsWith(".Label")) return GetString(Name.Substring(0, Name.Length - 6), Category.label);
             else if (Name.EndsWith(".ShortInfo")) return GetString(Name.Substring(0, Name.Length - 10), Category.tip);
@@ -346,15 +346,15 @@ namespace CADability.UserInterface
             //}
         }
         /// <summary>
-		/// Returns a formatted string. The string with the ID "Name" from the string resource
-		/// is formatted by substituting the {0}, {1} ... substring with the string values
-		/// of the args objects.
-		/// If there is a formatting error, the unformatted string will be returned.
-		/// </summary>
-		/// <param name="Name">Name or ID of the string</param>
-		/// <param name="args">Variable number of arguments for formatting</param>
-		/// <returns>The formatted string</returns>
-		public static string GetFormattedString(string Name, params object[] args)
+        /// Returns a formatted string. The string with the ID "Name" from the string resource
+        /// is formatted by substituting the {0}, {1} ... substring with the string values
+        /// of the args objects.
+        /// If there is a formatting error, the unformatted string will be returned.
+        /// </summary>
+        /// <param name="Name">Name or ID of the string</param>
+        /// <param name="args">Variable number of arguments for formatting</param>
+        /// <returns>The formatted string</returns>
+        public static string GetFormattedString(string Name, params object[] args)
         {
             string str = GetString(Name);
             try

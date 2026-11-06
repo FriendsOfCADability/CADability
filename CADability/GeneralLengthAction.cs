@@ -128,7 +128,7 @@ namespace CADability.Actions
         }
 
         /// <inheritdoc/>
-		public override void OnRemoveAction()
+        public override void OnRemoveAction()
         {
         }
 
@@ -169,7 +169,7 @@ namespace CADability.Actions
         }
 
         /// <inheritdoc/>
-		public override bool OnEscape()
+        public override bool OnEscape()
         {
             SetLength(initialLengthValue);
             base.RemoveThisAction();
@@ -177,7 +177,7 @@ namespace CADability.Actions
         }
 
         /// <inheritdoc/>
-		public override bool OnEnter()
+        public override bool OnEnter()
         {
             base.RemoveThisAction();
             return true;

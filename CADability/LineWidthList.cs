@@ -179,11 +179,11 @@ namespace CADability.Attribute
             return res;
         }
         /// <summary>
-		/// Returns the index of the given linewidth in this list
-		/// </summary>
-		/// <param name="lw">linewidth for which the index is requested</param>
-		/// <returns>the index found or -1 if this list does not contain lw</returns>
-		public int FindIndex(LineWidth lw)
+        /// Returns the index of the given linewidth in this list
+        /// </summary>
+        /// <param name="lw">linewidth for which the index is requested</param>
+        /// <returns>the index found or -1 if this list does not contain lw</returns>
+        public int FindIndex(LineWidth lw)
         {
             for (int i = 0; i < entries.Count; ++i)
             {

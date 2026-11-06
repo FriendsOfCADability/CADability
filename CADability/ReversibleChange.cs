@@ -248,7 +248,7 @@ namespace CADability
         /// <summary>
         /// Gets the method or property name for this ReversibleChange
         /// </summary>
-		public string MethodOrPropertyName
+        public string MethodOrPropertyName
         {   // nur zum Debuggen
             get { return methodOrPropertyName; }
         }
@@ -286,7 +286,7 @@ namespace CADability
         /// Overrides objec.ToString()
         /// </summary>
         /// <returns>the call for the undo as a string</returns>
-		public override string ToString()
+        public override string ToString()
         {
             string res = "ReversibleChange: " + objectToChange.ToString() + "." + methodOrPropertyName;
             if (parameters != null && parameters.Length > 0)

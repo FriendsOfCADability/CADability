@@ -121,7 +121,7 @@ namespace CADability.Actions
         }
 
         /// <inheritdoc/>
-		public override void OnRemoveAction()
+        public override void OnRemoveAction()
         {
         }
         /// <summary>
@@ -161,7 +161,7 @@ namespace CADability.Actions
         }
 
         /// <inheritdoc/>
-		public override bool OnEscape()
+        public override bool OnEscape()
         {
             SetAngle(InitialAngleValue);
             base.RemoveThisAction();
@@ -169,7 +169,7 @@ namespace CADability.Actions
         }
 
         /// <inheritdoc/>
-		public override bool OnEnter()
+        public override bool OnEnter()
         {
             base.RemoveThisAction();
             return true;

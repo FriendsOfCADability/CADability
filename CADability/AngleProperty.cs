@@ -411,15 +411,15 @@ namespace CADability.UserInterface
         [Obsolete("method has no functionality, remove this call")]
         public void CheckMouseButton(bool Check) { }
 
-		/// <summary>
-		/// Obsolete handler signature of <see cref="LabelChangedEvent"/>; hides <see cref="EditableProperty{T}.LabelChangedDelegate"/>.
-		/// Note that the sender is declared as <see cref="LengthProperty"/>.
-		/// </summary>
-		/// <param name="sender">The property entry whose label changed</param>
-		/// <param name="newLabel">The new label text</param>
+        /// <summary>
+        /// Obsolete handler signature of <see cref="LabelChangedEvent"/>; hides <see cref="EditableProperty{T}.LabelChangedDelegate"/>.
+        /// Note that the sender is declared as <see cref="LengthProperty"/>.
+        /// </summary>
+        /// <param name="sender">The property entry whose label changed</param>
+        /// <param name="newLabel">The new label text</param>
         [Obsolete("use delegate AngleProperty.LabelTextChanged instead")]
-		public new delegate void LabelChangedDelegate(LengthProperty sender, string newLabel);
-		
+        public new delegate void LabelChangedDelegate(LengthProperty sender, string newLabel);
+        
         /// <summary>
         /// Obsolete and never raised; use <see cref="EditableProperty{T}.LabelTextChanged"/> instead.
         /// </summary>

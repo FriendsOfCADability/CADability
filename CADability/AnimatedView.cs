@@ -757,11 +757,11 @@ namespace CADability
         }
 
 #pragma warning disable 67 // Suppress "event is never used" warning
-		//TODO: Use this event e.g. in RecalcScrollPosition() like other views did
-		/// <summary>
-		/// Not raised by this view: the animated view does not report its scroll position (see <see cref="IView.ScrollPositionChangedEvent"/>).
-		/// </summary>
-		public event CADability.ScrollPositionChanged ScrollPositionChangedEvent;
+        //TODO: Use this event e.g. in RecalcScrollPosition() like other views did
+        /// <summary>
+        /// Not raised by this view: the animated view does not report its scroll position (see <see cref="IView.ScrollPositionChangedEvent"/>).
+        /// </summary>
+        public event CADability.ScrollPositionChanged ScrollPositionChangedEvent;
 #pragma warning restore 67
 
         private void Scroll(double dx, double dy)

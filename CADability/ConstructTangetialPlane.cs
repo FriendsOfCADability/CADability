@@ -27,18 +27,18 @@ namespace CADability.Actions
             feedBackplane.Set(fplane, width, height);
         }
         public delegate void PlaneChangedDelegate(Plane plane);
-		public event PlaneChangedDelegate PlaneChangedEvent;
+        public event PlaneChangedDelegate PlaneChangedEvent;
         public ConstructTangetialPlane(string resourceId)
-		{
-			base.TitleId = resourceId;
-		}
-		public override string GetID()
-		{
-			return "Construct.Plane.Tangetial";
-		}
+        {
+            base.TitleId = resourceId;
+        }
+        public override string GetID()
+        {
+            return "Construct.Plane.Tangetial";
+        }
 
-		public override void OnSetAction()
-		{
+        public override void OnSetAction()
+        {
 
             plane = base.ActiveDrawingPlane;
             feedBackPolyLine = Polyline.Construct();
@@ -50,11 +50,11 @@ namespace CADability.Actions
             GeoObjectInput input = new GeoObjectInput("Construct.Plane.Tangetial.Face");
             input.FacesOnly = true;
             input.MouseOverGeoObjectsEvent += new GeoObjectInput.MouseOverGeoObjectsDelegate(OnMouseOverGeoObjects);
-			base.SetInput(input);
+            base.SetInput(input);
             //base.FeedBack.Add(feedBackPolyLine);
             base.FeedBack.Add(feedBackplane);
             base.OnSetAction();
-		}
+        }
 
         private void CheckPlane()
         {

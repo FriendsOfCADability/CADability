@@ -34,7 +34,7 @@ namespace CADability.Attribute
         /// Remove the provided <see cref="Filter"/> from the list
         /// </summary>
         /// <param name="f">Filter to remove</param>
-		public void Remove(Filter f)
+        public void Remove(Filter f)
         {
             for (int i = 0; i < propertyPages.Count; i++) if (propertyPages[i].IsOnTop()) propertyPages[i].OpenSubEntries(this, false);
             entries.Remove(f.Name);
@@ -52,7 +52,7 @@ namespace CADability.Attribute
         /// Add the provided <see cref="Filter"/> to the list
         /// </summary>
         /// <param name="f">Filter to add</param>
-		public void Add(Filter f)
+        public void Add(Filter f)
         {
             entries[f.Name] = f;
             f.Parent = this;
@@ -73,7 +73,7 @@ namespace CADability.Attribute
         /// </summary>
         /// <param name="go">Object to check</param>
         /// <returns>true: accepted, false: rejected</returns>
-		public bool Accept(IGeoObject go)
+        public bool Accept(IGeoObject go)
         {
             bool accepted = true;
             bool doInternalFiltering = true;

@@ -37,7 +37,7 @@ namespace CADability.UserInterface
 
             radiusProperty = new LengthProperty(Frame, "Circle.Radius");
             radiusProperty.OnGetValue = OnGetRadius;
-			radiusProperty.OnSetValue = OnSetRadius;
+            radiusProperty.OnSetValue = OnSetRadius;
             radiusProperty.ModifyWithMouse += ModifyRadiusWithMouse;
             radiusProperty.PropertyEntryChangedStateEvent+= OnStateChanged;
             radiusHotSpots = new LengthHotSpot[4];
@@ -63,7 +63,7 @@ namespace CADability.UserInterface
 
             diameterProperty = new LengthProperty(Frame, "Circle.Diameter");
             diameterProperty.OnGetValue = OnGetDiameter;
-			diameterProperty.OnSetValue = OnSetDiameter;
+            diameterProperty.OnSetValue = OnSetDiameter;
             diameterProperty.ModifyWithMouse += ModifyRadiusWithMouse;
             diameterProperty.PropertyEntryChangedStateEvent+= OnStateChanged;
 
@@ -78,7 +78,7 @@ namespace CADability.UserInterface
                 startAngleHotSpot.Position = circle.StartPoint;
 
                 endAngleProperty = new AngleProperty(Frame, "Arc.EndAngle");
-				endAngleProperty.OnGetValue = OnGetEndAngle;
+                endAngleProperty.OnGetValue = OnGetEndAngle;
                 endAngleProperty.OnSetValue = OnSetEndAngle;
                 endAngleProperty.ModifyWithMouse += ModifyEndAngleWithMouse;
                 endAngleProperty.PropertyEntryChangedStateEvent+= OnStateChanged;
@@ -106,7 +106,7 @@ namespace CADability.UserInterface
                 {
                     startAngleProperty = new AngleProperty(Frame, "Arc.StartAngle");
                     startAngleProperty.OnGetValue = OnGetStartAngle;
-					startAngleProperty.OnSetValue = OnSetStartAngle;
+                    startAngleProperty.OnSetValue = OnSetStartAngle;
                     startAngleProperty.ModifyWithMouse += ModifyStartAngleWithMouse;
                     startAngleProperty.PropertyEntryChangedStateEvent+= OnStateChanged;
                     startAngleHotSpot = new AngleHotSpot(startAngleProperty);

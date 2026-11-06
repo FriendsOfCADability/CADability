@@ -105,7 +105,7 @@ namespace CADability
                     dyProperty = new DoubleProperty(base.Frame, "Grid.YDistance");
                     dxProperty.OnGetValue = () => XDistance;
                     dxProperty.OnSetValue = l => dx = l;
-					dyProperty.OnGetValue = () => YDistance;
+                    dyProperty.OnGetValue = () => YDistance;
                     dyProperty.OnSetValue = l => dy = l;
                     dxProperty.Refresh();
                     dyProperty.Refresh();

@@ -133,11 +133,12 @@ namespace CADability
 
     /// <summary>
     /// Lets the application control where the global settings (<see cref="Settings.GlobalSettings"/>) are stored: attach a
-    /// handler to <see cref="GetGlobalSettingsFileName"/> before the settings are first used to provide the file name, or
-    /// set <see cref="neverSaveGlobalSettings"/> to suppress saving. Without a handler the file
-    /// "CADability.GlobalSettings.json" in the current directory is used if it exists there and the directory is
-    /// writable, otherwise the same file in the local application data folder (or in "My Documents" if that is not
-    /// available).
+    /// handler to <see cref="GetGlobalSettingsFileName"/> before the settings are first used to provide the file name,
+    /// set <see cref="neverSaveGlobalSettings"/> to suppress saving, or set <see cref="neverLoadGlobalSettings"/> to start
+    /// with default settings instead of reading the file, e.g. when the application stores the settings itself. Without a
+    /// handler the file "CADability.GlobalSettings.json" in the current directory is used if it exists there and the
+    /// directory is writable, otherwise the same file in the local application data folder (or in "My Documents" if that
+    /// is not available).
     /// </summary>
     public class SettingsGlobalFileName
     {

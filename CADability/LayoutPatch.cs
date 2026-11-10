@@ -616,27 +616,25 @@ namespace CADability
         }
         void ICommandHandler.OnSelected(MenuWithHandler selectedMenuItem, bool selected) { }
         #endregion
-        private void OnFocusChanged(IPropertyTreeView sender, IShowProperty newFocus, IShowProperty oldFocus)
+        public override void Selected(IPropertyEntry previousSelected)
         {
-            if (sender.FocusEntered(this, oldFocus, newFocus))
+            RemoveModifyLayoutPatchAction();
+            if (Frame.ActiveView == layoutView)
             {
-                action?.RemoveThisAction();
-                action = null;
-                if (Frame.ActiveView == layoutView)
-                {
-                    action = new ModifyLayoutPatch(this, layoutView);
-                    Frame.SetAction(action);
-                }
+                action = new ModifyLayoutPatch(this, layoutView);
+                Frame.SetAction(action);
             }
-            else if (sender.FocusLeft(this, oldFocus, newFocus))
-            {
-                action?.RemoveThisAction();
-                action = null;
-            }
-            if (sender.FocusLeft(visibleLayersSp, oldFocus, newFocus))
-            {
-                layoutView.Repaint();
-            }
+            base.Selected(previousSelected);
+        }
+        public override void UnSelected(IPropertyEntry nowSelected)
+        {
+            RemoveModifyLayoutPatchAction();
+            base.UnSelected(nowSelected);
+        }
+        private void RemoveModifyLayoutPatchAction()
+        {
+            action?.RemoveThisAction();
+            action = null;
         }
         private void SetSection()
         {

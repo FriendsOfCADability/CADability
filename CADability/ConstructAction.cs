@@ -2677,7 +2677,7 @@ namespace CADability.Actions
                     if (geoPointProperty.IsOpen && !geoPointProperty.IsSelected)
                     {   // there muste be one of the x, y or z entries selected
                         IPropertyEntry[] subentries = geoPointProperty.SubItems;
-                        IPropertyEntry selected = (geoPointProperty.Parent as IPropertyPage).GetCurrentSelection();
+                        IPropertyEntry selected = constructAction.propertyTreeView?.GetCurrentSelection(); // Parent is the page only for a root entry
                         for (int i = 0; i < subentries.Length; i++)
                         {
                             if (subentries[i] == selected)
@@ -3175,7 +3175,7 @@ namespace CADability.Actions
                     if (geoVectorProperty.IsOpen && !geoVectorProperty.IsSelected)
                     {
                         IPropertyEntry[] subentries = geoVectorProperty.SubItems;
-                        IPropertyEntry selected = (geoVectorProperty.Parent as IPropertyPage).GetCurrentSelection();
+                        IPropertyEntry selected = constructAction.propertyTreeView?.GetCurrentSelection(); // Parent is the page only for a root entry
                         for (int i = 0; i < subentries.Length; i++)
                         {
                             if (subentries[i] == selected)

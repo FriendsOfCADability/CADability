@@ -2592,7 +2592,15 @@ namespace CADability.Shapes
             }
             return minDist;
         }
-        internal double GetMinDistance(GeoPoint2D p)
+        /// <summary>
+        /// Returns the smallest distance between <paramref name="p"/> and the segments of this border, i.e. the distance
+        /// from the point to the outline itself (see <see cref="ICurve2D.MinDistance(GeoPoint2D)"/>). The result is never
+        /// negative and does not tell whether the point lies inside or outside a closed border; use
+        /// <see cref="GetPosition(GeoPoint2D)"/> for that. All segments are tested.
+        /// </summary>
+        /// <param name="p">the point to measure the distance to</param>
+        /// <returns>the minimum distance, 0 when the point lies on the border</returns>
+        public double GetMinDistance(GeoPoint2D p)
         {
             double minDist = double.MaxValue;
             for (int i = 0; i < segment.Length; ++i)

@@ -92,6 +92,7 @@ namespace CADability
         private IShowProperty[] subEntries;
         private DoubleProperty dxProperty;
         private DoubleProperty dyProperty;
+        private bool distanceModified; // dx or dy was changed in the property page, GridChangedEvent is still pending
         private MultipleChoiceProperty displayModeProperty;
         /// <inheritdoc/>
         public override IShowProperty[] SubEntries
@@ -104,9 +105,11 @@ namespace CADability
                     dxProperty = new DoubleProperty(base.Frame,"Grid.XDistance");
                     dyProperty = new DoubleProperty(base.Frame, "Grid.YDistance");
                     dxProperty.OnGetValue = () => XDistance;
-                    dxProperty.OnSetValue = l => dx = l;
+                    dxProperty.OnSetValue = l => { dx = l; distanceModified = true; };
                     dyProperty.OnGetValue = () => YDistance;
-                    dyProperty.OnSetValue = l => dy = l;
+                    dyProperty.OnSetValue = l => { dy = l; distanceModified = true; };
+                    dxProperty.PropertyEntryChangedStateEvent += OnDistanceStateChanged;
+                    dyProperty.PropertyEntryChangedStateEvent += OnDistanceStateChanged;
                     dxProperty.Refresh();
                     dyProperty.Refresh();
                     int initial = (int)displayMode + 1;
@@ -169,14 +172,17 @@ namespace CADability
             if (GridChangedEvent != null) GridChangedEvent(this);
         }
 
-        private void OnFocusChanged(IPropertyTreeView sender, IShowProperty NewFocus, IShowProperty OldFocus)
+        /// <summary>
+        /// The distances are set with every keystroke, but <see cref="GridChangedEvent"/> is only raised when the edit of
+        /// a distance ends (Enter, Tab, Escape or selecting another entry), so the grid is not redrawn for every
+        /// intermediate value.
+        /// </summary>
+        private void OnDistanceStateChanged(IPropertyEntry sender, StateChangedArgs args)
         {
-            // hier nur feuern wenn der Abstand verlassen wird,
-            // displaymode wird bei jeder Änderung gefeurt
-            if ((OldFocus == dxProperty && NewFocus != dyProperty) ||
-                (OldFocus == dyProperty && NewFocus != dxProperty))
+            if (args.EventState == StateChangedArgs.State.EditEnded && distanceModified)
             {
-                if (GridChangedEvent != null) GridChangedEvent(this);
+                distanceModified = false;
+                GridChangedEvent?.Invoke(this);
             }
         }
     }

@@ -871,7 +871,9 @@ namespace CADability.Actions
                 {
                     pp.Remove(selectedObjectsProperty);
                     pp.Add(selectedObjectsProperty, true);
-                    if (Frame.GetBooleanSetting("Action.PopProperties", true))
+                    // Only bring the page to front when there is something to show: clearing the selection (e.g. when another
+                    // action is set on top of this one, which removes the entry right afterwards) would show an empty page.
+                    if (selectedObjects.Count > 0 && Frame.GetBooleanSetting("Action.PopProperties", true))
                     {
                         pp.BringToFront();
                         Frame.SetControlCenterFocus("Action", null, false, false);

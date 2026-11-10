@@ -838,6 +838,8 @@ namespace CADability.Forms
         private void SetEntries(IPropertyEntry[] entries, int index, int added)
         {
             HashSet<IPropertyEntry> oldEntries, newEntries = new HashSet<IPropertyEntry>(entries);
+            // remember the selected entry, the index "selected" refers to the old list and is not valid for the new one
+            IPropertyEntry selectedEntry = (this.entries != null && selected >= 0 && selected < this.entries.Length) ? this.entries[selected] : null;
             if (this.entries != null) oldEntries = new HashSet<IPropertyEntry>(this.entries);
             else oldEntries = new HashSet<IPropertyEntry>(); // there is no HashSet.AddRange
             // don't call Removed with a subsequent Added on the same entry, because some entries keep a list of
@@ -867,9 +869,14 @@ namespace CADability.Forms
                 // to the entry they are shown under; overwriting it with the page would break every walk up the tree.
                 if (rootProperties.Contains(entries[i])) entries[i].Parent = this;
             }
+            // The selected entry keeps its selection when it is still shown, possibly at another index (e.g. an entry above it
+            // was opened or closed). When it is no longer shown, nothing is selected; a stale index would point to another
+            // entry or beyond the end of the list (GetCurrentSelection threw an IndexOutOfRangeException).
+            selected = selectedEntry != null ? Array.IndexOf(this.entries, selectedEntry) : -1;
             int totalHeight = entries.Length * lineHeight;
             AutoScrollMinSize = new Size(0, totalHeight);
             Invalidate();
+            if (selectedEntry != null && selected < 0) OnSelectionChanged?.Invoke(selectedEntry, null);
         }
         public void Refresh(IPropertyEntry toRefresh)
         {

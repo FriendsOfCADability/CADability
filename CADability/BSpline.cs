@@ -3794,9 +3794,28 @@ namespace CADability.GeoObject
             }
         }
 
-        internal BSpline SetCyclicalStartPoint(double pos)
+        /// <summary>
+        /// Returns a copy of this closed spline that starts and ends at <paramref name="position"/> instead of at
+        /// <see cref="ICurve.StartPoint"/>. The copy runs through the same points in the same direction, only its
+        /// parameterisation is rotated: position 0 of the copy is position <paramref name="position"/> of this spline.
+        /// This spline is not changed. Used when an edge of an imported model starts somewhere along a closed curve.
+        /// </summary>
+        /// <param name="position">the new start as a position on this spline, 0 for the start and 1 for the end
+        /// (see <see cref="ICurve.PointAt(double)"/>). 0 and 1 return an unchanged copy.</param>
+        /// <returns>the new spline, a clamped (not periodic) spline whose start and end point are equal</returns>
+        /// <exception cref="InvalidOperationException">when the start and end point of this spline are not equal (within
+        /// <see cref="Precision.eps"/>)</exception>
+        /// <exception cref="ArgumentOutOfRangeException">when <paramref name="position"/> is not between 0 and 1</exception>
+        public BSpline CloneWithStartAt(double position)
         {
-            double par = startParam + pos * (endParam - startParam);
+            if (((this as ICurve).StartPoint | (this as ICurve).EndPoint) >= Precision.eps)
+                throw new InvalidOperationException("CloneWithStartAt needs a closed spline, whose start and end point are equal.");
+            if (!(position >= 0.0 && position <= 1.0))
+                throw new ArgumentOutOfRangeException(nameof(position), position, "The position must be between 0 and 1.");
+            // A periodic spline keeps an extended knot vector in its nurbs helper, so splitting it yields parts that do not
+            // fit together below. The clamped copy of the full range is the same curve and splits correctly.
+            if (periodic) return TrimParam(startParam, endParam).CloneWithStartAt(position);
+            double par = startParam + position * (endParam - startParam);
             BSpline[] parts = SplitParam(par);
             List<GeoPoint> tp = new List<GeoPoint>();
             if (parts.Length == 2)
@@ -3824,10 +3843,6 @@ namespace CADability.GeoObject
                 BSpline res = BSpline.Construct();
                 if (sweights.Count > 0) res.SetData(this.degree, spoles.ToArray(), sweights.ToArray(), sknots.ToArray(), smults.ToArray(), false);
                 else res.SetData(this.degree, spoles.ToArray(), null, sknots.ToArray(), smults.ToArray(), false);
-#if DEBUG
-                GeoPoint pm = (res as ICurve).PointAt(0.001);
-                ICurve dbg = (res as ICurve).Approximate(true, 0.1);
-#endif
                 return res;
             }
             return this.Clone() as BSpline;

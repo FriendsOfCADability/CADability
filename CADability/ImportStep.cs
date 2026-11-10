@@ -3441,7 +3441,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
                                             {
                                                 if (sp > 1e-6 && sp < 1 - 1e-6)
                                                 {
-                                                    crv = (crv as BSpline).SetCyclicalStartPoint(sp);
+                                                    crv = (crv as BSpline).CloneWithStartAt(sp);
                                                 }
                                             }
                                             else if (crv is Line)
@@ -3502,7 +3502,7 @@ VERTEX_POINT: C:\Zeichnungen\STEP\Ligna - Staab - Halle 1.stp (85207)
                                                     // Problems[item.definingIndex] = "Debug: trimming spline across closed bound";
                                                     try
                                                     {   // does not always work, e.g. file exp.stp
-                                                        crv = (crv as BSpline).SetCyclicalStartPoint(sp);
+                                                        crv = (crv as BSpline).CloneWithStartAt(sp);
                                                         ep = crv.PositionOf(v2.Position);
                                                         crv.Trim(0.0, ep);
                                                     }

@@ -826,6 +826,7 @@ namespace CADability.Forms
                 {
                     if (pe.SubItems[i] != null)
                     {
+                        pe.SubItems[i].Parent = pe; // the entry it is shown under, not the page (see IPropertyEntry.Parent)
                         pe.SubItems[i].IndentLevel = level + 1;
                         res.Add(pe.SubItems[i]);
                         res.AddRange(GetSubEntries(pe.SubItems[i], level + 1));
@@ -861,8 +862,10 @@ namespace CADability.Forms
                 if (!oldEntries.Contains(entries[i]))
                 {
                     entries[i].Added(this);
-                    entries[i].Parent = this; // the propertypage should be responsible that all entries have the correct parent. No other code reqired.
                 }
+                // The page is the parent of the root entries only. GetSubEntries has already set the parent of the sub entries
+                // to the entry they are shown under; overwriting it with the page would break every walk up the tree.
+                if (rootProperties.Contains(entries[i])) entries[i].Parent = this;
             }
             int totalHeight = entries.Length * lineHeight;
             AutoScrollMinSize = new Size(0, totalHeight);
@@ -1132,7 +1135,7 @@ namespace CADability.Forms
         #region quick adaption to IPropertyTreeView, remove later
         public IView ActiveView => Frame.ActiveView;
         public IPropertyEntry GetParent(IShowProperty child)
-        {   // this is a work around, because Parent is not correct implemented. It is always the property page, but it is also used in that way
+        {
             return (child as IPropertyEntry).Parent as IPropertyEntry;
         }
         public IFrame GetFrame()

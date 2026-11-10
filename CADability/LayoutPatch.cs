@@ -616,9 +616,37 @@ namespace CADability
         }
         void ICommandHandler.OnSelected(MenuWithHandler selectedMenuItem, bool selected) { }
         #endregion
-        private void OnFocusChanged(IPropertyTreeView sender, IShowProperty newFocus, IShowProperty oldFocus)
+        /// <summary>
+        /// Starts listening to the selection of the page the patch is shown in, see <see cref="OnSelectionChanged"/>.
+        /// </summary>
+        /// <param name="pp">the property page the patch was added to</param>
+        public override void Added(IPropertyPage pp)
         {
-            if (sender.FocusEntered(this, oldFocus, newFocus))
+            if (propertyPage != null) propertyPage.OnSelectionChanged -= OnSelectionChanged;
+            base.Added(pp);
+            pp.OnSelectionChanged += OnSelectionChanged;
+        }
+        /// <summary>
+        /// Stops listening to the selection and removes the <see cref="ModifyLayoutPatch"/> action, if it is still active.
+        /// </summary>
+        /// <param name="pp">the property page the patch was removed from</param>
+        public override void Removed(IPropertyPage pp)
+        {
+            if (propertyPage != null) propertyPage.OnSelectionChanged -= OnSelectionChanged;
+            action?.RemoveThisAction();
+            action = null;
+            base.Removed(pp);
+        }
+        /// <summary>
+        /// While the patch or one of its sub entries is selected in the control center, the patch can be dragged on the
+        /// paper with <see cref="ModifyLayoutPatch"/>: the action is set when the selection moves into the patch and
+        /// removed when it moves out of it.
+        /// </summary>
+        private void OnSelectionChanged(IPropertyEntry unselected, IPropertyEntry selected)
+        {
+            bool wasInside = Contains(unselected);
+            bool isInside = Contains(selected);
+            if (isInside && !wasInside)
             {
                 action?.RemoveThisAction();
                 action = null;
@@ -628,15 +656,33 @@ namespace CADability
                     Frame.SetAction(action);
                 }
             }
-            else if (sender.FocusLeft(this, oldFocus, newFocus))
+            else if (wasInside && !isInside)
             {
                 action?.RemoveThisAction();
                 action = null;
             }
-            if (sender.FocusLeft(visibleLayersSp, oldFocus, newFocus))
+            if (visibleLayersSp != null && IsWithin(unselected, visibleLayersSp) && !IsWithin(selected, visibleLayersSp))
             {
-                layoutView.Repaint();
+                layoutView?.Repaint();
             }
+        }
+        /// <summary>
+        /// True if <paramref name="entry"/> is this patch or one of its (nested) sub entries.
+        /// </summary>
+        private bool Contains(IPropertyEntry entry)
+        {
+            return IsWithin(entry, this);
+        }
+        /// <summary>
+        /// True if <paramref name="entry"/> is <paramref name="root"/> or lies below it, following <see cref="IPropertyEntry.Parent"/>.
+        /// </summary>
+        private static bool IsWithin(IPropertyEntry entry, IPropertyEntry root)
+        {
+            for (IPropertyEntry e = entry; e != null; e = e.Parent as IPropertyEntry)
+            {
+                if (e == root) return true;
+            }
+            return false;
         }
         private void SetSection()
         {

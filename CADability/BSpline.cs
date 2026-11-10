@@ -3794,8 +3794,16 @@ namespace CADability.GeoObject
             }
         }
 
+        /// <summary>
+        /// Returns a copy of this closed spline that starts and ends at <paramref name="pos"/> (a position in [0, 1]) and
+        /// runs through the same points in the same direction. This spline is not changed. The caller must make sure that
+        /// start and end point are equal.
+        /// </summary>
         internal BSpline SetCyclicalStartPoint(double pos)
         {
+            // A periodic spline keeps an extended knot vector in its nurbs helper, so splitting it yields parts that do not
+            // fit together below. The clamped copy of the full range is the same curve and splits correctly.
+            if (periodic) return TrimParam(startParam, endParam).SetCyclicalStartPoint(pos);
             double par = startParam + pos * (endParam - startParam);
             BSpline[] parts = SplitParam(par);
             List<GeoPoint> tp = new List<GeoPoint>();

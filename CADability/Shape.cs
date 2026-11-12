@@ -3010,8 +3010,17 @@ namespace CADability.Shapes
         {
             ArrayList css = new ArrayList();
             ArrayList sss = new ArrayList();
+            BoundingRect toSubtractExtent = toSubtract.GetExtent();
             for (int i = 0; i < simpleShapes.Length; ++i)
             {
+                BoundingRect extent = simpleShapes[i].GetExtent();
+                if (ExtentsClearlyApart(extent, toSubtractExtent))
+                {   // SimpleShape.Subtract would find the outlines disjoint and return a clone of simpleShapes[i]. This shape
+                    // is replaced by the result anyway, so the shape itself can be kept, which saves cloning every simple shape
+                    // for every subtracted hole.
+                    css.Add(new CompoundShape(simpleShapes[i]));
+                    continue;
+                }
                 css.Add(SimpleShape.Subtract(simpleShapes[i], toSubtract));
             }
             for (int i = 0; i < css.Count; ++i)
@@ -3026,6 +3035,18 @@ namespace CADability.Shapes
                 }
             }
             simpleShapes = (SimpleShape[])sss.ToArray(typeof(SimpleShape));
+        }
+        /// <summary>
+        /// true when the two extents are further apart than ten times the precision a <see cref="BorderOperation"/> of two
+        /// borders with these extents works with, so that the borders are certainly found to be disjoint.
+        /// </summary>
+        private static bool ExtentsClearlyApart(BoundingRect e1, BoundingRect e2)
+        {
+            if (e1.IsEmpty() || e2.IsEmpty()) return false;
+            BoundingRect both = e1;
+            both.MinMax(e2);
+            double margin = (both.Width + both.Height) * 1e-5;
+            return e1.Right + margin < e2.Left || e2.Right + margin < e1.Left || e1.Top + margin < e2.Bottom || e2.Top + margin < e1.Bottom;
         }
         /// <summary>
         /// Returns the intersection of two compound shapes (the same as

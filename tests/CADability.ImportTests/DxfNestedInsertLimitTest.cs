@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using CADability;
+using CADability.DXF;
 using CADability.GeoObject;
 
 namespace CADability.ImportTests
@@ -113,6 +114,126 @@ namespace CADability.ImportTests
                 if (existed) Settings.GlobalSettings.SetValue(setting, old);
                 else Settings.GlobalSettings.RemoveSetting(setting);
             }
+        }
+
+        /// <summary>
+        /// Runs <paramref name="action"/> with the setting "DxfDwg.MaxImportObjects" set to <paramref name="limit"/>.
+        /// </summary>
+        private static void WithLimit(int limit, Action action)
+        {
+            const string setting = "DxfDwg.MaxImportObjects";
+            bool existed = Settings.GlobalSettings.ContainsSetting(setting);
+            object old = existed ? Settings.GlobalSettings.GetValue(setting) : null;
+            Settings.GlobalSettings.SetValue(setting, limit);
+            try { action(); }
+            finally
+            {
+                if (existed) Settings.GlobalSettings.SetValue(setting, old);
+                else Settings.GlobalSettings.RemoveSetting(setting);
+            }
+        }
+
+        /// <summary>
+        /// The exception a caller gets, with its exact type checked: it must be the public type and not wrapped.
+        /// </summary>
+        private static DxfImportLimitException ExpectLimit(Action import, long limit)
+        {
+            DxfImportLimitException ex = Assert.ThrowsException<DxfImportLimitException>(import);
+            Assert.AreEqual(limit, ex.Limit);
+            Assert.IsNull(ex.InnerException);
+            StringAssert.Contains(ex.Message, "DxfDwg.MaxImportObjects");
+            return ex;
+        }
+
+        /// <summary>
+        /// A caller written for 1.8.0-preview.3, which only knew an <see cref="ApplicationException"/>, still catches it.
+        /// </summary>
+        private static void ExpectApplicationException(Action import)
+        {
+            try
+            {
+                import();
+                Assert.Fail("the import must be refused");
+            }
+            catch (ApplicationException ex)
+            {
+                Assert.IsInstanceOfType(ex, typeof(DxfImportLimitException));
+            }
+        }
+
+        [TestMethod]
+        [DoNotParallelize] // changes a global setting
+        public void a_dxf_file_beyond_the_limit_throws_the_public_type()
+        {
+            string file = WriteNestedBlocks(5, 10); // 10^4 lines
+            WithLimit(1000, () =>
+            {
+                ExpectLimit(() => Project.ReadFromFile(file, "dxf"), 1000);
+                ExpectLimit(() => { _ = new Import(file).Project; }, 1000);
+                ExpectApplicationException(() => Project.ReadFromFile(file, "dxf"));
+            });
+        }
+
+        /// <summary>
+        /// The DWG reader of ACadSharp for R13 and later, with the same nested blocks as the DXF tests.
+        /// </summary>
+        [TestMethod]
+        [DoNotParallelize] // changes a global setting
+        public void a_dwg_file_beyond_the_limit_throws_the_public_type()
+        {
+            // the nested blocks of WriteNestedBlocks(5, 10), built with ACadSharp, which writes the DWG
+            ACadSharp.CadDocument doc = new ACadSharp.CadDocument(ACadSharp.ACadVersion.AC1018);
+            ACadSharp.Tables.BlockRecord inner = new ACadSharp.Tables.BlockRecord("L5");
+            inner.Entities.Add(new ACadSharp.Entities.Line(new CSMath.XYZ(0, 0, 0), new CSMath.XYZ(1, 0, 0)));
+            doc.BlockRecords.Add(inner);
+            for (int level = 4; level >= 1; level--)
+            {
+                ACadSharp.Tables.BlockRecord outer = new ACadSharp.Tables.BlockRecord("L" + level);
+                for (int i = 0; i < 10; i++) outer.Entities.Add(new ACadSharp.Entities.Insert(inner) { InsertPoint = new CSMath.XYZ(0, 2 * i, 0) });
+                doc.BlockRecords.Add(outer);
+                inner = outer;
+            }
+            doc.Entities.Add(new ACadSharp.Entities.Insert(inner));
+            string dwg = this.TestContext.TestName + ".dwg";
+            using (ACadSharp.IO.DwgWriter writer = new ACadSharp.IO.DwgWriter(dwg, doc)) writer.Write();
+
+            Project imported = Project.ReadFromFile(dwg, "dwg"); // the DWG holds the whole drawing
+            Assert.AreEqual(10000, imported.GetActiveModel().AllObjects.Sum(LineCount));
+            WithLimit(1000, () =>
+            {
+                ExpectLimit(() => Project.ReadFromFile(dwg, "dwg"), 1000);
+                ExpectLimit(() => { _ = new Import(dwg).Project; }, 1000);
+                ExpectApplicationException(() => Project.ReadFromFile(dwg, "dwg"));
+            });
+        }
+
+        /// <summary>
+        /// The R10 to R12 DWG reader of the ACadSharp fork, with a real drawing: one INSERT of a block with one line,
+        /// which is 2 objects.
+        /// </summary>
+        [TestMethod]
+        [DoNotParallelize] // changes a global setting
+        [DeploymentItem(@"Files/Dwg/r12_insert.dwg", nameof(an_r12_dwg_file_beyond_the_limit_throws_the_public_type))]
+        public void an_r12_dwg_file_beyond_the_limit_throws_the_public_type()
+        {
+            string dwg = System.IO.Path.Combine(this.TestContext.DeploymentDirectory, this.TestContext.TestName, "r12_insert.dwg");
+            Assert.IsTrue(File.Exists(dwg));
+            WithLimit(1, () =>
+            {
+                ExpectLimit(() => Project.ReadFromFile(dwg, "dwg"), 1);
+                ExpectApplicationException(() => Project.ReadFromFile(dwg, "dwg"));
+            });
+        }
+
+        /// <summary>
+        /// Other errors of the DWG import are still wrapped in an <see cref="InvalidOperationException"/>.
+        /// </summary>
+        [TestMethod]
+        public void other_dwg_errors_are_still_wrapped()
+        {
+            string dwg = this.TestContext.TestName + ".dwg";
+            File.WriteAllBytes(dwg, Encoding.ASCII.GetBytes("AC1018" + new string('\0', 200)));
+            Assert.ThrowsException<InvalidOperationException>(() => Project.ReadFromFile(dwg, "dwg"));
         }
     }
 }

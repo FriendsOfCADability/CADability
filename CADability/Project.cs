@@ -2008,8 +2008,9 @@ namespace CADability
                 CADability.DXF.Import import = new DXF.Import(filename, useProgress ? new UIProgressBar("import dwg") : null);
                 return import.Project;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is DXF.DxfImportLimitException))
             {
+                // the limit is reported as itself, as for DXF files, so callers can catch it by type
                 throw new InvalidOperationException("Failed to read DWG file '" + filename + "': " + ex.Message, ex);
             }
         }
@@ -2024,7 +2025,8 @@ namespace CADability
         /// <see cref="ImportStep"/>), and STL files give a solid for every closed set of triangles and a shell for every
         /// open one. Objects without a colour or layer get the project's standard ones.
         /// A DWG file that cannot be read throws an <see cref="InvalidOperationException"/>; a DXF or STEP file that cannot
-        /// be read throws an exception as well.
+        /// be read throws an exception as well. A DXF or DWG file whose blocks expand to more objects than the setting
+        /// "DxfDwg.MaxImportObjects" allows throws a <see cref="DXF.DxfImportLimitException"/>, for both formats unwrapped.
         /// </summary>
         /// <param name="FileName">The name of the file</param>
         /// <param name="Format">The format: cdb, dxf, dwg, step, stp or stl</param>

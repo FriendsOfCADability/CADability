@@ -460,7 +460,9 @@ namespace CADability.DXF
         /// Converts the drawing into a new <see cref="CADability.Project"/> and returns it. The model space becomes the first
         /// model of the project; a non-empty paper space is added as a second model named "*Paper_Space" (and shown instead when
         /// the model space is empty). Layers and the other table entries become attributes of the project. Each access converts
-        /// the drawing again, so keep the result. Returns null when no document was read.
+        /// the drawing again, so keep the result. Returns null when no document was read. Throws a
+        /// <see cref="DxfImportLimitException"/> when the blocks of the drawing expand to more objects than the setting
+        /// "DxfDwg.MaxImportObjects" allows.
         /// </summary>
         public Project Project { get => CreateProject(); }
 
@@ -2854,15 +2856,37 @@ namespace CADability.DXF
     }
 
     /// <summary>
-    /// Thrown by the DXF/DWG import when the INSERTs of the drawing would create more objects than the setting
-    /// "DxfDwg.MaxImportObjects" allows (1,000,000 by default). Every INSERT gets its own copy of its block, so nested blocks
-    /// multiply, and a small or crafted file could exhaust the memory.
+    /// Thrown by the DXF/DWG import when the INSERTs and DIMENSIONs of the drawing would create more objects than the
+    /// global setting "DxfDwg.MaxImportObjects" allows (1,000,000 by default; a value of 0 or less also means the default).
+    /// Every INSERT gets its own copy of its block, so nested blocks multiply, and a small or crafted file could exhaust
+    /// the memory.
     /// </summary>
-    internal class DxfImportLimitException : ApplicationException
+    /// <remarks>
+    /// It is thrown while the drawing is converted, by <see cref="Import.Project"/>, and reaches the caller of
+    /// <see cref="Project.ReadFromFile(string, string, bool, bool)"/> for "dxf" and "dwg" files directly, never wrapped in
+    /// another exception. No project is returned.
+    /// <para>
+    /// A caller can catch this type to tell the user that the drawing is too large, using <see cref="Limit"/>. To import
+    /// such a drawing on purpose, raise the setting, e.g. <c>Settings.GlobalSettings.SetValue("DxfDwg.MaxImportObjects", 5000000)</c>,
+    /// and import the file again; an imported object takes about 650 bytes of memory, and up to 1.6 KB during the import.
+    /// </para>
+    /// <para>
+    /// It derives from <see cref="ApplicationException"/>, so handlers written for that type keep catching it.
+    /// </para>
+    /// </remarks>
+    public sealed class DxfImportLimitException : ApplicationException
     {
-        public DxfImportLimitException(long limit)
+        internal DxfImportLimitException(long limit)
             : base("The drawing expands to more than " + limit.ToString(System.Globalization.CultureInfo.InvariantCulture)
                   + " objects through its nested blocks and is not imported (setting DxfDwg.MaxImportObjects).")
-        { }
+        {
+            Limit = limit;
+        }
+
+        /// <summary>
+        /// The limit that was exceeded: the value of the setting "DxfDwg.MaxImportObjects" when the import ran, or its
+        /// default of 1,000,000.
+        /// </summary>
+        public long Limit { get; }
     }
 }

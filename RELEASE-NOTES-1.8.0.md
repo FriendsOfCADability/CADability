@@ -46,6 +46,7 @@ All of it is added; nothing existing changes.
 - `Project.WriteToFile(string FileName, bool useProgress)`: saves without showing the progress bar, e.g. from a background thread (#509).
 - `SettingsGlobalFileName.neverLoadGlobalSettings` (default `false`): when set before `Settings` is first used, the global settings file is not read and the settings start with their defaults. `neverSaveGlobalSettings` keeps its meaning and only suppresses saving (#538, #541).
 - `Border.GetMinDistance(GeoPoint2D)` is public (it was `internal`): the distance from a point to the outline, the same inside and outside (#545).
+- `CADability.DXF.DxfImportLimitException`, derived from `ApplicationException`, with `Limit`: thrown when a DXF or DWG file exceeds the new setting `DxfDwg.MaxImportObjects`, so an application can recognise this case by type and show the limit (see *Behaviour changes*; it was `internal` before).
 - In CADability.Forms, which is not part of the package: `GdiFontProvider` (#468, #503).
 
 ## Fixed issues
@@ -83,7 +84,7 @@ All of it is added; nothing existing changes.
 - **Page settings** (#474): new files contain only the neutral `PageSetup`; earlier CADability versions ignore the page settings of such files and read everything else. The page and printer dialogs of a layout view always store their result in the layout.
 - **STL export**: texts are left out of STL files, on every platform (#479).
 - **Imported DXF and DWG texts and dimensions are drawn larger** than in 1.7.1: as large as AutoCAD shows them, because the height in the file is now read as the cap height (#506).
-- **New setting `DxfDwg.MaxImportObjects`** (default 1,000,000): DXF and DWG files whose blocks expand to more objects are no longer imported. The import stops with an `ApplicationException` whose message names the setting, and the handlers of single entities no longer swallow it or an `OutOfMemoryException`. Raise the setting if you import such drawings on purpose (#488, #533).
+- **New setting `DxfDwg.MaxImportObjects`** (default 1,000,000): DXF and DWG files whose blocks expand to more objects are no longer imported. The import stops with a `DxfImportLimitException` (an `ApplicationException`) whose message names the setting and whose `Limit` is the value exceeded. `Project.ReadFromFile` throws it directly for DXF and DWG files alike; other errors of the DWG import are still wrapped in an `InvalidOperationException`. The handlers of single entities no longer swallow it or an `OutOfMemoryException`. Raise the setting if you import such drawings on purpose (#488, #533).
 - **DXF/DWG import of an `INSERT` with a scale factor of 0**: it is skipped, as before; newer ACadSharp versions would otherwise build a singular transformation (#520).
 - **STEP import** (#522): `StepImport.Parallel` no longer makes the faces of one shell in parallel. A single solid with 3000 faces takes about 10 % longer; assemblies are as fast as before.
 - **Default styles get their attributes**: `StyleList.Default` named its colour, line width and line pattern in lower case, and the case-sensitive lookup never found them. The default styles now have these attributes, in English and German.

@@ -78,6 +78,7 @@ All of it is added; nothing existing changes.
   - The font lists in the property editors and dimension styles show the families of the current provider.
 - **Pictures** (#473):
   - Project files store a picture as the bytes of its image file instead of a serialized GDI+ bitmap. Files of earlier 1.x versions open as before, also on Linux and macOS.
+  - The other direction does not work: a file that contains a picture and was written by 1.8.0 could not be opened with 1.7.1 in a test on Linux (`NullReferenceException` while reading). Files without pictures written by 1.8.0 were read by 1.7.1 with identical geometry, texts, dimensions, hatches and user data. Update all installations that exchange files with pictures together.
   - Without GDI+, a picture is painted as its outline and an icon is not painted.
 - **Page settings** (#474): new files contain only the neutral `PageSetup`; earlier CADability versions ignore the page settings of such files and read everything else. The page and printer dialogs of a layout view always store their result in the layout.
 - **STL export**: texts are left out of STL files, on every platform (#479).

@@ -394,7 +394,42 @@ internal class Cluster : IQuadTreeInsertable
             }
             return null;
         }
-        private void RemoveAllDeadEnds()
+        /// <summary>
+        /// Connects each open end with the closest other open end that is less than maxGap away by a line.
+        /// </summary>
+        internal void InsertGapFillers()
+        {
+            ArrayList CurvesToInsert = new ArrayList();
+            foreach (Cluster cl in clusterSet)
+            {
+                if (cl.Joints.Count < 2)
+                {
+                    double minDist = maxGap;
+                    ICurve2D BestCurve = null;
+                    ICollection found = clusterTree.GetObjectsInsideRect(new BoundingRect(cl.center, maxGap, maxGap));
+                    foreach (Cluster clnear in found)
+                    {
+                        if (clnear != cl &&
+                            clnear.Joints.Count < 2 &&
+                            Geometry.Dist(cl.center, clnear.center) < minDist)
+                        {
+                            minDist = Geometry.Dist(cl.center, clnear.center);
+                            BestCurve = new Line2D(cl.center, clnear.center);
+                        }
+                    }
+                    if (BestCurve != null) CurvesToInsert.Add(BestCurve);
+                }
+            }
+            foreach (ICurve2D curve in CurvesToInsert)
+            {
+                Insert(curve);
+            }
+        }
+        /// <summary>
+        /// Removes all open chains of curves, starting at the clusters with fewer than two joints, and collects their curves
+        /// in <see cref="DeadObjects"/>.
+        /// </summary>
+        internal void RemoveAllDeadEnds()
         {
             ArrayList ClusterToRemove = new ArrayList(); // So that the loop can iterate over clusterSet
             foreach (Cluster cl in clusterSet)
@@ -408,10 +443,14 @@ internal class Cluster : IQuadTreeInsertable
         }
         private void RemoveDeadEnd(Cluster cl)
         {
+            // A cluster is in clusterTree exactly when it is in clusterSet. It must be taken out of the tree while it still
+            // has its joints: QuadNode.RemoveObject only descends into nodes the cluster hits, and a cluster without joints
+            // hits every node, so removing an empty cluster (or one that is no longer in the tree) traverses the whole tree.
             Cluster NextCluster = cl;
+            bool inTree = clusterSet.Contains(cl); // false for the other end of an open chain that has already been consumed
             while (NextCluster != null && NextCluster.Joints.Count < 2)
             {
-                clusterTree.RemoveObject(NextCluster);
+                if (inTree) clusterTree.RemoveObject(NextCluster);
                 clusterSet.Remove(NextCluster);
                 if (NextCluster.Joints.Count > 0)
                 {
@@ -422,10 +461,17 @@ internal class Cluster : IQuadTreeInsertable
                     else NextCluster = lp.StartCluster;
                     if (NextCluster != null)
                     {
+                        inTree = clusterSet.Contains(NextCluster);
                         for (int i = 0; i < NextCluster.Joints.Count; ++i)
                         {
                             if ((NextCluster.Joints[i]) == lp)
                             {
+                                if (inTree && NextCluster.Joints.Count - 1 < 2)
+                                {   // the next iteration removes this cluster: do it now, while its joints still tell
+                                    // where it is stored in the tree
+                                    clusterTree.RemoveObject(NextCluster);
+                                    inTree = false;
+                                }
                                 NextCluster.Joints.RemoveAt(i);
                                 break; // Extracted this path
                             }
@@ -932,44 +978,304 @@ internal class Cluster : IQuadTreeInsertable
 
         }
 #endif
-        public CompoundShape CreateCompoundShape(bool useInnerPoint, GeoPoint2D innerPoint, ConstrHatchInside.HatchMode mode, bool partInPart)
+        /// <summary>
+        /// Nests the hull borders like <see cref="NestPairwise"/> does, but by building a containment forest instead of
+        /// comparing all pairs: each border is compared only with the larger borders whose extent overlaps its extent, using
+        /// the same primitive as <see cref="SimpleShape.GetPosition(SimpleShape, SimpleShape)"/> (a <see cref="BorderOperation"/>
+        /// of the larger and the smaller border). The parent of a border is the smallest border that covers it.
+        /// With <paramref name="partInPart"/> the borders at even depth are outlines and those at odd depth holes of their
+        /// parent; without it depth 0 are outlines, depth 1 their holes and everything deeper is dropped. The order of the
+        /// simple shapes and holes is the one <see cref="NestPairwise"/> produces.
+        /// Returns null when the borders are not cleanly nested (a pair of borders intersects, touches, is identical or the
+        /// relation cannot be determined); the caller then uses <see cref="NestPairwise"/>, which handles these cases.
+        /// </summary>
+        /// <param name="borders">The borders, largest area first</param>
+        /// <param name="partInPart">true: parts inside holes of other parts are returned as simple shapes of their own, false: they are removed</param>
+        /// <returns>The nested shape or null</returns>
+        internal static CompoundShape NestByContainment(Border[] borders, bool partInPart)
         {
-            // 1. Connect open ends with other open ends if the distance is less than maxGap.
-            // 2. Remove all remaining dead ends (collect all single points and "consume" them from there).
-            // 3. This results in connected point sets.
-            // 4. Determine the edges and set references to their clusters (this step might be integrated into one of the previous steps).
-            // 5. Sort the edges counterclockwise within each cluster:
-            //    At this point, we have one or more non-overlapping graphs, where finding the border is easy by walking counterclockwise.
-            //    Additionally, for each graph, the hull can be found. It can be identified as it follows a clockwise direction.
-            // 6. If useInnerPoint == false && partInPart == true, then nested parts are also searched for and returned.
+            int n = borders.Length;
+            // NestPairwise makes a SimpleShape of every border before it compares it, which splits a border that consists
+            // of a single closed curve (SplitSingleCurve). Do the same before the borders are compared here.
+            SimpleShape[] shapes = new SimpleShape[n];
+            for (int i = 0; i < n; i++) shapes[i] = new SimpleShape(borders[i]);
 
-            // Insert gap fillers, specifically the shortest possible ones, 
-            // and only at open ends.
-            ArrayList CurvesToInsert = new ArrayList();
-            foreach (Cluster cl in clusterSet)
+            BoundingRect total = BoundingRect.EmptyBoundingRect;
+            BoundingRect[] extents = new BoundingRect[n];
+            double[] sizes = new double[n];
+            try
             {
-                if (cl.Joints.Count < 2)
+                for (int i = 0; i < n; i++)
                 {
-                    double minDist = maxGap;
-                    ICurve2D BestCurve = null;
-                    ICollection found = clusterTree.GetObjectsInsideRect(new BoundingRect(cl.center, maxGap, maxGap));
-                    foreach (Cluster clnear in found)
-                    {
-                        if (clnear != cl &&
-                            clnear.Joints.Count < 2 &&
-                            Geometry.Dist(cl.center, clnear.center) < minDist)
-                        {
-                            minDist = Geometry.Dist(cl.center, clnear.center);
-                            BestCurve = new Line2D(cl.center, clnear.center);
-                        }
-                    }
-                    if (BestCurve != null) CurvesToInsert.Add(BestCurve);
+                    // NestPairwise drops empty borders and borders with zero area in some places but not in others
+                    if (borders[i].IsEmpty || !(borders[i].Area > 0.0)) return null;
+                    extents[i] = borders[i].Extent;
+                    if (extents[i].IsEmpty()) return null;
+                    total.MinMax(extents[i]);
+                    sizes[i] = Math.Max(extents[i].Width, extents[i].Height);
                 }
             }
-            foreach (ICurve2D curve in CurvesToInsert)
+            catch (BorderException)
             {
-                Insert(curve);
+                return null;
             }
+            // BorderOperation works with a precision of (width + height) * 1e-6 of the common extent of the two borders.
+            // Borders whose extents are further apart than ten times that much for the whole drawing are certainly disjoint.
+            double tolerance = (total.Width + total.Height) * 1e-5;
+            if (!(tolerance > 0.0)) return null;
+            for (int i = 0; i < n; i++) extents[i].Inflate(tolerance);
+            total.Inflate(2 * tolerance);
+
+            // A uniform grid of the processed borders. Borders that cover many cells are kept in a list of their own.
+            double[] sortedSizes = (double[])sizes.Clone();
+            Array.Sort(sortedSizes);
+            double cellSize = Math.Max(2 * sortedSizes[n / 2] + 2 * tolerance, Math.Max(total.Width, total.Height) / 512.0);
+            int nx = Math.Max(1, (int)Math.Ceiling(total.Width / cellSize));
+            int ny = Math.Max(1, (int)Math.Ceiling(total.Height / cellSize));
+            List<int>[] grid = new List<int>[nx * ny];
+            List<int> bigBorders = new List<int>();
+            const int maxCellsPerBorder = 64;
+
+            int[] parent = new int[n];
+            int[] depth = new int[n];
+            int[] seen = new int[n]; // seen[i] == j + 1: border i has already been a candidate for border j
+            int[] onChain = new int[n]; // onChain[i] == j + 1: border i is an ancestor of the parent of border j
+            List<int> candidates = new List<int>();
+            List<int> covering = new List<int>();
+            for (int j = 0; j < n; j++)
+            {
+                int x0 = CellIndex(extents[j].Left, total.Left, cellSize, nx);
+                int x1 = CellIndex(extents[j].Right, total.Left, cellSize, nx);
+                int y0 = CellIndex(extents[j].Bottom, total.Bottom, cellSize, ny);
+                int y1 = CellIndex(extents[j].Top, total.Bottom, cellSize, ny);
+                bool big = (x1 - x0 + 1) * (y1 - y0 + 1) > maxCellsPerBorder;
+
+                // the already processed (larger) borders whose extent overlaps the extent of border j
+                candidates.Clear();
+                if (big)
+                {
+                    for (int i = 0; i < j; i++)
+                    {
+                        if (BoundingRect.Disjoint(extents[i], extents[j])) continue;
+                        candidates.Add(i);
+                    }
+                }
+                else
+                {
+                    for (int x = x0; x <= x1; x++)
+                    {
+                        for (int y = y0; y <= y1; y++)
+                        {
+                            List<int> cell = grid[x + nx * y];
+                            if (cell == null) continue;
+                            for (int k = 0; k < cell.Count; k++)
+                            {
+                                int i = cell[k];
+                                if (seen[i] == j + 1) continue;
+                                seen[i] = j + 1;
+                                if (!BoundingRect.Disjoint(extents[i], extents[j])) candidates.Add(i);
+                            }
+                        }
+                    }
+                    for (int k = 0; k < bigBorders.Count; k++)
+                    {
+                        int i = bigBorders[k];
+                        if (!BoundingRect.Disjoint(extents[i], extents[j])) candidates.Add(i);
+                    }
+                }
+
+                // classify each candidate like SimpleShape.GetPosition does: only disjoint borders and larger borders that
+                // cover the smaller one are a clean nesting
+                covering.Clear();
+                int par = -1;
+                for (int k = 0; k < candidates.Count; k++)
+                {
+                    int i = candidates[k];
+                    BorderOperation.BorderPosition position;
+                    try
+                    {
+                        position = BorderPair.GetBorderOperation(null, borders[i], borders[j], 0.0).Position;
+                    }
+                    catch (BorderException)
+                    {
+                        return null; // let NestPairwise deal with it, as it did before
+                    }
+                    switch (position)
+                    {
+                        case BorderOperation.BorderPosition.disjunct:
+                            break;
+                        case BorderOperation.BorderPosition.b1coversb2:
+                            covering.Add(i);
+                            if (i > par) par = i; // the smallest covering border, since the borders are sorted by area
+                            break;
+                        default:
+                            return null; // intersecting, identical, unknown or the smaller covering the larger
+                    }
+                }
+                parent[j] = par;
+                depth[j] = par < 0 ? 0 : depth[par] + 1;
+                // the borders covering j must be exactly the parent and its ancestors, otherwise the nesting is inconsistent
+                if (covering.Count != depth[j]) return null;
+                for (int p = par; p >= 0; p = parent[p]) onChain[p] = j + 1;
+                for (int k = 0; k < covering.Count; k++)
+                {
+                    if (onChain[covering[k]] != j + 1) return null;
+                }
+
+                if (big) bigBorders.Add(j);
+                else
+                {
+                    for (int x = x0; x <= x1; x++)
+                    {
+                        for (int y = y0; y <= y1; y++)
+                        {
+                            ref List<int> cell = ref grid[x + nx * y];
+                            if (cell == null) cell = new List<int>();
+                            cell.Add(j);
+                        }
+                    }
+                }
+            }
+
+            // Build the result in the order NestPairwise produces it: the outlines largest first. With partInPart the holes
+            // of an outline come largest first (each one is added to the end of the hole list when it is subtracted), without
+            // partInPart smallest first (the borders inside an outline are subtracted from the smallest to the largest, and
+            // a hole that covers holes subtracted before replaces them at the end of the list).
+            List<int> outlines = new List<int>();
+            List<Border>[] holes = new List<Border>[n];
+            if (partInPart)
+            {
+                for (int j = 0; j < n; j++)
+                {
+                    if (depth[j] % 2 == 0) outlines.Add(j);
+                    else (holes[parent[j]] ??= new List<Border>()).Add(borders[j]);
+                }
+            }
+            else
+            {
+                for (int j = 0; j < n; j++)
+                {
+                    if (depth[j] == 0) outlines.Add(j);
+                }
+                for (int j = n - 1; j >= 0; j--)
+                {
+                    if (depth[j] == 1) (holes[parent[j]] ??= new List<Border>()).Add(borders[j]);
+                }
+            }
+            SimpleShape[] result = new SimpleShape[outlines.Count];
+            for (int k = 0; k < outlines.Count; k++)
+            {
+                int o = outlines[k];
+                if (holes[o] == null) result[k] = shapes[o];
+                else result[k] = new SimpleShape(borders[o], holes[o].ToArray());
+            }
+            CompoundShape res = new CompoundShape();
+            res.UniteDisjunct(result);
+            return res;
+        }
+        private static int CellIndex(double v, double origin, double cellSize, int count)
+        {
+            int i = (int)Math.Floor((v - origin) / cellSize);
+            if (i < 0) return 0;
+            if (i >= count) return count - 1;
+            return i;
+        }
+        /// <summary>
+        /// The original nesting of the hull borders, which compares the borders pairwise and builds the result with boolean
+        /// operations. It is quadratic in the number of borders but also handles borders that are not cleanly nested
+        /// (intersecting, touching, identical). <see cref="NestByContainment"/> gives the same result faster for clean input
+        /// and falls back to this method otherwise.
+        /// </summary>
+        /// <param name="AllBorders">The borders, largest area first</param>
+        /// <param name="partInPart">true: parts inside holes of other parts are returned as simple shapes of their own, false: they are removed</param>
+        internal static CompoundShape NestPairwise(Border[] AllBorders, bool partInPart)
+        {
+            List<Border> toIterate = new List<Border>(AllBorders);
+
+            if (!partInPart) // Here, parts that lie within other parts are removed
+            {
+                CompoundShape res = new CompoundShape();
+                while (toIterate.Count > 0)
+                {
+                    SimpleShape ss = new SimpleShape(toIterate[0]);
+                    CompoundShape cs = new CompoundShape(ss);
+                    // The first is the edge, the following are the holes
+                    for (int i = toIterate.Count - 1; i > 0; --i)
+                    {
+                        SimpleShape ss1 = new SimpleShape(toIterate[i]);
+                        if (SimpleShape.GetPosition(ss, ss1) == SimpleShape.Position.firstcontainscecond)
+                        {
+                            cs.Subtract(ss1);
+                            toIterate.RemoveAt(i);
+                        }
+                    }
+                    toIterate.RemoveAt(0);
+                    res = CompoundShape.Union(res, cs);
+                }
+                return res;
+            }
+            else // Here, parts within other parts are returned as a new SimpleShape
+            {
+                CompoundShape cs = new CompoundShape(new SimpleShape(toIterate[0]));
+                // From large to small
+                for (int i = 1; i < toIterate.Count; i++)
+                {
+                    SimpleShape innerShape = new SimpleShape(toIterate[i]);
+
+                    // Determine the position of the innerShape
+                    var shapePos = SimpleShape.GetPosition(cs.SimpleShapes[0], innerShape);
+
+                    switch (shapePos)
+                    {
+                        case SimpleShape.Position.firstcontainscecond:
+                            // Cut innerShape from outerShape because it is completely inside
+                            cs.Subtract(innerShape); 
+                            break;
+                        case SimpleShape.Position.intersecting:
+                            // If parts overlap, they are merged
+                            cs = CompoundShape.Union(cs, new CompoundShape(innerShape)); 
+                            break;                                
+                        case SimpleShape.Position.disjunct:
+                            // The parts are completely independent
+                            
+                            bool shapeHandled = false;
+                            // But maybe the part is inside one of the other SimpleShapes?
+                            for (int j = 1; j < cs.SimpleShapes.Length; j++)
+                            {
+                                var shapePos2 = SimpleShape.GetPosition(cs.SimpleShapes[j], innerShape);
+                                if (shapePos2 == SimpleShape.Position.firstcontainscecond)
+                                {
+                                    cs.Subtract(innerShape);
+                                    shapeHandled = true;
+                                    break;
+                                }
+                                else if (shapePos2 == SimpleShape.Position.intersecting)
+                                {
+                                    cs = CompoundShape.Union(cs, new CompoundShape(innerShape));
+                                    shapeHandled = true;
+                                    break;
+                                }
+                            }
+                            if (!shapeHandled)
+                                cs.UniteDisjunct(innerShape);
+                            break;
+                    }
+                }
+                return cs;
+            }
+        }
+
+        /// <summary>
+        /// The first part of <see cref="CreateCompoundShape"/>: closes gaps, removes the dead ends (collected in
+        /// <see cref="DeadObjects"/>), sorts the edges around each cluster and returns all closed borders, the hulls of the
+        /// connected parts of the graph (<paramref name="inner"/> false) or the smallest enclosed areas (true), sorted by
+        /// area, the smallest first. Can be called only once for this graph.
+        /// </summary>
+        internal Border[] FindSortedBorders(bool inner)
+        {
+            // Insert gap fillers, specifically the shortest possible ones, 
+            // and only at open ends.
+            InsertGapFillers();
 
             // Here, additional joints could optionally be added using ICurve2D.MinDistance,
             // which could serve as true gap closers, e.g., closing a bottleneck formed
@@ -983,10 +1289,24 @@ internal class Cluster : IQuadTreeInsertable
             DebugJoints = AllJoints;
 #endif
 
-            bool inner = (mode != ConstrHatchInside.HatchMode.hull);
             Border[] AllBorders = FindAllBorders(AllJoints, inner);
             Array.Sort(AllBorders, new BorderAreaComparer());
             // Sort by size, starting with the smallest
+            return AllBorders;
+        }
+
+        public CompoundShape CreateCompoundShape(bool useInnerPoint, GeoPoint2D innerPoint, ConstrHatchInside.HatchMode mode, bool partInPart)
+        {
+            // 1. Connect open ends with other open ends if the distance is less than maxGap.
+            // 2. Remove all remaining dead ends (collect all single points and "consume" them from there).
+            // 3. This results in connected point sets.
+            // 4. Determine the edges and set references to their clusters (this step might be integrated into one of the previous steps).
+            // 5. Sort the edges counterclockwise within each cluster:
+            //    At this point, we have one or more non-overlapping graphs, where finding the border is easy by walking counterclockwise.
+            //    Additionally, for each graph, the hull can be found. It can be identified as it follows a clockwise direction.
+            // 6. If useInnerPoint == false && partInPart == true, then nested parts are also searched for and returned.
+            bool inner = (mode != ConstrHatchInside.HatchMode.hull);
+            Border[] AllBorders = FindSortedBorders(inner); // steps 1 to 5, sorted by size, starting with the smallest
 
             if (useInnerPoint)
             {
@@ -1052,79 +1372,8 @@ internal class Cluster : IQuadTreeInsertable
                 
                 // If there is more than one border
                 Array.Reverse(AllBorders); // The largest one first
-                List<Border> toIterate = new List<Border>(AllBorders);
-
-                if (!partInPart) // Here, parts that lie within other parts are removed
-                {
-                    CompoundShape res = new CompoundShape();
-                    while (toIterate.Count > 0)
-                    {
-                        SimpleShape ss = new SimpleShape(toIterate[0]);
-                        CompoundShape cs = new CompoundShape(ss);
-                        // The first is the edge, the following are the holes
-                        for (int i = toIterate.Count - 1; i > 0; --i)
-                        {
-                            SimpleShape ss1 = new SimpleShape(toIterate[i]);
-                            if (SimpleShape.GetPosition(ss, ss1) == SimpleShape.Position.firstcontainscecond)
-                            {
-                                cs.Subtract(ss1);
-                                toIterate.RemoveAt(i);
-                            }
-                        }
-                        toIterate.RemoveAt(0);
-                        res = CompoundShape.Union(res, cs);
-                    }
-                    return res;
-                }
-                else // Here, parts within other parts are returned as a new SimpleShape
-                {
-                    CompoundShape cs = new CompoundShape(new SimpleShape(toIterate[0]));
-                    // From large to small
-                    for (int i = 1; i < toIterate.Count; i++)
-                    {
-                        SimpleShape innerShape = new SimpleShape(toIterate[i]);
-
-                        // Determine the position of the innerShape
-                        var shapePos = SimpleShape.GetPosition(cs.SimpleShapes[0], innerShape);
-
-                        switch (shapePos)
-                        {
-                            case SimpleShape.Position.firstcontainscecond:
-                                // Cut innerShape from outerShape because it is completely inside
-                                cs.Subtract(innerShape); 
-                                break;
-                            case SimpleShape.Position.intersecting:
-                                // If parts overlap, they are merged
-                                cs = CompoundShape.Union(cs, new CompoundShape(innerShape)); 
-                                break;                                
-                            case SimpleShape.Position.disjunct:
-                                // The parts are completely independent
-                                
-                                bool shapeHandled = false;
-                                // But maybe the part is inside one of the other SimpleShapes?
-                                for (int j = 1; j < cs.SimpleShapes.Length; j++)
-                                {
-                                    var shapePos2 = SimpleShape.GetPosition(cs.SimpleShapes[j], innerShape);
-                                    if (shapePos2 == SimpleShape.Position.firstcontainscecond)
-                                    {
-                                        cs.Subtract(innerShape);
-                                        shapeHandled = true;
-                                        break;
-                                    }
-                                    else if (shapePos2 == SimpleShape.Position.intersecting)
-                                    {
-                                        cs = CompoundShape.Union(cs, new CompoundShape(innerShape));
-                                        shapeHandled = true;
-                                        break;
-                                    }
-                                }
-                                if (!shapeHandled)
-                                    cs.UniteDisjunct(innerShape);
-                                break;
-                        }
-                    }
-                    return cs;
-                }
+                // the containment forest is fast but only handles cleanly nested borders, it returns null otherwise
+                return NestByContainment(AllBorders, partInPart) ?? NestPairwise(AllBorders, partInPart);
             }
             // What should we return if useInnerPoint is not provided and multiple borders were found?
             return null;

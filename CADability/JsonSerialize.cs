@@ -1139,17 +1139,71 @@ namespace CADability
             return si;
         }
 
-        internal static bool SerializeAsStruct(Type type)
+        /// <summary>
+        /// The values of the <see cref="JsonVersion"/> attribute of a type, or the defaults when it has none.
+        /// </summary>
+        private sealed class JsonVersionInfo
+        {
+            public readonly bool serializeAsStruct;
+            public readonly int version;
+            public JsonVersionInfo(bool serializeAsStruct, int version)
+            {
+                this.serializeAsStruct = serializeAsStruct;
+                this.version = version;
+            }
+        }
+        /// <summary>
+        /// <see cref="SerializeAsStruct"/> is called for every value that is written or read, and reading the attribute by
+        /// reflection each time took most of the time of <see cref="Project.WriteToJson"/>. The attribute of a type never
+        /// changes, so it is read once per type. A ConditionalWeakTable is thread safe and does not keep types of collectible
+        /// assemblies alive.
+        /// </summary>
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Type, JsonVersionInfo> jsonVersionCache =
+            new System.Runtime.CompilerServices.ConditionalWeakTable<Type, JsonVersionInfo>();
+        /// <summary>
+        /// For tests only: true reads the attribute by reflection on every call, as before the cache existed. Per thread, so
+        /// that a test comparing both ways does not affect tests running in parallel.
+        /// </summary>
+        [ThreadStatic]
+        internal static bool BypassAttributeCache;
+        private static JsonVersionInfo ReadJsonVersion(Type type)
         {
             object[] cas = type.GetCustomAttributes(typeof(JsonVersion), true);
-            if (cas != null && cas.Length > 0) return (cas[0] as JsonVersion).serializeAsStruct;
-            return false;
+            if (cas != null && cas.Length > 0)
+            {
+                JsonVersion jv = cas[0] as JsonVersion;
+                return new JsonVersionInfo(jv.serializeAsStruct, jv.version);
+            }
+            return new JsonVersionInfo(false, 0);
+        }
+        private static JsonVersionInfo GetJsonVersion(Type type)
+        {
+            if (type == null || BypassAttributeCache) return ReadJsonVersion(type); // null: the NullReferenceException as before
+            return jsonVersionCache.GetValue(type, ReadJsonVersion);
+        }
+        internal static bool SerializeAsStruct(Type type)
+        {
+            return GetJsonVersion(type).serializeAsStruct;
+        }
+        /// <summary>
+        /// The answers of <see cref="HasSerializableAttribute"/>, per type (the values are <see cref="hasAttribute"/> or
+        /// <see cref="hasNoAttribute"/>).
+        /// </summary>
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Type, object> serializableCache =
+            new System.Runtime.CompilerServices.ConditionalWeakTable<Type, object>();
+        private static readonly object hasAttribute = new object();
+        private static readonly object hasNoAttribute = new object();
+        /// <summary>
+        /// Same as <c>System.Attribute.GetCustomAttribute(type, typeof(SerializableAttribute)) != null</c>, read once per type.
+        /// </summary>
+        internal static bool HasSerializableAttribute(Type type)
+        {
+            if (type == null || BypassAttributeCache) return System.Attribute.GetCustomAttribute(type, typeof(SerializableAttribute)) != null;
+            return serializableCache.GetValue(type, t => System.Attribute.GetCustomAttribute(t, typeof(SerializableAttribute)) != null ? hasAttribute : hasNoAttribute) == hasAttribute;
         }
         private static int SerializeVersion(Type type)
         {
-            object[] cas = type.GetCustomAttributes(typeof(JsonVersion), true);
-            if (cas != null && cas.Length > 0) return (cas[0] as JsonVersion).version;
-            return 0;
+            return GetJsonVersion(type).version;
         }
         private void CreateDeserializer(string typeName, string assemblyName, int ti)
         {

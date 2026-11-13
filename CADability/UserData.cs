@@ -594,16 +594,16 @@ namespace CADability
                 // since the keys must be unique, we use the keys as property names
                 if (de.Value != null && !de.Key.StartsWith("$")) // $xxx is reserved for Json additional entries
                 {
-                    // so kann man feststellen, ob de.Value serialisierbar ist
-                    SerializableAttribute sa = (SerializableAttribute)System.Attribute.GetCustomAttribute(de.Value.GetType(), typeof(SerializableAttribute));
-                    if (de.Value.GetType().IsPrimitive || de.Value is IJsonSerialize || sa != null)
+                    // this tells whether de.Value can be serialized; the attribute is looked up once per type
+                    bool serializable = JsonSerialize.HasSerializableAttribute(de.Value.GetType());
+                    if (de.Value.GetType().IsPrimitive || de.Value is IJsonSerialize || serializable)
                     {
                         data.AddProperty(de.Key, de.Value);
                     }
                     else if (de.Value.GetType().IsArray)
                     {
-                        sa = (SerializableAttribute)System.Attribute.GetCustomAttribute(de.Value.GetType().GetElementType(), typeof(SerializableAttribute));
-                        if (sa != null || de.Value.GetType().GetElementType().IsPrimitive || de.Value.GetType().GetElementType().GetInterface("IJsonSerialize") != null)
+                        serializable = JsonSerialize.HasSerializableAttribute(de.Value.GetType().GetElementType());
+                        if (serializable || de.Value.GetType().GetElementType().IsPrimitive || de.Value.GetType().GetElementType().GetInterface("IJsonSerialize") != null)
                         {
                             data.AddProperty(de.Key, de.Value);
                         }

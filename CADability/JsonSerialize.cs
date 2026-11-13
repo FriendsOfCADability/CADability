@@ -156,7 +156,7 @@ namespace CADability
     /// <see cref="FromStream(Stream)"/> reads. Each object is written once and referenced afterwards, so shared objects and
     /// cycles are preserved; types are stored by name and resolved when reading, where the <see cref="ResolveType"/> event lets
     /// an application map renamed types.
-    /// <see cref="Project.ReadFromFile(string)"/> and <see cref="Project.WriteToFile"/> use it for the ".cdb" project files.
+    /// <see cref="Project.ReadFromFile(string)"/> and <see cref="Project.WriteToFile(string)"/> use it for the ".cdb" project files.
     /// </summary>
     public class JsonSerialize : IJsonWriteData
     {

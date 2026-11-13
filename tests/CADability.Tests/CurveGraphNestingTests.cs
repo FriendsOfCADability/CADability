@@ -1,4 +1,4 @@
-using CADability.Actions;
+﻿using CADability.Actions;
 using CADability.Curve2D;
 using CADability.GeoObject;
 using CADability.Shapes;
@@ -187,15 +187,26 @@ namespace CADability.Tests
         private static ICurve2D[] CloneCurves(ICurve2D[] curves) => curves.Select(c => c.Clone()).ToArray();
 
         /// <summary>
-        /// Runs CurveGraph.CreateCompoundShape like CompoundShape.CreateFromList does, with or without the containment forest.
+        /// The borders that CreateCompoundShape nests, largest first, from a copy of the curves. NestPairwise and
+        /// NestByContainment make SimpleShapes of the borders, which splits a border that is a single closed curve, so each
+        /// of them gets borders of its own.
         /// </summary>
-        private static CompoundShape Create(ICurve2D[] curves, bool partInPart, bool useForest, out List<IGeoObject> dead, out bool usedForest)
+        private static Border[] BordersToNest(ICurve2D[] curves, out List<IGeoObject> dead)
         {
             CurveGraph graph = new CurveGraph(CloneCurves(curves), MaxGap);
-            graph.UseContainmentForest = useForest;
-            CompoundShape res = graph.CreateCompoundShape(false, new GeoPoint2D(0.0, 0.0), ConstrHatchInside.HatchMode.hull, partInPart);
+            Border[] borders = graph.FindSortedBorders(false);
+            Array.Reverse(borders); // as CreateCompoundShape does before it nests them
             dead = graph.DeadObjects;
-            usedForest = graph.UsedContainmentForest;
+            return borders;
+        }
+
+        /// <summary>
+        /// The public way: CompoundShape.CreateFromList, which tries the containment forest and falls back to NestPairwise.
+        /// </summary>
+        private static CompoundShape CreateFromList(ICurve2D[] curves, bool partInPart, out List<IGeoObject> dead)
+        {
+            CompoundShape res = CompoundShape.CreateFromList(CloneCurves(curves), MaxGap, partInPart, out GeoObjectList deadObjects);
+            dead = deadObjects.Cast<IGeoObject>().ToList();
             return res;
         }
 
@@ -262,19 +273,29 @@ namespace CADability.Tests
         }
 
         /// <summary>
-        /// Compares the containment forest with the original pairwise nesting on the same input and returns whether the
-        /// containment forest was used (and not its fallback).
+        /// Compares the containment forest and CompoundShape.CreateFromList with the original pairwise nesting on the same
+        /// input and returns whether the containment forest handled it (and not its fallback).
         /// </summary>
         private static bool AssertSameAsPairwise(ICurve2D[] curves, bool partInPart, string what)
         {
             TagCurves(curves);
-            CompoundShape expected = Create(curves, partInPart, false, out List<IGeoObject> expectedDead, out bool usedForest);
-            Assert.IsFalse(usedForest);
-            CompoundShape actual = Create(curves, partInPart, true, out List<IGeoObject> actualDead, out usedForest);
-            AssertSameLines(Describe(expected), Describe(actual), what);
+            Border[] borders = BordersToNest(curves, out List<IGeoObject> expectedDead);
+            Assert.IsTrue(borders.Length > 1, what + ": test setup, there must be several borders to nest");
+            CompoundShape expected = CurveGraph.NestPairwise(borders, partInPart);
+            List<string> expectedLines = Describe(expected);
+
+            CompoundShape forest = CurveGraph.NestByContainment(BordersToNest(curves, out _), partInPart);
+            if (forest != null)
+            {
+                AssertSameLines(expectedLines, Describe(forest), what + ", containment forest");
+                Assert.IsFalse(Describe(forest).Any(line => line.Contains("?")), what + ": a segment lost its UserData");
+            }
+
+            CompoundShape actual = CreateFromList(curves, partInPart, out List<IGeoObject> actualDead);
+            AssertSameLines(expectedLines, Describe(actual), what + ", CreateFromList");
             Assert.IsFalse(Describe(actual).Any(line => line.Contains("?")), what + ": a segment lost its UserData");
             AssertSameLines(Describe(expectedDead), Describe(actualDead), what + ", dead objects");
-            return usedForest;
+            return forest != null;
         }
 
         private static readonly FieldInfo clusterSetField = typeof(CurveGraph).GetField("clusterSet", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -410,7 +431,7 @@ namespace CADability.Tests
                 }
                 ICurve2D[] curves = g.Finish();
                 Assert.IsTrue(AssertSameAsPairwise(curves, partInPart, "partInPart " + partInPart));
-                CompoundShape cs = Create(curves, partInPart, true, out _, out _);
+                CompoundShape cs = CreateFromList(curves, partInPart, out _);
                 // with partInPart: the parts at depth 0, 2 and 4 of each nest; without: only depth 0
                 Assert.AreEqual(partInPart ? 9 : 3, cs.SimpleShapes.Length);
                 Assert.AreEqual(partInPart ? 12 : 6, cs.SimpleShapes.Sum(s => s.NumHoles));
@@ -428,7 +449,7 @@ namespace CADability.Tests
                 g.Rect(2, 2, 8, 8); // a hole near the corner of the first part
                 ICurve2D[] curves = g.Finish();
                 Assert.IsTrue(AssertSameAsPairwise(curves, partInPart, "partInPart " + partInPart));
-                CompoundShape cs = Create(curves, partInPart, true, out _, out _);
+                CompoundShape cs = CreateFromList(curves, partInPart, out _);
                 Assert.AreEqual(2, cs.SimpleShapes.Length);
                 Assert.AreEqual(401, cs.SimpleShapes[0].NumHoles);
                 Assert.AreEqual(36, cs.SimpleShapes[1].NumHoles);
@@ -445,7 +466,7 @@ namespace CADability.Tests
                     new Circle2D(new GeoPoint2D(0, 0), 50), new Circle2D(new GeoPoint2D(0, 0), 30), new Circle2D(new GeoPoint2D(0, 0), 10),
                     new Circle2D(new GeoPoint2D(200, 0), 40), new Circle2D(new GeoPoint2D(210, 0), 5) };
                 Assert.IsTrue(AssertSameAsPairwise(curves, partInPart, "partInPart " + partInPart));
-                CompoundShape cs = Create(curves, partInPart, true, out _, out _);
+                CompoundShape cs = CreateFromList(curves, partInPart, out _);
                 Assert.AreEqual(partInPart ? 3 : 2, cs.SimpleShapes.Length);
                 foreach (SimpleShape ss in cs.SimpleShapes)
                 {

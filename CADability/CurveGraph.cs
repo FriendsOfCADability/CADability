@@ -160,16 +160,6 @@ internal class Cluster : IQuadTreeInsertable
         /// List of unusable objects that were generated during the creation of a CompoundShape
         /// </summary>
         public List<IGeoObject> DeadObjects { get; } = new List<IGeoObject>();
-        /// <summary>
-        /// true (default): nest several hull borders with <see cref="NestByContainment"/> and use <see cref="NestPairwise"/>
-        /// only when the borders are not cleanly nested. false: always use <see cref="NestPairwise"/> (for tests).
-        /// </summary>
-        internal bool UseContainmentForest { get; set; } = true;
-        /// <summary>
-        /// true when the last call of <see cref="CreateCompoundShape"/> built its result with <see cref="NestByContainment"/>
-        /// (for tests).
-        /// </summary>
-        internal bool UsedContainmentForest { get; private set; }
 
         static public CurveGraph CrackCurves(GeoObjectList l, Plane plane, double maxGap)
         {   // All curves in l are projected onto the plane. This is just a first approach.
@@ -1275,18 +1265,14 @@ internal class Cluster : IQuadTreeInsertable
             }
         }
 
-        public CompoundShape CreateCompoundShape(bool useInnerPoint, GeoPoint2D innerPoint, ConstrHatchInside.HatchMode mode, bool partInPart)
+        /// <summary>
+        /// The first part of <see cref="CreateCompoundShape"/>: closes gaps, removes the dead ends (collected in
+        /// <see cref="DeadObjects"/>), sorts the edges around each cluster and returns all closed borders, the hulls of the
+        /// connected parts of the graph (<paramref name="inner"/> false) or the smallest enclosed areas (true), sorted by
+        /// area, the smallest first. Can be called only once for this graph.
+        /// </summary>
+        internal Border[] FindSortedBorders(bool inner)
         {
-            // 1. Connect open ends with other open ends if the distance is less than maxGap.
-            // 2. Remove all remaining dead ends (collect all single points and "consume" them from there).
-            // 3. This results in connected point sets.
-            // 4. Determine the edges and set references to their clusters (this step might be integrated into one of the previous steps).
-            // 5. Sort the edges counterclockwise within each cluster:
-            //    At this point, we have one or more non-overlapping graphs, where finding the border is easy by walking counterclockwise.
-            //    Additionally, for each graph, the hull can be found. It can be identified as it follows a clockwise direction.
-            // 6. If useInnerPoint == false && partInPart == true, then nested parts are also searched for and returned.
-            UsedContainmentForest = false;
-
             // Insert gap fillers, specifically the shortest possible ones, 
             // and only at open ends.
             InsertGapFillers();
@@ -1303,10 +1289,24 @@ internal class Cluster : IQuadTreeInsertable
             DebugJoints = AllJoints;
 #endif
 
-            bool inner = (mode != ConstrHatchInside.HatchMode.hull);
             Border[] AllBorders = FindAllBorders(AllJoints, inner);
             Array.Sort(AllBorders, new BorderAreaComparer());
             // Sort by size, starting with the smallest
+            return AllBorders;
+        }
+
+        public CompoundShape CreateCompoundShape(bool useInnerPoint, GeoPoint2D innerPoint, ConstrHatchInside.HatchMode mode, bool partInPart)
+        {
+            // 1. Connect open ends with other open ends if the distance is less than maxGap.
+            // 2. Remove all remaining dead ends (collect all single points and "consume" them from there).
+            // 3. This results in connected point sets.
+            // 4. Determine the edges and set references to their clusters (this step might be integrated into one of the previous steps).
+            // 5. Sort the edges counterclockwise within each cluster:
+            //    At this point, we have one or more non-overlapping graphs, where finding the border is easy by walking counterclockwise.
+            //    Additionally, for each graph, the hull can be found. It can be identified as it follows a clockwise direction.
+            // 6. If useInnerPoint == false && partInPart == true, then nested parts are also searched for and returned.
+            bool inner = (mode != ConstrHatchInside.HatchMode.hull);
+            Border[] AllBorders = FindSortedBorders(inner); // steps 1 to 5, sorted by size, starting with the smallest
 
             if (useInnerPoint)
             {
@@ -1372,16 +1372,8 @@ internal class Cluster : IQuadTreeInsertable
                 
                 // If there is more than one border
                 Array.Reverse(AllBorders); // The largest one first
-                if (UseContainmentForest)
-                {
-                    CompoundShape nested = NestByContainment(AllBorders, partInPart);
-                    if (nested != null)
-                    {
-                        UsedContainmentForest = true;
-                        return nested;
-                    }
-                }
-                return NestPairwise(AllBorders, partInPart);
+                // the containment forest is fast but only handles cleanly nested borders, it returns null otherwise
+                return NestByContainment(AllBorders, partInPart) ?? NestPairwise(AllBorders, partInPart);
             }
             // What should we return if useInnerPoint is not provided and multiple borders were found?
             return null;

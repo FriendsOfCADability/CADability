@@ -20,8 +20,10 @@ namespace CADability
 #endif
         class LockMultiple : IDisposable
         {
-            object[] lockedObjects;
-            string lockdbg;
+            readonly object[] lockedObjects;
+#if DEBUG
+            readonly string lockdbg; // only for the debug list of held locks
+#endif
             //            public LockMultiple(params object[] toLock)
             //            {
             //                lockedObjects = (object[])toLock.Clone();

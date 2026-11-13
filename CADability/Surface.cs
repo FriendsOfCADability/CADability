@@ -12712,7 +12712,7 @@ namespace CADability.GeoObject
             public GeoPoint2D uv1, uv2;
             public GeoVector cross; // kreuzprodukt der Normalenvektoren in diesem Punkt: Richtung der Kurve, NullVector wenn tangential
             public GeoVector2D dir1, dir2; // Richtungen im jeweiligen uv System
-            public LinkedIntersectionPoint next1, next2, prev1, prev2, next, prev; // verkettete Listen in uv1, uv2, zusammengemixt
+            public LinkedIntersectionPoint next1, next2, prev1, prev2, next; // verkettete Listen in uv1, uv2, zusammengemixt
             public int ui1, vi1, ui2, vi2; // index der fixedu/v Linie, zum Verketten
             public Tuple<int, int> enterOnSurf1, enterOnSurf2; // Feldnummer merken, wo dieser Punkt Eintrittspunkt ist
             [Flags]
@@ -13680,7 +13680,6 @@ namespace CADability.GeoObject
                 foreach (LinkedIntersectionPoint lip in allIps)
                 {
                     lip.next = null;
-                    lip.prev = null;
                 }
 #endif
                 List<LinkedIntersectionPoint> startPointOn1 = new List<LinkedIntersectionPoint>(); // werden nicht weiter verwendet, oder?

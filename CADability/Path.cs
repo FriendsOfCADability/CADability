@@ -1705,17 +1705,11 @@ namespace CADability.GeoObject
         {
             using (new Changing(this, typeof(ICurve), "Reverse", new object[0]))
             {
-#if DEBUG
-                isReversing = true;
-#endif
                 Array.Reverse(subCurves);
                 for (int i = 0; i < subCurves.Length; ++i)
                 {
                     subCurves[i].Reverse();
                 }
-#if DEBUG
-                isReversing = false;
-#endif
             }
         }
         /// <summary>
@@ -2495,7 +2489,6 @@ namespace CADability.GeoObject
         {
             get
             {
-                if (isReversing) return true;
                 if (subCurves == null) return true;
                 for (int i = 0; i < subCurves.Length - 1; ++i)
                 {
@@ -2505,7 +2498,6 @@ namespace CADability.GeoObject
                 return true;
             }
         }
-        private bool isReversing;
         private void SubCurveDidChange(IGeoObject Sender, GeoObjectChange Change)
         {
             if (this.isChanging < 1)

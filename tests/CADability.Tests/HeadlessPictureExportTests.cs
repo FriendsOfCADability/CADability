@@ -75,7 +75,9 @@ namespace CADability.Tests
                 Assert.Inconclusive("this runtime has no BinaryFormatter: " + e.Message);
             }
             MemoryStream written = new MemoryStream();
+#pragma warning disable CS0618 // this test is about the deprecated binary format, so it writes it on purpose
             MakeProject().WriteToStream(written);
+#pragma warning restore CS0618
 #pragma warning disable CS0618 // ReadFromStream is kept for binary files
             Project read = Project.ReadFromStream(new MemoryStream(written.ToArray()));
 #pragma warning restore CS0618

@@ -1443,7 +1443,7 @@ namespace CADability
         }
         /// <summary>
         /// Exports the project in one of the following formats: cdb (CADability's own JSON format, same as
-        /// <see cref="WriteToFile"/>), dxf, dwg, step (or stp) and stl. The case of <paramref name="format"/> does not
+        /// <see cref="WriteToFile(string)"/>), dxf, dwg, step (or stp) and stl. The case of <paramref name="format"/> does not
         /// matter, the extension of the file name is not used. DXF and DWG write all models (see <see cref="DXF.Export"/>;
         /// the DXF version is the setting "DxfDwg.Version", DWG is written as AutoCAD 2004 or later), STEP and STL write
         /// the active model only. STEP writes solids, shells and faces as boundary representation and curves as curve
@@ -1834,7 +1834,7 @@ namespace CADability
         }
         /// <summary>
         /// Reads a project from a file in CADability's own format (cdb): the JSON format written by
-        /// <see cref="WriteToFile"/>, or the binary format of older versions, which is converted when read. To read
+        /// <see cref="WriteToFile(string)"/>, or the binary format of older versions, which is converted when read. To read
         /// DXF, DWG, STEP or STL files use <see cref="ReadFromFile(string, string)"/>.
         /// </summary>
         /// <param name="FileName">The name of the file</param>

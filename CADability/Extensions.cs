@@ -148,7 +148,7 @@ namespace CADability
     }
 
     /// <summary>
-    /// A set of strings that can be saved, e.g. the feature names of a face (see <see cref="Shell.AddFeature"/>). It is
+    /// A set of strings that can be saved, e.g. the feature names of a face (see <see cref="GeoObject.Shell.AddFeature(string, IEnumerable{GeoObject.Face})"/>). It is
     /// <see cref="ICloneable"/>, so that <see cref="UserData.Clone"/> gives a clone its own set instead of sharing it.
     /// </summary>
     internal class SerializableHashSetString : HashSet<string>, IJsonSerialize, ICloneable

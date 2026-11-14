@@ -325,28 +325,6 @@ namespace CADability
                 return subEntries;
             }
         }
-        void OnFocusChanged(IPropertyTreeView sender, IShowProperty NewFocus, IShowProperty OldFocus)
-        {
-            if (subEntries != null)
-            {
-                steps.Clear(); // alle rauswerfen und neu aufbauen
-                for (int i = 0; i < subEntries.Length; ++i)
-                {
-                    PositionProperty pp = subEntries[i] as PositionProperty;
-                    if (pp != null)
-                    {
-                        if (pp.Drive == null) continue;
-                        SortedList<double, double> addTo;
-                        if (!steps.TryGetValue(pp.Drive, out addTo))
-                        {
-                            addTo = new SortedList<double, double>();
-                            steps[pp.Drive] = addTo;
-                        }
-                        addTo[pp.Time] = pp.Position;
-                    }
-                }
-            }
-        }
         #endregion
         #region ICommandHandler Members
         bool ICommandHandler.OnCommand(string MenuId)
@@ -364,7 +342,7 @@ namespace CADability
                     propertyTreeView.SelectEntry(pp); // besser wäre den ersten Eintrag davon
                     return true;
                 case "MenuId.Schedule.Sort":
-                    propertyTreeView.SelectEntry(this); // damit der Focus hierhin geht und die Änderungen übernommen werden
+                    propertyTreeView.SelectEntry(this); // ends a running edit of a position entry, so its value is stored in steps
                     subEntries = null;
                     propertyTreeView.Refresh(this);
                     return true;
@@ -618,31 +596,6 @@ namespace CADability
             IDrive newDrive = driveList.Find(NewValue as string);
             schedule.DriveChanged(drive, newDrive, time, position);
             drive = newDrive;
-        }
-        void OnFocusChanged(IPropertyTreeView sender, IShowProperty NewFocus, IShowProperty OldFocus)
-        {
-            //if (sender.FocusLeft(this, OldFocus, NewFocus))
-            //{
-            //    if (orgDrive != null)
-            //    {
-            //        if (orgDrive != drive || orgTime != time || orgPosition != position)
-            //        {
-            //            if (orgDrive == drive && orgTime == time)
-            //            {
-            //                schedule.PositionChanged(drive, time, orgPosition, position);
-            //            }
-            //            else
-            //            {
-            //                schedule.Remove(orgDrive, orgTime);
-            //                schedule.AddPosition(drive, time, position);
-            //            }
-            //        }
-            //    }
-            //    else
-            //    {
-            //        schedule.AddPosition(drive, time, position);
-            //    }
-            //}
         }
         #endregion
         #region ICommandHandler Members

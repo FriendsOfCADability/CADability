@@ -18,7 +18,9 @@ namespace CADability.UserInterface
         GeoPointProperty planeOrigin;
         GeoVectorProperty planeDirectionX;
         GeoVectorProperty planeDirectionY;
-        GeoVector dirX, dirY;
+        GeoVector dirX, dirY; // the directions typed in the sub entries, valid while dirXModified or dirYModified
+        bool dirXModified, dirYModified; // a typed direction is not yet applied to the drawing plane
+        bool originModified; // the origin was changed, the view is not yet repainted
         /// <summary>
         /// Creates the entry for the drawing plane of <paramref name="projection"/>, the projection of the view the entry
         /// belongs to.
@@ -37,8 +39,6 @@ namespace CADability.UserInterface
             planeDirectionY = new GeoVectorProperty(this, "PlaneDirectionY", "DrawingPlane.DirectionY", frame, false);
             planeDirectionX.IsAngle = false;
             planeDirectionY.IsAngle = false;
-            dirX = projection.DrawingPlane.DirectionX; // lokale Kopien, erst setzen beim Verlassen
-            dirY = projection.DrawingPlane.DirectionY;
             planeDirectionX.ModifiedByActionEvent += new CADability.UserInterface.GeoVectorProperty.ModifiedByActionDelegate(OnDirectionModifiedByAction);
             subEntries[0] = planeOrigin;
             subEntries[1] = planeDirectionX;
@@ -60,38 +60,41 @@ namespace CADability.UserInterface
                 Plane pln = projection.DrawingPlane;
                 pln.Location = value;
                 projection.DrawingPlane = pln;
+                originModified = true;
             }
         }
         /// <summary>
         /// The x direction of the drawing plane as edited in the "DrawingPlane.DirectionX" sub entry (which accesses it via
-        /// reflection). Setting it only stores the value; the plane of the projection is updated when the sub entry loses the
-        /// focus.
+        /// reflection). Setting it only stores the value; the plane of the projection is updated when the selection in the
+        /// control center leaves the sub entry. Until then the stored value is returned, otherwise the direction of the plane.
         /// </summary>
         public GeoVector PlaneDirectionX
         {
             get
             {
-                return dirX;
+                return dirXModified ? dirX : projection.DrawingPlane.DirectionX;
             }
             set
             {
                 dirX = value;
+                dirXModified = true;
             }
         }
         /// <summary>
         /// The y direction of the drawing plane as edited in the "DrawingPlane.DirectionY" sub entry (which accesses it via
-        /// reflection). Setting it only stores the value; the plane of the projection is updated when the sub entry loses the
-        /// focus.
+        /// reflection). Setting it only stores the value; the plane of the projection is updated when the selection in the
+        /// control center leaves the sub entry. Until then the stored value is returned, otherwise the direction of the plane.
         /// </summary>
         public GeoVector PlaneDirectionY
         {
             get
             {
-                return dirY;
+                return dirYModified ? dirY : projection.DrawingPlane.DirectionY;
             }
             set
             {
                 dirY = value;
+                dirYModified = true;
             }
         }
         #region IShowProperty Members
@@ -298,46 +301,79 @@ namespace CADability.UserInterface
             frame.SetControlCenterFocus("View", null, false, false);
         }
 
-        private void OnFocusChanged(IPropertyTreeView sender, IShowProperty NewFocus, IShowProperty OldFocus)
-        {   // bei der Änderung der Richtungen soll erst beim Verlassen des Fokus
-            // eine Neuberechnung stattfinden
-            // propertyTreeView kann hier null sein, da der Focus auch beim
-            // zusammenklappen des Eintrages verschwindet
-            if (sender.FocusLeft(planeDirectionX, OldFocus, NewFocus))
+        /// <summary>
+        /// Starts listening to the selection of the page the entry is shown in, see <see cref="OnSelectionChanged"/>.
+        /// </summary>
+        /// <param name="pp">the property page the entry was added to</param>
+        public override void Added(IPropertyPage pp)
+        {
+            if (propertyPage != null) propertyPage.OnSelectionChanged -= OnSelectionChanged;
+            base.Added(pp);
+            pp.OnSelectionChanged += OnSelectionChanged;
+        }
+        /// <summary>
+        /// Stops listening to the selection and applies the changes that are still pending, because the selection will
+        /// not leave the sub entries any more.
+        /// </summary>
+        /// <param name="pp">the property page the entry was removed from</param>
+        public override void Removed(IPropertyPage pp)
+        {
+            if (propertyPage != null) propertyPage.OnSelectionChanged -= OnSelectionChanged;
+            ApplyPendingChanges(null, false); // no refresh: the page is just updating its list of entries
+            base.Removed(pp);
+        }
+        private void OnSelectionChanged(IPropertyEntry unselected, IPropertyEntry selected)
+        {
+            ApplyPendingChanges(selected, true);
+        }
+        /// <summary>
+        /// A typed direction is applied to the drawing plane only when the selection leaves its entry, so the plane is not
+        /// recomputed for every keystroke or for the intermediate vector while the components are typed one after the
+        /// other. The same holds for the repaint after the origin was changed.
+        /// </summary>
+        /// <param name="selected">the newly selected entry, null to apply everything</param>
+        /// <param name="refreshEntries">true to show the resulting directions in the sub entries</param>
+        private void ApplyPendingChanges(IPropertyEntry selected, bool refreshEntries)
+        {
+            bool repaint = false;
+            if (dirXModified && !PropertyEntryTree.IsWithin(selected, planeDirectionX))
             {
+                dirXModified = false;
                 Plane pln = projection.DrawingPlane;
                 try
                 {
                     projection.DrawingPlane = new Plane(pln.Location, dirX, pln.DirectionY);
-                    dirX = projection.DrawingPlane.DirectionX;
-                    dirY = projection.DrawingPlane.DirectionY;
-                    planeDirectionX.Refresh();
-                    planeDirectionY.Refresh();
                 }
                 catch (PlaneException)
-                {   // wenns nicht geht, dann halt nicht
+                {   // invalid direction (e.g. parallel to the y direction): the plane stays as it is
                 }
-                frame.ActiveView.InvalidateAll();
+                repaint = true;
             }
-            if (sender.FocusLeft(planeDirectionY, OldFocus, NewFocus))
+            if (dirYModified && !PropertyEntryTree.IsWithin(selected, planeDirectionY))
             {
+                dirYModified = false;
                 Plane pln = projection.DrawingPlane;
                 try
                 {
                     projection.DrawingPlane = new Plane(pln.Location, pln.DirectionX, dirY);
-                    dirX = projection.DrawingPlane.DirectionX;
-                    dirY = projection.DrawingPlane.DirectionY;
-                    planeDirectionX.Refresh();
-                    planeDirectionY.Refresh();
                 }
                 catch (PlaneException)
-                {   // wenns nicht geht, dann halt nicht
+                {   // invalid direction (e.g. parallel to the x direction): the plane stays as it is
                 }
-                frame.ActiveView.InvalidateAll();
+                repaint = true;
             }
-            if (sender.FocusLeft(planeOrigin, OldFocus, NewFocus))
+            if (originModified && !PropertyEntryTree.IsWithin(selected, planeOrigin))
             {
-                frame.ActiveView.InvalidateAll();
+                originModified = false;
+                repaint = true;
+            }
+            if (repaint)
+            {
+                // show the directions of the plane as they are now (the plane may have adjusted the other direction, or
+                // rejected an invalid one)
+                if (refreshEntries && !dirXModified) planeDirectionX.Refresh();
+                if (refreshEntries && !dirYModified) planeDirectionY.Refresh();
+                frame.ActiveView?.InvalidateAll();
             }
         }
     }

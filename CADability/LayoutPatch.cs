@@ -661,7 +661,7 @@ namespace CADability
                 action?.RemoveThisAction();
                 action = null;
             }
-            if (visibleLayersSp != null && IsWithin(unselected, visibleLayersSp) && !IsWithin(selected, visibleLayersSp))
+            if (PropertyEntryTree.IsWithin(unselected, visibleLayersSp) && !PropertyEntryTree.IsWithin(selected, visibleLayersSp))
             {
                 layoutView?.Repaint();
             }
@@ -671,18 +671,7 @@ namespace CADability
         /// </summary>
         private bool Contains(IPropertyEntry entry)
         {
-            return IsWithin(entry, this);
-        }
-        /// <summary>
-        /// True if <paramref name="entry"/> is <paramref name="root"/> or lies below it, following <see cref="IPropertyEntry.Parent"/>.
-        /// </summary>
-        private static bool IsWithin(IPropertyEntry entry, IPropertyEntry root)
-        {
-            for (IPropertyEntry e = entry; e != null; e = e.Parent as IPropertyEntry)
-            {
-                if (e == root) return true;
-            }
-            return false;
+            return PropertyEntryTree.IsWithin(entry, this);
         }
         private void SetSection()
         {

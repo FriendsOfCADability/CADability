@@ -89,43 +89,39 @@ namespace CADability.UserInterface
                 return subEntries;
             }
         }
-        void OnFocusChanged(IPropertyTreeView sender, IShowProperty NewFocus, IShowProperty OldFocus)
+        /// <summary>
+        /// Starts listening to the selection of the page the entry is shown in, see <see cref="OnSelectionChanged"/>.
+        /// </summary>
+        /// <param name="pp">the property page the entry was added to</param>
+        public override void Added(IPropertyPage pp)
         {
-            if (sender.FocusLeft(this, OldFocus, NewFocus))
+            if (propertyPage != null) propertyPage.OnSelectionChanged -= OnSelectionChanged;
+            base.Added(pp);
+            pp.OnSelectionChanged += OnSelectionChanged;
+        }
+        /// <summary>
+        /// Stops listening to the selection.
+        /// </summary>
+        /// <param name="pp">the property page the entry was removed from</param>
+        public override void Removed(IPropertyPage pp)
+        {
+            if (propertyPage != null) propertyPage.OnSelectionChanged -= OnSelectionChanged;
+            base.Removed(pp);
+        }
+        /// <summary>
+        /// Selecting the list in the control center selects its objects in the <see cref="AnimatedView"/>, selecting one of
+        /// its sub entries selects the object of that entry.
+        /// </summary>
+        private void OnSelectionChanged(IPropertyEntry unselected, IPropertyEntry selected)
+        {
+            if (!(Frame?.ActiveView is AnimatedView av)) return;
+            if (selected == this)
             {
+                av.SetSelectedObjects(new GeoObjectList(list.ToArray()));
             }
-            else if (sender.FocusEntered(this, OldFocus, NewFocus))
+            else if (selected is SimpleNameProperty snp && snp.Parent == this)
             {
-                if (NewFocus == this)
-                {
-                    if (Frame.ActiveView is AnimatedView)
-                    {
-                        AnimatedView av = Frame.ActiveView as AnimatedView;
-                        av.SetSelectedObjects(new GeoObjectList(list.ToArray()));
-                    }
-                }
-                else if (NewFocus is SimpleNameProperty)
-                {
-                    if (Frame.ActiveView is AnimatedView)
-                    {
-                        AnimatedView av = Frame.ActiveView as AnimatedView;
-                        av.SetSelectedObject((NewFocus as SimpleNameProperty).AssociatedObject as IGeoObject);
-                    }
-                }
-            }
-            else
-            {   // möglicherweise Änderung innerhalb der Child objects
-                if (propertyTreeView.GetParent(NewFocus) == this)
-                {
-                    if (NewFocus is SimpleNameProperty)
-                    {
-                        if (Frame.ActiveView is AnimatedView)
-                        {
-                            AnimatedView av = Frame.ActiveView as AnimatedView;
-                            av.SetSelectedObject((NewFocus as SimpleNameProperty).AssociatedObject as IGeoObject);
-                        }
-                    }
-                }
+                av.SetSelectedObject(snp.AssociatedObject as IGeoObject);
             }
         }
         bool OnUpdateCommand(SimpleNameProperty sender, string MenuId, CommandState CommandState)

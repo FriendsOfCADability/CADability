@@ -1997,8 +1997,9 @@ namespace CADability
         /// <inheritdoc/>
         public override void Added(IPropertyPage page)
         {
+            if (propertyPage != null) propertyPage.OnSelectionChanged -= OnSelectionChanged;
             base.Added(page);
-            //propertyTreeView.FocusChangedEvent += new FocusChangedDelegate(OnFocusChanged);
+            page.OnSelectionChanged += OnSelectionChanged;
             viewDirectionModified = false;
             viewDirection = Projection.Direction;
             Projection.Grid.GridChangedEvent += OnGridChanged;
@@ -2011,7 +2012,9 @@ namespace CADability
         /// <param name="page">the IPropertyTreeView from which it was removed</param>
         public override void Removed(IPropertyPage page)
         {
-            //propertyTreeView.FocusChangedEvent -= new FocusChangedDelegate(OnFocusChanged);
+            if (propertyPage != null) propertyPage.OnSelectionChanged -= OnSelectionChanged;
+            // the selection will not leave the projection direction any more, so apply a pending change now
+            if (viewDirectionModified) ApplyViewDirection(false); // no refresh: the page is just updating its list of entries
             Projection.Grid.GridChangedEvent -= OnGridChanged;
             Frame.SettingChangedEvent -= OnSettingChanged;
             project.ModelsChangedEvent -= OnModelsChanged;
@@ -2082,31 +2085,47 @@ namespace CADability
             }
         }
 
-        private void OnFocusChanged(IPropertyTreeView sender, IShowProperty NewFocus, IShowProperty OldFocus)
+        /// <summary>
+        /// Typing in the projection direction (or in one of its x, y, z sub entries) or in the distance only stores the new
+        /// values (<see cref="viewDirectionModified"/>). They are applied when the selection in the control center moves
+        /// to an entry outside the projection direction, so the view does not turn with every keystroke or with the
+        /// intermediate vector while the components are typed one after the other.
+        /// </summary>
+        private void OnSelectionChanged(IPropertyEntry unselected, IPropertyEntry selected)
         {
-            foreach (IShowProperty sp in projectionDirection.SubEntries)
+            if (viewDirectionModified && !PropertyEntryTree.IsWithin(selected, projectionDirection))
             {
-                if (sp == NewFocus) return;
+                ApplyViewDirection(true);
             }
-            if (viewDirectionModified && NewFocus != projectionDirection)
+        }
+        /// <summary>
+        /// Applies the stored <see cref="viewDirection"/> and <see cref="distance"/> to the projection and repaints.
+        /// </summary>
+        /// <param name="refreshEntry">true to show the direction in the control center again when it was rejected</param>
+        private void ApplyViewDirection(bool refreshEntry)
+        {
+            viewDirectionModified = false;
+            if (viewDirection.IsNullVector())
+            {   // (0, 0, 0) is no direction: keep the current one and show it again
+                viewDirection = Projection.Direction;
+                if (refreshEntry) projectionDirection?.Refresh();
+                return;
+            }
+            if (distance > 0)
             {
-                if (distance > 0)
-                {
-                    GeoPoint fromHere;
-                    if (fixPointValid) fromHere = fixPoint - distance * viewDirection;
-                    else fromHere = GeoPoint.Origin - distance * viewDirection;
-                    ProjectedModel.SetViewDirection(fromHere, viewDirection, fixPoint, false);
-                }
-                else
-                {
-                    ProjectedModel.SetViewDirection(viewDirection, false);
-                }
-                viewDirectionModified = false;
-                // Repaint, wenn Projektionsrichtung sich ändert
-                ForceInvalidateAll();
-                canvas?.Invalidate();
-                RecalcScrollPosition();
+                GeoPoint fromHere;
+                if (fixPointValid) fromHere = fixPoint - distance * viewDirection;
+                else fromHere = GeoPoint.Origin - distance * viewDirection;
+                ProjectedModel.SetViewDirection(fromHere, viewDirection, fixPoint, false);
             }
+            else
+            {
+                ProjectedModel.SetViewDirection(viewDirection, false);
+            }
+            // repaint, because the projection direction changed
+            ForceInvalidateAll();
+            canvas?.Invalidate();
+            RecalcScrollPosition();
         }
         #endregion
         /// <summary>
@@ -2431,13 +2450,18 @@ namespace CADability
             // höchstens 200 Einheiten in der jeweiligen Richtung
             double dx = pr.Grid.XDistance;
             double dy = pr.Grid.YDistance;
+            // A distance of 0 (e.g. while typing "0.5" in the grid entry) would never leave the loops below: the grid is not
+            // shown then, but the drawing plane still needs a finite raster to compute its rectangle.
+            bool validDistances = dx > 0.0 && dy > 0.0;
+            if (!(dx > 0.0)) dx = 1.0;
+            if (!(dy > 0.0)) dy = 1.0;
             while (ext.Width / dx > 200) dx = dx * 2.0;
             while (ext.Height / dy > 200) dy = dy * 2.0;
             int xstart = (int)(ext.Left / dx - 1);
             int xend = (int)(ext.Right / dx + 1);
             int ystart = (int)(ext.Bottom / dy - 1);
             int yend = (int)(ext.Top / dy + 1);
-            if (xend - xstart < 250 && yend - ystart < 250 && pr.Grid.Show && displayGrid)
+            if (validDistances && xend - xstart < 250 && yend - ystart < 250 && pr.Grid.Show && displayGrid)
             {
                 switch (pr.Grid.DisplayMode)
                 {

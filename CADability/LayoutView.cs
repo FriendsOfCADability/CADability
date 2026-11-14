@@ -65,7 +65,7 @@ namespace CADability
         //private IPaintTo3D paintTo3D; // die OpenGL Zeichenmaschine
         internal ModOp2D layoutToScreen; // Abbildung layout auf Bildschirm, also Zoom und Scroll
         internal ModOp2D screenToLayout; // inverse Abbildung
-        private PrintDocument printDocument; // lokale Printeinstellungen
+        private PrintDocument printDocument; // the print settings of this view, created on demand (EnsurePrintDocument)
         private Project project; //Rückverweis wg. Druckereinstellung und Dokument Name
         private DoubleProperty paperWidth;
         private DoubleProperty paperHeight;
@@ -84,8 +84,17 @@ namespace CADability
             this.layout = layout;
             screenToLayout = layoutToScreen = ModOp2D.Null;
             base.resourceIdInternal = "LayoutView";
+            // the PrintDocument is created when it is first needed (EnsurePrintDocument): GDI+ printing only works on Windows,
+            // and showing a layout must not need it (issue #561)
+        }
+        /// <summary>
+        /// Creates the print document of this view when it is first needed, with the page settings of the layout, else those
+        /// of the project, else the orientation of the layout's paper.
+        /// </summary>
+        private void EnsurePrintDocument()
+        {
+            if (printDocument != null) return;
             printDocument = new PrintDocument();
-            // the page settings of the layout, else those of the project, else the orientation of the layout's paper
             PageSetup pageSetup = layout.PageSetup ?? project.DefaultPageSetup;
             try
             {
@@ -1041,14 +1050,14 @@ namespace CADability
 
         private void OnPrint()
         {
-            if (printDocument == null) printDocument = project.PrintDocument;
+            EnsurePrintDocument();
             Print(printDocument);
         }
         private void OnPrintSetup()
         {
             //psd.AllowPrinter = true;
             //psd.EnableMetric = true;
-            if (printDocument == null) printDocument = project.PrintDocument;
+            EnsurePrintDocument();
             if (layout.PageSetup != null) layout.PageSetup.ApplyTo(printDocument);
 
             if (Frame.UIService.ShowPageSetupDlg(ref printDocument, printDocument.DefaultPageSettings, out int width, out int height, out bool landscape) == DialogResult.OK)
@@ -1074,7 +1083,7 @@ namespace CADability
         }
         private void OnSelectPrinter()
         {
-            if (printDocument == null) printDocument = project.PrintDocument;
+            EnsurePrintDocument();
             //PrintDialog printDialog = new PrintDialog();
             //printDialog.Document = printDocument;
             //printDialog.AllowSomePages = false;

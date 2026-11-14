@@ -568,56 +568,185 @@ namespace CADability.Curve2D
             return from * new GeoVector2D(-maj * Math.Sin(a), min * Math.Cos(a));
         }
         /// <summary>
-        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.PerpendicularFoot (GeoPoint2D)"/>
+        /// Overrides <see cref="CADability.Curve2D.GeneralCurve2D.PerpendicularFoot (GeoPoint2D)"/>. Returns all points of the
+        /// ellipse where the line to <paramref name="fromHere"/> is perpendicular to the ellipse (up to four), computed exactly in the
+        /// frame of the axes. An <see cref="EllipseArc2D"/> returns only those inside the arc.
         /// </summary>
         /// <param name="fromHere">from this point</param>
-        /// <returns></returns>
+        /// <returns>the foot points</returns>
         public override GeoPoint2D[] PerpendicularFoot(GeoPoint2D fromHere)
         {
-            return base.PerpendicularFoot(fromHere);
+            GeoPoint2D[] feet = FootPoints(fromHere, false);
+            if (feet == null) return base.PerpendicularFoot(fromHere); // degenerated ellipse
+            return feet;
         }
         /// <summary>
-        /// Returns the foot point of the perpendicular from <paramref name="fromHere"/> onto the (full) ellipse which is closest to
-        /// that point, i.e. the point of the ellipse with the smallest distance to it. Uses <see cref="PerpendicularFoot"/> and falls
-        /// back to a Newton iteration when that yields nothing.
+        /// Returns the point of the full (extended) ellipse which is closest to <paramref name="fromHere"/>. The point is computed
+        /// with <see cref="DistanceCandidates"/>, not with the triangulation based <see cref="PerpendicularFoot"/>, which is
+        /// imprecise on flat ellipses. For an <see cref="EllipseArc2D"/> the result may lie outside of the arc.
         /// </summary>
         /// <param name="fromHere">the point to project</param>
-        /// <returns>the closest foot point</returns>
+        /// <returns>the closest point of the full ellipse</returns>
         protected GeoPoint2D ClosestPerpendicularFoot(GeoPoint2D fromHere)
         {
-            //GeoPoint2D p0 = toUnitCircle * fromHere;
-            //double a = Math.Atan2(p0.y, p0.x);
-            //if (a < 0.0) a += 2.0 * Math.PI;
-            //if (!counterClock) a = 2.0 * Math.PI - a;
-            //double u = a / (2 * Math.PI);
-            //GeoPoint2D[] res = new GeoPoint2D[2];
-            //return PointAt(NewtonPerpendicular(fromHere, u));
-            GeoPoint2D[] pf = PerpendicularFoot(fromHere);
-            double mindist = double.MaxValue;
-            int ind = -1;
-            for (int i = 0; i < pf.Length; i++)
+            GeoPoint2D[] candidates = DistanceCandidates(fromHere);
+            GeoPoint2D res = candidates[0];
+            double mindist = res | fromHere;
+            for (int i = 1; i < candidates.Length; i++)
             {
-                double dist = pf[i] | fromHere;
+                double dist = candidates[i] | fromHere;
                 if (dist < mindist)
                 {
                     mindist = dist;
-                    ind = i;
+                    res = candidates[i];
                 }
             }
-            if (ind >= 0) return pf[ind];
-            // the following will probably never be called:
-            // see: http://www.geometrictools.com/Documentation/DistancePointToEllipse2.pdf
-            // they seem to prefer Newton too, otherwise solve an equation of degree 4.
-            double a, b;
-            ModOp2D to, from;
-            GetAxisAlignedEllipse(out a, out b, out to, out from);
+            return res;
+        }
+        /// <summary>
+        /// Returns points of the full ellipse among which are all the points where the distance to <paramref name="fromHere"/> has a
+        /// local minimum. So the closest point of the ellipse, and the closest point of any arc of it which is not an end point of that
+        /// arc, is one of the returned points. These are the foot points of the full ellipse and, as a safeguard for points very close
+        /// to one of the axes, the four vertices.
+        /// </summary>
+        /// <param name="fromHere">the point to project</param>
+        /// <returns>candidate points on the ellipse, never empty</returns>
+        internal GeoPoint2D[] DistanceCandidates(GeoPoint2D fromHere)
+        {
+            GeoPoint2D[] res = FootPoints(fromHere, true);
+            if (res != null) return res;
+            // degenerated ellipse, no axis frame available
+            GeoPoint2D[] pf = base.PerpendicularFoot(fromHere);
+            if (pf.Length > 0) return pf;
+            return new GeoPoint2D[] { StartPoint, EndPoint };
+        }
+        /// <summary>
+        /// The foot points of the full ellipse (see <see cref="FootPointsAxisAligned"/>), optionally with the four vertices, or null
+        /// for a degenerated ellipse.
+        /// </summary>
+        private GeoPoint2D[] FootPoints(GeoPoint2D fromHere, bool withVertices)
+        {
+            GetAxisAlignedEllipse(out double maj, out double min, out ModOp2D to, out ModOp2D from);
+            if (maj == 0.0 || min == 0.0) return null;
             GeoPoint2D p = to * fromHere;
-            double x = 0.0, y = 0.0;
-            int iter = 0;
-            double d = Geometry.DistancePointEllipse(p.x, p.y, a, b, Precision.eps, 16, ref iter, ref x, ref y);
-            p = from * new GeoPoint2D(x, y);
-            double par = ParamOf(p);
-            return PointAtParam(par);
+            List<GeoPoint2D> axisFrame = FootPointsAxisAligned(p.x, p.y, maj, min);
+            if (withVertices)
+            {
+                axisFrame.Add(new GeoPoint2D(maj, 0.0));
+                axisFrame.Add(new GeoPoint2D(-maj, 0.0));
+                axisFrame.Add(new GeoPoint2D(0.0, min));
+                axisFrame.Add(new GeoPoint2D(0.0, -min));
+            }
+            GeoPoint2D[] res = new GeoPoint2D[axisFrame.Count];
+            for (int i = 0; i < res.Length; i++)
+            {   // put the point exactly onto the ellipse, so that a slightly imprecise root can only make the distance larger
+                double t = Math.Atan2(axisFrame[i].y / min, axisFrame[i].x / maj);
+                res[i] = from * new GeoPoint2D(maj * Math.Cos(t), min * Math.Sin(t));
+            }
+            return res;
+        }
+        /// <summary>
+        /// The foot points of the perpendiculars from the point (u, v) onto the ellipse (x/a)² + (y/b)² = 1.
+        /// </summary>
+        /// <remarks>
+        /// With a ≥ b and the point reflected into the first quadrant, the foot points are (a²u/(s+c), b²v/s) with c = a² − b², where s
+        /// is a root of F(s) = (au/(s+c))² + (bv/s)² − 1. There is exactly one root with s &gt; 0 (the closest point, first quadrant)
+        /// and exactly one with s &lt; −c (the farthest point, third quadrant). On (−c, 0) F is convex with its minimum at
+        /// s = −c/(1+k), k = (au/bv)^(2/3), so there are none, one or two roots there (fourth quadrant). Every root is found by
+        /// bisection on a monotonic part of F, which is robust for arbitrarily flat ellipses. Points on an axis are handled separately.
+        /// </remarks>
+        private static List<GeoPoint2D> FootPointsAxisAligned(double u, double v, double a, double b)
+        {
+            List<GeoPoint2D> res = new List<GeoPoint2D>(4);
+            if (a < b)
+            {   // the formulas below need the major axis in x-direction
+                List<GeoPoint2D> transposed = FootPointsAxisAligned(v, u, b, a);
+                for (int i = 0; i < transposed.Count; i++) res.Add(new GeoPoint2D(transposed[i].y, transposed[i].x));
+                return res;
+            }
+            double su = u < 0.0 ? -1.0 : 1.0;
+            double sv = v < 0.0 ? -1.0 : 1.0;
+            u = Math.Abs(u);
+            v = Math.Abs(v);
+            double c = (a - b) * (a + b);
+            double au = a * u, bv = b * v;
+            if (u > 0.0 && v > 0.0)
+            {
+                double r = Math.Sqrt(au * au + bv * bv);
+                // first quadrant: F(s) decreases from +∞ (s → 0) to −1, F(r) ≤ 0
+                double s = Bisect(x => Sqr(au / (x + c)) + Sqr(bv / x) - 1.0, 0.0, r, true);
+                res.Add(new GeoPoint2D(a * au / (s + c), b * bv / s));
+                // third quadrant, with w = −(s + c): F(w) decreases from +∞ (w → 0) to −1, F(r) ≤ 0
+                double w = Bisect(x => Sqr(au / x) + Sqr(bv / (x + c)) - 1.0, 0.0, r, true);
+                res.Add(new GeoPoint2D(-a * au / w, -b * bv / (w + c)));
+                if (c > 0.0)
+                {   // fourth quadrant; the part left of the minimum uses r = s + c to avoid cancellation
+                    double k = Math.Pow(au / bv, 2.0 / 3.0);
+                    double rm = c * k / (1.0 + k);
+                    double sm = -c / (1.0 + k);
+                    double fm = Sqr(au / rm) + Sqr(bv / sm) - 1.0;
+                    if (fm == 0.0) res.Add(new GeoPoint2D(a * au / rm, b * bv / sm)); // tangential: one double root
+                    else if (fm < 0.0)
+                    {
+                        double r1 = Bisect(x => Sqr(au / x) + Sqr(bv / (x - c)) - 1.0, 0.0, rm, true);
+                        res.Add(new GeoPoint2D(a * au / r1, b * bv / (r1 - c)));
+                        double s2 = Bisect(x => Sqr(au / (x + c)) + Sqr(bv / x) - 1.0, sm, 0.0, false);
+                        res.Add(new GeoPoint2D(a * au / (s2 + c), b * bv / s2));
+                    }
+                }
+            }
+            else if (v > 0.0)
+            {   // on the minor axis: both vertices on that axis, and two symmetric foot points on the opposite side inside the evolute
+                res.Add(new GeoPoint2D(0.0, b));
+                res.Add(new GeoPoint2D(0.0, -b));
+                if (bv < c)
+                {
+                    double y = -b * bv / c;
+                    double x = a * Math.Sqrt(Math.Max(0.0, 1.0 - Sqr(y / b)));
+                    res.Add(new GeoPoint2D(x, y));
+                    res.Add(new GeoPoint2D(-x, y));
+                }
+            }
+            else
+            {   // on the major axis (or the center): both vertices on that axis, and two symmetric closest points inside the evolute
+                res.Add(new GeoPoint2D(a, 0.0));
+                res.Add(new GeoPoint2D(-a, 0.0));
+                if (au < c)
+                {
+                    double x = a * au / c;
+                    double y = b * Math.Sqrt(Math.Max(0.0, 1.0 - Sqr(x / a)));
+                    res.Add(new GeoPoint2D(x, y));
+                    res.Add(new GeoPoint2D(x, -y));
+                }
+            }
+            for (int i = 0; i < res.Count; i++)
+            {
+                if (double.IsNaN(res[i].x) || double.IsNaN(res[i].y) || double.IsInfinity(res[i].x) || double.IsInfinity(res[i].y))
+                {
+                    res.RemoveAt(i);
+                    --i;
+                }
+                else res[i] = new GeoPoint2D(su * res[i].x, sv * res[i].y);
+            }
+            return res;
+        }
+        private static double Sqr(double x) { return x * x; }
+        /// <summary>
+        /// Finds the root of a monotonic function in (lo, hi) by bisection until the interval cannot be split any more. The function
+        /// is not evaluated at the bounds, which may be poles.
+        /// </summary>
+        private static double Bisect(Func<double, double> f, double lo, double hi, bool decreasing)
+        {
+            for (int i = 0; i < 2200; i++)
+            {
+                double m = 0.5 * (lo + hi);
+                if (m <= lo || m >= hi) break;
+                double fm = f(m);
+                if (fm == 0.0) return m;
+                if ((fm > 0.0) == decreasing) lo = m;
+                else hi = m;
+            }
+            return 0.5 * (lo + hi);
         }
         /// <inheritdoc/>
         public override double Distance(GeoPoint2D p)

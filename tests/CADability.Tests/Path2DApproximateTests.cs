@@ -45,19 +45,6 @@ namespace CADability.Tests
             }
         }
 
-        private static double DistanceToPolyline(GeoPoint2D p, List<GeoPoint2D> polyline)
-        {
-            double res = double.MaxValue;
-            for (int i = 1; i < polyline.Count; i++)
-            {
-                GeoVector2D dir = polyline[i] - polyline[i - 1];
-                double len2 = dir * dir;
-                double t = len2 == 0.0 ? 0.0 : Math.Max(0.0, Math.Min(1.0, ((p - polyline[i - 1]) * dir) / len2));
-                res = Math.Min(res, p | (polyline[i - 1] + t * dir));
-            }
-            return res;
-        }
-
         /// <summary>
         /// Both directions of the Hausdorff distance, sampled: every point of the approximation lies near the original
         /// and every point of the original lies near the approximation.
@@ -65,17 +52,9 @@ namespace CADability.Tests
         private static void AssertClose(ICurve2D original, ICurve2D approx, double maxError, string context)
         {
             double tolerance = maxError * 1.01 + 1e-9;
-            List<GeoPoint2D> dense = null;
             foreach (GeoPoint2D p in Samples(approx, 50))
             {
                 double d = original.MinDistance(p);
-                if (d > tolerance)
-                {
-                    // MinDistance of a very flat elliptical arc may overestimate the distance, so check against a dense polyline
-                    // of the original before reporting a failure
-                    if (dense == null) dense = new List<GeoPoint2D>(Samples(original, 2000));
-                    d = Math.Min(d, DistanceToPolyline(p, dense));
-                }
                 Assert.IsTrue(d <= tolerance, $"{context}: point {p} of the approximation is {d} away from the original");
             }
             foreach (GeoPoint2D p in Samples(original, 200))

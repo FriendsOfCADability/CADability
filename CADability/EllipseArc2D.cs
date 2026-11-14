@@ -1,5 +1,6 @@
 ﻿using CADability.GeoObject;
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Runtime.Serialization;
 using System.Threading;
@@ -583,6 +584,21 @@ namespace CADability.Curve2D
                 // minorAxis (or to the unit circle itself, when one of them is degenerate)
                 return ArcLength.OfEllipse(majorAxis * majorAxis, minorAxis * minorAxis, 0.0, startPar, sweepPar);
             }
+        }
+        /// <summary>
+        /// Returns the foot points of the perpendiculars from <paramref name="fromHere"/> onto the ellipse which lie inside this arc.
+        /// </summary>
+        /// <param name="fromHere">from this point</param>
+        /// <returns>the foot points inside the arc</returns>
+        public override GeoPoint2D[] PerpendicularFoot(GeoPoint2D fromHere)
+        {
+            GeoPoint2D[] feet = base.PerpendicularFoot(fromHere);
+            List<GeoPoint2D> res = new List<GeoPoint2D>(feet.Length);
+            for (int i = 0; i < feet.Length; i++)
+            {
+                if (IsParameterOnCurve(PositionOf(feet[i]))) res.Add(feet[i]);
+            }
+            return res.ToArray();
         }
         /// <inheritdoc/>
         public override double MinDistance(GeoPoint2D p)

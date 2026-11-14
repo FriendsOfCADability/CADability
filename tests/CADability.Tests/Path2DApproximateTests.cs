@@ -45,6 +45,19 @@ namespace CADability.Tests
             }
         }
 
+        private static double DistanceToPolyline(GeoPoint2D p, List<GeoPoint2D> polyline)
+        {
+            double res = double.MaxValue;
+            for (int i = 1; i < polyline.Count; i++)
+            {
+                GeoVector2D dir = polyline[i] - polyline[i - 1];
+                double len2 = dir * dir;
+                double t = len2 == 0.0 ? 0.0 : Math.Max(0.0, Math.Min(1.0, ((p - polyline[i - 1]) * dir) / len2));
+                res = Math.Min(res, p | (polyline[i - 1] + t * dir));
+            }
+            return res;
+        }
+
         /// <summary>
         /// Both directions of the Hausdorff distance, sampled: every point of the approximation lies near the original
         /// and every point of the original lies near the approximation.
@@ -52,9 +65,17 @@ namespace CADability.Tests
         private static void AssertClose(ICurve2D original, ICurve2D approx, double maxError, string context)
         {
             double tolerance = maxError * 1.01 + 1e-9;
+            List<GeoPoint2D> dense = null;
             foreach (GeoPoint2D p in Samples(approx, 50))
             {
                 double d = original.MinDistance(p);
+                if (d > tolerance)
+                {
+                    // MinDistance of a very flat elliptical arc may overestimate the distance, so check against a dense polyline
+                    // of the original before reporting a failure
+                    if (dense == null) dense = new List<GeoPoint2D>(Samples(original, 2000));
+                    d = Math.Min(d, DistanceToPolyline(p, dense));
+                }
                 Assert.IsTrue(d <= tolerance, $"{context}: point {p} of the approximation is {d} away from the original");
             }
             foreach (GeoPoint2D p in Samples(original, 200))
@@ -148,6 +169,40 @@ namespace CADability.Tests
                     foreach (ICurve2D seg in approx.SubCurves) Assert.IsInstanceOfType(seg, typeof(Arc2D), context);
                     Assert.IsTrue(approx.SubCurves.Length < lineCount, $"{context}: {approx.SubCurves.Length} arcs, {lineCount} lines");
                 }
+            }
+        }
+
+        [TestMethod]
+        public void NearlyStraightChain_WithArcs_StaysWithinToleranceAndWorksForLongHole()
+        {
+            // 50 elliptical arcs on the flat part of an ellipse (radius of curvature up to 100000): the approximation with arcs
+            // yields very flat arcs or lines, which must stay within tolerance and work for a caller such as MakeLongHole
+            GeoVector2D major = new GeoVector2D(1000, 0);
+            GeoVector2D minor = new GeoVector2D(0, 10);
+            const int pieces = 50;
+            ICurve2D[] segs = new ICurve2D[pieces];
+            for (int i = 0; i < pieces; i++)
+            {
+                double a1 = (60.0 + 60.0 * i / pieces) * Math.PI / 180.0;
+                double a2 = (60.0 + 60.0 * (i + 1) / pieces) * Math.PI / 180.0;
+                segs[i] = EllipseArc2D.Create(GeoPoint2D.Origin, major, minor, GeoPoint2D.Origin + Math.Cos(a1) * major + Math.Sin(a1) * minor,
+                    GeoPoint2D.Origin + Math.Cos(a2) * major + Math.Sin(a2) * minor, true);
+            }
+            Path2D path = new Path2D(segs, true);
+            foreach (double maxError in new[] { 0.1, 0.01, 0.001 })
+            {
+                string context = $"maxError {maxError}";
+                Path2D approx = path.Approximate(false, maxError) as Path2D;
+                Assert.IsNotNull(approx, context);
+                Assert.IsTrue(approx.SubCurves.Length < pieces, $"{context}: {approx.SubCurves.Length} segments");
+                AssertClose(path, approx, maxError, context);
+
+                // MakeLongHole approximates the center line with arcs allowed and builds the slot from the pieces
+                const double halfWidth = 5.0;
+                SimpleShape slot = SimpleShape.MakeLongHole(path, halfWidth, maxError);
+                Assert.IsNotNull(slot, context);
+                double expected = 2.0 * halfWidth * path.Length + Math.PI * halfWidth * halfWidth;
+                Assert.AreEqual(expected, slot.Area, 2.0 * halfWidth * path.Length * 1e-4, context);
             }
         }
 

@@ -1098,33 +1098,22 @@ namespace CADability.Curve2D
         /// <inheritdoc/>
         public override ICurve2D Approximate(bool linesOnly, double maxError)
         {
-            // wenn alles Linien oder Kreisbögen sind, dann ist man ja schon fertig
-            bool ok = true;
-            bool mixed = false;
+            if (subCurves.Length == 0) return this.Clone();
+            // Classify all sub-curves (issue #554: stopping at the first segment that is not allowed as is made the result
+            // depend on the start segment). If any segment can be approximated on its own (a line, a spline, or an arc
+            // when arcs are allowed), approximate segment by segment. Only a path that consists entirely of other segments,
+            // typically many short tangential curves, is approximated as a whole by subdivision.
+            bool approximateBySegment = false;
             for (int i = 0; i < subCurves.Length; ++i)
             {
-                if (subCurves[i] is Line2D)
+                if (subCurves[i] is Line2D || subCurves[i] is BSpline2D || (!linesOnly && (subCurves[i] is Arc2D || subCurves[i] is Circle2D)))
                 {
-                    mixed = true;
-                    continue;
+                    approximateBySegment = true;
+                    break; // one such segment is enough to decide
                 }
-                if (subCurves[i] is BSpline2D)
-                {
-                    mixed = true;
-                    continue;
-                }
-                if (!linesOnly && (subCurves[i] is Arc2D || subCurves[i] is Circle2D))
-                {
-                    mixed = true;
-                    continue;
-                }
-                ok = false;
-                break;
             }
-            if (ok && !mixed) return this.Clone();
-            if (mixed)
-            {   // enthält sowohl echte Linien (oder Bögen, wenn Bögen erlaubt) als auch andere Dinge
-                // dann ist es besser die einzelnen untersegmente zu approximieren
+            if (approximateBySegment)
+            {
                 List<ICurve2D> list = new List<ICurve2D>();
                 for (int i = 0; i < subCurves.Length; ++i)
                 {
@@ -1136,11 +1125,11 @@ namespace CADability.Curve2D
             }
             else
             {
-                // nur nicht erlaubte segmente, insbesondere viele kurze tangentiale Splines.
-                // mit möglichst wenigen Stützpunkten annähern
+                // only segments that are not allowed as is, especially many short tangential splines:
+                // approximate with as few points as possible
                 List<ICurve2D> list;
                 if (IsClosed)
-                {   // Start- und Enpunkt identisch. Man braucht mindestens einen Zwischenpunkt
+                {   // start point and end point coincide, at least one intermediate point is needed
                     List<ICurve2D> l1 = Approximate(0.0, 0.5, linesOnly, maxError);
                     List<ICurve2D> l2 = Approximate(0.5, 1.0, linesOnly, maxError);
                     list = new List<ICurve2D>();
@@ -1157,105 +1146,183 @@ namespace CADability.Curve2D
             }
         }
 
-        private List<ICurve2D> Approximate(double par1, double par2, bool linesOnly, double maxError)
+        /// <summary>
+        /// Points of this path between the path parameters <paramref name="par1"/> and <paramref name="par2"/>:
+        /// the start and end of that part and <paramref name="perSegment"/> intervals on each sub-curve it touches.
+        /// </summary>
+        private List<GeoPoint2D> SamplePart(double par1, double par2, int perSegment)
         {
-            double l = par1 * subCurves.Length;
-            int i1 = (int)l + 1;
-            if (i1 < 0) i1 = 0;
-            // if (i1 >= subCurves.Length) i1 = subCurves.Length - 1;
-            // nicht i1 runterrechnen, wird ja nie als index verwendet, wenn es größer als i2 ist
-            l = par2 * subCurves.Length;
-            int i2 = (int)l;
-            if (i2 < 0) i2 = 0;
-            if (i2 >= subCurves.Length) i2 = subCurves.Length - 1;
-            if (linesOnly)
+            List<GeoPoint2D> res = new List<GeoPoint2D>();
+            double l1 = par1 * subCurves.Length;
+            double l2 = par2 * subCurves.Length;
+            int first = Math.Max(0, (int)Math.Floor(l1));
+            int last = Math.Min(subCurves.Length - 1, (int)Math.Ceiling(l2) - 1);
+            for (int i = first; i <= last; ++i)
             {
-                Line2D l2d = new Line2D(PointAt(par1), PointAt(par2));
-                bool ok = true;
-                for (int i = i1; i <= i2; ++i)
+                double s = Math.Max(0.0, l1 - i);
+                double e = Math.Min(1.0, l2 - i);
+                if (e < s) continue;
+                for (int j = 0; j <= perSegment; ++j)
                 {
-                    GeoPoint2D p = subCurves[i].StartPoint;
-                    if (Math.Abs(Geometry.DistPL(p, l2d.StartPoint, l2d.EndPoint)) > maxError)
-                    {
-                        ok = false;
-                        break;
-                    }
+                    res.Add(subCurves[i].PointAt(s + (e - s) * j / perSegment));
                 }
-                if (ok && MinDistance(l2d.PointAt(0.5)) > maxError && l2d.Length > maxError) ok = false;
-                // l2d.Length > maxError: wenn die beiden Punkte so nahe beieinander liegen könnte es sich natürlich um eine Überschneidung handeln
-                // aber das ist extrem unwahrscheinlich. Man könnte hier auch einen Abbruch nehmen, wenn die beiden Parameter sich zu nahe kommen
-                // aber irgend ein Abbruchkriterium braucht es, MinDistance ist zu unsicher
-                if (ok)
-                {
-                    List<ICurve2D> res = new List<ICurve2D>(1);
-                    res.Add(l2d);
-                    return res;
-                }
+            }
+            return res;
+        }
+
+        /// <summary>
+        /// The sub-curves of this path between the path parameters <paramref name="par1"/> and <paramref name="par2"/>, the first
+        /// and last trimmed to that interval. Sub-curves that lie completely inside are not copied.
+        /// </summary>
+        private List<ICurve2D> PartCurves(double par1, double par2)
+        {
+            List<ICurve2D> res = new List<ICurve2D>();
+            double l1 = par1 * subCurves.Length;
+            double l2 = par2 * subCurves.Length;
+            int first = Math.Max(0, (int)Math.Floor(l1));
+            int last = Math.Min(subCurves.Length - 1, (int)Math.Ceiling(l2) - 1);
+            for (int i = first; i <= last; ++i)
+            {
+                double s = Math.Max(0.0, l1 - i);
+                double e = Math.Min(1.0, l2 - i);
+                if (e <= s) continue;
+                if (s == 0.0 && e == 1.0) res.Add(subCurves[i]);
                 else
                 {
-                    List<ICurve2D> res = new List<ICurve2D>();
-                    double pmm = (par1 + par2) / 2.0;
-                    res.AddRange(Approximate(par1, pmm, linesOnly, maxError));
-                    res.AddRange(Approximate(pmm, par2, linesOnly, maxError));
-                    return res;
+                    ICurve2D trimmed = subCurves[i].Trim(s, e);
+                    if (trimmed != null) res.Add(trimmed);
+                }
+            }
+            return res;
+        }
+
+        /// <summary>
+        /// True if <paramref name="p"/> lies within <paramref name="maxError"/> of one of <paramref name="curves"/>. The search
+        /// starts at the curve at <paramref name="fraction"/> of the list and proceeds alternately in both directions.
+        /// An empty list counts as close, so that a degenerate part does not block the approximation.
+        /// </summary>
+        private static bool IsCloseToAny(List<ICurve2D> curves, GeoPoint2D p, double fraction, double maxError)
+        {
+            if (curves.Count == 0) return true;
+            int start = Math.Max(0, Math.Min(curves.Count - 1, (int)(fraction * curves.Count)));
+            for (int d = 0; start - d >= 0 || start + d < curves.Count; ++d)
+            {
+                if (start + d < curves.Count && curves[start + d].MinDistance(p) <= maxError) return true;
+                if (d > 0 && start - d >= 0 && curves[start - d].MinDistance(p) <= maxError) return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Distance of <paramref name="p"/> to the arc, in closed form: the radial distance if the direction from the center to
+        /// <paramref name="p"/> lies within the sweep, otherwise the distance to the nearer end point.
+        /// </summary>
+        private static double DistanceToArc(GeoPoint2D p, Arc2D arc)
+        {
+            GeoVector2D v = p - arc.Center;
+            GeoVector2D s = arc.StartPoint - arc.Center;
+            double angle = Math.Atan2(s.x * v.y - s.y * v.x, s.x * v.x + s.y * v.y); // from the start point towards p
+            if (arc.Sweep < 0.0) angle = -angle;
+            if (angle < 0.0) angle += 2.0 * Math.PI;
+            if (angle <= Math.Abs(arc.Sweep)) return Math.Abs(v.Length - arc.Radius);
+            return Math.Min(p | arc.StartPoint, p | arc.EndPoint);
+        }
+
+        private static double DistanceToSegment(GeoPoint2D p, GeoPoint2D sp, GeoPoint2D ep)
+        {
+            GeoVector2D dir = ep - sp;
+            double len2 = dir.x * dir.x + dir.y * dir.y;
+            if (len2 == 0.0) return p | sp;
+            double t = ((p.x - sp.x) * dir.x + (p.y - sp.y) * dir.y) / len2;
+            if (t <= 0.0) return p | sp;
+            if (t >= 1.0) return p | ep;
+            return p | (sp + t * dir);
+        }
+
+        /// <summary>
+        /// True if all <paramref name="samples"/> lie within <paramref name="maxError"/> of the segment from <paramref name="sp"/> to <paramref name="ep"/>.
+        /// The distance is measured to the segment, not to the infinite line, so that a part that runs beyond the end of the chord is rejected.
+        /// </summary>
+        private static bool ChordFits(List<GeoPoint2D> samples, GeoPoint2D sp, GeoPoint2D ep, double maxError)
+        {
+            for (int i = 0; i < samples.Count; ++i)
+            {
+                if (DistanceToSegment(samples[i], sp, ep) > maxError) return false;
+            }
+            return true;
+        }
+
+        private List<ICurve2D> Approximate(double par1, double par2, bool linesOnly, double maxError)
+        {
+            const int samplesPerSegment = 16;
+            // when the parameter interval collapses, accept the result to guarantee termination
+            bool tooSmall = (par2 - par1) * subCurves.Length < 1e-8;
+            // The approximating curves are measured against the part of this path between par1 and par2 only, not against
+            // the whole path: on a closed contour a chord may pass close to another part of the path (issue #554).
+            List<GeoPoint2D> samples = SamplePart(par1, par2, samplesPerSegment);
+            GeoPoint2D p1 = PointAt(par1);
+            GeoPoint2D p2 = PointAt(par2);
+            ICurve2D[] arcs = null;
+            if (!linesOnly)
+            {
+                arcs = Curves2D.ConnectByTwoArcs(p1, p2, DirectionAt(par1), DirectionAt(par2));
+                // ConnectByTwoArcs returns a single line when no suitable pair of arcs exists, in particular when the part is
+                // too long (an arc would sweep 45 degrees or more) or almost straight. Then the line is tested like a chord
+                // and, if it does not fit, the part is subdivided while still allowing arcs.
+                if (arcs == null || arcs.Length != 2) arcs = null;
+            }
+            if (arcs == null)
+            {
+                if (tooSmall || ChordFits(samples, p1, p2, maxError))
+                {
+                    return new List<ICurve2D>(1) { new Line2D(p1, p2) };
                 }
             }
             else
             {
-                ICurve2D[] arcs = Curves2D.ConnectByTwoArcs(PointAt(par1), PointAt(par2), DirectionAt(par1), DirectionAt(par2));
                 bool ok = true;
-                for (int i = i1; i <= i2; ++i)
+                // every point of this part of the path must be close to the arcs
+                for (int i = 0; i < samples.Count && ok; ++i)
                 {
-                    GeoPoint2D p = subCurves[i].StartPoint;
                     bool close = false;
                     for (int j = 0; j < arcs.Length; ++j)
                     {
-                        if (arcs[j].MinDistance(p) < maxError)
+                        if (DistanceToArc(samples[i], (Arc2D)arcs[j]) <= maxError)
                         {
                             close = true;
+                            break;
                         }
                     }
-                    if (!close)
-                    {
-                        ok = false;
-                        break;
-                    }
-                    if (!close)
-                    {
-                        ok = false;
-                        break;
-                    }
+                    if (!close) ok = false;
                 }
-                // jetzt umgekehrt den Abstand der Mittelpunkte der Bögen (oder Linien) vom Originalpfad testen
-                for (int j = 0; j < arcs.Length; ++j)
-                {
-                    if (this.MinDistance(arcs[j].PointAt(0.5)) > maxError)
-                    {
-                        ok = false;
-                        break;
-                    }
-                }
+                // and vice versa: the arcs must be close to this part of the path
                 if (ok)
                 {
-                    return new List<ICurve2D>(arcs);
-                }
-                else
-                {
-                    if (Math.Abs(arcs[0].Sweep) < 0.1 || Math.Abs(arcs[1].Sweep) < 0.1)
-                    {   // Bögen zu klein, dann besser Linien, sonst gibts Stack Überlauf
-                        return Approximate(par1, par2, true, maxError);
-                    }
-                    else
+                    // Only the sub-curves of this part are tested, and only whether one of them is close enough: the search starts
+                    // at the sub-curve that corresponds roughly to the position on the arcs and stops at the first hit.
+                    List<ICurve2D> part = PartCurves(par1, par2);
+                    for (int j = 0; j < arcs.Length && ok; ++j)
                     {
-                        List<ICurve2D> res = new List<ICurve2D>();
-                        double pmm = (par1 + par2) / 2.0;
-                        res.AddRange(Approximate(par1, pmm, linesOnly, maxError));
-                        res.AddRange(Approximate(pmm, par2, linesOnly, maxError));
-                        return res;
+                        for (int k = 1; k < 4; ++k)
+                        {
+                            double fraction = (j + k / 4.0) / arcs.Length;
+                            if (!IsCloseToAny(part, arcs[j].PointAt(k / 4.0), fraction, maxError))
+                            {
+                                ok = false;
+                                break;
+                            }
+                        }
                     }
                 }
+                if (ok || tooSmall) return new List<ICurve2D>(arcs);
             }
-
+            {
+                List<ICurve2D> res = new List<ICurve2D>();
+                double pmm = (par1 + par2) / 2.0;
+                res.AddRange(Approximate(par1, pmm, linesOnly, maxError));
+                res.AddRange(Approximate(pmm, par2, linesOnly, maxError));
+                return res;
+            }
         }
         /// <inheritdoc/>
         public override double GetArea()

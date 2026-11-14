@@ -1170,6 +1170,64 @@ namespace CADability.Curve2D
             return res;
         }
 
+        /// <summary>
+        /// The sub-curves of this path between the path parameters <paramref name="par1"/> and <paramref name="par2"/>, the first
+        /// and last trimmed to that interval. Sub-curves that lie completely inside are not copied.
+        /// </summary>
+        private List<ICurve2D> PartCurves(double par1, double par2)
+        {
+            List<ICurve2D> res = new List<ICurve2D>();
+            double l1 = par1 * subCurves.Length;
+            double l2 = par2 * subCurves.Length;
+            int first = Math.Max(0, (int)Math.Floor(l1));
+            int last = Math.Min(subCurves.Length - 1, (int)Math.Ceiling(l2) - 1);
+            for (int i = first; i <= last; ++i)
+            {
+                double s = Math.Max(0.0, l1 - i);
+                double e = Math.Min(1.0, l2 - i);
+                if (e <= s) continue;
+                if (s == 0.0 && e == 1.0) res.Add(subCurves[i]);
+                else
+                {
+                    ICurve2D trimmed = subCurves[i].Trim(s, e);
+                    if (trimmed != null) res.Add(trimmed);
+                }
+            }
+            return res;
+        }
+
+        /// <summary>
+        /// True if <paramref name="p"/> lies within <paramref name="maxError"/> of one of <paramref name="curves"/>. The search
+        /// starts at the curve at <paramref name="fraction"/> of the list and proceeds alternately in both directions.
+        /// An empty list counts as close, so that a degenerate part does not block the approximation.
+        /// </summary>
+        private static bool IsCloseToAny(List<ICurve2D> curves, GeoPoint2D p, double fraction, double maxError)
+        {
+            if (curves.Count == 0) return true;
+            int start = Math.Max(0, Math.Min(curves.Count - 1, (int)(fraction * curves.Count)));
+            for (int d = 0; start - d >= 0 || start + d < curves.Count; ++d)
+            {
+                if (start + d < curves.Count && curves[start + d].MinDistance(p) <= maxError) return true;
+                if (d > 0 && start - d >= 0 && curves[start - d].MinDistance(p) <= maxError) return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Distance of <paramref name="p"/> to the arc, in closed form: the radial distance if the direction from the center to
+        /// <paramref name="p"/> lies within the sweep, otherwise the distance to the nearer end point.
+        /// </summary>
+        private static double DistanceToArc(GeoPoint2D p, Arc2D arc)
+        {
+            GeoVector2D v = p - arc.Center;
+            GeoVector2D s = arc.StartPoint - arc.Center;
+            double angle = Math.Atan2(s.x * v.y - s.y * v.x, s.x * v.x + s.y * v.y); // from the start point towards p
+            if (arc.Sweep < 0.0) angle = -angle;
+            if (angle < 0.0) angle += 2.0 * Math.PI;
+            if (angle <= Math.Abs(arc.Sweep)) return Math.Abs(v.Length - arc.Radius);
+            return Math.Min(p | arc.StartPoint, p | arc.EndPoint);
+        }
+
         private static double DistanceToSegment(GeoPoint2D p, GeoPoint2D sp, GeoPoint2D ep)
         {
             GeoVector2D dir = ep - sp;
@@ -1229,7 +1287,7 @@ namespace CADability.Curve2D
                     bool close = false;
                     for (int j = 0; j < arcs.Length; ++j)
                     {
-                        if (arcs[j].MinDistance(samples[i]) <= maxError)
+                        if (DistanceToArc(samples[i], (Arc2D)arcs[j]) <= maxError)
                         {
                             close = true;
                             break;
@@ -1240,18 +1298,18 @@ namespace CADability.Curve2D
                 // and vice versa: the arcs must be close to this part of the path
                 if (ok)
                 {
-                    ICurve2D part = Trim(par1, par2);
-                    if (part is Path2D pp && pp.SubCurves.Length > 0)
+                    // Only the sub-curves of this part are tested, and only whether one of them is close enough: the search starts
+                    // at the sub-curve that corresponds roughly to the position on the arcs and stops at the first hit.
+                    List<ICurve2D> part = PartCurves(par1, par2);
+                    for (int j = 0; j < arcs.Length && ok; ++j)
                     {
-                        for (int j = 0; j < arcs.Length && ok; ++j)
+                        for (int k = 1; k < 4; ++k)
                         {
-                            for (int k = 1; k < 4; ++k)
+                            double fraction = (j + k / 4.0) / arcs.Length;
+                            if (!IsCloseToAny(part, arcs[j].PointAt(k / 4.0), fraction, maxError))
                             {
-                                if (part.MinDistance(arcs[j].PointAt(k / 4.0)) > maxError)
-                                {
-                                    ok = false;
-                                    break;
-                                }
+                                ok = false;
+                                break;
                             }
                         }
                     }

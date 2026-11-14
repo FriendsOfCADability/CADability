@@ -157,12 +157,15 @@ namespace CADability.Tests
             // two elliptical arcs that meet at an angle: the subdivision branch must handle the kink with lines and with arcs
             EllipseArc2D e1 = EllipseArc2D.Create(GeoPoint2D.Origin, new GeoVector2D(60, 0), new GeoVector2D(0, 20), new GeoPoint2D(60, 0), new GeoPoint2D(0, 20), true);
             EllipseArc2D e2 = EllipseArc2D.Create(new GeoPoint2D(0, -10), new GeoVector2D(0, 30), new GeoVector2D(-40, 0), new GeoPoint2D(0, 20), new GeoPoint2D(-40, -10), true);
-            Path2D path = new Path2D(new ICurve2D[] { e1, e2 }, true);
+            Path2D forward = new Path2D(new ICurve2D[] { e1, e2 }, true);
+            Path2D backward = (Path2D)forward.Clone();
+            backward.Reverse(); // clockwise arcs, so that both orientations of the approximating arcs are tested
+            foreach (Path2D path in new[] { forward, backward })
             foreach (double maxError in new[] { 1.0, 0.1, 0.01 })
             {
                 foreach (bool linesOnly in new[] { true, false })
                 {
-                    string context = $"maxError {maxError}, linesOnly {linesOnly}";
+                    string context = $"{(path == forward ? "forward" : "backward")}, maxError {maxError}, linesOnly {linesOnly}";
                     Path2D approx = path.Approximate(linesOnly, maxError) as Path2D;
                     Assert.IsNotNull(approx, context);
                     Assert.IsTrue((approx.StartPoint | path.StartPoint) < 1e-6 && (approx.EndPoint | path.EndPoint) < 1e-6, context);

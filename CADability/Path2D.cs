@@ -1181,6 +1181,19 @@ namespace CADability.Curve2D
             return p | (sp + t * dir);
         }
 
+        /// <summary>
+        /// True if all <paramref name="samples"/> lie within <paramref name="maxError"/> of the segment from <paramref name="sp"/> to <paramref name="ep"/>.
+        /// The distance is measured to the segment, not to the infinite line, so that a part that runs beyond the end of the chord is rejected.
+        /// </summary>
+        private static bool ChordFits(List<GeoPoint2D> samples, GeoPoint2D sp, GeoPoint2D ep, double maxError)
+        {
+            for (int i = 0; i < samples.Count; ++i)
+            {
+                if (DistanceToSegment(samples[i], sp, ep) > maxError) return false;
+            }
+            return true;
+        }
+
         private List<ICurve2D> Approximate(double par1, double par2, bool linesOnly, double maxError)
         {
             const int samplesPerSegment = 16;
@@ -1189,38 +1202,26 @@ namespace CADability.Curve2D
             // The approximating curves are measured against the part of this path between par1 and par2 only, not against
             // the whole path: on a closed contour a chord may pass close to another part of the path (issue #554).
             List<GeoPoint2D> samples = SamplePart(par1, par2, samplesPerSegment);
-            if (linesOnly)
+            GeoPoint2D p1 = PointAt(par1);
+            GeoPoint2D p2 = PointAt(par2);
+            ICurve2D[] arcs = null;
+            if (!linesOnly)
             {
-                Line2D l2d = new Line2D(PointAt(par1), PointAt(par2));
-                bool ok = true;
-                for (int i = 0; i < samples.Count; ++i)
+                arcs = Curves2D.ConnectByTwoArcs(p1, p2, DirectionAt(par1), DirectionAt(par2));
+                // ConnectByTwoArcs returns a single line when no suitable pair of arcs exists, in particular when the part is
+                // too long (an arc would sweep 45 degrees or more) or almost straight. Then the line is tested like a chord
+                // and, if it does not fit, the part is subdivided while still allowing arcs.
+                if (arcs == null || arcs.Length != 2) arcs = null;
+            }
+            if (arcs == null)
+            {
+                if (tooSmall || ChordFits(samples, p1, p2, maxError))
                 {
-                    // distance to the segment, not to the infinite line, so that a part that runs beyond the end of the chord is rejected
-                    if (DistanceToSegment(samples[i], l2d.StartPoint, l2d.EndPoint) > maxError)
-                    {
-                        ok = false;
-                        break;
-                    }
-                }
-                if (ok || tooSmall)
-                {
-                    List<ICurve2D> res = new List<ICurve2D>(1);
-                    res.Add(l2d);
-                    return res;
-                }
-                else
-                {
-                    List<ICurve2D> res = new List<ICurve2D>();
-                    double pmm = (par1 + par2) / 2.0;
-                    res.AddRange(Approximate(par1, pmm, linesOnly, maxError));
-                    res.AddRange(Approximate(pmm, par2, linesOnly, maxError));
-                    return res;
+                    return new List<ICurve2D>(1) { new Line2D(p1, p2) };
                 }
             }
             else
             {
-                ICurve2D[] arcs = Curves2D.ConnectByTwoArcs(PointAt(par1), PointAt(par2), DirectionAt(par1), DirectionAt(par2));
-                if (arcs == null || arcs.Length == 0) return Approximate(par1, par2, true, maxError);
                 bool ok = true;
                 // every point of this part of the path must be close to the arcs
                 for (int i = 0; i < samples.Count && ok; ++i)
@@ -1255,25 +1256,14 @@ namespace CADability.Curve2D
                         }
                     }
                 }
-                if (ok || tooSmall)
-                {
-                    return new List<ICurve2D>(arcs);
-                }
-                else
-                {
-                    if (arcs.Length < 2 || Math.Abs(arcs[0].Sweep) < 0.1 || Math.Abs(arcs[1].Sweep) < 0.1)
-                    {   // arcs too small: use lines instead, otherwise the recursion may overflow the stack
-                        return Approximate(par1, par2, true, maxError);
-                    }
-                    else
-                    {
-                        List<ICurve2D> res = new List<ICurve2D>();
-                        double pmm = (par1 + par2) / 2.0;
-                        res.AddRange(Approximate(par1, pmm, linesOnly, maxError));
-                        res.AddRange(Approximate(pmm, par2, linesOnly, maxError));
-                        return res;
-                    }
-                }
+                if (ok || tooSmall) return new List<ICurve2D>(arcs);
+            }
+            {
+                List<ICurve2D> res = new List<ICurve2D>();
+                double pmm = (par1 + par2) / 2.0;
+                res.AddRange(Approximate(par1, pmm, linesOnly, maxError));
+                res.AddRange(Approximate(pmm, par2, linesOnly, maxError));
+                return res;
             }
         }
         /// <inheritdoc/>

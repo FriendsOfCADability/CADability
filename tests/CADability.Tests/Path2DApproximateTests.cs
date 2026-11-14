@@ -131,6 +131,7 @@ namespace CADability.Tests
             Path2D path = EllipseChain(pieces);
             Assert.IsTrue(path.IsClosed);
             double maxError = 0.1;
+            int lineCount = 0;
             foreach (bool linesOnly in new[] { true, false })
             {
                 string context = $"linesOnly {linesOnly}";
@@ -140,6 +141,33 @@ namespace CADability.Tests
                 Assert.AreEqual(Math.PI * 80 * 30, Math.Abs(approx.GetArea()), 2 * Math.PI * 80 * maxError, context);
                 // segment by segment would yield at least one segment per piece
                 Assert.IsTrue(approx.SubCurves.Length < pieces / 3, $"{context}: {approx.SubCurves.Length} segments");
+                if (linesOnly) lineCount = approx.SubCurves.Length;
+                else
+                {
+                    // when arcs are allowed, the chain is approximated by arcs, which need fewer segments than lines
+                    foreach (ICurve2D seg in approx.SubCurves) Assert.IsInstanceOfType(seg, typeof(Arc2D), context);
+                    Assert.IsTrue(approx.SubCurves.Length < lineCount, $"{context}: {approx.SubCurves.Length} arcs, {lineCount} lines");
+                }
+            }
+        }
+
+        [TestMethod]
+        public void OpenPathWithKink_StaysWithinTolerance()
+        {
+            // two elliptical arcs that meet at an angle: the subdivision branch must handle the kink with lines and with arcs
+            EllipseArc2D e1 = EllipseArc2D.Create(GeoPoint2D.Origin, new GeoVector2D(60, 0), new GeoVector2D(0, 20), new GeoPoint2D(60, 0), new GeoPoint2D(0, 20), true);
+            EllipseArc2D e2 = EllipseArc2D.Create(new GeoPoint2D(0, -10), new GeoVector2D(0, 30), new GeoVector2D(-40, 0), new GeoPoint2D(0, 20), new GeoPoint2D(-40, -10), true);
+            Path2D path = new Path2D(new ICurve2D[] { e1, e2 }, true);
+            foreach (double maxError in new[] { 1.0, 0.1, 0.01 })
+            {
+                foreach (bool linesOnly in new[] { true, false })
+                {
+                    string context = $"maxError {maxError}, linesOnly {linesOnly}";
+                    Path2D approx = path.Approximate(linesOnly, maxError) as Path2D;
+                    Assert.IsNotNull(approx, context);
+                    Assert.IsTrue((approx.StartPoint | path.StartPoint) < 1e-6 && (approx.EndPoint | path.EndPoint) < 1e-6, context);
+                    AssertClose(path, approx, maxError, context);
+                }
             }
         }
 

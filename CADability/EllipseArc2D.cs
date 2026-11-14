@@ -587,13 +587,14 @@ namespace CADability.Curve2D
         /// <inheritdoc/>
         public override double MinDistance(GeoPoint2D p)
         {
+            // the closest point of the arc is an end point or a local minimum of the distance on the full ellipse, which is
+            // one of the candidates; the closest point of the full ellipse alone is not enough, when it lies outside of the arc
             double res = Math.Min(p | StartPoint, p | EndPoint);
-            GeoPoint2D cpf = ClosestPerpendicularFoot(p);
-            double par = PositionOf(cpf);
-            if (IsParameterOnCurve(par))
+            GeoPoint2D[] candidates = DistanceCandidates(p);
+            for (int i = 0; i < candidates.Length; i++)
             {
-                double d = cpf | p;
-                if (d < res) res = d;
+                double d = candidates[i] | p;
+                if (d < res && IsParameterOnCurve(PositionOf(candidates[i]))) res = d;
             }
             return res;
         }

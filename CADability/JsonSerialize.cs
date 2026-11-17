@@ -656,6 +656,8 @@ namespace CADability
         int objectCount;
         FormattingStreamWriter outStream;
         Dictionary<Type, int> serializedTypes;
+        // objects of a type that was unknown when the file was read are all JsonProxyType objects: their type index is kept per original type name
+        Dictionary<string, int> serializedProxyTypes;
         Stack<bool> firstEntry;
         Dictionary<object, int> objectToIndex;
         // for deserialization:
@@ -1253,6 +1255,7 @@ namespace CADability
                         createEntity[ti] = delegate (JsonDict data, List<object> entities, ulong index, HashSet<ulong> underConstruction)
                         {
                             object created = ci.Invoke(new object[0]);
+                            if (created is JsonProxyType proxy) proxy.SetOriginalType(typeName, assemblyName, typeVersions[typeName]);
                             if (created is IJsonConvert cnvt)
                             {
                                 // "created" is not the final object, it must be converted first
@@ -1393,6 +1396,7 @@ namespace CADability
             EndObject();
             queue = new Queue<object>();
             serializedTypes = new Dictionary<Type, int>();
+            serializedProxyTypes = new Dictionary<string, int>();
             queue.Enqueue(toSerialize);
             objectToIndex = new Dictionary<object, int>();
             objectCount = 0;
@@ -1502,23 +1506,24 @@ namespace CADability
 
             int typeIndex;
             bool firstTimeTypeDefinition = false;
-            if (!serializedTypes.TryGetValue(val.GetType(), out typeIndex))
+            JsonProxyType proxy = val as JsonProxyType;
+            // An object of a type that was unknown when the file was read is written again with its original type name and version.
+            // All these objects are JsonProxyType objects, so they get their type index per original type name, not per Type.
+            string proxyKey = proxy == null ? null : proxy.OriginalTypeName + "," + proxy.OriginalTypeAssembly;
+            bool known = proxy != null ? serializedProxyTypes.TryGetValue(proxyKey, out typeIndex) : serializedTypes.TryGetValue(val.GetType(), out typeIndex);
+            if (!known)
             {   // first time a object of this type is beeing written we write the type name
-                typeIndex = serializedTypes.Count + 1;
-                serializedTypes[val.GetType()] = typeIndex;
-                if (val is JsonProxyType junk)
-                {   // if it is an unknown type, we use the typename that was given on deserialisation
-
-                    // the following is not correct: if the order of objects has been changed, there is no original typename in the JsonProxyType
-                    // we would need a more global dictionary of proxy types
-                    // but this is only an issue, when saving files, where an object could not be deserialized on read
-                    (this as IJsonWriteData).AddProperty("$Type", junk.OriginalTypeName);
-                    typeIndex = junk.OriginalTypeVersion;
-                    string assemblyName = junk.OriginalTypeAssembly;
+                typeIndex = serializedTypes.Count + serializedProxyTypes.Count + 1;
+                if (proxy != null)
+                {   // an unknown type: use the type name that was given on deserialisation
+                    serializedProxyTypes[proxyKey] = typeIndex;
+                    (this as IJsonWriteData).AddProperty("$Type", proxy.OriginalTypeName);
+                    string assemblyName = proxy.OriginalTypeAssembly;
                     if (assemblyName != null) (this as IJsonWriteData).AddProperty("$Assembly", assemblyName);
                 }
                 else
                 {
+                    serializedTypes[val.GetType()] = typeIndex;
                     (this as IJsonWriteData).AddProperty("$Type", val.GetType().FullName);
                     string assemblyName = val.GetType().Assembly.GetName().Name;
                     if (assemblyName != "CADability") (this as IJsonWriteData).AddProperty("$Assembly", assemblyName);
@@ -1534,7 +1539,7 @@ namespace CADability
             {
                 if (firstTimeTypeDefinition)
                 {
-                    int version = SerializeVersion(val.GetType());
+                    int version = proxy != null ? proxy.OriginalTypeVersion : SerializeVersion(val.GetType());
                     (this as IJsonWriteData).AddProperty("$TypeVersion", version);
                 }
                 (val as IJsonSerialize).GetObjectData(this); // calls one ore more of the AddValue methods
@@ -2038,37 +2043,78 @@ namespace CADability
             return res;
         }
     }
+    /// <summary>
+    /// Holds the data of an object whose type is unknown when a file is read (e.g. a type from an assembly that is not loaded),
+    /// so that the object is written again unchanged when the file is saved.
+    /// </summary>
     internal class JsonProxyType : Hashtable, IJsonSerialize, ISerializable
     {
         Dictionary<string, object> dict;
+        string originalTypeName, originalTypeAssembly;
+        int? originalTypeVersion;
         protected JsonProxyType()
         {
             dict = new Dictionary<string, object>();
         }
+        /// <summary>
+        /// Whether <paramref name="key"/> is written by the serializer itself and not part of the object's data.
+        /// </summary>
+        private static bool IsTypeProperty(string key)
+        {
+            return key == "$Type" || key == "$TypeIndex" || key == "$TypeVersion" || key == "$Assembly";
+        }
         public void GetObjectData(IJsonWriteData data)
         {
             foreach (KeyValuePair<string, object> item in dict)
-            {
-                data.AddProperty(item.Key, item.Value);
+            {   // the type properties are written by the serializer, writing them here again would duplicate them
+                if (!IsTypeProperty(item.Key)) data.AddProperty(item.Key, item.Value);
             }
         }
         public void SetObjectData(IJsonReadData data)
         {
             foreach (KeyValuePair<string, object> item in data)
             {
-                dict.Add(item.Key, item.Value);
+                dict[item.Key] = item.Value;
             }
         }
-        public string OriginalTypeName => dict["$Type"] as string;
+        /// <summary>
+        /// Called by the reader: only the first object of a type carries the type name in the file, so all other objects of that
+        /// type learn it here.
+        /// </summary>
+        internal void SetOriginalType(string typeName, string assemblyName, int version)
+        {
+            originalTypeName = typeName;
+            originalTypeAssembly = assemblyName;
+            originalTypeVersion = version;
+        }
+        public string OriginalTypeName
+        {
+            get
+            {
+                if (originalTypeName != null) return originalTypeName;
+                if (dict.TryGetValue("$Type", out object tname)) return tname as string;
+                return null;
+            }
+        }
         public string OriginalTypeAssembly
         {
             get
             {
+                if (originalTypeAssembly != null) return originalTypeAssembly;
                 if (dict.TryGetValue("$Assembly", out object assembly)) return assembly as string;
                 return null;
             }
         }
-        public int OriginalTypeVersion => (int)dict["$TypeVersion"];
+        public int OriginalTypeVersion
+        {
+            get
+            {
+                if (originalTypeVersion.HasValue) return originalTypeVersion.Value;
+                // numbers are read as double, not as int
+                if (dict.TryGetValue("$TypeVersion", out object ver) && ver is IConvertible) return Convert.ToInt32(ver, System.Globalization.CultureInfo.InvariantCulture);
+                return 0;
+            }
+        }
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);

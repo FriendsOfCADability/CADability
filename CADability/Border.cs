@@ -4624,22 +4624,37 @@ namespace CADability.Shapes
             Border clone = this.Clone();
             clone.flatten(); // to avoid polyLines
             List<ICurve2D> segments = new List<ICurve2D>(clone.Segments);
+            segments.RemoveAll(s => s == null);
             // we cannot have segments with inflection points for the following algorithm, so we split those segments
             for (int i = segments.Count - 1; i >= 0; --i)
             {
                 double[] infl = segments[i].GetInflectionPoints();
-                if (infl != null && infl.Length > 0)
+                if (infl == null || infl.Length == 0) continue;
+                // only inflection points strictly inside the segment are relevant. Trim may return null for
+                // (almost) empty parts (e.g. Arc2D, BSpline2D), so we must not put such parts into the list
+                List<double> splitPositions = new List<double>();
+                Array.Sort(infl);
+                for (int j = 0; j < infl.Length; j++)
                 {
-                    Array.Sort(infl);
-                    double lastPos = 1.0;
-                    for (int j = infl.Length - 1; j >= 0; --j)
-                    {
-                        ICurve2D part = segments[i].Trim(infl[j], lastPos);
-                        if (part != null) segments.Insert(i + 1, part);
-                        lastPos = infl[j];
-                    }
-                    segments[i] = segments[i].Trim(0, infl[0]);
+                    if (infl[j] > 1e-6 && infl[j] < 1 - 1e-6 && (splitPositions.Count == 0 || infl[j] - splitPositions[splitPositions.Count - 1] > 1e-6))
+                        splitPositions.Add(infl[j]);
                 }
+                if (splitPositions.Count == 0) continue;
+                splitPositions.Add(1.0);
+                List<ICurve2D> parts = new List<ICurve2D>();
+                double lastPos = 0.0;
+                for (int j = 0; j < splitPositions.Count; j++)
+                {
+                    ICurve2D part = segments[i].Trim(lastPos, splitPositions[j]);
+                    if (part != null) parts.Add(part);
+                    lastPos = splitPositions[j];
+                }
+                if (parts.Count > 0)
+                {
+                    segments.RemoveAt(i);
+                    segments.InsertRange(i, parts);
+                }
+                // else: keep the original segment
             }
             bool found = false;
             //do
@@ -4714,7 +4729,7 @@ namespace CADability.Shapes
                                 !Geometry.OnLeftSide(segments[j].StartPoint, segments[i].StartPoint, segments[i].StartDirection))
                             {   // check the startPoint of segment j (the endpoint is not checked, since it is the startpoint of j+1)
                                 GeoPoint2D[] tps = segments[i].TangentPoints(segments[j].StartPoint, segments[i].PointAt(0.5));
-                                for (int k = 0; k < tps.Length; k++)
+                                for (int k = 0; tps != null && k < tps.Length; k++)
                                 {
                                     double pos = segments[i].PositionOf(tps[k]);
                                     if (pos > 1e-6 && pos < 1 - 1e-6)
@@ -4746,7 +4761,7 @@ namespace CADability.Shapes
                             {   // if segment j is not a line, try to find a tangent line between segment i and segment j
                                 // to enhance performance we could check, whether segments[j] is party to the right side of the two beams, don't know what is faster
                                 GeoPoint2D[] tps = Curves2D.TangentLines(segments[i], segments[j]);
-                                for (int k = 0; k < tps.Length; k += 2)
+                                for (int k = 0; tps != null && k + 1 < tps.Length; k += 2)
                                 {
                                     double pos = segments[i].PositionOf(tps[k]);
                                     if (pos > 1e-6 && pos < 1 - 1e-6)

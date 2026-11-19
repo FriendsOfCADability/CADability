@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using CADability;
 using CADability.Curve2D;
 using CADability.Shapes;
@@ -114,6 +116,83 @@ namespace CADability.Tests
                 Assert.AreEqual(exact, new SimpleShape(new Border(NurbsCircle(17, 4, r))).Area, 1e-9 * exact,
                     $"radius {r}, off centre and through SimpleShape");
             }
+        }
+
+        /// <summary>
+        /// A clamped quintic spline through twelve poles, with the knot <paramref name="u"/> inserted four
+        /// times (Boehm). Insertion does not change the curve, only its knot spans: with u close to 1 the
+        /// last span becomes as short as 1 - u, with u close to 0 the first one.
+        /// </summary>
+        private static BSpline2D QuinticWithShortSpan(double u)
+        {
+            const int degree = 5;
+            List<GeoPoint2D> poles = new List<GeoPoint2D>();
+            for (int i = 0; i < 12; i++)
+            {
+                double t = i / 11.0;
+                poles.Add(new GeoPoint2D(520 - 430 * t, 310 + 3 * Math.Sin(5 * t)));
+            }
+            List<double> knots = new List<double>();
+            for (int i = 0; i <= degree; i++) knots.Add(0.0);
+            for (int i = 1; i <= 6; i++) knots.Add(i / 7.0);
+            for (int i = 0; i <= degree; i++) knots.Add(1.0);
+            for (int insertion = 0; insertion < 4; insertion++)
+            {
+                int k = knots.FindLastIndex(x => x <= u);
+                List<GeoPoint2D> inserted = new List<GeoPoint2D>();
+                for (int i = 0; i <= poles.Count; i++)
+                {
+                    if (i <= k - degree) inserted.Add(poles[i]);
+                    else if (i > k) inserted.Add(poles[i - 1]);
+                    else
+                    {
+                        double a = (u - knots[i]) / (knots[i + degree] - knots[i]);
+                        inserted.Add(new GeoPoint2D((1 - a) * poles[i - 1].x + a * poles[i].x, (1 - a) * poles[i - 1].y + a * poles[i].y));
+                    }
+                }
+                poles = inserted;
+                knots.Insert(k + 1, u);
+            }
+            double[] distinct = knots.Distinct().ToArray();
+            int[] multiplicities = distinct.Select(d => knots.Count(x => x == d)).ToArray();
+            double[] weights = Enumerable.Repeat(1.0, poles.Count).ToArray();
+            return new BSpline2D(poles.ToArray(), weights, distinct, multiplicities, degree, false, 0.0, 1.0);
+        }
+
+        /// <summary>
+        /// A short knot span next to u = 1 used to blow the area up: the exact area came from polynomials
+        /// written in the global parameter, whose coefficients on such a span grow with the inverse fifth
+        /// power of its width and cancel only in exact arithmetic. The plausibility check compared that area
+        /// with a chord polygon evaluated through the same polynomials, so both were wrong by the same
+        /// amount and the check passed. A CAD import met it in a DXF part whose spline had a span of width
+        /// 5e-7 at its end: a contour of 475 x 86 mm measured 4.8e33 mm^2, and the weight computed from that
+        /// overflowed a decimal.
+        /// </summary>
+        [TestMethod]
+        public void short_last_knot_span_does_not_blow_up_the_area()
+        {
+            foreach (double width in new double[] { 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 5e-7, 1e-7 })
+            {
+                BSpline2D spline = QuinticWithShortSpan(1.0 - width);
+                double expected = SweptArea(spline, GeoPoint2D.Origin);
+                Assert.AreEqual(expected, spline.GetArea(), 1e-7 * Math.Abs(expected), $"last span of width {width}");
+            }
+        }
+
+        /// <summary>
+        /// The way the short span reached the end in the CAD import: the spline in the file had it at its
+        /// start, where the polynomials are harmless, and assembling the contour reversed it. Reversing a
+        /// curve only changes the sign of the area it sweeps out.
+        /// </summary>
+        [TestMethod]
+        public void reversing_a_spline_with_a_short_first_span_negates_its_area()
+        {
+            BSpline2D spline = QuinticWithShortSpan(5e-7);
+            double forward = spline.GetArea();
+            Assert.AreEqual(SweptArea(spline, GeoPoint2D.Origin), forward, 1e-7 * Math.Abs(forward), "before reversing");
+            BSpline2D reversed = (BSpline2D)spline.Clone();
+            reversed.Reverse();
+            Assert.AreEqual(-forward, reversed.GetArea(), 1e-7 * Math.Abs(forward), "after reversing");
         }
     }
 }

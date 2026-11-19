@@ -2869,22 +2869,6 @@ namespace CADability
                 return knotParameter;
             }
         }
-        /// <summary>
-        /// Returns the area swept by the vector from (0,0) to the points on the curve 
-        /// </summary>
-        /// <returns></returns>
-        internal double RawArea()
-        {
-            GeoPoint2D sp = PointAt(knots[0]);
-            double a = 0.0;
-            for (int i = 0; i < knots.Length; i++)
-            {
-                GeoPoint2D ep = PointAt(knots[i]);
-                a += (sp.x * ep.y - sp.y * ep.x) / 2.0;
-                sp = ep;
-            }
-            return a;
-        }
         public double Area()
         {
             return Area(knots[0], knots[knots.Length - 1]);

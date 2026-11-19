@@ -3320,18 +3320,20 @@ namespace CADability.Curve2D
             return res.ToArray();
         }
         /// <inheritdoc/>
+        /// <remarks>
+        /// Always integrated (see <see cref="IntegratedArea"/>), no longer taken in closed form from
+        /// <see cref="ExplicitPCurve2D"/>. Its polynomials are written in the global knot parameter, so on
+        /// a short knot span far from zero their coefficients grow with the inverse fifth power of the span
+        /// width (for a quintic) and cancel each other only in exact arithmetic. In doubles a span of width
+        /// 1e-3 next to u = 1 cost 1.5 percent of the area, and one of width 5e-7 - as reversing a spline
+        /// with a short first span produces - turned a contour of a few square decimetres into 4.8e33. The
+        /// plausibility check against a chord polygon could not catch it: the polygon was evaluated through
+        /// the same polynomials and came out just as wrong. The integration evaluates the NURBS itself and
+        /// is exact for a polynomial curve, so nothing is lost by taking it always.
+        /// </remarks>
         public override double GetArea()
         {
-            // ExplicitPCurve2D uses alot of memory, it is a WeakReference now
-            ExplicitPCurve2D epc2d = (this as IExplicitPCurve2D).GetExplicitPCurve2D();
-            if (epc2d == null || epc2d.IsRational) return IntegratedArea();
-            else
-            {
-                double epca = epc2d.Area();
-                double repca = epc2d.RawArea();
-                if (Math.Sign(epca) != Math.Sign(repca) || Math.Abs(epca - repca) > 0.1 * Math.Max(Math.Abs(epca), Math.Abs(repca))) return IntegratedArea();
-                return epca;
-            }
+            return IntegratedArea();
         }
 
         /// <summary>
@@ -3370,10 +3372,10 @@ namespace CADability.Curve2D
         /// <see cref="Line2D.GetArea"/> and <see cref="Arc2D.GetArea"/> return in closed form, so
         /// <see cref="Shapes.Border.Area"/>, which sums its segments, keeps its meaning.
         /// <para>
-        /// This is the route taken whenever <see cref="ExplicitPCurve2D"/> cannot supply the area: for a
-        /// RATIONAL curve, where <see cref="ExplicitPCurve2D.Area()"/> has no closed form and returns zero,
-        /// and for a curve whose exact area the plausibility check against the chord polygon rejects.
-        /// Both used to fall through to the base class, which takes the area of <c>Approximate(false, 0.0)</c>
+        /// This is the route <see cref="GetArea"/> takes for every curve. A RATIONAL curve, where
+        /// <see cref="ExplicitPCurve2D.Area()"/> has no closed form and returns zero, and a curve whose
+        /// closed form area failed a plausibility check used to fall through to the base class, which takes
+        /// the area of <c>Approximate(false, 0.0)</c>
         /// - an arc approximation with no defined accuracy. Measured against a reference integration that
         /// costs a rational ellipse up to five percent of its area and a plain cubic spline through five
         /// points nearly fourteen percent. The error does not stay in 2d: a planar face contributes

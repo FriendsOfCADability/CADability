@@ -324,6 +324,41 @@ ad7062c4). The small fixes up to then are ported in
   `BooleanOperation`, `ISurface.Domain` and `ParallelepipedHull`, about 18,000
   lines; this needs a decision whether the kernels are merged.
 
+Compared again on 2026-11-17 with ShapeIt 282ea58 (27 commits since
+3319b34, master 77d8d5f6):
+
+- [x] Ported: saving a project with objects of a type that was unknown when
+  it was read (a8d3261; master threw an InvalidCastException, and the type
+  properties were written twice, so the fix goes further than ShapeIt's: one
+  type index per original type name), a `SerializableHashSetString` without
+  strings, and `Ellipse.SameGeometry` comparing two arcs by their points
+  instead of their centers (the `Ellipse.cs` part of c6c3df9).
+- [ ] Worth porting once a test case shows that they help: the
+  parallelepipeds of NURBS patches enclosing the Bézier control points
+  (0c87d51; master's `BoxedSurfaceEx.calcParallelEpiped` has the same
+  estimate from corners and borders), and `PositionOfNormal` with a Newton
+  iteration together with `PlaneSurface.GetExtremePositions` no longer
+  discarding the positions it found (74aa94b; in master `PositionOfNormal`
+  is an empty stub, and `GetExtremePositions` breaks out and returns -1).
+  The extra side-of-chord test of `GeneralCurve2D.MakeTriangulation`
+  (b42c9ca) is optional: master's inflection scan already separates two
+  inflections in one interval in most cases.
+- [ ] Depend on the rewritten kernel: tracing inner intersections as closed
+  loops (2c31ab7), reusing known intersection curves (57d257b), the
+  `OverlapsOutline` test of c6c3df9, ec50238, 0ab10f7, 78126c9, 890a257,
+  the fillet checks (8469f08) and `random()` in the formula evaluator
+  (3b8c418).
+- Not needed: the touching-faces special case of the difference (c36812e,
+  501e0c9; master gives the right result in all cases tried) and
+  `Curves2D.IsLinear` (269f03c, only used by ShapeIt's seeds).
+- [ ] Found while comparing: a solid of `Make3D.Rotate` with a BSpline
+  profile (`SurfaceOfRevolution`) gives wrong results as the first operand
+  of `Solid.Subtract` and `Solid.Intersect` with a box: cut in half by a
+  box above z = 5, the difference is empty and the intersection is the
+  whole solid. ShapeIt gives the right volumes, except where the cut is a
+  closed loop inside the face, which both kernels miss. Cylinders, cones
+  and tori made the same way are fine. Wrong since at least 1.0.18.
+
 ## Documentation
 
 - [x] The about 440 broken doc comments (wrong `param` names, unresolved

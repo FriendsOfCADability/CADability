@@ -311,6 +311,25 @@ ad7062c4). The small fixes up to then are ported in
   ShapeIt's rewritten `Surface.Intersect` does. The feature names of faces
   survive cloning and saving, but a clone shared the sets with the original
   (fixed).
+- [x] Second comparison on 2026-11-23 (ShapeIt 570d479, master 29b4c21),
+  ported in 1.8.4: `SurfaceOfRevolution` (888e54c: `Orientation` threw a
+  NullReferenceException, `SameGeometry` missed reversed and rotated
+  copies, a `Path` profile had wrong derivatives and `PositionOf`, because
+  v was mapped with `ParameterToPosition`), `Path.TryPointDeriv2At`, the
+  mixed derivative of `RuledSurface`, the orientation of open shells in
+  `Make3D.SewFaces` (58207c9), the comparison of short arcs in
+  `Ellipse.SameGeometry` (c6c3df9), `ConicalSurface.SameGeometry` for a
+  reversed or scaled cone (5dbdbe1), and two null checks when reading JSON.
+  Not ported: the return of the extreme positions in
+  `PlaneSurface.GetExtremePositions` (74aa94b), because master's
+  `BoxedSurfaceEx.PositionOfNormal` is still a stub that finds nothing, so
+  the fix would turn "not implemented" into "none"; the triangle check of
+  `GeneralCurve2D.MakeTriangulation` (b42c9ca, master triangulates
+  differently and no failing case is known); the undo copy left out of
+  `Shell.CombineConnectedFaces` (a071124, no measurable gain in master's
+  booleans: 0.3 ms per clone, 16 ms per operation). The hash of the long
+  keys (9de7ec9) has the same pattern in master's `PolygonRegion`, which is
+  not used.
 - [ ] Larger self-contained parts: `Shell.PushPull` (with its tests), the
   formula evaluator of `FormulaInput.cs` for length, angle and point
   properties, `BVH`, `StlSurfaceReconstruction` (analytic surfaces from STL).

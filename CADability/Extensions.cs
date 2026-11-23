@@ -167,6 +167,7 @@ namespace CADability
         public void SetObjectData(IJsonReadData data)
         {
             string[] strings = data.GetProperty<string[]>("Strings");
+            if (strings == null) return;
             for (int i = 0; i < strings.Length; i++)
             {
                 Add(strings[i]);

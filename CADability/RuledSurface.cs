@@ -283,7 +283,8 @@ namespace CADability
                 du = ((1.0 - uv.y) * dir11 + uv.y * dir21);
                 duu = ((1.0 - uv.y) * dir12 + uv.y * dir22);
                 dv = p2 - p1;
-                duv = dvv = GeoVector.NullVector;
+                duv = dir21 - dir11; // d/du of dv = p2 - p1
+                dvv = GeoVector.NullVector; // the surface is linear in v
             }
             else
             {

@@ -2123,10 +2123,20 @@ namespace CADability.GeoObject
         }
         /// <inheritdoc/>
         public virtual bool TryPointDeriv2At(double position, out GeoPoint point, out GeoVector deriv, out GeoVector deriv2)
-        {
+        {   // the same segment and local position as PointAt: each of the n segments covers 1/n of the position,
+            // so the derivatives of the segment are multiplied by n and n*n
             point = GeoPoint.Origin;
             deriv = deriv2 = GeoVector.NullVector;
-            return false;
+            if (subCurves.Length == 0) return false;
+            double pos = position * subCurves.Length;
+            int ind = (int)Math.Floor(pos);
+            if (ind < 0) ind = 0;
+            if (ind >= subCurves.Length) ind = subCurves.Length - 1;
+            if (!Curve(ind).TryPointDeriv2At(pos - ind, out point, out GeoVector d1, out GeoVector d2)) return false;
+            double n = subCurves.Length;
+            deriv = n * d1;
+            deriv2 = (n * n) * d2;
+            return true;
         }
         /// <inheritdoc/>
         public IReadOnlyList<GeoVector> PointAndDerivativesAt(double position, int grad)

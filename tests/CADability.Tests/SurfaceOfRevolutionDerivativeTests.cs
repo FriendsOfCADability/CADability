@@ -96,9 +96,19 @@ namespace CADability.Tests
             }
         }
 
+        /// <summary>A <see cref="Path"/> which hides the analytic derivatives of its segments.</summary>
+        private class PathWithoutSecondDerivative : GeoObject.Path
+        {
+            public override bool TryPointDeriv2At(double position, out GeoPoint point, out GeoVector deriv, out GeoVector deriv2)
+            {
+                point = GeoPoint.Origin;
+                deriv = deriv2 = GeoVector.NullVector;
+                return false;
+            }
+        }
+
         /// <summary>
-        /// A <see cref="Path"/> has no analytic second derivative, so Derivation2At differences the first derivative of the
-        /// profile instead.
+        /// A profile without an analytic second derivative: Derivation2At differences the profile instead.
         /// </summary>
         [TestMethod]
         public void the_second_derivatives_of_a_profile_without_an_analytic_one()
@@ -107,7 +117,7 @@ namespace CADability.Tests
             GeoVector radial = (axis ^ GeoVector.XAxis).Normalized;
             Ellipse arc = Ellipse.Construct();
             arc.SetArcPlaneCenterRadiusAngles(new Plane(AxisLocation, radial, axis), AxisLocation + 10 * radial, 3.0, 0.4, 2.5);
-            GeoObject.Path profile = GeoObject.Path.Construct();
+            GeoObject.Path profile = new PathWithoutSecondDerivative();
             Assert.IsTrue(profile.Set(new ICurve[] { arc }));
             Assert.IsFalse(((ICurve)profile).TryPointDeriv2At(0.5, out GeoPoint _, out GeoVector _, out GeoVector _),
                 "the profile must not deliver a second derivative, or this test does not reach the fallback");

@@ -1142,34 +1142,14 @@ namespace CADability.GeoObject
         /// <inheritdoc/>
         public override bool SameGeometry(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, double precision, out ModOp2D firstToSecond)
         {
-            if (other is ConicalSurface)
+            if (other is ConicalSurface cother)
             {
-                ConicalSurface cother = other as ConicalSurface;
-                // ist die folgende Bedingung nicht zu streng?
                 if (Precision.SameDirection(ZAxis, cother.ZAxis, false) &&
-                    (Geometry.DistPL(cother.Location, Location, ZAxis.Normalized) < precision) &&
+                    (Location | cother.Location) < precision &&
                     Precision.IsEqual(OpeningAngle, cother.OpeningAngle))
-                {   // the transformation can only be a translation in u-direction and possibly a mirroring in u-direction
-
-                    GeoPoint2D pu0 = cother.PositionOf(PointAt(new GeoPoint2D(0.0, 1.0)));
-                    GeoPoint2D pu1 = cother.PositionOf(PointAt(new GeoPoint2D(Math.PI / 2, 1.0)));
-                    if (pu0.x - pu1.x < -Math.PI) pu1.x -= 2 * Math.PI;
-                    if (pu0.x - pu1.x > Math.PI) pu0.x -= 2 * Math.PI;
-                    // a*0.0 + b = pu0.x
-                    // a*(PI/2) + b = pu1.x
-                    double b = pu0.x;
-                    double a = (pu1.x - pu0.x) / (Math.PI / 2);
-                    // pu.y muss 1.0 sein, oder?
-                    if (Math.Abs(pu0.y - 1.0) < 1e-7 && Math.Abs(pu0.y - 1.0) < 1e-7 && Math.Abs(Math.Abs(a) - 1) < 1e-7)
-                    {   // this should always be the case
-                        firstToSecond = new ModOp2D(a, 0.0, b, 0.0, 1.0, 0.0);
-                        return true;
-                    }
-                    else
-                    {
-                        firstToSecond = ModOp2D.Null;
-                        return false;
-                    }
+                {   // common apex, common axis and same opening angle: the double cones are identical, the transformation is
+                    // u' = +-u + b and v' = d*v + e (d differs from 1 when the axes have different lengths)
+                    return ParameterMappingTo(cother, thisBounds, precision, out firstToSecond);
                 }
                 else
                 {   // if it failed, check the four cornerpoints on the other surface
@@ -1203,28 +1183,63 @@ namespace CADability.GeoObject
                     if ((pt | po) > precision) return false;
 
                     // all points fit on the other surface within precision
-                    GeoPoint2D pu0 = cother.PositionOf(PointAt(new GeoPoint2D(0.0, 1.0)));
-                    GeoPoint2D pu1 = cother.PositionOf(PointAt(new GeoPoint2D(Math.PI / 2, 1.0)));
-                    if (pu0.x - pu1.x < -Math.PI) pu1.x += 2 * Math.PI;
-                    if (pu0.x - pu1.x > Math.PI) pu0.x -= 2 * Math.PI;
-                    // a*0.0 + b = pu0.x
-                    // a*(PI/2) + b = pu1.x
-                    double b = pu0.x;
-                    double a = (pu1.x - pu0.x) / (Math.PI / 2);
-                    // pu.y muss 1.0 sein, oder?
-                    if (Math.Abs(pu0.y - 1.0) < 1e-7 && Math.Abs(pu0.y - 1.0) < 1e-7 && Math.Abs(Math.Abs(a) - 1) < 1e-7)
-                    {   // this should always be the case
-                        firstToSecond = new ModOp2D(a, 0.0, b, 0.0, 1.0, 0.0);
-                        return true;
-                    }
-                    else
-                    {
-                        firstToSecond = ModOp2D.Null;
-                        return false;
-                    }
+                    return ParameterMappingTo(cother, thisBounds, precision, out firstToSecond);
                 }
             }
             return base.SameGeometry(thisBounds, other, otherBounds, precision, out firstToSecond);
+        }
+        /// <summary>
+        /// Computes the linear mapping u' = a*u + b, v' = d*v + e from the parameter space of this cone to the parameter
+        /// space of <paramref name="cother"/> and verifies it with 3d points: the mapped points must coincide with the
+        /// original points. Checking the v-parameter of the projection alone is not enough: when the generators of this
+        /// cone are normals of the other cone (two cones with a common axis whose surfaces are perpendicular), every point
+        /// of this cone is projected onto the same circle of the other cone.
+        /// </summary>
+        private bool ParameterMappingTo(ConicalSurface cother, BoundingRect thisBounds, double precision, out ModOp2D firstToSecond)
+        {
+            firstToSecond = ModOp2D.Null;
+            // two different, non zero v values on the same nappe, preferably inside the bounds
+            double v1 = 1.0;
+            double u0 = 0.0;
+            if (!thisBounds.IsEmpty() && !thisBounds.IsInfinite)
+            {
+                double vb = Math.Abs(thisBounds.Top) > Math.Abs(thisBounds.Bottom) ? thisBounds.Top : thisBounds.Bottom;
+                if (Math.Abs(vb) > Precision.eps) v1 = vb;
+                u0 = thisBounds.Left;
+            }
+            double v2 = v1 / 2.0;
+            GeoPoint2D p0 = cother.PositionOf(PointAt(new GeoPoint2D(u0, v1)));
+            GeoPoint2D p1 = cother.PositionOf(PointAt(new GeoPoint2D(u0 + Math.PI / 2, v1)));
+            GeoPoint2D p2 = cother.PositionOf(PointAt(new GeoPoint2D(u0, v2)));
+            double du = p1.x - p0.x;
+            while (du > Math.PI) du -= 2 * Math.PI;
+            while (du < -Math.PI) du += 2 * Math.PI;
+            double a = du / (Math.PI / 2);
+            if (Math.Abs(Math.Abs(a) - 1) > 1e-7) return false;
+            double b = p0.x - a * u0;
+            double d = (p0.y - p2.y) / (v1 - v2);
+            double e = p0.y - d * v1;
+            if (Math.Abs(d) < 1e-12) return false;
+            ModOp2D m = new ModOp2D(a, 0.0, b, 0.0, d, e);
+            // verify with 3d points
+            List<GeoPoint2D> toCheck = new List<GeoPoint2D>
+            {
+                new GeoPoint2D(u0, v1), new GeoPoint2D(u0 + Math.PI / 2, v1), new GeoPoint2D(u0 + Math.PI, v2), new GeoPoint2D(u0 + 3 * Math.PI / 2, -v1)
+            };
+            if (!thisBounds.IsEmpty() && !thisBounds.IsInfinite)
+            {
+                toCheck.Add(thisBounds.GetLowerLeft());
+                toCheck.Add(thisBounds.GetLowerRight());
+                toCheck.Add(thisBounds.GetUpperLeft());
+                toCheck.Add(thisBounds.GetUpperRight());
+                toCheck.Add(thisBounds.GetCenter());
+            }
+            foreach (GeoPoint2D uv in toCheck)
+            {
+                if ((PointAt(uv) | cother.PointAt(m * uv)) > precision) return false;
+            }
+            firstToSecond = m;
+            return true;
         }
         /// <inheritdoc/>
         public override RuledSurfaceMode IsRuled

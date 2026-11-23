@@ -2946,6 +2946,19 @@ namespace CADability.GeoObject
             {
                 Ellipse o = other as Ellipse;
                 if (precision == 0.0) precision = Precision.eps;
+                if (this.IsArc && o.IsArc)
+                {   // Compare the curves themselves, not the center: the center of a short arc is ill-conditioned. An arc whose
+                    // end has been moved by less than precision may have a center far off, but the curve is still the same.
+                    bool sameDirection = (this.StartPoint | o.StartPoint) < precision && (this.EndPoint | o.EndPoint) < precision;
+                    bool reverseDirection = (this.StartPoint | o.EndPoint) < precision && (this.EndPoint | o.StartPoint) < precision;
+                    if (!sameDirection && !reverseDirection) return false;
+                    // the end points and the points in between must agree, also for differently rotated or inversely oriented arcs
+                    foreach (double t in new double[] { 0.25, 0.5, 0.75 })
+                    {
+                        if ((this.PointAt(t) | o.PointAt(sameDirection ? t : 1.0 - t)) >= precision) return false;
+                    }
+                    return true;
+                }
                 if ((Center | o.Center) < precision)
                 {
                     // geändert wg. Dan Swope 18.9.15. gegeneinadner verderehte Kreise und invers orientierte Bögen sollen gleich sein

@@ -2072,7 +2072,11 @@ namespace CADability.GeoObject
                 }
 #endif
                 Shell shell = Shell.MakeShell(sf.ToArray());
-                shell.AssertOutwardOrientation();
+                // An open shell has no outside: the ray test of AssertOutwardOrientation would guess, e.g. turn a
+                // dented surface around when the ray along its normal hits the surface again. Keep the orientation of the
+                // first given face of the shell and orient the other faces like it.
+                if (shell.HasOpenEdgesExceptPoles()) shell.OrientConsistently(faces.First(sf.Contains));
+                else shell.AssertOutwardOrientation();
                 res.Add(shell);
 #if DEBUG
                 // System.Diagnostics.Debug.Assert(shell.OpenEdges.Length == 0);

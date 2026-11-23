@@ -311,25 +311,6 @@ ad7062c4). The small fixes up to then are ported in
   ShapeIt's rewritten `Surface.Intersect` does. The feature names of faces
   survive cloning and saving, but a clone shared the sets with the original
   (fixed).
-- [x] Second comparison on 2026-11-23 (ShapeIt 570d479, master 29b4c21),
-  ported in 1.8.4: `SurfaceOfRevolution` (888e54c: `Orientation` threw a
-  NullReferenceException, `SameGeometry` missed reversed and rotated
-  copies, a `Path` profile had wrong derivatives and `PositionOf`, because
-  v was mapped with `ParameterToPosition`), `Path.TryPointDeriv2At`, the
-  mixed derivative of `RuledSurface`, the orientation of open shells in
-  `Make3D.SewFaces` (58207c9), the comparison of short arcs in
-  `Ellipse.SameGeometry` (c6c3df9), `ConicalSurface.SameGeometry` for a
-  reversed or scaled cone (5dbdbe1), and two null checks when reading JSON.
-  Not ported: the return of the extreme positions in
-  `PlaneSurface.GetExtremePositions` (74aa94b), because master's
-  `BoxedSurfaceEx.PositionOfNormal` is still a stub that finds nothing, so
-  the fix would turn "not implemented" into "none"; the triangle check of
-  `GeneralCurve2D.MakeTriangulation` (b42c9ca, master triangulates
-  differently and no failing case is known); the undo copy left out of
-  `Shell.CombineConnectedFaces` (a071124, no measurable gain in master's
-  booleans: 0.3 ms per clone, 16 ms per operation). The hash of the long
-  keys (9de7ec9) has the same pattern in master's `PolygonRegion`, which is
-  not used.
 - [ ] Larger self-contained parts: `Shell.PushPull` (with its tests), the
   formula evaluator of `FormulaInput.cs` for length, angle and point
   properties, `BVH`, `StlSurfaceReconstruction` (analytic surfaces from STL).
@@ -342,6 +323,61 @@ ad7062c4). The small fixes up to then are ported in
   faces above.) They depend on ShapeIt's rewritten
   `BooleanOperation`, `ISurface.Domain` and `ParallelepipedHull`, about 18,000
   lines; this needs a decision whether the kernels are merged.
+
+Compared again on 2026-11-17 with ShapeIt 282ea58 (27 commits since
+3319b34, master 77d8d5f6):
+
+- [x] Ported: saving a project with objects of a type that was unknown when
+  it was read (a8d3261; master threw an InvalidCastException, and the type
+  properties were written twice, so the fix goes further than ShapeIt's: one
+  type index per original type name), a `SerializableHashSetString` without
+  strings, and `Ellipse.SameGeometry` comparing two arcs by their points
+  instead of their centers (the `Ellipse.cs` part of c6c3df9).
+- [ ] Worth porting once a test case shows that they help: the
+  parallelepipeds of NURBS patches enclosing the Bézier control points
+  (0c87d51; master's `BoxedSurfaceEx.calcParallelEpiped` has the same
+  estimate from corners and borders), and `PositionOfNormal` with a Newton
+  iteration together with `PlaneSurface.GetExtremePositions` no longer
+  discarding the positions it found (74aa94b; in master `PositionOfNormal`
+  is an empty stub, and `GetExtremePositions` breaks out and returns -1).
+  The extra side-of-chord test of `GeneralCurve2D.MakeTriangulation`
+  (b42c9ca) is optional: master's inflection scan already separates two
+  inflections in one interval in most cases.
+- [ ] Depend on the rewritten kernel: tracing inner intersections as closed
+  loops (2c31ab7), reusing known intersection curves (57d257b), the
+  `OverlapsOutline` test of c6c3df9, ec50238, 0ab10f7, 78126c9, 890a257,
+  the fillet checks (8469f08) and `random()` in the formula evaluator
+  (3b8c418).
+- Not needed: the touching-faces special case of the difference (c36812e,
+  501e0c9; master gives the right result in all cases tried) and
+  `Curves2D.IsLinear` (269f03c, only used by ShapeIt's seeds).
+- [ ] Found while comparing: a solid of `Make3D.Rotate` with a BSpline
+  profile (`SurfaceOfRevolution`) gives wrong results as the first operand
+  of `Solid.Subtract` and `Solid.Intersect` with a box: cut in half by a
+  box above z = 5, the difference is empty and the intersection is the
+  whole solid. ShapeIt gives the right volumes, except where the cut is a
+  closed loop inside the face, which both kernels miss. Cylinders, cones
+  and tori made the same way are fine. Wrong since at least 1.0.18. Still
+  wrong after the `SurfaceOfRevolution` fixes of 1.8.4 (checked on
+  2026-11-23 with a BSpline profile from r = 10 to 12, cut at z = 5).
+
+Compared again on 2026-11-23 with ShapeIt 570d479 (master 29b4c21 plus
+#565), ported in 1.8.4:
+
+- [x] `SurfaceOfRevolution` (888e54c): `Orientation` threw a
+  NullReferenceException and `Intersect` did so for a planar curve in a plane
+  through the axis (both fell through into the old 2d implementation);
+  `SameGeometry` missed reversed curves, a reversed axis and copies rotated
+  about the axis; a `Path` profile had wrong derivatives and `PositionOf`,
+  because v was mapped with `ParameterToPosition`. Together with it
+  `Path.TryPointDeriv2At`, the mixed derivative of `RuledSurface`, the
+  orientation of open shells in `Make3D.SewFaces` (58207c9) and
+  `ConicalSurface.SameGeometry` for a reversed or scaled cone (5dbdbe1).
+- Not ported: the undo copy left out of `Shell.CombineConnectedFaces`
+  (a071124), no measurable gain in master's booleans (0.3 ms per clone,
+  16 ms per operation). The hash of the long keys of `CDTriangulation`
+  (9de7ec9) has the same pattern in master's `PolygonRegion`, which is not
+  used. The extreme positions of `PlaneSurface` stay as described above.
 
 ## Documentation
 

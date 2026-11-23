@@ -1,6 +1,6 @@
 # CADability 1.8.4
 
-CADability 1.8.4 is on [nuget.org](https://www.nuget.org/packages/CADability/1.8.4). This patch release takes over surface and curve fixes from the ShapeIt fork (FriendsOfCADability/ShapeIt, `develop` 570d479).
+CADability 1.8.4 is on [nuget.org](https://www.nuget.org/packages/CADability/1.8.4). This patch release takes over surface, curve and JSON fixes from the ShapeIt fork (FriendsOfCADability/ShapeIt, `develop` 570d479).
 
 > **No recompilation needed.** 1.8.4 is source and binary compatible with 1.8.3: no public API is added, removed or changed.
 
@@ -13,15 +13,14 @@ CADability 1.8.4 is on [nuget.org](https://www.nuget.org/packages/CADability/1.8
 - **`Path.TryPointDeriv2At`** returned false, so callers had to fall back to numerical derivatives. It now returns the exact derivatives of the segment, scaled to the position of the path.
 - **`RuledSurface.Derivation2At`**: the mixed derivative `duv` was always zero. It is the difference of the derivatives of the two curves, which matters for twisted ruled surfaces such as a hyperbolic paraboloid.
 - **`Make3D.SewFaces`** turned open, curved shells inside out: it oriented every sewn shell "outward" with a ray test. For an open shell, a ray along the normal of a dented surface can hit the surface again, and the face was flipped. Open shells now keep the orientation of their first given face, and the other faces are oriented consistently with it. Closed shells are still oriented outward.
-- **`Ellipse.SameGeometry`** (via `ICurve.SameGeometry`) compared two arcs by their centers. The center of a short arc is ill-conditioned: when one end of an arc moves by 5e-5, its center can move by 100. Arcs are now compared by their end points and by the points at 1/4, 1/2 and 3/4 of their length, in either direction. Full circles and ellipses are compared as before. In ShapeIt this made a union fail when an edge had been moved slightly onto a vertex.
 - **`ConicalSurface.SameGeometry`** now also recognizes a cone whose axis is reversed or has a different length (the same double cone with another v scale) and returns the mapping verified with 3d points.
-- Reading JSON: `StringList` no longer throws when the `Strings` property is missing, and an unknown type kept as `JsonProxyType` no longer throws when `$Type` or `$TypeVersion` is missing.
+- From #565, merged after 1.8.3: saving a project with objects of a type that was unknown when it was read no longer throws an `InvalidCastException` and writes the same file again (`JsonProxyType`); `SerializableHashSetString` no longer throws when its strings are missing; `Ellipse.SameGeometry` compares two arcs by their end points and the points at 1/4, 1/2 and 3/4 instead of by their ill-conditioned centers.
 
 ## Behaviour changes
 
 - `SurfaceOfRevolution.PointAt` of a surface with a `Path` profile returns other points for the same (u, v) than in 1.8.3. In 1.8.3, `PointAt` and `PositionOf` did not agree for these surfaces, so faces built on them were already inconsistent. Surfaces with other profiles are unchanged within their parameter range.
 - `Make3D.SewFaces` keeps the orientation of open shells instead of guessing it.
-- `ICurve.SameGeometry` of two arcs can now return true where 1.8.3 said false, namely for short arcs whose ends differ by less than the precision. The opposite does not happen.
+- `ICurve.SameGeometry` of two arcs can now return true where 1.8.3 said false, namely for short arcs whose ends differ by less than the precision.
 
 ## Package
 

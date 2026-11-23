@@ -180,16 +180,48 @@ namespace CADability.GeoObject
 
         }
 #endif
+        /// <summary>
+        /// The position (0..1) on the curve of the parameter <paramref name="v"/>. v runs linearly from
+        /// <see cref="ICurve.PositionToParameter"/>(0) to (1), so this is the inverse of the mapping that
+        /// <see cref="PositionOf"/> uses. <see cref="ICurve.ParameterToPosition"/> is not used: for a
+        /// <see cref="Path"/> it maps by length, which is not the inverse of its PositionToParameter, and an
+        /// <see cref="Ellipse"/> wraps a parameter outside of its range by 2*pi.
+        /// </summary>
         private double GetPos(double v)
-        {   // wandelt v in einen Wert zwischen 0 und 1 um
+        {
             return (v - curveStartParameter) / (curveEndParameter - curveStartParameter);
+        }
+        /// <summary>
+        /// The point of <see cref="curveToRotate"/> at the parameter <paramref name="v"/> and its first and second
+        /// derivative with respect to v. <see cref="ICurve.TryPointDeriv2At"/> differentiates by the position;
+        /// curves which don't implement it are differenced numerically. <see cref="ICurve.DirectionAt"/> is not used:
+        /// it is only required to give the direction, and a <see cref="Path"/> gives the derivative of its segment.
+        /// The point is always taken from <see cref="ICurve.PointAt"/>, so that it is the point of <see cref="PointAt(GeoPoint2D)"/>.
+        /// </summary>
+        private void CurveDerivatives(double v, out GeoPoint point, out GeoVector deriv1, out GeoVector deriv2)
+        {
+            double pos = GetPos(v);
+            double f = 1.0 / (curveEndParameter - curveStartParameter); // d(position)/dv
+            point = curveToRotate.PointAt(pos);
+            if (curveToRotate.TryPointDeriv2At(pos, out GeoPoint _, out GeoVector d1, out GeoVector d2))
+            {
+                deriv1 = f * d1;
+                deriv2 = (f * f) * d2;
+                return;
+            }
+            // central differences by the position; the second derivative with a larger step, its rounding error grows with 1/h^2
+            const double h = 1e-6, h2 = 1e-4;
+            deriv1 = (f / (2.0 * h)) * (curveToRotate.PointAt(pos + h) - curveToRotate.PointAt(pos - h));
+            GeoPoint pp = curveToRotate.PointAt(pos + h2);
+            GeoPoint pm = curveToRotate.PointAt(pos - h2);
+            deriv2 = (f * f / (h2 * h2)) * ((pp - point) + (pm - point));
         }
         /// <inheritdoc/>
         public override GeoPoint PointAt(GeoPoint2D uv)
         {
             if (curveToRotate != null)
             {
-                GeoPoint p = curveToRotate.PointAt(curveToRotate.ParameterToPosition(uv.y)); // we would need PointAtParam
+                GeoPoint p = curveToRotate.PointAt(GetPos(uv.y));
                 ModOp rotate = ModOp.Rotate(axisLocation, axisDirection, (SweepAngle)uv.x);
                 return rotate * p;
             }
@@ -361,9 +393,7 @@ namespace CADability.GeoObject
         {
             if (curveToRotate != null)
             {   // new implementation
-                // v is the parameter of the curve, DirectionAt is the derivative by its position
-                double pos = curveToRotate.ParameterToPosition(uv.y);
-                GeoVector dir = PositionPerParameter(pos) * curveToRotate.DirectionAt(pos);
+                CurveDerivatives(uv.y, out GeoPoint _, out GeoVector dir, out GeoVector _);
                 ModOp rotate = ModOp.Rotate(axisLocation, axisDirection, (SweepAngle)uv.x);
                 return rotate * dir;
             }
@@ -390,35 +420,17 @@ namespace CADability.GeoObject
                 duv = (1.0 / (2 * h)) * (VDirection(new GeoPoint2D(uv.x + h, uv.y)) - VDirection(new GeoPoint2D(uv.x - h, uv.y)));
                 return;
             }
-            // PointAt is rotate(u) * c(pos(v)) with the curve c evaluated at its position pos = ParameterToPosition(v).
-            // The derivatives of c are by its position, so each v derivative needs the factor d(pos)/dv.
-            double pos = curveToRotate.ParameterToPosition(uv.y);
-            if (!curveToRotate.TryPointDeriv2At(pos, out GeoPoint c0, out GeoVector c1, out GeoVector c2))
-            {   // the curve has no analytic second derivative: difference its first derivative
-                const double h = 1e-6;
-                c0 = curveToRotate.PointAt(pos);
-                c1 = curveToRotate.DirectionAt(pos);
-                c2 = (1.0 / (2 * h)) * (curveToRotate.DirectionAt(pos + h) - curveToRotate.DirectionAt(pos - h));
-            }
-            double dpos = PositionPerParameter(pos);
+            // PointAt is rotate(u) * c(v), CurveDerivatives gives the derivatives of c by v
+            CurveDerivatives(uv.y, out GeoPoint c0, out GeoVector c1, out GeoVector c2);
             ModOp rotate = ModOp.Rotate(axisLocation, axisDirection, (SweepAngle)uv.x);
             location = rotate * c0;
             // the derivative of the rotation by the angle is the cross product with the (oriented) axis
             GeoVector omega = RotationAxis();
             du = omega ^ (location - axisLocation);
             duu = omega ^ du;
-            dv = dpos * (rotate * c1);
-            dvv = (dpos * dpos) * (rotate * c2);
+            dv = rotate * c1;
+            dvv = rotate * c2;
             duv = omega ^ dv;
-        }
-        /// <summary>
-        /// d(position)/d(parameter) of <see cref="curveToRotate"/> at the provided position, the factor between the
-        /// derivatives of the curve (by its position) and those of this surface (by v, which is the curve parameter).
-        /// </summary>
-        private double PositionPerParameter(double pos)
-        {
-            const double h = 1e-6;
-            return 2 * h / (curveToRotate.PositionToParameter(pos + h) - curveToRotate.PositionToParameter(pos - h));
         }
         /// <summary>
         /// The unit vector w with d/du (rotate(u) * x) = w ^ (rotate(u) * x), i.e. the axis direction with the
@@ -486,8 +498,8 @@ namespace CADability.GeoObject
                     {   // new implementation: part of the rotated curveToRotate
                         ModOp rot = ModOp.Rotate(axisLocation, axisDirection, (SweepAngle)l2d.StartPoint.x);
                         res = curveToRotate.CloneModified(rot);
-                        double spos = curveToRotate.ParameterToPosition(l2d.StartPoint.y);
-                        double epos = curveToRotate.ParameterToPosition(l2d.EndPoint.y);
+                        double spos = GetPos(l2d.StartPoint.y);
+                        double epos = GetPos(l2d.EndPoint.y);
                         if (spos > epos)
                         {
                             res.Trim(epos, spos);
@@ -1118,8 +1130,6 @@ namespace CADability.GeoObject
         /// <inheritdoc/>
         public override void Intersect(ICurve curve, BoundingRect uvExtent, out GeoPoint[] ips, out GeoPoint2D[] uvOnFaces, out double[] uOnCurve3Ds)
         {
-            if (curveToRotate != null) base.Intersect(curve, uvExtent, out ips, out uvOnFaces, out uOnCurve3Ds); // new implementation: check special cases
-
             if (curve.GetPlanarState() == PlanarState.Planar)
             {
                 Plane pln = curve.GetPlane();
@@ -1158,8 +1168,8 @@ namespace CADability.GeoObject
                     uOnCurve3Ds = luOnCurve3Ds.ToArray();
                     return;
                 }
-                else if (Precision.IsPerpendicular(pln.Normal, Axis, false) && Precision.IsPointOnPlane(Location, pln))
-                {   // Ebene der Kurve geht durch Achse
+                else if (curveToRotate == null && Precision.IsPerpendicular(pln.Normal, Axis, false) && Precision.IsPointOnPlane(Location, pln))
+                {   // Ebene der Kurve geht durch Achse. Only for the old implementation: this needs the 2d curve
                     ICurve crvnorm = curve.CloneModified(fromSurface); // die Kurve im System der Rotationsfläche: dort ist die Y-Achse die Achse und die basiscurve2d wird rotiert
                     Plane plcnorm = crvnorm.GetPlane();
 
@@ -1222,7 +1232,7 @@ namespace CADability.GeoObject
         /// <inheritdoc/>
         public override double Orientation(GeoPoint p)
         {
-            if (curveToRotate != null) base.Orientation(p); // new implementation: what is this good for?
+            if (curveToRotate != null) return base.Orientation(p); // the code below is the old implementation, it needs the 2d curve
 
             // soll vermutlich feststellen ob außerhalb oder innerhalb der Fläche im Bezug auf die Achse
             // Richards code verwendet das aufwendige GetLineIntersection.
@@ -1400,8 +1410,8 @@ namespace CADability.GeoObject
                 ModOp rotate = ModOp.Rotate(axisLocation, axisDirection, (SweepAngle)u);
                 ICurve res = curveToRotate.CloneModified(rotate);
 
-                double vminp = curveToRotate.ParameterToPosition(vmin);
-                double vmaxp = curveToRotate.ParameterToPosition(vmax);
+                double vminp = GetPos(vmin);
+                double vmaxp = GetPos(vmax);
                 if (curveToRotate.IsClosed)
                 {
                     while (vminp < 0) vminp += 1;
@@ -1506,8 +1516,58 @@ namespace CADability.GeoObject
         /// <inheritdoc/>
         public override bool SameGeometry(BoundingRect thisBounds, ISurface other, BoundingRect otherBounds, double precision, out ModOp2D firstToSecond)
         {
+            if (other is SurfaceOfRevolution sr && curveToRotate != null && sr.curveToRotate != null)
+            {   // u is the angle about the axis, v runs linearly over the parameter range of the curve. With a common axis the
+                // other curve must be this curve rotated about the axis by some angle b (b = 0 for the same curve), possibly
+                // reversed. Then the mapping is u' = su * (u - b), v' = a*v + e, which is verified with points.
+                // The general test (Surfaces.Overlapping) must not be used here, it calls SameGeometry again.
+                firstToSecond = ModOp2D.Null;
+                if (!Precision.SameDirection(axisDirection, sr.axisDirection, false)) return false;
+                if (Geometry.DistPL(sr.axisLocation, axisLocation, axisDirection) > precision) return false;
+                double su = axisDirection * sr.axisDirection > 0 ? 1.0 : -1.0;
+                const double q = 0.37; // a point of the curve which is usually not on the axis
+                GeoPoint p0 = curveToRotate.PointAt(q);
+                foreach (bool reverse in new bool[] { false, true })
+                {
+                    GeoPoint p1 = sr.curveToRotate.PointAt(reverse ? 1.0 - q : q);
+                    GeoVector r0 = p0 - Geometry.DropPL(p0, axisLocation, axisDirection);
+                    GeoVector r1 = p1 - Geometry.DropPL(p1, axisLocation, axisDirection);
+                    if (Math.Abs(r0.Length - r1.Length) > precision) continue;
+                    double angle = 0.0;
+                    if (r0.Length > precision && r1.Length > precision)
+                        angle = Math.Atan2((r0 ^ r1) * axisDirection.Normalized, r0 * r1);
+                    foreach (double b in new double[] { angle, -angle })
+                    {
+                        double w0 = reverse ? sr.curveEndParameter : sr.curveStartParameter;
+                        double w1 = reverse ? sr.curveStartParameter : sr.curveEndParameter;
+                        double a = (w1 - w0) / (curveEndParameter - curveStartParameter);
+                        ModOp2D mapping = new ModOp2D(su, 0.0, -su * b, 0.0, a, w0 - a * curveStartParameter);
+                        bool fits = true;
+                        foreach (double u in new double[] { 0.3, 2.9, 4.4 })
+                        {
+                            foreach (double pos in new double[] { 0.0, 0.17, 0.5, 0.83, 1.0 })
+                            {
+                                GeoPoint2D uv = new GeoPoint2D(u, curveStartParameter + pos * (curveEndParameter - curveStartParameter));
+                                if ((PointAt(uv) | sr.PointAt(mapping * uv)) > precision)
+                                {
+                                    fits = false;
+                                    break;
+                                }
+                            }
+                            if (!fits) break;
+                        }
+                        if (fits)
+                        {
+                            firstToSecond = mapping;
+                            return true;
+                        }
+                        if (angle == 0.0) break;
+                    }
+                }
+                return false;
+            }
             if (other is SurfaceOfRevolution)
-            {
+            {   // old implementation
                 firstToSecond = ModOp2D.Null;
                 SurfaceOfRevolution srother = other as SurfaceOfRevolution;
                 bool reverse;

@@ -357,7 +357,27 @@ Compared again on 2026-11-17 with ShapeIt 282ea58 (27 commits since
   box above z = 5, the difference is empty and the intersection is the
   whole solid. ShapeIt gives the right volumes, except where the cut is a
   closed loop inside the face, which both kernels miss. Cylinders, cones
-  and tori made the same way are fine. Wrong since at least 1.0.18.
+  and tori made the same way are fine. Wrong since at least 1.0.18. Still
+  wrong after the `SurfaceOfRevolution` fixes of 1.8.4 (checked on
+  2026-11-23 with a BSpline profile from r = 10 to 12, cut at z = 5).
+
+Compared again on 2026-11-23 with ShapeIt 570d479 (master 29b4c21 plus
+#565), ported in 1.8.4:
+
+- [x] `SurfaceOfRevolution` (888e54c): `Orientation` threw a
+  NullReferenceException and `Intersect` did so for a planar curve in a plane
+  through the axis (both fell through into the old 2d implementation);
+  `SameGeometry` missed reversed curves, a reversed axis and copies rotated
+  about the axis; a `Path` profile had wrong derivatives and `PositionOf`,
+  because v was mapped with `ParameterToPosition`. Together with it
+  `Path.TryPointDeriv2At`, the mixed derivative of `RuledSurface`, the
+  orientation of open shells in `Make3D.SewFaces` (58207c9) and
+  `ConicalSurface.SameGeometry` for a reversed or scaled cone (5dbdbe1).
+- Not ported: the undo copy left out of `Shell.CombineConnectedFaces`
+  (a071124), no measurable gain in master's booleans (0.3 ms per clone,
+  16 ms per operation). The hash of the long keys of `CDTriangulation`
+  (9de7ec9) has the same pattern in master's `PolygonRegion`, which is not
+  used. The extreme positions of `PlaneSurface` stay as described above.
 
 ## Documentation
 

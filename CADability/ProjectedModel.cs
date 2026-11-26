@@ -714,9 +714,9 @@ namespace CADability
         }
         internal void RecalcAll(bool temporary)
         {
-            if (FrameImpl.MainFrame != null && FrameImpl.MainFrame.ActiveView != null && FrameImpl.MainFrame.ActiveView.Canvas != null)
-                FrameImpl.MainFrame.ActiveView.Canvas.Cursor = "WaitCursor";
-
+            // Only the change events of the objects are connected again; the projected model no longer has a quadtree of its own
+            // to recalculate. It used to show the wait cursor, which is not needed for this short loop and, called on every mouse move
+            // while the view was rotated, kept Windows switching cursors and delayed the paints (issue #568).
             for (int i = 0; i < model.Count; ++i)
             {
                 IGeoObject go = model[i];

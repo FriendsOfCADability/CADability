@@ -229,12 +229,12 @@ namespace CADability
         }
         /// <summary>
         /// Sets the view direction of the (parallel) projection so that the z axis of the world points upwards on the screen
-        /// (the y axis when looking along the z axis). The cached extent is discarded and, unless
-        /// <paramref name="temporary"/> is true, the display data of all objects is rebuilt. Temporary is used while the user
-        /// rotates the view with the mouse; call it again with temporary false when the rotation is finished.
+        /// (the y axis when looking along the z axis). The cached extent is discarded; the display lists do not depend on the
+        /// view direction and are kept.
         /// </summary>
         /// <param name="dir">The new view direction (from the viewer into the scene)</param>
-        /// <param name="temporary">true to postpone the rebuilding of the display data</param>
+        /// <param name="temporary">Not used any more: there is nothing to postpone while the user rotates the view. It is kept for
+        /// compatibility</param>
         public void SetViewDirection(GeoVector dir, bool temporary)
         {
             if (Precision.IsNullVector(dir ^ new GeoVector(0.0, 0.0, 1.0)))
@@ -248,54 +248,50 @@ namespace CADability
                 else projection.SetDirection(dir, new GeoVector(0.0, 0.0, -1.0), model.Extent);
             }
             extent.MakeEmpty();
-            if (!temporary) RecalcAll(temporary);
         }
         /// <summary>
         /// Makes the projection a perspective projection with the viewer at <paramref name="fromHere"/> looking in
-        /// <paramref name="direction"/>; <paramref name="fixPoint"/> keeps its position on the screen. See
-        /// <see cref="SetViewDirection(GeoVector, bool)"/> for the meaning of <paramref name="temporary"/>.
+        /// <paramref name="direction"/>; <paramref name="fixPoint"/> keeps its position on the screen. The cached extent is
+        /// discarded, the display lists are kept.
         /// </summary>
         /// <param name="fromHere">The position of the viewer (eye point)</param>
         /// <param name="direction">The view direction</param>
         /// <param name="fixPoint">The point that stays at its place on the screen</param>
-        /// <param name="temporary">true to postpone the rebuilding of the display data</param>
+        /// <param name="temporary">Not used any more, see <see cref="SetViewDirection(GeoVector, bool)"/></param>
         public void SetViewDirection(GeoPoint fromHere, GeoVector direction, GeoPoint fixPoint, bool temporary)
         {
             projection.SetPerspective(fromHere, direction, model.Extent, fixPoint);
             extent.MakeEmpty();
-            if (!temporary) RecalcAll(temporary);
         }
         /// <summary>
         /// Sets the unscaled projection (the transformation from world coordinates to the 2d coordinates of the projection
         /// plane, <see cref="CADability.Projection.UnscaledProjection"/>) directly; the projection becomes a parallel
         /// projection. <see cref="ModelView.SetViewDirection(ModOp, GeoPoint, bool)"/> uses it when the user rotates the view
-        /// and then scrolls so that the fix point stays at its place. See <see cref="SetViewDirection(GeoVector, bool)"/> for
-        /// the meaning of <paramref name="temporary"/>.
+        /// and then scrolls so that the fix point stays at its place. The cached extent is discarded, the display lists are kept.
         /// </summary>
         /// <param name="p">The new unscaled projection</param>
-        /// <param name="temporary">true to postpone the rebuilding of the display data</param>
+        /// <param name="temporary">Not used any more, see <see cref="SetViewDirection(GeoVector, bool)"/></param>
         public void SetViewDirection(ModOp p, bool temporary)
         {
             projection.SetUnscaledProjection(p);
             extent.MakeEmpty();
-            if (!temporary) RecalcAll(temporary);
         }
         /// <summary>
-        /// Marks the display lists as invalid, discards the cached extent and rebuilds the display data of all objects of the
-        /// model. Call it after changes the projected model does not notice by itself, e.g. after setting
+        /// Marks the display lists of this projected model as invalid, so that the next paint collects them again from the model,
+        /// and discards the cached extent. Call it after changes the projected model does not notice by itself, e.g. after setting
         /// <see cref="Projection"/> or <see cref="UseLineWidth"/>; <see cref="ModelView.ForceInvalidateAll"/> calls it.
         /// </summary>
         public void ForceRecalc()
         {
             dirty = true;
             extent.MakeEmpty();
-            RecalcAll(false);
         }
         /// <summary>
         /// Makes this projected model and all other projected models of the same <see cref="Model"/> record their display
         /// lists again with the next paint, and requests a repaint. Use it when the display lists are no longer valid, e.g.
         /// after the graphics device was lost or the renderer was switched (together with <see cref="Text.ClearFontCache"/>).
-        /// Unlike <see cref="ForceRecalc"/> it keeps the extent and does not rebuild the display data of the objects.
+        /// Unlike <see cref="ForceRecalc"/>, which only makes this projected model collect the existing display lists again, it
+        /// makes the model record them anew; the extent is kept.
         /// </summary>
         public void InvalidateDisplayLists()
         {
@@ -712,21 +708,6 @@ namespace CADability
             visibleLayers.CopyTo(res, 0);
             return res;
         }
-        internal void RecalcAll(bool temporary)
-        {
-            // Only the change events of the objects are connected again; the projected model no longer has a quadtree of its own
-            // to recalculate. It used to show the wait cursor, which is not needed for this short loop and, called on every mouse move
-            // while the view was rotated, kept Windows switching cursors and delayed the paints (issue #568).
-            for (int i = 0; i < model.Count; ++i)
-            {
-                IGeoObject go = model[i];
-                go.WillChangeEvent -= new ChangeDelegate(GeoObjectWillChange);
-                go.DidChangeEvent -= new ChangeDelegate(GeoObjectDidChange);
-                Add(go);
-            }
-
-        }
-
         /// <summary>
         /// Finds the snap point for the mouse position described by the <see cref="SnapPointFinder"/>: all visible objects in
         /// the pick area are asked for their snap points (<see cref="IGeoObject.FindSnapPoint(SnapPointFinder)"/>), then the

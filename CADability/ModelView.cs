@@ -653,7 +653,7 @@ namespace CADability
         private ProjectedModel projectedModel;
         private Project project;
         private bool zAxisUp;
-        internal bool projectedModelNeedsRecalc; // the view has been rotated with the mouse, the projected model must be updated when the rotation ends
+        internal bool projectedModelNeedsRecalc; // the view has been rotated with the mouse, the scroll position must be updated when the rotation ends
         private GeoPoint? rotationCenter; // the point the view rotates around while the mouse rotates it and no fix point is set, found once per rotation
         private static bool UseOpenGl = Settings.GlobalSettings.GetBoolValue("UseOpenGl", true);
         private static double mouseWheelZoomFactor = Settings.GlobalSettings.GetDoubleValue("MouseWheelZoomFactor", 1.1);
@@ -1419,8 +1419,8 @@ namespace CADability
                         GeoPoint fromHere;
                         if (fixPointValid) fromHere = fixPoint - distance * viewDirection;
                         else fromHere = GeoPoint.Origin - distance * viewDirection;
-                        // temporary: the projected model is updated once when the rotation ends (projectedModelNeedsRecalc), the display
-                        // lists do not depend on the view direction
+                        // the scroll position is updated once when the rotation ends (projectedModelNeedsRecalc), the display lists do not
+                        // depend on the view direction
                         ProjectedModel.SetViewDirection(fromHere, viewDirection, fixPoint, true);
                         canvas?.Invalidate();
                     }
@@ -1445,7 +1445,6 @@ namespace CADability
                 if (projectedModelNeedsRecalc)
                 {
                     projectedModelNeedsRecalc = false;
-                    projectedModel.RecalcAll(false);
                     RecalcScrollPosition();
                     if (DisplayChangedEvent != null) DisplayChangedEvent(this, new DisplayChangeArg(DisplayChangeArg.Reasons.Unknown));
                 }
@@ -1486,7 +1485,6 @@ namespace CADability
             if (projectedModelNeedsRecalc)
             {
                 projectedModelNeedsRecalc = false;
-                projectedModel.RecalcAll(false);
                 RecalcScrollPosition();
             }
         }
@@ -2222,8 +2220,9 @@ namespace CADability
         /// <param name="project">The new unscaled projection: the rotation (and mirroring) of the world coordinate system into the view coordinate system</param>
         /// <param name="fixPoint">The point in world coordinates that keeps its position on the screen</param>
         /// <param name="mouseIsDown">True while the mouse is still rotating: only the view is repainted, which is all a new view direction needs,
-        /// because the display lists do not depend on it. When false, the projected model and the scroll position are updated as well. A caller
-        /// that passes true must make sure that this happens when the rotation ends, as the view itself does with the next mouse move after it.</param>
+        /// because the display lists do not depend on it. When false, the projected model collects its display lists again and the scroll
+        /// position is updated. A caller that passes true must make sure that the scroll position is updated when the rotation ends, as the
+        /// view itself does with the next mouse move after it.</param>
         public void SetViewDirection(ModOp project, GeoPoint fixPoint, bool mouseIsDown)
         {
             PointF before = projectedModel.Projection.ProjectF(fixPoint);
@@ -2380,7 +2379,7 @@ namespace CADability
                     if (VOffset > 0) canvas.Cursor = "PanSouth";
                     else canvas.Cursor = "PanNorth";
                 }
-                projectedModelNeedsRecalc = true; // the projected model is updated with the next mouse move that does not rotate
+                projectedModelNeedsRecalc = true; // the scroll position is updated with the next mouse move that does not rotate
             }
         }
         /// <summary>
@@ -2421,12 +2420,11 @@ namespace CADability
                 projectedModel.RemoveVisibleLayer(l);
         }
         /// <summary>
-        /// Re-registers all objects of the model with the <see cref="ProjectedModel"/> (recalculating its quadtree and extent for the current
-        /// projection) and updates the scroll position. The frame calls it after the view direction has been changed by a menu command.
+        /// Updates the scroll position after the view direction has been changed. The frame calls it after a menu command has changed
+        /// the view direction. The projected model has no quadtree of its own any more which it would have to recalculate here.
         /// </summary>
         public void Recalc()
         {
-            projectedModel.RecalcAll(false);
             RecalcScrollPosition();
         }
         private void RepaintSynchronized()

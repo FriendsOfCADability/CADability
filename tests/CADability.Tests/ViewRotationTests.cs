@@ -131,7 +131,7 @@ namespace CADability.Tests
 
             Assert.IsFalse(Precision.SameDirection(before, modelView.Projection.Direction, false), "the view has been rotated");
             Assert.IsFalse(rebuilt, "a new view direction does not need new display lists");
-            Assert.IsTrue(modelView.projectedModelNeedsRecalc, "the projected model is updated when the rotation ends");
+            Assert.IsTrue(modelView.projectedModelNeedsRecalc, "the scroll position is updated when the rotation ends");
         }
 
         [TestMethod]

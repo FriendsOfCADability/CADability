@@ -2,7 +2,9 @@
 
 CADability 1.8.5 is on [nuget.org](https://www.nuget.org/packages/CADability/1.8.5). This patch release makes rotating the view with the mouse smooth again (#568).
 
-> **No recompilation needed.** 1.8.5 is source and binary compatible with 1.8.4: no public API is added, removed or changed.
+> **1.8.4 was not published.** Its version number and release notes were prepared, but the package never reached nuget.org. 1.8.5 is the first package after 1.8.3 and therefore also contains all fixes of [1.8.4](RELEASE-NOTES-1.8.4.md): surface, curve and JSON fixes from the ShapeIt fork. Read those notes as well when you update from 1.8.3, in particular their behaviour changes.
+
+> **No recompilation needed.** 1.8.5 is source and binary compatible with 1.8.3: no public API is added, removed or changed.
 
 ## Fixes
 
@@ -21,4 +23,4 @@ CADability 1.8.5 is on [nuget.org](https://www.nuget.org/packages/CADability/1.8
 
 ## Package
 
-`CADability.1.8.5.nupkg` contains `CADability.dll` and `CADability.xml` for netstandard2.0, with `ACadSharp.dll` and `ACadSharp.xml` 3.8.49 (FriendsOfCADability fork) embedded, as in 1.8.4. Dependencies are unchanged from 1.8.4. Symbols are on the nuget.org symbol server (`CADability.1.8.5.snupkg`, Source Link).
+`CADability.1.8.5.nupkg` contains `CADability.dll` and `CADability.xml` for netstandard2.0, with `ACadSharp.dll` and `ACadSharp.xml` 3.8.49 (FriendsOfCADability fork) embedded, as in 1.8.3. Dependencies are unchanged from 1.8.3. Symbols are on the nuget.org symbol server (`CADability.1.8.5.snupkg`, Source Link).

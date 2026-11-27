@@ -653,7 +653,8 @@ namespace CADability
         private ProjectedModel projectedModel;
         private Project project;
         private bool zAxisUp;
-        internal bool projectedModelNeedsRecalc; // Ansicht wurde mit der Maus gedreht, Quadtree muss berechnet werden
+        internal bool projectedModelNeedsRecalc; // the view has been rotated with the mouse, the scroll position must be updated when the rotation ends
+        private GeoPoint? rotationCenter; // the point the view rotates around while the mouse rotates it and no fix point is set, found once per rotation
         private static bool UseOpenGl = Settings.GlobalSettings.GetBoolValue("UseOpenGl", true);
         private static double mouseWheelZoomFactor = Settings.GlobalSettings.GetDoubleValue("MouseWheelZoomFactor", 1.1);
         private GeoPoint fixPoint;
@@ -1271,6 +1272,7 @@ namespace CADability
                 canvas.Cursor = "SizeAll";
                 lastPanPosition = new Point(e.X, e.Y);
             }
+            rotationCenter = null; // a rotation with the mouse starts with this button press
             canvas.Frame.ActiveView = this;
             canvas.Frame.ActionStack.OnMouseDown(e, this);
         }
@@ -1306,6 +1308,7 @@ namespace CADability
                 int VScrollOffset = e.Y - lastPanPosition.Y;
                 canvas?.Invalidate();
                 projectedModel.Scroll(HScrollOffset, VScrollOffset);
+                rotationCenter = null; // scrolling moves another point into the center of the view
                 if (HScrollOffset > 0)
                 {
                     if (DisplayChangedEvent != null) DisplayChangedEvent(this, new DisplayChangeArg(DisplayChangeArg.Reasons.ScrollLeft));
@@ -1393,22 +1396,11 @@ namespace CADability
                             SetViewDirection(project, fixPoint, true);
                         else
                         {
-                            // find a good fixpoint for the rotation of the view:
-                            GeoPoint fp = Projection.UnProject(clcenter);
-                            PickArea pa = Projection.GetPickSpace(new Rectangle(clcenter.Y - 5, clcenter.Y - 5, 10, 10));
-                            double pd = Model.GetPickDistance(pa, null);
-                            if (pd != double.MaxValue) fp = pa.FrontCenter + pd * pa.Direction; // the point in the center of the screen, when there is something
-                            else
-                            {   // when there is nothing in the center, use the point on the drawing plane
-                                Axis pb = Projection.PointBeam(clcenter);
-                                try
-                                {
-                                    GeoPoint2D dpp = Projection.DrawingPlane.Intersect(pb);
-                                    fp = Projection.DrawingPlane.ToGlobal(dpp);
-                                }
-                                catch (PlaneException) { }
-                            }
-                            SetViewDirection(project, fp, true);
+                            // The point in the center of the view is found once when the rotation starts and kept until it ends:
+                            // picking it on every mouse move costs time with large models and lets the center of the rotation
+                            // wander in depth.
+                            if (!rotationCenter.HasValue) rotationCenter = FindRotationCenter(clcenter);
+                            SetViewDirection(project, rotationCenter.Value, true);
                         }
                     }
                     else
@@ -1427,15 +1419,10 @@ namespace CADability
                         GeoPoint fromHere;
                         if (fixPointValid) fromHere = fixPoint - distance * viewDirection;
                         else fromHere = GeoPoint.Origin - distance * viewDirection;
-                        ProjectedModel.SetViewDirection(fromHere, viewDirection, fixPoint, false);
-
-                        ForceInvalidateAll();
+                        // the scroll position is updated once when the rotation ends (projectedModelNeedsRecalc), the display lists do not
+                        // depend on the view direction
+                        ProjectedModel.SetViewDirection(fromHere, viewDirection, fixPoint, true);
                         canvas?.Invalidate();
-                        //if (!mouseIsDown)
-                        //{
-                        //    RecalcScrollPosition();
-                        //    projectedModel.RecalcAll(false);
-                        //}
                     }
                     if (Math.Abs(HOffset) > Math.Abs(VOffset))
                     {
@@ -1454,10 +1441,10 @@ namespace CADability
             }
             else
             {
+                rotationCenter = null; // the rotation has ended, the next one finds its center again
                 if (projectedModelNeedsRecalc)
                 {
                     projectedModelNeedsRecalc = false;
-                    projectedModel.RecalcAll(false);
                     RecalcScrollPosition();
                     if (DisplayChangedEvent != null) DisplayChangedEvent(this, new DisplayChangeArg(DisplayChangeArg.Reasons.Unknown));
                 }
@@ -1498,7 +1485,6 @@ namespace CADability
             if (projectedModelNeedsRecalc)
             {
                 projectedModelNeedsRecalc = false;
-                projectedModel.RecalcAll(false);
                 RecalcScrollPosition();
             }
         }
@@ -2228,26 +2214,29 @@ namespace CADability
 
         /// <summary>
         /// Sets the unscaled projection (the rotation part of the view, see <see cref="CADability.Projection.UnscaledProjection"/>) and scrolls the
-        /// view so that <paramref name="fixPoint"/> keeps its position on the screen. The display lists are rebuilt and the view is repainted. Used by
+        /// view so that <paramref name="fixPoint"/> keeps its position on the screen, then the view is repainted. Used by
         /// the interactive rotation of the view with the mouse and by the view point action.
         /// </summary>
         /// <param name="project">The new unscaled projection: the rotation (and mirroring) of the world coordinate system into the view coordinate system</param>
         /// <param name="fixPoint">The point in world coordinates that keeps its position on the screen</param>
-        /// <param name="mouseIsDown">True while the mouse is still rotating; the quadtree of the projected model and the scroll position are only updated when false</param>
+        /// <param name="mouseIsDown">True while the mouse is still rotating: only the view is repainted, which is all a new view direction needs,
+        /// because the display lists do not depend on it. When false, the projected model collects its display lists again and the scroll
+        /// position is updated. A caller that passes true must make sure that the scroll position is updated when the rotation ends, as the
+        /// view itself does with the next mouse move after it.</param>
         public void SetViewDirection(ModOp project, GeoPoint fixPoint, bool mouseIsDown)
         {
             PointF before = projectedModel.Projection.ProjectF(fixPoint);
-            projectedModel.SetViewDirection(project, mouseIsDown);
+            projectedModel.SetViewDirection(project, true);
             PointF after = projectedModel.Projection.ProjectF(fixPoint);
             projectedModel.Scroll(before.X - after.X, before.Y - after.Y);
 
-            ForceInvalidateAll();
-            canvas?.Invalidate();
+            // ForceInvalidateAll on every step of a rotation made the rotation slower the more objects the model has (issue #568)
             if (!mouseIsDown)
             {
+                ForceInvalidateAll();
                 RecalcScrollPosition();
-                projectedModel.RecalcAll(false);
             }
+            canvas?.Invalidate();
 #if DEBUG
             //BoundingRect br = GetVisibleBoundingRect();
             //GeoVector dir = this.Projection.Direction;
@@ -2390,8 +2379,32 @@ namespace CADability
                     if (VOffset > 0) canvas.Cursor = "PanSouth";
                     else canvas.Cursor = "PanNorth";
                 }
-                projectedModelNeedsRecalc = false;
+                projectedModelNeedsRecalc = true; // the scroll position is updated with the next mouse move that does not rotate
             }
+        }
+        /// <summary>
+        /// Finds the point the view rotates around when no <see cref="FixPoint"/> is set: the nearest visible object under
+        /// <paramref name="center"/>, or the point of the drawing plane there when no object is under it.
+        /// </summary>
+        /// <param name="center">The center of the view in client coordinates of the canvas</param>
+        /// <returns>The center of the rotation in world coordinates</returns>
+        private GeoPoint FindRotationCenter(Point center)
+        {
+            GeoPoint fp = Projection.UnProject(center);
+            PickArea pa = Projection.GetPickSpace(new Rectangle(center.X - 5, center.Y - 5, 10, 10));
+            double pd = Model.GetPickDistance(pa, new HashSet<Layer>(projectedModel.GetVisibleLayers()));
+            if (pd != double.MaxValue) fp = pa.FrontCenter + pd * pa.Direction;
+            else
+            {
+                Axis pb = Projection.PointBeam(center);
+                try
+                {
+                    GeoPoint2D dpp = Projection.DrawingPlane.Intersect(pb);
+                    fp = Projection.DrawingPlane.ToGlobal(dpp);
+                }
+                catch (PlaneException) { }
+            }
+            return fp;
         }
         /// <summary>
         /// Shows or hides the objects of a layer in this view. The visibility of layers is a property of the view (its <see cref="ProjectedModel"/>),
@@ -2407,12 +2420,11 @@ namespace CADability
                 projectedModel.RemoveVisibleLayer(l);
         }
         /// <summary>
-        /// Re-registers all objects of the model with the <see cref="ProjectedModel"/> (recalculating its quadtree and extent for the current
-        /// projection) and updates the scroll position. The frame calls it after the view direction has been changed by a menu command.
+        /// Updates the scroll position after the view direction has been changed. The frame calls it after a menu command has changed
+        /// the view direction. The projected model has no quadtree of its own any more which it would have to recalculate here.
         /// </summary>
         public void Recalc()
         {
-            projectedModel.RecalcAll(false);
             RecalcScrollPosition();
         }
         private void RepaintSynchronized()

@@ -1,6 +1,8 @@
 # CADability 1.8.4
 
-CADability 1.8.4 is on [nuget.org](https://www.nuget.org/packages/CADability/1.8.4). This patch release takes over surface, curve and JSON fixes from the ShapeIt fork (FriendsOfCADability/ShapeIt, `develop` 570d479).
+> **Not published.** 1.8.4 never reached nuget.org. Its changes are first released with [1.8.5](RELEASE-NOTES-1.8.5.md).
+
+This patch release takes over surface, curve and JSON fixes from the ShapeIt fork (FriendsOfCADability/ShapeIt, `develop` 570d479).
 
 > **No recompilation needed.** 1.8.4 is source and binary compatible with 1.8.3: no public API is added, removed or changed.
 
@@ -24,4 +26,4 @@ CADability 1.8.4 is on [nuget.org](https://www.nuget.org/packages/CADability/1.8
 
 ## Package
 
-`CADability.1.8.4.nupkg` contains `CADability.dll` and `CADability.xml` for netstandard2.0, with `ACadSharp.dll` and `ACadSharp.xml` 3.8.49 (FriendsOfCADability fork) embedded, as in 1.8.3. Dependencies are unchanged from 1.8.3. Symbols are on the nuget.org symbol server (`CADability.1.8.4.snupkg`, Source Link).
+`CADability.1.8.4.nupkg` would have contained `CADability.dll` and `CADability.xml` for netstandard2.0, with `ACadSharp.dll` and `ACadSharp.xml` 3.8.49 (FriendsOfCADability fork) embedded, as in 1.8.3. Dependencies are unchanged from 1.8.3. Symbols would have been on the nuget.org symbol server (`CADability.1.8.4.snupkg`, Source Link).

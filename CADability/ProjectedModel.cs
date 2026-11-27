@@ -106,6 +106,7 @@ namespace CADability
         private bool recalcVisibility;
         private bool dirty; // zugefügt, gelöscht oder geändert, die Displaylisten stimmen nicht mehr
         private bool connected;
+        private bool eventsConnected; // connected to the events of the model and its objects, see ConnectEvents
 
         //internal void CollectFacesAndEdges(IGeoObject toCheck)
         //{
@@ -167,10 +168,7 @@ namespace CADability
             supressAutoRegeneration = false;
             geoObjects = new Dictionary<int, IGeoObject>();
             extent = BoundingRect.EmptyBoundingRect;
-            model.GeoObjectAddedEvent += new CADability.Model.GeoObjectAdded(GeoObjectAddedEvent);
-            model.GeoObjectRemovedEvent += new CADability.Model.GeoObjectRemoved(GeoObjectRemovedEvent);
-            model.ExtentChangedEvent += new Model.ExtentChangedDelegate(OnModelExtentChanged);
-            model.NewDisplaylistAvailableEvent += new Model.NewDisplaylistAvailableDelegate(OnNewDisplaylistAvailable);
+            ConnectEvents();
             ColorSetting cs = Settings.GlobalSettings.GetValue("Select.SelectColor") as ColorSetting;
             useLineWidth = Settings.GlobalSettings.GetBoolValue("View.UseLineWidth", true);
             visibleLayers = new HashSet<Layer>();
@@ -180,12 +178,6 @@ namespace CADability
                 pr.Precision = m.Extent.Size / 1000;
             }
 
-            // alle Objekt müssen sich hier melden
-            for (int i = 0; i < m.Count; ++i)
-            {
-                IGeoObject go = m[i];
-                Add(go);
-            }
             dbgcnt++;
             dbg = dbgcnt;
             Settings.GlobalSettings.SettingChangedEvent -= new SettingChangedDelegate(OnSettingChanged);
@@ -329,10 +321,8 @@ namespace CADability
             {
                 connected = true;
                 extent = BoundingRect.EmptyBoundingRect;
-                model.GeoObjectAddedEvent += new CADability.Model.GeoObjectAdded(GeoObjectAddedEvent);
-                model.GeoObjectRemovedEvent += new CADability.Model.GeoObjectRemoved(GeoObjectRemovedEvent);
-                model.ExtentChangedEvent += new Model.ExtentChangedDelegate(OnModelExtentChanged);
-                model.NewDisplaylistAvailableEvent += new Model.NewDisplaylistAvailableDelegate(OnNewDisplaylistAvailable);
+                // a projected model created by the constructor is already connected to the events, one read from a file is not
+                ConnectEvents();
                 //geoObjects2D = new Dictionary<IGeoObject, I2DRepresentation[]>();
                 // gdiResources = new GDIResources(); GDIResources bitte eliminieren
                 ColorSetting cs = Settings.GlobalSettings.GetValue("Select.SelectColor") as ColorSetting;
@@ -344,12 +334,6 @@ namespace CADability
                     projection.Precision = model.Extent.Size / 1000;
                 }
 
-                // alle Objekt müssen sich hier melden
-                for (int i = 0; i < model.Count; ++i)
-                {
-                    IGeoObject go = model[i];
-                    Add(go);
-                }
                 //TODO: OnSettingChanged wird nicht richtig abgemeldet, führt daher zu memory leaks, deshalb z.Z. deaktiviert
                 Settings.GlobalSettings.SettingChangedEvent -= new SettingChangedDelegate(OnSettingChanged);
                 //Settings.GlobalSettings.SettingChangedEvent += new SettingChangedDelegate(OnSettingChanged);
@@ -1250,6 +1234,21 @@ namespace CADability
             if (model.octTree == null) return res; // hier ggf. lineare Suche...
             res.AddRange(model.octTree.GetObjectsFromRect(this.projection, pickrect, false));
             return res;
+        }
+        /// <summary>
+        /// Connects this projected model to the events of the model and of all its objects, once: the constructor and
+        /// <see cref="Connect(IPaintTo3D)"/> both call it. Connecting twice made every change of an object raise
+        /// <see cref="NeedsRepaintEvent"/> twice and every event of the model be handled twice.
+        /// </summary>
+        private void ConnectEvents()
+        {
+            if (eventsConnected) return;
+            eventsConnected = true;
+            model.GeoObjectAddedEvent += new CADability.Model.GeoObjectAdded(GeoObjectAddedEvent);
+            model.GeoObjectRemovedEvent += new CADability.Model.GeoObjectRemoved(GeoObjectRemovedEvent);
+            model.ExtentChangedEvent += new Model.ExtentChangedDelegate(OnModelExtentChanged);
+            model.NewDisplaylistAvailableEvent += new Model.NewDisplaylistAvailableDelegate(OnNewDisplaylistAvailable);
+            for (int i = 0; i < model.Count; ++i) Add(model[i]);
         }
         private void Add(IGeoObject go)
         {
